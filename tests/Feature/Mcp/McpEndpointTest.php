@@ -95,6 +95,7 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_database',
         'list_services',
         'get_service',
+        'control',
     );
     expect($toolNames)->not->toContain('get_resource_status');
 });
@@ -203,3 +204,60 @@ test('MCP rejects token when user no longer belongs to token team', function () 
 
     $response->assertUnauthorized();
 });
+
+test('control tool rejects call when token lacks deploy permission', function () {
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $response = mcpCallTool($token, 'control', [
+        'resource' => 'application',
+        'action' => 'start',
+        'uuid' => 'some-uuid',
+    ]);
+    $response->assertOk();
+
+    expect($response->json('result.isError'))->toBeTrue();
+    expect($response->json('result.content.0.text'))->toContain('Missing required permissions');
+});
+
+test('control tool rejects call when resource is not found or team mismatch', function () {
+    $token = $this->user->createToken('mcp-deploy', ['deploy'])->plainTextToken;
+
+    $response = mcpCallTool($token, 'control', [
+        'resource' => 'application',
+        'action' => 'start',
+        'uuid' => 'some-invalid-uuid',
+    ]);
+    $response->assertOk();
+
+    expect($response->json('result.isError'))->toBeTrue();
+    expect($response->json('result.content.0.text'))->toContain('not found or access denied');
+});
+
+test('control tool queues application start', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = \App\Models\StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = \App\Models\Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'status' => 'exited',
+    ]);
+
+    $token = $this->user->createToken('mcp-deploy', ['deploy'])->plainTextToken;
+
+    $response = mcpCallTool($token, 'control', [
+        'resource' => 'application',
+        'action' => 'start',
+        'uuid' => $application->uuid,
+    ]);
+    $response->assertOk();
+
+    $body = mcpToolJson($response);
+    expect($body['data']['message'])->toBe('Deployment request queued.');
+    expect($body['data'])->toHaveKey('deployment_uuid');
+});
+
