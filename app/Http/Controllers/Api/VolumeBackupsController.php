@@ -13,6 +13,7 @@ use App\Models\Service;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\MessageBag;
 use OpenApi\Attributes as OA;
 use RuntimeException;
 
@@ -161,6 +162,26 @@ class VolumeBackupsController extends Controller
             return response()->json(['message' => 'Storage not found.'], 404);
         }
 
+        ['errors' => $errors, 's3Storage' => $s3Storage, 'saveToS3' => $saveToS3] = $this->validateUpsertRequest($request, $storage, $teamId);
+
+        if ($errors->isNotEmpty()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        return $this->persistSchedule($request, $storage, $teamId, $s3Storage, $saveToS3, $resourceType, $resource);
+    }
+
+    /**
+     * @return array{errors: MessageBag, s3Storage: S3Storage|null, saveToS3: bool}
+     */
+    private function validateUpsertRequest(
+        Request $request,
+        LocalPersistentVolume|LocalFileVolume $storage,
+        int|string $teamId,
+    ): array {
         $validator = customApiValidator($request->all(), [
             'frequency' => 'required|string|max:255',
             'enabled' => 'boolean',
@@ -223,13 +244,22 @@ class VolumeBackupsController extends Controller
             $errors->add('storage_uuid', 'Only directory file storages can be backed up.');
         }
 
-        if ($errors->isNotEmpty()) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $errors,
-            ], 422);
-        }
+        return [
+            'errors' => $errors,
+            's3Storage' => $s3Storage,
+            'saveToS3' => $saveToS3,
+        ];
+    }
 
+    private function persistSchedule(
+        Request $request,
+        LocalPersistentVolume|LocalFileVolume $storage,
+        int|string $teamId,
+        ?S3Storage $s3Storage,
+        bool $saveToS3,
+        string $resourceType,
+        Model $resource,
+    ): JsonResponse {
         $backup = $storage->scheduledBackups()->updateOrCreate([], [
             'team_id' => $teamId,
             'frequency' => $request->string('frequency')->toString(),

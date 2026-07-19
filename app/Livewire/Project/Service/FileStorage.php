@@ -84,7 +84,24 @@ class FileStorage extends Component
         $this->hasEnabledBackup = $backup?->enabled ?? false;
         $this->backupUrl = null;
 
-        if (! $this->hasEnabledBackup || ! $this->resource instanceof Application) {
+        if (! $this->hasEnabledBackup) {
+            return;
+        }
+
+        if ($this->resource instanceof ServiceDatabase) {
+            $this->backupUrl = route('project.service.database.backups', [
+                'project_uuid' => $this->resource->service->project()->uuid,
+                'environment_uuid' => $this->resource->service->environment->uuid,
+                'service_uuid' => $this->resource->service->uuid,
+                'stack_service_uuid' => $this->resource->uuid,
+            ]);
+
+            return;
+        }
+
+        if (! $this->resource instanceof Application) {
+            $this->hasEnabledBackup = false;
+
             return;
         }
 

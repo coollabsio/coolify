@@ -10,13 +10,14 @@
 <form wire:submit="save" class="flex flex-col gap-4">
     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <h2>S3</h2>
-        <x-forms.button type="submit" class="w-full sm:w-auto">Save</x-forms.button>
+        <x-forms.button type="submit" class="w-full sm:w-auto" canGate="update"
+            :canResource="$backup">Save</x-forms.button>
         @if (!$saveToS3)
             <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
-                wire:target="toggleS3" isHighlighted>Enable S3</x-forms.button>
+                wire:target="toggleS3" isHighlighted canGate="update" :canResource="$backup">Enable S3</x-forms.button>
         @else
             <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
-                wire:target="toggleS3">Disable S3</x-forms.button>
+                wire:target="toggleS3" canGate="update" :canResource="$backup">Disable S3</x-forms.button>
         @endif
     </div>
 
@@ -29,7 +30,8 @@
                 <x-highlighted text="*" />
             @endif
         </div>
-        <x-forms.select id="s3StorageId" wire:model.live="s3StorageId" :required="$saveToS3">
+        <x-forms.select id="s3StorageId" wire:model.live="s3StorageId" :required="$saveToS3" canGate="update"
+            :canResource="$backup">
             @foreach ($availableS3Storages as $s3Storage)
                 <option value="{{ $s3Storage->id }}">{{ $s3Storage->name }}</option>
             @endforeach
@@ -39,10 +41,12 @@
     <div class="w-full max-w-md">
         @if ($saveToS3)
             <x-forms.checkbox instantSave id="disableLocalBackup" label="Disable Local Backup"
-                helper="When enabled, backup files are deleted locally after a successful S3 upload." />
+                helper="When enabled, backup files are deleted locally after a successful S3 upload." canGate="update"
+                :canResource="$backup" />
         @else
             <x-forms.checkbox id="disableLocalBackup" label="Disable Local Backup"
-                helper="When enabled, backup files are deleted locally after a successful S3 upload." disabled />
+                helper="When enabled, backup files are deleted locally after a successful S3 upload." disabled
+                canGate="update" :canResource="$backup" />
         @endif
     </div>
 

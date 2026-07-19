@@ -17,6 +17,10 @@ use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
 {
@@ -192,6 +196,41 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server, bool
 
     $foldersToCheck = collect($filenames)->map(fn ($file) => dirname($file))->unique();
     $foldersToCheck->each(fn ($folder) => deleteEmptyBackupFolder($folder, $server));
+}
+
+function streamBackupFromServer(Server $server, string $filename, string $contentType): StreamedResponse
+{
+    $disk = Storage::build([
+        'driver' => 'sftp',
+        'host' => $server->ip,
+        'port' => (int) $server->port,
+        'username' => $server->user,
+        'privateKey' => $server->privateKey->getKeyLocation(),
+        'root' => '/',
+    ]);
+
+    if (! $disk->exists($filename)) {
+        throw new FileNotFoundException($filename);
+    }
+
+    return new StreamedResponse(function () use ($disk, $filename) {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        $stream = $disk->readStream($filename);
+        if ($stream === false || is_null($stream)) {
+            abort(500, 'Failed to open stream for the requested file.');
+        }
+        while (! feof($stream)) {
+            echo fread($stream, 2048);
+            flush();
+        }
+
+        fclose($stream);
+    }, 200, [
+        'Content-Type' => $contentType,
+        'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
+    ]);
 }
 
 function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
@@ -430,8 +469,12 @@ function deleteOldBackupsFromS3($backup): Collection
         ->all();
 
     if (! empty($filesToDelete)) {
-        deleteBackupsS3($filesToDelete, $backup->s3);
-        $processedBackups = $backupsToDelete;
+        try {
+            deleteBackupsS3($filesToDelete, $backup->s3);
+            $processedBackups = $backupsToDelete;
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     return $processedBackups;

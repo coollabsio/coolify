@@ -85,22 +85,26 @@ class Create extends Component
             return;
         }
 
-        $backup = $target->scheduledBackups()->updateOrCreate(
-            [],
-            [
-                'team_id' => currentTeam()->id,
-                'frequency' => $this->frequency,
-                'enabled' => true,
-            ],
-        );
+        try {
+            $backup = $target->scheduledBackups()->updateOrCreate(
+                [],
+                [
+                    'team_id' => currentTeam()->id,
+                    'frequency' => $this->frequency,
+                    'enabled' => true,
+                ],
+            );
 
-        $this->dispatch('success', $backup->wasRecentlyCreated ? 'Scheduled storage backup created.' : 'Scheduled storage backup updated.');
-        $this->redirectRoute('project.application.backup.show', [
-            'project_uuid' => $this->application->project()->uuid,
-            'environment_uuid' => $this->application->environment->uuid,
-            'application_uuid' => $this->application->uuid,
-            'backup_uuid' => $backup->uuid,
-        ], navigate: true);
+            $this->dispatch('success', $backup->wasRecentlyCreated ? 'Scheduled storage backup created.' : 'Scheduled storage backup updated.');
+            redirectRoute($this, 'project.application.backup.show', [
+                'project_uuid' => $this->application->project()->uuid,
+                'environment_uuid' => $this->application->environment->uuid,
+                'application_uuid' => $this->application->uuid,
+                'backup_uuid' => $backup->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function render()

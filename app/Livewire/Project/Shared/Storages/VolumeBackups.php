@@ -9,6 +9,8 @@ use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Routing\Redirector;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -178,13 +180,13 @@ class VolumeBackups extends Component
         $this->dispatch('success', $this->enabled ? 'Storage backups enabled.' : 'Storage backups disabled.');
     }
 
-    public function backupNow()
+    public function backupNow(): Redirector|RedirectResponse|null
     {
         $this->authorize('update', $this->resource);
 
         if (! $this->backup) {
             if (! $this->validateSettings()) {
-                return;
+                return null;
             }
 
             $this->enabled = false;
@@ -202,7 +204,7 @@ class VolumeBackups extends Component
         ]);
     }
 
-    public function delete(?string $password = null, array $selectedActions = [])
+    public function delete(?string $password = null, array $selectedActions = []): bool|string
     {
         $this->authorize('update', $this->resource);
 

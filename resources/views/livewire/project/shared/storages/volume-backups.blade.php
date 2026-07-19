@@ -10,12 +10,12 @@
     @else
         @include('livewire.project.shared.storages.volume-backups.general')
     @endif
-</div>
 
-@script
-<script>
-    window.download_volume_backup_file = function(executionId) {
-        window.open('/download/volume-backup/' + executionId, '_blank');
-    }
-</script>
-@endscript
+    @script
+    <script>
+        window.download_volume_backup_file = function(executionId) {
+            window.open('/download/volume-backup/' + executionId, '_blank');
+        }
+    </script>
+    @endscript
+</div>

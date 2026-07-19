@@ -98,8 +98,7 @@ use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
@@ -389,41 +388,13 @@ Route::middleware(['auth'])->group(function () {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }
 
-            $privateKeyLocation = $server->privateKey->getKeyLocation();
-            $disk = Storage::build([
-                'driver' => 'sftp',
-                'host' => $server->ip,
-                'port' => (int) $server->port,
-                'username' => $server->user,
-                'privateKey' => $privateKeyLocation,
-                'root' => '/',
-            ]);
-            if (! $disk->exists($filename)) {
-                if ($execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
-                    return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
-                }
-
-                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
+            return streamBackupFromServer($server, $filename, 'application/octet-stream');
+        } catch (FileNotFoundException) {
+            if (isset($execution) && $execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
+                return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
             }
 
-            return new StreamedResponse(function () use ($disk, $filename) {
-                if (ob_get_level()) {
-                    ob_end_clean();
-                }
-                $stream = $disk->readStream($filename);
-                if ($stream === false || is_null($stream)) {
-                    abort(500, 'Failed to open stream for the requested file.');
-                }
-                while (! feof($stream)) {
-                    echo fread($stream, 2048);
-                    flush();
-                }
-
-                fclose($stream);
-            }, 200, [
-                'Content-Type' => 'application/octet-stream',
-                'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
-            ]);
+            return response()->json(['message' => 'Backup not found locally on the server.'], 404);
         } catch (Throwable $e) {
             return response()->json(['message' => 'Failed to download backup.'], 500);
         }
@@ -455,37 +426,9 @@ Route::middleware(['auth'])->group(function () {
                 return response()->json(['message' => 'Server not found.'], 404);
             }
 
-            $filename = $execution->filename;
-            $disk = Storage::build([
-                'driver' => 'sftp',
-                'host' => $server->ip,
-                'port' => (int) $server->port,
-                'username' => $server->user,
-                'privateKey' => $server->privateKey->getKeyLocation(),
-                'root' => '/',
-            ]);
-            if (! $disk->exists($filename)) {
-                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
-            }
-
-            return new StreamedResponse(function () use ($disk, $filename) {
-                if (ob_get_level()) {
-                    ob_end_clean();
-                }
-                $stream = $disk->readStream($filename);
-                if ($stream === false || is_null($stream)) {
-                    abort(500, 'Failed to open stream for the requested file.');
-                }
-                while (! feof($stream)) {
-                    echo fread($stream, 2048);
-                    flush();
-                }
-
-                fclose($stream);
-            }, 200, [
-                'Content-Type' => 'application/gzip',
-                'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
-            ]);
+            return streamBackupFromServer($server, $execution->filename, 'application/gzip');
+        } catch (FileNotFoundException) {
+            return response()->json(['message' => 'Backup not found locally on the server.'], 404);
         } catch (Throwable) {
             return response()->json(['message' => 'Failed to download backup.'], 500);
         }

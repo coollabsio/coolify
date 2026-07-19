@@ -19,11 +19,15 @@ use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Routing\Redirector;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +47,12 @@ it('provides the volume backup domain classes and relationship', function () {
         ->and(class_exists(VolumeBackups::class))->toBeTrue()
         ->and(method_exists(LocalPersistentVolume::class, 'scheduledBackups'))->toBeTrue()
         ->and(method_exists(LocalFileVolume::class, 'scheduledBackups'))->toBeTrue();
+});
+
+it('keeps the volume backup script inside the Livewire root element', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups.blade.php'));
+
+    expect(strrpos($view, '@endscript'))->toBeLessThan(strrpos($view, '</div>'));
 });
 
 it('targets named volumes and application directory mounts through one backup relation', function () {
@@ -115,6 +125,59 @@ it('creates a scheduled backup with a preselected volume from the shared modal',
         ->and($backup->enabled)->toBeTrue()
         ->and($backup->save_s3)->toBeFalse()
         ->and($backup->s3_storage_id)->toBeNull();
+});
+
+it('handles scheduled backup persistence failures', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $shouldFail = true;
+
+    ScheduledVolumeBackup::creating(function () use (&$shouldFail): void {
+        if ($shouldFail) {
+            $shouldFail = false;
+
+            throw new RuntimeException('Scheduled backup persistence failed.');
+        }
+    });
+
+    Livewire::test(CreateScheduledVolumeBackup::class, [
+        'application' => $application,
+        'selectedTargetKey' => 'volume:'.$volume->id,
+    ])
+        ->set('frequency', 'daily')
+        ->call('submit')
+        ->assertDispatched('error', 'Scheduled backup persistence failed.');
+
+    expect(ScheduledVolumeBackup::query()->count())->toBe(0);
+});
+
+it('respects the instance wire navigate setting after creating a scheduled backup', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::create([
+        'id' => 0,
+        'is_wire_navigate_enabled' => false,
+    ]));
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+
+    $component = Livewire::test(CreateScheduledVolumeBackup::class, [
+        'application' => $application,
+        'selectedTargetKey' => 'volume:'.$volume->id,
+    ])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledVolumeBackup::query()->sole();
+
+    $component->assertRedirectToRoute('project.application.backup.show', [
+        'project_uuid' => $application->project()->uuid,
+        'environment_uuid' => $application->environment->uuid,
+        'application_uuid' => $application->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
+    expect($component->effects)->not->toHaveKey('redirectUsingNavigate');
 });
 
 it('creates a scheduled backup for a preselected application directory', function () {
@@ -411,6 +474,49 @@ it('offers backup configuration and status on application directory mounts', fun
         ->assertSee('href="'.$backupUrl.'"', false);
 });
 
+it('links the backup enabled badge to service database backups for database directory mounts', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application] = createVolumeBackupApplication($team);
+    $service = Service::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ]);
+    $database = ServiceDatabase::create([
+        'uuid' => new_public_id(),
+        'name' => 'postgres',
+        'image' => 'postgres:17-alpine',
+        'service_id' => $service->id,
+    ]);
+    $directory = LocalFileVolume::unguarded(fn () => LocalFileVolume::withoutEvents(fn () => LocalFileVolume::create([
+        'uuid' => new_public_id(),
+        'fs_path' => './postgres-data',
+        'mount_path' => '/var/lib/postgresql/data',
+        'is_directory' => true,
+        'is_based_on_git' => false,
+        'is_preview_suffix_enabled' => true,
+        'resource_id' => $database->id,
+        'resource_type' => $database->getMorphClass(),
+    ])));
+    $directory->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'enabled' => true,
+    ]);
+
+    $backupUrl = route('project.service.database.backups', [
+        'project_uuid' => $application->project()->uuid,
+        'environment_uuid' => $application->environment->uuid,
+        'service_uuid' => $service->uuid,
+        'stack_service_uuid' => $database->uuid,
+    ]);
+
+    Livewire::test(FileStorage::class, ['fileStorage' => $directory])
+        ->assertSee('Backup enabled')
+        ->assertSee('href="'.$backupUrl.'"', false);
+});
+
 it('prevents a backed up directory from being converted or deleted', function () {
     Process::fake();
     $team = Team::factory()->create();
@@ -482,6 +588,20 @@ it('exposes actions to manage and run volume backups', function () {
         ->and(method_exists(VolumeBackups::class, 'cleanupFailed'))->toBeTrue()
         ->and(method_exists(VolumeBackups::class, 'cleanupDeleted'))->toBeTrue()
         ->and(method_exists(VolumeBackups::class, 'deleteBackup'))->toBeTrue();
+});
+
+it('declares the volume backup action return types', function () {
+    $backupNowReturnType = (new ReflectionMethod(VolumeBackups::class, 'backupNow'))->getReturnType();
+    $deleteReturnType = (new ReflectionMethod(VolumeBackups::class, 'delete'))->getReturnType();
+
+    expect($backupNowReturnType)->toBeInstanceOf(ReflectionUnionType::class)
+        ->and(collect($backupNowReturnType->getTypes())->map->getName()->all())->toEqualCanonicalizing([
+            RedirectResponse::class,
+            Redirector::class,
+            'null',
+        ])
+        ->and($deleteReturnType)->toBeInstanceOf(ReflectionUnionType::class)
+        ->and(collect($deleteReturnType->getTypes())->map->getName()->all())->toEqualCanonicalizing(['bool', 'string']);
 });
 
 it('renders volume backup executions like database backup executions', function () {
