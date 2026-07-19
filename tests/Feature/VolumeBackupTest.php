@@ -2010,6 +2010,34 @@ it('dispatches due scheduled directory backups', function () {
     );
 });
 
+it('retains scheduled volume backups and archive metadata when the server is missing', function () {
+    config(['constants.coolify.self_hosted' => true]);
+    Queue::fake();
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => '* * * * *',
+        'enabled' => true,
+    ]);
+    $execution = ScheduledVolumeBackupExecution::create([
+        'scheduled_volume_backup_id' => $backup->id,
+        'status' => 'success',
+        'filename' => '/data/coolify/backups/volumes/test/archive.tar.gz',
+    ]);
+    $application->update([
+        'destination_id' => null,
+        'destination_type' => null,
+    ]);
+
+    (new ScheduledJobManager)->handle();
+
+    expect($backup->fresh())->not->toBeNull()
+        ->and($execution->fresh())->not->toBeNull()
+        ->and($execution->fresh()->filename)->toBe('/data/coolify/backups/volumes/test/archive.tar.gz');
+    Queue::assertNotPushed(VolumeBackupJob::class);
+});
+
 it('dispatches pending recovery without starting another volume backup', function () {
     config(['constants.coolify.self_hosted' => true]);
     Queue::fake();

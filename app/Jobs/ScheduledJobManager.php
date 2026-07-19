@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
@@ -397,10 +398,20 @@ class ScheduledJobManager implements ShouldQueue
                 return;
             }
 
-            if (! $backup->backupable || ! $server) {
-                $backup->delete();
+            if (! $backup->backupable) {
+                DeleteScheduledVolumeBackup::run($backup, $server);
                 $this->skippedCount++;
                 $this->logSkip('volume_backup', 'resource_deleted', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                ]);
+
+                return;
+            }
+
+            if (! $server) {
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'server_missing', [
                     'backup_id' => $backup->id,
                     'team_id' => $backup->team_id,
                 ]);
