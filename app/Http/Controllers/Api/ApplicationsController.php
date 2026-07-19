@@ -3849,9 +3849,9 @@ class ApplicationsController extends Controller
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Start',
-        description: 'Start application. `Post` request is also accepted.',
+        description: 'Start application.',
         path: '/applications/{uuid}/start',
         operationId: 'start-application-by-uuid',
         security: [
@@ -3973,9 +3973,9 @@ class ApplicationsController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Stop',
-        description: 'Stop application. `Post` request is also accepted.',
+        description: 'Stop application.',
         path: '/applications/{uuid}/stop',
         operationId: 'stop-application-by-uuid',
         security: [
@@ -4066,9 +4066,9 @@ class ApplicationsController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Restart',
-        description: 'Restart application. `Post` request is also accepted.',
+        description: 'Restart application.',
         path: '/applications/{uuid}/restart',
         operationId: 'restart-application-by-uuid',
         security: [
