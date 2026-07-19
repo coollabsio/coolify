@@ -1,0 +1,23 @@
+# documentation: https://bettermq.com
+# slogan: betterMQ is an open-source self-hosted HTTP message broker — durable enqueue and signed webhook push delivery.
+# category: messaging
+# tags: message broker, message queue, webhook, http, jobs, durable, open source, mq
+# logo: svgs/bettermq.svg
+# port: 8080
+
+services:
+  bettermq:
+    image: ghcr.io/bettermq/bettermq:0.4.0
+    environment:
+      - SERVICE_URL_BETTERMQ_8080
+      # Set to 1 if webhook destinations are on private Docker networks / loopback (not for public internet).
+      - BETTERMQ_ALLOW_PRIVATE_DESTINATIONS=${BETTERMQ_ALLOW_PRIVATE_DESTINATIONS:-0}
+    volumes:
+      - bettermq-data:/data
+    command: ["serve", "--data-dir", "/data"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
