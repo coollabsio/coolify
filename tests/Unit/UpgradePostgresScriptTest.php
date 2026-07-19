@@ -44,24 +44,22 @@ it('downloads postgres upgrade script during install and upgrade without auto-ru
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
-it('generates a dedicated flux laravel api token during install and upgrade', function (string $path) {
-    $script = file_get_contents(getcwd().'/'.$path);
+it('does not provision a flux laravel api token before v5 production activation', function (string $path) {
+    $source = file_get_contents(getcwd().'/'.$path);
 
-    expect($script)
-        ->toContain('update_env_var "COOLIFY_FLUX_LARAVEL_API_TOKEN" "$(openssl rand -hex 32)"');
+    expect($source)->not->toContain('COOLIFY_FLUX_LARAVEL_API_TOKEN');
 })->with([
+    'production env' => '.env.production',
     'stable install' => 'scripts/install.sh',
     'nightly install' => 'other/nightly/install.sh',
     'stable upgrade' => 'scripts/upgrade.sh',
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
-it('creates a writable flux storage directory during install and upgrade', function (string $path) {
-    $script = file_get_contents(getcwd().'/'.$path);
+it('does not provision flux storage before v5 production activation', function (string $path) {
+    $source = file_get_contents(getcwd().'/'.$path);
 
-    expect($script)
-        ->toContain('/data/coolify/flux')
-        ->toContain('chown -R 9999:root /data/coolify/flux');
+    expect($source)->not->toContain('/data/coolify/flux');
 })->with([
     'stable install' => 'scripts/install.sh',
     'nightly install' => 'other/nightly/install.sh',

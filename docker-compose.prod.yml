@@ -18,7 +18,6 @@ services:
       - PHP_FPM_PM_START_SERVERS=${PHP_FPM_PM_START_SERVERS:-1}
       - PHP_FPM_PM_MIN_SPARE_SERVERS=${PHP_FPM_PM_MIN_SPARE_SERVERS:-1}
       - PHP_FPM_PM_MAX_SPARE_SERVERS=${PHP_FPM_PM_MAX_SPARE_SERVERS:-10}
-      - COOLIFY_CONTAINER_ROLE=${COOLIFY_CONTAINER_ROLE:-all}
     env_file:
       - /data/coolify/source/.env
     ports:

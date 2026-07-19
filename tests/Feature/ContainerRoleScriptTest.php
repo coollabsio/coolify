@@ -33,9 +33,16 @@ it('falls back to the container role from the local env file', function () {
     expect($result->successful())->toBeTrue();
 });
 
-it('keeps production and development role helpers in sync', function () {
-    expect(file_get_contents(base_path('docker/production/etc/s6-overlay/scripts/container-role')))
-        ->toBe(file_get_contents(base_path('docker/development/etc/s6-overlay/scripts/container-role')));
+it('keeps container roles out of the production image', function () {
+    expect(base_path('docker/production/etc/s6-overlay/scripts/container-role'))->not->toBeFile();
+
+    foreach (['horizon', 'nightwatch-agent', 'scheduler-worker'] as $service) {
+        $runScript = file_get_contents(base_path("docker/production/etc/s6-overlay/s6-rc.d/{$service}/run"));
+
+        expect($runScript)
+            ->not->toContain('container-role')
+            ->not->toContain('COOLIFY_CONTAINER_ROLE');
+    }
 });
 
 function runContainerRoleHelper(string $roles, string $serviceRole, ?string $workingDirectory = null): ProcessResult
@@ -61,17 +68,15 @@ it('does not register a separate v5 flux status listener service', function () {
     }
 });
 
-it('configures flux to publish v5 resource statuses to laravel over local http by default', function () {
-    foreach (['development', 'production'] as $environment) {
-        $runScript = file_get_contents(base_path("docker/{$environment}/etc/s6-overlay/s6-rc.d/flux/run"));
+it('configures development flux to publish v5 resource statuses to laravel over local http by default', function () {
+    $runScript = file_get_contents(base_path('docker/development/etc/s6-overlay/s6-rc.d/flux/run'));
 
-        expect($runScript)
-            ->toContain('COOLIFY_FLUX_LARAVEL_API_URL')
-            ->toContain('http://127.0.0.1:8080')
-            ->toContain('COOLIFY_FLUX_LARAVEL_API_TOKEN')
-            ->not->toContain('APP_KEY')
-            ->not->toContain("grep -E '^APP_KEY=' .env")
-            ->not->toContain('COOLIFY_FLUX_REDIS_URL')
-            ->not->toContain('COOLIFY_FLUX_RESOURCE_STATUS_CHANNEL');
-    }
+    expect($runScript)
+        ->toContain('COOLIFY_FLUX_LARAVEL_API_URL')
+        ->toContain('http://127.0.0.1:8080')
+        ->toContain('COOLIFY_FLUX_LARAVEL_API_TOKEN')
+        ->not->toContain('APP_KEY')
+        ->not->toContain("grep -E '^APP_KEY=' .env")
+        ->not->toContain('COOLIFY_FLUX_REDIS_URL')
+        ->not->toContain('COOLIFY_FLUX_RESOURCE_STATUS_CHANNEL');
 });
