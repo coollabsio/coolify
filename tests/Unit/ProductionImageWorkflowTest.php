@@ -32,3 +32,15 @@ it('only promotes stable releases to latest', function () {
         ->toContain('if: ${{ ! github.event.release.prerelease }}')
         ->toContain('--tag "${IMAGE}:latest"');
 });
+
+it('documents the sha image release process', function () {
+    $releaseGuide = file_get_contents(dirname(__DIR__, 2).'/RELEASE.md');
+
+    expect($releaseGuide)
+        ->toContain('Merge the release commit into `v4.x`')
+        ->toContain('`sha-<commit-sha>`')
+        ->toContain('targeting the exact commit that produced the SHA image')
+        ->toContain('promotes the existing SHA image without rebuilding it')
+        ->toContain('Update the CDN')
+        ->not->toContain('Merging to `main`');
+});

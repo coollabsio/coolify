@@ -15,20 +15,35 @@ This guide outlines the release process for Coolify, intended for developers and
 
 ## Release Process
 
-1. **Development on `next` or Feature Branches**
-   - Improvements, fixes, and new features are developed on the `next` branch or separate feature branches.
+1. **Prepare the Release**
+   - Develop changes on `next` or feature branches.
+   - Set the release version in `config/constants.php` and `versions.json`. Both values must match the planned Git tag without the `v` prefix (for example, `4.2.0` for tag `v4.2.0`).
+   - Verify the changelog and required tests before merging.
 
-2. **Merging to `main`**
-   - Once ready, changes are merged from the `next` branch into the `main` branch (via a pull request).
+2. **Build the Release Commit**
+   - Merge the release commit into `v4.x` through a pull request.
+   - The `Production Build (v4)` workflow builds AMD64 and ARM64 images and publishes them to Docker Hub and GHCR using immutable architecture tags.
+   - After both builds complete, the workflow creates the multi-architecture `sha-<commit-sha>` manifest in both registries.
+   - This workflow does not update a semantic version tag or `latest`.
 
-3. **Building the Release**
-   - After merging to `main`, GitHub Actions automatically builds release images for all architectures and pushes them to the GitHub Container Registry and Docker Hub with the specific version tag and the `latest` tag.
+3. **Wait for the SHA Image**
+   - Confirm the complete `Production Build (v4)` workflow, including its `merge-manifest` job, succeeded.
+   - Do not publish the release before the multi-architecture SHA image exists in both registries.
 
-4. **Creating a GitHub Release**
-   - A new GitHub release is manually created with details of the changes made in the version.
+4. **Create and Publish the GitHub Release**
+   - Create a GitHub release with a semantic version tag such as `v4.2.0`, targeting the exact commit that produced the SHA image.
+   - Mark beta or other test releases as prereleases. Publish production versions as stable releases.
+   - Publishing the release starts the `Release Coolify` workflow. It verifies that the Git tag matches `config/constants.php`, then promotes the existing SHA image without rebuilding it.
+   - The workflow assigns the semantic version tag in Docker Hub and GHCR. Stable releases also update `latest`; prereleases do not.
 
-5. **Updating the CDN**
-   - To make a new version publicly available, the version information on the CDN needs to be updated manually. After that the new version number will be available at [https://cdn.coollabs.io/coolify/versions.json](https://cdn.coollabs.io/coolify/versions.json).
+5. **Verify the Promotion**
+   - Confirm the `Release Coolify` workflow succeeded.
+   - Verify the semantic version image has the same manifest digest as `sha-<commit-sha>` in Docker Hub and GHCR.
+   - For stable releases, also verify `latest` points to the promoted release manifest.
+
+6. **Update the CDN**
+   - To make a new version available to self-hosted instances, update the version information on the CDN manually.
+   - Confirm the new version is available at [https://cdn.coollabs.io/coolify/versions.json](https://cdn.coollabs.io/coolify/versions.json).
 
 > [!NOTE]
 > The CDN update may not occur immediately after the GitHub release. It can take hours or even days due to additional testing, stability checks, or potential hotfixes. **The update becomes available only after the CDN is updated. After the CDN is updated, a discord announcement will be made in the Production Release channel.**
@@ -36,7 +51,7 @@ This guide outlines the release process for Coolify, intended for developers and
 ## Version Types
 
 <details>
-  <summary><strong>Stable (coming soon)</strong></summary>
+  <summary><strong>Stable</strong></summary>
 
 - **Stable**
   - The production version suitable for stable, production environments (recommended).
