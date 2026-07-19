@@ -1970,9 +1970,9 @@ class ServicesController extends Controller
         return moveResourceToEnvironment($request, $service, 'Service', $teamId);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Start',
-        description: 'Start service. `Post` request is also accepted.',
+        description: 'Start service.',
         path: '/services/{uuid}/start',
         operationId: 'start-service-by-uuid',
         security: [
@@ -2056,9 +2056,9 @@ class ServicesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Stop',
-        description: 'Stop service. `Post` request is also accepted.',
+        description: 'Stop service.',
         path: '/services/{uuid}/stop',
         operationId: 'stop-service-by-uuid',
         security: [
@@ -2154,9 +2154,9 @@ class ServicesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Restart',
-        description: 'Restart service. `Post` request is also accepted.',
+        description: 'Restart service.',
         path: '/services/{uuid}/restart',
         operationId: 'restart-service-by-uuid',
         security: [

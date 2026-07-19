@@ -3,12 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
 
 class OtherController extends Controller
 {
+    public function post_required(): JsonResponse
+    {
+        return response()
+            ->json(['message' => 'This endpoint has changed to a POST request.'], 405)
+            ->header('Allow', 'POST');
+    }
+
     #[OA\Get(
         summary: 'Version',
         description: 'Get Coolify version.',
@@ -41,7 +49,7 @@ class OtherController extends Controller
         return response(config('constants.coolify.version'));
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Enable API',
         description: 'Enable API (only with root permissions).',
         path: '/enable',
@@ -97,7 +105,7 @@ class OtherController extends Controller
         return response()->json(['message' => 'API enabled.'], 200);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Disable API',
         description: 'Disable API (only with root permissions).',
         path: '/disable',

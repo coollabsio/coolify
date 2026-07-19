@@ -8,6 +8,7 @@ use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -887,7 +888,7 @@ class ServersController extends Controller
         return response()->json(['message' => 'Server deleted.']);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Validate',
         description: 'Validate server by UUID.',
         path: '/servers/{uuid}/validate',
@@ -899,6 +900,19 @@ class ServersController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(
+                        property: 'install',
+                        description: 'Install missing prerequisites and Docker. This can restart the Docker daemon.',
+                        type: 'boolean',
+                        default: false,
+                    ),
+                ],
+            ),
+        ),
         responses: [
             new OA\Response(
                 response: 201,
@@ -948,14 +962,33 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $this->authorize('update', $server);
-        ValidateServer::dispatch($server);
+
+        $validator = customApiValidator($request->all(), [
+            'install' => 'boolean',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $install = $request->boolean('install', false);
+        if ($install) {
+            ValidateAndInstallServerJob::dispatch($server);
+        } else {
+            ValidateServer::dispatch($server);
+        }
 
         auditLog('api.server.validated', [
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
+            'install' => $install,
         ]);
 
-        return response()->json(['message' => 'Validation started.'], 201);
+        $message = $install ? 'Validation and installation started.' : 'Validation started.';
+
+        return response()->json(['message' => $message], 201);
     }
 }

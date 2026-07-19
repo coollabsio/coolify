@@ -3535,12 +3535,12 @@
             }
         },
         "\/applications\/{uuid}\/start": {
-            "get": {
+            "post": {
                 "tags": [
                     "Applications"
                 ],
                 "summary": "Start",
-                "description": "Start application. `Post` request is also accepted.",
+                "description": "Start application.",
                 "operationId": "start-application-by-uuid",
                 "parameters": [
                     {
@@ -3612,12 +3612,12 @@
             }
         },
         "\/applications\/{uuid}\/stop": {
-            "get": {
+            "post": {
                 "tags": [
                     "Applications"
                 ],
                 "summary": "Stop",
-                "description": "Stop application. `Post` request is also accepted.",
+                "description": "Stop application.",
                 "operationId": "stop-application-by-uuid",
                 "parameters": [
                     {
@@ -3674,12 +3674,12 @@
             }
         },
         "\/applications\/{uuid}\/restart": {
-            "get": {
+            "post": {
                 "tags": [
                     "Applications"
                 ],
                 "summary": "Restart",
-                "description": "Restart application. `Post` request is also accepted.",
+                "description": "Restart application.",
                 "operationId": "restart-application-by-uuid",
                 "parameters": [
                     {
@@ -7034,12 +7034,12 @@
             }
         },
         "\/databases\/{uuid}\/start": {
-            "get": {
+            "post": {
                 "tags": [
                     "Databases"
                 ],
                 "summary": "Start",
-                "description": "Start database. `Post` request is also accepted.",
+                "description": "Start database.",
                 "operationId": "start-database-by-uuid",
                 "parameters": [
                     {
@@ -7087,12 +7087,12 @@
             }
         },
         "\/databases\/{uuid}\/stop": {
-            "get": {
+            "post": {
                 "tags": [
                     "Databases"
                 ],
                 "summary": "Stop",
-                "description": "Stop database. `Post` request is also accepted.",
+                "description": "Stop database.",
                 "operationId": "stop-database-by-uuid",
                 "parameters": [
                     {
@@ -7149,12 +7149,12 @@
             }
         },
         "\/databases\/{uuid}\/restart": {
-            "get": {
+            "post": {
                 "tags": [
                     "Databases"
                 ],
                 "summary": "Restart",
-                "description": "Restart database. `Post` request is also accepted.",
+                "description": "Restart database.",
                 "operationId": "restart-database-by-uuid",
                 "parameters": [
                     {
@@ -8256,12 +8256,12 @@
             }
         },
         "\/deploy": {
-            "get": {
+            "post": {
                 "tags": [
                     "Deployments"
                 ],
                 "summary": "Deploy",
-                "description": "Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.",
+                "description": "Deploy by tag or UUID using query parameters or a JSON body.",
                 "operationId": "deploy-by-tag-or-uuid",
                 "parameters": [
                     {
@@ -10103,7 +10103,7 @@
             }
         },
         "\/enable": {
-            "get": {
+            "post": {
                 "summary": "Enable API",
                 "description": "Enable API (only with root permissions).",
                 "operationId": "enable-api",
@@ -10155,7 +10155,7 @@
             }
         },
         "\/disable": {
-            "get": {
+            "post": {
                 "summary": "Disable API",
                 "description": "Disable API (only with root permissions).",
                 "operationId": "disable-api",
@@ -12376,7 +12376,7 @@
             }
         },
         "\/servers\/{uuid}\/validate": {
-            "get": {
+            "post": {
                 "tags": [
                     "Servers"
                 ],
@@ -12394,6 +12394,23 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "install": {
+                                        "description": "Install missing prerequisites and Docker. This can restart the Docker daemon.",
+                                        "type": "boolean",
+                                        "default": false
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "201": {
                         "description": "Server validation started.",
@@ -12804,85 +12821,6 @@
             }
         },
         "\/services\/{uuid}\/applications\/{app_uuid}\/start": {
-            "get": {
-                "tags": [
-                    "Service applications"
-                ],
-                "summary": "Start or redeploy service application container",
-                "description": "Runs docker compose up for a single compose service (no-deps), optionally pulling the image and rebuilding.",
-                "operationId": "start-service-application-by-service-and-app-uuid",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "description": "Service UUID.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "app_uuid",
-                        "in": "path",
-                        "description": "Service application UUID.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "force",
-                        "in": "query",
-                        "description": "When true, passes --build to docker compose up.",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean",
-                            "default": false
-                        }
-                    },
-                    {
-                        "name": "latest",
-                        "in": "query",
-                        "description": "When true, pulls the image for this compose service before up.",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean",
-                            "default": false
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Deploy request queued.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "501": {
-                        "description": "Swarm not supported."
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
             "post": {
                 "tags": [
                     "Service applications"
@@ -12963,65 +12901,6 @@
             }
         },
         "\/services\/{uuid}\/applications\/{app_uuid}\/restart": {
-            "get": {
-                "tags": [
-                    "Service applications"
-                ],
-                "summary": "Restart service application container",
-                "description": "Restarts a single compose service container (docker restart).",
-                "operationId": "restart-service-application-by-service-and-app-uuid",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "description": "Service UUID.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "app_uuid",
-                        "in": "path",
-                        "description": "Service application UUID.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Restart queued.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "501": {
-                        "description": "Swarm not supported."
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
             "post": {
                 "tags": [
                     "Service applications"
@@ -13084,65 +12963,6 @@
             }
         },
         "\/services\/{uuid}\/applications\/{app_uuid}\/stop": {
-            "get": {
-                "tags": [
-                    "Service applications"
-                ],
-                "summary": "Stop service application container",
-                "description": "Stops a single compose service container (docker stop).",
-                "operationId": "stop-service-application-by-service-and-app-uuid",
-                "parameters": [
-                    {
-                        "name": "uuid",
-                        "in": "path",
-                        "description": "Service UUID.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "app_uuid",
-                        "in": "path",
-                        "description": "Service application UUID.",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Stop queued.",
-                        "content": {
-                            "application\/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "$ref": "#\/components\/responses\/401"
-                    },
-                    "404": {
-                        "$ref": "#\/components\/responses\/404"
-                    },
-                    "501": {
-                        "description": "Swarm not supported."
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
             "post": {
                 "tags": [
                     "Service applications"
@@ -14797,12 +14617,12 @@
             }
         },
         "\/services\/{uuid}\/start": {
-            "get": {
+            "post": {
                 "tags": [
                     "Services"
                 ],
                 "summary": "Start",
-                "description": "Start service. `Post` request is also accepted.",
+                "description": "Start service.",
                 "operationId": "start-service-by-uuid",
                 "parameters": [
                     {
@@ -14850,12 +14670,12 @@
             }
         },
         "\/services\/{uuid}\/stop": {
-            "get": {
+            "post": {
                 "tags": [
                     "Services"
                 ],
                 "summary": "Stop",
-                "description": "Stop service. `Post` request is also accepted.",
+                "description": "Stop service.",
                 "operationId": "stop-service-by-uuid",
                 "parameters": [
                     {
@@ -14912,12 +14732,12 @@
             }
         },
         "\/services\/{uuid}\/restart": {
-            "get": {
+            "post": {
                 "tags": [
                     "Services"
                 ],
                 "summary": "Restart",
-                "description": "Restart service. `Post` request is also accepted.",
+                "description": "Restart service.",
                 "operationId": "restart-service-by-uuid",
                 "parameters": [
                     {

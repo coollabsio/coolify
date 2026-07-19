@@ -3050,9 +3050,9 @@ class DatabasesController extends Controller
         return moveResourceToEnvironment($request, $database, 'Database', $teamId);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Start',
-        description: 'Start database. `Post` request is also accepted.',
+        description: 'Start database.',
         path: '/databases/{uuid}/start',
         operationId: 'start-database-by-uuid',
         security: [
@@ -3137,9 +3137,9 @@ class DatabasesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Stop',
-        description: 'Stop database. `Post` request is also accepted.',
+        description: 'Stop database.',
         path: '/databases/{uuid}/stop',
         operationId: 'stop-database-by-uuid',
         security: [
@@ -3236,9 +3236,9 @@ class DatabasesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Restart',
-        description: 'Restart database. `Post` request is also accepted.',
+        description: 'Restart database.',
         path: '/databases/{uuid}/restart',
         operationId: 'restart-database-by-uuid',
         security: [

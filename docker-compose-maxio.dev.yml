@@ -96,6 +96,7 @@ services:
     container_name: coolify-vite
     working_dir: /var/www/html
     environment:
+      # Set VITE_HOST in .env to a browser-reachable IP/hostname for LAN/Tailscale access
       VITE_HOST: "${VITE_HOST:-localhost}"
       VITE_PORT: "${VITE_PORT:-5173}"
     ports:

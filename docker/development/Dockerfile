@@ -98,5 +98,8 @@ RUN mkdir -p /etc/nginx/conf.d && \
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
-# Switch to non-root user
-USER www-data
+# Stay as root for s6 init so bind-mounted workspaces work even when the host
+# tree is root-owned (CI, Jean, rootful Docker). PHP-FPM/nginx still run as
+# www-data via their service configs. Do NOT set USER www-data here — that
+# makes init-setup (composer install) fail with "vendor could not be created".
+USER root
