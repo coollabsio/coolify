@@ -91,7 +91,7 @@
                                             ->merge($env->clickhouses ?? collect());
                                         $envResources = collect()
                                             ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
-                                            ->merge($env->v5Applications->map(fn($app) => ['type' => 'v5-application', 'resource' => $app]))
+                                            ->merge(config('v5.enabled') ? $env->v5Applications->map(fn($app) => ['type' => 'v5-application', 'resource' => $app]) : collect())
                                             ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
                                             ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]))
                                             ->sortBy(fn($item) => strtolower($item['resource']->name));
@@ -141,7 +141,7 @@
                                         ->merge($env->clickhouses ?? collect());
                                     $envResources = collect()
                                         ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
-                                        ->merge($env->v5Applications->map(fn($app) => ['type' => 'v5-application', 'resource' => $app]))
+                                        ->merge(config('v5.enabled') ? $env->v5Applications->map(fn($app) => ['type' => 'v5-application', 'resource' => $app]) : collect())
                                         ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
                                         ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]));
                                 @endphp

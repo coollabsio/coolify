@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Flux\AgentTokenIssuer;
+use App\Support\V5\V5Feature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -25,6 +26,12 @@ class V5FluxGenerateKeys extends Command
 
     public function handle(AgentTokenIssuer $agentTokenIssuer): int
     {
+        if (! V5Feature::enabled()) {
+            $this->error('V5 is only available in development environments.');
+
+            return self::FAILURE;
+        }
+
         $privateKeyPath = (string) config('flux.jwt_private_key_path');
         $publicKeyPath = (string) config('flux.jwt_public_key_path');
 

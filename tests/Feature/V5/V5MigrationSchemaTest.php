@@ -7,7 +7,7 @@ beforeEach(function () {
 });
 
 it('reuses existing projects instead of creating v5 projects', function () {
-    expect(file_exists(database_path('migrations/2026_06_04_050157_v5_create_projects_table.php')))->toBeFalse()
+    expect(file_exists(database_path('migrations-v5/2026_06_04_050157_v5_create_projects_table.php')))->toBeFalse()
         ->and(file_exists(app_path('Models/V5/Project.php')))->toBeFalse();
 });
 
@@ -16,10 +16,10 @@ it('creates v5 cluster tables and lets each server belong to one cluster', funct
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
 
     expect(Schema::hasTable('v5_clusters'))->toBeTrue()
@@ -61,10 +61,10 @@ it('creates v5 server tables in the shared database', function () {
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $migration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $migration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $migration->up();
 
     expect(Schema::hasTable('v5_servers'))->toBeTrue()
@@ -109,10 +109,10 @@ it('creates v5 server canvas columns for movable caddy ingress nodes', function 
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
 
     expect(Schema::hasColumns('v5_servers', [
@@ -127,10 +127,10 @@ it('creates v5 server ingress columns', function () {
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
 
     expect(Schema::hasColumns('v5_servers', [
@@ -147,13 +147,13 @@ it('creates v5 application tables for dashboard canvas nodes', function () {
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
 
-    $applicationMigration = include database_path('migrations/2026_06_19_140000_v5_create_applications_table.php');
+    $applicationMigration = include database_path('migrations-v5/2026_06_19_140000_v5_create_applications_table.php');
     $applicationMigration->up();
 
     expect(Schema::hasTable('v5_applications'))->toBeTrue()
@@ -188,13 +188,13 @@ it('creates v5 application domain tables for zero or more inbound routes', funct
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
 
-    $applicationMigration = include database_path('migrations/2026_06_19_140000_v5_create_applications_table.php');
+    $applicationMigration = include database_path('migrations-v5/2026_06_19_140000_v5_create_applications_table.php');
     $applicationMigration->up();
 
     expect(Schema::hasTable('v5_application_domains'))->toBeTrue()
@@ -221,16 +221,16 @@ it('creates generic v5 resource connection tables', function () {
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
 
-    $applicationMigration = include database_path('migrations/2026_06_19_140000_v5_create_applications_table.php');
+    $applicationMigration = include database_path('migrations-v5/2026_06_19_140000_v5_create_applications_table.php');
     $applicationMigration->up();
 
-    $connectionMigration = include database_path('migrations/2026_06_19_142000_v5_create_resource_connections_table.php');
+    $connectionMigration = include database_path('migrations-v5/2026_06_19_142000_v5_create_resource_connections_table.php');
     $connectionMigration->up();
 
     expect(Schema::hasTable('v5_resource_connections'))->toBeTrue()
@@ -269,10 +269,10 @@ it('keeps v5 server fields in the initial migration', function () {
     Schema::dropIfExists('v5_servers');
     Schema::dropIfExists('v5_clusters');
 
-    $clusterMigration = include database_path('migrations/2026_06_16_130649_v5_create_clusters_table.php');
+    $clusterMigration = include database_path('migrations-v5/2026_06_16_130649_v5_create_clusters_table.php');
     $clusterMigration->up();
 
-    $serverMigration = include database_path('migrations/2026_06_16_130650_v5_create_servers_table.php');
+    $serverMigration = include database_path('migrations-v5/2026_06_16_130650_v5_create_servers_table.php');
     $serverMigration->up();
 
     expect(Schema::hasColumns('v5_servers', [

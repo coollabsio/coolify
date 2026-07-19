@@ -171,9 +171,6 @@ else
     log "Network 'coolify' already exists"
 fi
 
-mkdir -p /data/coolify/flux
-chown -R 9999:root /data/coolify/flux
-
 # Fix SSH directory ownership if not owned by container user UID 9999 (fixes #6621)
 # Only changes owner — preserves existing group to respect custom setups
 SSH_OWNER=$(stat -c '%u' /data/coolify/ssh 2>/dev/null || echo "unknown")

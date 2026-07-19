@@ -6,6 +6,7 @@ use App\Actions\V5\Server\SyncDevLimaServers;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
+use App\Support\V5\V5Feature;
 use Illuminate\Console\Command;
 
 class V5SyncDevLimaServers extends Command
@@ -15,15 +16,14 @@ class V5SyncDevLimaServers extends Command
         {--user-id=0 : User recorded as creator}
         {--private-key-id= : Optional private key used by the dev servers}
         {--cluster=Development-Lima : Cluster name for the dev Lima servers}
-        {--server=* : Server as name|host|ssh_user|ssh_port|wireguard_management_ip}
-        {--force : Allow running outside local/development environments}';
+        {--server=* : Server as name|host|ssh_user|ssh_port|wireguard_management_ip}';
 
     protected $description = 'Sync development Lima VMs into the v5 server/cluster tables.';
 
     public function handle(): int
     {
-        if (! app()->environment(['local', 'development', 'testing']) && ! $this->option('force')) {
-            $this->error('This command is intended for development only. Use --force to override.');
+        if (! V5Feature::enabled()) {
+            $this->error('V5 is only available in development environments.');
 
             return self::FAILURE;
         }

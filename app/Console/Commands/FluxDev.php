@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Flux\AgentTokenIssuer;
+use App\Support\V5\V5Feature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -13,8 +14,7 @@ class FluxDev extends Command
         {host_id=coold-dev : Stable coold host id}
         {--caps= : Comma-separated host capabilities}
         {--ttl=3600 : Token lifetime in seconds}
-        {--output= : Optional path to write the token with 0600 permissions}
-        {--force : Allow running outside local/development environments}';
+        {--output= : Optional path to write the token with 0600 permissions}';
 
     protected $description = 'Run Flux development helpers.';
 
@@ -30,8 +30,8 @@ class FluxDev extends Command
 
     public function handle(AgentTokenIssuer $agentTokenIssuer): int
     {
-        if (! app()->environment(['local', 'development', 'testing']) && ! $this->option('force')) {
-            $this->error('This command is intended for development only. Use --force to override.');
+        if (! V5Feature::enabled()) {
+            $this->error('V5 is only available in development environments.');
 
             return self::FAILURE;
         }

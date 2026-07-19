@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\V5\Application as V5Application;
 use App\Models\V5\ResourceConnection as V5ResourceConnection;
+use App\Support\V5\V5Feature;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -56,8 +57,10 @@ class Environment extends BaseModel
 
     public function isEmpty()
     {
-        return ! V5Application::query()->where('environment_id', $this->id)->exists() &&
-            ! V5ResourceConnection::query()->where('environment_id', $this->id)->exists() &&
+        return (! V5Feature::enabled() || (
+            ! V5Application::query()->where('environment_id', $this->id)->exists() &&
+            ! V5ResourceConnection::query()->where('environment_id', $this->id)->exists()
+        )) &&
             $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * build their schema by hand instead of running the full migration set.
  *
  * The column definitions must exactly mirror the final state produced by the
- * database/migrations/*v5* files (including the 2026_07_05/2026_07_06
+ * database/migrations-v5 files (including the 2026_07_05/2026_07_06
  * additions: status_observed_at, coold_version, has_coold/is_ingress booleans
  * replacing the dropped capabilities json, and NOT NULL server uuids). Update
  * this class in the same change as any v5 migration.

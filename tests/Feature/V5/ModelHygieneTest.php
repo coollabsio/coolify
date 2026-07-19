@@ -93,7 +93,7 @@ it('rewrites legacy fqcn morph rows to the v5 application alias', function () {
         'updated_at' => now(),
     ]);
 
-    $migration = include database_path('migrations/2026_07_06_090000_v5_convert_resource_connection_morphs_to_aliases.php');
+    $migration = include database_path('migrations-v5/2026_07_06_090000_v5_convert_resource_connection_morphs_to_aliases.php');
     $migration->up();
 
     $connection = DB::table('v5_resource_connections')->where('uuid', 'legacy-connection')->first();
@@ -155,7 +155,7 @@ it('backfills the capability booleans from the legacy json column', function () 
         ['name' => 'empty', 'capabilities' => null],
     ]);
 
-    $migration = include database_path('migrations/2026_07_06_090100_v5_convert_server_capabilities_to_booleans.php');
+    $migration = include database_path('migrations-v5/2026_07_06_090100_v5_convert_server_capabilities_to_booleans.php');
     $migration->up();
 
     $serversByName = DB::table('v5_servers')->get()->keyBy('name');

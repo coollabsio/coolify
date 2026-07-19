@@ -18,6 +18,7 @@ use App\Jobs\UpdateCoolifyJob;
 use App\Jobs\V5ReconcileServersJob;
 use App\Jobs\V5RotateAgentTokensJob;
 use App\Models\InstanceSettings;
+use App\Support\V5\V5Feature;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -51,13 +52,10 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
 
-        // V5 reconciliation loop: pull-based safety net for the push-only
-        // coold -> flux -> webhook status pipeline, plus container status pruning.
-        $this->scheduleInstance->job(new V5ReconcileServersJob)->everyFiveMinutes()->withoutOverlapping()->onOneServer();
-
-        // V5 host JWT rotation: re-mints and SSH-pushes a fresh host token
-        // before the on-disk token expires so coold reconnects stay authorized.
-        $this->scheduleInstance->job(new V5RotateAgentTokensJob)->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
+        if (V5Feature::enabled()) {
+            $this->scheduleInstance->job(new V5ReconcileServersJob)->everyFiveMinutes()->withoutOverlapping()->onOneServer();
+            $this->scheduleInstance->job(new V5RotateAgentTokensJob)->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
+        }
 
         if (isDev()) {
             // Instance Jobs

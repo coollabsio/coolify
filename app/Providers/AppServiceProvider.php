@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
 use App\Models\V5\Application;
+use App\Support\V5\V5Feature;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\App;
@@ -29,7 +30,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureCommands();
-        $this->configureMorphMap();
+
+        if (V5Feature::enabled()) {
+            $this->loadMigrationsFrom(database_path('migrations-v5'));
+            $this->configureMorphMap();
+        }
+
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();

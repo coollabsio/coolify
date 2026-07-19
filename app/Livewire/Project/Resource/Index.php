@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Resource;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\V5\Application as V5Application;
+use App\Support\V5\V5Feature;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -58,21 +59,26 @@ class Index extends Component
 
         // Load projects and environments for breadcrumb navigation
         $this->allProjects = Project::ownedByCurrentTeamCached();
+        $environmentRelations = [
+            'applications:id,uuid,name,environment_id',
+            'services:id,uuid,name,environment_id',
+            'postgresqls:id,uuid,name,environment_id',
+            'redis:id,uuid,name,environment_id',
+            'mongodbs:id,uuid,name,environment_id',
+            'mysqls:id,uuid,name,environment_id',
+            'mariadbs:id,uuid,name,environment_id',
+            'keydbs:id,uuid,name,environment_id',
+            'dragonflies:id,uuid,name,environment_id',
+            'clickhouses:id,uuid,name,environment_id',
+        ];
+
+        if (V5Feature::enabled()) {
+            $environmentRelations[] = 'v5Applications:id,uuid,name,environment_id,status';
+        }
+
         $this->allEnvironments = $project->environments()
             ->select('id', 'uuid', 'name', 'project_id')
-            ->with([
-                'applications:id,uuid,name,environment_id',
-                'v5Applications:id,uuid,name,environment_id,status',
-                'services:id,uuid,name,environment_id',
-                'postgresqls:id,uuid,name,environment_id',
-                'redis:id,uuid,name,environment_id',
-                'mongodbs:id,uuid,name,environment_id',
-                'mysqls:id,uuid,name,environment_id',
-                'mariadbs:id,uuid,name,environment_id',
-                'keydbs:id,uuid,name,environment_id',
-                'dragonflies:id,uuid,name,environment_id',
-                'clickhouses:id,uuid,name,environment_id',
-            ])
+            ->with($environmentRelations)
             ->get();
 
         $this->environment = $environment->loadCount([
@@ -105,8 +111,8 @@ class Index extends Component
 
             return $application;
         });
-        $this->applications = $this->applications
-            ->merge(V5Application::query()
+        if (V5Feature::enabled()) {
+            $this->applications = $this->applications->merge(V5Application::query()
                 ->where('team_id', currentTeam()->id)
                 ->where('project_id', $this->project->id)
                 ->where('environment_id', $this->environment->id)
@@ -120,8 +126,10 @@ class Index extends Component
                     ]);
 
                     return $application;
-                }))
-            ->sortBy('name');
+                }));
+        }
+
+        $this->applications = $this->applications->sortBy('name');
 
         // Load all database resources in a single query per type
         $databaseTypes = [

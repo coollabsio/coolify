@@ -8,6 +8,7 @@ use App\Jobs\V5TeardownTeamJob;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
+use App\Support\V5\V5Feature;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
@@ -80,11 +81,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             // DB cascade removes the servers/applications/private keys. Captured
             // synchronously into a queued job so an unreachable host cannot block
             // or fail the team deletion (see V5TeardownTeamJob). Guarded so a v5
-            // teardown problem never breaks v4 team deletion.
-            try {
-                V5TeardownTeamJob::dispatchForTeam($team);
-            } catch (\Throwable $exception) {
-                report($exception);
+            // teardown problem never breaks v4 team deletion. This is disabled
+            // with the rest of v5 outside development environments.
+            if (V5Feature::enabled()) {
+                try {
+                    V5TeardownTeamJob::dispatchForTeam($team);
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
             }
 
             RevokeUserTeamTokens::forTeam($team->id);

@@ -1,6 +1,16 @@
 <?php
 
+use App\Support\V5\V5Feature;
 use Illuminate\Support\Str;
+
+$v5Enabled = V5Feature::enabledForEnvironment((string) env('APP_ENV', 'production'));
+$v5ReconcileSupervisor = $v5Enabled ? [
+    'v5reconcile' => [
+        'autoScalingStrategy' => 'size',
+        'minProcesses' => env('HORIZON_V5_RECONCILE_MIN_PROCESSES', 1),
+        'maxProcesses' => env('HORIZON_V5_RECONCILE_MAX_PROCESSES', 1),
+    ],
+] : [];
 
 return [
 
@@ -193,23 +203,20 @@ return [
             'timeout' => env('HORIZON_TIMEOUT', 36000),
         ],
 
-        // Dedicated low-priority pool for the v5 reconcile + host-token rotation
-        // jobs (queue `v5-reconcile`, set via onQueue()). Isolated from the
-        // user-facing high/default deploy pool so a starved rotation cannot let
-        // host tokens drift to expiry, and so the 5-minute fleet fan-out never
-        // blocks deploys.
-        'v5reconcile' => [
-            'connection' => 'redis',
-            'balance' => env('HORIZON_V5_RECONCILE_BALANCE', 'false'),
-            'queue' => 'v5-reconcile',
-            'maxTime' => env('HORIZON_V5_RECONCILE_MAX_TIME', 0),
-            'maxJobs' => 200,
-            'memory' => 128,
-            'tries' => 1,
-            'nice' => 10,
-            'sleep' => 3,
-            'timeout' => env('HORIZON_V5_RECONCILE_TIMEOUT', 300),
-        ],
+        ...($v5Enabled ? [
+            'v5reconcile' => [
+                'connection' => 'redis',
+                'balance' => env('HORIZON_V5_RECONCILE_BALANCE', 'false'),
+                'queue' => 'v5-reconcile',
+                'maxTime' => env('HORIZON_V5_RECONCILE_MAX_TIME', 0),
+                'maxJobs' => 200,
+                'memory' => 128,
+                'tries' => 1,
+                'nice' => 10,
+                'sleep' => 3,
+                'timeout' => env('HORIZON_V5_RECONCILE_TIMEOUT', 300),
+            ],
+        ] : []),
     ],
 
     'environments' => [
@@ -221,11 +228,6 @@ return [
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
-            'v5reconcile' => [
-                'autoScalingStrategy' => 'size',
-                'minProcesses' => env('HORIZON_V5_RECONCILE_MIN_PROCESSES', 1),
-                'maxProcesses' => env('HORIZON_V5_RECONCILE_MAX_PROCESSES', 2),
-            ],
         ],
         'local' => [
             's6' => [
@@ -235,11 +237,10 @@ return [
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
-            'v5reconcile' => [
-                'autoScalingStrategy' => 'size',
-                'minProcesses' => env('HORIZON_V5_RECONCILE_MIN_PROCESSES', 1),
-                'maxProcesses' => env('HORIZON_V5_RECONCILE_MAX_PROCESSES', 1),
-            ],
+            ...$v5ReconcileSupervisor,
         ],
+        'development' => $v5ReconcileSupervisor,
+        'dev' => $v5ReconcileSupervisor,
+        'testing' => $v5ReconcileSupervisor,
     ],
 ];
