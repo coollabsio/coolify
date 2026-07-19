@@ -56,6 +56,13 @@ class LocalPersistentVolume extends BaseModel
         return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
     }
 
+    public function abortIfScheduledBackupsExist(): void
+    {
+        if ($this->scheduledBackups()->exists()) {
+            abort(422, 'Delete this volume backup schedule and its archives before deleting the volume.');
+        }
+    }
+
     protected function customizeName($value)
     {
         return str($value)->trim()->value;

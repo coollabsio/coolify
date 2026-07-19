@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
 
@@ -1454,6 +1455,26 @@ it('prevents a volume with tracked backup archives from being deleted', function
 
     expect(fn () => $volume->delete())->toThrow(RuntimeException::class, 'Delete this volume backup schedule');
     expect($volume->fresh())->not->toBeNull();
+});
+
+it('aborts storage deletion when scheduled backups exist', function () {
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $directory = createApplicationBackupDirectory($application);
+
+    $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+    $directory->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+
+    expect(fn () => $volume->abortIfScheduledBackupsExist())
+        ->toThrow(HttpException::class, 'Delete this volume backup schedule and its archives before deleting the volume.')
+        ->and(fn () => $directory->abortIfScheduledBackupsExist())
+        ->toThrow(HttpException::class, 'Delete this directory backup schedule and its archives before deleting the directory.');
 });
 
 it('deletes disabled volume backup archives before deleting their application', function () {

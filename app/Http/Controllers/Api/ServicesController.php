@@ -2911,13 +2911,7 @@ class ServicesController extends Controller
             ], 422);
         }
 
-        if ($storage->scheduledBackups()->exists()) {
-            return response()->json([
-                'message' => $storage instanceof LocalFileVolume
-                    ? 'Delete this directory backup schedule and its archives before deleting the directory.'
-                    : 'Delete this volume backup schedule and its archives before deleting the volume.',
-            ], 422);
-        }
+        $storage->abortIfScheduledBackupsExist();
 
         if ($storage instanceof LocalFileVolume) {
             $storage->deleteStorageOnServer();

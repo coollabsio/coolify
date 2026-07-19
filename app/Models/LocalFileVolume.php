@@ -96,6 +96,13 @@ class LocalFileVolume extends BaseModel
         return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
     }
 
+    public function abortIfScheduledBackupsExist(): void
+    {
+        if ($this->scheduledBackups()->exists()) {
+            abort(422, 'Delete this directory backup schedule and its archives before deleting the directory.');
+        }
+    }
+
     public function loadStorageOnServer()
     {
         if ($this->is_host_file) {
