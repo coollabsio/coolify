@@ -2,6 +2,7 @@
 
 use App\Livewire\Project\Service\EditDomain;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -9,24 +10,31 @@ use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
+uses(RefreshDatabase::class);
+
 beforeEach(function () {
+    // Required base instance settings (id 0)
+    $instanceSettings = new InstanceSettings;
+    $instanceSettings->id = 0;
+    $instanceSettings->save();
+
     // Create user and team
     $this->user = User::factory()->create();
     $this->team = Team::factory()->create();
     $this->user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($this->user);
+    session(['currentTeam' => ['id' => $this->team->id]]);
 
     // Create server
     $this->server = Server::factory()->create([
         'team_id' => $this->team->id,
     ]);
 
-    // Create standalone docker destination
-    $this->destination = StandaloneDocker::factory()->create([
-        'server_id' => $this->server->id,
-    ]);
+    // Use the standalone docker destination auto-created with the server
+    $this->destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
 
     // Create project and environment
     $this->project = Project::factory()->create([
@@ -130,6 +138,32 @@ it('shows warning when at least one domain is missing port (multiple domains)', 
         ->set('fqdn', 'http://example.com:8000,https://app.example.com') // Second domain missing port
         ->call('submit')
         ->assertSet('showPortWarningModal', true);
+});
+
+it('closes the modal after successfully saving domains', function () {
+    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
+        ->set('fqdn', 'http://example.com:3000') // Valid domain with a port
+        ->call('submit')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('close-modal');
+});
+
+it('does not close the modal while the port warning is shown', function () {
+    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
+        ->set('fqdn', 'http://example.com') // Remove port -> triggers warning, early return
+        ->call('submit')
+        ->assertSet('showPortWarningModal', true)
+        ->assertNotDispatched('close-modal');
+});
+
+it('closes the modal after confirming port removal', function () {
+    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
+        ->set('fqdn', 'http://example.com') // Remove port
+        ->call('submit')
+        ->assertSet('showPortWarningModal', true)
+        ->call('confirmRemovePort')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('close-modal');
 });
 
 it('does not show warning for services without required port', function () {

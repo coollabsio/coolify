@@ -154,6 +154,7 @@ class EditDomain extends Component
             $this->dispatch('refresh');
             $this->dispatch('refreshServices');
             $this->dispatch('configurationChanged');
+            $this->dispatch('close-modal');
         } catch (\Throwable $e) {
             $originalFqdn = $this->application->getOriginal('fqdn');
             if ($originalFqdn !== $this->application->fqdn) {
