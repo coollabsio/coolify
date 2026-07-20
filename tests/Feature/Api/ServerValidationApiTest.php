@@ -12,12 +12,16 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]);
+    config()->set('app.maintenance.driver', 'file');
+    config()->set('cache.default', 'array');
+
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    session(['currentTeam' => $this->team]);
     $this->token = $this->user->createToken('server-validation', ['write'])->plainTextToken;
 
     Queue::fake();
@@ -33,7 +37,12 @@ it('validates without installing by default', function () {
         ->postJson("/api/v1/servers/{$this->server->uuid}/validate");
 
     $response->assertCreated()->assertJson(['message' => 'Validation started.']);
+    ValidateServer::assertPushedWith(
+        fn (Server $server): bool => $server->is($this->server),
+        'high'
+    );
     Queue::assertNotPushed(ValidateAndInstallServerJob::class);
+    expect($this->server->fresh()->is_validating)->toBeTrue();
 });
 
 it('validates and installs when explicitly requested', function () {
@@ -45,7 +54,8 @@ it('validates and installs when explicitly requested', function () {
         ValidateAndInstallServerJob::class,
         fn (ValidateAndInstallServerJob $job): bool => $job->server->is($this->server)
     );
-    Queue::assertNotPushed(ValidateServer::class);
+    ValidateServer::assertNotPushed();
+    expect($this->server->fresh()->is_validating)->toBeTrue();
 });
 
 it('rejects an invalid install option', function () {

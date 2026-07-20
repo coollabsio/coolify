@@ -974,6 +974,11 @@ class ServersController extends Controller
         }
 
         $install = $request->boolean('install', false);
+        $server->update([
+            'is_validating' => true,
+            'validation_logs' => null,
+        ]);
+
         if ($install) {
             ValidateAndInstallServerJob::dispatch($server);
         } else {

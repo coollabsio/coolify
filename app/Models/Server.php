@@ -263,6 +263,7 @@ class Server extends BaseModel
         'delete_unused_networks' => 'boolean',
         'unreachable_notification_sent' => 'boolean',
         'is_build_server' => 'boolean',
+        'is_validating' => 'boolean',
         'force_disabled' => 'boolean',
     ];
 
