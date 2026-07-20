@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\Internal\FluxResourceStatusController;
+use App\Support\V5\V5Feature;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
 use App\Http\Controllers\Api\ResourcesController;
@@ -305,6 +307,10 @@ Route::group([
 Route::group([
     'prefix' => 'v1',
 ], function () {
+    if (V5Feature::enabled()) {
+        Route::post('/internal/flux/resource-status', FluxResourceStatusController::class);
+    }
+
     Route::post('/sentinel/push', [SentinelController::class, 'push']);
 });
 

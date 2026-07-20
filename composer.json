@@ -15,6 +15,7 @@
         "danharrin/livewire-rate-limiting": "^2.1.0",
         "doctrine/dbal": "^4.4.1",
         "guzzlehttp/guzzle": "^7.10.0",
+        "inertiajs/inertia-laravel": "^3.1",
         "laravel/fortify": "^1.34.0",
         "laravel/framework": "^12.49.0",
         "laravel/horizon": "^5.43.0",
