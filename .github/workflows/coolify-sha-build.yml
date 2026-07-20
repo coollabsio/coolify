@@ -1,8 +1,8 @@
-name: Production Build (v4)
+name: Build Coolify (SHA)
 
 on:
   push:
-    branches: ["v4.x"]
+    branches: ["v4.x", "main"]
 
 permissions:
   contents: read
