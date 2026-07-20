@@ -22,8 +22,8 @@ services:
       - '110:110'
       - '4190:4190'
     volumes:
-      - '/var/lib/stalwart-mail:/etc/stalwart'
-      - '/var/lib/stalwart-data:/var/lib/stalwart'
+      - 'stalwart-mail:/etc/stalwart'
+      - 'stalwart-data:/var/lib/stalwart'
       - '/etc/localtime:/etc/localtime:ro'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
