@@ -9,7 +9,7 @@ services:
   stalwart:
     image: 'stalwartlabs/stalwart:v0.16.13'
     environment:
-    - SERVICE_FQDN_STALWART_8080
+    - SERVICE_URL_STALWART_8080
     restart: unless-stopped
     expose:
     - '8080'
