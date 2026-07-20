@@ -32,6 +32,7 @@ class StandaloneDocker extends BaseModel
         'server_id',
         'name',
         'network',
+        'bind_ip',
     ];
 
     protected static function boot()
@@ -164,5 +165,25 @@ class StandaloneDocker extends BaseModel
     public function attachedTo()
     {
         return $this->applications()->exists() || $this->databases()->count() > 0 || $this->services()->exists();
+    }
+
+    public function hasBoundIp(): bool
+    {
+        return filled($this->bind_ip);
+    }
+
+    public function traefikEntrypointSuffix(): ?string
+    {
+        return $this->hasBoundIp() ? "dest{$this->id}" : null;
+    }
+
+    public function traefikInternalHttpPort(): int
+    {
+        return 8000 + ($this->id * 2);
+    }
+
+    public function traefikInternalHttpsPort(): int
+    {
+        return 8001 + ($this->id * 2);
     }
 }

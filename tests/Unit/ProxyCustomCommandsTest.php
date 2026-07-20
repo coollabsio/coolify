@@ -103,6 +103,35 @@ it('returns empty array when config is empty', function () {
     expect($customCommands)->toBeArray()->toBeEmpty();
 });
 
+it('does not classify bound-destination entrypoints as custom commands', function () {
+    $existingConfig = [
+        'services' => [
+            'traefik' => [
+                'command' => [
+                    '--ping=true',
+                    '--api.dashboard=true',
+                    '--entrypoints.http.address=:80',
+                    '--entrypoints.https.address=:443',
+                    '--entrypoints.http-dest5.address=:8010',
+                    '--entrypoints.https-dest5.address=:8011',
+                    '--entrypoints.http-dest5.http.encodequerysemicolons=true',
+                    '--entrypoints.https-dest5.http.encodequerysemicolons=true',
+                    '--providers.docker=true',
+                ],
+            ],
+        ],
+    ];
+
+    $yamlConfig = Yaml::dump($existingConfig);
+
+    $server = Mockery::mock('App\Models\Server');
+    $server->shouldReceive('proxyType')->andReturn(ProxyTypes::TRAEFIK->value);
+
+    $customCommands = extractCustomProxyCommands($server, $yamlConfig);
+
+    expect($customCommands)->toBeArray()->toBeEmpty();
+});
+
 it('correctly identifies multiple custom command types', function () {
     $existingConfig = [
         'services' => [

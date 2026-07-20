@@ -2,10 +2,14 @@
 
 namespace App\Livewire\Destination\New;
 
+use App\Jobs\RestartProxyJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Rules\ValidServerIp;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -31,6 +35,8 @@ class Docker extends Component
 
     #[Validate(['required', 'boolean'])]
     public bool $isSwarm = false;
+
+    public ?string $bindIp = null;
 
     public function mount(?string $server_id = null): void
     {
@@ -76,6 +82,8 @@ class Docker extends Component
         try {
             $this->authorize('create', $this->isSwarm ? SwarmDocker::class : StandaloneDocker::class);
             $this->validate();
+            $this->validateBindIp();
+
             if ($this->isSwarm) {
                 $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();
                 if ($found) {
@@ -95,13 +103,48 @@ class Docker extends Component
                     $docker = StandaloneDocker::create([
                         'name' => $this->name,
                         'network' => $this->network,
+                        'bind_ip' => blank($this->bindIp) ? null : $this->bindIp,
                         'server_id' => $this->selectedServer->id,
                     ]);
+
+                    if (filled($docker->bind_ip)) {
+                        RestartProxyJob::dispatch($this->selectedServer);
+                    }
                 }
             }
-            redirectRoute($this, 'destination.show', [$docker->uuid]);
+
+            return redirectRoute($this, 'destination.show', [$docker->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function validateBindIp(): void
+    {
+        if (blank($this->bindIp) || $this->isSwarm) {
+            return;
+        }
+
+        Validator::make(
+            ['bindIp' => $this->bindIp],
+            ['bindIp' => ['string', new ValidServerIp]],
+        )->validate();
+
+        if ($this->bindIp === $this->selectedServer->ip) {
+            throw ValidationException::withMessages([
+                'bindIp' => 'Bind IP must differ from the server IP.',
+            ]);
+        }
+
+        $duplicate = StandaloneDocker::query()
+            ->where('server_id', $this->selectedServer->id)
+            ->where('bind_ip', $this->bindIp)
+            ->exists();
+
+        if ($duplicate) {
+            throw ValidationException::withMessages([
+                'bindIp' => 'Bind IP is already used by another destination on this server.',
+            ]);
         }
     }
 }
