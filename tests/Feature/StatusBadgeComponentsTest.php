@@ -59,23 +59,27 @@ it('uses a shared refresh badge for resource status refresh actions', function (
         ->not->toContain('<svg');
 });
 
-it('renders health warning helpers as badges instead of warning icons', function () {
+it('renders health warning helpers without increasing the badge row height', function (string $status, string $expectedText) {
     $html = view('components.status.running', [
-        'status' => 'running:unknown',
+        'status' => $status,
     ])->render();
     $runningStatus = file_get_contents(resource_path('views/components/status/running.blade.php'));
 
     expect($html)
-        ->toContain('No health check')
+        ->toContain($expectedText)
+        ->toContain('class="flex items-center gap-1 leading-none"')
         ->toContain('inline-flex h-5 max-w-full items-center gap-1 rounded-sm border')
         ->not->toContain('<svg');
 
     expect($runningStatus)
         ->toContain('<x-status-badge')
-        ->toContain('class="flex items-center gap-1"')
+        ->toContain('class="flex items-center gap-1 leading-none"')
         ->not->toContain('class="px-2"')
         ->not->toContain('viewBox="0 0 256 256"');
-});
+})->with([
+    'unknown health' => ['running:unknown', 'No health check'],
+    'unhealthy' => ['running:unhealthy', 'Unhealthy'],
+]);
 
 it('renders restart counts as warning badges', function () {
     $resource = new class

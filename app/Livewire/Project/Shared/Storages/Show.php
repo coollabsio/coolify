@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Models\Application;
 use App\Models\LocalPersistentVolume;
+use App\Models\ScheduledVolumeBackup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Show extends Component
@@ -31,6 +34,10 @@ class Show extends Component
     public ?string $hostPath = null;
 
     public bool $isPreviewSuffixEnabled = true;
+
+    public bool $hasEnabledBackup = false;
+
+    public ?string $backupUrl = null;
 
     protected $validationAttributes = [
         'name' => 'name',
@@ -81,10 +88,38 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(): void
     {
         $this->syncData(false);
         $this->isReadOnly = $this->storage->shouldBeReadOnlyInUI();
+        $this->refreshBackupStatus();
+    }
+
+    #[On('refreshVolumeBackups')]
+    public function refreshBackupStatus(): void
+    {
+        $backup = $this->storage->scheduledBackups()->first();
+
+        $this->hasEnabledBackup = $backup?->enabled ?? false;
+        $this->backupUrl = null;
+
+        if (! $this->hasEnabledBackup || ! $this->resource instanceof Application) {
+            return;
+        }
+
+        $parameters = [
+            'project_uuid' => $this->resource->project()->uuid,
+            'environment_uuid' => $this->resource->environment->uuid,
+            'application_uuid' => $this->resource->uuid,
+        ];
+        $hasOtherBackups = ScheduledVolumeBackup::query()
+            ->forApplication($this->resource)
+            ->where('id', '!=', $backup->id)
+            ->exists();
+
+        $this->backupUrl = $hasOtherBackups
+            ? route('project.application.backup.index', [...$parameters, 'search' => $this->storage->name])
+            : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
     }
 
     public function instantSave(): void
@@ -115,8 +150,15 @@ class Show extends Component
             return 'The provided password is incorrect.';
         }
 
+        if ($this->storage->scheduledBackups()->exists()) {
+            $this->dispatch('error', 'Delete this volume backup schedule and its archives before deleting the volume.');
+
+            return false;
+        }
+
         $this->storage->delete();
         $this->dispatch('refreshStorages');
+        $this->dispatch('configurationChanged');
 
         return true;
     }

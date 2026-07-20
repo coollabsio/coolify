@@ -19,7 +19,15 @@
         @endif
         <div class="flex flex-col justify-center text-sm select-text">
             <div class="flex gap-2  md:flex-row flex-col">
-                <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />
+                <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly>
+                    <x-slot:labelSuffix>
+                        @if ($hasEnabledBackup)
+                            <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                status="Backup enabled" type="success"
+                                :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                        @endif
+                    </x-slot:labelSuffix>
+                </x-forms.input>
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
@@ -51,6 +59,14 @@
                                 confirmationText="{{ $fs_path }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                                 shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
+                            @if ($resource instanceof \App\Models\Application)
+                                <x-modal-input buttonTitle="Configure Backup" title="Configure Directory Backup"
+                                    :wireIgnore="false">
+                                    <livewire:project.application.backup.create :application="$resource"
+                                        :selected-target-key="'directory:' . $fileStorage->id"
+                                        wire:key="configure-directory-backup-{{ $fileStorage->id }}" />
+                                </x-modal-input>
+                            @endif
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Deletion?" buttonTitle="Delete"
                                 isErrorButton submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
                                     'The selected directory and all its contents will be permanently deleted from the container.',
@@ -130,5 +146,16 @@
                 @endif
             @endif
         </form>
+        @if ($isReadOnly && $fileStorage->is_directory && $resource instanceof \App\Models\Application)
+            @can('update', $resource)
+                <div>
+                    <x-modal-input buttonTitle="Configure Backup" title="Configure Directory Backup" :wireIgnore="false">
+                        <livewire:project.application.backup.create :application="$resource"
+                            :selected-target-key="'directory:' . $fileStorage->id"
+                            wire:key="configure-readonly-directory-backup-{{ $fileStorage->id }}" />
+                    </x-modal-input>
+                </div>
+            @endcan
+        @endif
     </div>
 </div>
