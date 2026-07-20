@@ -7,11 +7,14 @@ use App\Models\GitlabApp;
 use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class GitlabPrivateRepository extends Component
 {
+    use AuthorizesRequests;
+
     public $current_step = 'gitlab_apps';
 
     public $gitlab_apps;
@@ -158,6 +161,8 @@ class GitlabPrivateRepository extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', Application::class);
+
             $validator = validator([
                 'selected_repository_path' => $this->selected_repository_path,
                 'selected_branch_name' => $this->selected_branch_name,

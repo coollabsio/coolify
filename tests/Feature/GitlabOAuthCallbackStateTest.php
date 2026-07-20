@@ -105,4 +105,25 @@ describe('GitLab OAuth callback state validation', function () {
 
         $response->assertRedirect(route('login'));
     });
+
+    test('rejects a callback from a team member who cannot administer the source', function () {
+        Http::fake();
+
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $this->actingAs($member);
+        session(['currentTeam' => $this->team]);
+
+        $state = 'member-state';
+        Cache::put(GitlabSource::oauthStateCacheKey($state), [
+            'gitlab_app_id' => $this->gitlabApp->id,
+            'team_id' => $this->team->id,
+        ], now()->addMinutes(60));
+
+        $response = $this->get('/webhooks/source/gitlab/redirect?code=any&state='.$state);
+
+        $response->assertRedirect(route('source.all'));
+        Http::assertNothingSent();
+        expect($this->gitlabApp->refresh()->access_token)->toBeNull();
+    });
 });

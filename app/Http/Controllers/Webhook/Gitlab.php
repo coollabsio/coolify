@@ -40,6 +40,11 @@ class Gitlab extends Controller
 
             $gitlabApp = GitlabApp::whereKey(data_get($payload, 'gitlab_app_id'))->firstOrFail();
 
+            // Only users who may administer the source can complete OAuth and store tokens.
+            if (! $request->user()->can('update', $gitlabApp)) {
+                return redirect()->route('source.all')->with('error', 'You are not authorized to connect this GitLab App.');
+            }
+
             $baseUrl = rtrim($gitlabApp->html_url, '/');
 
             $response = Http::asForm()->post("{$baseUrl}/oauth/token", [
