@@ -1,4 +1,4 @@
-name: Production Build (v4)
+name: Build Coolify (SHA)
 
 on:
   push:
