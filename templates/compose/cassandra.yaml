@@ -1,0 +1,28 @@
+# documentation: https://cassandra.apache.org/doc/latest/
+# slogan: Highly scalable NoSQL database with distributed architecture
+# category: Database
+# tags: cassandra,database,nosql,cluster
+# logo: svgs/cassandra.svg
+# port: 9042
+
+services:
+  cassandra:
+    image: 'cassandra:5.0'
+    environment:
+      - SERVICE_URL_CASSANDRA_9042
+      - CASSANDRA_CLUSTER_NAME=${CASSANDRA_CLUSTER_NAME:-Coolify-Cluster}
+      - CASSANDRA_LISTEN_ADDRESS=${CASSANDRA_LISTEN_ADDRESS:-auto}
+      - CASSANDRA_BROADCAST_ADDRESS=${CASSANDRA_BROADCAST_ADDRESS:-auto}
+      - CASSANDRA_RPC_ADDRESS=${CASSANDRA_RPC_ADDRESS:-0.0.0.0}
+      - CASSANDRA_SEEDS=${CASSANDRA_SEEDS:-cassandra}
+      - MAX_HEAP_SIZE=${MAX_HEAP_SIZE:-512M}
+    volumes:
+      - 'cassandra-data:/var/lib/cassandra'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "cqlsh -e 'DESCRIBE KEYSPACES' || exit 1"
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
