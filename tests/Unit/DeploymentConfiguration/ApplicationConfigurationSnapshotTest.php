@@ -4,6 +4,8 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Team;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
@@ -78,6 +80,35 @@ it('detects redeploy-only domain changes', function () {
         ->and($change['expandable'])->toBeTrue()
         ->and($change['new_full_value'])->toBe($domains);
 });
+
+it('detects added storage mounts as redeploy-only changes', function (string $type) {
+    $application = snapshotTestApplication();
+    markSnapshotTestApplicationDeployed($application);
+
+    if ($type === 'volume') {
+        LocalPersistentVolume::create([
+            'name' => $application->uuid.'-data',
+            'mount_path' => '/app/data',
+            'resource_id' => $application->id,
+            'resource_type' => $application->getMorphClass(),
+        ]);
+    } else {
+        LocalFileVolume::withoutEvents(fn () => LocalFileVolume::forceCreate([
+            'uuid' => (string) Str::uuid(),
+            'fs_path' => application_configuration_dir().'/'.$application->uuid.'/data',
+            'mount_path' => '/app/data',
+            'is_directory' => $type === 'directory',
+            'resource_id' => $application->id,
+            'resource_type' => $application->getMorphClass(),
+        ]));
+    }
+
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($diff->requiresBuild())->toBeFalse()
+        ->and(collect($diff->changes())->pluck('section'))->toContain('storage');
+})->with(['volume', 'directory', 'file']);
 
 it('detects Docker image reference changes as redeploy-only changes', function (string $field, string $label, string $newValue) {
     $application = snapshotTestApplication([

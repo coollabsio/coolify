@@ -131,6 +131,19 @@ function mobileActionsAreBeforeSelect(string $heading, string $actionsId, string
     return $actionsPosition !== false && $selectPosition !== false && $actionsPosition < $selectPosition;
 }
 
+it('places database backups immediately after configuration in navigation menus', function () {
+    $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+    $mobileMenuItems = str($databaseHeading)->between('$databasePageItems = [', '$databaseConfigurationItems = [')->toString();
+    $desktopMenuItems = str($databaseHeading)->between('class="scrollbar hidden', '</nav>')->toString();
+
+    foreach ([$mobileMenuItems, $desktopMenuItems] as $menuItems) {
+        expect(strpos($menuItems, 'Configuration'))
+            ->toBeLessThan(strpos($menuItems, 'Backups'))
+            ->and(strpos($menuItems, 'Backups'))->toBeLessThan(strpos($menuItems, 'Logs'))
+            ->and(strpos($menuItems, 'Logs'))->toBeLessThan(strpos($menuItems, 'Terminal'));
+    }
+});
+
 it('keeps configuration sidebars hidden until desktop breakpoint', function () {
     expect(file_get_contents(resource_path('views/livewire/project/database/configuration.blade.php')))
         ->toContain('sub-menu-wrapper hidden md:flex');

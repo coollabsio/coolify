@@ -497,7 +497,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->backup_log && $this->backup_log->status === 'success') {
-                removeOldBackups($this->backup);
+                $this->removeExpiredBackups();
             }
         } catch (Throwable $e) {
             throw $e;
@@ -510,6 +510,19 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     'finished_at' => Carbon::now()->toImmutable(),
                 ]);
             }
+        }
+    }
+
+    private function removeExpiredBackups(): void
+    {
+        try {
+            removeOldBackups($this->backup);
+        } catch (Throwable $exception) {
+            Log::channel('scheduled-errors')->warning('Database backup retention cleanup failed', [
+                'backup_id' => $this->backup->id,
+                'execution_id' => $this->backup_log?->id,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 

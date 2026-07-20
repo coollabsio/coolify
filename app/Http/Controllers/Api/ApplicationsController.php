@@ -4910,6 +4910,8 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
+        $storage->abortIfScheduledBackupsExist();
+
         if ($storage instanceof LocalFileVolume) {
             $storage->deleteStorageOnServer();
         }

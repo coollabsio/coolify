@@ -17,6 +17,10 @@ use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
 {
@@ -179,7 +183,7 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     return $database;
 }
 
-function deleteBackupsLocally(string|array|null $filenames, Server $server): void
+function deleteBackupsLocally(string|array|null $filenames, Server $server, bool $throwError = false): void
 {
     if (empty($filenames)) {
         return;
@@ -187,11 +191,46 @@ function deleteBackupsLocally(string|array|null $filenames, Server $server): voi
     if (is_string($filenames)) {
         $filenames = [$filenames];
     }
-    $quotedFiles = array_map(fn ($file) => "\"$file\"", $filenames);
-    instant_remote_process(['rm -f '.implode(' ', $quotedFiles)], $server, throwError: false);
+    $quotedFiles = array_map(fn ($file) => escapeshellarg($file), $filenames);
+    instant_remote_process(['rm -f '.implode(' ', $quotedFiles)], $server, throwError: $throwError);
 
     $foldersToCheck = collect($filenames)->map(fn ($file) => dirname($file))->unique();
     $foldersToCheck->each(fn ($folder) => deleteEmptyBackupFolder($folder, $server));
+}
+
+function streamBackupFromServer(Server $server, string $filename, string $contentType): StreamedResponse
+{
+    $disk = Storage::build([
+        'driver' => 'sftp',
+        'host' => $server->ip,
+        'port' => (int) $server->port,
+        'username' => $server->user,
+        'privateKey' => $server->privateKey->getKeyLocation(),
+        'root' => '/',
+    ]);
+
+    if (! $disk->exists($filename)) {
+        throw new FileNotFoundException($filename);
+    }
+
+    return new StreamedResponse(function () use ($disk, $filename) {
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+        $stream = $disk->readStream($filename);
+        if ($stream === false || is_null($stream)) {
+            abort(500, 'Failed to open stream for the requested file.');
+        }
+        while (! feof($stream)) {
+            echo fread($stream, 2048);
+            flush();
+        }
+
+        fclose($stream);
+    }, 200, [
+        'Content-Type' => $contentType,
+        'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
+    ]);
 }
 
 function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
@@ -214,7 +253,9 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'aws_url' => $s3->awsUrl(),
     ]);
 
-    $disk->delete($filenames);
+    if (! $disk->delete($filenames)) {
+        throw new RuntimeException('One or more S3 backup files could not be deleted.');
+    }
 }
 
 function deleteEmptyBackupFolder($folderPath, Server $server): void
@@ -428,8 +469,12 @@ function deleteOldBackupsFromS3($backup): Collection
         ->all();
 
     if (! empty($filesToDelete)) {
-        deleteBackupsS3($filesToDelete, $backup->s3);
-        $processedBackups = $backupsToDelete;
+        try {
+            deleteBackupsS3($filesToDelete, $backup->s3);
+            $processedBackups = $backupsToDelete;
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     return $processedBackups;

@@ -131,10 +131,12 @@ class Storage extends Component
                 'resource_type' => $this->resource->getMorphClass(),
             ]);
             $this->resource->refresh();
+            $this->dispatch('configurationChanged');
             $this->dispatch('success', 'Volume added successfully');
             $this->dispatch('closeStorageModal', 'volume');
             $this->clearForm();
             $this->refreshStorages();
+            $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -163,6 +165,7 @@ class Storage extends Component
                 'resource_type' => get_class($this->resource),
             ]);
 
+            $this->dispatch('configurationChanged');
             $this->dispatch('success', 'File mount added successfully');
             $this->dispatch('closeStorageModal', 'file');
             $this->clearForm();
@@ -195,6 +198,7 @@ class Storage extends Component
                 'resource_type' => get_class($this->resource),
             ]);
 
+            $this->dispatch('configurationChanged');
             $this->dispatch('success', 'Host file mount added successfully');
             $this->dispatch('closeStorageModal', 'host-file');
             $this->clearForm();
@@ -231,6 +235,7 @@ class Storage extends Component
                 'resource_type' => get_class($this->resource),
             ]);
 
+            $this->dispatch('configurationChanged');
             $this->dispatch('success', 'Directory mount added successfully');
             $this->dispatch('closeStorageModal', 'directory');
             $this->clearForm();
