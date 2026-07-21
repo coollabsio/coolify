@@ -81,7 +81,6 @@ class DashboardData
             'links' => [
                 'onboarding' => route('onboarding'),
                 'serverCreate' => route('server.create'),
-                'profileAppearance' => route('profile.appearance'),
                 'dashboard' => route('dashboard'),
                 'uiMode' => route('ui.mode'),
             ],

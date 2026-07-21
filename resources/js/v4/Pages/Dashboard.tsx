@@ -1,4 +1,4 @@
-import { Head, usePage } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 
 import { Button } from '@/components/ui/button';
 import { csrfToken } from '@/lib/csrf';
@@ -14,8 +14,6 @@ export default function Dashboard({
     links,
     flash,
 }: V4DashboardProps) {
-    const { uiMode } = usePage().props as { uiMode?: string };
-
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6">
             <Head title="Dashboard | Coolify" />
@@ -27,9 +25,6 @@ export default function Dashboard({
                     {flash?.error ? <p className="text-destructive mt-2 text-sm">{flash.error}</p> : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide">
-                        UI: {uiMode ?? 'next'}
-                    </span>
                     {/* Native form POST so the browser does a full document reload into classic Livewire. */}
                     <form method="POST" action={links.uiMode}>
                         <input type="hidden" name="_token" value={csrfToken()} />
@@ -38,9 +33,6 @@ export default function Dashboard({
                             Switch to classic UI
                         </Button>
                     </form>
-                    <Button type="button" variant="ghost" size="sm" render={<ClassicLink href={links.profileAppearance} />}>
-                        Appearance
-                    </Button>
                 </div>
             </header>
 

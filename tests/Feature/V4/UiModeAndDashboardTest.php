@@ -84,6 +84,7 @@ it('serves the inertia next dashboard when ui mode is next', function () {
             ->where('projects.0.name', 'Next Project')
             ->where('permissions.createProject', true)
             ->has('links.uiMode')
+            ->missing('links.profileAppearance')
             ->where('uiMode', UiMode::Next->value));
 });
 

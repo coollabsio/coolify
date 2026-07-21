@@ -28,7 +28,6 @@ export type V4DashboardPermissions = {
 export type V4DashboardLinks = {
     onboarding: string;
     serverCreate: string;
-    profileAppearance: string;
     dashboard: string;
     uiMode: string;
 };
