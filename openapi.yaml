@@ -2022,7 +2022,7 @@ paths:
       tags:
         - Applications
       summary: 'Get application logs.'
-      description: 'Get application logs by UUID.'
+      description: 'Get application logs by UUID. For Docker Compose applications with multiple services, pass `service_name` (the compose service key, e.g. `web` or `db`) to select which container''s logs to return. Without `service_name`, the first running container is used (legacy behavior).'
       operationId: get-application-logs-by-uuid
       parameters:
         -
@@ -2030,6 +2030,13 @@ paths:
           in: path
           description: 'UUID of the application.'
           required: true
+          schema:
+            type: string
+        -
+          name: service_name
+          in: query
+          description: 'Docker Compose service name (the key under `services:` in docker-compose). Required to target a specific container when the application runs multiple compose services.'
+          required: false
           schema:
             type: string
         -

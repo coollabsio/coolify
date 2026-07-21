@@ -102,6 +102,80 @@ function filterServiceSubContainersByName(Collection $containers, string $name):
     })->values();
 }
 
+/**
+ * Filter application containers belonging to a docker-compose service.
+ *
+ * Compose applications name containers as "{serviceName}-{applicationUuid}[-suffix]".
+ * Non-compose applications typically use "{applicationUuid}[-suffix]" only.
+ *
+ * Matching is done in PHP (never interpolate user input into shell filters).
+ */
+function filterApplicationContainersByServiceName(Collection $containers, string $serviceName, string $applicationUuid): Collection
+{
+    $serviceName = trim($serviceName);
+    if ($serviceName === '') {
+        return $containers->values();
+    }
+
+    $uuid = trim($applicationUuid);
+    $namePrefix = $serviceName.'-'.$uuid;
+    $slugPrefix = Str::slug($namePrefix);
+
+    return $containers->filter(function ($container) use ($serviceName, $namePrefix, $slugPrefix) {
+        $rawNames = (string) data_get($container, 'Names', '');
+        foreach (preg_split('/,/', $rawNames) ?: [] as $rawName) {
+            $name = ltrim(trim((string) $rawName), '/');
+            if ($name === '') {
+                continue;
+            }
+            // Exact service name (rare) or Coolify compose naming: {service}-{uuid}[-suffix]
+            if ($name === $serviceName || str_starts_with($name, $namePrefix)) {
+                return true;
+            }
+        }
+
+        $labels = data_get($container, 'Labels', []);
+        if (is_string($labels)) {
+            $labels = format_docker_labels_to_json($labels);
+        }
+        $coolifyName = (string) collect($labels)->get('coolify.name', '');
+        if ($coolifyName !== '' && ($coolifyName === $slugPrefix || str_starts_with($coolifyName, $slugPrefix))) {
+            return true;
+        }
+
+        return false;
+    })->values();
+}
+
+/**
+ * Infer docker-compose service names from running application containers.
+ *
+ * @return list<string>
+ */
+function listApplicationComposeServiceNames(Collection $containers, string $applicationUuid): array
+{
+    $uuid = trim($applicationUuid);
+    if ($uuid === '') {
+        return [];
+    }
+
+    return $containers->map(function ($container) use ($uuid) {
+        $rawNames = (string) data_get($container, 'Names', '');
+        foreach (preg_split('/,/', $rawNames) ?: [] as $rawName) {
+            $name = ltrim(trim((string) $rawName), '/');
+            if ($name === '') {
+                continue;
+            }
+            // {service}-{uuid} or {service}-{uuid}-{timestamp|pr-N}
+            if (preg_match('/^(.+)-'.preg_quote($uuid, '/').'(?:$|[-_])/', $name, $matches)) {
+                return $matches[1];
+            }
+        }
+
+        return null;
+    })->filter()->unique()->values()->all();
+}
+
 function format_docker_command_output_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);

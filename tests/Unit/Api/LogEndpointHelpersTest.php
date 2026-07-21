@@ -99,3 +99,51 @@ it('does not interpolate the requested service name into the docker ps shell com
 
     expect($source)->not->toContain('coolify.name={$name}');
 });
+
+it('filters application compose containers by service name', function () {
+    if (! function_exists('filterApplicationContainersByServiceName')) {
+        expect(function_exists('filterApplicationContainersByServiceName'))->toBeTrue();
+
+        return;
+    }
+
+    $uuid = 'app-uuid-123';
+    $containers = collect([
+        ['ID' => 'web-id', 'Names' => "web-{$uuid}", 'Labels' => "coolify.name=web-{$uuid},coolify.applicationId=1"],
+        ['ID' => 'db-id', 'Names' => "db-{$uuid}-120000000000", 'Labels' => "coolify.name=db-{$uuid}-120000000000"],
+        ['ID' => 'other-id', 'Names' => "worker-other-uuid", 'Labels' => 'coolify.name=worker-other-uuid'],
+    ]);
+
+    expect(filterApplicationContainersByServiceName($containers, 'web', $uuid)->pluck('ID')->all())
+        ->toBe(['web-id'])
+        ->and(filterApplicationContainersByServiceName($containers, 'db', $uuid)->pluck('ID')->all())
+        ->toBe(['db-id'])
+        ->and(filterApplicationContainersByServiceName($containers, 'missing', $uuid)->all())
+        ->toBe([]);
+});
+
+it('lists available compose service names from application containers', function () {
+    if (! function_exists('listApplicationComposeServiceNames')) {
+        expect(function_exists('listApplicationComposeServiceNames'))->toBeTrue();
+
+        return;
+    }
+
+    $uuid = 'app-uuid-123';
+    $containers = collect([
+        ['Names' => "web-{$uuid}"],
+        ['Names' => "db-{$uuid}-pr-4"],
+        ['Names' => "api-{$uuid}-155959123456"],
+        ['Names' => 'unrelated-container'],
+    ]);
+
+    expect(listApplicationComposeServiceNames($containers, $uuid))
+        ->toBe(['web', 'db', 'api']);
+});
+
+it('documents service_name on the application logs OpenAPI path', function () {
+    $source = file_get_contents(__DIR__.'/../../../app/Http/Controllers/Api/ApplicationsController.php');
+
+    expect($source)->toContain("name: 'service_name'")
+        ->and($source)->toContain('filterApplicationContainersByServiceName');
+});

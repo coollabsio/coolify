@@ -2286,7 +2286,7 @@ class ApplicationsController extends Controller
 
     #[OA\Get(
         summary: 'Get application logs.',
-        description: 'Get application logs by UUID.',
+        description: 'Get application logs by UUID. For Docker Compose applications with multiple services, pass `service_name` (the compose service key, e.g. `web` or `db`) to select which container\'s logs to return. Without `service_name`, the first running container is used (legacy behavior).',
         path: '/applications/{uuid}/logs',
         operationId: 'get-application-logs-by-uuid',
         security: [
@@ -2299,6 +2299,15 @@ class ApplicationsController extends Controller
                 in: 'path',
                 description: 'UUID of the application.',
                 required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'service_name',
+                in: 'query',
+                description: 'Docker Compose service name (the key under `services:` in docker-compose). Required to target a specific container when the application runs multiple compose services.',
+                required: false,
                 schema: new OA\Schema(
                     type: 'string',
                 )
@@ -2375,7 +2384,26 @@ class ApplicationsController extends Controller
             ], 400);
         }
 
-        $container = $containers->first();
+        $serviceName = trim((string) $request->query('service_name', ''));
+        if ($serviceName !== '') {
+            $matched = filterApplicationContainersByServiceName($containers, $serviceName, $application->uuid);
+            if ($matched->isEmpty()) {
+                $available = listApplicationComposeServiceNames($containers, $application->uuid);
+                $message = "No running container found for compose service '{$serviceName}'.";
+                if (count($available) > 0) {
+                    $message .= ' Available services: '.implode(', ', $available).'.';
+                }
+
+                return response()->json([
+                    'message' => $message,
+                    'available_services' => $available,
+                ], 404);
+            }
+            $container = $matched->first();
+        } else {
+            // Backward compatible: single-container apps and legacy multi-service callers.
+            $container = $containers->first();
+        }
 
         $status = getContainerStatus($application->destination->server, $container['Names']);
         if ($status !== 'running') {
