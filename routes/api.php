@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
+use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\Internal\FluxResourceStatusController;
 use App\Http\Controllers\Api\NotificationsController;
@@ -275,6 +276,11 @@ Route::group([
     Route::delete('/github-apps/{github_app_id}', [GithubController::class, 'delete_github_app'])->middleware(['api.ability:write']);
     Route::get('/github-apps/{github_app_id}/repositories', [GithubController::class, 'load_repositories'])->middleware(['api.ability:read']);
     Route::get('/github-apps/{github_app_id}/repositories/{owner}/{repo}/branches', [GithubController::class, 'load_branches'])->middleware(['api.ability:read']);
+
+    Route::get('/gitlab-apps', [GitlabController::class, 'list_gitlab_apps'])->middleware(['api.ability:read']);
+    Route::post('/gitlab-apps', [GitlabController::class, 'create_gitlab_app'])->middleware(['api.ability:write']);
+    Route::patch('/gitlab-apps/{gitlab_app_id}', [GitlabController::class, 'update_gitlab_app'])->middleware(['api.ability:write']);
+    Route::delete('/gitlab-apps/{gitlab_app_id}', [GitlabController::class, 'delete_gitlab_app'])->middleware(['api.ability:write']);
 
     Route::get('/databases', [DatabasesController::class, 'databases'])->middleware(['api.ability:read']);
     Route::post('/databases/postgresql', [DatabasesController::class, 'create_database_postgresql'])->middleware(['api.ability:write']);

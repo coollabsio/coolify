@@ -11,7 +11,7 @@
                     Open Repository
                     <x-external-link />
                 </a>
-                @if (data_get($application, 'source.is_public') === false)
+                @if (data_get($application, 'source.is_public') === false && $application->source instanceof \App\Models\GithubApp)
                     <a target="_blank" class="hover:no-underline flex items-center gap-1"
                         href="{{ getInstallationPath($application->source) }}">
                         Open Git App
@@ -67,7 +67,7 @@
                         @forelse ($sources as $source)
                             <div wire:key="{{ $source->name }}">
                                 <x-modal-confirmation title="Change Git Source" :actions="['Change git source to ' . $source->name]" :buttonFullWidth="true"
-                                    :isHighlightedButton="$application->source_id === $source->id" :disabled="$application->source_id === $source->id"
+                                    :isHighlightedButton="$application->source_id === $source->id && $application->source_type === $source->getMorphClass()" :disabled="$application->source_id === $source->id && $application->source_type === $source->getMorphClass()"
                                     submitAction="changeSource({{ $source->id }}, {{ $source->getMorphClass() }})"
                                     :confirmWithText="true" confirmationText="Change Git Source"
                                     confirmationLabel="Please confirm changing the git source by entering the text below"
@@ -76,7 +76,7 @@
                                         <div class="flex items-center gap-2">
                                             <div class="box-title">
                                                 {{ $source->name }}
-                                                @if ($application->source_id === $source->id)
+                                                @if ($application->source_id === $source->id && $application->source_type === $source->getMorphClass())
                                                     <span class="text-xs">(current)</span>
                                                 @endif
                                             </div>
