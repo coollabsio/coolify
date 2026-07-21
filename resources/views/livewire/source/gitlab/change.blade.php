@@ -46,7 +46,8 @@
 
                 <h3 class="pt-4">OAuth Credentials</h3>
                 <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientId" label="Application ID" />
-                <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientSecretInput" label="Application Secret" type="password" />
+                <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientSecretInput" label="Application Secret" type="password"
+                    helper="Stored encrypted. Leave empty and save other fields without changing the existing secret." />
                 <x-forms.input canGate="update" :canResource="$gitlab_app" id="groupName" label="Group Name"
                     helper="Comma-separated group names to filter visible repositories." />
 
@@ -171,8 +172,9 @@
                 <x-forms.input id="name" label="Name" />
                 <x-forms.input id="clientId" label="Application ID" required
                     helper="The Application ID from your GitLab OAuth Application." />
-                <x-forms.input id="clientSecretInput" label="Application Secret" type="password" required
-                    helper="The Secret from your GitLab OAuth Application." />
+                <x-forms.input id="clientSecretInput" label="Application Secret" type="password"
+                    :required="blank($clientSecretInput) && blank(data_get($gitlab_app, 'client_secret'))"
+                    helper="The Secret from your GitLab OAuth Application. Saved encrypted and shown again after reload." />
                 <x-forms.input id="groupName" label="Group Name"
                     helper="Optional. Comma-separated group names to filter repositories." />
 

@@ -56,4 +56,21 @@ describe('GitLab source setup view', function () {
             ->set('htmlUrl', 'https://gitlab.example.com')
             ->assertSet('apiUrl', 'https://gitlab.example.com/api/v4');
     });
+
+    test('saves and reloads the application secret after refresh', function () {
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->set('clientId', 'gitlab-app-id')
+            ->set('clientSecretInput', 'super-secret-value')
+            ->call('submit')
+            ->assertDispatched('success');
+
+        $this->gitlabApp->refresh()->makeVisible(['client_secret']);
+        expect($this->gitlabApp->client_secret)->toBe('super-secret-value');
+
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->assertSet('clientId', 'gitlab-app-id')
+            ->assertSet('clientSecretInput', 'super-secret-value');
+    });
 });

@@ -173,7 +173,9 @@ class Change extends Component
             $this->customUser = $this->gitlab_app->custom_user;
             $this->customPort = $this->gitlab_app->custom_port;
             $this->clientId = $this->gitlab_app->client_id;
-            $this->clientSecretInput = null;
+            // Decrypt and surface for authorized editors (same pattern as GitHub App client_secret).
+            $this->gitlab_app->makeVisible(['client_secret', 'webhook_token', 'access_token', 'refresh_token']);
+            $this->clientSecretInput = $this->gitlab_app->client_secret;
             $this->webhookToken = $this->gitlab_app->webhook_token;
             $this->groupName = $this->gitlab_app->group_name;
             $this->isSystemWide = $this->gitlab_app->is_system_wide;
