@@ -158,41 +158,6 @@
                 return base ? base.replace(/\/+$/, '') + this.redirectPath : '';
             }
         }">
-            @if (!isCloud() || isDev())
-                <div class="flex flex-col gap-3">
-                    <h3>Public endpoint</h3>
-                    <div class="text-sm dark:text-neutral-400">
-                        GitLab will redirect back to this Coolify URL. It must match the Callback URL on your GitLab OAuth Application exactly.
-                    </div>
-                    <x-forms.checkbox x-model="useCustomWebhookEndpoint" id="use_custom_webhook_endpoint"
-                        label="Use custom webhook endpoint"
-                        helper="Enable this when the public URL GitLab should call differs from Coolify's configured URL, for example behind Cloudflare Tunnel or when accessing via a LAN IP." />
-                    <div x-show="!useCustomWebhookEndpoint">
-                        <x-forms.select wire:model.live='webhook_endpoint' x-model="webhookEndpoint"
-                            label="Selected endpoint"
-                            helper="GitLab will use this endpoint unless custom mode is enabled.">
-                            @if ($fqdn)
-                                <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
-                            @endif
-                            @if ($ipv4)
-                                <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
-                            @endif
-                            @if ($ipv6)
-                                <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
-                            @endif
-                            @if (config('app.url'))
-                                <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
-                            @endif
-                        </x-forms.select>
-                    </div>
-                    <div x-cloak x-show="useCustomWebhookEndpoint">
-                        <x-forms.input x-model="customWebhookEndpoint" id="custom_webhook_endpoint" type="url"
-                            label="Custom endpoint" placeholder="https://coolify.example.com"
-                            helper="GitLab will use this custom public URL. Do not include /webhooks." />
-                    </div>
-                </div>
-            @endif
-
             <h3>Step 1: Create an OAuth Application on GitLab</h3>
             <div class="text-sm flex flex-col gap-1">
                 <p>Go to your GitLab instance and create a new OAuth Application:</p>
@@ -223,6 +188,41 @@
                     helper="The Secret from your GitLab OAuth Application. Saved encrypted and shown again after reload." />
                 <x-forms.input id="groupName" label="Group Name"
                     helper="Optional. Comma-separated group names to filter repositories." />
+
+                @if (!isCloud() || isDev())
+                    <div class="flex flex-col gap-3 pt-2">
+                        <div class="text-sm font-medium">Public endpoint</div>
+                        <div class="text-sm dark:text-neutral-400">
+                            GitLab will redirect back to this Coolify URL. It must match the Callback URL on your GitLab OAuth Application exactly.
+                        </div>
+                        <x-forms.checkbox x-model="useCustomWebhookEndpoint" id="use_custom_webhook_endpoint"
+                            label="Use custom webhook endpoint"
+                            helper="Enable this when the public URL GitLab should call differs from Coolify's configured URL, for example behind Cloudflare Tunnel or when accessing via a LAN IP." />
+                        <div x-show="!useCustomWebhookEndpoint">
+                            <x-forms.select wire:model.live='webhook_endpoint' x-model="webhookEndpoint"
+                                label="Selected endpoint"
+                                helper="GitLab will use this endpoint unless custom mode is enabled.">
+                                @if ($fqdn)
+                                    <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
+                                @endif
+                                @if ($ipv4)
+                                    <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
+                                @endif
+                                @if ($ipv6)
+                                    <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
+                                @endif
+                                @if (config('app.url'))
+                                    <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
+                                @endif
+                            </x-forms.select>
+                        </div>
+                        <div x-cloak x-show="useCustomWebhookEndpoint">
+                            <x-forms.input x-model="customWebhookEndpoint" id="custom_webhook_endpoint" type="url"
+                                label="Custom endpoint" placeholder="https://coolify.example.com"
+                                helper="GitLab will use this custom public URL. Do not include /webhooks." />
+                        </div>
+                    </div>
+                @endif
 
                 <div x-data="{
                                         activeAccordion: '',
