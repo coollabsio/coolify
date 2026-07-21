@@ -163,14 +163,26 @@ trait BuildsResponse
      */
     protected function actionsForApplication(string $uuid, ?string $status = null): array
     {
-        return [
+        $actions = [
             ['tool' => 'get_application', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
-            ['tool' => 'get_logs', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Container logs'],
             ['tool' => 'list_env_keys', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
             ['tool' => 'list_deployments', 'args' => ['application_uuid' => $uuid], 'hint' => 'Deployment history'],
+            ['tool' => 'list_application_previews', 'args' => ['uuid' => $uuid], 'hint' => 'PR preview deployments'],
             ['tool' => 'list_storages', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
             ['tool' => 'list_scheduled_tasks', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Scheduled tasks'],
         ];
+
+        $s = strtolower((string) $status);
+        if (str_starts_with($s, 'running') && ! str_contains($s, 'unhealthy')) {
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Live container logs (requires running)'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'stop', 'uuid' => $uuid, 'confirm' => true], 'hint' => 'Stop (needs deploy + confirm)'];
+        } else {
+            $actions[] = ['tool' => 'deploy', 'args' => ['uuid' => $uuid], 'hint' => 'Deploy/start (needs deploy ability)'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start (needs deploy ability)'];
+        }
+
+        return $actions;
     }
 
     /**
@@ -178,13 +190,22 @@ trait BuildsResponse
      */
     protected function actionsForDatabase(string $uuid, ?string $status = null): array
     {
-        return [
+        $actions = [
             ['tool' => 'get_database', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
-            ['tool' => 'get_logs', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Container logs'],
             ['tool' => 'list_env_keys', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
             ['tool' => 'list_database_backups', 'args' => ['uuid' => $uuid], 'hint' => 'Backup schedules'],
             ['tool' => 'list_storages', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
         ];
+
+        $s = strtolower((string) $status);
+        if (str_starts_with($s, 'running') && ! str_contains($s, 'unhealthy')) {
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Live logs if running'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
+        } else {
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start (needs deploy ability)'];
+        }
+
+        return $actions;
     }
 
     /**
@@ -192,15 +213,24 @@ trait BuildsResponse
      */
     protected function actionsForService(string $uuid, ?string $status = null): array
     {
-        return [
+        $actions = [
             ['tool' => 'get_service', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
             ['tool' => 'list_service_applications', 'args' => ['uuid' => $uuid], 'hint' => 'Service applications'],
             ['tool' => 'list_service_databases', 'args' => ['uuid' => $uuid], 'hint' => 'Service databases'],
-            ['tool' => 'get_logs', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Service logs'],
             ['tool' => 'list_env_keys', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
             ['tool' => 'list_storages', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
             ['tool' => 'list_scheduled_tasks', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Scheduled tasks'],
         ];
+
+        $s = strtolower((string) $status);
+        if (str_contains($s, 'running') && ! str_contains($s, 'unhealthy')) {
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Live logs if running'];
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
+        } else {
+            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start (needs deploy ability)'];
+        }
+
+        return $actions;
     }
 
     /**

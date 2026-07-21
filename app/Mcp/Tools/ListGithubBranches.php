@@ -15,10 +15,15 @@ class ListGithubBranches extends Tool
 {
     protected string $name = 'list_github_branches';
 
-    protected string $description = 'List branches for a repository via a GitHub app owned by (or system-wide for) the authenticated team.';
+    protected string $description = 'List branches for a repository via a team GitHub app (calls GitHub API). Soft-registered only when a GitHub app exists.';
 
     use BuildsResponse;
     use ResolvesTeam;
+
+    public function shouldRegister(): bool
+    {
+        return GithubApp::query()->exists();
+    }
 
     public function handle(Request $request): Response
     {
@@ -68,7 +73,14 @@ class ListGithubBranches extends Tool
                     ->get("/repos/{$owner}/{$repo}/branches", ['per_page' => 100, 'page' => $page]);
 
                 if ($response->failed()) {
-                    return $this->mcpError($request, 'Failed to load branches from GitHub.', ['resource_uuid' => $appUuid]);
+                    $status = $response->status();
+                    $hint = match (true) {
+                        $status === 401, $status === 403 => 'GitHub app credentials/installation invalid or missing permissions.',
+                        $status === 404 => 'Repository not found or not accessible to this GitHub app.',
+                        default => 'GitHub API request failed.',
+                    };
+
+                    return $this->mcpError($request, "{$hint} (HTTP {$status})", ['resource_uuid' => $appUuid]);
                 }
 
                 $batch = collect($response->json() ?? []);

@@ -140,7 +140,7 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'list_env_keys',
     );
     expect($toolNames)->not->toContain('get_resource_status');
-    expect($toolNames)->not->toContain('control');
+    expect($toolNames)->toContain('coolify_help', 'control', 'deploy');
 });
 
 test('list_projects returns summary + pagination scoped to the token team', function () {

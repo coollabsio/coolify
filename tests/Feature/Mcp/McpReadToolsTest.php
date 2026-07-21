@@ -70,7 +70,7 @@ function mcpReadJson($response): array
     return json_decode($response->json('result.content.0.text'), true);
 }
 
-test('tools/list includes new read tools and excludes control', function () {
+test('tools/list includes new read tools and lifecycle tools', function () {
     $token = mcpReadToken();
     $response = test()->withHeaders([
         'Content-Type' => 'application/json',
@@ -106,8 +106,15 @@ test('tools/list includes new read tools and excludes control', function () {
         'list_database_backups',
         'list_service_applications',
         'list_service_databases',
+        'search_resources',
+        'list_unhealthy_resources',
+        'list_application_previews',
+        'list_shared_env_keys',
+        'coolify_help',
+        'control',
+        'deploy',
+        'cancel_deployment',
     );
-    expect($names)->not->toContain('control');
 });
 
 test('get_project returns environments and counts for team project only', function () {
@@ -395,4 +402,285 @@ test('get_logs rejects other team application uuid', function () {
         'uuid' => $otherApp->uuid,
     ]);
     expect($response->json('result.isError'))->toBeTrue();
+});
+
+test('search_resources finds team app by name and domain and excludes other team', function () {
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDest = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    Application::factory()->create([
+        'name' => 'SecretOtherApp',
+        'fqdn' => 'https://app.example.com',
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+
+    $byName = mcpReadCall('search_resources', ['query' => $this->application->name]);
+    $byName->assertOk();
+    $names = collect(mcpReadJson($byName)['data']['results'])->pluck('name');
+    expect($names)->toContain($this->application->name);
+    expect($names)->not->toContain('SecretOtherApp');
+
+    $byDomain = mcpReadCall('search_resources', ['query' => 'app.example.com', 'types' => 'application']);
+    $byDomain->assertOk();
+    $uuids = collect(mcpReadJson($byDomain)['data']['results'])->pluck('uuid');
+    expect($uuids)->toContain($this->application->uuid);
+});
+
+test('list_unhealthy_resources includes non-running apps and is team scoped', function () {
+    $this->application->update(['status' => 'exited:unhealthy']);
+
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDest = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    Application::factory()->create([
+        'name' => 'OtherDown',
+        'status' => 'exited:unhealthy',
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+
+    $response = mcpReadCall('list_unhealthy_resources');
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    $names = collect($body['data']['unhealthy'])->pluck('name');
+    expect($names)->toContain($this->application->name);
+    expect($names)->not->toContain('OtherDown');
+});
+
+test('list_application_previews is team scoped', function () {
+    $preview = \App\Models\ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://github.com/org/repo/pull/42',
+        'fqdn' => 'https://pr-42.example.com',
+        'status' => 'running:healthy',
+    ]);
+
+    $response = mcpReadCall('list_application_previews', ['uuid' => $this->application->uuid]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    expect(collect($body['data']['previews'])->pluck('uuid'))->toContain($preview->uuid);
+    expect(collect($body['data']['previews'])->pluck('pull_request_id'))->toContain(42);
+
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDest = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    $otherApp = Application::factory()->create([
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+
+    expect(mcpReadCall('list_application_previews', ['uuid' => $otherApp->uuid])->json('result.isError'))->toBeTrue();
+});
+
+test('list_shared_env_keys returns names without values and is team scoped', function () {
+    \App\Models\SharedEnvironmentVariable::create([
+        'key' => 'SHARED_API_URL',
+        'value' => 'https://secret.example.com',
+        'type' => 'project',
+        'team_id' => $this->team->id,
+        'project_id' => $this->project->id,
+    ]);
+
+    $response = mcpReadCall('list_shared_env_keys', [
+        'scope' => 'project',
+        'uuid' => $this->project->uuid,
+    ]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    $raw = json_encode($body);
+    expect(collect($body['data']['keys'])->pluck('key'))->toContain('SHARED_API_URL');
+    expect($raw)->not->toContain('secret.example.com');
+    expect($raw)->not->toContain('"value"');
+
+    $otherProject = Project::factory()->create(['team_id' => Team::factory()->create()->id]);
+    expect(mcpReadCall('list_shared_env_keys', [
+        'scope' => 'project',
+        'uuid' => $otherProject->uuid,
+    ])->json('result.isError'))->toBeTrue();
+});
+
+test('get_deployment include_log_summary returns capped redacted text', function () {
+    $logs = json_encode([
+        ['output' => 'step 1 ok', 'type' => 'stdout', 'hidden' => false],
+        ['output' => 'password=supersecretvalue', 'type' => 'stderr', 'hidden' => false],
+        ['output' => 'done', 'type' => 'stdout', 'hidden' => false],
+    ]);
+
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-log-'.fake()->uuid(),
+        'status' => 'failed',
+        'server_id' => $this->server->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+        'commit' => 'deadbeef',
+        'logs' => $logs,
+    ]);
+
+    $response = mcpReadCall('get_deployment', [
+        'uuid' => $deployment->deployment_uuid,
+        'include_log_summary' => true,
+        'log_lines' => 10,
+    ]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+
+    expect($body['data']['log_summary']['available'])->toBeTrue();
+    expect($body['data']['log_summary']['text'])->toContain('step 1 ok');
+    // Full logs field still scrubbed from root payload
+    expect(json_encode($body))->not->toContain('"logs":');
+});
+
+test('list_servers reachable filter works', function () {
+    $this->server->settings->forceFill(['is_reachable' => true])->saveQuietly();
+
+    $response = mcpReadCall('list_servers', ['reachable' => true]);
+    $response->assertOk();
+    $uuids = collect(mcpReadJson($response)['data'])->pluck('uuid');
+    expect($uuids)->toContain($this->server->uuid);
+
+    $none = mcpReadCall('list_servers', ['reachable' => false]);
+    $none->assertOk();
+    expect(collect(mcpReadJson($none)['data'])->pluck('uuid'))->not->toContain($this->server->uuid);
+});
+
+test('list_applications status and server_uuid filters work', function () {
+    $this->application->update(['status' => 'running:healthy']);
+
+    $byStatus = mcpReadCall('list_applications', ['status' => 'running']);
+    $byStatus->assertOk();
+    expect(collect(mcpReadJson($byStatus)['data'])->pluck('uuid'))->toContain($this->application->uuid);
+
+    $byServer = mcpReadCall('list_applications', ['server_uuid' => $this->server->uuid]);
+    $byServer->assertOk();
+    expect(collect(mcpReadJson($byServer)['data'])->pluck('uuid'))->toContain($this->application->uuid);
+
+    $missingServer = mcpReadCall('list_applications', ['server_uuid' => 'no-such-server']);
+    $missingServer->assertOk();
+    expect(mcpReadJson($missingServer)['data'])->toBe([]);
+});
+
+test('MCP lists prompts for troubleshooting workflows', function () {
+    $token = mcpReadToken();
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'prompts/list',
+        'params' => (object) [],
+    ]);
+
+    $response->assertOk();
+    $names = collect($response->json('result.prompts'))->pluck('name')->all();
+    expect($names)->toContain('troubleshoot_application', 'explain_failed_deploy');
+});
+
+test('get_logs returns structured next_tools when application is not running', function () {
+    $this->application->update(['status' => 'exited:unhealthy']);
+
+    $response = mcpReadCall('get_logs', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+    ]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+
+    expect($body['data']['ok'])->toBeFalse();
+    expect($body['data']['reason'])->toBe('not_running');
+    expect($body['data']['next_tools'])->not->toBeEmpty();
+    expect(collect($body['data']['next_tools'])->pluck('tool'))->toContain('list_deployments', 'list_unhealthy_resources');
+});
+
+test('coolify_help returns catalog intents', function () {
+    $response = mcpReadCall('coolify_help', ['intent' => 'essentials']);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    expect($body['data']['catalog']['essentials']['tools'])->toContain('search_resources', 'control');
+});
+
+test('list_unhealthy_resources sample_only returns summary and samples', function () {
+    $this->application->update(['status' => 'exited:unhealthy']);
+
+    $response = mcpReadCall('list_unhealthy_resources', ['sample_only' => true, 'sample_per_type' => 3]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    expect($body['data']['sample_only'])->toBeTrue();
+    expect($body['data']['summary'])->toHaveKeys(['total', 'applications', 'servers']);
+    expect($body['data']['samples'])->toHaveKeys(['applications', 'servers', 'services', 'databases']);
+});
+
+test('control and deploy require deploy ability', function () {
+    $denied = mcpReadCall('control', [
+        'resource' => 'application',
+        'action' => 'start',
+        'uuid' => $this->application->uuid,
+    ]);
+    $denied->assertOk();
+    expect($denied->json('result.isError'))->toBeTrue();
+    expect($denied->json('result.content.0.text'))->toContain('Missing required permissions');
+
+    $deployDenied = mcpReadCall('deploy', ['uuid' => $this->application->uuid]);
+    expect($deployDenied->json('result.isError'))->toBeTrue();
+});
+
+test('control stop requires confirm', function () {
+    $token = test()->user->createToken('mcp-deploy', ['read', 'deploy'])->plainTextToken;
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'control',
+            'arguments' => (object) [
+                'resource' => 'application',
+                'action' => 'stop',
+                'uuid' => $this->application->uuid,
+            ],
+        ],
+    ]);
+    expect($response->json('result.isError'))->toBeTrue();
+    expect($response->json('result.content.0.text'))->toContain('confirm=true');
+});
+
+test('MCP resources list includes overview and application template', function () {
+    $token = mcpReadToken();
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'resources/list',
+        'params' => (object) [],
+    ]);
+
+    $response->assertOk();
+    $uris = collect($response->json('result.resources'))->pluck('uri')->filter()->all();
+    $templates = collect($response->json('result.resources'))->pluck('uriTemplate')->filter()->all();
+
+    // Static resource may appear under resources; templates under list or templates/list depending on server.
+    $all = collect($uris)->merge($templates)->implode(' ');
+    expect($all)->toContain('coolify://');
 });

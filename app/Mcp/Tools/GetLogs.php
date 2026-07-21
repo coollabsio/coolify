@@ -18,7 +18,7 @@ class GetLogs extends Tool
 {
     protected string $name = 'get_logs';
 
-    protected string $description = 'Fetch recent container logs for an application, database, service, or service child resource owned by the authenticated team. Default 100 lines, max 500.';
+    protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
 
     use BuildsResponse;
     use ResolvesResource;
@@ -60,18 +60,145 @@ class GetLogs extends Tool
         $lines = $this->normalizeMcpLogLines($request->get('lines'));
         $showTimestamps = parseLogTimestampFlag($request->get('show_timestamps'));
 
+        $failure = $this->preflightFailure($resource, $resourceType, $uuid);
+        if ($failure !== null) {
+            return $this->mcpSuccess($request, $this->respond($failure), ['resource_uuid' => $uuid, 'outcome' => 'unavailable']);
+        }
+
         try {
             $logs = $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps);
         } catch (\Throwable $e) {
-            return $this->mcpError($request, $e->getMessage(), ['resource_uuid' => $uuid]);
+            return $this->mcpSuccess($request, $this->respond(
+                $this->failurePayload(
+                    reason: 'log_fetch_failed',
+                    message: $e->getMessage(),
+                    resourceType: $resourceType,
+                    uuid: $uuid,
+                    status: $resource->status ?? null,
+                    server: $this->resolveServerMeta($resource, $resourceType),
+                )
+            ), ['resource_uuid' => $uuid, 'outcome' => 'error']);
         }
 
         return $this->mcpSuccess($request, $this->respond([
+            'ok' => true,
             'resource' => $resourceType,
             'uuid' => $uuid,
             'lines' => $lines,
             'logs' => $logs,
         ]), ['resource_uuid' => $uuid]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function preflightFailure(mixed $resource, string $resourceType, string $uuid): ?array
+    {
+        $status = $resource->status ?? null;
+        $serverMeta = $this->resolveServerMeta($resource, $resourceType);
+
+        // Prefer status-based failure (DB-only) before host reachability so agents
+        // can continue with deploy history without needing a live SSH path.
+        if (is_string($status) && $status !== '' && ! str_starts_with(strtolower($status), 'running')) {
+            return $this->failurePayload(
+                reason: 'not_running',
+                message: 'Resource is not running; live container logs are unavailable.',
+                resourceType: $resourceType,
+                uuid: $uuid,
+                status: $status,
+                server: $serverMeta,
+            );
+        }
+
+        if ($serverMeta === null) {
+            return $this->failurePayload(
+                reason: 'no_server',
+                message: 'Resource has no server destination; cannot fetch logs.',
+                resourceType: $resourceType,
+                uuid: $uuid,
+                status: $status,
+                server: null,
+            );
+        }
+
+        if ($serverMeta['is_reachable'] === false) {
+            return $this->failurePayload(
+                reason: 'server_unreachable',
+                message: 'Destination server is not reachable from Coolify; cannot fetch live logs.',
+                resourceType: $resourceType,
+                uuid: $uuid,
+                status: $status,
+                server: $serverMeta,
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array{uuid: ?string, name: ?string, is_reachable: ?bool}|null  $server
+     * @return array<string, mixed>
+     */
+    private function failurePayload(
+        string $reason,
+        string $message,
+        string $resourceType,
+        string $uuid,
+        mixed $status,
+        ?array $server,
+    ): array {
+        $next = [
+            ['tool' => 'list_unhealthy_resources', 'args' => new \stdClass, 'hint' => 'See all unhealthy resources'],
+            ['tool' => 'list_deployments', 'args' => $resourceType === 'application' ? ['application_uuid' => $uuid] : new \stdClass, 'hint' => 'Check deploy history'],
+        ];
+
+        if ($resourceType === 'application') {
+            $next[] = ['tool' => 'get_application', 'args' => ['uuid' => $uuid], 'hint' => 'Refresh application status'];
+            $next[] = ['tool' => 'get_deployment', 'args' => ['uuid' => '{deployment_uuid}', 'include_log_summary' => true], 'hint' => 'If a failed deploy exists, use its UUID'];
+            $next[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start/deploy if token has deploy ability'];
+        } elseif ($resourceType === 'database') {
+            $next[] = ['tool' => 'get_database', 'args' => ['uuid' => $uuid], 'hint' => 'Refresh database status'];
+            $next[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start if token has deploy ability'];
+        } elseif ($resourceType === 'service') {
+            $next[] = ['tool' => 'get_service', 'args' => ['uuid' => $uuid], 'hint' => 'Refresh service status'];
+            $next[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start if token has deploy ability'];
+        }
+
+        return [
+            'ok' => false,
+            'reason' => $reason,
+            'message' => $message,
+            'resource' => $resourceType,
+            'uuid' => $uuid,
+            'status' => $status,
+            'server' => $server,
+            'next_tools' => $next,
+        ];
+    }
+
+    /**
+     * @return array{uuid: ?string, name: ?string, is_reachable: ?bool}|null
+     */
+    private function resolveServerMeta(mixed $resource, string $resourceType): ?array
+    {
+        $server = null;
+        if ($resource instanceof Application || $resourceType === 'database') {
+            $server = $resource->destination?->server;
+        } elseif ($resource instanceof Service) {
+            $server = $resource->server;
+        } elseif ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {
+            $server = $resource->service?->server;
+        }
+
+        if (! $server) {
+            return null;
+        }
+
+        return [
+            'uuid' => $server->uuid,
+            'name' => $server->name,
+            'is_reachable' => $server->settings?->is_reachable,
+        ];
     }
 
     private function fetchLogs(mixed $resource, string $resourceType, int $lines, bool $showTimestamps): string
@@ -83,12 +210,12 @@ class GetLogs extends Tool
             }
             $containers = getCurrentApplicationContainerStatus($server, $resource->id);
             if ($containers->count() === 0) {
-                throw new \RuntimeException('Application is not running.');
+                throw new \RuntimeException('Application has no running containers.');
             }
             $container = $containers->first();
             $status = getContainerStatus($server, $container['Names']);
             if ($status !== 'running') {
-                throw new \RuntimeException('Application is not running.');
+                throw new \RuntimeException('Application container is not running.');
             }
 
             return (string) getContainerLogs($server, $container['ID'], $lines, $showTimestamps);
@@ -112,7 +239,6 @@ class GetLogs extends Tool
             if (! $server) {
                 throw new \RuntimeException('Service has no server.');
             }
-            // Aggregate first application container if present; otherwise first database container.
             $app = $resource->applications()->first();
             if ($app) {
                 $containerName = $app->name.'-'.$resource->uuid;

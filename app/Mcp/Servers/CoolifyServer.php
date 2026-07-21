@@ -2,6 +2,14 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Prompts\ExplainFailedDeploy;
+use App\Mcp\Prompts\TroubleshootApplication;
+use App\Mcp\Resources\ApplicationResource;
+use App\Mcp\Resources\InfrastructureOverviewResource;
+use App\Mcp\Tools\CancelDeployment;
+use App\Mcp\Tools\Control;
+use App\Mcp\Tools\CoolifyHelp;
+use App\Mcp\Tools\Deploy;
 use App\Mcp\Tools\GetApplication;
 use App\Mcp\Tools\GetCurrentTeam;
 use App\Mcp\Tools\GetDatabase;
@@ -17,6 +25,7 @@ use App\Mcp\Tools\GetServerResources;
 use App\Mcp\Tools\GetService;
 use App\Mcp\Tools\GetServiceApplication;
 use App\Mcp\Tools\GetServiceDatabase;
+use App\Mcp\Tools\ListApplicationPreviews;
 use App\Mcp\Tools\ListApplications;
 use App\Mcp\Tools\ListBackupExecutions;
 use App\Mcp\Tools\ListDatabaseBackups;
@@ -36,9 +45,12 @@ use App\Mcp\Tools\ListServers;
 use App\Mcp\Tools\ListServiceApplications;
 use App\Mcp\Tools\ListServiceDatabases;
 use App\Mcp\Tools\ListServices;
+use App\Mcp\Tools\ListSharedEnvKeys;
 use App\Mcp\Tools\ListStorages;
 use App\Mcp\Tools\ListTags;
 use App\Mcp\Tools\ListTeamMembers;
+use App\Mcp\Tools\ListUnhealthyResources;
+use App\Mcp\Tools\SearchResources;
 use Laravel\Mcp\Server;
 
 class CoolifyServer extends Server
@@ -55,20 +67,34 @@ class CoolifyServer extends Server
     public int $defaultPaginationLength = 100;
 
     protected string $instructions = <<<'MD'
-Read-only MCP server for Coolify, scoped to the authenticated team token. Every tool enforces team ownership.
+Coolify MCP for the authenticated team token. Every tool enforces team ownership.
 
-Recommended workflow:
-1. get_infrastructure_overview or get_current_team — start here.
-2. list_projects / get_project / get_environment — navigate hierarchy.
-3. list_servers / list_applications / list_databases / list_services / list_resources — browse inventories (paginated).
-4. get_* by UUID for details; get_logs / list_deployments for debugging; list_env_keys for config names (never values).
-5. Server context: get_server_domains, get_server_resources, list_destinations.
+Start here (prefer these before deep get_*):
+1. coolify_help — tool catalog by intent (overview|search|debug|deploy|essentials).
+2. get_infrastructure_overview — counts + health_hints.
+3. search_resources — fuzzy name/UUID/domain when type is unknown.
+4. list_unhealthy_resources sample_only=true — cheap "what's broken?" sample + counts.
 
-Every response is `{ data, _actions?, _pagination? }`. Secrets, passwords, env values, private keys, and full deploy logs are never returned.
+Then: list_*/get_* for details. Debug is DB-first:
+- list_deployments → get_deployment(include_log_summary=true)
+- list_env_keys / list_shared_env_keys (names only, never values)
+- get_logs only if status is running; on failure use reason + next_tools (do not loop)
+
+Lifecycle (requires token ability **deploy**):
+- control (start|stop|restart; stop needs confirm=true)
+- deploy, cancel_deployment
+
+Prompts: troubleshoot_application, explain_failed_deploy.
+Resources: coolify://overview, coolify://application/{uuid}.
+
+Responses: `{ data, _actions?, _pagination? }`. Secrets and full deploy logs are never returned.
 MD;
 
     protected array $tools = [
+        CoolifyHelp::class,
         GetInfrastructureOverview::class,
+        SearchResources::class,
+        ListUnhealthyResources::class,
         GetCurrentTeam::class,
         ListTeamMembers::class,
         ListServers::class,
@@ -83,6 +109,7 @@ MD;
         ListResources::class,
         ListApplications::class,
         GetApplication::class,
+        ListApplicationPreviews::class,
         ListDatabases::class,
         GetDatabase::class,
         ListDatabaseBackups::class,
@@ -97,6 +124,7 @@ MD;
         GetDeployment::class,
         GetLogs::class,
         ListEnvKeys::class,
+        ListSharedEnvKeys::class,
         ListStorages::class,
         ListResourceTags::class,
         ListScheduledTasks::class,
@@ -105,9 +133,18 @@ MD;
         ListGithubApps::class,
         ListGithubRepositories::class,
         ListGithubBranches::class,
+        Control::class,
+        Deploy::class,
+        CancelDeployment::class,
     ];
 
-    protected array $resources = [];
+    protected array $resources = [
+        InfrastructureOverviewResource::class,
+        ApplicationResource::class,
+    ];
 
-    protected array $prompts = [];
+    protected array $prompts = [
+        TroubleshootApplication::class,
+        ExplainFailedDeploy::class,
+    ];
 }

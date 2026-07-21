@@ -15,10 +15,15 @@ class ListGithubRepositories extends Tool
 {
     protected string $name = 'list_github_repositories';
 
-    protected string $description = 'List repositories accessible via a GitHub app owned by (or system-wide for) the authenticated team. Pass github_app_uuid.';
+    protected string $description = 'List repositories via a team GitHub app (calls GitHub API). Prefer list_github_apps first. Soft-registered only when a GitHub app exists.';
 
     use BuildsResponse;
     use ResolvesTeam;
+
+    public function shouldRegister(): bool
+    {
+        return GithubApp::query()->exists();
+    }
 
     public function handle(Request $request): Response
     {
@@ -59,7 +64,14 @@ class ListGithubRepositories extends Tool
                     ->get('/installation/repositories', ['per_page' => 100, 'page' => $page]);
 
                 if ($response->failed()) {
-                    return $this->mcpError($request, 'Failed to load repositories from GitHub.', ['resource_uuid' => $appUuid]);
+                    $status = $response->status();
+                    $hint = match (true) {
+                        $status === 401, $status === 403 => 'GitHub app credentials/installation invalid or missing permissions.',
+                        $status === 404 => 'GitHub installation or endpoint not found.',
+                        default => 'GitHub API request failed.',
+                    };
+
+                    return $this->mcpError($request, "{$hint} (HTTP {$status})", ['resource_uuid' => $appUuid]);
                 }
 
                 $batch = collect($response->json('repositories') ?? []);

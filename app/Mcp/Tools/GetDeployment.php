@@ -14,10 +14,16 @@ class GetDeployment extends Tool
 {
     protected string $name = 'get_deployment';
 
-    protected string $description = 'Get deployment details by deployment UUID for the authenticated team. Build logs and configuration snapshots are never returned.';
+    protected string $description = 'Get deployment details by deployment UUID for the authenticated team. Optional include_log_summary returns a capped, redacted tail of build output (default off). Full logs and configuration snapshots are never returned.';
 
     use BuildsResponse;
     use ResolvesTeam;
+
+    private const DEFAULT_LOG_LINES = 40;
+
+    private const MAX_LOG_LINES = 100;
+
+    private const MAX_LOG_CHARS = 8000;
 
     public function handle(Request $request): Response
     {
@@ -68,16 +74,101 @@ class GetDeployment extends Tool
             'finished_at' => $deployment->finished_at,
         ]);
 
+        $includeSummary = filter_var($request->get('include_log_summary'), FILTER_VALIDATE_BOOLEAN);
+        if ($includeSummary) {
+            $lines = max(1, min(self::MAX_LOG_LINES, (int) ($request->get('log_lines') ?? self::DEFAULT_LOG_LINES)));
+            $data['log_summary'] = $this->buildLogSummary($deployment, $lines);
+        }
+
         return $this->mcpSuccess($request, $this->respond(
             $data,
             $this->actionsForDeployment($uuid, $application->uuid),
         ), ['resource_uuid' => $uuid]);
     }
 
+    /**
+     * @return array{available: bool, lines: int, truncated: bool, text: string|null}
+     */
+    private function buildLogSummary(ApplicationDeploymentQueue $deployment, int $lines): array
+    {
+        $raw = $deployment->getRawOriginal('logs') ?? $deployment->getAttributes()['logs'] ?? null;
+        if (! is_string($raw) || $raw === '') {
+            // logs may be hidden — force read from DB attribute bag
+            $raw = $deployment->getAttributes()['logs'] ?? null;
+        }
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return [
+                'available' => false,
+                'lines' => 0,
+                'truncated' => false,
+                'text' => null,
+            ];
+        }
+
+        try {
+            $entries = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            $text = remove_iip((string) $raw);
+            $text = $this->truncateText($text, self::MAX_LOG_CHARS);
+
+            return [
+                'available' => true,
+                'lines' => substr_count($text, "\n") + 1,
+                'truncated' => strlen((string) $raw) > self::MAX_LOG_CHARS,
+                'text' => $text,
+            ];
+        }
+
+        if (! is_array($entries)) {
+            return [
+                'available' => false,
+                'lines' => 0,
+                'truncated' => false,
+                'text' => null,
+            ];
+        }
+
+        $outputs = collect($entries)
+            ->filter(fn ($e) => is_array($e) && ! ($e['hidden'] ?? false))
+            ->map(function ($e) {
+                $type = $e['type'] ?? 'stdout';
+                $output = (string) ($e['output'] ?? '');
+                $prefix = $type === 'stderr' || $type === 'error' ? '[err] ' : '';
+
+                return $prefix.remove_iip($output);
+            })
+            ->filter(fn ($line) => trim($line) !== '')
+            ->values();
+
+        $tail = $outputs->slice(max(0, $outputs->count() - $lines))->values();
+        $text = $tail->implode("\n");
+        $truncated = $outputs->count() > $lines || strlen($text) > self::MAX_LOG_CHARS;
+        $text = $this->truncateText($text, self::MAX_LOG_CHARS);
+
+        return [
+            'available' => true,
+            'lines' => $tail->count(),
+            'truncated' => $truncated,
+            'text' => $text,
+        ];
+    }
+
+    private function truncateText(string $text, int $max): string
+    {
+        if (strlen($text) <= $max) {
+            return $text;
+        }
+
+        return substr($text, -$max);
+    }
+
     public function schema(JsonSchema $schema): array
     {
         return [
             'uuid' => $schema->string()->description('Deployment UUID.')->required(),
+            'include_log_summary' => $schema->boolean()->description('If true, include a capped redacted tail of deploy output (default false).'),
+            'log_lines' => $schema->integer()->description('Log summary lines when include_log_summary is true (default 40, max 100).'),
         ];
     }
 }
