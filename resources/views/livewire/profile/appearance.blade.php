@@ -37,6 +37,29 @@
         },
     }" class="flex max-w-2xl flex-col">
         <section class="space-y-1.5">
+            <h2>Interface</h2>
+            <div>Choose the Coolify UI for this browser. Classic is Livewire; Next is the new Inertia/React UI (v4).</div>
+            <div class="flex flex-wrap gap-1.5">
+                <form method="POST" action="{{ route('ui.mode') }}">
+                    @csrf
+                    <input type="hidden" name="mode" value="classic">
+                    <button type="submit" aria-label="Use classic UI"
+                        class="flex items-center gap-2 rounded-sm border border-neutral-300 bg-white px-2 py-1 text-left text-sm hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-coollabs dark:border-coolgray-300 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 dark:focus-visible:ring-warning {{ session('ui_mode', request()->cookie('ui_mode', 'classic')) === 'classic' ? 'border-coollabs text-coollabs dark:border-warning dark:text-warning' : '' }}">
+                        <span>Classic</span>
+                    </button>
+                </form>
+                <form method="POST" action="{{ route('ui.mode') }}">
+                    @csrf
+                    <input type="hidden" name="mode" value="next">
+                    <button type="submit" aria-label="Use next UI"
+                        class="flex items-center gap-2 rounded-sm border border-neutral-300 bg-white px-2 py-1 text-left text-sm hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-coollabs dark:border-coolgray-300 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 dark:focus-visible:ring-warning {{ session('ui_mode', request()->cookie('ui_mode', 'classic')) === 'next' ? 'border-coollabs text-coollabs dark:border-warning dark:text-warning' : '' }}">
+                        <span>Next</span>
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <section class="space-y-1.5">
             <h2>Appearance</h2>
             <div>Choose how Coolify looks in this browser.</div>
             <div class="flex flex-wrap gap-1.5">

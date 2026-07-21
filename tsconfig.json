@@ -22,12 +22,17 @@
         "paths": {
             "@/*": [
                 "resources/js/v5/*"
+            ],
+            "@v4/*": [
+                "resources/js/v4/*"
             ]
         },
         "baseUrl": ".",
         "ignoreDeprecations": "6.0"
     },
     "include": [
+        "resources/js/v4/**/*.ts",
+        "resources/js/v4/**/*.tsx",
         "resources/js/v5/**/*.ts",
         "resources/js/v5/**/*.tsx"
     ],

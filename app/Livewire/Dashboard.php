@@ -2,9 +2,7 @@
 
 namespace App\Livewire;
 
-use App\Models\PrivateKey;
-use App\Models\Project;
-use App\Models\Server;
+use App\Support\Dashboard\DashboardData;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -18,9 +16,10 @@ class Dashboard extends Component
 
     public function mount()
     {
-        $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
-        $this->servers = Server::ownedByCurrentTeamCached();
-        $this->projects = Project::ownedByCurrentTeam()->with('environments')->get();
+        $data = DashboardData::collections();
+        $this->privateKeys = $data['privateKeys'];
+        $this->servers = $data['servers'];
+        $this->projects = $data['projects'];
     }
 
     public function render()

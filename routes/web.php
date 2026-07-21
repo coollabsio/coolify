@@ -1,11 +1,12 @@
 <?php
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DashboardRouter;
 use App\Http\Controllers\OauthController;
+use App\Http\Controllers\UiModeController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
-use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
@@ -117,7 +118,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
     });
 
-    Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/', DashboardRouter::class)->name('dashboard');
+    Route::post('/ui/mode', [UiModeController::class, 'update'])->name('ui.mode');
     Route::get('/admin', AdminIndex::class)->name('admin.index');
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 

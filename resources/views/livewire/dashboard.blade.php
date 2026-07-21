@@ -5,8 +5,20 @@
     @if (session('error'))
         <span x-data x-init="$wire.emit('error', '{{ session('error') }}')" />
     @endif
-    <h1>Dashboard</h1>
-    <div class="subtitle">Your self-hosted infrastructure.</div>
+    <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <h1>Dashboard</h1>
+            <div class="subtitle">Your self-hosted infrastructure.</div>
+        </div>
+        <form method="POST" action="{{ route('ui.mode') }}" class="shrink-0">
+            @csrf
+            <input type="hidden" name="mode" value="next">
+            <button type="submit"
+                class="rounded-sm border border-neutral-300 bg-white px-2 py-1 text-sm hover:bg-neutral-100 dark:border-coolgray-300 dark:bg-coolgray-100 dark:hover:bg-coolgray-200">
+                Try Next UI
+            </button>
+        </form>
+    </div>
 
     <section class="-mt-2">
         <div class="flex items-center gap-2 pb-2">

@@ -4,7 +4,7 @@ This file provides guidance to agentic coding tools when working with code in th
 
 ## Project Overview
 
-Coolify is an open-source, self-hostable PaaS (alternative to Heroku/Netlify/Vercel). It manages servers, applications, databases, and services via SSH. Built with Laravel 12 (using Laravel 10 file structure), Livewire 3, and Tailwind CSS v4.
+Coolify is an open-source, self-hostable PaaS (alternative to Heroku/Netlify/Vercel). It manages servers, applications, databases, and services via SSH. Built with Laravel 12 (using Laravel 10 file structure), Livewire 3, and Tailwind CSS v4. A switchable **Next** UI (Inertia + React + shadcn, reusing v5 design-system components) is being rolled out page-by-page alongside the classic Livewire UI — see Dual UI below.
 
 ## Design Reference
 
@@ -115,10 +115,40 @@ function loginAsRoot(): mixed
 - **Proxy** — Traefik reverse proxy managed per server.
 
 ### Frontend
-- Livewire 3 components with Alpine.js for client-side interactivity
+- Livewire 3 components with Alpine.js for client-side interactivity (classic v4 UI)
 - Blade templates in `resources/views/livewire/`
 - Tailwind CSS v4 with `@tailwindcss/forms` and `@tailwindcss/typography`
 - Vite for asset bundling
+- **Next v4 UI (Inertia + React + shadcn):** experimental dual UI for Coolify v4 pages (see Dual UI below)
+- **v5 UI:** separate product surface under `/v5` (`resources/js/v5/`, `routes/v5.php`) — not the same as Next v4
+
+### Dual UI (Classic Livewire + Next Inertia for Coolify v4)
+
+Coolify v4 supports two frontends for the same product pages. Users switch via **Profile → Appearance → Interface** or the dashboard control (`POST /ui/mode`, session + cookie `ui_mode`: `classic` | `next`).
+
+| Layer | Classic (default) | Next (Inertia) |
+| --- | --- | --- |
+| Pages | Livewire + Blade | `resources/js/v4/Pages/*.tsx` |
+| Entry | Livewire full-page components | `resources/js/v4/app.tsx` + `resources/views/v4/app.blade.php` |
+| Backend data | Shared helpers under `app/Support/` (e.g. `DashboardData`) | Same helpers; controllers in `app/Http/Controllers/V4/` |
+| Routing | Same named routes (e.g. `dashboard`) via routers like `DashboardRouter` | Same routes when `ui_mode=next` |
+| Design system | Existing Blade/Tailwind classic styles | **Reuse v5 shadcn/UI where it makes sense** (`@/` → `resources/js/v5`), page-only code under `resources/js/v4/` |
+
+**Dual-maintenance rule (required):**
+- When changing **behavior, permissions, validation, or data** for a page that exists in both UIs, update the **shared backend** (Support/Action/service used by both) — not only one frontend.
+- When changing **copy, empty states, or capability gates** on a dual page, mirror the change in both Livewire Blade and the Inertia React page.
+- Prefer extracting shared data builders (like `App\Support\Dashboard\DashboardData`) before adding a Next version of a page.
+- Do **not** duplicate shadcn primitives under `resources/js/v4/components/ui` — import from `@/components/ui/*` (v5) unless a component is Next-page-specific.
+- v5 (`/v5`) remains a separate surface; do not mix v5 domain models/routes with Next v4 product pages.
+- **Full document reloads when crossing shells:** UI mode switch (`POST /ui/mode`) always full-reloads. Any Next UI control that navigates to a classic Livewire/Blade page must use a plain `<a href>` (or `ClassicLink` in `resources/js/v4/components/classic-link.tsx`) — never Inertia `<Link>` / `router.visit` — or the browser keeps the React shell and hybrid UI appears.
+
+**File map (Next v4):**
+- `app/Support/V4/UiMode.php` — preference enum + session/cookie
+- `app/Http/Middleware/V4/HandleInertiaRequests.php` — Inertia root view + shared props
+- `app/Http/Controllers/V4/` — Inertia page controllers
+- `app/Http/Controllers/DashboardRouter.php` — dual-render entry for `/`
+- `app/Support/Dashboard/DashboardData.php` — shared dashboard collections/props
+- `resources/js/v4/` — Next app entry + Pages (imports shared UI from `resources/js/v5` via `@/`)
 
 ### Laravel 10 Structure (NOT Laravel 11+ slim structure)
 - Middleware in `app/Http/Middleware/` — custom middleware includes `CheckForcePasswordReset`, `DecideWhatToDoWithUser`, `ApiAbility`, `ApiSensitiveData`

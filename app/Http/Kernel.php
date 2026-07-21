@@ -19,6 +19,7 @@ use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustHosts;
 use App\Http\Middleware\TrustProxies;
+use App\Http\Middleware\V4\HandleInertiaRequests as V4HandleInertiaRequests;
 use App\Http\Middleware\V5\EnsureCurrentTeam as V5EnsureCurrentTeam;
 use App\Http\Middleware\V5\HandleInertiaRequests as V5HandleInertiaRequests;
 use App\Http\Middleware\ValidateSignature;
@@ -76,7 +77,7 @@ class Kernel extends HttpKernel
             SubstituteBindings::class,
             CheckForcePasswordReset::class,
             DecideWhatToDoWithUser::class,
-
+            V4HandleInertiaRequests::class,
         ],
 
         'v5.web' => [

@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
         resolve: {
             alias: {
                 "@": fileURLToPath(new URL("./resources/js/v5", import.meta.url)),
+                "@v4": fileURLToPath(new URL("./resources/js/v4", import.meta.url)),
             },
         },
         server: {
@@ -45,6 +46,7 @@ export default defineConfig(({ mode }) => {
                 input: [
                     "resources/css/app.css",
                     "resources/js/app.js",
+                    "resources/js/v4/app.tsx",
                     "resources/js/v5/app.tsx",
                 ],
                 refresh: true,

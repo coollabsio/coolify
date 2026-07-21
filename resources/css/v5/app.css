@@ -4,6 +4,7 @@
 @import "@fontsource-variable/geist";
 
 @source '../../js/v5/**/*.{js,jsx,ts,tsx}';
+@source '../../js/v4/**/*.{js,jsx,ts,tsx}';
 @source '../../../storage/framework/views/*.php';
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -150,7 +151,8 @@
 
     html,
     body,
-    #v5-app {
+    #v5-app,
+    #v4-app {
         min-height: 100dvh;
     }
 
