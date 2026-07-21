@@ -11,6 +11,7 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\VolumeCloneJob;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -18,7 +19,9 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\SwarmDocker;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -4647,5 +4650,196 @@ class DatabasesController extends Controller
     public function delete_tag(Request $request): JsonResponse
     {
         return $this->deleteTag($request);
+    }
+
+    #[OA\Post(
+        summary: 'Clone',
+        description: 'Clone a database to a destination owned by the authenticated team.',
+        path: '/databases/{uuid}/clone',
+        operationId: 'clone-database-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string'),
+                    new OA\Property(property: 'name', type: 'string', nullable: true),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Database cloned.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function clone_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'destination_uuid' => 'required|string',
+            'name' => 'string|max:255|nullable',
+            'clone_volumes' => 'boolean',
+        ]);
+        $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
+            ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+
+        if (! $destination || ! $destination->server?->canHostResources()) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+
+        $uuid = new_public_id();
+        $name = $request->filled('name')
+            ? $request->string('name')->toString()
+            : $database->name.'-clone-'.$uuid;
+        $cloneVolumeData = $request->boolean('clone_volumes', false);
+
+        $newDatabase = $database->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->fill([
+            'uuid' => $uuid,
+            'name' => $name,
+            'status' => 'exited',
+            'started_at' => null,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+        ]);
+        $newDatabase->save();
+
+        foreach ($database->tags as $tag) {
+            $newDatabase->tags()->attach($tag->id);
+        }
+
+        $newDatabase->persistentStorages()->delete();
+        foreach ($database->persistentStorages()->get() as $volume) {
+            $originalName = $volume->name;
+            $newName = match (true) {
+                str_starts_with($originalName, 'postgres-data-') => 'postgres-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'mysql-data-') => 'mysql-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'redis-data-') => 'redis-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'clickhouse-data-') => 'clickhouse-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'mariadb-data-') => 'mariadb-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'mongodb-data-') => 'mongodb-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'keydb-data-') => 'keydb-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'dragonfly-data-') => 'dragonfly-data-'.$newDatabase->uuid,
+                str_starts_with($volume->name, $database->uuid) => str($volume->name)->replace($database->uuid, $newDatabase->uuid)->toString(),
+                default => $newDatabase->uuid.'-'.$volume->name,
+            };
+
+            $newPersistentVolume = $volume->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+                'uuid',
+            ])->fill([
+                'name' => $newName,
+                'resource_id' => $newDatabase->id,
+            ]);
+            $newPersistentVolume->save();
+
+            if ($cloneVolumeData) {
+                try {
+                    StopDatabase::dispatch($database);
+                    VolumeCloneJob::dispatch(
+                        $volume->name,
+                        $newPersistentVolume->name,
+                        $database->destination->server,
+                        $newDatabase->destination->server,
+                        $newPersistentVolume,
+                    );
+                    StartDatabase::dispatch($database);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+                }
+            }
+        }
+
+        foreach ($database->fileStorages()->get() as $storage) {
+            $storage->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'resource_id' => $newDatabase->id,
+            ])->save();
+        }
+
+        foreach ($database->scheduledBackups()->get() as $backup) {
+            $backup->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'uuid' => new_public_id(),
+                'database_id' => $newDatabase->id,
+                'database_type' => $newDatabase->getMorphClass(),
+                'team_id' => $teamId,
+            ])->save();
+        }
+
+        foreach ($database->environment_variables()->get() as $environmentVariable) {
+            $environmentVariable->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'resourceable_id' => $newDatabase->id,
+                'resourceable_type' => $newDatabase->getMorphClass(),
+            ])->save();
+        }
+
+        auditLog('api.database.cloned', [
+            'team_id' => $teamId,
+            'source_uuid' => $database->uuid,
+            'database_uuid' => $newDatabase->uuid,
+            'database_name' => $newDatabase->name,
+            'destination_uuid' => $destination->uuid,
+            'clone_volumes' => $cloneVolumeData,
+        ]);
+
+        return response()->json([
+            'uuid' => $newDatabase->uuid,
+            'message' => 'Database cloned.',
+        ], 201);
     }
 }

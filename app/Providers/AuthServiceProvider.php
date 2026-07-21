@@ -34,6 +34,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
+use App\Models\Tag;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\V5\Application as V5Application;
@@ -64,6 +65,7 @@ use App\Policies\ServicePolicy;
 use App\Policies\SharedEnvironmentVariablePolicy;
 use App\Policies\StandaloneDockerPolicy;
 use App\Policies\SwarmDockerPolicy;
+use App\Policies\TagPolicy;
 use App\Policies\TeamPolicy;
 use App\Policies\V5\ApplicationPolicy as V5ApplicationPolicy;
 use App\Policies\V5\ClusterPolicy as V5ClusterPolicy;
@@ -129,6 +131,7 @@ class AuthServiceProvider extends ServiceProvider
         GithubApp::class => GithubAppPolicy::class,
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
         CloudInitScript::class => CloudInitScriptPolicy::class,
+        Tag::class => TagPolicy::class,
 
         // V5 policies - scoped to the current team resolved from the request
         V5Application::class => V5ApplicationPolicy::class,

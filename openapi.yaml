@@ -9881,16 +9881,61 @@ paths:
       security:
         -
           bearerAuth: []
-  /teams/current:
+  /team:
     get:
       tags:
         - Teams
       summary: 'Authenticated Team'
-      description: 'Get currently authenticated team.'
-      operationId: get-current-team
+      description: 'Get the team bound to the API token.'
+      operationId: get-token-team
       responses:
         '200':
-          description: 'Current Team.'
+          description: 'Team bound to the API token.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /team/members:
+    get:
+      tags:
+        - Teams
+      summary: 'Authenticated Team Members'
+      description: 'Get members of the team bound to the API token.'
+      operationId: get-token-team-members
+      responses:
+        '200':
+          description: 'Members of the team bound to the API token.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+  /teams/current:
+    get:
+      tags:
+        - Teams
+      summary: 'Authenticated Team (deprecated)'
+      description: 'Deprecated alias of GET /team. Get the team bound to the API token.'
+      operationId: get-current-team
+      deprecated: true
+      responses:
+        '200':
+          description: 'Team bound to the API token.'
           content:
             application/json:
               schema:
@@ -9906,12 +9951,13 @@ paths:
     get:
       tags:
         - Teams
-      summary: 'Authenticated Team Members'
-      description: 'Get currently authenticated team members.'
+      summary: 'Authenticated Team Members (deprecated)'
+      description: 'Deprecated alias of GET /team/members. Get members of the team bound to the API token.'
       operationId: get-current-team-members
+      deprecated: true
       responses:
         '200':
-          description: 'Currently authenticated team members.'
+          description: 'Members of the team bound to the API token.'
           content:
             application/json:
               schema:
