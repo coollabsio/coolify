@@ -5393,8 +5393,7 @@ class ApplicationsController extends Controller
                 $output = instant_remote_process([
                     "docker inspect --format='{{.Config.Image}}' {$application->uuid}",
                 ], $server, throwError: false);
-                $currentTag = str($output)->trim()->explode(':');
-                $current = data_get($currentTag, 1);
+                $current = self::currentRollbackImageTag(str($output)->trim()->toString());
 
                 $output = instant_remote_process([
                     "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
@@ -5420,6 +5419,22 @@ class ApplicationsController extends Controller
             'current' => $current,
             'images' => $images,
         ]);
+    }
+
+    private static function currentRollbackImageTag(string $imageReference): ?string
+    {
+        if (str_contains($imageReference, '@')) {
+            return null;
+        }
+
+        $lastColon = strrpos($imageReference, ':');
+        $lastSlash = strrpos($imageReference, '/');
+
+        if ($lastColon === false || ($lastSlash !== false && $lastColon < $lastSlash)) {
+            return null;
+        }
+
+        return substr($imageReference, $lastColon + 1) ?: null;
     }
 
     #[OA\Post(
