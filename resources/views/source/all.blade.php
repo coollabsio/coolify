@@ -26,7 +26,7 @@
                             {{ $source->name }}
                         </div>
                         @if (is_null($source->app_id))
-                            <span class="box-description text-error! ">Configuration is not finished.</span>
+                            <span class="box-description text-warning">Setup required</span>
                         @else
                             @if ($source->organization)
                                 <span class="box-description">Organization: {{ $source->organization }}</span>
@@ -46,7 +46,7 @@
                         @if ($source->isConnected())
                             <span class="box-description text-success">Connected — {{ $source->html_url }}</span>
                         @else
-                            <span class="box-description text-warning">Setup required — {{ $source->html_url }}</span>
+                            <span class="box-description text-warning">Setup required</span>
                         @endif
                     </div>
                 </a>
