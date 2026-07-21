@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\Crypt;
+
 class GitlabApp extends BaseModel
 {
     protected $fillable = [
@@ -47,6 +51,47 @@ class GitlabApp extends BaseModel
             'is_system_wide' => 'boolean',
             'is_public' => 'boolean',
         ];
+    }
+
+    /**
+     * Encrypt webhook tokens at rest. Supports legacy plaintext values until they are re-saved.
+     * Not a standard encrypted cast: webhooks look up by token value (see findByWebhookToken).
+     */
+    protected function webhookToken(): Attribute
+    {
+        return Attribute::make(
+            get: function (?string $value): ?string {
+                if ($value === null || $value === '') {
+                    return $value;
+                }
+
+                try {
+                    return Crypt::decryptString($value);
+                } catch (DecryptException) {
+                    // Legacy rows stored the token in plaintext.
+                    return $value;
+                }
+            },
+            set: function (?string $value): ?string {
+                if ($value === null || $value === '') {
+                    return $value;
+                }
+
+                return Crypt::encryptString($value);
+            },
+        );
+    }
+
+    public static function findByWebhookToken(string $token): ?self
+    {
+        if ($token === '') {
+            return null;
+        }
+
+        // Encrypted values cannot be matched with a SQL equality; sources are few per instance.
+        return static::query()->get()->first(
+            fn (self $app): bool => filled($app->webhook_token) && hash_equals((string) $app->webhook_token, $token)
+        );
     }
 
     protected static function booted(): void

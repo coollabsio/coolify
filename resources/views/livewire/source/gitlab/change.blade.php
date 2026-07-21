@@ -92,8 +92,8 @@
                     </div>
                     <x-forms.input readonly label="Webhook URL"
                         value="{{ rtrim($this->resolvePublicBaseUrl(), '/') }}/webhooks/source/gitlab/events" />
-                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="webhookToken" label="Webhook Secret Token"
-                        helper="Set this same token in your GitLab webhook's 'Secret token' field." />
+                    <x-forms.input canGate="update" :canResource="$gitlab_app" id="webhookToken" label="Webhook Secret Token" type="password"
+                        helper="Set this same token in your GitLab webhook's Secret token field. Stored encrypted." />
                 </div>
 
                 @if ($applications->count() > 0)

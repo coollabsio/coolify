@@ -103,7 +103,7 @@ class Gitlab extends Controller
                 ], 401);
             }
 
-            $gitlab_app = GitlabApp::where('webhook_token', $x_gitlab_token)->first();
+            $gitlab_app = GitlabApp::findByWebhookToken($x_gitlab_token);
             if (! $gitlab_app) {
                 auditLogWebhookFailure('gitlab', 'invalid_token', [
                     'event' => $object_kind,

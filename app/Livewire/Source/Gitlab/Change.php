@@ -237,7 +237,9 @@ class Change extends Component
             if (! empty($this->clientSecretInput)) {
                 $this->gitlab_app->client_secret = $this->clientSecretInput;
             }
-            $this->gitlab_app->webhook_token = $this->webhookToken;
+            if (! empty($this->webhookToken)) {
+                $this->gitlab_app->webhook_token = $this->webhookToken;
+            }
             $this->gitlab_app->group_name = $this->groupName;
             $this->gitlab_app->is_system_wide = $this->isSystemWide;
             $this->gitlab_app->private_key_id = $this->privateKeyId;
