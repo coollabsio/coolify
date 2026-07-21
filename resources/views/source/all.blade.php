@@ -25,12 +25,10 @@
                             <x-git-icon class="inline-block w-4 h-4 mr-1" git="App\Models\GithubApp" />
                             {{ $source->name }}
                         </div>
-                        @if (is_null($source->app_id))
-                            <span class="box-description text-warning">Setup required</span>
+                        @if ($source->isConnected())
+                            <span class="box-description text-success">Connected</span>
                         @else
-                            @if ($source->organization)
-                                <span class="box-description">Organization: {{ $source->organization }}</span>
-                            @endif
+                            <span class="box-description text-warning">Setup required</span>
                         @endif
                     </div>
                 </a>
