@@ -3,21 +3,28 @@
 use App\Livewire\Project\Shared\ResourceOperations;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
+uses(RefreshDatabase::class);
+
 beforeEach(function () {
+    $this->withoutVite();
+    InstanceSettings::forceCreate(['id' => 0]);
+
     // Team A (attacker's team)
     $this->userA = User::factory()->create();
     $this->teamA = Team::factory()->create();
     $this->userA->teams()->attach($this->teamA, ['role' => 'owner']);
 
     $this->serverA = Server::factory()->create(['team_id' => $this->teamA->id]);
-    $this->destinationA = StandaloneDocker::factory()->create(['server_id' => $this->serverA->id]);
+    $this->destinationA = StandaloneDocker::where('server_id', $this->serverA->id)->firstOrFail();
     $this->projectA = Project::factory()->create(['team_id' => $this->teamA->id]);
     $this->environmentA = Environment::factory()->create(['project_id' => $this->projectA->id]);
 
@@ -30,7 +37,7 @@ beforeEach(function () {
     // Team B (victim's team)
     $this->teamB = Team::factory()->create();
     $this->serverB = Server::factory()->create(['team_id' => $this->teamB->id]);
-    $this->destinationB = StandaloneDocker::factory()->create(['server_id' => $this->serverB->id]);
+    $this->destinationB = StandaloneDocker::where('server_id', $this->serverB->id)->firstOrFail();
     $this->projectB = Project::factory()->create(['team_id' => $this->teamB->id]);
     $this->environmentB = Environment::factory()->create(['project_id' => $this->projectB->id]);
 
@@ -40,7 +47,7 @@ beforeEach(function () {
 
 test('cloneTo rejects destination belonging to another team', function () {
     Livewire::test(ResourceOperations::class, ['resource' => $this->applicationA])
-        ->call('cloneTo', $this->destinationB->id)
+        ->call('cloneTo', $this->destinationB->uuid)
         ->assertHasErrors('destination_id');
 
     // Ensure no cross-tenant application was created
@@ -48,12 +55,16 @@ test('cloneTo rejects destination belonging to another team', function () {
 });
 
 test('cloneTo allows destination belonging to own team', function () {
-    $secondDestination = StandaloneDocker::factory()->create(['server_id' => $this->serverA->id]);
+    $secondDestination = StandaloneDocker::factory()->create([
+        'server_id' => $this->serverA->id,
+        'network' => 'second-destination',
+    ]);
 
     Livewire::test(ResourceOperations::class, ['resource' => $this->applicationA])
-        ->call('cloneTo', $secondDestination->id)
-        ->assertHasNoErrors('destination_id')
-        ->assertRedirect();
+        ->call('cloneTo', $secondDestination->uuid)
+        ->assertHasNoErrors('destination_id');
+
+    expect(Application::count())->toBe(2);
 });
 
 test('moveTo rejects environment belonging to another team', function () {

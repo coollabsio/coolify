@@ -509,9 +509,29 @@ class Server extends BaseModel
         });
     }
 
-    public static function isUsable()
+    public static function isUsable(): Builder
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
+        return self::usableByBuildServerStatus(false);
+    }
+
+    public static function isUsableBuildServer(): Builder
+    {
+        return self::usableByBuildServerStatus(true);
+    }
+
+    private static function usableByBuildServerStatus(bool $isBuildServer): Builder
+    {
+        return Server::ownedByCurrentTeam()
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'is_build_server', $isBuildServer)
+            ->whereRelation('settings', 'force_disabled', false);
+    }
+
+    public function canHostResources(): bool
+    {
+        return ! $this->isBuildServer();
     }
 
     public function settings()

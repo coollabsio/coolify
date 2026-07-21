@@ -36,6 +36,10 @@ use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
+use App\Models\V5\Application as V5Application;
+use App\Models\V5\Cluster as V5Cluster;
+use App\Models\V5\ResourceConnection as V5ResourceConnection;
+use App\Models\V5\Server as V5Server;
 use App\Models\WebhookNotificationSettings;
 use App\Policies\ApiTokenPolicy;
 use App\Policies\ApplicationPolicy;
@@ -61,6 +65,10 @@ use App\Policies\SharedEnvironmentVariablePolicy;
 use App\Policies\StandaloneDockerPolicy;
 use App\Policies\SwarmDockerPolicy;
 use App\Policies\TeamPolicy;
+use App\Policies\V5\ApplicationPolicy as V5ApplicationPolicy;
+use App\Policies\V5\ClusterPolicy as V5ClusterPolicy;
+use App\Policies\V5\ResourceConnectionPolicy as V5ResourceConnectionPolicy;
+use App\Policies\V5\ServerPolicy as V5ServerPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -121,6 +129,12 @@ class AuthServiceProvider extends ServiceProvider
         GithubApp::class => GithubAppPolicy::class,
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
         CloudInitScript::class => CloudInitScriptPolicy::class,
+
+        // V5 policies - scoped to the current team resolved from the request
+        V5Application::class => V5ApplicationPolicy::class,
+        V5Cluster::class => V5ClusterPolicy::class,
+        V5ResourceConnection::class => V5ResourceConnectionPolicy::class,
+        V5Server::class => V5ServerPolicy::class,
 
     ];
 

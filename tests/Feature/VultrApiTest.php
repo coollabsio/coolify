@@ -301,6 +301,104 @@ describe('POST /api/v1/servers/vultr', function () {
         ]);
     });
 
+    test('deletes the Vultr instance when local server persistence fails', function () {
+        Http::fake([
+            'https://api.vultr.com/v2/ssh-keys' => Http::response([
+                'ssh_key' => ['id' => 'key-1', 'ssh_key' => testPublicKey()],
+            ], 201),
+            'https://api.vultr.com/v2/ssh-keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['links' => ['next' => null]],
+            ], 200),
+            'https://api.vultr.com/v2/instances' => Http::response([
+                'instance' => [
+                    'id' => 'instance-persistence-fails',
+                    'main_ip' => '203.0.113.10',
+                    'status' => 'pending',
+                ],
+            ], 202),
+            'https://api.vultr.com/v2/instances/instance-persistence-fails' => Http::response(null, 204),
+        ]);
+
+        $eventDispatcher = Server::getEventDispatcher();
+        Server::setEventDispatcher(clone $eventDispatcher);
+        Server::created(function (): void {
+            throw new RuntimeException('local persistence failed');
+        });
+
+        try {
+            $response = $this->withHeaders([
+                'Authorization' => 'Bearer '.$this->bearerToken,
+                'Content-Type' => 'application/json',
+            ])->postJson('/api/v1/servers/vultr', [
+                'cloud_provider_token_id' => $this->vultrToken->uuid,
+                'region' => 'ewr',
+                'plan' => 'vc2-1c-1gb',
+                'os_id' => 2284,
+                'name' => 'persistence-fails',
+                'private_key_uuid' => $this->privateKey->uuid,
+            ]);
+        } finally {
+            Server::setEventDispatcher($eventDispatcher);
+        }
+
+        $response->assertServerError();
+        $response->assertJson(['message' => 'Failed to create Vultr server.']);
+        $this->assertDatabaseMissing('servers', [
+            'vultr_instance_id' => 'instance-persistence-fails',
+        ]);
+        Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+            && $request->url() === 'https://api.vultr.com/v2/instances/instance-persistence-fails');
+    });
+
+    test('keeps the tracked Vultr server when public IP polling fails', function () {
+        Http::fake([
+            'https://api.vultr.com/v2/ssh-keys' => Http::response([
+                'ssh_key' => ['id' => 'key-1', 'ssh_key' => testPublicKey()],
+            ], 201),
+            'https://api.vultr.com/v2/ssh-keys*' => Http::response([
+                'ssh_keys' => [],
+                'meta' => ['links' => ['next' => null]],
+            ], 200),
+            'https://api.vultr.com/v2/instances' => Http::response([
+                'instance' => [
+                    'id' => 'instance-polling-fails',
+                    'main_ip' => '0.0.0.0',
+                    'status' => 'pending',
+                ],
+            ], 202),
+            'https://api.vultr.com/v2/instances/instance-polling-fails' => Http::response([
+                'error' => 'temporary polling failure',
+            ], 500),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/servers/vultr', [
+            'cloud_provider_token_id' => $this->vultrToken->uuid,
+            'region' => 'ewr',
+            'plan' => 'vc2-1c-1gb',
+            'os_id' => 2284,
+            'name' => 'polling-fails',
+            'private_key_uuid' => $this->privateKey->uuid,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonFragment([
+            'vultr_instance_id' => 'instance-polling-fails',
+            'ip' => Server::PLACEHOLDER_IP,
+        ]);
+        $this->assertDatabaseHas('servers', [
+            'name' => 'polling-fails',
+            'ip' => Server::PLACEHOLDER_IP,
+            'team_id' => $this->team->id,
+            'vultr_instance_id' => 'instance-polling-fails',
+            'vultr_instance_status' => 'pending',
+        ]);
+        Http::assertNotSent(fn ($request) => $request->method() === 'DELETE');
+    });
+
     test('server creation authorizes access to the stored Vultr token', function () {
         $member = User::factory()->create();
         $this->team->members()->attach($member->id, ['role' => 'member']);

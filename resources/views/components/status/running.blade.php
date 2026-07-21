@@ -21,7 +21,7 @@
     $showUnknownHelper = ! str($status)->startsWith('Proxy') && (str($status)->contains('unknown') || str($healthStatus)->contains('unknown'));
     $showUnhealthyHelper = ! str($status)->startsWith('Proxy') && (str($status)->contains('unhealthy') || str($healthStatus)->contains('unhealthy'));
 @endphp
-<div class="flex items-center gap-1">
+<div class="flex items-center gap-1 leading-none">
     @if ($lastDeploymentLink)
         <x-status-badge as="a" href="{{ $lastDeploymentLink }}" target="_blank" status="{{ $badgeStatus }}" type="success"
             title="{{ $title }}" class="cursor-pointer underline" />

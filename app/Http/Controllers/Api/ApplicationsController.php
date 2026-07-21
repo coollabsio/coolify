@@ -1237,6 +1237,12 @@ class ApplicationsController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
+        if (! $server->canHostResources()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
+            ], 422);
+        }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
             return response()->json(['message' => 'Server has no destinations.'], 400);
@@ -3843,9 +3849,9 @@ class ApplicationsController extends Controller
         ]);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Start',
-        description: 'Start application. `Post` request is also accepted.',
+        description: 'Start application.',
         path: '/applications/{uuid}/start',
         operationId: 'start-application-by-uuid',
         security: [
@@ -3967,9 +3973,9 @@ class ApplicationsController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Stop',
-        description: 'Stop application. `Post` request is also accepted.',
+        description: 'Stop application.',
         path: '/applications/{uuid}/stop',
         operationId: 'stop-application-by-uuid',
         security: [
@@ -4060,9 +4066,9 @@ class ApplicationsController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Restart',
-        description: 'Restart application. `Post` request is also accepted.',
+        description: 'Restart application.',
         path: '/applications/{uuid}/restart',
         operationId: 'restart-application-by-uuid',
         security: [
@@ -4903,6 +4909,8 @@ class ApplicationsController extends Controller
                 'message' => 'This storage is read-only (managed by docker-compose or service definition) and cannot be deleted.',
             ], 422);
         }
+
+        $storage->abortIfScheduledBackupsExist();
 
         if ($storage instanceof LocalFileVolume) {
             $storage->deleteStorageOnServer();

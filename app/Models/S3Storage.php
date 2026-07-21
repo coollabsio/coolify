@@ -69,6 +69,15 @@ class S3Storage extends BaseModel
                 'save_s3' => false,
                 's3_storage_id' => null,
             ]);
+            ScheduledVolumeBackupExecution::where('s3_storage_id', $storage->id)
+                ->update([
+                    's3_storage_deleted' => true,
+                    's3_cleanup_pending' => false,
+                ]);
+            ScheduledVolumeBackup::where('s3_storage_id', $storage->id)->update([
+                'save_s3' => false,
+                's3_storage_id' => null,
+            ]);
         });
     }
 
@@ -99,6 +108,11 @@ class S3Storage extends BaseModel
     public function scheduledBackups()
     {
         return $this->hasMany(ScheduledDatabaseBackup::class, 's3_storage_id');
+    }
+
+    public function scheduledVolumeBackups()
+    {
+        return $this->hasMany(ScheduledVolumeBackup::class, 's3_storage_id');
     }
 
     public function awsUrl()

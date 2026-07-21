@@ -850,6 +850,12 @@ class DatabasesController extends Controller
 
         $this->authorize('manageBackups', $database);
 
+        if (! $database->isBackupSolutionAvailable()) {
+            return response()->json([
+                'message' => 'Scheduled backups are not supported for this database type.',
+            ], 422);
+        }
+
         // Validate frequency is a valid cron expression
         $isValid = validate_cron_expression($request->frequency);
         if (! $isValid) {
@@ -915,6 +921,8 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mysql_database;
             } elseif ($database->type() === 'standalone-mariadb') {
                 $backupData['databases_to_backup'] = $database->mariadb_database;
+            } elseif ($database->type() === 'standalone-clickhouse') {
+                $backupData['databases_to_backup'] = $database->clickhouse_db;
             }
         }
 
@@ -1804,6 +1812,12 @@ class DatabasesController extends Controller
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
+        }
+        if (! $server->canHostResources()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
+            ], 422);
         }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
@@ -3016,7 +3030,7 @@ class DatabasesController extends Controller
             ),
         ]
     )]
-    public function move_by_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function move_by_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -3036,9 +3050,9 @@ class DatabasesController extends Controller
         return moveResourceToEnvironment($request, $database, 'Database', $teamId);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Start',
-        description: 'Start database. `Post` request is also accepted.',
+        description: 'Start database.',
         path: '/databases/{uuid}/start',
         operationId: 'start-database-by-uuid',
         security: [
@@ -3123,9 +3137,9 @@ class DatabasesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Stop',
-        description: 'Stop database. `Post` request is also accepted.',
+        description: 'Stop database.',
         path: '/databases/{uuid}/stop',
         operationId: 'stop-database-by-uuid',
         security: [
@@ -3222,9 +3236,9 @@ class DatabasesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Restart',
-        description: 'Restart database. `Post` request is also accepted.',
+        description: 'Restart database.',
         path: '/databases/{uuid}/restart',
         operationId: 'restart-database-by-uuid',
         security: [
@@ -4469,6 +4483,8 @@ class DatabasesController extends Controller
                 'message' => 'This storage is read-only (managed by docker-compose or service definition) and cannot be deleted.',
             ], 422);
         }
+
+        $storage->abortIfScheduledBackupsExist();
 
         if ($storage instanceof LocalFileVolume) {
             $storage->deleteStorageOnServer();

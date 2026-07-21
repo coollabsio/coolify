@@ -17,7 +17,7 @@ class VultrService
             'Authorization' => 'Bearer '.$this->token,
         ])
             ->timeout(30)
-            ->retry(3, fn (int $attempt) => $attempt * 100)
+            ->retry(3, fn (int $attempt) => $attempt * 100, throw: false)
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
