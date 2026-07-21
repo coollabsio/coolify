@@ -191,7 +191,6 @@
 
                 @if (!isCloud() || isDev())
                     <div class="flex flex-col gap-3 pt-2">
-                        <div class="text-sm font-medium">Public endpoint</div>
                         <div class="text-sm dark:text-neutral-400">
                             GitLab will redirect back to this Coolify URL. It must match the Callback URL on your GitLab OAuth Application exactly.
                         </div>
