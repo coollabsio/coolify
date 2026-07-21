@@ -29,6 +29,8 @@ trait BuildsResponse
         'service_id', 'project_id', 'parent_id',
         'resourceable', 'resourceable_id', 'resourceable_type',
         'destination_type', 'source_type', 'tokenable',
+        'build_server_id', 'horizon_job_id', 'horizon_job_worker',
+        'current_process_id', 'app_id', 'installation_id',
 
         // sentinel / observability secrets
         'sentinel_token', 'sentinel_custom_url',
@@ -48,15 +50,18 @@ trait BuildsResponse
         // database connection strings embed credentials
         'internal_db_url', 'external_db_url', 'init_scripts',
 
-        // webhook secrets
+        // webhook / oauth / key secrets
         'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea',
         'manual_webhook_secret_github', 'manual_webhook_secret_gitlab',
+        'client_secret', 'webhook_secret', 'client_id',
+        'private_key', 'public_key',
 
         // bulky / unsafe blobs
         'dockerfile', 'docker_compose', 'docker_compose_raw',
         'custom_labels', 'environment_variables',
         'environment_variables_preview', 'validation_logs',
-        'server_metadata',
+        'server_metadata', 'logs', 'configuration_snapshot',
+        'configuration_diff', 'fs_path', 'content', 'file_storage_content',
     ];
 
     /**
@@ -132,7 +137,7 @@ trait BuildsResponse
     {
         $page = $args['page'];
         $perPage = $args['per_page'];
-        $totalPages = (int) ceil($total / $perPage);
+        $totalPages = (int) ceil($total / max(1, $perPage));
 
         $meta = [
             'page' => $page,
@@ -152,25 +157,20 @@ trait BuildsResponse
     }
 
     /**
-     * HATEOAS-style action suggestions for an application.
+     * HATEOAS-style action suggestions for an application (read tools only).
      *
      * @return array<int, array<string, mixed>>
      */
     protected function actionsForApplication(string $uuid, ?string $status = null): array
     {
-        $actions = [
+        return [
             ['tool' => 'get_application', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'get_logs', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Container logs'],
+            ['tool' => 'list_env_keys', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
+            ['tool' => 'list_deployments', 'args' => ['application_uuid' => $uuid], 'hint' => 'Deployment history'],
+            ['tool' => 'list_storages', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
+            ['tool' => 'list_scheduled_tasks', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Scheduled tasks'],
         ];
-
-        $s = strtolower((string) $status);
-        if (str_contains($s, 'running')) {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart'];
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'stop', 'uuid' => $uuid], 'hint' => 'Stop'];
-        } else {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start'];
-        }
-
-        return $actions;
     }
 
     /**
@@ -178,19 +178,13 @@ trait BuildsResponse
      */
     protected function actionsForDatabase(string $uuid, ?string $status = null): array
     {
-        $actions = [
+        return [
             ['tool' => 'get_database', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'get_logs', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Container logs'],
+            ['tool' => 'list_env_keys', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
+            ['tool' => 'list_database_backups', 'args' => ['uuid' => $uuid], 'hint' => 'Backup schedules'],
+            ['tool' => 'list_storages', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
         ];
-
-        $s = strtolower((string) $status);
-        if (str_contains($s, 'running')) {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart'];
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'stop', 'uuid' => $uuid], 'hint' => 'Stop'];
-        } else {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start'];
-        }
-
-        return $actions;
     }
 
     /**
@@ -198,19 +192,15 @@ trait BuildsResponse
      */
     protected function actionsForService(string $uuid, ?string $status = null): array
     {
-        $actions = [
+        return [
             ['tool' => 'get_service', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'list_service_applications', 'args' => ['uuid' => $uuid], 'hint' => 'Service applications'],
+            ['tool' => 'list_service_databases', 'args' => ['uuid' => $uuid], 'hint' => 'Service databases'],
+            ['tool' => 'get_logs', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Service logs'],
+            ['tool' => 'list_env_keys', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Env key names (no values)'],
+            ['tool' => 'list_storages', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Volumes / file mounts'],
+            ['tool' => 'list_scheduled_tasks', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Scheduled tasks'],
         ];
-
-        $s = strtolower((string) $status);
-        if (str_contains($s, 'running')) {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart'];
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'stop', 'uuid' => $uuid], 'hint' => 'Stop'];
-        } else {
-            $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'start', 'uuid' => $uuid], 'hint' => 'Start'];
-        }
-
-        return $actions;
     }
 
     /**
@@ -220,6 +210,39 @@ trait BuildsResponse
     {
         return [
             ['tool' => 'get_server', 'args' => ['uuid' => $uuid], 'hint' => 'Full details'],
+            ['tool' => 'get_server_domains', 'args' => ['uuid' => $uuid], 'hint' => 'Domains on this server'],
+            ['tool' => 'get_server_resources', 'args' => ['uuid' => $uuid], 'hint' => 'Resources on this server'],
+            ['tool' => 'list_destinations', 'args' => ['server_uuid' => $uuid], 'hint' => 'Docker destinations'],
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function actionsForProject(string $uuid): array
+    {
+        return [
+            ['tool' => 'get_project', 'args' => ['uuid' => $uuid], 'hint' => 'Project details'],
+            ['tool' => 'list_applications', 'args' => ['project_uuid' => $uuid], 'hint' => 'Applications in project'],
+            ['tool' => 'list_services', 'args' => ['project_uuid' => $uuid], 'hint' => 'Services in project'],
+            ['tool' => 'list_databases', 'args' => ['project_uuid' => $uuid], 'hint' => 'Databases in project'],
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function actionsForDeployment(string $deploymentUuid, ?string $applicationUuid = null): array
+    {
+        $actions = [
+            ['tool' => 'get_deployment', 'args' => ['uuid' => $deploymentUuid], 'hint' => 'Deployment details'],
+        ];
+
+        if (is_string($applicationUuid) && $applicationUuid !== '') {
+            $actions[] = ['tool' => 'get_application', 'args' => ['uuid' => $applicationUuid], 'hint' => 'Parent application'];
+            $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'application', 'uuid' => $applicationUuid], 'hint' => 'Application logs'];
+        }
+
+        return $actions;
     }
 }

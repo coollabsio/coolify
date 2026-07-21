@@ -1,0 +1,101 @@
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Concerns\ResolvesTeam;
+use App\Models\GithubApp;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Http;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Tool;
+
+class ListGithubRepositories extends Tool
+{
+    protected string $name = 'list_github_repositories';
+
+    protected string $description = 'List repositories accessible via a GitHub app owned by (or system-wide for) the authenticated team. Pass github_app_uuid.';
+
+    use BuildsResponse;
+    use ResolvesTeam;
+
+    public function handle(Request $request): Response
+    {
+        if ($error = $this->ensureAbility($request, 'read', $this->name)) {
+            return $error;
+        }
+
+        $teamId = $this->resolveTeamId($request);
+        if (is_null($teamId)) {
+            return $this->mcpError($request, 'Invalid token.');
+        }
+
+        $appUuid = $request->get('github_app_uuid');
+        if (! is_string($appUuid) || $appUuid === '') {
+            return $this->mcpError($request, 'github_app_uuid argument is required.');
+        }
+
+        $githubApp = GithubApp::query()
+            ->where('uuid', $appUuid)
+            ->where(function ($q) use ($teamId) {
+                $q->where('team_id', $teamId)->orWhere('is_system_wide', true);
+            })
+            ->first();
+
+        if (! $githubApp) {
+            return $this->mcpError($request, "GitHub app [{$appUuid}] not found.", ['resource_uuid' => $appUuid]);
+        }
+
+        try {
+            $token = generateGithubInstallationToken($githubApp);
+            $repositories = collect();
+            $page = 1;
+            $maxPages = 20;
+
+            while ($page <= $maxPages) {
+                $response = Http::GitHub($githubApp->api_url, $token)
+                    ->timeout(20)
+                    ->get('/installation/repositories', ['per_page' => 100, 'page' => $page]);
+
+                if ($response->failed()) {
+                    return $this->mcpError($request, 'Failed to load repositories from GitHub.', ['resource_uuid' => $appUuid]);
+                }
+
+                $batch = collect($response->json('repositories') ?? []);
+                if ($batch->isEmpty()) {
+                    break;
+                }
+
+                $repositories = $repositories->merge($batch);
+                if ($batch->count() < 100) {
+                    break;
+                }
+                $page++;
+            }
+
+            $summaries = $repositories->map(fn ($repo) => [
+                'id' => data_get($repo, 'id'),
+                'name' => data_get($repo, 'name'),
+                'full_name' => data_get($repo, 'full_name'),
+                'private' => data_get($repo, 'private'),
+                'html_url' => data_get($repo, 'html_url'),
+                'default_branch' => data_get($repo, 'default_branch'),
+            ])->values()->all();
+
+            return $this->mcpSuccess($request, $this->respond([
+                'github_app_uuid' => $appUuid,
+                'repositories' => $summaries,
+            ]), ['resource_uuid' => $appUuid]);
+        } catch (\Throwable $e) {
+            return $this->mcpError($request, 'Failed to load repositories: '.$e->getMessage(), ['resource_uuid' => $appUuid]);
+        }
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'github_app_uuid' => $schema->string()->description('GitHub app UUID.')->required(),
+        ];
+    }
+}

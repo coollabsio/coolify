@@ -134,8 +134,13 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_database',
         'list_services',
         'get_service',
+        'get_project',
+        'list_deployments',
+        'get_logs',
+        'list_env_keys',
     );
     expect($toolNames)->not->toContain('get_resource_status');
+    expect($toolNames)->not->toContain('control');
 });
 
 test('list_projects returns summary + pagination scoped to the token team', function () {

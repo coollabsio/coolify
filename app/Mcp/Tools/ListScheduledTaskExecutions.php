@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Concerns\ResolvesResource;
+use App\Mcp\Concerns\ResolvesTeam;
+use App\Models\ScheduledTask;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Tool;
+
+class ListScheduledTaskExecutions extends Tool
+{
+    protected string $name = 'list_scheduled_task_executions';
+
+    protected string $description = 'List recent executions for a scheduled task on an application or service owned by the authenticated team.';
+
+    use BuildsResponse;
+    use ResolvesResource;
+    use ResolvesTeam;
+
+    public function handle(Request $request): Response
+    {
+        if ($error = $this->ensureAbility($request, 'read', $this->name)) {
+            return $error;
+        }
+
+        $teamId = $this->resolveTeamId($request);
+        if (is_null($teamId)) {
+            return $this->mcpError($request, 'Invalid token.');
+        }
+
+        $resourceType = $request->get('resource');
+        $uuid = $request->get('uuid');
+        $taskUuid = $request->get('task_uuid');
+
+        if (! is_string($resourceType) || ! $this->isValidResourceType($resourceType, $this->scheduledTaskResourceTypes)) {
+            return $this->mcpError($request, 'resource must be one of: application, service.');
+        }
+        if (! is_string($uuid) || $uuid === '') {
+            return $this->mcpError($request, 'uuid argument is required.');
+        }
+        if (! is_string($taskUuid) || $taskUuid === '') {
+            return $this->mcpError($request, 'task_uuid argument is required.');
+        }
+
+        $resource = $this->resolveTeamResource($teamId, $resourceType, $uuid);
+        if (! $resource) {
+            return $this->mcpError($request, ucfirst($resourceType)." [{$uuid}] not found.", ['resource_uuid' => $uuid]);
+        }
+
+        $taskQuery = ScheduledTask::ownedByCurrentTeamAPI($teamId)->where('uuid', $taskUuid);
+        if ($resourceType === 'application') {
+            $taskQuery->where('application_id', $resource->id);
+        } else {
+            $taskQuery->where('service_id', $resource->id);
+        }
+
+        $task = $taskQuery->first();
+        if (! $task) {
+            return $this->mcpError($request, "Scheduled task [{$taskUuid}] not found.", ['resource_uuid' => $taskUuid]);
+        }
+
+        $args = $this->paginationArgs($request);
+        $execQuery = $task->executions();
+        $total = (clone $execQuery)->count();
+        $executions = $execQuery
+            ->skip($args['offset'])
+            ->take($args['per_page'])
+            ->get()
+            ->map(fn ($ex) => $this->scrubSensitive([
+                'uuid' => $ex->uuid ?? null,
+                'status' => $ex->status ?? null,
+                'message' => $ex->message ?? null,
+                'created_at' => $ex->created_at,
+                'updated_at' => $ex->updated_at,
+            ]))
+            ->values()
+            ->all();
+
+        return $this->mcpSuccess($request, $this->respond(
+            [
+                'resource' => $resourceType,
+                'uuid' => $uuid,
+                'task_uuid' => $taskUuid,
+                'executions' => $executions,
+            ],
+            [],
+            $this->paginationMeta('list_scheduled_task_executions', $args, $total, [
+                'resource' => $resourceType,
+                'uuid' => $uuid,
+                'task_uuid' => $taskUuid,
+            ]),
+        ), ['resource_uuid' => $taskUuid]);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'resource' => $schema->string()->description('application | service')->required(),
+            'uuid' => $schema->string()->description('Parent resource UUID.')->required(),
+            'task_uuid' => $schema->string()->description('Scheduled task UUID.')->required(),
+            'page' => $schema->integer()->description('Page number (default 1).'),
+            'per_page' => $schema->integer()->description('Items per page (default 50, max 100).'),
+        ];
+    }
+}
