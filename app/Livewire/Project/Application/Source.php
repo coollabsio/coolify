@@ -96,9 +96,19 @@ class Source extends Component
 
     private function getSources()
     {
-        // filter the current source out
-        $this->sources = currentTeam()->sources()->whereNotNull('app_id')->reject(function ($source) {
-            return $source->id === $this->application->source_id;
+        $this->sources = currentTeam()->sources()->filter(function ($source) {
+            if ($source->id === $this->application->source_id
+                && $source->getMorphClass() === $this->application->source_type) {
+                return false;
+            }
+            if ($source instanceof GithubApp) {
+                return ! is_null($source->app_id);
+            }
+            if ($source instanceof GitlabApp) {
+                return $source->isConnected();
+            }
+
+            return true;
         })->sortBy('name');
     }
 
@@ -137,7 +147,6 @@ class Source extends Component
 
     public function changeSource($sourceId, $sourceType)
     {
-
         try {
             $this->authorize('update', $this->application);
             $allowedSourceTypes = [GithubApp::class, GitlabApp::class];
@@ -150,14 +159,22 @@ class Source extends Component
             $this->dispatch('configurationChanged');
 
             ['repository' => $customRepository] = $this->application->customRepository();
-            $repository = githubApi($this->application->source, "repos/{$customRepository}");
-            $data = data_get($repository, 'data');
-            $repository_project_id = data_get($data, 'id');
-            if (isset($repository_project_id)) {
-                if ($this->application->repository_project_id !== $repository_project_id) {
-                    $this->application->repository_project_id = $repository_project_id;
-                    $this->application->save();
+            $repository_project_id = null;
+
+            if ($sourceType === GithubApp::class) {
+                $repository = githubApi($source, "repos/{$customRepository}");
+                $repository_project_id = data_get($repository, 'data.id');
+            } elseif ($sourceType === GitlabApp::class) {
+                if ($source->isConnected()) {
+                    $encoded = urlencode($customRepository);
+                    $project = gitlabApi($source, "/projects/{$encoded}");
+                    $repository_project_id = data_get($project, 'data.id');
                 }
+            }
+
+            if (isset($repository_project_id) && $this->application->repository_project_id !== $repository_project_id) {
+                $this->application->repository_project_id = $repository_project_id;
+                $this->application->save();
             }
 
             $this->application->refresh();
