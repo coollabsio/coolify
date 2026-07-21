@@ -5,8 +5,11 @@
     <div class="flex items-center gap-2">
         <h1>Sources</h1>
         @can('createAnyResource')
-            <x-modal-input buttonTitle="+ Add" title="New GitHub App" :closeOutside="false">
+            <x-modal-input buttonTitle="+ Add GitHub" title="New GitHub App" :closeOutside="false">
                 <livewire:source.github.create />
+            </x-modal-input>
+            <x-modal-input buttonTitle="+ Add GitLab" title="New GitLab App" :closeOutside="false">
+                <livewire:source.gitlab.create />
             </x-modal-input>
         @endcan
     </div>
@@ -17,15 +20,31 @@
                 <a class="flex gap-2 text-center hover:no-underline coolbox group"
                     {{ wireNavigate() }}
                     href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
-                    {{-- <x-git-icon class="dark:text-white w-8 h-8 mt-1" git="{{ $source->getMorphClass() }}" /> --}}
                     <div class="text-left dark:group-hover:text-white flex flex-col justify-center mx-6">
-                        <div class="box-title">{{ $source->name }}</div>
-                        @if (is_null($source->app_id))
-                            <span class="box-description text-error! ">Configuration is not finished.</span>
+                        <div class="box-title">
+                            <x-git-icon class="inline-block w-4 h-4 mr-1" git="App\Models\GithubApp" />
+                            {{ $source->name }}
+                        </div>
+                        @if ($source->isConnected())
+                            <span class="box-description text-success">Connected</span>
                         @else
-                            @if ($source->organization)
-                                <span class="box-description">Organization: {{ $source->organization }}</span>
-                            @endif
+                            <span class="box-description text-warning">Setup required</span>
+                        @endif
+                    </div>
+                </a>
+            @elseif ($source->getMorphClass() === 'App\Models\GitlabApp')
+                <a class="flex gap-2 text-center hover:no-underline coolbox group"
+                    {{ wireNavigate() }}
+                    href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => data_get($source, 'uuid')]) }}">
+                    <div class="text-left dark:group-hover:text-white flex flex-col justify-center mx-6">
+                        <div class="box-title">
+                            <x-git-icon class="inline-block w-4 h-4 mr-1" git="App\Models\GitlabApp" />
+                            {{ $source->name }}
+                        </div>
+                        @if ($source->isConnected())
+                            <span class="box-description text-success">Connected</span>
+                        @else
+                            <span class="box-description text-warning">Setup required</span>
                         @endif
                     </div>
                 </a>

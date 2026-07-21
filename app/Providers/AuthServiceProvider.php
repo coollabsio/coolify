@@ -13,6 +13,7 @@ use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -51,6 +52,7 @@ use App\Policies\DatabasePolicy;
 use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
 use App\Policies\GithubAppPolicy;
+use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
@@ -127,6 +129,9 @@ class AuthServiceProvider extends ServiceProvider
 
         // Git source policies
         GithubApp::class => GithubAppPolicy::class,
+        GitlabApp::class => GitlabAppPolicy::class,
+
+        // Cloud provider policies
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
         CloudInitScript::class => CloudInitScriptPolicy::class,
 
