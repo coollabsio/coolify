@@ -46,7 +46,7 @@ describe('GitLab source setup view', function () {
             ->assertSee('Advanced / Self-hosted')
             ->assertSee('Application ID')
             ->assertSee('Application Secret')
-            ->assertSee('Save Credentials')
+            ->assertSee('Save')
             ->assertDontSee('alert-warning');
     });
 

@@ -166,7 +166,7 @@
             <form wire:submit='submit' class="flex flex-col gap-2">
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 pt-2">
                     <h3>Step 2: Enter the credentials</h3>
-                    <x-forms.button type="submit">Save Credentials</x-forms.button>
+                    <x-forms.button type="submit">Save</x-forms.button>
                 </div>
                 <x-forms.input id="name" label="Name" />
                 <x-forms.input id="clientId" label="Application ID" required
