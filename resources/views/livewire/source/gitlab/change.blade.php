@@ -29,8 +29,6 @@
             </div>
             <div class="flex flex-col gap-2">
                 <x-forms.input canGate="update" :canResource="$gitlab_app" id="name" label="Name" />
-                <x-forms.input canGate="update" :canResource="$gitlab_app" id="groupName" label="Group Name"
-                    helper="Comma-separated group names to filter visible repositories." />
                 @if (!isCloud())
                     <div class="w-48">
                         <x-forms.checkbox canGate="update" :canResource="$gitlab_app" label="System Wide"
@@ -49,6 +47,8 @@
                 <h3 class="pt-4">OAuth Credentials</h3>
                 <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientId" label="Application ID" />
                 <x-forms.input canGate="update" :canResource="$gitlab_app" id="clientSecretInput" label="Application Secret" type="password" />
+                <x-forms.input canGate="update" :canResource="$gitlab_app" id="groupName" label="Group Name"
+                    helper="Comma-separated group names to filter visible repositories." />
 
                 <div x-data="{
                                         activeAccordion: '',
@@ -170,6 +170,8 @@
                     helper="The Application ID from your GitLab OAuth Application." />
                 <x-forms.input id="clientSecretInput" label="Application Secret" type="password" required
                     helper="The Secret from your GitLab OAuth Application." />
+                <x-forms.input id="groupName" label="Group Name"
+                    helper="Optional. Comma-separated group names to filter repositories." />
 
                 <div x-data="{
                                         activeAccordion: '',
@@ -196,8 +198,6 @@
                                     <x-forms.input id="apiUrl" label="API URL"
                                         helper="Usually your GitLab URL with /api/v4 appended." />
                                 </div>
-                                <x-forms.input id="groupName" label="Group Name"
-                                    helper="Optional. Comma-separated group names to filter repositories." />
                                 <div class="flex gap-2">
                                     <x-forms.input id="customUser" label="SSH User" />
                                     <x-forms.input type="number" id="customPort" label="SSH Port" />
