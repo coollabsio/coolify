@@ -7,6 +7,7 @@ use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Component;
@@ -252,10 +253,10 @@ class Change extends Component
             $this->customUser = $this->gitlab_app->custom_user;
             $this->customPort = $this->gitlab_app->custom_port;
             $this->clientId = $this->gitlab_app->client_id;
-            // Decrypt and surface for authorized editors (same pattern as GitHub App client_secret).
-            $this->gitlab_app->makeVisible(['client_secret', 'webhook_token', 'access_token', 'refresh_token']);
-            $this->clientSecretInput = $this->gitlab_app->client_secret;
-            $this->webhookToken = $this->gitlab_app->webhook_token;
+            if (Gate::allows('update', $this->gitlab_app)) {
+                $this->clientSecretInput = $this->gitlab_app->client_secret;
+                $this->webhookToken = $this->gitlab_app->webhook_token;
+            }
             $this->groupName = $this->gitlab_app->group_name;
             $this->isSystemWide = $this->gitlab_app->is_system_wide;
             $this->privateKeyId = $this->gitlab_app->private_key_id;
@@ -282,8 +283,9 @@ class Change extends Component
         try {
             $this->authorize('update', $this->gitlab_app);
 
-            $this->gitlab_app->makeVisible(['client_secret', 'webhook_token', 'access_token', 'refresh_token']);
-            $this->syncData(true);
+            $this->validateOnly('isSystemWide');
+
+            $this->gitlab_app->is_system_wide = $this->isSystemWide;
             $this->gitlab_app->save();
             $this->dispatch('success', 'GitLab App updated.');
         } catch (\Throwable $e) {

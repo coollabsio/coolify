@@ -46,6 +46,38 @@ beforeEach(function () {
 });
 
 describe('GitLab App authorization', function () {
+    test('unrelated users cannot inspect system-wide source secrets in the component payload', function () {
+        $otherTeam = Team::factory()->create();
+        $systemWideSource = GitlabApp::create([
+            'name' => 'Shared GitLab',
+            'api_url' => 'https://gitlab.example.com/api/v4',
+            'html_url' => 'https://gitlab.example.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'client_id' => 'shared-client-id',
+            'client_secret' => 'shared-client-secret',
+            'webhook_token' => 'shared-webhook-token',
+            'access_token' => 'shared-access-token',
+            'refresh_token' => 'shared-refresh-token',
+            'expires_at' => time() + 3600,
+            'team_id' => $otherTeam->id,
+            'is_system_wide' => true,
+            'is_public' => false,
+        ]);
+
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        $component = Livewire::withQueryParams(['gitlab_app_uuid' => $systemWideSource->uuid])
+            ->test(Change::class)
+            ->assertSet('clientSecretInput', null)
+            ->assertSet('webhookToken', null);
+
+        expect($component->html())
+            ->not->toContain('shared-client-secret')
+            ->not->toContain('shared-webhook-token');
+    });
+
     test('team member cannot update a gitlab app via instantSave', function () {
         $this->actingAs($this->member);
         session(['currentTeam' => $this->team]);
@@ -71,6 +103,29 @@ describe('GitLab App authorization', function () {
 
         expect($this->gitlabApp->refresh()->is_system_wide)->toBeTrue();
     });
+
+    test('instantSave rejects unsafe GitLab URLs', function (string $url) {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->set('htmlUrl', $url)
+            ->set('apiUrl', $url.'/api/v4')
+            ->set('isSystemWide', true)
+            ->call('instantSave')
+            ->assertDispatched('success');
+
+        $this->gitlabApp->refresh();
+
+        expect($this->gitlabApp->html_url)->toBe('https://gitlab.example.com')
+            ->and($this->gitlabApp->api_url)->toBe('https://gitlab.example.com/api/v4')
+            ->and($this->gitlabApp->is_system_wide)->toBeTrue();
+    })->with([
+        'private address' => 'http://10.0.0.1',
+        'loopback address' => 'http://127.0.0.1',
+        'metadata service address' => 'http://169.254.169.254',
+    ]);
 
     test('team member cannot create an application from a private gitlab repository', function () {
         $this->actingAs($this->member);
