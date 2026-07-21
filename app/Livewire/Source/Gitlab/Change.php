@@ -59,6 +59,8 @@ class Change extends Component
 
     public ?string $oauthState = null;
 
+    private bool $shouldDeriveApiUrlAfterHtmlUrlUpdate = false;
+
     protected function rules(): array
     {
         return [
@@ -74,6 +76,19 @@ class Change extends Component
             'isSystemWide' => 'required|bool',
             'privateKeyId' => 'nullable|int',
         ];
+    }
+
+    public function updatingHtmlUrl(): void
+    {
+        $this->shouldDeriveApiUrlAfterHtmlUrlUpdate = blank($this->apiUrl)
+            || $this->apiUrl === rtrim($this->htmlUrl, '/').'/api/v4';
+    }
+
+    public function updatedHtmlUrl(): void
+    {
+        if ($this->shouldDeriveApiUrlAfterHtmlUrlUpdate) {
+            $this->apiUrl = rtrim($this->htmlUrl, '/').'/api/v4';
+        }
     }
 
     public function mount()
