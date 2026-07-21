@@ -21,7 +21,10 @@
                     {{ wireNavigate() }}
                     href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
                     <div class="text-left dark:group-hover:text-white flex flex-col justify-center mx-6">
-                        <div class="box-title">{{ $source->name }}</div>
+                        <div class="box-title">
+                            <x-git-icon class="inline-block w-4 h-4 mr-1" git="App\Models\GithubApp" />
+                            {{ $source->name }}
+                        </div>
                         @if (is_null($source->app_id))
                             <span class="box-description text-error! ">Configuration is not finished.</span>
                         @else
