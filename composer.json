@@ -75,7 +75,6 @@
         "phpstan/phpstan": "^2.1.38",
         "rector/rector": "^2.3.5",
         "serversideup/spin": "^3.1.1",
-        "spatie/laravel-ignition": "^2.10.0",
         "symfony/http-client": "^7.4.5"
     },
     "minimum-stability": "stable",
