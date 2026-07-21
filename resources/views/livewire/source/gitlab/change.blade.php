@@ -2,7 +2,10 @@
     @if ($isConnected)
         <form wire:submit='submit'>
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h1>GitLab App</h1>
+                <div class="flex items-center gap-2">
+                    <h1>GitLab App</h1>
+                    <x-status-badge status="Connected" type="success" />
+                </div>
                 <div class="flex gap-2">
                     <x-forms.button canGate="update" :canResource="$gitlab_app" type="submit">Save</x-forms.button>
                     <x-forms.button wire:click.prevent="testConnection">Test Connection</x-forms.button>
@@ -17,16 +20,6 @@
                 </div>
             </div>
             <div class="subtitle">Your GitLab App for private repositories.</div>
-            <div class="flex items-center gap-2 mb-4">
-                <span class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded bg-success/10 text-success">
-                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3" /></svg>
-                    Connected
-                </span>
-                <x-forms.button wire:click.prevent="disconnect"
-                    class="bg-transparent border-transparent hover:bg-transparent hover:border-transparent hover:underline text-xs">
-                    Disconnect
-                </x-forms.button>
-            </div>
             <div class="flex flex-col gap-2">
                 <x-forms.input canGate="update" :canResource="$gitlab_app" id="name" label="Name" />
                 @if (!isCloud())

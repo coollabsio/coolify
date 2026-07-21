@@ -319,24 +319,6 @@ class Change extends Component
         }
     }
 
-    public function disconnect()
-    {
-        try {
-            $this->authorize('update', $this->gitlab_app);
-
-            $this->gitlab_app->update([
-                'access_token' => null,
-                'refresh_token' => null,
-                'expires_at' => null,
-            ]);
-
-            $this->isConnected = false;
-            $this->dispatch('success', 'GitLab App disconnected.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
     public function delete()
     {
         try {
