@@ -44,7 +44,7 @@
                             {{ $source->name }}
                         </div>
                         @if ($source->isConnected())
-                            <span class="box-description text-success">Connected — {{ $source->html_url }}</span>
+                            <span class="box-description text-success">Connected</span>
                         @else
                             <span class="box-description text-warning">Setup required</span>
                         @endif
