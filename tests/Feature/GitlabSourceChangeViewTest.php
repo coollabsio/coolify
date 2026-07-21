@@ -73,4 +73,17 @@ describe('GitLab source setup view', function () {
             ->assertSet('clientId', 'gitlab-app-id')
             ->assertSet('clientSecretInput', 'super-secret-value');
     });
+
+    test('supports github-style custom public endpoint for oauth redirect uri', function () {
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->assertSee('Use custom webhook endpoint')
+            ->assertSee('Selected endpoint')
+            ->set('use_custom_webhook_endpoint', true)
+            ->set('custom_webhook_endpoint', 'http://100.75.155.70:8000')
+            ->assertSet('redirectUri', 'http://100.75.155.70:8000/webhooks/source/gitlab/redirect');
+
+        expect($this->gitlabApp->refresh()->redirect_uri)
+            ->toBe('http://100.75.155.70:8000/webhooks/source/gitlab/redirect');
+    });
 });

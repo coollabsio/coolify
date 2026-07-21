@@ -98,7 +98,7 @@
                         (<code>Settings &gt; Webhooks</code>):
                     </div>
                     <x-forms.input readonly label="Webhook URL"
-                        value="{{ $webhook_endpoint }}/webhooks/source/gitlab/events" />
+                        value="{{ rtrim($this->resolvePublicBaseUrl(), '/') }}/webhooks/source/gitlab/events" />
                     <x-forms.input canGate="update" :canResource="$gitlab_app" id="webhookToken" label="Webhook Secret Token"
                         helper="Set this same token in your GitLab webhook's 'Secret token' field." />
                 </div>
@@ -148,7 +148,51 @@
             <span>You must complete this step before you can use this source!</span>
         </div>
 
-        <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-4" x-data="{
+            webhookEndpoint: $wire.entangle('webhook_endpoint').live,
+            useCustomWebhookEndpoint: $wire.entangle('use_custom_webhook_endpoint').live,
+            customWebhookEndpoint: $wire.entangle('custom_webhook_endpoint').live,
+            redirectPath: '/webhooks/source/gitlab/redirect',
+            get redirectUri() {
+                const base = (this.useCustomWebhookEndpoint ? this.customWebhookEndpoint : this.webhookEndpoint) || '';
+                return base ? base.replace(/\/+$/, '') + this.redirectPath : '';
+            }
+        }">
+            @if (!isCloud() || isDev())
+                <div class="flex flex-col gap-3">
+                    <h3>Public endpoint</h3>
+                    <div class="text-sm dark:text-neutral-400">
+                        GitLab will redirect back to this Coolify URL. It must match the Callback URL on your GitLab OAuth Application exactly.
+                    </div>
+                    <x-forms.checkbox x-model="useCustomWebhookEndpoint" id="use_custom_webhook_endpoint"
+                        label="Use custom webhook endpoint"
+                        helper="Enable this when the public URL GitLab should call differs from Coolify's configured URL, for example behind Cloudflare Tunnel or when accessing via a LAN IP." />
+                    <div x-show="!useCustomWebhookEndpoint">
+                        <x-forms.select wire:model.live='webhook_endpoint' x-model="webhookEndpoint"
+                            label="Selected endpoint"
+                            helper="GitLab will use this endpoint unless custom mode is enabled.">
+                            @if ($fqdn)
+                                <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
+                            @endif
+                            @if ($ipv4)
+                                <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
+                            @endif
+                            @if ($ipv6)
+                                <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
+                            @endif
+                            @if (config('app.url'))
+                                <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
+                            @endif
+                        </x-forms.select>
+                    </div>
+                    <div x-cloak x-show="useCustomWebhookEndpoint">
+                        <x-forms.input x-model="customWebhookEndpoint" id="custom_webhook_endpoint" type="url"
+                            label="Custom endpoint" placeholder="https://coolify.example.com"
+                            helper="GitLab will use this custom public URL. Do not include /webhooks." />
+                    </div>
+                </div>
+            @endif
+
             <h3>Step 1: Create an OAuth Application on GitLab</h3>
             <div class="text-sm flex flex-col gap-1">
                 <p>Go to your GitLab instance and create a new OAuth Application:</p>
@@ -158,7 +202,9 @@
                     <x-external-link />
                 </a>
                 <ul class="list-disc list-inside mt-2 space-y-1">
-                    <li>Set <strong>Redirect URI</strong> to: <code>{{ $redirectUri }}</code></li>
+                    <li>Set <strong>Redirect URI</strong> to:
+                        <code x-text="redirectUri || @js($redirectUri)">{{ $redirectUri }}</code>
+                    </li>
                     <li>Enable scopes: <code>api</code>, <code>read_user</code>, <code>read_repository</code></li>
                     <li>Uncheck <strong>Confidential</strong> if you run into issues</li>
                 </ul>
@@ -221,8 +267,8 @@
 
             @if ($clientId)
                 <h3 class="pt-2">Step 3: Authorize with GitLab</h3>
-                <div class="text-sm">Click the button below to authorize Coolify with your GitLab instance.</div>
-                <a href="{{ $this->getOAuthUrl() }}" class="w-fit">
+                <div class="text-sm">Click the button below to authorize Coolify with your GitLab instance. The redirect URI must match the Callback URL configured in GitLab.</div>
+                <a href="{{ $this->getOAuthUrl() }}" class="w-fit" wire:key="oauth-url-{{ md5((string) $redirectUri) }}">
                     <x-forms.button class="mt-2">
                         Connect to GitLab
                     </x-forms.button>

@@ -17,6 +17,10 @@ class Change extends Component
 
     public string $webhook_endpoint = '';
 
+    public string $custom_webhook_endpoint = '';
+
+    public bool $use_custom_webhook_endpoint = false;
+
     public ?string $ipv4 = null;
 
     public ?string $ipv6 = null;
@@ -75,6 +79,9 @@ class Change extends Component
             'groupName' => 'nullable|string',
             'isSystemWide' => 'required|bool',
             'privateKeyId' => 'nullable|int',
+            'webhook_endpoint' => ['required', 'string', 'url'],
+            'custom_webhook_endpoint' => ['nullable', 'string', 'url'],
+            'use_custom_webhook_endpoint' => ['required', 'bool'],
         ];
     }
 
@@ -88,6 +95,40 @@ class Change extends Component
     {
         if ($this->shouldDeriveApiUrlAfterHtmlUrlUpdate) {
             $this->apiUrl = rtrim($this->htmlUrl, '/').'/api/v4';
+        }
+    }
+
+    public function updatedWebhookEndpoint(): void
+    {
+        $this->persistRedirectUriFromEndpoint();
+    }
+
+    public function updatedUseCustomWebhookEndpoint(): void
+    {
+        $this->persistRedirectUriFromEndpoint();
+    }
+
+    public function updatedCustomWebhookEndpoint(): void
+    {
+        $this->persistRedirectUriFromEndpoint();
+    }
+
+    private function persistRedirectUriFromEndpoint(): void
+    {
+        $this->refreshRedirectUri();
+
+        if (! $this->gitlab_app || blank($this->redirectUri)) {
+            return;
+        }
+
+        try {
+            $this->authorize('update', $this->gitlab_app);
+            if ($this->gitlab_app->redirect_uri !== $this->redirectUri) {
+                $this->gitlab_app->redirect_uri = $this->redirectUri;
+                $this->gitlab_app->save();
+            }
+        } catch (\Throwable) {
+            // Keep the live redirect URI even if the user cannot persist yet.
         }
     }
 
@@ -124,12 +165,47 @@ class Change extends Component
                 $this->webhook_endpoint = $this->fqdn ?? $this->ipv4 ?? $this->ipv6 ?? config('app.url') ?? '';
             }
 
-            $this->redirectUri = $this->webhook_endpoint.'/webhooks/source/gitlab/redirect';
+            // Prefer a previously saved redirect base when it matches one of the selectable endpoints
+            // or when it differs (restore custom mode for self-hosted / tunnel setups).
+            $savedRedirect = $this->gitlab_app->redirect_uri;
+            if (filled($savedRedirect)) {
+                $savedBase = rtrim(str($savedRedirect)->before('/webhooks/source/gitlab/redirect')->toString(), '/');
+                $known = collect([$this->fqdn, $this->ipv4, $this->ipv6, config('app.url')])
+                    ->filter()
+                    ->map(fn ($url) => rtrim((string) $url, '/'));
+
+                if ($known->contains($savedBase)) {
+                    $this->webhook_endpoint = $savedBase;
+                    $this->use_custom_webhook_endpoint = false;
+                } elseif (! (isCloud() && ! isDev()) && filled($savedBase)) {
+                    $this->use_custom_webhook_endpoint = true;
+                    $this->custom_webhook_endpoint = $savedBase;
+                }
+            }
+
+            $this->refreshRedirectUri();
 
             $this->oauthState = $this->createOAuthState();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function refreshRedirectUri(): void
+    {
+        $base = $this->resolvePublicBaseUrl();
+        $this->redirectUri = $base === ''
+            ? ''
+            : $base.'/webhooks/source/gitlab/redirect';
+    }
+
+    public function resolvePublicBaseUrl(): string
+    {
+        if ($this->use_custom_webhook_endpoint && filled($this->custom_webhook_endpoint)) {
+            return rtrim($this->custom_webhook_endpoint, '/');
+        }
+
+        return rtrim($this->webhook_endpoint ?: (config('app.url') ?? ''), '/');
     }
 
     public static function oauthStateCacheKey(string $state): string
@@ -165,6 +241,7 @@ class Change extends Component
             $this->gitlab_app->group_name = $this->groupName;
             $this->gitlab_app->is_system_wide = $this->isSystemWide;
             $this->gitlab_app->private_key_id = $this->privateKeyId;
+            $this->refreshRedirectUri();
             $this->gitlab_app->redirect_uri = $this->redirectUri;
         } else {
             $this->name = $this->gitlab_app->name;
@@ -280,6 +357,7 @@ class Change extends Component
 
     public function getOAuthUrl(): string
     {
+        $this->refreshRedirectUri();
         $baseUrl = rtrim($this->htmlUrl, '/');
 
         $query = http_build_query([
