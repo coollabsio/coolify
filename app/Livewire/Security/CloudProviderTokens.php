@@ -4,6 +4,7 @@ namespace App\Livewire\Security;
 
 use App\Models\CloudProviderToken;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class CloudProviderTokens extends Component
@@ -14,8 +15,12 @@ class CloudProviderTokens extends Component
 
     public function mount()
     {
-        $this->authorize('viewAny', CloudProviderToken::class);
-        $this->loadTokens();
+        try {
+            $this->authorize('viewAny', CloudProviderToken::class);
+            $this->loadTokens();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function getListeners()
@@ -50,9 +55,24 @@ class CloudProviderTokens extends Component
                 } else {
                     $this->dispatch('error', 'DigitalOcean token validation failed. Please check the token.');
                 }
+            } elseif ($token->provider === 'vultr') {
+                $isValid = $this->validateVultrToken($token->token);
+                if ($isValid) {
+                    $this->dispatch('success', 'Vultr token is valid.');
+                } else {
+                    $this->dispatch('error', 'Vultr token validation failed. Please check the token.');
+                }
             } else {
                 $this->dispatch('error', 'Unknown provider.');
             }
+
+            auditLog('ui.cloud_token.validated', [
+                'team_id' => currentTeam()->id,
+                'cloud_token_uuid' => $token->uuid,
+                'cloud_token_name' => $token->name,
+                'provider' => $token->provider,
+                'valid' => $isValid ?? false,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -61,7 +81,7 @@ class CloudProviderTokens extends Component
     private function validateHetznerToken(string $token): bool
     {
         try {
-            $response = \Illuminate\Support\Facades\Http::withToken($token)
+            $response = Http::withToken($token)
                 ->timeout(10)
                 ->get('https://api.hetzner.cloud/v1/servers?per_page=1');
 
@@ -74,9 +94,22 @@ class CloudProviderTokens extends Component
     private function validateDigitalOceanToken(string $token): bool
     {
         try {
-            $response = \Illuminate\Support\Facades\Http::withToken($token)
+            $response = Http::withToken($token)
                 ->timeout(10)
                 ->get('https://api.digitalocean.com/v2/account');
+
+            return $response->successful();
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function validateVultrToken(string $token): bool
+    {
+        try {
+            $response = Http::withToken($token)
+                ->timeout(10)
+                ->get('https://api.vultr.com/v2/account');
 
             return $response->successful();
         } catch (\Throwable $e) {
@@ -98,8 +131,18 @@ class CloudProviderTokens extends Component
                 return;
             }
 
+            $tokenUuid = $token->uuid;
+            $tokenName = $token->name;
+            $tokenProvider = $token->provider;
             $token->delete();
             $this->loadTokens();
+
+            auditLog('ui.cloud_token.deleted', [
+                'team_id' => currentTeam()->id,
+                'cloud_token_uuid' => $tokenUuid,
+                'cloud_token_name' => $tokenName,
+                'provider' => $tokenProvider,
+            ]);
 
             $this->dispatch('success', 'Cloud provider token deleted successfully.');
         } catch (\Throwable $e) {

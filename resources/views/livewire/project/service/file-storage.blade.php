@@ -4,6 +4,10 @@
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 File on server exceeds 5 MB and cannot be edited from the UI. Edit it directly on the server.
             </div>
+        @elseif ($fileStorage->is_host_file)
+            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+                This host file mount is bind-only. Coolify will not create, edit, load, chmod, or delete the source file.
+            </div>
         @elseif ($isReadOnly)
             <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
                 @if ($fileStorage->is_directory)
@@ -15,7 +19,15 @@
         @endif
         <div class="flex flex-col justify-center text-sm select-text">
             <div class="flex gap-2  md:flex-row flex-col">
-                <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly />
+                <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly>
+                    <x-slot:labelSuffix>
+                        @if ($hasEnabledBackup)
+                            <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                status="Backup enabled" type="success"
+                                :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                        @endif
+                    </x-slot:labelSuffix>
+                </x-forms.input>
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
@@ -32,7 +44,14 @@
             @if (!$isReadOnly)
                 @can('update', $resource)
                     <div class="flex gap-2">
-                        @if ($fileStorage->is_directory)
+                        @if ($fileStorage->is_host_file)
+                            <x-modal-confirmation :ignoreWire="false" title="Confirm Host File Mount Removal?"
+                                buttonTitle="Delete" isErrorButton submitAction="delete" :checkboxes="$hostFileDeletionCheckboxes"
+                                :actions="['Only the mount configuration will be removed. The host file will not be deleted.']"
+                                confirmationText="{{ $fs_path }}"
+                                confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
+                                shortConfirmationLabel="Filepath" />
+                        @elseif ($fileStorage->is_directory)
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Conversion to File?"
                                 buttonTitle="Convert to file" submitAction="convertToFile" :actions="[
                                     'All files in this directory will be permanently deleted and an empty file will be created in its place.',
@@ -40,6 +59,14 @@
                                 confirmationText="{{ $fs_path }}"
                                 confirmationLabel="Please confirm the execution of the actions by entering the Filepath below"
                                 shortConfirmationLabel="Filepath" :confirmWithPassword="false" step2ButtonText="Convert to file" />
+                            @if ($resource instanceof \App\Models\Application)
+                                <x-modal-input buttonTitle="Configure Backup" title="Configure Directory Backup"
+                                    :wireIgnore="false">
+                                    <livewire:project.application.backup.create :application="$resource"
+                                        :selected-target-key="'directory:' . $fileStorage->id"
+                                        wire:key="configure-directory-backup-{{ $fileStorage->id }}" />
+                                </x-modal-input>
+                            @endif
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Directory Deletion?" buttonTitle="Delete"
                                 isErrorButton submitAction="delete" :checkboxes="$directoryDeletionCheckboxes" :actions="[
                                     'The selected directory and all its contents will be permanently deleted from the container.',
@@ -68,7 +95,7 @@
                         @endif
                     </div>
                 @endcan
-                @if (!$fileStorage->is_directory)
+                @if (!$fileStorage->is_directory && !$fileStorage->is_host_file)
                     @can('update', $resource)
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                             <div class="w-full sm:w-96">
@@ -99,8 +126,8 @@
                 @endif
             @else
                 {{-- Read-only view --}}
-                @if (!$fileStorage->is_directory)
-                    @can('view', $resource)
+                @if (!$fileStorage->is_directory && !$fileStorage->is_host_file)
+                    @can('update', $resource)
                         <div class="flex gap-2">
                             <x-forms.button type="button" wire:click="loadStorageOnServer">Load from
                                 server</x-forms.button>
@@ -119,5 +146,16 @@
                 @endif
             @endif
         </form>
+        @if ($isReadOnly && $fileStorage->is_directory && $resource instanceof \App\Models\Application)
+            @can('update', $resource)
+                <div>
+                    <x-modal-input buttonTitle="Configure Backup" title="Configure Directory Backup" :wireIgnore="false">
+                        <livewire:project.application.backup.create :application="$resource"
+                            :selected-target-key="'directory:' . $fileStorage->id"
+                            wire:key="configure-readonly-directory-backup-{{ $fileStorage->id }}" />
+                    </x-modal-input>
+                </div>
+            @endcan
+        @endif
     </div>
 </div>

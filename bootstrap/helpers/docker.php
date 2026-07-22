@@ -9,7 +9,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
@@ -71,6 +70,36 @@ function getCurrentServiceContainerStatus(Server $server, int $id): Collection
     }
 
     return $containers;
+}
+
+function getCurrentDatabaseContainerStatus(Server $server, int $id): Collection
+{
+    $containers = collect([]);
+    if (! $server->isSwarm()) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.databaseId={$id}' --format '{{json .}}' "], $server);
+        $containers = format_docker_command_output_to_json($containers);
+
+        return $containers->filter();
+    }
+
+    return $containers;
+}
+
+function getCurrentServiceSubContainerStatus(Server $server, int $id, string $name): Collection
+{
+    return filterServiceSubContainersByName(getCurrentServiceContainerStatus($server, $id), $name);
+}
+
+function filterServiceSubContainersByName(Collection $containers, string $name): Collection
+{
+    return $containers->filter(function ($container) use ($name) {
+        $labels = data_get($container, 'Labels', []);
+        if (is_string($labels)) {
+            $labels = format_docker_labels_to_json($labels);
+        }
+
+        return collect($labels)->get('coolify.name') === $name;
+    })->values();
 }
 
 function format_docker_command_output_to_json($rawOutput): Collection
@@ -149,13 +178,18 @@ function executeInDocker(string $containerId, string $command)
     return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
-function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
+function buildContainerStatusCommand(Server $server, string $container_id): string
 {
     if ($server->isSwarm()) {
-        $container = instant_remote_process(["docker service ls --filter 'name={$container_id}' --format '{{json .}}' "], $server, $throwError);
-    } else {
-        $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
+        return 'docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ";
     }
+
+    return "docker inspect --format '{{json .}}' ".escapeshellarg($container_id);
+}
+
+function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
+{
+    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError);
     if (! $container) {
         return 'exited';
     }
@@ -459,7 +493,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
-                $uuid = new Cuid2;
+                $uuid = new_public_id();
             }
 
             $url = Url::fromString($domain);
@@ -1248,18 +1282,38 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
-function getContainerLogs(Server $server, string $container_id, int $lines = 100): string
+function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int
 {
-    if ($server->isSwarm()) {
-        $output = instant_remote_process([
-            "docker service logs -n {$lines} {$container_id} 2>&1",
-        ], $server);
-    } else {
-        $output = instant_remote_process([
-            "docker logs -n {$lines} {$container_id} 2>&1",
-        ], $server);
+    $lines = filter_var($lines, FILTER_VALIDATE_INT);
+    if ($lines === false || $lines <= 0) {
+        return $default;
     }
 
+    return min($lines, $max);
+}
+
+function parseLogTimestampFlag(mixed $showTimestamps): bool
+{
+    return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+}
+
+function buildContainerLogsCommand(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+{
+    $command = "docker logs -n {$lines}";
+    if ($server->isSwarm()) {
+        $command = "docker service logs -n {$lines}";
+    }
+
+    if ($showTimestamps) {
+        $command .= ' --timestamps';
+    }
+
+    return "{$command} ".escapeshellarg($container_id).' 2>&1';
+}
+
+function getContainerLogs(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+{
+    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
     $output = removeAnsiColors($output);
 
     return $output;
@@ -1364,7 +1418,7 @@ function generateDockerBuildArgs($variables): Collection
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
 
         // Only return the key - Docker will get the value from the environment
-        return "--build-arg {$key}";
+        return '--build-arg '.escapeshellarg((string) $key);
     });
 }
 

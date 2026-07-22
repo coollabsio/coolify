@@ -18,6 +18,7 @@
             'destinations' => $s->destinations()->map(
                 fn($d) => [
                     'id' => $d->id,
+                    'uuid' => $d->uuid,
                     'name' => $d->name,
                     'server_id' => $s->id,
                 ],
@@ -77,6 +78,9 @@
                             <template x-for="server in servers" :key="server.id">
                                 <option :value="server.id" x-text="`${server.name} (${server.ip})`"></option>
                             </template>
+                            @foreach ($buildServers as $buildServer)
+                                <option disabled>{{ $buildServer->name }} — Build server — cannot host resources</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -84,8 +88,8 @@
                         <label class="block text-sm font-medium mb-2">Select Network Destination</label>
                         <select x-model="selectedCloneDestination" :disabled="!selectedCloneServer" class="select">
                             <option value="">Choose a destination...</option>
-                            <template x-for="destination in availableDestinations" :key="destination.id">
-                                <option :value="destination.id" x-text="destination.name"></option>
+                            <template x-for="destination in availableDestinations" :key="destination.uuid">
+                                <option :value="destination.uuid" x-text="destination.name"></option>
                             </template>
                         </select>
                     </div>
@@ -101,16 +105,10 @@
                     </div>
                 </div>
             </div>
-        @else
-            <x-callout type="warning" title="Access Restricted">
-                You don't have permission to clone resources. Contact your team administrator to request access.
-            </x-callout>
-        @endcan
 
-        <h3 class="pt-4">Move Resource</h3>
-        <div class="pb-4">Transfer this resource between projects and environments.</div>
+            <h3 class="pt-4">Move Resource</h3>
+            <div class="pb-4">Transfer this resource between projects and environments.</div>
 
-        @can('update', $resource)
             @if ($projects->count() > 0)
                 <div class="space-y-4">
                     <div class="flex flex-col lg:flex-row gap-4">
@@ -160,9 +158,8 @@
                 </div>
             @endif
         @else
-            <x-callout type="warning" title="Access Restricted">
-                You don't have permission to move resources between projects or environments. Contact your team
-                administrator to request access.
+            <x-callout type="danger" title="Insufficient Permissions">
+                You don't have permission to modify this resource. Contact your team administrator for access.
             </x-callout>
         @endcan
     </div>

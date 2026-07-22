@@ -72,32 +72,72 @@ class ValidateAndInstall extends Component
 
     public function retry()
     {
-        $this->authorize('update', $this->server);
-        $this->uptime = null;
-        $this->supported_os_type = null;
-        $this->prerequisites_installed = null;
-        $this->docker_installed = null;
-        $this->docker_compose_installed = null;
-        $this->docker_version = null;
-        $this->error = null;
-        $this->number_of_tries = 0;
-        $this->init();
+        try {
+            $this->authorize('update', $this->server);
+            $this->uptime = null;
+            $this->supported_os_type = null;
+            $this->prerequisites_installed = null;
+            $this->docker_installed = null;
+            $this->docker_compose_installed = null;
+            $this->docker_version = null;
+            $this->error = null;
+            $this->number_of_tries = 0;
+            $this->init();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function validateConnection()
     {
-        $this->authorize('update', $this->server);
-        ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
-        if (! $this->uptime) {
-            $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$sanitizedError.'</div>';
-            $this->server->update([
-                'validation_logs' => $this->error,
-            ]);
+        try {
+            $this->authorize('update', $this->server);
+            if ($this->server->vultr_instance_id) {
+                $status = $this->server->refreshVultrState();
+                $this->server->refresh();
 
-            return;
+                if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+                    $this->error = $status === 'deleted'
+                        ? 'Vultr instance is deleted or no longer accessible. Relink this server before validating.'
+                        : 'Vultr instance is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                }
+            }
+
+            if ($this->server->digitalocean_droplet_id) {
+                $status = $this->server->refreshDigitalOceanState();
+                $this->server->refresh();
+
+                if (in_array($status, ['off', 'archive', 'deleted'], true)) {
+                    $this->error = $status === 'deleted'
+                        ? 'DigitalOcean droplet is deleted or no longer accessible. Relink this server before validating.'
+                        : 'DigitalOcean droplet is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                }
+            }
+
+            ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
+            if (! $this->uptime) {
+                $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+                $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$sanitizedError.'</div>';
+                $this->server->update([
+                    'validation_logs' => $this->error,
+                ]);
+
+                return;
+            }
+            $this->dispatch('validateOS');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->dispatch('validateOS');
     }
 
     public function validateOS()

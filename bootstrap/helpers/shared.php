@@ -64,7 +64,6 @@ use PurplePixie\PhpDns\DNSQuery;
 use PurplePixie\PhpDns\DNSTypes;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 function base_configuration_dir(): string
 {
@@ -115,6 +114,13 @@ function sanitize_string(?string $input = null): ?string
     return $sanitized;
 }
 
+function new_public_id(int $length = 24): string
+{
+    $length = max(1, $length);
+
+    return Str::lower(Str::random($length));
+}
+
 /**
  * Validate that a path or identifier is safe for use in shell commands.
  *
@@ -160,7 +166,7 @@ function validateShellSafePath(string $input, string $context = 'path'): string
 /**
  * Validate that a filename is safe for use as a plain file name (no path components).
  *
- * Prevents path traversal attacks by rejecting directory separators, traversal
+ * Prevents unsafe parent directory paths by rejecting directory separators, parent directory
  * sequences, and null bytes, in addition to all shell metacharacters blocked by
  * validateShellSafePath(). Intended for user-supplied filenames such as PostgreSQL
  * init script names that are later written to a specific directory on the host.
@@ -169,7 +175,7 @@ function validateShellSafePath(string $input, string $context = 'path'): string
  * @param  string  $context  Descriptive name for error messages (e.g., 'init script filename')
  * @return string The validated input (unchanged if valid)
  *
- * @throws Exception If dangerous characters or path traversal sequences are detected
+ * @throws Exception If dangerous characters or parent directory sequences are detected
  */
 function validateFilenameSafe(string $input, string $context = 'filename'): string
 {
@@ -192,10 +198,10 @@ function validateFilenameSafe(string $input, string $context = 'filename'): stri
         );
     }
 
-    // Reject path traversal sequences (catches encoded or unusual forms)
+    // Reject parent directory sequences (catches encoded or unusual forms)
     if (str_contains($input, '..')) {
         throw new Exception(
-            "Invalid {$context}: path traversal sequence ('..') is not allowed."
+            "Invalid {$context}: parent directory sequence ('..') is not allowed."
         );
     }
 
@@ -222,6 +228,197 @@ function validateFilenameSafe(string $input, string $context = 'filename'): stri
     }
 
     return $input;
+}
+
+/**
+ * Validate and normalize a user supplied file mount path.
+ *
+ * File mount paths are container paths supplied by tenants. They may look like
+ * absolute paths (for example /etc/nginx/nginx.conf), but are later joined to a
+ * Coolify-managed configuration directory on the host. Therefore shell safety is
+ * not enough: every path segment must also be unable to traverse out of that
+ * managed directory.
+ *
+ * @throws Exception
+ */
+function validateFileMountPath(string $input, string $context = 'file mount path'): string
+{
+    validateShellSafePath($input, $context);
+
+    if (str_contains($input, "\0")) {
+        throw new Exception(
+            "Invalid {$context}: contains null byte. ".
+            'Null bytes are not allowed in file mount paths for security reasons.'
+        );
+    }
+
+    if (str_contains($input, '\\')) {
+        throw new Exception(
+            "Invalid {$context}: backslash directory separators are not allowed."
+        );
+    }
+
+    $path = str($input)->trim()->start('/')->replaceMatches('#/+#', '/')->value();
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || ($segment !== '.' && $segment !== '..')) {
+            continue;
+        }
+
+        throw new Exception(
+            "Invalid {$context}: relative path segments ('.' or '..') are not allowed."
+        );
+    }
+
+    return $path;
+}
+
+/**
+ * Validate a host file path used as a bind-only source.
+ *
+ * Unlike managed file mounts, this path is not re-based under the Coolify
+ * configuration directory and must never be written by Coolify. It still needs
+ * to be shell-safe because other storage code may pass paths through remote
+ * shell commands.
+ *
+ * @throws Exception
+ */
+function validateHostFileMountPath(string $input, string $context = 'host file path'): string
+{
+    validateShellSafePath($input, $context);
+
+    if (str_contains($input, "\0")) {
+        throw new Exception("Invalid {$context}: contains null byte.");
+    }
+
+    if (str_contains($input, '\\')) {
+        throw new Exception("Invalid {$context}: backslash directory separators are not allowed.");
+    }
+
+    $path = str($input)->trim()->replaceMatches('#/+#', '/')->value();
+
+    if ($path === '' || ! str_starts_with($path, '/')) {
+        throw new Exception("Invalid {$context}: must be an absolute path.");
+    }
+
+    if ($path === '/' || str_ends_with($path, '/')) {
+        throw new Exception("Invalid {$context}: must point to a file, not a directory.");
+    }
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || ($segment !== '.' && $segment !== '..')) {
+            continue;
+        }
+
+        throw new Exception("Invalid {$context}: relative path segments ('.' or '..') are not allowed.");
+    }
+
+    return normalizeUnixPath($path);
+}
+
+/**
+ * Resolve a tenant file mount path under a Coolify-managed base directory.
+ *
+ * This performs lexical normalization only; the target file does not need to
+ * exist yet. The normalized result must remain inside the given base directory.
+ *
+ * @throws Exception
+ */
+function confineFileMountPath(string $baseDirectory, string $path, string $context = 'file mount path'): string
+{
+    $baseDirectory = normalizeUnixPath($baseDirectory);
+    $mountPath = validateFileMountPath($path, $context);
+    $resolvedPath = normalizeUnixPath($baseDirectory.'/'.$mountPath);
+
+    if ($resolvedPath !== $baseDirectory && ! str_starts_with($resolvedPath, $baseDirectory.'/')) {
+        throw new Exception(
+            "Invalid {$context}: resolved path must stay inside the resource configuration directory."
+        );
+    }
+
+    return $resolvedPath;
+}
+
+/**
+ * Normalize an existing host path and assert it remains inside a base directory.
+ *
+ * Dot-relative paths are resolved against the base directory for legacy
+ * LocalFileVolume rows. Absolute paths must already point inside the base.
+ *
+ * @throws Exception
+ */
+function confinePathToBase(string $baseDirectory, string $path, string $context = 'path'): string
+{
+    $baseDirectory = normalizeUnixPath($baseDirectory);
+    $path = trim($path);
+
+    if (str_starts_with($path, '.')) {
+        $path = $baseDirectory.'/'.str($path)->after('.')->value();
+    } elseif (! str_starts_with($path, '/')) {
+        $path = $baseDirectory.'/'.$path;
+    }
+
+    $resolvedPath = normalizeUnixPath($path);
+
+    if ($resolvedPath !== $baseDirectory && ! str_starts_with($resolvedPath, $baseDirectory.'/')) {
+        throw new Exception(
+            "Invalid {$context}: resolved path must stay inside the resource configuration directory."
+        );
+    }
+
+    return $resolvedPath;
+}
+
+/**
+ * Normalize a Unix path lexically without consulting the remote filesystem.
+ *
+ * @throws Exception
+ */
+function normalizeUnixPath(string $path): string
+{
+    validateShellSafePath($path, 'path');
+
+    if (str_contains($path, "\0")) {
+        throw new Exception('Invalid path: contains null byte.');
+    }
+
+    if (str_contains($path, '\\')) {
+        throw new Exception('Invalid path: backslash directory separators are not allowed.');
+    }
+
+    $isAbsolute = str_starts_with($path, '/');
+    $segments = [];
+
+    foreach (explode('/', $path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+
+        if ($segment === '..') {
+            if ($segments === [] || end($segments) === '..') {
+                if ($isAbsolute) {
+                    throw new Exception('Invalid path: resolved path escapes the base directory.');
+                }
+                $segments[] = $segment;
+
+                continue;
+            }
+
+            array_pop($segments);
+
+            continue;
+        }
+
+        $segments[] = $segment;
+    }
+
+    $normalized = implode('/', $segments);
+
+    if ($isAbsolute) {
+        return $normalized === '' ? '/' : '/'.$normalized;
+    }
+
+    return $normalized === '' ? '.' : $normalized;
 }
 
 /**
@@ -336,6 +533,17 @@ function find_destination_for_current_team(?string $uuid): StandaloneDocker|Swar
 
     return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
         ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
+}
+
+function find_resource_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    $destination = find_destination_for_current_team($uuid);
+
+    if (! $destination?->server?->canHostResources()) {
+        return null;
+    }
+
+    return $destination;
 }
 
 function showBoarding(): bool
@@ -455,7 +663,7 @@ function generate_random_name(?string $cuid = null): string
         ]
     );
     if (is_null($cuid)) {
-        $cuid = new Cuid2;
+        $cuid = new_public_id();
     }
 
     return Str::kebab("{$generator->getName()}-$cuid");
@@ -491,7 +699,7 @@ function formatPrivateKey(string $privateKey)
 function generate_application_name(string $git_repository, string $git_branch, ?string $cuid = null): string
 {
     if (is_null($cuid)) {
-        $cuid = new Cuid2;
+        $cuid = new_public_id();
     }
 
     $repo_name = str_contains($git_repository, '/') ? last(explode('/', $git_repository)) : $git_repository;
@@ -1057,7 +1265,6 @@ function sslip(Server $server)
 
 function get_service_templates(bool $force = false): Collection
 {
-
     if ($force) {
         try {
             $response = Http::retry(3, 1000)->get(config('constants.services.official'));
@@ -1068,15 +1275,16 @@ function get_service_templates(bool $force = false): Collection
 
             return collect($services);
         } catch (Throwable) {
-            $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-            return collect(json_decode($services))->sortKeys();
+            return get_service_templates();
         }
-    } else {
-        $services = File::get(base_path('templates/'.config('constants.services.file_name')));
-
-        return collect(json_decode($services))->sortKeys();
     }
+
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $mtime = filemtime($path) ?: 0;
+
+    return Cache::remember("service-templates:{$mtime}", now()->addDay(), function () use ($path) {
+        return collect(json_decode(File::get($path)))->sortKeys();
+    });
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -1567,7 +1775,6 @@ function validateDNSEntry(string $fqdn, Server $server)
             $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
-                ray('Error: '.$query->getLasterror());
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
@@ -3259,7 +3466,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $template = $resource->preview_url_template;
                                     $host = $url->getHost();
                                     $schema = $url->getScheme();
-                                    $random = new Cuid2;
+                                    $random = new_public_id();
                                     $preview_fqdn = str_replace('{{random}}', $random, $template);
                                     $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                                     $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
@@ -3552,6 +3759,27 @@ function redirectRoute(Component $component, string $name, array $parameters = [
     return $component->redirectRoute($name, $parameters, navigate: $navigate);
 }
 
+function coolifyRegistryUrl(): string
+{
+    try {
+        return instanceSettings()->docker_registry_url ?: 'docker.io';
+    } catch (Throwable) {
+        return config('constants.coolify.registry_url', 'docker.io');
+    }
+}
+
+function coolifyHelperImage(): string
+{
+    $configuredHelperImage = config('constants.coolify.helper_image');
+    $configuredDefaultHelperImage = config('constants.coolify.registry_url', 'docker.io').'/coollabsio/coolify-helper';
+
+    if ($configuredHelperImage !== $configuredDefaultHelperImage) {
+        return $configuredHelperImage;
+    }
+
+    return coolifyRegistryUrl().'/coollabsio/coolify-helper';
+}
+
 function getHelperVersion(): string
 {
     $settings = instanceSettings();
@@ -3568,9 +3796,6 @@ function loggy($message = null, array $context = [])
 {
     if (! isDev()) {
         return;
-    }
-    if (function_exists('ray') && config('app.debug')) {
-        ray($message, $context);
     }
     if (is_null($message)) {
         return app('log');
@@ -3813,7 +4038,7 @@ function formatBytes(?int $bytes, int $precision = 2): string
 
 /**
  * Validates that a file path is safely within the /tmp/ directory.
- * Protects against path traversal attacks by resolving the real path
+ * Protects against unsafe parent directory paths by resolving the real path
  * and verifying it stays within /tmp/.
  *
  * Note: On macOS, /tmp is often a symlink to /private/tmp, which is handled.

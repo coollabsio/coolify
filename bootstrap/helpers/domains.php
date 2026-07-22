@@ -4,6 +4,54 @@ use App\Models\Application;
 use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 
+function isValidDomainUrl(string $url): bool
+{
+    $components = parse_url($url);
+
+    if ($components === false) {
+        return false;
+    }
+
+    $scheme = $components['scheme'] ?? '';
+    $host = $components['host'] ?? '';
+
+    if (! in_array(strtolower($scheme), ['http', 'https'], true) || $host === '') {
+        return false;
+    }
+
+    $urlToValidate = $scheme.'://';
+
+    if (isset($components['user'])) {
+        $urlToValidate .= $components['user'];
+
+        if (isset($components['pass'])) {
+            $urlToValidate .= ':'.$components['pass'];
+        }
+
+        $urlToValidate .= '@';
+    }
+
+    $urlToValidate .= str_replace('_', '-', $host);
+
+    if (isset($components['port'])) {
+        $urlToValidate .= ':'.$components['port'];
+    }
+
+    if (isset($components['path'])) {
+        $urlToValidate .= $components['path'];
+    }
+
+    if (isset($components['query'])) {
+        $urlToValidate .= '?'.$components['query'];
+    }
+
+    if (isset($components['fragment'])) {
+        $urlToValidate .= '#'.$components['fragment'];
+    }
+
+    return filter_var($urlToValidate, FILTER_VALIDATE_URL) !== false;
+}
+
 function checkDomainUsage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
 {
     $conflicts = [];

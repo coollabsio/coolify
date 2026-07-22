@@ -6,7 +6,6 @@ use App\Models\Project;
 use App\Models\Server;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 class Select extends Component
@@ -24,6 +23,8 @@ class Select extends Component
     public Collection|null|Server $allServers;
 
     public Collection|null|Server $servers;
+
+    public ?Collection $buildServers = null;
 
     public bool $onlyBuildServerAvailable = false;
 
@@ -107,20 +108,23 @@ class Select extends Component
     public function loadServices()
     {
         $services = get_service_templates();
-        $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services->keys());
+        $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
             $default_logo = 'images/default.webp';
             $logo = data_get($service, 'logo', $default_logo);
             $local_logo_path = public_path($logo);
+            $serviceKey = (string) $key;
 
             return [
-                'name' => str($key)->headline(),
+                'id' => $serviceKey,
+                'name' => str($serviceKey)->headline(),
+                'docsSlug' => str($serviceKey)->lower()->value(),
                 'logo' => asset($logo),
                 'logo_github_url' => file_exists($local_logo_path)
                     ? 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo
                     : asset($default_logo),
-                'templateLastUpdated' => $templateLastUpdatedMap[(string) $key] ?? null,
+                'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
             ] + (array) $service;
         })->all();
 
@@ -165,6 +169,12 @@ class Select extends Component
                 'name' => 'Private Repository (with GitHub App)',
                 'description' => 'You can deploy public & private repositories through your GitHub Apps.',
                 'logo' => asset('svgs/github.svg'),
+            ],
+            [
+                'id' => 'private-gitlab-app',
+                'name' => 'Private Repository (with GitLab App)',
+                'description' => 'You can deploy public & private repositories through your GitLab Apps.',
+                'logo' => asset('svgs/gitlab.svg'),
             ],
             [
                 'id' => 'private-deploy-key',
@@ -279,19 +289,31 @@ class Select extends Component
         return $this->formatLastModified($this->serviceTemplatesPath());
     }
 
-    private function serviceTemplateLastUpdatedMap(Collection $serviceNames): array
+    private function serviceTemplateLastUpdatedMap(Collection $services): array
     {
-        $bundleMtime = file_exists($this->serviceTemplatesPath()) ? filemtime($this->serviceTemplatesPath()) : 0;
+        return $services
+            ->mapWithKeys(fn ($service, $serviceName) => [
+                (string) $serviceName => $this->serviceTemplateLastUpdatedFromPayload($service)
+                    ?? $this->serviceTemplateLastUpdated((string) $serviceName),
+            ])
+            ->all();
+    }
 
-        return Cache::remember(
-            "service-template-last-updated-map:{$bundleMtime}",
-            now()->addDay(),
-            fn () => $serviceNames
-                ->mapWithKeys(fn ($serviceName) => [
-                    (string) $serviceName => $this->serviceTemplateLastUpdated((string) $serviceName),
-                ])
-                ->all()
-        );
+    private function serviceTemplateLastUpdatedFromPayload(mixed $service): ?string
+    {
+        $timestamp = data_get($service, 'template_last_updated_at');
+
+        if (! is_string($timestamp) || $timestamp === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($timestamp)
+                ->timezone(config('app.timezone'))
+                ->format('M j, Y H:i');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function serviceTemplateLastUpdated(string $serviceName): ?string
@@ -325,7 +347,10 @@ class Select extends Component
 
     public function setType(string $type)
     {
-        $type = str($type)->lower()->slug()->value();
+        if (! str($type)->startsWith('one-click-service-')) {
+            $type = str($type)->lower()->slug()->value();
+        }
+
         if ($this->loading) {
             return;
         }
@@ -363,7 +388,7 @@ class Select extends Component
 
             return;
         }
-        if (count($this->servers) === 1) {
+        if (count($this->servers) === 1 && $this->buildServers?->isEmpty()) {
             $server = $this->servers->first();
             if ($server instanceof Server) {
                 $this->setServer($server);
@@ -435,12 +460,8 @@ class Select extends Component
     public function loadServers()
     {
         $this->servers = Server::isUsable()->get()->sortBy('name');
-        $this->allServers = $this->servers;
-
-        if ($this->allServers && $this->allServers->isNotEmpty()) {
-            $this->onlyBuildServerAvailable = $this->allServers->every(function ($server) {
-                return $server->isBuildServer();
-            });
-        }
+        $this->buildServers = Server::isUsableBuildServer()->get()->sortBy('name');
+        $this->allServers = $this->servers->concat($this->buildServers);
+        $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();
     }
 }

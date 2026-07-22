@@ -2,11 +2,18 @@
     @if (data_get($github_app, 'app_id'))
         <form wire:submit='submit'>
             <div class="flex flex-col sm:flex-row sm:items-center gap-2">
-                <h1>GitHub App</h1>
+                <div class="flex items-center gap-2">
+                    <h1>GitHub App</h1>
+                    @if ($isConnected)
+                        <x-status-badge status="Connected" type="success" />
+                    @endif
+                </div>
                 <div class="flex gap-2">
                     @if (data_get($github_app, 'installation_id'))
                         <x-forms.button canGate="update" :canResource="$github_app" type="submit"
                             :disabled="$activeTab !== 'general'">Save</x-forms.button>
+                        <x-forms.button canGate="view" :canResource="$github_app"
+                            wire:click.prevent="testConnection">Test Connection</x-forms.button>
                     @endif
                     @can('delete', $github_app)
                         @if ($applications->count() > 0)
@@ -373,7 +380,8 @@
                         baseUrl = devWebhook;
                     }
                     const webhookBaseUrl = `${baseUrl}/webhooks`;
-                    const path = organization ? `organizations/${organization}/settings/apps/new` : 'settings/apps/new';
+                    const organizationPath = organization ? encodeURIComponent(organization.replace(/^\/+|\/+$/g, '')) : '';
+                    const path = organizationPath ? `organizations/${organizationPath}/settings/apps/new` : 'settings/apps/new';
                     const default_permissions = {
                         contents: 'read',
                         metadata: 'read',

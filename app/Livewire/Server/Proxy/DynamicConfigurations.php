@@ -3,11 +3,14 @@
 namespace App\Livewire\Server\Proxy;
 
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class DynamicConfigurations extends Component
 {
+    use AuthorizesRequests;
+
     public ?Server $server = null;
 
     public $parameters = [];
@@ -35,6 +38,11 @@ class DynamicConfigurations extends Component
 
     public function loadDynamicConfigurations()
     {
+        try {
+            $this->authorize('view', $this->server);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
         $proxy_path = $this->server->proxyPath();
         $files = instant_remote_process(["mkdir -p $proxy_path/dynamic && ls -1 {$proxy_path}/dynamic"], $this->server);
         $files = collect(explode("\n", $files))->filter(fn ($file) => ! empty($file));

@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Hash;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0]);
+    InstanceSettings::create(['id' => 0, 'is_sponsorship_popup_enabled' => false]);
 });
 
 it('shows registration page when no users exist', function () {

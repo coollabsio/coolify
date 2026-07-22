@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 /**
  * Validates a Docker Compose YAML string for command injection vulnerabilities.
@@ -371,8 +370,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
     $server = data_get($resource, 'destination.server');
-    $fileStorages = $resource->fileStorages();
-
     try {
         $yaml = Yaml::parse($compose);
     } catch (Exception) {
@@ -504,6 +501,40 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'is_preview' => false,
                     ]);
                 }
+
+            }
+
+            // Also populate docker_compose_domains for dockercompose apps from direct SERVICE_* declarations.
+            if ($resource->build_pack === 'dockercompose' && ($key->startsWith('SERVICE_FQDN_') || $key->startsWith('SERVICE_URL_'))) {
+                $parsed = parseServiceEnvironmentVariable($key->value());
+                $normalizedServiceName = str($parsed['service_name'])->replace('-', '_')->replace('.', '_')->value();
+                $serviceExists = false;
+                foreach (array_keys($services) as $serviceNameKey) {
+                    if (str($serviceNameKey)->replace('-', '_')->replace('.', '_')->value() === $normalizedServiceName) {
+                        $serviceExists = true;
+                        break;
+                    }
+                }
+                if ($serviceExists) {
+                    $domains = collect(json_decode(data_get($resource, 'docker_compose_domains') ?: '[]'));
+                    $domainExists = data_get($domains->get($normalizedServiceName), 'domain');
+                    if (is_null($domainExists)) {
+                        $serviceNameForDomain = str($parsed['service_name'])->replace('_', '-')->value();
+                        $domainValue = generateUrl(server: $server, random: "$serviceNameForDomain-$uuid");
+                        if ($value && get_class($value) === Illuminate\Support\Stringable::class && $value->startsWith('/')) {
+                            $path = $value->value();
+                            if ($path !== '/') {
+                                $domainValue = "$domainValue$path";
+                            }
+                        }
+                        if ($parsed['port'] && is_numeric($parsed['port'])) {
+                            $domainValue = "$domainValue:{$parsed['port']}";
+                        }
+                        $domains->put($normalizedServiceName, ['domain' => $domainValue]);
+                        $resource->docker_compose_domains = $domains->toJson();
+                        $resource->save();
+                    }
+                }
             }
         }
 
@@ -611,7 +642,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
                         // Only add domain if the service exists
                         if ($serviceExists) {
-                            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
+                            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains') ?: '[]'));
                             $domainExists = data_get($domains->get($serviceName), 'domain');
 
                             // Update domain using URL with port if applicable
@@ -704,14 +735,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -757,12 +785,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
@@ -1240,7 +1265,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $schema = $url->getScheme();
                         $portInt = $url->getPort();
                         $port = $portInt !== null ? ':'.$portInt : '';
-                        $random = new Cuid2;
+                        $random = new_public_id();
                         $preview_fqdn = str_replace('{{random}}', $random, $template);
                         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                         $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
@@ -1489,9 +1514,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
-    } catch (Exception $e) {
+    } catch (Exception) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');
@@ -2071,7 +2095,6 @@ function serviceParser(Service $resource): Collection
                 'service_id' => $resource->id,
             ]);
         }
-        $fileStorages = $savedService->fileStorages();
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
@@ -2091,14 +2114,11 @@ function serviceParser(Service $resource): Collection
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -2144,12 +2164,9 @@ function serviceParser(Service $resource): Collection
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
@@ -2748,7 +2765,6 @@ function serviceParser(Service $resource): Collection
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
     } catch (Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');

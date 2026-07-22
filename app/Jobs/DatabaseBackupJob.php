@@ -8,6 +8,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -16,6 +17,8 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
+use App\Rules\SafeWebhookUrl;
+use App\Support\ClickhouseBackupCommand;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -27,7 +30,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
-use Visus\Cuid2\Cuid2;
 
 class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -39,7 +41,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -271,6 +273,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mysql_database];
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $databasesToBackup = [$this->database->mariadb_database];
+                } elseif ($this->database instanceof StandaloneClickhouse) {
+                    $databasesToBackup = [$this->database->clickhouse_db];
                 } else {
                     return;
                 }
@@ -294,6 +298,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     // Format: db1,db2,db3
                     $databasesToBackup = explode(',', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
+                } elseif ($this->database instanceof StandaloneClickhouse) {
+                    // Format: db1,db2,db3
+                    $databasesToBackup = explode(',', $databasesToBackup);
+                    $databasesToBackup = array_map('trim', $databasesToBackup);
                 } else {
                     return;
                 }
@@ -309,7 +317,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Generate unique UUID for each database backup execution
                 $attempts = 0;
                 do {
-                    $this->backup_log_uuid = (string) new Cuid2;
+                    $this->backup_log_uuid = new_public_id();
                     $exists = ScheduledDatabaseBackupExecution::where('uuid', $this->backup_log_uuid)->exists();
                     $attempts++;
                     if ($attempts >= 3 && $exists) {
@@ -386,6 +394,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_mariadb($database);
+                    } elseif ($this->database instanceof StandaloneClickhouse) {
+                        $this->backup_file = '/clickhouse-backup-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.zip";
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        $this->backup_standalone_clickhouse($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
@@ -400,6 +419,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } catch (Throwable $e) {
                     // Local backup failed
+                    if ($this->database instanceof StandaloneClickhouse) {
+                        deleteBackupsLocally($this->backup_location, $this->server);
+                    }
                     if ($this->backup_log) {
                         $this->backup_log->update([
                             'status' => 'failed',
@@ -475,7 +497,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 }
             }
             if ($this->backup_log && $this->backup_log->status === 'success') {
-                removeOldBackups($this->backup);
+                $this->removeExpiredBackups();
             }
         } catch (Throwable $e) {
             throw $e;
@@ -488,6 +510,19 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     'finished_at' => Carbon::now()->toImmutable(),
                 ]);
             }
+        }
+    }
+
+    private function removeExpiredBackups(): void
+    {
+        try {
+            removeOldBackups($this->backup);
+        } catch (Throwable $exception) {
+            Log::channel('scheduled-errors')->warning('Database backup retention cleanup failed', [
+                'backup_id' => $this->backup->id,
+                'execution_id' => $this->backup_log?->id,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 
@@ -642,6 +677,32 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function backup_standalone_clickhouse(string $database): void
+    {
+        $archiveName = ltrim($this->backup_file, '/');
+
+        try {
+            $commands = ClickhouseBackupCommand::make(
+                containerName: $this->container_name,
+                database: $database,
+                archiveName: $archiveName,
+                backupDirectory: $this->backup_dir,
+            );
+
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+        } catch (Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        } finally {
+            $cleanupCommand = ClickhouseBackupCommand::cleanup($this->container_name, $archiveName);
+            instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
+        }
+    }
+
     private function add_to_backup_output($output): void
     {
         if ($this->backup_output) {
@@ -715,9 +776,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedEndpoint = escapeshellarg($endpoint);
             $escapedKey = escapeshellarg($key);
             $escapedSecret = escapeshellarg($secret);
+            $escapedBackupLocation = escapeshellarg($this->backup_location);
+            $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
+            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint))
+                ->map(fn (string $resolveOption): string => '--resolve '.escapeshellarg($resolveOption))
+                ->implode(' ');
+            $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
 
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set{$resolveOptions} temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
+            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp {$escapedBackupLocation} {$escapedS3Destination}";
             instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
 
             $this->s3_uploaded = true;
@@ -733,7 +800,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getFullImageName(): string
     {
-        $helperImage = config('constants.coolify.helper_image');
+        $helperImage = coolifyHelperImage();
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";

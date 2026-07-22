@@ -109,9 +109,24 @@ class ServerSetting extends Model
         'sentinel_token' => 'encrypted',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
+        'is_build_server' => 'boolean',
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'sentinel_token',
+        'sentinel_custom_url',
+        'logdrain_newrelic_license_key',
+        'logdrain_axiom_api_key',
+        'logdrain_custom_config',
+        'logdrain_custom_config_parser',
     ];
 
     protected static function booted()

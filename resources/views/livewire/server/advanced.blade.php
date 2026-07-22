@@ -3,7 +3,7 @@
         {{ data_get_str($server, 'name')->limit(10) }} > Advanced | Coolify
     </x-slot>
     <livewire:server.navbar :server="$server" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
         <x-server.sidebar :server="$server" activeMenu="advanced" />
         <form wire:submit='submit' class="w-full">
             <div>
@@ -37,7 +37,7 @@
                             helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
                         <x-forms.input canGate="update" :canResource="$server" id="dynamicTimeout"
                             type="number" min="1"
-                            label="Deployment timeout (seconds)" required
+                            label="Deployment timeout (sec)" required
                             helper="You can define the maximum duration for a deployment to run before timing it out." />
                         <x-forms.input canGate="update" :canResource="$server" id="deploymentQueueLimit"
                             type="number" min="1"

@@ -4,7 +4,6 @@ namespace App\Livewire;
 
 // use Livewire\Component;
 use Illuminate\View\Component;
-use Visus\Cuid2\Cuid2;
 
 class MonacoEditor extends Component
 {
@@ -40,7 +39,7 @@ class MonacoEditor extends Component
     public function render()
     {
         if (is_null($this->id)) {
-            $this->id = new Cuid2;
+            $this->id = new_public_id();
         }
 
         if (is_null($this->name)) {

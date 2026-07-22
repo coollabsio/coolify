@@ -20,8 +20,12 @@
             <div class="flex gap-2">
                 <x-forms.input label="Initial Username" id="clickhouseAdminUser" placeholder="If empty: clickhouse"
                     readonly helper="You can only change this in the database." canGate="update" :canResource="$database" />
-                <x-forms.input label="Initial Password" id="clickhouseAdminPassword" type="password" required readonly
-                    helper="You can only change this in the database." canGate="update" :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Initial Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Initial Password" id="clickhouseAdminPassword" type="password" required readonly
+                        helper="You can only change this in the database." canGate="update" :canResource="$database" />
+                @endif
             </div>
         @else
             <div class=" dark:text-warning">Please verify these values. You can only modify them before the initial
@@ -29,8 +33,12 @@
             </div>
             <div class="flex gap-2">
                 <x-forms.input label="Username" id="clickhouseAdminUser" required canGate="update" :canResource="$database" />
-                <x-forms.input label="Password" id="clickhouseAdminPassword" type="password" required canGate="update"
-                    :canResource="$database" />
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Password" id="clickhouseAdminPassword" type="password" required canGate="update"
+                        :canResource="$database" />
+                @endif
             </div>
         @endif
         <x-forms.input

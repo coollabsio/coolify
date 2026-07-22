@@ -44,6 +44,61 @@ it('downloads postgres upgrade script during install and upgrade without auto-ru
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
+it('does not provision a flux laravel api token before v5 production activation', function (string $path) {
+    $source = file_get_contents(getcwd().'/'.$path);
+
+    expect($source)->not->toContain('COOLIFY_FLUX_LARAVEL_API_TOKEN');
+})->with([
+    'production env' => '.env.production',
+    'stable install' => 'scripts/install.sh',
+    'nightly install' => 'other/nightly/install.sh',
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('does not provision flux storage before v5 production activation', function (string $path) {
+    $source = file_get_contents(getcwd().'/'.$path);
+
+    expect($source)->not->toContain('/data/coolify/flux');
+})->with([
+    'stable install' => 'scripts/install.sh',
+    'nightly install' => 'other/nightly/install.sh',
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('uses the selected registry url when extracting upgrade images', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+
+    expect($script)->toContain('IMAGES=$(REGISTRY_URL=${REGISTRY_URL} LATEST_IMAGE=${LATEST_IMAGE} docker compose --env-file "$ENV_FILE" $COMPOSE_FILES config --images');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('persists the selected registry url during upgrades', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+
+    expect($script)->toContain('set_env_var "REGISTRY_URL" "$REGISTRY_URL"');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('uses the existing env registry url when old callers do not pass a registry argument', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+
+    expect($script)
+        ->toContain('if [ -n "${3+x}" ]; then')
+        ->toContain('REGISTRY_URL="$3"')
+        ->toContain('elif [ -f "$ENV_FILE" ] && grep -q "^REGISTRY_URL=" "$ENV_FILE"; then')
+        ->toContain("REGISTRY_URL=$(grep \"^REGISTRY_URL=\" \"\$ENV_FILE\" | cut -d '=' -f2- | head -n1)")
+        ->toContain('REGISTRY_URL="docker.io"');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
 it('keeps postgres upgrade compose override in future upgrade compose commands', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 

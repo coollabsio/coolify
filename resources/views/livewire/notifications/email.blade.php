@@ -81,7 +81,11 @@
                         </div>
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
                             <x-forms.input canGate="update" :canResource="$settings" id="smtpUsername" label="SMTP Username" />
-                            <x-forms.input canGate="update" :canResource="$settings" id="smtpPassword" type="password" label="SMTP Password" />
+                            @can('update', $settings)
+                                <x-forms.input canGate="update" :canResource="$settings" id="smtpPassword" type="password" label="SMTP Password" />
+                            @else
+                                <x-forms.input disabled label="SMTP Password" value="Hidden (only admins can view)" />
+                            @endcan
                             <x-forms.input canGate="update" :canResource="$settings" id="smtpTimeout" type="number"  helper="Timeout value for sending emails."
                                 label="Timeout" />
                         </div>
@@ -103,8 +107,12 @@
                 <div class="flex flex-col">
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
-                            <x-forms.input canGate="update" :canResource="$settings" required type="password" id="resendApiKey" placeholder="API key"
-                                label="API Key" />
+                            @can('update', $settings)
+                                <x-forms.input canGate="update" :canResource="$settings" required type="password" id="resendApiKey" placeholder="API key"
+                                    label="API Key" />
+                            @else
+                                <x-forms.input disabled label="API Key" value="Hidden (only admins can view)" />
+                            @endcan
                         </div>
                     </div>
                 </div>
