@@ -24,6 +24,22 @@
                     placeholder="59e02939b1bf39f16c93138a28727aec520bb916da021180ae502c61626b3cf0"
                     helper="Enter only the 64-character hex digest (without 'sha256:' prefix)" />
             </div>
+            <div class="pt-2">
+                <h3>Registry Credentials (optional)</h3>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <x-forms.select id="dockerRegistryId" label="Registry Credentials"
+                        helper="Optional. Manage credentials in Keys &amp; Tokens &gt; Docker Registries.">
+                        <option value="">No credentials (public)</option>
+                        @if ($dockerRegistries)
+                            @foreach ($dockerRegistries as $registry)
+                                <option value="{{ $registry->id }}">
+                                    {{ $registry->name }} ({{ $registry->registry_url ?? 'docker.io' }})
+                                </option>
+                            @endforeach
+                        @endif
+                    </x-forms.select>
+                </div>
+            </div>
         </div>
     </form>
 </div>

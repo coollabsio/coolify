@@ -9,6 +9,7 @@ use App\Models\ApplicationSetting;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\DiscordNotificationSettings;
+use App\Models\DockerRegistry;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
@@ -49,6 +50,7 @@ use App\Policies\ApplicationSettingPolicy;
 use App\Policies\CloudInitScriptPolicy;
 use App\Policies\CloudProviderTokenPolicy;
 use App\Policies\DatabasePolicy;
+use App\Policies\DockerRegistryPolicy;
 use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
 use App\Policies\GithubAppPolicy;
@@ -85,6 +87,7 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         Server::class => ServerPolicy::class,
         PrivateKey::class => PrivateKeyPolicy::class,
+        DockerRegistry::class => DockerRegistryPolicy::class,
         StandaloneDocker::class => StandaloneDockerPolicy::class,
         SwarmDocker::class => SwarmDockerPolicy::class,
         Application::class => ApplicationPolicy::class,

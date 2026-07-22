@@ -137,6 +137,7 @@ function sharedDataApplications()
         'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
         'docker_registry_image_name' => ValidationPatterns::dockerImageNameRules(),
         'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
+        'docker_registry_id' => 'numeric|nullable|exists:docker_registries,id',
         'install_command' => ValidationPatterns::shellSafeCommandRules(),
         'build_command' => ValidationPatterns::shellSafeCommandRules(),
         'start_command' => ValidationPatterns::shellSafeCommandRules(),

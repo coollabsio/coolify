@@ -311,6 +311,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(PrivateKey::class);
     }
 
+    public function dockerRegistries()
+    {
+        return $this->hasMany(DockerRegistry::class);
+    }
+
     public function cloudProviderTokens()
     {
         return $this->hasMany(CloudProviderToken::class);

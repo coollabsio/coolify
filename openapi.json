@@ -16286,6 +16286,11 @@
                         "nullable": true,
                         "description": "Docker registry image tag."
                     },
+                    "docker_registry_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Docker registry credentials identifier."
+                    },
                     "build_pack": {
                         "type": "string",
                         "description": "Build pack.",

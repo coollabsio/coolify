@@ -220,6 +220,20 @@
                         @endif
                     @endif
                 </div>
+                <div class="flex flex-col gap-2 pt-2 xl:flex-row">
+                    <x-forms.select id="dockerRegistryId" label="Registry Credentials"
+                        helper="Optional. Manage credentials in Keys &amp; Tokens &gt; Docker Registries."
+                        x-bind:disabled="!canUpdate">
+                        <option value="">No credentials (public)</option>
+                        @if ($dockerRegistries)
+                            @foreach ($dockerRegistries as $registry)
+                                <option value="{{ $registry->id }}">
+                                    {{ $registry->name }} ({{ $registry->registry_url ?? 'docker.io' }})
+                                </option>
+                            @endforeach
+                        @endif
+                    </x-forms.select>
+                </div>
             @endif
             <div class="pt-6">
                 <h3>Build</h3>
