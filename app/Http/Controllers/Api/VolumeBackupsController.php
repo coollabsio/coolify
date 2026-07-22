@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Http\Controllers\Controller;
+use App\Jobs\VolumeBackupJob;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -441,5 +442,104 @@ class VolumeBackupsController extends Controller
             'retention_max_storage_s3' => $backup->retention_max_storage_s3,
             'timeout' => $backup->timeout,
         ];
+    }
+
+    #[OA\Post(
+        summary: 'Run application storage backup',
+        description: 'Queue an immediate volume backup for an application storage that has a schedule.',
+        path: '/applications/{uuid}/storages/{storage_uuid}/backups/run',
+        operationId: 'run-application-storage-backup',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Storage backup queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Post(
+        summary: 'Run database storage backup',
+        description: 'Queue an immediate volume backup for a database storage that has a schedule.',
+        path: '/databases/{uuid}/storages/{storage_uuid}/backups/run',
+        operationId: 'run-database-storage-backup',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Storage backup queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    #[OA\Post(
+        summary: 'Run service storage backup',
+        description: 'Queue an immediate volume backup for a service storage that has a schedule.',
+        path: '/services/{uuid}/storages/{storage_uuid}/backups/run',
+        operationId: 'run-service-storage-backup',
+        security: [['bearerAuth' => []]],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Storage backup queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function run(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $resourceType = $request->route('resource_type');
+        $resource = $this->findResource($resourceType, $request->route('uuid'), $teamId);
+        if (! $resource) {
+            return response()->json([
+                'message' => match ($resourceType) {
+                    'application' => 'Application not found.',
+                    'database' => 'Database not found.',
+                    'service' => 'Service not found.',
+                    default => 'Resource not found.',
+                },
+            ], 404);
+        }
+
+        $this->authorize('update', $resource);
+
+        $storage = $this->findStorage($resource, $request->route('storage_uuid'));
+        if (! $storage) {
+            return response()->json(['message' => 'Storage not found.'], 404);
+        }
+
+        $backup = $storage->scheduledBackups()->first();
+        if (! $backup) {
+            return response()->json(['message' => 'Storage backup schedule not found.'], 404);
+        }
+
+        VolumeBackupJob::dispatch($backup);
+
+        auditLog('api.volume_backup.run', [
+            'team_id' => $teamId,
+            'resource_type' => $resourceType,
+            'resource_uuid' => $resource->uuid,
+            'storage_uuid' => $storage->uuid,
+            'backup_uuid' => $backup->uuid,
+        ]);
+
+        return response()->json([
+            'message' => 'Storage backup queued.',
+            'uuid' => $backup->uuid,
+        ]);
     }
 }
