@@ -19,8 +19,11 @@ services:
           db sqlite3 /db/main.db
           message-store db
           file-upload fs /uploads/
-          listen irc+insecure://0.0.0.0:6667
-          listen ws+insecure://0.0.0.0:80
+          # INSECURE: Plaintext IRC exposes passwords and messages.
+          # Use ircs:// with a TLS certificate instead:
+          # listen ircs://0.0.0.0:6697
+          # INSECURE: Plaintext WebSocket. Use wss:// with TLS instead:
+          # listen wss://0.0.0.0:443
           listen unix+admin:///run/soju/admin
     networks:
       default:
