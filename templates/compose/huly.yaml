@@ -52,8 +52,8 @@ services:
       - TRANSACTOR_URL=ws://transactor:3333
       - ENDPOINT_URL=ws://transactor:3333
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-changeme}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-changeme}
       - FRONT_URL=http://front:8080
       - INIT_WORKSPACE=demo-tracker
       - MODEL_ENABLED=*
@@ -76,8 +76,8 @@ services:
       - COLLABORATOR_URL=ws://collaborator:3078
       - COLLABORATOR_API_URL=http://collaborator:3078
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-changeme}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-changeme}
       - TITLE=Huly Self Hosted
       - DEFAULT_LANGUAGE=en
       - LAST_NAME_FIRST=true
@@ -92,8 +92,8 @@ services:
       - UPLOAD_URL=/files
       - MONGO_URL=mongodb://mongodb:27017
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-changeme}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-changeme}
   transactor:
     image: hardcoreeng/transactor:v0.6.246
     environment:
@@ -106,8 +106,8 @@ services:
       - METRICS_CONSOLE=false
       - METRICS_FILE=metrics.txt
       - MINIO_ENDPOINT=minio
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-changeme}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-changeme}
       - REKONI_URL=http://rekoni:4004
       - FRONT_URL=http://localhost:8087
       - SERVER_PROVIDER=ws
