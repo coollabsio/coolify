@@ -216,9 +216,23 @@ class SafeWebhookUrl implements ValidationRule
 
         $customDnsServers = $this->customDnsServers();
         if ($customDnsServers !== []) {
-            return $this->resolveHostWithCustomDnsServers($host, $customDnsServers);
+            $customResolvedIps = $this->resolveHostWithCustomDnsServers($host, $customDnsServers);
+            // Fall back to the system resolver when custom DNS has no answer so
+            // docker/internal hostnames (e.g. coolify-minio) still work with an
+            // instance-level public DNS server configured.
+            if ($customResolvedIps !== []) {
+                return $customResolvedIps;
+            }
         }
 
+        return $this->resolveHostWithSystemDns($host);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveHostWithSystemDns(string $host): array
+    {
         $records = @dns_get_record($host, DNS_A | DNS_AAAA);
         if ($records === false) {
             $records = [];
@@ -249,7 +263,7 @@ class SafeWebhookUrl implements ValidationRule
      * @param  array<int, string>  $dnsServers
      * @return array<int, string>
      */
-    private function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
+    protected function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
     {
         $ips = [];
 
