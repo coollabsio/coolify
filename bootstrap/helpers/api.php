@@ -129,6 +129,16 @@ function sharedDataApplications()
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_raw_compose_deployment_enabled' => 'boolean',
+        'is_log_drain_enabled' => 'boolean',
+        'is_gpu_enabled' => 'boolean',
+        'gpu_driver' => 'string|nullable',
+        'gpu_count' => 'string|nullable',
+        'gpu_device_ids' => 'string|nullable',
+        'gpu_options' => 'string|nullable',
+        'is_consistent_container_name_enabled' => 'boolean',
+        'custom_internal_name' => 'string|nullable',
+        'preview_url_template' => 'string',
+        'max_restart_count' => 'integer|min:0',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
         'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
@@ -310,6 +320,14 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_gzip_enabled');
     $request->offsetUnset('is_stripprefix_enabled');
     $request->offsetUnset('is_raw_compose_deployment_enabled');
+    $request->offsetUnset('is_log_drain_enabled');
+    $request->offsetUnset('is_gpu_enabled');
+    $request->offsetUnset('gpu_driver');
+    $request->offsetUnset('gpu_count');
+    $request->offsetUnset('gpu_device_ids');
+    $request->offsetUnset('gpu_options');
+    $request->offsetUnset('is_consistent_container_name_enabled');
+    $request->offsetUnset('custom_internal_name');
     $request->offsetUnset('docker_compose_raw');
     $request->offsetUnset('tags');
 }
