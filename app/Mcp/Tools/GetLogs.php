@@ -18,7 +18,7 @@ class GetLogs extends Tool
 {
     protected string $name = 'get_logs';
 
-    protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
+    protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Multi-container services require resource=service_application|service_database. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
 
     use BuildsResponse;
     use ResolvesResource;
@@ -239,28 +239,41 @@ class GetLogs extends Tool
             if (! $server) {
                 throw new \RuntimeException('Service has no server.');
             }
-            $app = $resource->applications()->first();
-            if ($app) {
-                $containerName = $app->name.'-'.$resource->uuid;
-                $status = getContainerStatus($server, $containerName);
-                if ($status !== 'running') {
-                    throw new \RuntimeException('Service application container is not running.');
-                }
 
-                return (string) getContainerLogs($server, $containerName, $lines, $showTimestamps);
-            }
-            $db = $resource->databases()->first();
-            if ($db) {
-                $containerName = $db->name.'-'.$resource->uuid;
-                $status = getContainerStatus($server, $containerName);
-                if ($status !== 'running') {
-                    throw new \RuntimeException('Service database container is not running.');
-                }
+            $apps = $resource->applications()->get(['id', 'uuid', 'name', 'service_id', 'status']);
+            $dbs = $resource->databases()->get(['id', 'uuid', 'name', 'service_id', 'status']);
+            $total = $apps->count() + $dbs->count();
 
-                return (string) getContainerLogs($server, $containerName, $lines, $showTimestamps);
+            if ($total === 0) {
+                throw new \RuntimeException('Service has no containers.');
             }
 
-            throw new \RuntimeException('Service has no containers.');
+            // Multi-container services need an explicit child resource type.
+            if ($total > 1) {
+                $choices = $apps->map(fn ($app) => [
+                    'resource' => 'service_application',
+                    'uuid' => $app->uuid,
+                    'name' => $app->name,
+                ])->concat($dbs->map(fn ($db) => [
+                    'resource' => 'service_database',
+                    'uuid' => $db->uuid,
+                    'name' => $db->name,
+                ]))->values()->all();
+
+                throw new \RuntimeException(
+                    'Service has multiple containers. Call get_logs with resource=service_application or service_database and the child uuid. Choices: '
+                    .json_encode($choices)
+                );
+            }
+
+            $child = $apps->first() ?? $dbs->first();
+            $containerName = $child->name.'-'.$resource->uuid;
+            $status = getContainerStatus($server, $containerName);
+            if ($status !== 'running') {
+                throw new \RuntimeException('Service container is not running.');
+            }
+
+            return (string) getContainerLogs($server, $containerName, $lines, $showTimestamps);
         }
 
         if ($resource instanceof ServiceApplication || $resource instanceof ServiceDatabase) {

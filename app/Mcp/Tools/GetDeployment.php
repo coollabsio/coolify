@@ -14,7 +14,7 @@ class GetDeployment extends Tool
 {
     protected string $name = 'get_deployment';
 
-    protected string $description = 'Get deployment details by deployment UUID for the authenticated team. Optional include_log_summary returns a capped, redacted tail of build output (default off). Full logs and configuration snapshots are never returned.';
+    protected string $description = 'Get deployment details by deployment UUID for the authenticated team. Optional include_log_summary returns a capped, best-effort-redacted tail of build output (default off). Full logs and configuration snapshots are never returned; residual secrets in free-form log text may remain.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -109,7 +109,7 @@ class GetDeployment extends Tool
         try {
             $entries = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
         } catch (\Throwable) {
-            $text = remove_iip((string) $raw);
+            $text = $this->redactLogText((string) $raw);
             $text = $this->truncateText($text, self::MAX_LOG_CHARS);
 
             return [
@@ -136,7 +136,7 @@ class GetDeployment extends Tool
                 $output = (string) ($e['output'] ?? '');
                 $prefix = $type === 'stderr' || $type === 'error' ? '[err] ' : '';
 
-                return $prefix.remove_iip($output);
+                return $prefix.$this->redactLogText($output);
             })
             ->filter(fn ($line) => trim($line) !== '')
             ->values();
@@ -152,6 +152,31 @@ class GetDeployment extends Tool
             'truncated' => $truncated,
             'text' => $text,
         ];
+    }
+
+    /**
+     * Best-effort redaction for deploy log tails shown to MCP clients.
+     * Uses remove_iip plus common KEY=value secret patterns; not a guarantee.
+     */
+    private function redactLogText(string $text): string
+    {
+        $text = remove_iip($text);
+
+        // password= / secret= / token= style assignments (quoted or bare)
+        $text = preg_replace(
+            '/\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token)\b\s*[=:]\s*[\'"]?[^\s\'"]{3,}[\'"]?/i',
+            '$1='.REDACTED,
+            $text
+        ) ?? $text;
+
+        // export FOO=bar style for sensitive-looking names
+        $text = preg_replace(
+            '/\b(export\s+)?([A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*[\'"]?[^\s\'"]{3,}[\'"]?/i',
+            '$1$2='.REDACTED,
+            $text
+        ) ?? $text;
+
+        return $text;
     }
 
     private function truncateText(string $text, int $max): string

@@ -27,8 +27,14 @@ class EnsureTokenBelongsToCurrentTeamMember
         }
 
         $role = $team->pivot?->role;
-        if (($token->can('root') || $token->can('write') || $token->can('write:sensitive'))
-            && ! in_array($role, ['admin', 'owner'], true)) {
+        // Match ApiAbility::MEMBER_DISALLOWED_ABILITIES — members are read-only.
+        $elevated = $token->can('root')
+            || $token->can('write')
+            || $token->can('write:sensitive')
+            || $token->can('deploy')
+            || $token->can('read:sensitive');
+
+        if ($elevated && ! in_array($role, ['admin', 'owner'], true)) {
             return response()->json(['message' => 'Missing required team role.'], 403);
         }
 

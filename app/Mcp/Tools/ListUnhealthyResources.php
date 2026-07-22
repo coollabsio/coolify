@@ -6,10 +6,12 @@ use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\McpStatusFilters;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
+use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Collection;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -18,7 +20,7 @@ class ListUnhealthyResources extends Tool
 {
     protected string $name = 'list_unhealthy_resources';
 
-    protected string $description = 'List team resources that look unhealthy or down. Uses SQL filters for apps/DBs. Optional sample_only returns a small sample per type plus full summary counts. Default per_page 20.';
+    protected string $description = 'List team resources that look unhealthy or down. Prefer sample_only=true first (cheap sample + counts). Apps/DBs use SQL filters; services need a lightweight status scan. Default per_page 20.';
 
     use BuildsResponse;
     use McpStatusFilters;
@@ -74,7 +76,7 @@ class ListUnhealthyResources extends Tool
         $appCount = (clone $appQuery)->count();
         $unhealthyApps = $appQuery
             ->orderBy('name')
-            ->when($sampleOnly, fn ($q) => $q->limit($samplePerType), fn ($q) => $q)
+            ->when($sampleOnly, fn ($q) => $q->limit($samplePerType))
             ->get()
             ->map(fn ($app) => [
                 'type' => 'application',
@@ -86,57 +88,11 @@ class ListUnhealthyResources extends Tool
                 'reason' => 'status_not_running',
             ]);
 
-        // --- Services: status is aggregated (accessor); load lightweight rows then filter ---
-        $services = Service::whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId))
-            ->with(['environment.project:id,uuid,name,team_id', 'applications:id,service_id,status,exclude_from_status', 'databases:id,service_id,status,exclude_from_status'])
-            ->orderBy('name')
-            ->get()
-            ->filter(fn ($svc) => ! $this->looksHealthy($svc->status ?? null))
-            ->values();
-        $serviceCount = $services->count();
-        $unhealthyServices = ($sampleOnly ? $services->take($samplePerType) : $services)
-            ->map(fn ($svc) => [
-                'type' => 'service',
-                'uuid' => $svc->uuid,
-                'name' => $svc->name,
-                'status' => $svc->status ?? null,
-                'project_uuid' => $svc->environment?->project?->uuid,
-                'project_name' => $svc->environment?->project?->name,
-                'reason' => 'status_not_running',
-            ]);
+        // --- Services: aggregated status accessor; chunk + early exit for samples ---
+        [$serviceCount, $unhealthyServices] = $this->collectUnhealthyServices($teamId, $sampleOnly, $samplePerType);
 
-        // --- Databases: SQL per standalone model ---
-        $dbItems = collect();
-        $dbCount = 0;
-        foreach (Project::where('team_id', $teamId)->select('id', 'uuid', 'name')->get() as $project) {
-            $envIds = $project->environments()->pluck('id');
-            if ($envIds->isEmpty()) {
-                continue;
-            }
-            foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
-                $dq = $modelClass::query()->whereIn('environment_id', $envIds);
-                $this->scopeNotHealthyRunning($dq);
-                $dbCount += (clone $dq)->count();
-                $rows = $dq->orderBy('name')
-                    ->when($sampleOnly, fn ($q) => $q->limit($samplePerType))
-                    ->get(['uuid', 'name', 'status']);
-                foreach ($rows as $db) {
-                    $dbItems->push([
-                        'type' => method_exists($db, 'type') ? $db->type() : class_basename($db),
-                        'resource_kind' => 'database',
-                        'uuid' => $db->uuid,
-                        'name' => $db->name,
-                        'status' => $db->status ?? null,
-                        'project_uuid' => $project->uuid,
-                        'project_name' => $project->name,
-                        'reason' => 'status_not_running',
-                    ]);
-                }
-            }
-        }
-        if ($sampleOnly) {
-            $dbItems = $dbItems->unique('uuid')->take($samplePerType)->values();
-        }
+        // --- Databases: SQL per standalone model, team env ids once ---
+        [$dbCount, $dbItems] = $this->collectUnhealthyDatabases($teamId, $sampleOnly, $samplePerType);
 
         $summary = [
             'total' => $unhealthyServers->count() + $appCount + $serviceCount + $dbCount,
@@ -173,12 +129,7 @@ class ListUnhealthyResources extends Tool
             ->values();
 
         $total = $items->count();
-        // When SQL counts differ from collected (services/db sample paths), prefer summary totals for apps/services/db counts but page the collected list.
         $page = $items->slice($args['offset'], $args['per_page'])->values()->all();
-
-        $extra = array_filter([
-            'sample_only' => false,
-        ]);
 
         return $this->mcpSuccess($request, $this->respond(
             [
@@ -186,14 +137,105 @@ class ListUnhealthyResources extends Tool
                 'summary' => $summary,
             ],
             [],
-            $this->paginationMeta('list_unhealthy_resources', $args, $total, $extra),
+            $this->paginationMeta('list_unhealthy_resources', $args, $total, ['sample_only' => false]),
         ));
+    }
+
+    /**
+     * @return array{0: int, 1: Collection<int, array<string, mixed>>}
+     */
+    private function collectUnhealthyServices(int $teamId, bool $sampleOnly, int $samplePerType): array
+    {
+        $base = Service::whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId))
+            ->with([
+                'environment.project:id,uuid,name,team_id',
+                'applications:id,service_id,status,exclude_from_status',
+                'databases:id,service_id,status,exclude_from_status',
+            ])
+            ->orderBy('name');
+
+        $unhealthy = collect();
+        $serviceCount = 0;
+
+        // Chunk so large teams do not hydrate every service at once.
+        $base->chunk(100, function ($chunk) use ($sampleOnly, $samplePerType, &$unhealthy, &$serviceCount) {
+            foreach ($chunk as $svc) {
+                if ($this->looksHealthy($svc->status ?? null)) {
+                    continue;
+                }
+                $serviceCount++;
+                if ($sampleOnly && $unhealthy->count() >= $samplePerType) {
+                    continue;
+                }
+                $unhealthy->push([
+                    'type' => 'service',
+                    'uuid' => $svc->uuid,
+                    'name' => $svc->name,
+                    'status' => $svc->status ?? null,
+                    'project_uuid' => $svc->environment?->project?->uuid,
+                    'project_name' => $svc->environment?->project?->name,
+                    'reason' => 'status_not_running',
+                ]);
+            }
+        });
+
+        return [$serviceCount, $unhealthy->values()];
+    }
+
+    /**
+     * @return array{0: int, 1: Collection<int, array<string, mixed>>}
+     */
+    private function collectUnhealthyDatabases(int $teamId, bool $sampleOnly, int $samplePerType): array
+    {
+        $projects = Project::where('team_id', $teamId)->select('id', 'uuid', 'name')->get()->keyBy('id');
+        $envToProject = Environment::query()
+            ->whereIn('project_id', $projects->keys())
+            ->pluck('project_id', 'id');
+
+        $envIds = $envToProject->keys();
+        $dbItems = collect();
+        $dbCount = 0;
+
+        if ($envIds->isEmpty()) {
+            return [0, $dbItems];
+        }
+
+        foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+            $dq = $modelClass::query()->whereIn('environment_id', $envIds);
+            $this->scopeNotHealthyRunning($dq);
+            $dbCount += (clone $dq)->count();
+
+            $rows = $dq->orderBy('name')
+                ->when($sampleOnly, fn ($q) => $q->limit($samplePerType))
+                ->get(['uuid', 'name', 'status', 'environment_id']);
+
+            foreach ($rows as $db) {
+                $projectId = $envToProject[$db->environment_id] ?? null;
+                $project = $projectId ? $projects->get($projectId) : null;
+                $dbItems->push([
+                    'type' => method_exists($db, 'type') ? $db->type() : class_basename($db),
+                    'resource_kind' => 'database',
+                    'uuid' => $db->uuid,
+                    'name' => $db->name,
+                    'status' => $db->status ?? null,
+                    'project_uuid' => $project?->uuid,
+                    'project_name' => $project?->name,
+                    'reason' => 'status_not_running',
+                ]);
+            }
+        }
+
+        if ($sampleOnly) {
+            $dbItems = $dbItems->unique('uuid')->take($samplePerType)->values();
+        }
+
+        return [$dbCount, $dbItems];
     }
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'sample_only' => $schema->boolean()->description('If true, return only a small sample per type plus full summary counts (cheaper).'),
+            'sample_only' => $schema->boolean()->description('If true, return only a small sample per type plus full summary counts (cheaper). Prefer this first.'),
             'sample_per_type' => $schema->integer()->description('Sample size per type when sample_only=true (default 5, max 20).'),
             'page' => $schema->integer()->description('Page number (default 1).'),
             'per_page' => $schema->integer()->description('Items per page (default 20, max 100).'),

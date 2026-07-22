@@ -2,17 +2,20 @@
 
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
@@ -457,7 +460,7 @@ test('list_unhealthy_resources includes non-running apps and is team scoped', fu
 });
 
 test('list_application_previews is team scoped', function () {
-    $preview = \App\Models\ApplicationPreview::create([
+    $preview = ApplicationPreview::create([
         'application_id' => $this->application->id,
         'pull_request_id' => 42,
         'pull_request_html_url' => 'https://github.com/org/repo/pull/42',
@@ -487,7 +490,7 @@ test('list_application_previews is team scoped', function () {
 });
 
 test('list_shared_env_keys returns names without values and is team scoped', function () {
-    \App\Models\SharedEnvironmentVariable::create([
+    SharedEnvironmentVariable::create([
         'key' => 'SHARED_API_URL',
         'value' => 'https://secret.example.com',
         'type' => 'project',
@@ -541,6 +544,8 @@ test('get_deployment include_log_summary returns capped redacted text', function
 
     expect($body['data']['log_summary']['available'])->toBeTrue();
     expect($body['data']['log_summary']['text'])->toContain('step 1 ok');
+    expect($body['data']['log_summary']['text'])->not->toContain('supersecretvalue');
+    expect($body['data']['log_summary']['text'])->toContain('password=');
     // Full logs field still scrubbed from root payload
     expect(json_encode($body))->not->toContain('"logs":');
 });
@@ -661,6 +666,165 @@ test('control stop requires confirm', function () {
     ]);
     expect($response->json('result.isError'))->toBeTrue();
     expect($response->json('result.content.0.text'))->toContain('confirm=true');
+});
+
+test('team member with deploy ability cannot call lifecycle tools', function () {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+
+    $token = $this->user->createToken('mcp-member-deploy', ['read', 'deploy'])->plainTextToken;
+
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'control',
+            'arguments' => (object) [
+                'resource' => 'application',
+                'action' => 'start',
+                'uuid' => $this->application->uuid,
+            ],
+        ],
+    ]);
+
+    // Middleware returns 403; ensureAbility would also deny if middleware were bypassed.
+    expect($response->status())->toBeIn([403]);
+    expect($response->json('message') ?? $response->json('result.content.0.text') ?? '')
+        ->toMatch('/team role|Missing required/i');
+});
+
+test('control start with deploy ability queues application deployment', function () {
+    Bus::fake();
+
+    $token = $this->user->createToken('mcp-deploy-start', ['read', 'deploy'])->plainTextToken;
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'control',
+            'arguments' => (object) [
+                'resource' => 'application',
+                'action' => 'start',
+                'uuid' => $this->application->uuid,
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeFalse();
+    $body = mcpReadJson($response);
+    expect($body['data']['ok'])->toBeTrue()
+        ->and($body['data']['action'])->toBe('start')
+        ->and($body['data']['deployment_uuid'])->not->toBeEmpty();
+});
+
+test('deploy tool queues application deployment', function () {
+    Bus::fake();
+
+    $token = $this->user->createToken('mcp-deploy-tool', ['read', 'deploy'])->plainTextToken;
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'deploy',
+            'arguments' => (object) [
+                'uuid' => $this->application->uuid,
+                'force' => false,
+            ],
+        ],
+    ]);
+
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeFalse();
+    $body = mcpReadJson($response);
+    expect($body['data']['ok'])->toBeTrue()
+        ->and($body['data']['deployment_uuid'])->not->toBeEmpty();
+    expect(ApplicationDeploymentQueue::where('deployment_uuid', $body['data']['deployment_uuid'])->exists())->toBeTrue();
+});
+
+test('cancel_deployment cancels team deployment and rejects other team', function () {
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-cancel-'.fake()->uuid(),
+        'status' => 'in_progress',
+        'server_id' => $this->server->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+        'commit' => 'abc',
+        'current_process_id' => '12345',
+    ]);
+
+    $token = $this->user->createToken('mcp-cancel', ['read', 'deploy'])->plainTextToken;
+    $ok = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'cancel_deployment',
+            'arguments' => (object) ['uuid' => $deployment->deployment_uuid],
+        ],
+    ]);
+
+    $ok->assertOk();
+    expect($ok->json('result.isError'))->toBeFalse();
+    $body = mcpReadJson($ok);
+    expect($body['data']['ok'])->toBeTrue()
+        ->and($body['data']['status'])->toBe('cancelled-by-user');
+    expect($deployment->fresh()->status)->toBe('cancelled-by-user');
+
+    $otherTeam = Team::factory()->create();
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherDest = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    $otherApp = Application::factory()->create([
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+    $otherDep = ApplicationDeploymentQueue::create([
+        'application_id' => $otherApp->id,
+        'deployment_uuid' => 'dep-other-cancel-'.fake()->uuid(),
+        'status' => 'in_progress',
+        'server_id' => $otherServer->id,
+        'application_name' => $otherApp->name,
+        'server_name' => $otherServer->name,
+    ]);
+
+    $denied = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'cancel_deployment',
+            'arguments' => (object) ['uuid' => $otherDep->deployment_uuid],
+        ],
+    ]);
+    expect($denied->json('result.isError'))->toBeTrue();
+    expect($otherDep->fresh()->status)->toBe('in_progress');
 });
 
 test('MCP resources list includes overview and application template', function () {

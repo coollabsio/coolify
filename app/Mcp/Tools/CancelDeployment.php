@@ -55,6 +55,8 @@ class CancelDeployment extends Tool
             return $this->mcpError($request, "Deployment cannot be cancelled. Current status: {$deployment->status}", ['resource_uuid' => $uuid]);
         }
 
+        $deploymentUuid = $deployment->deployment_uuid;
+
         $deployment->update([
             'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
         ]);
@@ -64,11 +66,24 @@ class CancelDeployment extends Tool
             $server = Server::whereTeamId($teamId)->find($buildServerId);
             if ($server) {
                 $deployment->addLogEntry('Deployment cancelled by user via MCP.', 'stderr');
-                $checkCommand = "docker ps -a --filter name={$deployment->deployment_uuid} --format '{{.Names}}'";
+
+                $checkCommand = "docker ps -a --filter name={$deploymentUuid} --format '{{.Names}}'";
                 $containerExists = instant_remote_process([$checkCommand], $server);
+
                 if ($containerExists && str($containerExists)->trim()->isNotEmpty()) {
-                    instant_remote_process(["docker rm -f {$deployment->deployment_uuid}"], $server);
+                    instant_remote_process(["docker rm -f {$deploymentUuid}"], $server);
                     $deployment->addLogEntry('Deployment container stopped.');
+                } else {
+                    $deployment->addLogEntry('Deployment container not yet started. Will be cancelled when job checks status.');
+                }
+
+                // Parity with REST cancel_deployment: stop the remote build process if known.
+                if ($deployment->current_process_id) {
+                    try {
+                        instant_remote_process(["kill -9 {$deployment->current_process_id}"], $server);
+                    } catch (\Throwable) {
+                        // Process might already be gone.
+                    }
                 }
             }
         } catch (\Throwable) {
@@ -78,6 +93,8 @@ class CancelDeployment extends Tool
         auditLog('mcp.deployment.cancelled', [
             'team_id' => $teamId,
             'deployment_uuid' => $uuid,
+            'application_id' => $deployment->application_id,
+            'server_id' => $deployment->server_id,
         ]);
 
         return $this->mcpSuccess($request, $this->respond([

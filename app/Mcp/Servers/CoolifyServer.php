@@ -37,8 +37,8 @@ use App\Mcp\Tools\ListGithubApps;
 use App\Mcp\Tools\ListGithubBranches;
 use App\Mcp\Tools\ListGithubRepositories;
 use App\Mcp\Tools\ListProjects;
-use App\Mcp\Tools\ListResourceTags;
 use App\Mcp\Tools\ListResources;
+use App\Mcp\Tools\ListResourceTags;
 use App\Mcp\Tools\ListScheduledTaskExecutions;
 use App\Mcp\Tools\ListScheduledTasks;
 use App\Mcp\Tools\ListServers;
@@ -87,7 +87,7 @@ Lifecycle (requires token ability **deploy**):
 Prompts: troubleshoot_application, explain_failed_deploy.
 Resources: coolify://overview, coolify://application/{uuid}.
 
-Responses: `{ data, _actions?, _pagination? }`. Secrets and full deploy logs are never returned.
+Responses: `{ data, _actions?, _pagination? }`. Env values, configuration snapshots, and full deploy logs are never returned. Optional deploy log summaries are best-effort redacted only.
 MD;
 
     protected array $tools = [

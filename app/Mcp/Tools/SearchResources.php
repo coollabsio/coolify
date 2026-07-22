@@ -5,6 +5,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
+use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -140,23 +141,37 @@ class SearchResources extends Tool
         }
 
         if (in_array('database', $typesList, true)) {
-            foreach (Project::where('team_id', $teamId)->get() as $project) {
-                foreach ($project->databases() as $db) {
-                    $nameMatch = str_contains(strtolower((string) $db->name), strtolower($needle));
-                    $uuidMatch = $db->uuid === $needle;
-                    if (! $nameMatch && ! $uuidMatch) {
-                        continue;
+            $projects = Project::where('team_id', $teamId)->select('id', 'uuid', 'name')->get()->keyBy('id');
+            $envToProject = Environment::query()
+                ->whereIn('project_id', $projects->keys())
+                ->pluck('project_id', 'id');
+            $envIds = $envToProject->keys();
+
+            if ($envIds->isNotEmpty()) {
+                foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+                    $rows = $modelClass::query()
+                        ->whereIn('environment_id', $envIds)
+                        ->where(function ($q) use ($like, $needle) {
+                            $q->whereRaw('LOWER(name) LIKE ?', [$like])
+                                ->orWhere('uuid', $needle);
+                        })
+                        ->limit($limit)
+                        ->get(['uuid', 'name', 'status', 'environment_id']);
+
+                    foreach ($rows as $db) {
+                        $projectId = $envToProject[$db->environment_id] ?? null;
+                        $project = $projectId ? $projects->get($projectId) : null;
+                        $results->push([
+                            'type' => method_exists($db, 'type') ? $db->type() : 'database',
+                            'resource_kind' => 'database',
+                            'uuid' => $db->uuid,
+                            'name' => $db->name,
+                            'status' => $db->status ?? null,
+                            'project_uuid' => $project?->uuid,
+                            'project_name' => $project?->name,
+                            'match' => 'name_or_uuid',
+                        ]);
                     }
-                    $results->push([
-                        'type' => method_exists($db, 'type') ? $db->type() : 'database',
-                        'resource_kind' => 'database',
-                        'uuid' => $db->uuid,
-                        'name' => $db->name,
-                        'status' => $db->status ?? null,
-                        'project_uuid' => $project->uuid,
-                        'project_name' => $project->name,
-                        'match' => 'name_or_uuid',
-                    ]);
                 }
             }
         }
