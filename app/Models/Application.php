@@ -74,6 +74,7 @@ use Symfony\Component\Yaml\Yaml;
         'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
         'status' => ['type' => 'string', 'description' => 'Application status.'],
         'preview_url_template' => ['type' => 'string',  'description' => 'Preview URL template.'],
+        'max_restart_count' => ['type' => 'integer', 'description' => 'Maximum container restart count before stopping.'],
         'destination_type' => ['type' => 'string', 'description' => 'Destination type.'],
         'destination_id' => ['type' => 'integer', 'description' => 'Destination identifier.'],
         'source_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Source identifier.'],
