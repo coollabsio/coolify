@@ -29,6 +29,11 @@ class ServerProxyController extends Controller
         return Server::whereTeamId($teamId)->whereUuid($uuid)->first();
     }
 
+    private function canReadSensitive(): bool
+    {
+        return request()->attributes->get('can_read_sensitive', false) === true;
+    }
+
     /**
      * @return array{
      *     proxy_type: string|null,
@@ -49,7 +54,8 @@ class ServerProxyController extends Controller
             'generate_exact_labels' => (bool) ($server->settings->generate_exact_labels ?? false),
         ];
 
-        if ($includeConfiguration) {
+        // Proxy compose can contain secrets; only expose with read:sensitive (and admin) like other APIs.
+        if ($includeConfiguration && $this->canReadSensitive()) {
             // Prefer DB-stored config only — never SSH or regenerate for GET.
             $configuration = $server->proxy->get('last_saved_proxy_configuration');
             $payload['configuration'] = filled($configuration) ? $configuration : null;
@@ -60,7 +66,7 @@ class ServerProxyController extends Controller
 
     #[OA\Get(
         summary: 'Get server proxy',
-        description: 'Get proxy settings for a server owned by the authenticated team. Configuration is returned only when it is already stored safely in the database (no remote fetch).',
+        description: 'Get proxy settings for a server owned by the authenticated team. The raw proxy configuration is only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner, and only when already stored in the database (no remote fetch).',
         path: '/servers/{uuid}/proxy',
         operationId: 'get-server-proxy',
         security: [['bearerAuth' => []]],
@@ -80,7 +86,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'redirect_enabled', type: 'boolean', example: true),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true, example: 'https://example.com'),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean', example: false),
-                        new OA\Property(property: 'configuration', type: 'string', nullable: true, description: 'Docker Compose proxy configuration when stored in the database.'),
+                        new OA\Property(property: 'configuration', type: 'string', nullable: true, description: 'Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.'),
                     ]
                 )
             ),

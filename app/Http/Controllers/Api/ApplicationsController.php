@@ -5399,7 +5399,10 @@ class ApplicationsController extends Controller
                     "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
                 ], $server);
                 $images = str($output)->trim()->explode("\n")->filter(function ($item) use ($image) {
-                    return str($item)->contains($image);
+                    $repository = str($item)->before('#')->toString();
+
+                    // Exact repository match only — avoid substring collisions across images.
+                    return $repository === $image;
                 })->map(function ($item) use ($current) {
                     $parts = str($item)->explode('#');
 

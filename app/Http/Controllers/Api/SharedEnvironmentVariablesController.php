@@ -253,7 +253,7 @@ class SharedEnvironmentVariablesController extends Controller
             'type' => $type,
         ]);
 
-        return response()->json($this->removeSensitiveData($env->fresh()))->setStatusCode(201);
+        return response()->json($this->removeSensitiveData($env->fresh()));
     }
 
     private function deleteEnv(int $teamId, int|string $envId, string $type, array $scope = []): JsonResponse
@@ -381,15 +381,15 @@ class SharedEnvironmentVariablesController extends Controller
     #[OA\Patch(
         summary: 'Update Team Shared Env',
         description: 'Update a team shared environment variable by id.',
-        path: '/team/envs/{env_uuid}',
+        path: '/team/envs/{env_id}',
         operationId: 'update-team-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
-            new OA\Response(response: 201, description: 'Environment variable updated.'),
+            new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
@@ -402,18 +402,18 @@ class SharedEnvironmentVariablesController extends Controller
             return $teamId;
         }
 
-        return $this->updateEnv($request, $teamId, $request->route('env_uuid'), 'team');
+        return $this->updateEnv($request, $teamId, $request->route('env_id'), 'team');
     }
 
     #[OA\Delete(
         summary: 'Delete Team Shared Env',
         description: 'Delete a team shared environment variable by id.',
-        path: '/team/envs/{env_uuid}',
+        path: '/team/envs/{env_id}',
         operationId: 'delete-team-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Environment variable deleted.'),
@@ -428,7 +428,7 @@ class SharedEnvironmentVariablesController extends Controller
             return $teamId;
         }
 
-        return $this->deleteEnv($teamId, $request->route('env_uuid'), 'team');
+        return $this->deleteEnv($teamId, $request->route('env_id'), 'team');
     }
 
     // ── Project ───────────────────────────────────────────────────────
@@ -504,16 +504,16 @@ class SharedEnvironmentVariablesController extends Controller
     #[OA\Patch(
         summary: 'Update Project Shared Env',
         description: 'Update a project shared environment variable by id.',
-        path: '/projects/{uuid}/envs/{env_uuid}',
+        path: '/projects/{uuid}/envs/{env_id}',
         operationId: 'update-project-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
-            new OA\Response(response: 201, description: 'Environment variable updated.'),
+            new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
@@ -536,7 +536,7 @@ class SharedEnvironmentVariablesController extends Controller
         return $this->updateEnv(
             $request,
             $teamId,
-            $request->route('env_uuid'),
+            $request->route('env_id'),
             'project',
             ['project_id' => $project->id],
         );
@@ -545,13 +545,13 @@ class SharedEnvironmentVariablesController extends Controller
     #[OA\Delete(
         summary: 'Delete Project Shared Env',
         description: 'Delete a project shared environment variable by id.',
-        path: '/projects/{uuid}/envs/{env_uuid}',
+        path: '/projects/{uuid}/envs/{env_id}',
         operationId: 'delete-project-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Environment variable deleted.'),
@@ -575,7 +575,7 @@ class SharedEnvironmentVariablesController extends Controller
 
         return $this->deleteEnv(
             $teamId,
-            $request->route('env_uuid'),
+            $request->route('env_id'),
             'project',
             ['project_id' => $project->id],
         );
@@ -666,17 +666,17 @@ class SharedEnvironmentVariablesController extends Controller
     #[OA\Patch(
         summary: 'Update Environment Shared Env',
         description: 'Update an environment shared environment variable by id.',
-        path: '/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_uuid}',
+        path: '/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_id}',
         operationId: 'update-environment-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'environment_name_or_uuid', in: 'path', required: true, description: 'Environment name or UUID', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
-            new OA\Response(response: 201, description: 'Environment variable updated.'),
+            new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
@@ -704,7 +704,7 @@ class SharedEnvironmentVariablesController extends Controller
         return $this->updateEnv(
             $request,
             $teamId,
-            $request->route('env_uuid'),
+            $request->route('env_id'),
             'environment',
             ['environment_id' => $environment->id],
         );
@@ -713,14 +713,14 @@ class SharedEnvironmentVariablesController extends Controller
     #[OA\Delete(
         summary: 'Delete Environment Shared Env',
         description: 'Delete an environment shared environment variable by id.',
-        path: '/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_uuid}',
+        path: '/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_id}',
         operationId: 'delete-environment-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Project UUID', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'environment_name_or_uuid', in: 'path', required: true, description: 'Environment name or UUID', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Environment variable deleted.'),
@@ -749,7 +749,7 @@ class SharedEnvironmentVariablesController extends Controller
 
         return $this->deleteEnv(
             $teamId,
-            $request->route('env_uuid'),
+            $request->route('env_id'),
             'environment',
             ['environment_id' => $environment->id],
         );
@@ -828,16 +828,16 @@ class SharedEnvironmentVariablesController extends Controller
     #[OA\Patch(
         summary: 'Update Server Shared Env',
         description: 'Update a server shared environment variable by id.',
-        path: '/servers/{uuid}/envs/{env_uuid}',
+        path: '/servers/{uuid}/envs/{env_id}',
         operationId: 'update-server-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
-            new OA\Response(response: 201, description: 'Environment variable updated.'),
+            new OA\Response(response: 200, description: 'Environment variable updated.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
@@ -860,7 +860,7 @@ class SharedEnvironmentVariablesController extends Controller
         return $this->updateEnv(
             $request,
             $teamId,
-            $request->route('env_uuid'),
+            $request->route('env_id'),
             'server',
             ['server_id' => $server->id],
         );
@@ -869,13 +869,13 @@ class SharedEnvironmentVariablesController extends Controller
     #[OA\Delete(
         summary: 'Delete Server Shared Env',
         description: 'Delete a server shared environment variable by id.',
-        path: '/servers/{uuid}/envs/{env_uuid}',
+        path: '/servers/{uuid}/envs/{env_id}',
         operationId: 'delete-server-shared-env',
         security: [['bearerAuth' => []]],
         tags: ['Shared Environment Variables'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'env_uuid', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
+            new OA\Parameter(name: 'env_id', in: 'path', required: true, description: 'Shared env id (integer).', schema: new OA\Schema(type: 'integer')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Environment variable deleted.'),
@@ -899,7 +899,7 @@ class SharedEnvironmentVariablesController extends Controller
 
         return $this->deleteEnv(
             $teamId,
-            $request->route('env_uuid'),
+            $request->route('env_id'),
             'server',
             ['server_id' => $server->id],
         );

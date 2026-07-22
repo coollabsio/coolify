@@ -57,6 +57,14 @@ function recommendedApplicationSettingsPayload(): array
         'is_gzip_enabled' => false,
         'is_stripprefix_enabled' => false,
         'is_raw_compose_deployment_enabled' => true,
+        'is_log_drain_enabled' => true,
+        'is_gpu_enabled' => true,
+        'gpu_driver' => 'nvidia',
+        'gpu_count' => '1',
+        'gpu_device_ids' => '0',
+        'gpu_options' => null,
+        'is_consistent_container_name_enabled' => true,
+        'custom_internal_name' => 'my-app-internal',
     ];
 }
 

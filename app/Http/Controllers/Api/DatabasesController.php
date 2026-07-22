@@ -26,6 +26,7 @@ use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
@@ -4751,6 +4752,10 @@ class DatabasesController extends Controller
         }
 
         $newDatabase->persistentStorages()->delete();
+        $pendingVolumeClones = [];
+        $sourceServer = $database->destination?->server;
+        $targetServer = $newDatabase->destination?->server;
+
         foreach ($database->persistentStorages()->get() as $volume) {
             $originalName = $volume->name;
             $newName = match (true) {
@@ -4778,19 +4783,40 @@ class DatabasesController extends Controller
             $newPersistentVolume->save();
 
             if ($cloneVolumeData) {
-                try {
-                    StopDatabase::dispatch($database);
-                    VolumeCloneJob::dispatch(
-                        $volume->name,
-                        $newPersistentVolume->name,
-                        $database->destination->server,
-                        $newDatabase->destination->server,
-                        $newPersistentVolume,
+                $pendingVolumeClones[] = [
+                    'source' => $volume->name,
+                    'target' => $newPersistentVolume->name,
+                    'model' => $newPersistentVolume,
+                ];
+            }
+        }
+
+        // Stop once, clone all volumes, then start once — avoids per-volume stop/start races.
+        if ($pendingVolumeClones !== [] && $sourceServer && $targetServer) {
+            try {
+                $chain = [
+                    function () use ($database) {
+                        StopDatabase::run($database);
+                    },
+                ];
+
+                foreach ($pendingVolumeClones as $clone) {
+                    $chain[] = new VolumeCloneJob(
+                        $clone['source'],
+                        $clone['target'],
+                        $sourceServer,
+                        $targetServer,
+                        $clone['model'],
                     );
-                    StartDatabase::dispatch($database);
-                } catch (\Exception $e) {
-                    \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
                 }
+
+                $chain[] = function () use ($database) {
+                    StartDatabase::run($database);
+                };
+
+                Bus::chain($chain)->onQueue('high')->dispatch();
+            } catch (\Exception $e) {
+                \Log::error('Failed to queue database volume clone for '.$database->uuid.': '.$e->getMessage());
             }
         }
 

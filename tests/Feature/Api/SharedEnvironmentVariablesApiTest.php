@@ -73,7 +73,7 @@ describe('Team shared environment variables API', function () {
                 'is_multiline' => true,
             ]);
 
-        $update->assertStatus(201);
+        $update->assertOk();
         $update->assertJsonFragment(['key' => 'TEAM_API_KEY']);
         expect($update->json('is_multiline'))->toBeTruthy();
 

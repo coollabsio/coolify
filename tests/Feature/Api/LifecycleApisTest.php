@@ -5,14 +5,17 @@ use App\Models\Application;
 use App\Models\CloudInitScript;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\ScheduledTask;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
@@ -119,6 +122,157 @@ describe('POST /api/v1/applications/{uuid}/clone', function () {
             ]);
 
         $response->assertNotFound();
+    });
+});
+
+describe('POST /api/v1/databases/{uuid}/clone', function () {
+    test('clones a database and returns the new uuid', function () {
+        $database = StandalonePostgresql::create([
+            'name' => 'source-db',
+            'image' => 'postgres:17-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders($this->headers)
+            ->postJson("/api/v1/databases/{$database->uuid}/clone", [
+                'destination_uuid' => $this->destination->uuid,
+                'name' => 'cloned-db',
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('message', 'Database cloned.');
+
+        $cloned = StandalonePostgresql::where('uuid', $response->json('uuid'))->first();
+        expect($cloned)->not->toBeNull()
+            ->and($cloned->name)->toBe('cloned-db')
+            ->and($cloned->environment_id)->toBe($database->environment_id)
+            ->and($cloned->destination_id)->toBe($this->destination->id)
+            ->and(str($cloned->status)->startsWith('exited'))->toBeTrue();
+    });
+
+    test('creates renamed volumes when cloning a database with clone_volumes', function () {
+        // Prevent remote stop/clone/start from running in unit tests.
+        Bus::fake();
+
+        $database = StandalonePostgresql::create([
+            'name' => 'source-db-volumes',
+            'image' => 'postgres:17-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        // Factory/create hooks may already create a data volume.
+        if ($database->persistentStorages()->count() === 0) {
+            LocalPersistentVolume::create([
+                'name' => 'postgres-data-'.$database->uuid,
+                'mount_path' => '/var/lib/postgresql/data',
+                'resource_id' => $database->id,
+                'resource_type' => $database->getMorphClass(),
+            ]);
+        }
+
+        $sourceVolumeCount = $database->persistentStorages()->count();
+        expect($sourceVolumeCount)->toBeGreaterThan(0);
+
+        $response = $this->withHeaders($this->headers)
+            ->postJson("/api/v1/databases/{$database->uuid}/clone", [
+                'destination_uuid' => $this->destination->uuid,
+                'name' => 'cloned-db-volumes',
+                'clone_volumes' => true,
+            ])
+            ->assertCreated();
+
+        $cloned = StandalonePostgresql::where('uuid', $response->json('uuid'))->firstOrFail();
+        expect($cloned->persistentStorages()->count())->toBe($sourceVolumeCount)
+            ->and($cloned->persistentStorages()->first()->name)->not->toBe($database->persistentStorages()->first()->name)
+            ->and($cloned->persistentStorages()->first()->name)->toContain($cloned->uuid);
+    });
+
+    test('returns 404 for another team database', function () {
+        $otherTeam = Team::factory()->create();
+        $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+        $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->firstOrFail();
+        $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+        $otherEnvironment = $otherProject->environments()->first()
+            ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+        $otherDatabase = StandalonePostgresql::create([
+            'name' => 'other-db',
+            'image' => 'postgres:17-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $otherEnvironment->id,
+            'destination_id' => $otherDestination->id,
+            'destination_type' => $otherDestination->getMorphClass(),
+        ]);
+
+        $this->withHeaders($this->headers)
+            ->postJson("/api/v1/databases/{$otherDatabase->uuid}/clone", [
+                'destination_uuid' => $this->destination->uuid,
+            ])
+            ->assertNotFound();
+    });
+});
+
+describe('POST /api/v1/services/{uuid}/clone', function () {
+    test('clones a service and parses applications from compose', function () {
+        $service = Service::factory()->create([
+            'name' => 'source-service',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'server_id' => $this->server->id,
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+            'compose_parsing_version' => '5',
+        ]);
+        $service->parse();
+        expect($service->applications()->count())->toBeGreaterThan(0);
+
+        $response = $this->withHeaders($this->headers)
+            ->postJson("/api/v1/services/{$service->uuid}/clone", [
+                'destination_uuid' => $this->destination->uuid,
+                'name' => 'cloned-service',
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('message', 'Service cloned.');
+
+        $cloned = Service::where('uuid', $response->json('uuid'))->first();
+        expect($cloned)->not->toBeNull()
+            ->and($cloned->name)->toBe('cloned-service')
+            ->and($cloned->environment_id)->toBe($service->environment_id)
+            ->and($cloned->applications()->count())->toBe($service->applications()->count());
+    });
+
+    test('returns 404 for another team service', function () {
+        $otherTeam = Team::factory()->create();
+        $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+        $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->firstOrFail();
+        $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+        $otherEnvironment = $otherProject->environments()->first()
+            ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+        $otherService = Service::factory()->create([
+            'environment_id' => $otherEnvironment->id,
+            'destination_id' => $otherDestination->id,
+            'destination_type' => $otherDestination->getMorphClass(),
+            'server_id' => $otherServer->id,
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        ]);
+
+        $this->withHeaders($this->headers)
+            ->postJson("/api/v1/services/{$otherService->uuid}/clone", [
+                'destination_uuid' => $this->destination->uuid,
+            ])
+            ->assertNotFound();
     });
 });
 

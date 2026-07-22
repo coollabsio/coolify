@@ -62,7 +62,9 @@ function serverProxyApiToken(User $user, Team $team, array $abilities): string
 }
 
 test('GET /api/v1/servers/{uuid}/proxy returns proxy settings without configuration when none is stored', function () {
-    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+    $sensitiveToken = serverProxyApiToken($this->user, $this->team, ['read', 'read:sensitive']);
+
+    $this->withHeaders(serverProxyApiHeaders($sensitiveToken))
         ->getJson("/api/v1/servers/{$this->server->uuid}/proxy")
         ->assertOk()
         ->assertJsonPath('proxy_type', ProxyTypes::TRAEFIK->value)
@@ -72,15 +74,53 @@ test('GET /api/v1/servers/{uuid}/proxy returns proxy settings without configurat
         ->assertJsonPath('configuration', null);
 });
 
-test('GET /api/v1/servers/{uuid}/proxy returns stored configuration when present in the database', function () {
+test('GET /api/v1/servers/{uuid}/proxy omits stored configuration without read:sensitive', function () {
     $compose = "services:\n  traefik:\n    image: traefik:v3.5\n";
     $this->server->proxy->set('last_saved_proxy_configuration', $compose);
     $this->server->save();
 
-    $this->withHeaders(serverProxyApiHeaders($this->bearerToken))
+    // '*' tokens grant all abilities including read:sensitive; use a read-only token.
+    $readToken = serverProxyApiToken($this->user, $this->team, ['read']);
+
+    $this->withHeaders(serverProxyApiHeaders($readToken))
+        ->getJson("/api/v1/servers/{$this->server->uuid}/proxy")
+        ->assertOk()
+        ->assertJsonMissingPath('configuration');
+});
+
+test('GET /api/v1/servers/{uuid}/proxy returns stored configuration with read:sensitive for admins', function () {
+    $compose = "services:\n  traefik:\n    image: traefik:v3.5\n";
+    $this->server->proxy->set('last_saved_proxy_configuration', $compose);
+    $this->server->save();
+
+    $sensitiveToken = serverProxyApiToken($this->user, $this->team, ['read', 'read:sensitive']);
+
+    $this->withHeaders(serverProxyApiHeaders($sensitiveToken))
         ->getJson("/api/v1/servers/{$this->server->uuid}/proxy")
         ->assertOk()
         ->assertJsonPath('configuration', $compose);
+});
+
+test('GET /api/v1/servers/{uuid}/proxy hides configuration from non-admin users with read:sensitive', function () {
+    $compose = "services:\n  traefik:\n    image: traefik:v3.5\n";
+    $this->server->proxy->set('last_saved_proxy_configuration', $compose);
+    $this->server->save();
+
+    // ApiSensitiveData requires admin/owner of the token team even with read:sensitive.
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    session(['currentTeam' => $this->team]);
+    $memberToken = serverProxyApiToken($member, $this->team, ['read', 'read:sensitive']);
+
+    // Members may be forbidden from viewing servers via policy; when allowed, config must still be hidden.
+    $response = $this->withHeaders(serverProxyApiHeaders($memberToken))
+        ->getJson("/api/v1/servers/{$this->server->uuid}/proxy");
+
+    if ($response->status() === 200) {
+        $response->assertJsonMissingPath('configuration');
+    } else {
+        $response->assertForbidden();
+    }
 });
 
 test('GET /api/v1/servers/{uuid}/proxy does not expose another team server', function () {

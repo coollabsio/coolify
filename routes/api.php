@@ -86,8 +86,8 @@ Route::group([
     Route::patch('/notifications/webhook', [NotificationsController::class, 'update_webhook'])->middleware(['api.ability:write']);
     Route::get('/team/envs', [SharedEnvironmentVariablesController::class, 'team_envs'])->middleware(['api.ability:read']);
     Route::post('/team/envs', [SharedEnvironmentVariablesController::class, 'team_create_env'])->middleware(['api.ability:write']);
-    Route::patch('/team/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'team_update_env'])->middleware(['api.ability:write']);
-    Route::delete('/team/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'team_delete_env'])->middleware(['api.ability:write']);
+    Route::patch('/team/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'team_update_env'])->middleware(['api.ability:write']);
+    Route::delete('/team/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'team_delete_env'])->middleware(['api.ability:write']);
     Route::get('/teams/{id}', [TeamController::class, 'team_by_id'])->middleware(['api.ability:read']);
     Route::get('/teams/{id}/members', [TeamController::class, 'members_by_id'])->middleware(['api.ability:read']);
 
@@ -97,12 +97,12 @@ Route::group([
     // Shared project/environment envs must be registered before the catch-all environment route.
     Route::get('/projects/{uuid}/envs', [SharedEnvironmentVariablesController::class, 'project_envs'])->middleware(['api.ability:read']);
     Route::post('/projects/{uuid}/envs', [SharedEnvironmentVariablesController::class, 'project_create_env'])->middleware(['api.ability:write']);
-    Route::patch('/projects/{uuid}/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'project_update_env'])->middleware(['api.ability:write']);
-    Route::delete('/projects/{uuid}/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'project_delete_env'])->middleware(['api.ability:write']);
+    Route::patch('/projects/{uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'project_update_env'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'project_delete_env'])->middleware(['api.ability:write']);
     Route::get('/projects/{uuid}/environments/{environment_name_or_uuid}/envs', [SharedEnvironmentVariablesController::class, 'environment_envs'])->middleware(['api.ability:read']);
     Route::post('/projects/{uuid}/environments/{environment_name_or_uuid}/envs', [SharedEnvironmentVariablesController::class, 'environment_create_env'])->middleware(['api.ability:write']);
-    Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'environment_update_env'])->middleware(['api.ability:write']);
-    Route::delete('/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'environment_delete_env'])->middleware(['api.ability:write']);
+    Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'environment_update_env'])->middleware(['api.ability:write']);
+    Route::delete('/projects/{uuid}/environments/{environment_name_or_uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'environment_delete_env'])->middleware(['api.ability:write']);
     Route::get('/projects/{uuid}/{environment_name_or_uuid}', [ProjectController::class, 'environment_details'])->middleware(['api.ability:read']);
     Route::post('/projects/{uuid}/environments', [ProjectController::class, 'create_environment'])->middleware(['api.ability:write']);
     Route::patch('/projects/{uuid}/environments/{environment_name_or_uuid}', [ProjectController::class, 'update_environment'])->middleware(['api.ability:write']);
@@ -152,8 +152,8 @@ Route::group([
     Route::get('/servers/{uuid}/resources', [ServersController::class, 'resources_by_server'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/envs', [SharedEnvironmentVariablesController::class, 'server_envs'])->middleware(['api.ability:read']);
     Route::post('/servers/{uuid}/envs', [SharedEnvironmentVariablesController::class, 'server_create_env'])->middleware(['api.ability:write']);
-    Route::patch('/servers/{uuid}/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'server_update_env'])->middleware(['api.ability:write']);
-    Route::delete('/servers/{uuid}/envs/{env_uuid}', [SharedEnvironmentVariablesController::class, 'server_delete_env'])->middleware(['api.ability:write']);
+    Route::patch('/servers/{uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'server_update_env'])->middleware(['api.ability:write']);
+    Route::delete('/servers/{uuid}/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'server_delete_env'])->middleware(['api.ability:write']);
 
     // Server subsystem APIs (Docker cleanup, log drains, Sentinel, Cloudflare Tunnel).
     Route::get('/servers/{uuid}/docker-cleanup', [ServerDockerCleanupController::class, 'show'])->middleware(['api.ability:read']);
