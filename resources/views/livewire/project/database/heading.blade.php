@@ -108,7 +108,7 @@
                         </x-forms.button>
                     @else
                         <button type="button" class="button shrink-0"
-                            @click="document.getElementById('database-start-trigger')?.click()">
+                            @click="$wire.dispatch('startEvent')">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -234,7 +234,7 @@
                             Stop
                         </x-forms.button>
                     @else
-                        <x-forms.button canGate="manage" :canResource="$database" @click="document.getElementById('database-start-trigger')?.click()" class="gap-2">
+                        <x-forms.button canGate="manage" :canResource="$database" @click="$wire.dispatch('startEvent')" class="gap-2">
 
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -284,15 +284,6 @@
                 step1ButtonText="Continue" step2ButtonText="Confirm">
                 <x-slot:trigger>
                     <button id="database-stop-trigger" type="button" class="hidden">Stop</button>
-                </x-slot:trigger>
-            </x-modal-confirmation>
-            <x-modal-confirmation title="Confirm Database Start?" buttonTitle="Start" submitAction="startEvent"
-                :actions="[
-                    'This database will be started.',
-                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Start Database"
-                :dispatchAction="true">
-                <x-slot:trigger>
-                    <button id="database-start-trigger" type="button" class="hidden">Start</button>
                 </x-slot:trigger>
             </x-modal-confirmation>
     @endif
