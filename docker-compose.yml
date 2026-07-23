@@ -12,13 +12,13 @@ services:
             - redis
             - soketi
     postgres:
-        image: postgres:15-alpine
+        image: "${POSTGRES_IMAGE:-postgres:15-alpine}"
         container_name: coolify-db
         restart: always
         networks:
             - coolify
     redis:
-        image: redis:7-alpine
+        image: "${REDIS_IMAGE:-redis:7-alpine}"
         container_name: coolify-redis
         restart: always
         networks:

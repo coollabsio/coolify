@@ -10,6 +10,8 @@
 ## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration (default: false)
 ## AUTOUPDATE - Set to "false" to disable auto-updates
 ## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
+## POSTGRES_IMAGE - Full PostgreSQL image override
+## REDIS_IMAGE - Full Redis image override
 
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
@@ -42,6 +44,8 @@ echo "Source code: https://github.com/coollabsio/coolify/blob/v4.x/scripts/insta
 ROOT_USERNAME=${ROOT_USERNAME:-}
 ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
 ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
+POSTGRES_IMAGE=${POSTGRES_IMAGE:-}
+REDIS_IMAGE=${REDIS_IMAGE:-}
 
 if [ -n "${REGISTRY_URL+x}" ]; then
     echo "Using registry URL from environment variable: $REGISTRY_URL"
@@ -838,6 +842,29 @@ update_env_var() {
     fi
 }
 
+validate_image_override() {
+    local key="$1"
+    local value="$2"
+
+    if [[ ! "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._/@:-]*$ ]]; then
+        echo " - ERROR: ${key} must be a valid complete Docker image reference"
+        exit 1
+    fi
+}
+
+set_image_override() {
+    local key="$1"
+    local value="$2"
+
+    validate_image_override "$key" "$value"
+    if grep -q "^${key}=" "$ENV_FILE"; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+    else
+        printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+    fi
+    echo " - Set ${key} to the requested image"
+}
+
 update_env_var "APP_ID" "$(openssl rand -hex 16)"
 update_env_var "APP_KEY" "base64:$(openssl rand -base64 32)"
 # update_env_var "DB_USERNAME" "$(openssl rand -hex 16)" # Causes issues: database "random-user" does not exist
@@ -858,6 +885,14 @@ fi
 if [ -n "${REGISTRY_URL+x}" ]; then
     # Only update if REGISTRY_URL was explicitly provided
     update_env_var "REGISTRY_URL" "$REGISTRY_URL"
+fi
+
+if [ -n "$POSTGRES_IMAGE" ]; then
+    set_image_override "POSTGRES_IMAGE" "$POSTGRES_IMAGE"
+fi
+
+if [ -n "$REDIS_IMAGE" ]; then
+    set_image_override "REDIS_IMAGE" "$REDIS_IMAGE"
 fi
 
 if [ "$AUTOUPDATE" = "false" ]; then
