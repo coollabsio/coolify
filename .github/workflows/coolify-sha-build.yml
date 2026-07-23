@@ -76,15 +76,35 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.GITHUB_REGISTRY }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
         run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          TAG_ARGS=(--tag "${IMAGE}:sha-${SHA}")
+          # Moving tag for the latest production-line SHA image (v4.x only).
+          if [ "${BRANCH}" = "v4.x" ]; then
+            TAG_ARGS+=(--tag "${IMAGE}:edge")
+          fi
           docker buildx imagetools create \
-          ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-amd64 \
-          ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-aarch64 \
-          --tag ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            "${IMAGE}:sha-${SHA}-amd64" \
+            "${IMAGE}:sha-${SHA}-aarch64" \
+            "${TAG_ARGS[@]}"
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
         run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          TAG_ARGS=(--tag "${IMAGE}:sha-${SHA}")
+          # Moving tag for the latest production-line SHA image (v4.x only).
+          if [ "${BRANCH}" = "v4.x" ]; then
+            TAG_ARGS+=(--tag "${IMAGE}:edge")
+          fi
           docker buildx imagetools create \
-          ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-amd64 \
-          ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-aarch64 \
-          --tag ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            "${IMAGE}:sha-${SHA}-amd64" \
+            "${IMAGE}:sha-${SHA}-aarch64" \
+            "${TAG_ARGS[@]}"
