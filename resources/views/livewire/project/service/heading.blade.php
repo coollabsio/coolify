@@ -168,7 +168,7 @@
                             Stop
                         </x-forms.button>
                         <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            @click="$wire.dispatch('forceDeployEvent')">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -179,7 +179,7 @@
                         </button>
                     @elseif (str($service->status)->contains('exited'))
                         <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-start-trigger')?.click()">
+                            @click="$wire.dispatch('startEvent')">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -189,7 +189,7 @@
                             Deploy
                         </button>
                         <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            @click="$wire.dispatch('forceDeployEvent')">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -228,7 +228,7 @@
                             Stop
                         </x-forms.button>
                         <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-start-trigger')?.click()">
+                            @click="$wire.dispatch('startEvent')">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -238,7 +238,7 @@
                             Deploy
                         </button>
                         <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+                            @click="$wire.dispatch('forceDeployEvent')">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -422,7 +422,7 @@
                             Stop
                         </x-forms.button>
                     @elseif (str($service->status)->contains('exited'))
-                        <x-forms.button canGate="deploy" :canResource="$service" @click="document.getElementById('service-start-trigger')?.click()" class="gap-2">
+                        <x-forms.button canGate="deploy" :canResource="$service" @click="$wire.dispatch('startEvent')" class="gap-2">
 
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -447,7 +447,7 @@
                             </svg>
                             Stop
                         </x-forms.button>
-                        <x-forms.button canGate="deploy" :canResource="$service" @click="document.getElementById('service-start-trigger')?.click()" class="gap-2">
+                        <x-forms.button canGate="deploy" :canResource="$service" @click="$wire.dispatch('startEvent')" class="gap-2">
 
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -471,13 +471,6 @@
         @endif
     </div>
     @if ($service->isDeployable)
-            <x-modal-confirmation title="Confirm Service Deployment?" buttonTitle="Deploy"
-                submitAction="startEvent" :dispatchAction="true" :actions="['This service will be deployed.']"
-                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Confirm">
-                <x-slot:trigger>
-                    <button id="service-start-trigger" type="button" class="hidden">Deploy</button>
-                </x-slot:trigger>
-            </x-modal-confirmation>
             <x-modal-confirmation title="Confirm Service Restart?" buttonTitle="Restart"
                 submitAction="restartEvent" :dispatchAction="true" :actions="['This service will be restarted.']"
                 :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Confirm">
@@ -490,13 +483,6 @@
                 :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Confirm">
                 <x-slot:trigger>
                     <button id="service-stop-trigger" type="button" class="hidden">Stop</button>
-                </x-slot:trigger>
-            </x-modal-confirmation>
-            <x-modal-confirmation title="Confirm Service Force Deployment?" buttonTitle="Force Deploy"
-                submitAction="forceDeployEvent" :dispatchAction="true" :actions="['This service will be force deployed.']"
-                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Confirm">
-                <x-slot:trigger>
-                    <button id="service-forceDeploy-trigger" type="button" class="hidden">Force Deploy</button>
                 </x-slot:trigger>
             </x-modal-confirmation>
             <x-modal-confirmation title="Confirm Pull Latest Images & Restart?" buttonTitle="Pull Latest Images & Restart"
