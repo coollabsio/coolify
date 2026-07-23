@@ -7,7 +7,7 @@
 
 services:
   buzz:
-    image: 'ghcr.io/block/buzz:${BUZZ_TAG:-latest}'
+    image: 'ghcr.io/block/buzz:${BUZZ_TAG:-main}'
     environment:
       - SERVICE_URL_BUZZ_3000
       - BUZZ_BIND_ADDR=0.0.0.0:3000

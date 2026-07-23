@@ -4,7 +4,7 @@ it('includes a production-ready Buzz one-click service template', function () {
     $compose = file_get_contents(__DIR__.'/../../templates/compose/buzz.yaml');
 
     expect($compose)
-        ->toContain('ghcr.io/block/buzz')
+        ->toContain('ghcr.io/block/buzz:${BUZZ_TAG:-main}')
         ->toContain('SERVICE_URL_BUZZ_3000')
         ->toContain('RELAY_URL=wss://${SERVICE_FQDN_BUZZ}')
         ->toContain('BUZZ_RELAY_PRIVATE_KEY=${SERVICE_HEX_64_RELAYKEY}')
@@ -29,7 +29,7 @@ it('includes a production-ready Buzz one-click service template', function () {
         $generatedCompose = base64_decode($templates['buzz']['compose'], strict: true);
 
         expect($generatedCompose)
-            ->toContain('ghcr.io/block/buzz')
+            ->toContain('ghcr.io/block/buzz:${BUZZ_TAG:-main}')
             ->toContain('wss://');
     }
 });
