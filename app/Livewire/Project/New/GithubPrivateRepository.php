@@ -192,7 +192,7 @@ class GithubPrivateRepository extends Component
             }
 
             $destination_uuid = $this->query['destination'] ?? null;
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }
@@ -201,7 +201,7 @@ class GithubPrivateRepository extends Component
             $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
-            $application = Application::create([
+            $application = new Application([
                 'name' => generate_application_name($this->selected_repository_owner.'/'.$this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => str($this->selected_repository_owner)->trim()->toString().'/'.str($this->selected_repository_repo)->trim()->toString(),
@@ -216,6 +216,7 @@ class GithubPrivateRepository extends Component
                 'source_id' => $this->github_app->id,
                 'source_type' => $this->github_app->getMorphClass(),
             ]);
+            $application->save();
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 

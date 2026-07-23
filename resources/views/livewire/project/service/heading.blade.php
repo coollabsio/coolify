@@ -23,7 +23,7 @@
                 ['label' => 'Back', 'route' => 'project.service.configuration', 'active' => false, 'parameters' => [...$parameters, 'stack_service_uuid' => null]],
                 ['label' => 'General', 'route' => 'project.service.index', 'active' => request()->routeIs('project.service.index')],
                 ['label' => 'Advanced', 'route' => 'project.service.index.advanced', 'active' => request()->routeIs('project.service.index.advanced')],
-                ['label' => 'Backups', 'route' => 'project.service.database.backups', 'active' => request()->routeIs('project.service.database.backups')],
+                ['label' => 'Backups', 'route' => 'project.service.database.backups', 'active' => request()->routeIs('project.service.database.backup*')],
                 ['label' => 'Import Backup', 'route' => 'project.service.database.import', 'active' => request()->routeIs('project.service.database.import')],
             ];
         }

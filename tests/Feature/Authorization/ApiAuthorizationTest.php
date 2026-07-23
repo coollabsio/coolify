@@ -15,7 +15,10 @@ use Illuminate\Support\Str;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(
+        ['id' => 0],
+        ['is_api_enabled' => true],
+    ));
 
     $this->team = Team::factory()->create();
 

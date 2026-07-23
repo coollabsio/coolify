@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Actions\User\RevokeUserTeamTokens;
 use App\Events\ServerReachabilityChanged;
+use App\Jobs\V5TeardownTeamJob;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
+use App\Support\V5\V5Feature;
 use App\Notifications\Channels\SendsSlack;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
@@ -75,6 +77,20 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         });
 
         static::deleting(function (Team $team) {
+            // Best-effort on-host teardown of this team's v5 resources BEFORE the
+            // DB cascade removes the servers/applications/private keys. Captured
+            // synchronously into a queued job so an unreachable host cannot block
+            // or fail the team deletion (see V5TeardownTeamJob). Guarded so a v5
+            // teardown problem never breaks v4 team deletion. This is disabled
+            // with the rest of v5 outside development environments.
+            if (V5Feature::enabled()) {
+                try {
+                    V5TeardownTeamJob::dispatchForTeam($team);
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+
             RevokeUserTeamTokens::forTeam($team->id);
 
             foreach ($team->privateKeys as $key) {
@@ -219,13 +235,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('webhook')?->isEnabled();
     }
 
-    public function subscriptionEnded()
+    public function subscriptionEnded(?Subscription $subscription = null): void
     {
-        if (! $this->subscription) {
+        $subscription ??= $this->subscription;
+
+        if (! $subscription) {
             return;
         }
 
-        $this->subscription->update([
+        $subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,

@@ -1,4 +1,16 @@
-<div>
+<div x-data="{
+    search: '',
+    backups: @js($database->scheduledBackups->map(fn ($backup) => [
+        'name' => strtolower($database->name),
+        'frequency' => strtolower($backup->frequency),
+        's3_storage' => strtolower($backup->s3?->name ?? ''),
+    ])->values()),
+    hasMatches() {
+        const query = this.search.toLowerCase();
+
+        return this.backups.some((backup) => backup.name.includes(query) || backup.frequency.includes(query) || backup.s3_storage.includes(query));
+    },
+}">
     <div class="flex flex-col gap-2">
         @if ($database->is_migrated && blank($database->custom_type))
             <div>
@@ -18,9 +30,16 @@
                 </form>
             </div>
         @else
+            <div class="max-w-md pb-4">
+                <x-forms.input id="null" type="search" x-model="search"
+                    placeholder="Search by database name, frequency, or S3 storage..." />
+            </div>
+            <div x-cloak x-show="search !== '' && backups.length > 0 && !hasMatches()">
+                No scheduled backups match your search.
+            </div>
             @forelse($database->scheduledBackups as $backup)
                 @if ($type == 'database')
-                    <a @class([
+                    <a x-show="search === '' || @js(strtolower($database->name)).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase()) || @js(strtolower($backup->s3?->name ?? '')).includes(search.toLowerCase())" @class([
                         'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
                         'border-blue-500/50 border-dashed' =>
                             $backup->latest_log &&
@@ -94,21 +113,19 @@
                                     @endif
                                 @endif
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • S3: {{ $backup->s3?->name ?? 'Storage unavailable' }}
                                 @endif
                             @else
                                 Last Run: Never • Total Executions: 0
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • S3: {{ $backup->s3?->name ?? 'Storage unavailable' }}
                                 @endif
                             @endif
                         </div>
                     </a>
                 @else
-                    <div @class([
+                    <a x-show="search === '' || @js(strtolower($database->name)).includes(search.toLowerCase()) || @js(strtolower($backup->frequency)).includes(search.toLowerCase()) || @js(strtolower($backup->s3?->name ?? '')).includes(search.toLowerCase())" @class([
                         'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
-                        'bg-gray-200 dark:bg-coolgray-200' =>
-                            data_get($backup, 'id') === data_get($selectedBackup, 'id'),
                         'border-blue-500/50 border-dashed' =>
                             $backup->latest_log &&
                             data_get($backup->latest_log, 'status') === 'running',
@@ -119,9 +136,8 @@
                             $backup->latest_log &&
                             data_get($backup->latest_log, 'status') === 'success',
                         'border-gray-200 dark:border-coolgray-300' => !$backup->latest_log,
-                        'border-coollabs' =>
-                            data_get($backup, 'id') === data_get($selectedBackup, 'id'),
-                    ]) wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
+                    ]) {{ wireNavigate() }}
+                        href="{{ route('project.service.database.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
                         @if ($backup->latest_log && data_get($backup->latest_log, 'status') === 'running')
                             <div class="absolute top-2 right-2">
                                 <x-loading />
@@ -182,7 +198,7 @@
                                     @endif
                                 @endif
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • S3: {{ $backup->s3?->name ?? 'Storage unavailable' }}
                                 @endif
                                 <br>Total Executions: {{ $backup->executions()->count() }}
                                 @php
@@ -202,23 +218,15 @@
                             @else
                                 Last Run: Never • Total Executions: 0
                                 @if ($backup->save_s3)
-                                    • S3: Enabled
+                                    • S3: {{ $backup->s3?->name ?? 'Storage unavailable' }}
                                 @endif
                             @endif
                         </div>
-                    </div>
+                    </a>
                 @endif
             @empty
                 <div>No scheduled backups configured.</div>
             @endforelse
         @endif
     </div>
-    @if ($type === 'service-database' && $selectedBackup)
-        <div class="pt-10">
-            <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
-                :available-s3-storages="$s3s" :status="data_get($database, 'status')" />
-            <livewire:project.database.backup-executions wire:key="{{ $selectedBackup->uuid }}" :backup="$selectedBackup"
-                :database="$database" />
-        </div>
-    @endif
 </div>

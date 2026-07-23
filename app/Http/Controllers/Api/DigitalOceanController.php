@@ -15,6 +15,7 @@ use App\Rules\ValidHostname;
 use App\Services\DigitalOceanService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 class DigitalOceanController extends Controller
@@ -283,6 +284,10 @@ class DigitalOceanController extends Controller
             return response()->json(['message' => 'Private key not found.'], 404);
         }
 
+        $digitalOceanService = null;
+        $dropletId = null;
+        $server = null;
+
         try {
             $digitalOceanService = new DigitalOceanService($token->token);
             $sshKeyId = $this->getOrCreateSshKey($digitalOceanService, $privateKey);
@@ -309,28 +314,40 @@ class DigitalOceanController extends Controller
 
             $droplet = $digitalOceanService->createDroplet($params);
             $dropletId = (int) $droplet['id'];
-            $droplet = $digitalOceanService->waitForPublicIp($droplet, true, $request->enable_ipv6);
-            $ipAddress = $digitalOceanService->getPublicIpAddress($droplet, true, $request->enable_ipv6);
 
-            if (! $ipAddress) {
-                throw new \Exception('No public IP address available for the new droplet.');
+            $server = DB::transaction(function () use ($normalizedServerName, $teamId, $privateKey, $token, $dropletId, $droplet): Server {
+                $server = Server::create([
+                    'name' => $normalizedServerName,
+                    'ip' => Server::PLACEHOLDER_IP,
+                    'user' => 'root',
+                    'port' => 22,
+                    'team_id' => $teamId,
+                    'private_key_id' => $privateKey->id,
+                    'cloud_provider_token_id' => $token->id,
+                    'digitalocean_droplet_id' => $dropletId,
+                    'digitalocean_droplet_status' => $droplet['status'] ?? null,
+                ]);
+
+                $server->proxy->set('status', 'exited');
+                $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
+                $server->save();
+
+                return $server;
+            });
+
+            try {
+                $droplet = $digitalOceanService->waitForPublicIp($droplet, true, $request->enable_ipv6);
+                $ipAddress = $digitalOceanService->getPublicIpAddress($droplet, true, $request->enable_ipv6);
+
+                if ($ipAddress) {
+                    $server->update([
+                        'ip' => $ipAddress,
+                        'digitalocean_droplet_status' => $droplet['status'] ?? $server->digitalocean_droplet_status,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                report($e);
             }
-
-            $server = Server::create([
-                'name' => $normalizedServerName,
-                'ip' => $ipAddress,
-                'user' => 'root',
-                'port' => 22,
-                'team_id' => $teamId,
-                'private_key_id' => $privateKey->id,
-                'cloud_provider_token_id' => $token->id,
-                'digitalocean_droplet_id' => $dropletId,
-                'digitalocean_droplet_status' => $droplet['status'] ?? null,
-            ]);
-
-            $server->proxy->set('status', 'exited');
-            $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
-            $server->save();
 
             if ($request->instant_validate) {
                 ValidateServer::dispatch($server);
@@ -341,15 +358,17 @@ class DigitalOceanController extends Controller
                 'server_uuid' => $server->uuid,
                 'server_name' => $server->name,
                 'digitalocean_droplet_id' => $dropletId,
-                'ip' => $ipAddress,
+                'ip' => $server->ip,
             ]);
 
             return response()->json([
                 'uuid' => $server->uuid,
                 'digitalocean_droplet_id' => $dropletId,
-                'ip' => $ipAddress,
+                'ip' => $server->ip,
             ])->setStatusCode(201);
         } catch (RateLimitException $e) {
+            $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
+
             $response = response()->json(['message' => $e->getMessage()], 429);
             if ($e->retryAfter !== null) {
                 $response->header('Retry-After', $e->retryAfter);
@@ -357,11 +376,26 @@ class DigitalOceanController extends Controller
 
             return $response;
         } catch (\Throwable $e) {
+            $this->deleteUntrackedDroplet($digitalOceanService, $dropletId, $server);
+
             logger()->error('Failed to create DigitalOcean server', [
                 'error' => $e->getMessage(),
             ]);
 
             return response()->json(['message' => 'Failed to create DigitalOcean server.'], 500);
+        }
+    }
+
+    private function deleteUntrackedDroplet(?DigitalOceanService $digitalOceanService, ?int $dropletId, ?Server $server): void
+    {
+        if (! $digitalOceanService || ! $dropletId || $server) {
+            return;
+        }
+
+        try {
+            $digitalOceanService->deleteDroplet($dropletId);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

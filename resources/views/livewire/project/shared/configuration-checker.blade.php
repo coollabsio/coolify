@@ -55,6 +55,7 @@
                                     <h3 class="text-2xl font-bold text-black dark:text-white">Configuration changes</h3>
                                     <p class="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                                         These changes are not applied to the latest deployment yet.
+                                        (If you think it is incorrect, just ignore)
                                     </p>
                                 </div>
                                 <button type="button" @click="configurationDiffModalOpen = false"

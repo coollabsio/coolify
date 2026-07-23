@@ -109,6 +109,7 @@ class ServerSetting extends Model
         'sentinel_token' => 'encrypted',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
+        'is_build_server' => 'boolean',
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',

@@ -18,6 +18,7 @@ use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
 use App\Services\DigitalOceanService;
+use App\Services\HetznerService;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use App\Traits\ClearsGlobalSearchCache;
@@ -111,6 +112,15 @@ use Symfony\Component\Yaml\Yaml;
 class Server extends BaseModel
 {
     use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
+
+    /**
+     * Sentinel IP for servers that do not have a real address yet
+     * (cloud provisioning in progress or parked as unreachable).
+     * Scheduled jobs skip these servers via skipServer().
+     */
+    public const PLACEHOLDER_IP = '1.2.3.4';
+
+    public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
 
     public static $batch_counter = 0;
 
@@ -307,6 +317,85 @@ class Server extends BaseModel
         return 'server';
     }
 
+    public function hasPlaceholderIp(): bool
+    {
+        // Cast: the saving hook stores the ip as a Stringable in memory.
+        return self::isPlaceholderIp((string) $this->ip);
+    }
+
+    public static function isPlaceholderIp(?string $ip): bool
+    {
+        return blank($ip) || in_array($ip, self::PLACEHOLDER_IPS, true);
+    }
+
+    /**
+     * Replace a placeholder IP with the real address once the cloud
+     * provider reports one. Returns true when the IP was updated.
+     */
+    public function backfillPlaceholderIp(?string $ip): bool
+    {
+        if (self::isPlaceholderIp($ip)) {
+            return false;
+        }
+
+        $updated = static::query()
+            ->whereKey($this->getKey())
+            ->where(function (Builder $query): void {
+                $query->whereNull('ip')
+                    ->orWhere('ip', '')
+                    ->orWhereIn('ip', self::PLACEHOLDER_IPS);
+            })
+            ->update(['ip' => $ip]);
+
+        if ($updated === 0) {
+            return false;
+        }
+
+        $this->forceFill(['ip' => $ip]);
+        $this->syncOriginalAttribute('ip');
+        static::flushIdentityMap();
+
+        return true;
+    }
+
+    /**
+     * Persist provider status without saving a stale in-memory IP value.
+     *
+     * @param  array<string, mixed>  $updates
+     */
+    private function persistProviderState(array $updates): void
+    {
+        if (empty($updates)) {
+            return;
+        }
+
+        static::query()->whereKey($this->getKey())->update($updates);
+        $this->forceFill($updates);
+        $this->syncOriginalAttributes(array_keys($updates));
+        static::flushIdentityMap();
+    }
+
+    public function refreshHetznerState(): ?string
+    {
+        if (! $this->hetzner_server_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hetzner') {
+            return $this->hetzner_server_status;
+        }
+
+        $hetznerService = new HetznerService($this->cloudProviderToken->token);
+        $server = $hetznerService->getServer($this->hetzner_server_id);
+        $status = $server['status'] ?? null;
+        $assignedIp = data_get($server, 'public_net.ipv4.ip') ?? data_get($server, 'public_net.ipv6.ip');
+
+        $updates = [];
+        if ($this->hetzner_server_status !== $status) {
+            $updates['hetzner_server_status'] = $status;
+        }
+        $this->persistProviderState($updates);
+        $this->backfillPlaceholderIp($assignedIp);
+
+        return $status;
+    }
+
     public function refreshVultrState(): ?string
     {
         if (! $this->vultr_instance_id || ! $this->cloudProviderToken) {
@@ -322,8 +411,7 @@ class Server extends BaseModel
             }
 
             if ($this->vultr_instance_status !== 'deleted') {
-                $this->update(['vultr_instance_status' => 'deleted']);
-                $this->forceFill(['vultr_instance_status' => 'deleted']);
+                $this->persistProviderState(['vultr_instance_status' => 'deleted']);
             }
 
             return 'deleted';
@@ -338,16 +426,8 @@ class Server extends BaseModel
         if ($this->vultr_instance_status !== $status) {
             $updates['vultr_instance_status'] = $status;
         }
-
-        $hasPlaceholderIp = blank($this->ip) || in_array($this->ip, ['0.0.0.0', '::'], true);
-        if ($hasPlaceholderIp && $publicIp) {
-            $updates['ip'] = $publicIp;
-        }
-
-        if (! empty($updates)) {
-            $this->update($updates);
-            $this->forceFill($updates);
-        }
+        $this->persistProviderState($updates);
+        $this->backfillPlaceholderIp($publicIp);
 
         return $status;
     }
@@ -364,7 +444,7 @@ class Server extends BaseModel
             $droplet = $digitalOceanService->getDroplet((int) $this->digitalocean_droplet_id);
         } catch (RequestException $e) {
             if ($e->response?->status() === 404) {
-                $this->update(['digitalocean_droplet_status' => 'deleted']);
+                $this->persistProviderState(['digitalocean_droplet_status' => 'deleted']);
 
                 return 'deleted';
             }
@@ -372,7 +452,7 @@ class Server extends BaseModel
             throw $e;
         } catch (\Throwable $e) {
             if ((int) $e->getCode() === 404) {
-                $this->update(['digitalocean_droplet_status' => 'deleted']);
+                $this->persistProviderState(['digitalocean_droplet_status' => 'deleted']);
 
                 return 'deleted';
             }
@@ -387,12 +467,8 @@ class Server extends BaseModel
         $status = $droplet['status'] ?? null;
         $ip = $digitalOceanService->getPublicIpAddress($droplet);
 
-        $updates = ['digitalocean_droplet_status' => $status];
-        if ($ip && $ip !== $this->ip) {
-            $updates['ip'] = $ip;
-        }
-
-        $this->update($updates);
+        $this->persistProviderState(['digitalocean_droplet_status' => $status]);
+        $this->backfillPlaceholderIp($ip);
 
         return $status;
     }
@@ -433,9 +509,29 @@ class Server extends BaseModel
         });
     }
 
-    public static function isUsable()
+    public static function isUsable(): Builder
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
+        return self::usableByBuildServerStatus(false);
+    }
+
+    public static function isUsableBuildServer(): Builder
+    {
+        return self::usableByBuildServerStatus(true);
+    }
+
+    private static function usableByBuildServerStatus(bool $isBuildServer): Builder
+    {
+        return Server::ownedByCurrentTeam()
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'is_build_server', $isBuildServer)
+            ->whereRelation('settings', 'force_disabled', false);
+    }
+
+    public function canHostResources(): bool
+    {
+        return ! $this->isBuildServer();
     }
 
     public function settings()
@@ -1176,7 +1272,7 @@ $schema://$host {
 
     public function skipServer()
     {
-        if ($this->ip === '1.2.3.4') {
+        if ($this->hasPlaceholderIp()) {
             return true;
         }
         if ($this->settings->force_disabled === true) {
@@ -1188,7 +1284,7 @@ $schema://$host {
 
     public function isFunctional()
     {
-        $isFunctional = data_get($this->settings, 'is_reachable') && data_get($this->settings, 'is_usable') && data_get($this->settings, 'force_disabled') === false && $this->ip !== '1.2.3.4';
+        $isFunctional = data_get($this->settings, 'is_reachable') && data_get($this->settings, 'is_usable') && data_get($this->settings, 'force_disabled') === false && ! $this->hasPlaceholderIp();
 
         if ($isFunctional === false) {
             Storage::disk('ssh-mux')->delete($this->muxFilename());

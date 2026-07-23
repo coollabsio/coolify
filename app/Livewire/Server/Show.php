@@ -202,7 +202,7 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->syncData();
-            if (! $this->server->isEmpty()) {
+            if (! $this->server->isBuildServer() && ! $this->server->isEmpty()) {
                 $this->isBuildServerLocked = true;
             }
             // Load saved Hetzner status and validation state
@@ -409,6 +409,12 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if ($value === true && ! $this->server->isEmpty()) {
+                $this->isBuildServer = false;
+                $this->dispatch('error', 'A server with existing resources cannot be configured as a build server.');
+
+                return;
+            }
             if ($value === true && $this->isSentinelEnabled) {
                 $this->isSentinelEnabled = false;
                 $this->isMetricsEnabled = false;
@@ -487,6 +493,11 @@ class Show extends Component
             if ($this->server->hetzner_server_status !== $this->hetznerServerStatus) {
                 $this->server->hetzner_server_status = $this->hetznerServerStatus;
                 $this->server->update(['hetzner_server_status' => $this->hetznerServerStatus]);
+            }
+
+            $assignedIp = data_get($serverData, 'public_net.ipv4.ip') ?? data_get($serverData, 'public_net.ipv6.ip');
+            if ($this->server->backfillPlaceholderIp($assignedIp)) {
+                $this->ip = $this->server->ip;
             }
             if ($manual) {
                 $this->dispatch('success', 'Server status refreshed: '.ucfirst($this->hetznerServerStatus ?? 'unknown'));
@@ -606,6 +617,7 @@ class Show extends Component
     public function startVultrInstance()
     {
         try {
+            $this->authorize('update', $this->server);
             if (! $this->server->vultr_instance_id || ! $this->server->cloudProviderToken) {
                 $this->dispatch('error', 'This server is not associated with a Vultr instance or token.');
 

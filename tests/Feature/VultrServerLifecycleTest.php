@@ -123,6 +123,8 @@ it('updates placeholder server IP when Vultr status refresh returns assigned pub
 });
 
 it('does not overwrite an established server IP during Vultr status refresh', function () {
+    $this->server->update(['ip' => '198.51.100.20']);
+
     Http::fake([
         'https://api.vultr.com/v2/instances/instance-1' => Http::response([
             'instance' => [
@@ -135,12 +137,12 @@ it('does not overwrite an established server IP during Vultr status refresh', fu
 
     Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
         ->call('checkVultrInstanceStatus', true)
-        ->assertSet('ip', '1.2.3.4')
+        ->assertSet('ip', '198.51.100.20')
         ->assertSet('vultrInstanceStatus', 'active');
 
     $this->assertDatabaseHas('servers', [
         'id' => $this->server->id,
-        'ip' => '1.2.3.4',
+        'ip' => '198.51.100.20',
         'vultr_instance_status' => 'active',
     ]);
 });
@@ -268,6 +270,26 @@ it('starts a Vultr instance', function () {
     ]);
 
     Http::assertSent(fn ($request) => $request->url() === 'https://api.vultr.com/v2/instances/instance-1/start');
+});
+
+it('prevents members from starting a Vultr instance', function () {
+    $this->server->update(['vultr_instance_status' => 'stopped']);
+
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Http::fake([
+        'https://api.vultr.com/v2/instances/instance-1/start' => Http::response([], 204),
+    ]);
+
+    Livewire::test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->call('startVultrInstance')
+        ->assertDispatched('error');
+
+    expect($this->server->fresh()->vultr_instance_status)->toBe('stopped');
+    Http::assertNothingSent();
 });
 
 it('links a server to Vultr by matching IP', function () {

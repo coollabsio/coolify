@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\V5\V5Feature;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
@@ -34,6 +35,13 @@ class RouteServiceProvider extends ServiceProvider
             Route::prefix('webhooks')
                 ->group(base_path('routes/webhooks.php'));
 
+            if (V5Feature::enabled()) {
+                Route::middleware('v5.web')
+                    ->prefix('v5')
+                    ->as('v5.')
+                    ->group(base_path('routes/v5.php'));
+            }
+
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
         });
@@ -54,6 +62,12 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('5', function (Request $request) {
             return Limit::perMinute(5)->by($request->user()?->id ?: $request->ip());
         });
+
+        if (V5Feature::enabled()) {
+            RateLimiter::for('v5', function (Request $request) {
+                return Limit::perMinute(120)->by($request->user()?->id ?: $request->ip());
+            });
+        }
 
         RateLimiter::for('feedback', function (Request $request) {
             return Limit::perMinute(3)->by($request->user()?->id ?: $request->ip());

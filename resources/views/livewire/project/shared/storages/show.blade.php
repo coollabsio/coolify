@@ -12,10 +12,26 @@
                         $storage->resource_type === 'App\Models\ServiceApplication' ||
                             $storage->resource_type === 'App\Models\ServiceDatabase')
                         <x-forms.input id="name" label="Volume Name" required readonly
-                            helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
+                            helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing.">
+                            <x-slot:labelSuffix>
+                                @if ($hasEnabledBackup)
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                                @endif
+                            </x-slot:labelSuffix>
+                        </x-forms.input>
                     @else
                         <x-forms.input id="name" label="Volume Name" required readonly
-                            helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing." />
+                            helper="Warning: Changing the volume name after the initial start could cause problems. Only use it when you know what are you doing.">
+                            <x-slot:labelSuffix>
+                                @if ($hasEnabledBackup)
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                                @endif
+                            </x-slot:labelSuffix>
+                        </x-forms.input>
                     @endif
                     @if ($isService || $startedAt)
                         <x-forms.input id="hostPath" readonly helper="Directory on the host system."
@@ -33,7 +49,15 @@
                 </div>
             @else
                 <div class="flex gap-2 items-end w-full">
-                    <x-forms.input id="name" required readonly />
+                    <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required readonly>
+                        <x-slot:labelSuffix>
+                            @if ($hasEnabledBackup)
+                                <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                    status="Backup enabled" type="success"
+                                    :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                            @endif
+                        </x-slot:labelSuffix>
+                    </x-forms.input>
                     <x-forms.input id="hostPath" readonly />
                     <x-forms.input id="mountPath" required readonly />
                 </div>
@@ -47,18 +71,43 @@
                     </div>
                 @endcan
             @endif
+            @if ($resource instanceof \App\Models\Application)
+                @can('update', $resource)
+                    <x-modal-input buttonTitle="Configure Backup" title="Configure Volume Backup" :wireIgnore="false">
+                        <livewire:project.application.backup.create :application="$resource"
+                            :selected-target-key="'volume:' . $storage->id"
+                            wire:key="configure-readonly-volume-backup-{{ $storage->id }}" />
+                    </x-modal-input>
+                @endcan
+            @endif
         @else
             @can('update', $resource)
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="name" label="Volume Name" required />
+                        <x-forms.input id="name" label="Volume Name" required>
+                            <x-slot:labelSuffix>
+                                @if ($hasEnabledBackup)
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                                @endif
+                            </x-slot:labelSuffix>
+                        </x-forms.input>
                         <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path" />
                         <x-forms.input id="mountPath" label="Destination Path"
                             helper="Directory inside the container." required />
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="name" required />
+                        <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required>
+                            <x-slot:labelSuffix>
+                                @if ($hasEnabledBackup)
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                                @endif
+                            </x-slot:labelSuffix>
+                        </x-forms.input>
                         <x-forms.input id="hostPath" />
                         <x-forms.input id="mountPath" required />
                     </div>
@@ -74,6 +123,13 @@
                     <x-forms.button type="submit">
                         Update
                     </x-forms.button>
+                    @if ($resource instanceof \App\Models\Application)
+                        <x-modal-input buttonTitle="Configure Backup" title="Configure Volume Backup" :wireIgnore="false">
+                            <livewire:project.application.backup.create :application="$resource"
+                                :selected-target-key="'volume:' . $storage->id"
+                                wire:key="configure-volume-backup-{{ $storage->id }}" />
+                        </x-modal-input>
+                    @endif
                     <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton buttonTitle="Delete"
                         submitAction="delete" :actions="[
                             'The selected persistent storage/volume will be permanently deleted.',
@@ -85,7 +141,15 @@
             @else
                 @if ($isFirst)
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="name" label="Volume Name" required disabled />
+                        <x-forms.input id="name" label="Volume Name" required disabled>
+                            <x-slot:labelSuffix>
+                                @if ($hasEnabledBackup)
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                                @endif
+                            </x-slot:labelSuffix>
+                        </x-forms.input>
                         <x-forms.input id="hostPath" helper="Directory on the host system." label="Source Path"
                             disabled />
                         <x-forms.input id="mountPath" label="Destination Path"
@@ -93,7 +157,15 @@
                     </div>
                 @else
                     <div class="flex gap-2 items-end w-full">
-                        <x-forms.input id="name" required disabled />
+                        <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required disabled>
+                            <x-slot:labelSuffix>
+                                @if ($hasEnabledBackup)
+                                    <x-status-badge :as="$backupUrl ? 'a' : 'span'" :href="$backupUrl"
+                                        status="Backup enabled" type="success"
+                                        :class="$backupUrl ? 'cursor-pointer underline' : null" />
+                                @endif
+                            </x-slot:labelSuffix>
+                        </x-forms.input>
                         <x-forms.input id="hostPath" disabled />
                         <x-forms.input id="mountPath" required disabled />
                     </div>

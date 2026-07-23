@@ -18,6 +18,7 @@
             'destinations' => $s->destinations()->map(
                 fn($d) => [
                     'id' => $d->id,
+                    'uuid' => $d->uuid,
                     'name' => $d->name,
                     'server_id' => $s->id,
                 ],
@@ -77,6 +78,9 @@
                             <template x-for="server in servers" :key="server.id">
                                 <option :value="server.id" x-text="`${server.name} (${server.ip})`"></option>
                             </template>
+                            @foreach ($buildServers as $buildServer)
+                                <option disabled>{{ $buildServer->name }} — Build server — cannot host resources</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -84,8 +88,8 @@
                         <label class="block text-sm font-medium mb-2">Select Network Destination</label>
                         <select x-model="selectedCloneDestination" :disabled="!selectedCloneServer" class="select">
                             <option value="">Choose a destination...</option>
-                            <template x-for="destination in availableDestinations" :key="destination.id">
-                                <option :value="destination.id" x-text="destination.name"></option>
+                            <template x-for="destination in availableDestinations" :key="destination.uuid">
+                                <option :value="destination.uuid" x-text="destination.name"></option>
                             </template>
                         </select>
                     </div>

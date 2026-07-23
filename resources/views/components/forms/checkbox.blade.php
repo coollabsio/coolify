@@ -39,7 +39,8 @@
                     value={{ $domValue }} id="{{ $htmlId }}" @if ($checked) checked @endif />
             @else
                 <input type="checkbox" @disabled($disabled) {{ $attributes->class([$defaultClass, 'shrink-0']) }}
-                    wire:model={{ $value ?? $modelBinding }} id="{{ $htmlId }}" @if ($checked) checked @endif />
+                    @if ($live) wire:model.live={{ $value ?? $modelBinding }} @else wire:model={{ $value ?? $modelBinding }} @endif
+                    id="{{ $htmlId }}" @if ($checked) checked @endif />
             @endif
         @endif
     </label>

@@ -3,12 +3,14 @@
 use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Tests\TestCase;
 
-uses(TestCase::class);
+uses(TestCase::class, RefreshDatabase::class);
 
 class TestableRailpackDeploymentJob extends ApplicationDeploymentJob
 {
@@ -373,9 +375,9 @@ it('creates an empty build-time env file for railpack when there are no generate
     ]));
 
     foreach ([
-        'application_deployment_queue' => new class
+        'application_deployment_queue' => new class extends ApplicationDeploymentQueue
         {
-            public function addLogEntry(string $message, string $type = 'info', bool $hidden = false): void {}
+            public function addLogEntry(string $message, string $type = 'stdout', bool $hidden = false): void {}
         },
         'build_pack' => 'railpack',
         'pull_request_id' => 0,

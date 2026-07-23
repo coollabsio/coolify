@@ -2,19 +2,14 @@
     @php
         $databasePageItems = [
             ['label' => 'Configuration', 'route' => 'project.database.configuration', 'active' => request()->routeIs('project.database.configuration')],
-            ['label' => 'Logs', 'route' => 'project.database.logs', 'active' => request()->routeIs('project.database.logs')],
-            ['label' => 'Terminal', 'route' => 'project.database.command', 'active' => request()->routeIs('project.database.command'), 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
             [
                 'label' => 'Backups',
                 'route' => 'project.database.backup.index',
-                'active' => request()->routeIs('project.database.backup.index', 'project.database.backup.execution'),
-                'visible' => in_array($database->getMorphClass(), [
-                    'App\Models\StandalonePostgresql',
-                    'App\Models\StandaloneMongodb',
-                    'App\Models\StandaloneMysql',
-                    'App\Models\StandaloneMariadb',
-                ]),
+                'active' => request()->routeIs('project.database.backup.*'),
+                'visible' => $database->isBackupSolutionAvailable(),
             ],
+            ['label' => 'Logs', 'route' => 'project.database.logs', 'active' => request()->routeIs('project.database.logs')],
+            ['label' => 'Terminal', 'route' => 'project.database.command', 'active' => request()->routeIs('project.database.command'), 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
         ];
 
         $databaseConfigurationItems = [
@@ -190,6 +185,12 @@
                 Configuration
             </a>
 
+            @if ($database->isBackupSolutionAvailable())
+                <a class="shrink-0 {{ request()->routeIs('project.database.backup.*') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+                    href="{{ route('project.database.backup.index', $parameters) }}">
+                    Backups
+                </a>
+            @endif
             <a class="shrink-0 {{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.logs', $parameters) }}">
                 Logs
@@ -200,16 +201,7 @@
                     Terminal
                 </a>
             @endcan
-            @if (
-                $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-                <a class="shrink-0 {{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                    href="{{ route('project.database.backup.index', $parameters) }}">
-                    Backups
-                </a>
-            @endif
+
         </nav>
 
         @if ($database->destination->server->isFunctional())

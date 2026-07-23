@@ -717,20 +717,19 @@ class ByHetzner extends Component
                 $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
             }
 
-            if (! $ipAddress) {
-                throw new \Exception('No public IP address available. Enable at least one of IPv4 or IPv6.');
-            }
-
-            // Create server in Coolify database
+            // Create server in Coolify database immediately so the Hetzner
+            // server is always tracked, even when no IP is assigned yet —
+            // the server page polling backfills the placeholder IP later.
             $server = Server::create([
                 'name' => $this->server_name,
-                'ip' => $ipAddress,
+                'ip' => $ipAddress ?? Server::PLACEHOLDER_IP,
                 'user' => 'root',
                 'port' => 22,
                 'team_id' => currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
                 'cloud_provider_token_id' => $this->selected_token_id,
                 'hetzner_server_id' => $hetznerServer['id'],
+                'hetzner_server_status' => $hetznerServer['status'] ?? null,
             ]);
 
             $server->proxy->set('status', 'exited');

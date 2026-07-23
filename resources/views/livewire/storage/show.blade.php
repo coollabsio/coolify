@@ -20,7 +20,7 @@
                 submitAction="delete({{ $storage->id }})" :actions="array_filter([
                     'The selected storage location will be permanently deleted from Coolify.',
                     $backupCount > 0
-                        ? $backupCount . ' backup schedule(s) will be updated to no longer save to S3 and will only store backups locally on the server.'
+                        ? $backupCount . ' backup schedule(s) will stop saving to S3. Existing objects in this storage will not be deleted.'
                         : null,
                 ])" confirmationText="{{ $storage->name }}"
                 confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"

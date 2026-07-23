@@ -1,7 +1,7 @@
 <div wire:init='refreshBackupExecutions'>
     @isset($backup)
-        <div class="flex flex-col gap-3 py-4 sm:flex-row sm:flex-wrap sm:items-center">
-            <h3 class="py-0">Executions <span class="text-xs">({{ $executions_count }})</span></h3>
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <h2 class="py-0">Executions</h2>
             @if ($executions_count > 0)
                 <div class="flex items-center gap-2">
                     <x-forms.button disabled="{{ !$showPrev }}" wire:click="previousPage('{{ $defaultTake }}')">
@@ -36,7 +36,7 @@
             </div>
         </div>
         <div @if (!$skip) wire:poll.5000ms="refreshBackupExecutions" @endif
-            class="flex flex-col gap-4">
+            class="flex flex-col gap-4 pt-2">
             @forelse($executions as $execution)
                 <div wire:key="{{ data_get($execution, 'id') }}" @class([
                     'flex flex-col border-l-2 transition-colors p-4 bg-white dark:bg-coolgray-100 text-black dark:text-white',
