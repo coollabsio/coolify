@@ -3725,6 +3725,48 @@ function convertToKeyValueCollection($environment)
 
     return $convertedServiceVariables;
 }
+
+/**
+ * Remove the shared project-wide `.env` file from every Compose service's
+ * `env_file` directive.
+ *
+ * Coolify writes a single `.env` containing every environment variable of the
+ * whole Compose project. Attaching that file to each service leaks the secrets
+ * of one container to all the others (e.g. the Redis container could read the
+ * app's OPENAI_API_KEY). Each service already receives its own variables through
+ * its resolved `environment:` block (values are interpolated at deploy time via
+ * `docker compose --env-file .env`), so the shared file is unnecessary for a
+ * service to get its own values and only serves to expose unrelated secrets.
+ *
+ * Variables/files a service explicitly declares for itself are preserved.
+ *
+ * @see https://github.com/coollabsio/coolify/issues/7655
+ *
+ * @param  array<string, mixed>  $composeFile
+ * @return array<string, mixed>
+ */
+function stripSharedEnvFileFromComposeServices(array $composeFile): array
+{
+    $services = data_get($composeFile, 'services', []);
+    foreach ($services as $serviceName => $service) {
+        $existingEnvFiles = data_get($service, 'env_file');
+        $scopedEnvFiles = collect(is_null($existingEnvFiles) ? [] : (is_array($existingEnvFiles) ? $existingEnvFiles : [$existingEnvFiles]))
+            ->reject(fn ($envFile) => $envFile === '.env')
+            ->unique()
+            ->values();
+
+        if ($scopedEnvFiles->isEmpty()) {
+            unset($service['env_file']);
+        } else {
+            $service['env_file'] = $scopedEnvFiles->all();
+        }
+
+        $services[$serviceName] = $service;
+    }
+
+    return data_set($composeFile, 'services', $services);
+}
+
 function instanceSettings()
 {
     return InstanceSettings::get();

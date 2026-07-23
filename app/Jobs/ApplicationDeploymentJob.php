@@ -690,14 +690,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         } else {
             $composeFile = $this->application->parse(pull_request_id: $this->pull_request_id, preview_id: data_get($this->preview, 'id'), commit: $this->commit);
-            // Always add .env file to services
-            $services = collect(data_get($composeFile, 'services', []));
-            $services = $services->map(function ($service, $name) {
-                $service['env_file'] = ['.env'];
-
-                return $service;
-            });
-            $composeFile['services'] = $services->toArray();
+            // Scope environment variables per service: each container receives only the
+            // variables it declares in its own environment/env_file, never the shared
+            // project-wide .env, which would leak every service's secrets to every
+            // container. See https://github.com/coollabsio/coolify/issues/7655
+            $composeFile = stripSharedEnvFileFromComposeServices(is_array($composeFile) ? $composeFile : convertToArray($composeFile));
             if (empty($composeFile)) {
                 $this->application_deployment_queue->addLogEntry('Failed to parse docker-compose file.');
                 $this->fail('Failed to parse docker-compose file.');
