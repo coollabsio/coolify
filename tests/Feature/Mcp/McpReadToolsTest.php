@@ -9,6 +9,7 @@ use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\Tag;
@@ -16,6 +17,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -57,6 +59,25 @@ function mcpReadCall(string $name, array $arguments = [])
         'Content-Type' => 'application/json',
         'Accept' => 'application/json, text/event-stream',
         'Authorization' => 'Bearer '.mcpReadToken(),
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => $name,
+            'arguments' => (object) $arguments,
+        ],
+    ]);
+}
+
+function mcpSensitiveReadCall(string $name, array $arguments = [])
+{
+    $token = test()->user->createToken('mcp-sensitive-read', ['read', 'read:sensitive'])->plainTextToken;
+
+    return test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
     ])->postJson('/mcp', [
         'jsonrpc' => '2.0',
         'id' => 1,
@@ -400,7 +421,7 @@ test('get_logs rejects other team application uuid', function () {
         'destination_type' => $otherDest->getMorphClass(),
     ]);
 
-    $response = mcpReadCall('get_logs', [
+    $response = mcpSensitiveReadCall('get_logs', [
         'resource' => 'application',
         'uuid' => $otherApp->uuid,
     ]);
@@ -579,6 +600,33 @@ test('list_applications status and server_uuid filters work', function () {
     expect(mcpReadJson($missingServer)['data'])->toBe([]);
 });
 
+test('list_services filters by its computed status before pagination', function () {
+    Service::factory()->create([
+        'name' => 'Matching service',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    Service::factory()->create([
+        'name' => 'Another service',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $response = mcpReadCall('list_services', [
+        'status' => 'unknown',
+        'per_page' => 1,
+    ]);
+
+    $response->assertOk();
+    $body = mcpReadJson($response);
+
+    expect($body['_pagination']['total'])->toBe(2)
+        ->and($body['data'])->toHaveCount(1)
+        ->and($body['data'][0]['status'])->toContain('unknown');
+});
+
 test('MCP lists prompts for troubleshooting workflows', function () {
     $token = mcpReadToken();
     $response = test()->withHeaders([
@@ -597,10 +645,34 @@ test('MCP lists prompts for troubleshooting workflows', function () {
     expect($names)->toContain('troubleshoot_application', 'explain_failed_deploy');
 });
 
+test('get_logs requires sensitive read ability', function () {
+    $this->application->update(['status' => 'running:healthy']);
+
+    $response = mcpReadCall('get_logs', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+    ]);
+
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeTrue()
+        ->and($response->json('result.content.0.text'))->toContain('read:sensitive');
+});
+
+test('team members cannot retrieve logs with sensitive read ability', function () {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+
+    $response = mcpSensitiveReadCall('get_logs', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+    ]);
+
+    expect($response->status())->toBeIn([403]);
+});
+
 test('get_logs returns structured next_tools when application is not running', function () {
     $this->application->update(['status' => 'exited:unhealthy']);
 
-    $response = mcpReadCall('get_logs', [
+    $response = mcpSensitiveReadCall('get_logs', [
         'resource' => 'application',
         'uuid' => $this->application->uuid,
     ]);
@@ -825,6 +897,46 @@ test('cancel_deployment cancels team deployment and rejects other team', functio
     ]);
     expect($denied->json('result.isError'))->toBeTrue();
     expect($otherDep->fresh()->status)->toBe('in_progress');
+});
+
+test('cancel_deployment updates only a still cancellable deployment', function () {
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-atomic-cancel-'.fake()->uuid(),
+        'status' => 'in_progress',
+        'server_id' => $this->server->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+    ]);
+
+    $updates = [];
+    DB::listen(function ($query) use (&$updates) {
+        if (str_starts_with(strtolower(ltrim($query->sql)), 'update')) {
+            $updates[] = strtolower($query->sql);
+        }
+    });
+
+    $token = $this->user->createToken('mcp-atomic-cancel', ['read', 'deploy'])->plainTextToken;
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'cancel_deployment',
+            'arguments' => (object) ['uuid' => $deployment->deployment_uuid],
+        ],
+    ]);
+
+    $response->assertOk();
+    expect(collect($updates)->contains(
+        fn (string $sql) => str_contains($sql, 'application_deployment_queues')
+            && str_contains($sql, 'status')
+            && str_contains($sql, ' in '),
+    ))->toBeTrue();
 });
 
 test('MCP resources list includes overview and application template', function () {

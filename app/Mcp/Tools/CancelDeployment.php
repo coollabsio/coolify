@@ -51,15 +51,19 @@ class CancelDeployment extends Tool
             ApplicationDeploymentStatus::QUEUED->value,
             ApplicationDeploymentStatus::IN_PROGRESS->value,
         ];
-        if (! in_array($deployment->status, $cancellable, true)) {
+        $deploymentUuid = $deployment->deployment_uuid;
+
+        $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
+            ->whereIn('status', $cancellable)
+            ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
+
+        if ($updated !== 1) {
+            $deployment->refresh();
+
             return $this->mcpError($request, "Deployment cannot be cancelled. Current status: {$deployment->status}", ['resource_uuid' => $uuid]);
         }
 
-        $deploymentUuid = $deployment->deployment_uuid;
-
-        $deployment->update([
-            'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
-        ]);
+        $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
 
         try {
             $buildServerId = $deployment->build_server_id ?? $deployment->server_id;

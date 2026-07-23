@@ -70,7 +70,7 @@ test('get_logs returns structured next_tools when not running', function () {
     $response = mcpImproveCall('get_logs', [
         'resource' => 'application',
         'uuid' => $this->application->uuid,
-    ]);
+    ], mcpImproveToken(['read', 'read:sensitive']));
     $response->assertOk();
     $body = mcpImproveJson($response);
     expect($body['data']['ok'])->toBeFalse()

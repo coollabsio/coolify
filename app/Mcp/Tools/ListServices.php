@@ -93,19 +93,27 @@ class ListServices extends Tool
                             ->merge($server->swarmDockers()->pluck('id')));
                 });
             })
-            ->when(is_string($status), fn ($query) => $query->whereRaw('LOWER(COALESCE(status, \'\')) LIKE ?', ['%'.strtolower($status).'%']))
             ->when(is_string($name), fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
 
-        // Service status is often an accessor — filter in PHP when column filter is unreliable.
-        // Prefer DB filter first for pagination accuracy when status column exists.
+        if (is_string($status)) {
+            $services = $query
+                ->with(['applications', 'databases'])
+                ->orderBy('name')
+                ->get()
+                ->filter(fn (Service $service) => str_contains(strtolower((string) $service->status), strtolower(trim($status))))
+                ->values();
+            $total = $services->count();
+            $services = $services->slice($args['offset'], $args['per_page']);
+        } else {
+            $total = (clone $query)->count();
+            $services = $query
+                ->orderBy('name')
+                ->skip($args['offset'])
+                ->take($args['per_page'])
+                ->get();
+        }
 
-        $total = (clone $query)->count();
-
-        $summaries = $query
-            ->orderBy('name')
-            ->skip($args['offset'])
-            ->take($args['per_page'])
-            ->get()
+        $summaries = $services
             ->map(fn ($svc) => [
                 'uuid' => $svc->uuid,
                 'name' => $svc->name,

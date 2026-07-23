@@ -18,7 +18,7 @@ class GetLogs extends Tool
 {
     protected string $name = 'get_logs';
 
-    protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Multi-container services require resource=service_application|service_database. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
+    protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Requires read:sensitive ability. Multi-container services require resource=service_application|service_database. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
 
     use BuildsResponse;
     use ResolvesResource;
@@ -26,7 +26,7 @@ class GetLogs extends Tool
 
     public function handle(Request $request): Response
     {
-        if ($error = $this->ensureAbility($request, 'read', $this->name)) {
+        if ($error = $this->ensureAbility($request, 'read:sensitive', $this->name)) {
             return $error;
         }
 
