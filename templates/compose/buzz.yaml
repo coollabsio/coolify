@@ -44,6 +44,8 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      permissions:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD-SHELL
@@ -122,5 +124,14 @@ services:
         mc alias set local http://minio:9000 "$${BUZZ_S3_ACCESS_KEY}" "$${BUZZ_S3_SECRET_KEY}"
         mc mb --ignore-existing "local/$${BUZZ_S3_BUCKET}"
         mc anonymous set none "local/$${BUZZ_S3_BUCKET}"
+    restart: 'no'
+    exclude_from_hc: true
+    
+  permissions:
+    image: 'alpine:3.22'
+    user: '0:0'
+    command: "sh -c \"mkdir -p /data && chown -R 1000:1000 /data\"\n"
+    volumes:
+      - 'buzz-git-data:/data'
     restart: 'no'
     exclude_from_hc: true
