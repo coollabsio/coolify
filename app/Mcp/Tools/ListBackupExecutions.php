@@ -48,6 +48,7 @@ class ListBackupExecutions extends Tool
         $backup = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)
             ->where('uuid', $backupUuid)
             ->where('database_id', $database->id)
+            ->where('database_type', $database->getMorphClass())
             ->first();
 
         if (! $backup) {

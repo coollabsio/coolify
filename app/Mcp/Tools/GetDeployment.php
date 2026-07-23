@@ -14,7 +14,7 @@ class GetDeployment extends Tool
 {
     protected string $name = 'get_deployment';
 
-    protected string $description = 'Get deployment details by deployment UUID for the authenticated team. Optional include_log_summary returns a capped, best-effort-redacted tail of build output (default off). Full logs and configuration snapshots are never returned; residual secrets in free-form log text may remain.';
+    protected string $description = 'Get deployment details by deployment UUID for the authenticated team. Optional include_log_summary requires read:sensitive and returns a capped, best-effort-redacted tail of build output (default off). Full logs and configuration snapshots are never returned; residual secrets in free-form log text may remain.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -28,6 +28,11 @@ class GetDeployment extends Tool
     public function handle(Request $request): Response
     {
         if ($error = $this->ensureAbility($request, 'read', $this->name)) {
+            return $error;
+        }
+
+        $includeSummary = filter_var($request->get('include_log_summary'), FILTER_VALIDATE_BOOLEAN);
+        if ($includeSummary && $error = $this->ensureAbility($request, 'read:sensitive', $this->name)) {
             return $error;
         }
 
@@ -74,7 +79,6 @@ class GetDeployment extends Tool
             'finished_at' => $deployment->finished_at,
         ]);
 
-        $includeSummary = filter_var($request->get('include_log_summary'), FILTER_VALIDATE_BOOLEAN);
         if ($includeSummary) {
             $lines = max(1, min(self::MAX_LOG_LINES, (int) ($request->get('log_lines') ?? self::DEFAULT_LOG_LINES)));
             $data['log_summary'] = $this->buildLogSummary($deployment, $lines);
@@ -110,12 +114,16 @@ class GetDeployment extends Tool
             $entries = json_decode($raw, true, flags: JSON_THROW_ON_ERROR);
         } catch (\Throwable) {
             $text = $this->redactLogText((string) $raw);
+            $allLines = preg_split('/\r\n|\r|\n/', $text) ?: [$text];
+            $tail = array_slice($allLines, -$lines);
+            $text = implode("\n", $tail);
+            $truncated = count($allLines) > $lines || strlen($text) > self::MAX_LOG_CHARS;
             $text = $this->truncateText($text, self::MAX_LOG_CHARS);
 
             return [
                 'available' => true,
                 'lines' => substr_count($text, "\n") + 1,
-                'truncated' => strlen((string) $raw) > self::MAX_LOG_CHARS,
+                'truncated' => $truncated,
                 'text' => $text,
             ];
         }
@@ -192,7 +200,7 @@ class GetDeployment extends Tool
     {
         return [
             'uuid' => $schema->string()->description('Deployment UUID.')->required(),
-            'include_log_summary' => $schema->boolean()->description('If true, include a capped redacted tail of deploy output (default false).'),
+            'include_log_summary' => $schema->boolean()->description('If true, include a capped redacted tail of deploy output; requires read:sensitive (default false).'),
             'log_lines' => $schema->integer()->description('Log summary lines when include_log_summary is true (default 40, max 100).'),
         ];
     }

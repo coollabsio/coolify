@@ -42,6 +42,7 @@ class ListDatabaseBackups extends Tool
 
         $backups = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)
             ->where('database_id', $database->id)
+            ->where('database_type', $database->getMorphClass())
             ->get()
             ->map(fn ($backup) => $this->scrubSensitive([
                 'uuid' => $backup->uuid,

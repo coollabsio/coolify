@@ -8,10 +8,13 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Models\User;
@@ -139,6 +142,54 @@ test('tools/list includes new read tools and lifecycle tools', function () {
         'deploy',
         'cancel_deployment',
     );
+});
+
+test('database backup tools scope schedules by database type and id', function () {
+    $postgres = StandalonePostgresql::create([
+        'name' => 'postgres',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $mysql = StandaloneMysql::create([
+        'name' => 'mysql',
+        'mysql_root_password' => 'password',
+        'mysql_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    expect($mysql->id)->toBe($postgres->id);
+
+    $postgresBackup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->team->id,
+        'frequency' => '0 0 * * *',
+        'database_id' => $postgres->id,
+        'database_type' => $postgres->getMorphClass(),
+    ]);
+    $mysqlBackup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->team->id,
+        'frequency' => '0 0 * * *',
+        'database_id' => $mysql->id,
+        'database_type' => $mysql->getMorphClass(),
+    ]);
+
+    $response = mcpReadCall('list_database_backups', ['uuid' => $postgres->uuid]);
+    $response->assertOk();
+
+    $backupUuids = collect(mcpReadJson($response)['data']['backups'])->pluck('uuid');
+    expect($backupUuids)
+        ->toContain($postgresBackup->uuid)
+        ->not->toContain($mysqlBackup->uuid);
+
+    $response = mcpReadCall('list_backup_executions', [
+        'database_uuid' => $postgres->uuid,
+        'scheduled_backup_uuid' => $mysqlBackup->uuid,
+    ]);
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeTrue();
 });
 
 test('get_project returns environments and counts for team project only', function () {
@@ -537,7 +588,32 @@ test('list_shared_env_keys returns names without values and is team scoped', fun
     ])->json('result.isError'))->toBeTrue();
 });
 
-test('get_deployment include_log_summary returns capped redacted text', function () {
+test('get_deployment include_log_summary requires sensitive read ability', function () {
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-log-'.fake()->uuid(),
+        'status' => 'failed',
+        'server_id' => $this->server->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+        'commit' => 'deadbeef',
+        'logs' => json_encode([
+            ['output' => 'unstructured-sensitive-build-output', 'type' => 'stdout', 'hidden' => false],
+        ]),
+    ]);
+
+    $response = mcpReadCall('get_deployment', [
+        'uuid' => $deployment->deployment_uuid,
+        'include_log_summary' => true,
+    ]);
+
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeTrue()
+        ->and($response->json('result.content.0.text'))->toContain('read:sensitive')
+        ->and($response->json('result.content.0.text'))->not->toContain('unstructured-sensitive-build-output');
+});
+
+test('get_deployment include_log_summary returns capped redacted text with sensitive read ability', function () {
     $logs = json_encode([
         ['output' => 'step 1 ok', 'type' => 'stdout', 'hidden' => false],
         ['output' => 'password=supersecretvalue', 'type' => 'stderr', 'hidden' => false],
@@ -555,7 +631,7 @@ test('get_deployment include_log_summary returns capped redacted text', function
         'logs' => $logs,
     ]);
 
-    $response = mcpReadCall('get_deployment', [
+    $response = mcpSensitiveReadCall('get_deployment', [
         'uuid' => $deployment->deployment_uuid,
         'include_log_summary' => true,
         'log_lines' => 10,
@@ -569,6 +645,32 @@ test('get_deployment include_log_summary returns capped redacted text', function
     expect($body['data']['log_summary']['text'])->toContain('password=');
     // Full logs field still scrubbed from root payload
     expect(json_encode($body))->not->toContain('"logs":');
+});
+
+test('get_deployment plain-text log summary respects the requested line limit', function () {
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-log-'.fake()->uuid(),
+        'status' => 'failed',
+        'server_id' => $this->server->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+        'commit' => 'deadbeef',
+        'logs' => "first line\nsecond line token=supersecretvalue\nlast line",
+    ]);
+
+    $response = mcpSensitiveReadCall('get_deployment', [
+        'uuid' => $deployment->deployment_uuid,
+        'include_log_summary' => true,
+        'log_lines' => 1,
+    ]);
+    $response->assertOk();
+    $summary = mcpReadJson($response)['data']['log_summary'];
+
+    expect($summary['lines'])->toBe(1)
+        ->and($summary['truncated'])->toBeTrue()
+        ->and($summary['text'])->toBe('last line')
+        ->and($summary['text'])->not->toContain('supersecretvalue');
 });
 
 test('list_servers reachable filter works', function () {
