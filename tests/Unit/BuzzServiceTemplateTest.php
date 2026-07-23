@@ -10,6 +10,8 @@ it('includes a production-ready Buzz one-click service template', function () {
         ->toContain('BUZZ_RELAY_PRIVATE_KEY=${SERVICE_HEX_64_RELAYKEY}')
         ->toContain('BUZZ_AUTO_MIGRATE=${BUZZ_AUTO_MIGRATE:-true}')
         ->toContain('minio-init')
+        ->toContain('buzz-git-init')
+        ->toContain('chown -R 1000:1000 /data/git')
         ->toContain('exclude_from_hc: true')
         ->toContain('postgres:17-alpine')
         ->toContain('redis:7-alpine');

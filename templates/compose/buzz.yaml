@@ -6,6 +6,18 @@
 # port: 3000
 
 services:
+  # Named volumes are root-owned on first create; buzz runs as UID 1000 and needs write access.
+  buzz-git-init:
+    image: 'alpine:3.21'
+    volumes:
+      - buzz-git-data:/data/git
+    command:
+      - /bin/sh
+      - '-ec'
+      - 'chown -R 1000:1000 /data/git'
+    restart: 'no'
+    exclude_from_hc: true
+
   buzz:
     image: 'ghcr.io/block/buzz:${BUZZ_TAG:-main}'
     environment:
@@ -43,6 +55,8 @@ services:
       minio:
         condition: service_healthy
       minio-init:
+        condition: service_completed_successfully
+      buzz-git-init:
         condition: service_completed_successfully
     healthcheck:
       test:
