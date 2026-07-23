@@ -435,7 +435,7 @@
         "category": "messaging",
         "logo": "svgs/buzz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-07-23T17:25:53+02:00",
+        "template_last_updated_at": "2026-07-23T18:52:29+02:00",
         "port": "3000"
     },
     "calibre-web-automated-book-downloader": {
