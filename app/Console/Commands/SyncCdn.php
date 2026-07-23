@@ -12,21 +12,21 @@ use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
 
-class SyncBunny extends Command
+class SyncCdn extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'sync:bunny {--bunny}';
+    protected $signature = 'sync:cdn {--bunny} {--templates}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sync files to BunnyCDN';
+    protected $description = 'Sync files to BunnyCDN or the coollabs-cdn GitHub repository';
 
     protected function removeTemporaryDirectory(string $tmpDir): void
     {
@@ -188,7 +188,8 @@ class SyncBunny extends Command
             }
 
             // Commit changes
-            $commitMessage = "Update $envLabel files (install.sh, docker-compose, env) - ".date('Y-m-d H:i:s');
+            $changedFileList = implode(', ', array_map('basename', $changedFiles));
+            $commitMessage = "Update $envLabel files ($changedFileList) - ".date('Y-m-d H:i:s');
             $output = [];
             exec('cd '.escapeshellarg($tmpDir).' && git commit -m '.escapeshellarg($commitMessage).' 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
@@ -248,6 +249,14 @@ class SyncBunny extends Command
     {
         $that = $this;
         $only_bunny = $this->option('bunny');
+        $only_templates = $this->option('templates');
+
+        if ($only_bunny && $only_templates) {
+            $this->error('The --bunny and --templates options cannot be used together.');
+
+            return self::FAILURE;
+        }
+
         $nightly = select(
             label: 'Which environment would you like to sync?',
             options: [
@@ -392,6 +401,19 @@ class SyncBunny extends Command
             }
             if (! $only_bunny) {
                 $envLabel = $nightly ? 'NIGHTLY' : 'PRODUCTION';
+                $templatesTarget = $nightly
+                    ? 'json/coolify/nightly/service-templates-latest.json'
+                    : 'json/coolify/service-templates-latest.json';
+
+                if ($only_templates) {
+                    $this->info("About to sync $envLabel service templates to GitHub repository.");
+                    $this->syncFilesToGitHubRepo([
+                        $service_template_location => $templatesTarget,
+                    ], $nightly);
+
+                    return;
+                }
+
                 $this->info("About to sync $envLabel releases, versions, compose, and environment files to GitHub repository.");
 
                 if ($nightly) {
@@ -403,7 +425,7 @@ class SyncBunny extends Command
                         $install_script_location => 'json/coolify/nightly/install.sh',
                         $upgrade_script_location => 'json/coolify/nightly/upgrade.sh',
                         $upgrade_postgres_script_location => 'json/coolify/nightly/upgrade-postgres.sh',
-                        $service_template_location => 'json/coolify/nightly/service-templates-latest.json',
+                        $service_template_location => $templatesTarget,
                     ];
                 } else {
                     $files = [
@@ -414,7 +436,7 @@ class SyncBunny extends Command
                         $install_script_location => 'json/coolify/install.sh',
                         $upgrade_script_location => 'json/coolify/upgrade.sh',
                         $upgrade_postgres_script_location => 'json/coolify/upgrade-postgres.sh',
-                        $service_template_location => 'json/coolify/service-templates-latest.json',
+                        $service_template_location => $templatesTarget,
                     ];
                 }
 
