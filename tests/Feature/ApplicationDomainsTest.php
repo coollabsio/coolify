@@ -541,6 +541,115 @@ it('adds a suggested domain to the application', function () {
         ->toContain('https://www.example.com');
 });
 
+it('saves after confirming a domain conflict on add', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Conflicting App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://shared.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://shared.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('pendingAction', 'add')
+        ->assertSet('forceSaveDomains', false)
+        ->call('confirmDomainUsage')
+        ->assertSet('showDomainConflictModal', false)
+        ->assertSet('forceSaveDomains', false)
+        ->assertSet('pendingAction', null)
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)->toBe('https://shared.example.com');
+});
+
+it('saves a suggested domain after confirming a domain conflict', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'WWW Conflicting App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://www.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $this->application->update([
+        'fqdn' => 'https://example.com',
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('addSuggestedDomain', 1)
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('pendingAction', 'suggested')
+        ->assertSet('forceSaveDomains', false)
+        ->call('confirmDomainUsage')
+        ->assertSet('showDomainConflictModal', false)
+        ->assertSet('pendingAction', null)
+        ->assertSet('forceSaveDomains', false)
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    expect(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://example.com')
+        ->toContain('https://www.example.com');
+});
+
+it('saves after confirming a domain conflict on edit', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Edit Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://taken.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $this->application->update(['fqdn' => 'https://original.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingDomain', 'https://taken.example.com')
+        ->call('updateDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('pendingAction', 'update')
+        ->call('confirmDomainUsage')
+        ->assertSet('showDomainConflictModal', false)
+        ->assertSet('pendingAction', null)
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)->toBe('https://taken.example.com');
+});
+
+it('clears pending conflict action when the conflict modal is dismissed', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Dismiss Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://dismiss.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://dismiss.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('pendingAction', 'add')
+        ->set('showDomainConflictModal', false)
+        ->assertSet('pendingAction', null)
+        ->assertSet('forceSaveDomains', false);
+
+    expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
 it('does not show a suggested row when both www variants are configured', function () {
     $this->application->update([
         'fqdn' => 'https://example.com,https://www.example.com',

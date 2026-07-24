@@ -55,6 +55,9 @@ class Domains extends Component
 
     public string $editDomainDnsMessage = '';
 
+    /** Pending save path after conflict confirmation: add | update | suggested */
+    public ?string $pendingAction = null;
+
     public bool $isCompose = false;
 
     public bool $isReadonlyLabels = false;
@@ -604,6 +607,39 @@ class Domains extends Component
         $this->addDomain();
     }
 
+    public function confirmDomainUsage(): void
+    {
+        $this->forceSaveDomains = true;
+        $this->showDomainConflictModal = false;
+
+        if ($this->pendingAction === 'update') {
+            $this->updateDomain();
+
+            return;
+        }
+
+        if ($this->pendingAction === 'suggested') {
+            $this->addSuggestedDomain((int) ($this->editingIndex ?? -1));
+
+            return;
+        }
+
+        $this->addDomain();
+    }
+
+    /**
+     * Clear pending conflict state when the modal is dismissed without confirmation.
+     * confirmDomainUsage sets forceSaveDomains before closing the modal.
+     */
+    public function updatedShowDomainConflictModal(bool $value): void
+    {
+        if ($value || $this->forceSaveDomains) {
+            return;
+        }
+
+        $this->pendingAction = null;
+    }
+
     public function addDomain(): void
     {
         try {
@@ -646,6 +682,7 @@ class Domains extends Component
             }
 
             $merged = $current->merge($newUrls)->unique()->values();
+            $this->pendingAction = 'add';
             // DNS was already validated (or overridden) in the modal; skip save-time toast noise.
             if (! $this->saveDomainList($merged, $this->newDomainService, checkDns: false)) {
                 return;
@@ -658,6 +695,8 @@ class Domains extends Component
                 failureMessage: $this->addDomainDnsMessage,
             );
 
+            $this->forceSaveDomains = false;
+            $this->pendingAction = null;
             $this->resetAddDomainForm();
             $this->dispatch('close-modal');
             $this->dispatch('success', 'Domain added.');
@@ -820,6 +859,7 @@ class Domains extends Component
                     $this->domainRows[$index]['checked_at'] = now()->toIso8601String();
                     $this->domainRows[$index]['needs_force_add'] = true;
                     $this->forceAddSuggestedIndex = $index;
+                    $this->editingIndex = $index;
                     $this->persistDomainDnsStatuses();
                     $this->dispatch('error', 'DNS validation failed.', $dnsFailure);
 
@@ -828,6 +868,8 @@ class Domains extends Component
             }
 
             $merged = $current->merge($newUrls)->unique()->values();
+            $this->pendingAction = 'suggested';
+            $this->editingIndex = $index;
             if (! $this->saveDomainList($merged, $serviceName, checkDns: false)) {
                 return;
             }
@@ -840,6 +882,9 @@ class Domains extends Component
             );
 
             $this->forceAddSuggestedIndex = null;
+            $this->editingIndex = null;
+            $this->pendingAction = null;
+            $this->forceSaveDomains = false;
             $this->dispatch('success', 'Domain added.');
             $this->refreshDomains();
             $this->pruneDomainDnsStatusesToCurrentDomains();
@@ -856,6 +901,11 @@ class Domains extends Component
         $this->editingService = null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
+        if ($this->pendingAction === 'update') {
+            $this->pendingAction = null;
+            $this->forceSaveDomains = false;
+            $this->showDomainConflictModal = false;
+        }
     }
 
     public function confirmUpdateDomainDespiteDns(): void
@@ -910,6 +960,7 @@ class Domains extends Component
             }
 
             $updated = $current->map(fn (string $url) => $url === $oldUrl ? $newUrl : $url)->unique()->values();
+            $this->pendingAction = 'update';
             if (! $this->saveDomainList($updated, $service, checkDns: false)) {
                 return;
             }
@@ -921,6 +972,8 @@ class Domains extends Component
                 failureMessage: $this->editDomainDnsMessage,
             );
 
+            $this->forceSaveDomains = false;
+            $this->pendingAction = null;
             $this->cancelEdit();
             $this->dispatch('success', 'Domain updated.');
             $this->refreshDomains();
@@ -1106,20 +1159,6 @@ class Domains extends Component
         $fragment = isset($parts['fragment']) ? '#'.$parts['fragment'] : '';
 
         return "{$scheme}://{$counterpartHost}{$port}{$path}{$query}{$fragment}";
-    }
-
-    public function confirmDomainUsage(): void
-    {
-        $this->forceSaveDomains = true;
-        $this->showDomainConflictModal = false;
-
-        if ($this->editingIndex !== null) {
-            $this->updateDomain();
-
-            return;
-        }
-
-        $this->addDomain();
     }
 
     /**

@@ -32,6 +32,15 @@ class ServiceApplication extends BaseModel
         'is_migrated',
     ];
 
+    /**
+     * Internal DNS check cache — not part of the public API surface.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'domain_dns_statuses',
+    ];
+
     protected function casts(): array
     {
         return [

@@ -234,6 +234,7 @@ class Application extends BaseModel
         'docker_compose',
         'docker_compose_raw',
         'custom_labels',
+        'domain_dns_statuses',
     ];
 
     protected function casts(): array
