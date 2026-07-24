@@ -144,6 +144,7 @@ it('restores from the source prefix, reconciles credentials, promotes, and disab
     Process::assertRan(fn ($process) => str_contains($process->command, 'backup-list --json --detail')
         && str_contains($process->command, '. /etc/wal-g/env'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'backup-fetch')
+        && str_contains($process->command, '--network '.escapeshellarg($this->destination->network))
         && str_contains($process->command, '--user 999:999')
         && str_contains($process->command, 'base_restore_candidate'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'recovery.signal'));

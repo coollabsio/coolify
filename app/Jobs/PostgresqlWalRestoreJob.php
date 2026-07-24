@@ -359,6 +359,7 @@ class PostgresqlWalRestoreJob implements ShouldBeEncrypted, ShouldQueue
 
         $dataDirectory = ResolvePostgresqlDataDirectory::run($targetDatabase, populated: false);
         $volumeMount = $storage->name.':'.$storage->mount_path;
+        $network = escapeshellarg($targetDatabase->destination->network);
         $prepareScript = 'set -eu; mkdir -p "$1"; find "$1" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +; chown 999:999 "$1"; chmod 0700 "$1"';
         $prepareCommand = 'docker run --rm --name '.escapeshellarg('coolify-walg-restore-prepare-'.$this->executionUuid)
             .' --entrypoint sh -v '.escapeshellarg($volumeMount)
@@ -366,7 +367,7 @@ class PostgresqlWalRestoreJob implements ShouldBeEncrypted, ShouldQueue
             .' -c '.escapeshellarg($prepareScript)
             .' sh '.escapeshellarg($dataDirectory);
         $fetchCommand = 'docker run --rm --name '.escapeshellarg('coolify-walg-restore-fetch-'.$this->executionUuid)
-            .' --user 999:999 --entrypoint sh'
+            .' --network '.$network.' --user 999:999 --entrypoint sh'
             .' -v '.escapeshellarg($volumeMount)
             .' -v '.escapeshellarg($this->configurationDirectory.'/wal-g/env:/etc/wal-g/env:ro')
             .' '.escapeshellarg($targetDatabase->image)
