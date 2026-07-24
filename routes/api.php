@@ -195,6 +195,11 @@ Route::group([
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/databases/{uuid}/backups', [DatabasesController::class, 'database_backup_details_uuid'])->middleware(['api.ability:read']);
+    Route::get('/databases/{uuid}/point-in-time-recovery', [DatabasesController::class, 'postgresql_point_in_time_recovery'])->middleware(['api.ability:read']);
+    Route::put('/databases/{uuid}/point-in-time-recovery', [DatabasesController::class, 'update_postgresql_point_in_time_recovery'])->middleware(['api.ability:write']);
+    Route::post('/databases/{uuid}/point-in-time-recovery/base-backup', [DatabasesController::class, 'run_postgresql_point_in_time_recovery_base_backup'])->middleware(['api.ability:deploy']);
+    Route::post('/databases/{uuid}/point-in-time-recovery/health-check', [DatabasesController::class, 'run_postgresql_point_in_time_recovery_health_check'])->middleware(['api.ability:write']);
+    Route::post('/databases/{uuid}/point-in-time-recovery/restore', [DatabasesController::class, 'restore_postgresql_point_in_time_recovery'])->middleware(['api.ability:deploy']);
     Route::get('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions', [DatabasesController::class, 'list_backup_executions'])->middleware(['api.ability:read']);
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/databases/{uuid}/backups', [DatabasesController::class, 'create_backup'])->middleware(['api.ability:write']);

@@ -8,6 +8,7 @@ use App\Livewire\Project\Database\PointInTimeRecovery;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PostgresqlWalBackupConfiguration;
+use App\Models\PostgresqlWalBackupExecution;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\Server;
@@ -47,6 +48,13 @@ beforeEach(function () {
         'enabled' => true,
         'postgres_major_version' => 16,
         'status' => 'warning',
+    ]);
+    PostgresqlWalBackupExecution::create([
+        'postgresql_wal_backup_configuration_id' => $this->configuration->id,
+        'operation' => 'health_check',
+        'status' => 'success',
+        'message' => 'WAL archiving is healthy.',
+        'finished_at' => now(),
     ]);
 
     $this->actingAs($this->admin);
@@ -127,6 +135,8 @@ it('allows detached storage reattachment but rejects active storage swaps', func
         's3_storage_id' => null,
         'enabled' => false,
         'status' => 'failed',
+        'last_base_backup_at' => now()->subHours(2),
+        'last_successful_base_backup_at' => now()->subHour(),
     ]);
     $foreignTeam = Team::factory()->create();
     $foreignStorage = createPostgresqlPitrPageStorage($foreignTeam, 'foreign');
@@ -144,7 +154,9 @@ it('allows detached storage reattachment but rejects active storage swaps', func
     $configuration = $this->configuration->fresh();
     expect($configuration->s3_storage_id)->toBe($replacement->id)
         ->and($configuration->enabled)->toBeTrue()
-        ->and($configuration->status)->toBe('pending_restart');
+        ->and($configuration->status)->toBe('pending_restart')
+        ->and($configuration->last_base_backup_at)->toBeNull()
+        ->and($configuration->last_successful_base_backup_at)->toBeNull();
 });
 
 it('queues manual base backups, health checks, and UTC restores', function () {

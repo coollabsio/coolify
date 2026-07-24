@@ -12,6 +12,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -69,7 +70,11 @@ class PostgresqlWalBaseBackupJob implements ShouldBeEncrypted, ShouldBeUnique, S
     {
         $this->configuration->refresh()->loadMissing(['database.destination.server', 's3']);
 
-        if (! $this->configuration->enabled || ! in_array($this->configuration->status, ['healthy', 'warning'], true)) {
+        if (
+            ! $this->configuration->enabled
+            || ! in_array($this->configuration->status, ['healthy', 'warning'], true)
+            || ! $this->configuration->hasVerifiedArchivingHealth()
+        ) {
             return;
         }
 
@@ -133,6 +138,17 @@ class PostgresqlWalBaseBackupJob implements ShouldBeEncrypted, ShouldBeUnique, S
 
     public function failed(?Throwable $exception): void
     {
+        if ($this->retryWhenBusy && $exception instanceof MaxAttemptsExceededException) {
+            $this->configuration->executions()->create([
+                'operation' => 'base_backup',
+                'status' => 'failed',
+                'message' => 'The WAL-G repository is busy with another backup, retention, or restore operation. Retry the base backup later.',
+                'finished_at' => now(),
+            ]);
+
+            return;
+        }
+
         $this->markFailed($exception ?? new RuntimeException('The WAL-G base backup job failed.'));
     }
 

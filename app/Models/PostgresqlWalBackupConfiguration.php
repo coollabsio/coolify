@@ -76,4 +76,18 @@ class PostgresqlWalBackupConfiguration extends BaseModel
     {
         return $this->hasMany(PostgresqlWalBackupExecution::class)->latest();
     }
+
+    public function hasVerifiedArchivingHealth(): bool
+    {
+        if ($this->last_successful_base_backup_at) {
+            return true;
+        }
+
+        return $this->executions()
+            ->where('operation', 'health_check')
+            ->where('status', 'success')
+            ->whereNotNull('finished_at')
+            ->where('finished_at', '>=', $this->updated_at)
+            ->exists();
+    }
 }

@@ -124,14 +124,18 @@ class PointInTimeRecovery extends Component
         $this->authorize('manageBackups', $this->database);
         $this->configuration->refresh();
 
-        if (! $this->configuration->enabled || ! in_array($this->configuration->status, ['healthy', 'warning'], true)) {
+        if (
+            ! $this->configuration->enabled
+            || ! in_array($this->configuration->status, ['healthy', 'warning'], true)
+            || ! $this->configuration->hasVerifiedArchivingHealth()
+        ) {
             throw ValidationException::withMessages([
                 'baseBackup' => 'Apply the configuration and wait for a healthy archive check before starting a base backup.',
             ]);
         }
 
         PostgresqlWalBaseBackupJob::dispatch($this->configuration, retryWhenBusy: true);
-        $this->dispatch('success', 'WAL-G base backup queued.');
+        $this->dispatch('success', 'WAL-G base backup queued and will retry if the repository is busy.');
     }
 
     public function runHealthCheck(): void
@@ -216,6 +220,8 @@ class PointInTimeRecovery extends Component
 
         if ($wasDetached) {
             $this->configuration->enabled = true;
+            $this->configuration->last_base_backup_at = null;
+            $this->configuration->last_successful_base_backup_at = null;
         }
         if ($this->configuration->isDirty()) {
             $this->configuration->status = 'pending_restart';

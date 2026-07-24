@@ -83,6 +83,8 @@ class S3Storage extends BaseModel
                 'enabled' => false,
                 'status' => 'failed',
                 's3_storage_id' => null,
+                'last_base_backup_at' => null,
+                'last_successful_base_backup_at' => null,
             ]);
         });
     }

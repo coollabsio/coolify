@@ -11,15 +11,20 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\PostgresqlWalBaseBackupJob;
+use App\Jobs\PostgresqlWalHealthCheckJob;
+use App\Jobs\PostgresqlWalRestoreJob;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\PostgresqlWalBackupConfiguration;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Support\ValidationPatterns;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -267,6 +272,356 @@ class DatabasesController extends Controller
         $backupConfig = ScheduledDatabaseBackup::ownedByCurrentTeamAPI($teamId)->with('executions')->where('database_id', $database->id)->get();
 
         return response()->json($backupConfig);
+    }
+
+    #[OA\Get(
+        summary: 'Get PostgreSQL point-in-time recovery',
+        description: 'Get WAL-G point-in-time recovery configuration and recent operations.',
+        path: '/databases/{uuid}/point-in-time-recovery',
+        operationId: 'get-postgresql-point-in-time-recovery',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Point-in-time recovery configuration.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
+    public function postgresql_point_in_time_recovery(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = $this->findPitrDatabase($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'PostgreSQL point-in-time recovery configuration not found.'], 404);
+        }
+
+        $this->authorize('view', $database);
+
+        return response()->json($this->postgresqlPitrPayload(
+            $database,
+            $database->walBackupConfiguration()->firstOrFail(),
+            $teamId,
+        ));
+    }
+
+    #[OA\Put(
+        summary: 'Update PostgreSQL point-in-time recovery',
+        description: 'Update an existing WAL-G point-in-time recovery configuration.',
+        path: '/databases/{uuid}/point-in-time-recovery',
+        operationId: 'update-postgresql-point-in-time-recovery',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object')),
+        responses: [
+            new OA\Response(response: 200, description: 'Point-in-time recovery configuration updated.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function update_postgresql_point_in_time_recovery(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $invalidRequest = validateIncomingRequest($request);
+        if ($invalidRequest instanceof JsonResponse) {
+            return $invalidRequest;
+        }
+
+        $allowedFields = [
+            's3_storage_uuid',
+            'base_backup_frequency',
+            'archive_timeout_seconds',
+            'wal_level',
+            'retention_full_backups',
+            'timeout',
+        ];
+        $validator = customApiValidator($request->all(), [
+            's3_storage_uuid' => ['sometimes', 'required', 'string'],
+            'base_backup_frequency' => ['sometimes', 'required', 'string', 'max:255'],
+            'archive_timeout_seconds' => ['sometimes', 'required', 'integer', 'min:1', 'max:86400'],
+            'wal_level' => ['sometimes', 'required', 'string', 'in:replica,logical'],
+            'retention_full_backups' => ['sometimes', 'required', 'integer', 'min:1', 'max:1000'],
+            'timeout' => ['sometimes', 'required', 'integer', 'min:60', 'max:36000'],
+        ]);
+        $validator->fails();
+        foreach (array_diff(array_keys($request->all()), $allowedFields) as $field) {
+            $validator->errors()->add($field, 'This field is not allowed.');
+        }
+        if (
+            ! $validator->errors()->has('base_backup_frequency')
+            && $request->has('base_backup_frequency')
+            && ! validate_cron_expression($request->string('base_backup_frequency')->toString())
+        ) {
+            $validator->errors()->add('base_backup_frequency', 'The base backup frequency must be a valid cron or human expression.');
+        }
+        if ($validator->errors()->any()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $database = $this->findPitrDatabase($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'PostgreSQL point-in-time recovery configuration not found.'], 404);
+        }
+
+        $this->authorize('manageBackups', $database);
+        $configuration = $database->walBackupConfiguration()->firstOrFail();
+        $values = $validator->validated();
+
+        if ($configuration->s3_storage_id === null && ! array_key_exists('s3_storage_uuid', $values)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['s3_storage_uuid' => ['Attach a usable S3 storage before updating this configuration.']],
+            ], 422);
+        }
+
+        if (array_key_exists('s3_storage_uuid', $values)) {
+            $storage = S3Storage::ownedByCurrentTeamAPI($teamId)
+                ->where('uuid', $values['s3_storage_uuid'])
+                ->where('is_usable', true)
+                ->first();
+            if (! $storage) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['s3_storage_uuid' => ['Select a usable S3 storage owned by this team.']],
+                ], 422);
+            }
+            if ($configuration->s3_storage_id !== null && $configuration->s3_storage_id !== $storage->id) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['s3_storage_uuid' => ['Active PITR storage cannot be changed. Storage migration is not supported.']],
+                ], 422);
+            }
+            if ($configuration->s3_storage_id === null) {
+                $configuration->s3_storage_id = $storage->id;
+                $configuration->enabled = true;
+                $configuration->last_base_backup_at = null;
+                $configuration->last_successful_base_backup_at = null;
+            }
+            unset($values['s3_storage_uuid']);
+        }
+
+        $configuration->fill($values);
+        if ($configuration->isDirty()) {
+            $configuration->status = 'pending_restart';
+            $configuration->last_health_message = 'Point-in-time recovery settings changed; restart PostgreSQL to apply them.';
+            $configuration->save();
+        }
+
+        auditLog('api.database.postgresql_pitr_updated', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'configuration_uuid' => $configuration->uuid,
+            'fields' => array_keys($request->all()),
+        ]);
+
+        return response()->json($this->postgresqlPitrPayload($database, $configuration->fresh(), $teamId));
+    }
+
+    #[OA\Post(
+        summary: 'Run PostgreSQL WAL-G base backup',
+        path: '/databases/{uuid}/point-in-time-recovery/base-backup',
+        operationId: 'run-postgresql-wal-g-base-backup',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 202, description: 'Base backup queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Archive configuration is not ready.'),
+        ],
+    )]
+    public function run_postgresql_point_in_time_recovery_base_backup(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = $this->findPitrDatabase($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'PostgreSQL point-in-time recovery configuration not found.'], 404);
+        }
+
+        $this->authorize('manageBackups', $database);
+        $configuration = $database->walBackupConfiguration()->firstOrFail();
+        if (
+            ! $configuration->enabled
+            || ! in_array($configuration->status, ['healthy', 'warning'], true)
+            || ! $configuration->hasVerifiedArchivingHealth()
+        ) {
+            return response()->json([
+                'message' => 'Apply the configuration and wait for a healthy archive check before starting a base backup.',
+            ], 409);
+        }
+
+        PostgresqlWalBaseBackupJob::dispatch($configuration, retryWhenBusy: true);
+        auditLog('api.database.postgresql_pitr_base_backup_queued', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'configuration_uuid' => $configuration->uuid,
+        ]);
+
+        return response()->json(['message' => 'WAL-G base backup queued and will retry if the repository is busy.'], 202);
+    }
+
+    #[OA\Post(
+        summary: 'Run PostgreSQL WAL archive health check',
+        path: '/databases/{uuid}/point-in-time-recovery/health-check',
+        operationId: 'run-postgresql-wal-archive-health-check',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 202, description: 'Health check queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
+    public function run_postgresql_point_in_time_recovery_health_check(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $database = $this->findPitrDatabase($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'PostgreSQL point-in-time recovery configuration not found.'], 404);
+        }
+
+        $this->authorize('manageBackups', $database);
+        $configuration = $database->walBackupConfiguration()->firstOrFail();
+        PostgresqlWalHealthCheckJob::dispatch($configuration);
+        auditLog('api.database.postgresql_pitr_health_check_queued', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'configuration_uuid' => $configuration->uuid,
+        ]);
+
+        return response()->json(['message' => 'WAL archive health check queued.'], 202);
+    }
+
+    #[OA\Post(
+        summary: 'Restore PostgreSQL to a point in time',
+        path: '/databases/{uuid}/point-in-time-recovery/restore',
+        operationId: 'restore-postgresql-to-point-in-time',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object')),
+        responses: [
+            new OA\Response(response: 202, description: 'Point-in-time restore queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function restore_postgresql_point_in_time_recovery(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $invalidRequest = validateIncomingRequest($request);
+        if ($invalidRequest instanceof JsonResponse) {
+            return $invalidRequest;
+        }
+
+        $allowedFields = ['target_time', 'name', 'description'];
+        $validator = customApiValidator($request->all(), [
+            'target_time' => ['required', 'string'],
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+        ]);
+        $validator->fails();
+        foreach (array_diff(array_keys($request->all()), $allowedFields) as $field) {
+            $validator->errors()->add($field, 'This field is not allowed.');
+        }
+        if ($validator->errors()->any()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        if (! preg_match('/(?:Z|\+00:00)\z/', $request->string('target_time')->toString())) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['target_time' => ['The restore target must include an explicit UTC offset (Z or +00:00).']],
+            ], 422);
+        }
+
+        try {
+            $targetTime = CarbonImmutable::parse($request->string('target_time')->toString())->utc();
+        } catch (\Throwable) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['target_time' => ['The restore target must be a valid UTC timestamp.']],
+            ], 422);
+        }
+        if ($targetTime->isFuture()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['target_time' => ['The restore target time cannot be in the future.']],
+            ], 422);
+        }
+
+        $database = $this->findPitrDatabase($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'PostgreSQL point-in-time recovery configuration not found.'], 404);
+        }
+
+        $this->authorize('manageBackups', $database);
+        $configuration = $database->walBackupConfiguration()->firstOrFail();
+        $job = new PostgresqlWalRestoreJob(
+            $configuration,
+            $targetTime,
+            $request->string('name')->toString(),
+            $request->input('description'),
+        );
+        dispatch($job);
+        auditLog('api.database.postgresql_pitr_restore_queued', [
+            'team_id' => $teamId,
+            'database_uuid' => $database->uuid,
+            'configuration_uuid' => $configuration->uuid,
+            'execution_uuid' => $job->executionUuid,
+            'target_time' => $targetTime->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'message' => 'Point-in-time restore queued.',
+            'execution_uuid' => $job->executionUuid,
+        ], 202);
     }
 
     #[OA\Get(
@@ -4503,6 +4858,78 @@ class DatabasesController extends Controller
         ]);
 
         return response()->json(['message' => 'Storage deleted.']);
+    }
+
+    private function findPitrDatabase(string $uuid, int|string $teamId): ?StandalonePostgresql
+    {
+        $database = queryDatabaseByUuidWithinTeam($uuid, $teamId);
+        if (! $database instanceof StandalonePostgresql || ! $database->walBackupConfiguration()->exists()) {
+            return null;
+        }
+
+        return $database;
+    }
+
+    /**
+     * @return array{
+     *     database_uuid: string,
+     *     image: string,
+     *     configuration: array<string, mixed>,
+     *     executions: array<int, array<string, mixed>>
+     * }
+     */
+    private function postgresqlPitrPayload(
+        StandalonePostgresql $database,
+        PostgresqlWalBackupConfiguration $configuration,
+        int|string $teamId,
+    ): array {
+        $storageUuid = $configuration->s3_storage_id
+            ? S3Storage::ownedByCurrentTeamAPI((int) $teamId)
+                ->whereKey($configuration->s3_storage_id)
+                ->value('uuid')
+            : null;
+        $executions = $configuration->executions()
+            ->with('restoredDatabase:id,uuid')
+            ->limit(20)
+            ->get()
+            ->map(fn ($execution): array => [
+                'uuid' => $execution->uuid,
+                'operation' => $execution->operation,
+                'status' => $execution->status,
+                'message' => $execution->message,
+                'backup_name' => $execution->backup_name,
+                'target_time' => $execution->target_time?->toIso8601String(),
+                'restored_database_uuid' => $execution->restoredDatabase?->uuid,
+                'started_at' => $execution->started_at?->toIso8601String(),
+                'finished_at' => $execution->finished_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'database_uuid' => $database->uuid,
+            'image' => $database->image,
+            'configuration' => [
+                'uuid' => $configuration->uuid,
+                's3_storage_uuid' => $storageUuid,
+                'enabled' => $configuration->enabled,
+                'base_backup_frequency' => $configuration->base_backup_frequency,
+                'archive_timeout_seconds' => $configuration->archive_timeout_seconds,
+                'wal_level' => $configuration->wal_level,
+                'retention_full_backups' => $configuration->retention_full_backups,
+                'timeout' => $configuration->timeout,
+                'postgres_major_version' => $configuration->postgres_major_version,
+                'status' => $configuration->status,
+                'last_health_message' => $configuration->last_health_message,
+                'last_archived_wal' => $configuration->last_archived_wal,
+                'last_archived_at' => $configuration->last_archived_at?->toIso8601String(),
+                'last_failed_wal' => $configuration->last_failed_wal,
+                'last_failed_at' => $configuration->last_failed_at?->toIso8601String(),
+                'last_base_backup_at' => $configuration->last_base_backup_at?->toIso8601String(),
+                'last_successful_base_backup_at' => $configuration->last_successful_base_backup_at?->toIso8601String(),
+            ],
+            'executions' => $executions,
+        ];
     }
 
     #[OA\Get(

@@ -6,6 +6,7 @@ use App\Jobs\PostgresqlWalRetentionJob;
 use App\Jobs\ScheduledJobManager;
 use App\Models\Environment;
 use App\Models\PostgresqlWalBackupConfiguration;
+use App\Models\PostgresqlWalBackupExecution;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
@@ -17,6 +18,7 @@ use App\Notifications\Database\PostgresqlWalArchivingFailed;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Process\FakeProcessResult;
+use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
@@ -81,6 +83,7 @@ it('uses one shared repository lock for base backups and retention', function ()
 });
 
 it('runs a base backup against resolved PGDATA and then applies full-backup retention', function () {
+    recordSuccessfulPostgresqlWalHealthCheck($this->configuration);
     Process::fake([
         '*PG_VERSION*' => new FakeProcessResult(output: "/var/lib/postgresql/data/custom\n"),
         '*backup-push*' => new FakeProcessResult(output: "INFO: Wrote backup with name base_00000001000000000000000A\n"),
@@ -90,7 +93,10 @@ it('runs a base backup against resolved PGDATA and then applies full-backup rete
 
     (new PostgresqlWalBaseBackupJob($this->configuration))->handle();
 
-    $executions = $this->configuration->executions()->reorder('id')->get();
+    $executions = $this->configuration->executions()
+        ->whereIn('operation', ['base_backup', 'retention'])
+        ->reorder('id')
+        ->get();
     expect($executions)->toHaveCount(2)
         ->and($executions[0]->operation)->toBe('base_backup')
         ->and($executions[0]->status)->toBe('success')
@@ -119,7 +125,17 @@ it('skips base backups until the archive configuration is applied', function () 
     Process::assertNothingRan();
 });
 
+it('skips the initial base backup until archive health is verified', function () {
+    Process::fake();
+
+    (new PostgresqlWalBaseBackupJob($this->configuration))->handle();
+
+    expect($this->configuration->executions)->toHaveCount(0);
+    Process::assertNothingRan();
+});
+
 it('records a failed base backup and marks the configuration failed', function () {
+    recordSuccessfulPostgresqlWalHealthCheck($this->configuration);
     Process::fake([
         '*PG_VERSION*' => new FakeProcessResult(output: "/var/lib/postgresql/data\n"),
         '*backup-push*' => Process::result(errorOutput: 'archive unavailable', exitCode: 1),
@@ -136,12 +152,13 @@ it('records a failed base backup and marks the configuration failed', function (
 });
 
 it('marks an applied healthy archiver healthy and records its latest WAL', function () {
+    Carbon::setTestNow(Carbon::create(2026, 7, 24, 3, 0, 0, 'UTC'));
     $this->configuration->update([
         'status' => 'pending_restart',
         'last_successful_base_backup_at' => now(),
     ]);
     Process::fake([
-        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|12|0|00000001000000000000000C|2026-07-24 02:00:00+00||\n"),
+        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|12|0|00000001000000000000000C|2026-07-24 02:00:00+00|||2026-07-24 03:00:01+00\n"),
         '*' => new FakeProcessResult,
     ]);
 
@@ -156,10 +173,30 @@ it('marks an applied healthy archiver healthy and records its latest WAL', funct
         ->and($execution->status)->toBe('success');
 });
 
+it('keeps a reattached configuration pending until PostgreSQL restarts', function () {
+    Carbon::setTestNow(Carbon::create(2026, 7, 24, 3, 0, 0, 'UTC'));
+    Queue::fake();
+    $this->configuration->update([
+        'status' => 'pending_restart',
+        'last_base_backup_at' => null,
+        'last_successful_base_backup_at' => null,
+    ]);
+    Process::fake([
+        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|12|0|||||2026-07-24 02:59:59+00\n"),
+        '*' => new FakeProcessResult,
+    ]);
+
+    (new PostgresqlWalHealthCheckJob($this->configuration->fresh()))->handle();
+
+    expect($this->configuration->fresh()->status)->toBe('pending_restart')
+        ->and($this->configuration->fresh()->last_health_message)->toContain('waiting for a database restart');
+    Queue::assertNotPushed(PostgresqlWalBaseBackupJob::class);
+});
+
 it('keeps a healthy archiver in warning state until its first base backup', function () {
     Queue::fake();
     Process::fake([
-        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|1|0||||\n"),
+        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|1|0|||||2026-07-24 02:00:00+00\n"),
         '*' => new FakeProcessResult,
     ]);
 
@@ -181,12 +218,32 @@ it('makes initial base backup dispatches unique per WAL-G configuration', functi
         ->and($job->uniqueFor)->toBeGreaterThan($job->timeout);
 });
 
+it('makes health checks unique per WAL-G configuration', function () {
+    $job = new PostgresqlWalHealthCheckJob($this->configuration);
+
+    expect($job)->toBeInstanceOf(ShouldBeUnique::class)
+        ->and($job->uniqueId())->toBe((string) $this->configuration->id)
+        ->and($job->uniqueFor)->toBeGreaterThan($job->timeout);
+});
+
 it('retries a user-requested base backup when the repository is busy', function () {
     $job = new PostgresqlWalBaseBackupJob($this->configuration, retryWhenBusy: true);
     $middleware = $job->middleware()[0];
 
     expect($middleware->releaseAfter)->toBe(30)
         ->and($job->tries)->toBeGreaterThan(1);
+});
+
+it('records exhausted manual backup retries without marking archiving failed', function () {
+    $job = new PostgresqlWalBaseBackupJob($this->configuration, retryWhenBusy: true);
+
+    $job->failed(new MaxAttemptsExceededException('Repository lock retries were exhausted.'));
+
+    $execution = $this->configuration->executions()->firstOrFail();
+    expect($execution->operation)->toBe('base_backup')
+        ->and($execution->status)->toBe('failed')
+        ->and($execution->message)->toContain('repository is busy')
+        ->and($this->configuration->fresh()->status)->toBe('warning');
 });
 
 it('re-baselines a reset archiver failure counter without treating it as recovery', function () {
@@ -197,7 +254,7 @@ it('re-baselines a reset archiver failure counter without treating it as recover
         'last_successful_base_backup_at' => now(),
     ]);
     Process::fake([
-        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|0|0||||\n"),
+        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|0|0|||||2026-07-24 02:00:00+00\n"),
         '*' => new FakeProcessResult,
     ]);
 
@@ -217,7 +274,7 @@ it('notifies the team when PostgreSQL reports a new WAL archive failure', functi
         'last_successful_base_backup_at' => now(),
     ]);
     Process::fake([
-        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|10|2|00000001000000000000000A|2026-07-24 02:00:00+00|00000001000000000000000B|2026-07-24 02:01:00+00\n"),
+        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|10|2|00000001000000000000000A|2026-07-24 02:00:00+00|00000001000000000000000B|2026-07-24 02:01:00+00|2026-07-24 02:00:00+00\n"),
         '*' => new FakeProcessResult,
     ]);
 
@@ -242,7 +299,7 @@ it('keeps monitoring a detached configuration and raises the disk-fill warning',
         's3_storage_id' => null,
     ]);
     Process::fake([
-        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|10|1||||\n"),
+        '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|10|1|||||2026-07-24 02:00:00+00\n"),
         '*' => new FakeProcessResult,
     ]);
 
@@ -261,7 +318,7 @@ it('marks a disabled configuration terminal after archiving is physically off', 
         's3_storage_id' => null,
     ]);
     Process::fake([
-        '*pg_stat_archiver*' => new FakeProcessResult(output: "off|(disabled)|0|0||||\n"),
+        '*pg_stat_archiver*' => new FakeProcessResult(output: "off|(disabled)|0|0|||||2026-07-24 02:00:00+00\n"),
         '*' => new FakeProcessResult,
     ]);
 
@@ -354,6 +411,17 @@ function createPostgresqlWalJobStorage(Team $team): S3Storage
         'endpoint' => 'https://s3.example.com',
         'is_usable' => true,
         'team_id' => $team->id,
+    ]);
+}
+
+function recordSuccessfulPostgresqlWalHealthCheck(
+    PostgresqlWalBackupConfiguration $configuration,
+): PostgresqlWalBackupExecution {
+    return $configuration->executions()->create([
+        'operation' => 'health_check',
+        'status' => 'success',
+        'message' => 'WAL archiving is healthy.',
+        'finished_at' => now(),
     ]);
 }
 

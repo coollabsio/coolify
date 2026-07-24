@@ -10,13 +10,14 @@ use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use RuntimeException;
 use Throwable;
 
-class PostgresqlWalHealthCheckJob implements ShouldBeEncrypted, ShouldQueue
+class PostgresqlWalHealthCheckJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -24,11 +25,18 @@ class PostgresqlWalHealthCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public int $timeout = 120;
 
+    public int $uniqueFor = 420;
+
     private ?PostgresqlWalBackupExecution $execution = null;
 
     public function __construct(public PostgresqlWalBackupConfiguration $configuration)
     {
         $this->onQueue(crons_queue());
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->configuration->id;
     }
 
     public function handle(): void
@@ -82,18 +90,21 @@ class PostgresqlWalHealthCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            if (
+                $this->configuration->status === 'pending_restart'
+                && $archiveState['postmaster_started_at']->isBefore($this->configuration->updated_at)
+            ) {
+                $message = 'WAL-G archive settings are waiting for a database restart.';
+                $this->configuration->update([
+                    'last_health_message' => $message,
+                    'last_failed_count' => $archiveState['failed_count'],
+                ]);
+                $this->completeExecution('success', $message);
+
+                return;
+            }
+
             if ($archiveState['archive_mode'] !== 'on' || ! str($archiveState['archive_command'])->contains('coolify-walg-archive')) {
-                if ($this->configuration->status === 'pending_restart') {
-                    $message = 'WAL-G archive settings are waiting for a database restart.';
-                    $this->configuration->update([
-                        'last_health_message' => $message,
-                        'last_failed_count' => $archiveState['failed_count'],
-                    ]);
-                    $this->completeExecution('success', $message);
-
-                    return;
-                }
-
                 $this->failHealthCheck('PostgreSQL WAL archiving is not using the Coolify WAL-G archive command.');
 
                 return;
@@ -152,7 +163,8 @@ class PostgresqlWalHealthCheckJob implements ShouldBeEncrypted, ShouldQueue
      *     last_archived_wal: ?string,
      *     last_archived_at: ?Carbon,
      *     last_failed_wal: ?string,
-     *     last_failed_at: ?Carbon
+     *     last_failed_at: ?Carbon,
+     *     postmaster_started_at: Carbon
      * }
      */
     private function readArchiveState(): array
@@ -160,7 +172,7 @@ class PostgresqlWalHealthCheckJob implements ShouldBeEncrypted, ShouldQueue
         $database = $this->configuration->database;
         $server = $database->destination->server;
         $query = <<<'SQL'
-SELECT current_setting('archive_mode'), current_setting('archive_command'), archived_count, failed_count, COALESCE(last_archived_wal, ''), COALESCE(last_archived_time::text, ''), COALESCE(last_failed_wal, ''), COALESCE(last_failed_time::text, '') FROM pg_stat_archiver;
+SELECT current_setting('archive_mode'), current_setting('archive_command'), archived_count, failed_count, COALESCE(last_archived_wal, ''), COALESCE(last_archived_time::text, ''), COALESCE(last_failed_wal, ''), COALESCE(last_failed_time::text, ''), pg_postmaster_start_time()::text FROM pg_stat_archiver;
 SQL;
         $command = 'docker exec '.escapeshellarg($database->uuid)
             .' psql --username '.escapeshellarg($database->postgres_user)
@@ -170,7 +182,7 @@ SQL;
         $output = trim((string) instant_remote_process([$command], $server, timeout: $this->timeout));
         $fields = explode('|', $output);
 
-        if (count($fields) !== 8) {
+        if (count($fields) !== 9) {
             throw new RuntimeException('PostgreSQL returned an invalid WAL archiver health response.');
         }
 
@@ -183,6 +195,7 @@ SQL;
             'last_archived_at' => filled($fields[5]) ? Carbon::parse($fields[5]) : null,
             'last_failed_wal' => filled($fields[6]) ? $fields[6] : null,
             'last_failed_at' => filled($fields[7]) ? Carbon::parse($fields[7]) : null,
+            'postmaster_started_at' => Carbon::parse($fields[8]),
         ];
     }
 
