@@ -26,8 +26,13 @@
         <div class="flex flex-wrap gap-2 sm:flex-nowrap">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
             <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
-            <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/postgres'>https://hub.docker.com/_/postgres</a>" />
+            @if ($database->walBackupConfiguration)
+                <x-forms.input label="Image" id="image" required disabled
+                    helper="PITR database images are locked after creation." />
+            @else
+                <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
+                    helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/postgres'>https://hub.docker.com/_/postgres</a>" />
+            @endif
         </div>
         <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise
             automations (like backups) won't work.

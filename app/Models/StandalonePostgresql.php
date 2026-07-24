@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Actions\Database\BuildPostgresqlWalGEnvironment;
+use App\Actions\Database\BuildPostgresqlWalGPostgresConfig;
+use App\Actions\Database\ValidatePostgresqlWalGImage;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
@@ -10,6 +13,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 class StandalonePostgresql extends BaseModel
 {
@@ -123,6 +127,22 @@ class StandalonePostgresql extends BaseModel
                 $database->last_online_at = now();
             }
         });
+        static::updating(function (StandalonePostgresql $database): void {
+            if (! $database->isDirty('image')) {
+                return;
+            }
+
+            $configuration = $database->walBackupConfiguration()->first();
+            if (! $configuration) {
+                return;
+            }
+
+            ValidatePostgresqlWalGImage::run($database->image, $configuration->postgres_major_version);
+
+            throw ValidationException::withMessages([
+                'image' => 'The image of a PITR-enabled PostgreSQL database cannot be changed.',
+            ]);
+        });
     }
 
     /**
@@ -184,6 +204,26 @@ class StandalonePostgresql extends BaseModel
         $newConfigHash = $this->image.$this->ports_mappings.$this->postgres_initdb_args.$this->postgres_host_auth_method;
         $newConfigHash .= $this->healthCheckConfigurationHash();
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
+
+        $walBackupConfiguration = $this->walBackupConfiguration()->with('s3')->first();
+        if ($walBackupConfiguration) {
+            $walEnvironmentHash = null;
+            if ($walBackupConfiguration->s3) {
+                $walEnvironmentHash = hash('sha256', BuildPostgresqlWalGEnvironment::run($walBackupConfiguration));
+            }
+            $newConfigHash .= json_encode([
+                'postgres_conf' => $this->postgres_conf,
+                'enabled' => $walBackupConfiguration->enabled,
+                'base_backup_frequency' => $walBackupConfiguration->base_backup_frequency,
+                'archive_timeout_seconds' => $walBackupConfiguration->archive_timeout_seconds,
+                'wal_level' => $walBackupConfiguration->wal_level,
+                'retention_full_backups' => $walBackupConfiguration->retention_full_backups,
+                'timeout' => $walBackupConfiguration->timeout,
+                'postgres_major_version' => $walBackupConfiguration->postgres_major_version,
+                'managed_postgres_configuration' => BuildPostgresqlWalGPostgresConfig::run($walBackupConfiguration),
+                'wal_environment_hash' => $walEnvironmentHash,
+            ]);
+        }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {

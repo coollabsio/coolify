@@ -3,9 +3,13 @@
 namespace App\Actions\Database;
 
 use App\Helpers\SslHelper;
+use App\Models\PostgresqlWalBackupConfiguration;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use Carbon\CarbonInterface;
 use Lorisleiva\Actions\Concerns\AsAction;
+use RuntimeException;
+use Spatie\Activitylog\Contracts\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartPostgresql
@@ -22,9 +26,46 @@ class StartPostgresql
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandalonePostgresql $database)
-    {
+    private ?PostgresqlWalBackupConfiguration $walBackupConfiguration = null;
+
+    private ?PostgresqlWalBackupConfiguration $restoreSourceConfiguration = null;
+
+    private ?CarbonInterface $restoreTargetTime = null;
+
+    private bool $hasCustomPostgresConfiguration = false;
+
+    public function handle(
+        StandalonePostgresql $database,
+        ?PostgresqlWalBackupConfiguration $restoreSourceConfiguration = null,
+        ?CarbonInterface $restoreTargetTime = null,
+    ): ?Activity {
         $this->database = $database;
+        $this->commands = [];
+        $this->init_scripts = [];
+        $this->hasCustomPostgresConfiguration = false;
+        $this->walBackupConfiguration = $database->walBackupConfiguration()->with(['database', 's3'])->first();
+        $this->restoreSourceConfiguration = $restoreSourceConfiguration?->loadMissing(['database', 's3']);
+        $this->restoreTargetTime = $restoreTargetTime;
+
+        if (($this->restoreSourceConfiguration === null) !== ($this->restoreTargetTime === null)) {
+            throw new RuntimeException('A restore source configuration and target time must be provided together.');
+        }
+        if ($this->restoreSourceConfiguration && ! $this->walBackupConfiguration) {
+            throw new RuntimeException('A restore target must have a PostgreSQL WAL backup configuration.');
+        }
+        if ($this->walBackupConfiguration) {
+            ValidatePostgresqlWalGImage::run($database->image, $this->walBackupConfiguration->postgres_major_version);
+        }
+        if ($this->restoreSourceConfiguration) {
+            ValidatePostgresqlWalGImage::run(
+                $this->restoreSourceConfiguration->database->image,
+                $this->restoreSourceConfiguration->postgres_major_version,
+            );
+            if ($this->restoreSourceConfiguration->postgres_major_version !== $this->walBackupConfiguration->postgres_major_version) {
+                throw new RuntimeException('The restore source and target PostgreSQL major versions must match.');
+            }
+        }
+
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
         if (isDev()) {
@@ -38,6 +79,8 @@ class StartPostgresql
             "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/",
             "echo 'Directories created successfully.'",
         ];
+
+        $this->configureWalGFiles();
 
         if (! $this->database->enable_ssl) {
             $this->commands[] = "rm -rf $this->configuration_dir/ssl";
@@ -72,7 +115,7 @@ class StartPostgresql
             if (! $caCert) {
                 $this->dispatch('error', 'No CA certificate found for this database. Please generate a CA certificate for this server in the server/advanced page.');
 
-                return;
+                return null;
             }
 
             $this->ssl_certificate = $this->database->sslCertificates()->first();
@@ -97,7 +140,7 @@ class StartPostgresql
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
-        $this->add_custom_conf();
+        $this->add_custom_conf($this->managedPostgresConfiguration());
 
         $docker_compose = [
             'services' => [
@@ -160,6 +203,13 @@ class StartPostgresql
             );
         }
 
+        if ($this->shouldMountWalGFiles()) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'],
+                $this->walGVolumes(),
+            );
+        }
+
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
@@ -180,7 +230,7 @@ class StartPostgresql
 
         $command = ['postgres'];
 
-        if (filled($this->database->postgres_conf)) {
+        if ($this->hasCustomPostgresConfiguration) {
             $docker_compose['services'][$container_name]['volumes'] = array_merge(
                 $docker_compose['services'][$container_name]['volumes'],
                 [[
@@ -191,6 +241,10 @@ class StartPostgresql
                 ]]
             );
             $command = array_merge($command, ['-c', 'config_file=/etc/postgresql/postgresql.conf']);
+        }
+
+        if ($this->walBackupConfiguration && ($this->restoreSourceConfiguration || ! $this->walBackupConfiguration->enabled)) {
+            $command = array_merge($command, ['-c', 'archive_mode=off']);
         }
 
         if ($this->database->enable_ssl) {
@@ -316,24 +370,161 @@ class StartPostgresql
         }
     }
 
-    private function add_custom_conf()
+    private function add_custom_conf(string $managedConfiguration = ''): void
     {
         $filename = 'custom-postgres.conf';
         $config_file_path = "$this->configuration_dir/$filename";
 
-        if (blank($this->database->postgres_conf)) {
+        if (blank($this->database->postgres_conf) && blank($managedConfiguration)) {
             $this->commands[] = "rm -f $config_file_path";
 
             return;
         }
 
-        $content = $this->database->postgres_conf;
+        $content = trim((string) $this->database->postgres_conf);
         if (! str($content)->contains('listen_addresses')) {
-            $content .= "\nlisten_addresses = '*'";
-            $this->database->postgres_conf = $content;
-            $this->database->save();
+            if (filled($content)) {
+                $content .= "\n";
+            }
+            $content .= "listen_addresses = '*'";
+            if (filled($this->database->postgres_conf)) {
+                $this->database->postgres_conf = $content;
+                $this->database->save();
+            }
+        }
+        if (filled($managedConfiguration)) {
+            if (filled($content)) {
+                $content .= "\n\n";
+            }
+            $content .= "# Coolify managed WAL-G settings\n{$managedConfiguration}";
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+        $this->hasCustomPostgresConfiguration = true;
+    }
+
+    private function configureWalGFiles(): void
+    {
+        if (! $this->walBackupConfiguration) {
+            return;
+        }
+
+        $walDirectory = $this->configuration_dir.'/wal-g';
+        $this->commands[] = 'mkdir -p '.escapeshellarg($walDirectory);
+
+        if (! $this->shouldMountWalGFiles()) {
+            $this->commands[] = 'rm -f '.escapeshellarg($walDirectory.'/env');
+
+            return;
+        }
+
+        $archiveWrapper = implode("\n", [
+            '#!/bin/sh',
+            'set -a',
+            '. /etc/wal-g/env',
+            'exec wal-g wal-push "$1"',
+        ]);
+        $fetchWrapper = implode("\n", [
+            '#!/bin/sh',
+            'set -a',
+            '. /etc/wal-g/env',
+            'exec wal-g wal-fetch "$1" "$2"',
+        ]);
+
+        foreach ([
+            'coolify-walg-archive' => $archiveWrapper,
+            'coolify-walg-fetch' => $fetchWrapper,
+        ] as $filename => $content) {
+            $path = $walDirectory.'/'.$filename;
+            $this->commands[] = "echo '".base64_encode($content)."' | base64 -d | tee ".escapeshellarg($path).' > /dev/null';
+            $this->commands[] = 'chmod 0755 '.escapeshellarg($path);
+        }
+
+        $this->transferWalGEnvironment($this->restoreSourceConfiguration ?? $this->walBackupConfiguration);
+    }
+
+    private function transferWalGEnvironment(PostgresqlWalBackupConfiguration $configuration): void
+    {
+        $environment = BuildPostgresqlWalGEnvironment::run($configuration);
+        $walDirectory = $this->configuration_dir.'/wal-g';
+        $remoteTemporaryPath = $walDirectory.'/.env.'.new_public_id();
+        $remoteEnvironmentPath = $walDirectory.'/env';
+        $localTemporaryPath = tempnam(sys_get_temp_dir(), 'coolify-walg-');
+
+        if ($localTemporaryPath === false) {
+            throw new RuntimeException('Could not create a temporary WAL-G environment file.');
+        }
+
+        try {
+            if (file_put_contents($localTemporaryPath, $environment) === false || ! chmod($localTemporaryPath, 0600)) {
+                throw new RuntimeException('Could not securely write the temporary WAL-G environment file.');
+            }
+
+            instant_remote_process([
+                'mkdir -p '.escapeshellarg($walDirectory),
+                'chmod 0755 '.escapeshellarg($walDirectory),
+            ], $this->database->destination->server);
+            instant_scp($localTemporaryPath, $remoteTemporaryPath, $this->database->destination->server);
+            instant_remote_process([
+                'chmod 0600 '.escapeshellarg($remoteTemporaryPath),
+                'chown 999:999 '.escapeshellarg($remoteTemporaryPath),
+                'mv -f '.escapeshellarg($remoteTemporaryPath).' '.escapeshellarg($remoteEnvironmentPath),
+            ], $this->database->destination->server);
+        } finally {
+            if (is_file($localTemporaryPath)) {
+                unlink($localTemporaryPath);
+            }
+            instant_remote_process(
+                ['rm -f '.escapeshellarg($remoteTemporaryPath)],
+                $this->database->destination->server,
+                false,
+            );
+        }
+    }
+
+    private function managedPostgresConfiguration(): string
+    {
+        if ($this->restoreSourceConfiguration && $this->restoreTargetTime) {
+            return BuildPostgresqlWalGPostgresConfig::run($this->restoreSourceConfiguration, $this->restoreTargetTime);
+        }
+        if ($this->walBackupConfiguration?->enabled) {
+            return BuildPostgresqlWalGPostgresConfig::run($this->walBackupConfiguration);
+        }
+
+        return '';
+    }
+
+    private function shouldMountWalGFiles(): bool
+    {
+        return $this->restoreSourceConfiguration !== null || $this->walBackupConfiguration?->enabled === true;
+    }
+
+    /**
+     * @return array<int, array{type: string, source: string, target: string, read_only: bool}>
+     */
+    private function walGVolumes(): array
+    {
+        $walDirectory = $this->configuration_dir.'/wal-g';
+
+        return [
+            [
+                'type' => 'bind',
+                'source' => $walDirectory.'/env',
+                'target' => '/etc/wal-g/env',
+                'read_only' => true,
+            ],
+            [
+                'type' => 'bind',
+                'source' => $walDirectory.'/coolify-walg-archive',
+                'target' => '/usr/local/bin/coolify-walg-archive',
+                'read_only' => true,
+            ],
+            [
+                'type' => 'bind',
+                'source' => $walDirectory.'/coolify-walg-fetch',
+                'target' => '/usr/local/bin/coolify-walg-fetch',
+                'read_only' => true,
+            ],
+        ];
     }
 }
