@@ -129,6 +129,10 @@ class PostgresqlWalHealthCheckJob implements ShouldBeEncrypted, ShouldQueue
                 'last_health_message' => $message,
             ]);
             $this->completeExecution('success', $message);
+
+            if ($this->configuration->enabled && ! $this->configuration->last_successful_base_backup_at) {
+                PostgresqlWalBaseBackupJob::dispatch($this->configuration->fresh());
+            }
         } catch (Throwable $exception) {
             $this->failHealthCheck($exception->getMessage());
         }

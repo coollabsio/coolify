@@ -2,9 +2,13 @@
 
 namespace App\Livewire\Project\New;
 
+use App\Actions\Database\ValidatePostgresqlWalGImage;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Server;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Routing\Redirector;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -52,6 +56,12 @@ class Select extends Component
 
     public string $postgresql_type = 'postgres:16-alpine';
 
+    public string $pitr_postgresql_image = 'ghcr.io/coollabsio/postgres-walg:18';
+
+    public ?string $pitr_s3_storage_uuid = null;
+
+    public array $pitrS3Storages = [];
+
     public ?string $existingPostgresqlUrl = null;
 
     protected $queryString = [
@@ -83,7 +93,7 @@ class Select extends Component
                 $this->server_id = $queryServerId;
                 $this->destination_uuid = $queryDestination;
                 $this->server = Server::ownedByCurrentTeam()->find($queryServerId);
-                $this->current_step = 'select-postgresql-type';
+                $this->current_step = 'select-postgresql-mode';
             }
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -436,10 +446,69 @@ class Select extends Component
         ]);
     }
 
+    public function selectPostgresqlMode(string $mode): void
+    {
+        if ($mode === 'regular') {
+            $this->current_step = 'select-postgresql-type';
+
+            return;
+        }
+
+        if ($mode !== 'pitr') {
+            $this->addError('postgresql_mode', 'Select a valid PostgreSQL mode.');
+
+            return;
+        }
+
+        $this->pitrS3Storages = S3Storage::ownedByCurrentTeam(['uuid', 'name', 'is_usable'])
+            ->where('is_usable', true)
+            ->get()
+            ->map(fn (S3Storage $storage): array => [
+                'uuid' => $storage->uuid,
+                'name' => $storage->name,
+            ])
+            ->all();
+        $this->pitr_s3_storage_uuid = count($this->pitrS3Storages) === 1
+            ? $this->pitrS3Storages[0]['uuid']
+            : null;
+        $this->current_step = 'select-postgresql-pitr';
+    }
+
+    public function createPitrPostgresql(): Redirector|RedirectResponse|null
+    {
+        $this->validate([
+            'pitr_postgresql_image' => ['required', 'string'],
+            'pitr_s3_storage_uuid' => ['required', 'string'],
+        ]);
+
+        ValidatePostgresqlWalGImage::run($this->pitr_postgresql_image);
+        $storage = S3Storage::ownedByCurrentTeam(['uuid', 'is_usable'])
+            ->where('uuid', $this->pitr_s3_storage_uuid)
+            ->where('is_usable', true)
+            ->first();
+
+        if (! $storage) {
+            $this->addError('pitr_s3_storage_uuid', 'Select an available S3 storage owned by the current team.');
+
+            return null;
+        }
+
+        return redirect()->route('project.resource.create', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
+            'type' => $this->type,
+            'destination' => $this->destination_uuid,
+            'server_id' => $this->server_id,
+            'database_mode' => 'pitr',
+            'database_image' => $this->pitr_postgresql_image,
+            's3_storage_uuid' => $storage->uuid,
+        ]);
+    }
+
     public function whatToDoNext()
     {
         if ($this->type === 'postgresql') {
-            $this->current_step = 'select-postgresql-type';
+            $this->current_step = 'select-postgresql-mode';
         } else {
             return redirect()->route('project.resource.create', [
                 'project_uuid' => $this->parameters['project_uuid'],

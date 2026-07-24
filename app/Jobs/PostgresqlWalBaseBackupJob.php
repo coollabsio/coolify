@@ -8,6 +8,7 @@ use App\Models\PostgresqlWalBackupExecution;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
-class PostgresqlWalBaseBackupJob implements ShouldBeEncrypted, ShouldQueue
+class PostgresqlWalBaseBackupJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -24,17 +25,25 @@ class PostgresqlWalBaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public int $timeout;
 
+    public int $uniqueFor;
+
     private ?PostgresqlWalBackupExecution $execution = null;
 
     public function __construct(public PostgresqlWalBackupConfiguration $configuration)
     {
         $this->onQueue(crons_queue());
         $this->timeout = $configuration->timeout;
+        $this->uniqueFor = $configuration->timeout + 300;
     }
 
     public static function repositoryLockKey(int $configurationId): string
     {
         return 'postgresql-wal-repo-'.$configurationId;
+    }
+
+    public function uniqueId(): string
+    {
+        return (string) $this->configuration->id;
     }
 
     public function middleware(): array

@@ -15,6 +15,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Notifications\Database\PostgresqlWalArchivingFailed;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Process\FakeProcessResult;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
@@ -156,6 +157,7 @@ it('marks an applied healthy archiver healthy and records its latest WAL', funct
 });
 
 it('keeps a healthy archiver in warning state until its first base backup', function () {
+    Queue::fake();
     Process::fake([
         '*pg_stat_archiver*' => new FakeProcessResult(output: "on|/usr/local/bin/coolify-walg-archive %p|1|0||||\n"),
         '*' => new FakeProcessResult,
@@ -165,6 +167,18 @@ it('keeps a healthy archiver in warning state until its first base backup', func
 
     expect($this->configuration->fresh()->status)->toBe('warning')
         ->and($this->configuration->fresh()->last_health_message)->toContain('no successful WAL-G base backup');
+    Queue::assertPushed(
+        PostgresqlWalBaseBackupJob::class,
+        fn (PostgresqlWalBaseBackupJob $job) => $job->configuration->is($this->configuration),
+    );
+});
+
+it('makes initial base backup dispatches unique per WAL-G configuration', function () {
+    $job = new PostgresqlWalBaseBackupJob($this->configuration);
+
+    expect($job)->toBeInstanceOf(ShouldBeUnique::class)
+        ->and($job->uniqueId())->toBe((string) $this->configuration->id)
+        ->and($job->uniqueFor)->toBeGreaterThan($job->timeout);
 });
 
 it('re-baselines a reset archiver failure counter without treating it as recovery', function () {

@@ -501,6 +501,71 @@
             @endif
         </div>
     @endif
+    @if ($current_step === 'select-postgresql-mode')
+        <div x-data="{ selecting: false }">
+            <h2>Select a PostgreSQL mode</h2>
+            <div>Choose regular PostgreSQL or continuous WAL archiving with point-in-time recovery.</div>
+            <div class="grid grid-cols-1 gap-6 pt-8 lg:grid-cols-2">
+                <button type="button" class="coolbox group flex gap-2 text-left"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.selectPostgresqlMode('regular'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PostgreSQL</div>
+                        <div class="box-description">
+                            Standard PostgreSQL with the existing logical backup support.
+                        </div>
+                    </div>
+                </button>
+                <button type="button" class="coolbox group flex gap-2 text-left"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.selectPostgresqlMode('pitr'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="box-title">PostgreSQL with Point-in-Time Recovery</div>
+                        <div class="box-description">
+                            Continuously archive WAL to S3 and restore the full cluster to a timestamp.
+                        </div>
+                    </div>
+                </button>
+            </div>
+        </div>
+    @endif
+    @if ($current_step === 'select-postgresql-pitr')
+        <div class="flex max-w-2xl flex-col gap-6">
+            <div>
+                <h2>Configure Point-in-Time Recovery</h2>
+                <div>PITR uses a Coolify PostgreSQL WAL-G image and an S3-compatible storage.</div>
+            </div>
+            @if (count($pitrS3Storages) === 0)
+                <x-callout type="warning" title="S3 storage required">
+                    Add and verify an S3-compatible storage for this team before creating a PITR database.
+                </x-callout>
+            @else
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <x-forms.select id="pitr_s3_storage_uuid" label="S3 Storage" required
+                        wire:model="pitr_s3_storage_uuid">
+                        <option value="">Select storage</option>
+                        @foreach ($pitrS3Storages as $storage)
+                            <option value="{{ $storage['uuid'] }}">{{ $storage['name'] }}</option>
+                        @endforeach
+                    </x-forms.select>
+                    <x-forms.select id="pitr_postgresql_image" label="PostgreSQL Version" required
+                        wire:model="pitr_postgresql_image">
+                        <option value="ghcr.io/coollabsio/postgres-walg:18">PostgreSQL 18</option>
+                        <option value="ghcr.io/coollabsio/postgres-walg:17">PostgreSQL 17</option>
+                        <option value="ghcr.io/coollabsio/postgres-walg:16">PostgreSQL 16</option>
+                    </x-forms.select>
+                </div>
+                <div>
+                    <x-forms.button wire:click="createPitrPostgresql" wire:loading.attr="disabled"
+                        wire:target="createPitrPostgresql">
+                        Create PostgreSQL with PITR
+                    </x-forms.button>
+                </div>
+            @endif
+        </div>
+    @endif
     @if ($current_step === 'select-postgresql-type')
         <div x-data="{ selecting: false }">
             <h2>Select a Postgresql type</h2>

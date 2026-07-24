@@ -2,9 +2,15 @@
 
 namespace App\Livewire\Project\Resource;
 
+use App\Actions\Database\ValidatePostgresqlWalGImage;
 use App\Models\EnvironmentVariable;
+use App\Models\PostgresqlWalBackupConfiguration;
+use App\Models\S3Storage;
 use App\Models\Service;
+use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class Create extends Component
@@ -22,6 +28,8 @@ class Create extends Component
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
         $database_image = request()->query('database_image');
+        $databaseMode = request()->query('database_mode');
+        $s3StorageUuid = request()->query('s3_storage_uuid');
 
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (! $project) {
@@ -48,11 +56,57 @@ class Create extends Component
 
                         return;
                     }
-                    $database = create_standalone_postgresql(
-                        environmentId: $environment->id,
-                        destination: $destination,
-                        databaseImage: $database_image
-                    );
+                    if ($databaseMode !== null && ! in_array($databaseMode, ['regular', 'pitr'], true)) {
+                        throw ValidationException::withMessages([
+                            'database_mode' => 'Select a valid PostgreSQL mode.',
+                        ]);
+                    }
+
+                    if ($databaseMode === 'pitr') {
+                        if (! is_string($database_image)) {
+                            throw ValidationException::withMessages([
+                                'image' => 'Select a supported PostgreSQL WAL-G image.',
+                            ]);
+                        }
+                        $majorVersion = ValidatePostgresqlWalGImage::run($database_image);
+                        $storage = is_string($s3StorageUuid)
+                            ? S3Storage::ownedByCurrentTeam(['uuid', 'is_usable'])
+                                ->where('uuid', $s3StorageUuid)
+                                ->where('is_usable', true)
+                                ->first()
+                            : null;
+
+                        if (! $storage) {
+                            throw ValidationException::withMessages([
+                                's3_storage_uuid' => 'Select an available S3 storage owned by the current team.',
+                            ]);
+                        }
+
+                        $database = DB::transaction(function () use ($environment, $destination, $database_image, $storage, $majorVersion): StandalonePostgresql {
+                            $database = create_standalone_postgresql(
+                                environmentId: $environment->id,
+                                destination: $destination,
+                                databaseImage: $database_image,
+                            );
+                            PostgresqlWalBackupConfiguration::create([
+                                'team_id' => currentTeam()->id,
+                                'standalone_postgresql_id' => $database->id,
+                                's3_storage_id' => $storage->id,
+                                'enabled' => true,
+                                'postgres_major_version' => $majorVersion,
+                                'status' => 'warning',
+                                'last_health_message' => 'Waiting for PostgreSQL WAL archiving to be verified.',
+                            ]);
+
+                            return $database;
+                        });
+                    } else {
+                        $database = create_standalone_postgresql(
+                            environmentId: $environment->id,
+                            destination: $destination,
+                            databaseImage: $database_image,
+                        );
+                    }
                 } elseif ($type->value() === 'redis') {
                     $database = create_standalone_redis($environment->id, $destination);
                 } elseif ($type->value() === 'mongodb') {
