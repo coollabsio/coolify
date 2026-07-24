@@ -7,6 +7,7 @@ use App\Rules\ValidS3BucketName;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -78,6 +79,11 @@ class S3Storage extends BaseModel
                 'save_s3' => false,
                 's3_storage_id' => null,
             ]);
+            PostgresqlWalBackupConfiguration::where('s3_storage_id', $storage->id)->update([
+                'enabled' => false,
+                'status' => 'failed',
+                's3_storage_id' => null,
+            ]);
         });
     }
 
@@ -113,6 +119,11 @@ class S3Storage extends BaseModel
     public function scheduledVolumeBackups()
     {
         return $this->hasMany(ScheduledVolumeBackup::class, 's3_storage_id');
+    }
+
+    public function postgresqlWalBackupConfigurations(): HasMany
+    {
+        return $this->hasMany(PostgresqlWalBackupConfiguration::class, 's3_storage_id');
     }
 
     public function awsUrl()

@@ -8,6 +8,7 @@ use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandalonePostgresql extends BaseModel
@@ -395,6 +396,11 @@ class StandalonePostgresql extends BaseModel
     public function scheduledBackups()
     {
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function walBackupConfiguration(): HasOne
+    {
+        return $this->hasOne(PostgresqlWalBackupConfiguration::class);
     }
 
     public function environment_variables()

@@ -22,6 +22,9 @@
                     $backupCount > 0
                         ? $backupCount . ' backup schedule(s) will stop saving to S3. Existing objects in this storage will not be deleted.'
                         : null,
+                    $postgresqlWalBackupConfigurationCount > 0
+                        ? $postgresqlWalBackupConfigurationCount . ' PITR configuration(s) will be detached and require attention. Existing objects in this storage will not be deleted.'
+                        : null,
                 ])" confirmationText="{{ $storage->name }}"
                 confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
                 shortConfirmationLabel="Storage Name" :confirmWithPassword="false" step2ButtonText="Permanently Delete" />

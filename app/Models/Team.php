@@ -13,6 +13,7 @@ use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Notifications\Notifiable;
 use OpenApi\Attributes as OA;
 
@@ -323,6 +324,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function s3s()
     {
         return $this->hasMany(S3Storage::class)->where('is_usable', true);
+    }
+
+    public function postgresqlWalBackupConfigurations(): HasMany
+    {
+        return $this->hasMany(PostgresqlWalBackupConfiguration::class);
     }
 
     public function emailNotificationSettings()

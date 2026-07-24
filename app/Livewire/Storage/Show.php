@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Storage;
 
+use App\Models\PostgresqlWalBackupConfiguration;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
@@ -19,6 +20,8 @@ class Show extends Component
 
     public int $backupCount = 0;
 
+    public int $postgresqlWalBackupConfigurationCount = 0;
+
     public function mount()
     {
         $this->storage = S3Storage::ownedByCurrentTeam()->whereUuid(request()->storage_uuid)->first();
@@ -33,6 +36,10 @@ class Show extends Component
         $this->currentRoute = request()->route()->getName();
         $this->backupCount = ScheduledDatabaseBackup::where('s3_storage_id', $this->storage->id)->count()
             + ScheduledVolumeBackup::where('s3_storage_id', $this->storage->id)->count();
+        $this->postgresqlWalBackupConfigurationCount = PostgresqlWalBackupConfiguration::where(
+            's3_storage_id',
+            $this->storage->id,
+        )->count();
     }
 
     public function delete()
