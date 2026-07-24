@@ -61,7 +61,7 @@
             @endif
         </div>
     </div>
-    <div class="navbar-main">
+    <div class="navbar-main max-md:border-b-0">
         <nav
             class="scrollbar hidden min-h-10 w-full flex-nowrap items-center gap-6 overflow-x-scroll overflow-y-hidden pb-1 whitespace-nowrap md:flex md:w-auto md:overflow-visible">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}" href="{{ route('server.show', [

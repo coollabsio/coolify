@@ -87,17 +87,30 @@
                                 <x-forms.input canGate="update" :canResource="$serviceApplication" label="Description"
                                     id="description"></x-forms.input>
                             </div>
-                            <div class="flex gap-2">
+                            <div class="flex flex-col gap-2 sm:flex-row">
                                 @if (!$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
-                                    @if ($serviceApplication->required_fqdn)
-                                        <x-forms.input canGate="update" :canResource="$serviceApplication" required placeholder="https://app.coolify.io"
-                                            label="Domains" id="fqdn"
-                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- https://app.coolify.io,https://cloud.coolify.io/dashboard<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container.<br>- https://app.coolify.io:8080/api -> app.coolify.io/api will point to port 8080 inside the container."></x-forms.input>
-                                    @else
-                                        <x-forms.input canGate="update" :canResource="$serviceApplication" placeholder="https://app.coolify.io"
-                                            label="Domains" id="fqdn"
-                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- https://app.coolify.io,https://cloud.coolify.io/dashboard<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container.<br>- https://app.coolify.io:8080/api -> app.coolify.io/api will point to port 8080 inside the container."></x-forms.input>
-                                    @endif
+                                    @php
+                                        $domainCount = filled($serviceApplication->fqdn)
+                                            ? collect(explode(',', $serviceApplication->fqdn))->map(fn ($d) => trim($d))->filter()->count()
+                                            : 0;
+                                    @endphp
+                                    <div class="flex-1 text-sm dark:text-neutral-400">
+                                        @if ($domainCount === 0)
+                                            No domains set
+                                        @elseif ($domainCount === 1)
+                                            1 domain set
+                                        @else
+                                            {{ $domainCount }} domains set
+                                        @endif
+                                        ·
+                                        <a class="underline dark:text-white" {{ wireNavigate() }}
+                                            href="{{ route('project.service.domains', [
+                                                'project_uuid' => data_get($parameters, 'project_uuid'),
+                                                'environment_uuid' => data_get($parameters, 'environment_uuid'),
+                                                'service_uuid' => data_get($parameters, 'service_uuid'),
+                                            ]) }}">Manage</a>
+                                        on the service Domains page.
+                                    </div>
                                 @endif
                                 <x-forms.input canGate="update" :canResource="$serviceApplication"
                                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"

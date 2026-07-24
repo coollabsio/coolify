@@ -17,6 +17,7 @@ class ServiceApplication extends BaseModel
         'human_name',
         'description',
         'fqdn',
+        'domain_dns_statuses',
         'ports',
         'exposes',
         'status',
@@ -30,6 +31,13 @@ class ServiceApplication extends BaseModel
         'last_online_at',
         'is_migrated',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'domain_dns_statuses' => 'array',
+        ];
+    }
 
     protected static function booted()
     {

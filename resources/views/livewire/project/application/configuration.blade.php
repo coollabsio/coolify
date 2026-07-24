@@ -20,6 +20,11 @@
                 'active' => $currentRoute === 'project.application.configuration',
             ],
             [
+                'label' => 'Domains',
+                'route' => 'project.application.domains',
+                'active' => $currentRoute === 'project.application.domains',
+            ],
+            [
                 'label' => 'Advanced',
                 'route' => 'project.application.advanced',
                 'active' => $currentRoute === 'project.application.advanced',
@@ -130,6 +135,8 @@
         <div class="w-full md:flex-grow">
             @if ($currentRoute === 'project.application.configuration')
                 <livewire:project.application.general :application="$application" />
+            @elseif ($currentRoute === 'project.application.domains')
+                <livewire:project.application.domains :application="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
             @elseif ($currentRoute === 'project.application.advanced')

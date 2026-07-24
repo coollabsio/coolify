@@ -8,6 +8,7 @@
 
         $serviceConfigurationItems = [
             ['label' => 'General', 'route' => 'project.service.configuration', 'active' => request()->routeIs('project.service.configuration')],
+            ['label' => 'Domains', 'route' => 'project.service.domains', 'active' => request()->routeIs('project.service.domains')],
             ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'active' => request()->routeIs('project.service.environment-variables')],
             ['label' => 'Persistent Storages', 'route' => 'project.service.storages', 'active' => request()->routeIs('project.service.storages')],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'active' => request()->routeIs('project.service.scheduled-tasks.show', 'project.service.scheduled-tasks')],

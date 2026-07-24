@@ -14,15 +14,15 @@
                     </div>
                 </div>
                 <div class="mb-4">Deploy resources, like Applications, Databases, Services...</div>
-                <div class="flex gap-2 items-start">
-                    <input autocomplete="off" x-ref="searchInput" class="input-sticky flex-1"
+                <div class="flex flex-col gap-2 items-stretch sm:flex-row sm:items-start">
+                    <input autocomplete="off" x-ref="searchInput" class="input-sticky w-full sm:flex-1"
                         :class="{ 'input-sticky-active': isSticky }" x-model="search" placeholder="Type / to search..."
                         @keydown.window.slash.prevent="$refs.searchInput.focus()">
                     <!-- Category Filter Dropdown -->
-                    <div class="relative" x-data="{ openCategoryDropdown: false, categorySearch: '' }" @click.outside="openCategoryDropdown = false">
+                    <div class="relative w-full sm:w-auto" x-data="{ openCategoryDropdown: false, categorySearch: '' }" @click.outside="openCategoryDropdown = false">
                         <!-- Loading/Disabled State -->
                         <div x-show="loading || categories.length === 0"
-                            class="flex items-center justify-between gap-2 py-1.5 px-3 w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-neutral-100 dark:bg-coolgray-200 cursor-not-allowed whitespace-nowrap opacity-50">
+                            class="flex items-center justify-between gap-2 py-1.5 px-3 w-full sm:w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-neutral-100 dark:bg-coolgray-200 cursor-not-allowed whitespace-nowrap opacity-50">
                             <span class="text-sm text-neutral-400 dark:text-neutral-600">Filter by category</span>
                             <svg class="w-4 h-4 text-neutral-400 shrink-0" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24">
@@ -33,7 +33,7 @@
                         <!-- Active State -->
                         <div x-show="!loading && categories.length > 0"
                             @click="openCategoryDropdown = !openCategoryDropdown; $nextTick(() => { if (openCategoryDropdown) $refs.categorySearchInput.focus() })"
-                            class="flex items-center justify-between gap-2 py-1.5 px-3 w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-pointer hover:ring-coolgray-400 transition-all whitespace-nowrap">
+                            class="flex items-center justify-between gap-2 py-1.5 px-3 w-full sm:w-64 text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-pointer hover:ring-coolgray-400 transition-all whitespace-nowrap">
                             <span class="text-sm truncate"
                                 x-text="selectedCategory === '' ? 'Filter by category' : selectedCategory"
                                 :class="selectedCategory === '' ? 'text-neutral-400 dark:text-neutral-600' :

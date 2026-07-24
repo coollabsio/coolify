@@ -182,7 +182,7 @@ it('keeps configuration sidebars hidden until desktop breakpoint', function () {
         ->toContain('server-mobile-actions')
         ->toContain('Actions')
         ->toContain('pb-0 md:pb-6')
-        ->toContain('navbar-main')
+        ->toContain('navbar-main max-md:border-b-0')
         ->toContain('server-mobile-actions" class="mt-2 mb-3')
         ->toContain('hidden min-h-10')
         ->toContain('md:flex')
