@@ -12,6 +12,7 @@ use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
@@ -462,7 +463,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $fqdn = generateFqdn(server: $server, random: "$uuid", parserVersion: $resource->compose_parsing_version);
                 }
 
-                if ($value && get_class($value) === Illuminate\Support\Stringable::class && $value->startsWith('/')) {
+                if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
                     $path = $value->value();
                     if ($path !== '/') {
                         $fqdn = "$fqdn$path";
@@ -515,7 +516,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     if (is_null($domainExists)) {
                         $serviceNameForDomain = str($parsed['service_name'])->replace('_', '-')->value();
                         $domainValue = generateUrl(server: $server, random: "$serviceNameForDomain-$uuid");
-                        if ($value && get_class($value) === Illuminate\Support\Stringable::class && $value->startsWith('/')) {
+                        if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
                             $path = $value->value();
                             if ($path !== '/') {
                                 $domainValue = "$domainValue$path";
@@ -1286,7 +1287,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
+                return getFqdnWithoutPort($fqdn);
             });
             $coolifyEnvironments->put('COOLIFY_URL', $fqdnsWithoutPort->implode(','));
 
@@ -1782,8 +1783,10 @@ function serviceParser(Service $resource): Collection
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
-                    $fqdn = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
-                    $url = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
+                    // FQDN may be a comma-separated list; use the first entry (same as updateCompose).
+                    $firstFqdn = trim((string) str($savedService->fqdn)->explode(',')->first());
+                    $fqdn = getFqdnWithoutPort($firstFqdn);
+                    $url = $fqdn;
                 } else {
                     // For ServiceDatabase, generate fqdn/url without saving to the model
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -1795,7 +1798,7 @@ function serviceParser(Service $resource): Collection
                 // Strip scheme for environment variable values
                 $fqdnValueForEnv = str($fqdn)->after('://')->value();
 
-                if ($value && get_class($value) === Illuminate\Support\Stringable::class && $value->startsWith('/')) {
+                if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
                     $path = $value->value();
                     if ($path !== '/') {
                         // Only add path if it's not already present (prevents duplication on subsequent parse() calls)
@@ -2559,8 +2562,8 @@ function serviceParser(Service $resource): Collection
                 return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
             });
             $coolifyEnvironments->put('COOLIFY_FQDN', $fqdnsWithoutPort->implode(','));
-            $urls = $fqdns->map(function ($fqdn): Stringable {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
+            $urls = $fqdns->map(function ($fqdn) {
+                return getFqdnWithoutPort($fqdn);
             });
             $coolifyEnvironments->put('COOLIFY_URL', $urls->implode(','));
         }

@@ -757,7 +757,20 @@ function getFqdnWithoutPort(string $fqdn)
         $scheme = $url->getScheme();
         $path = $url->getPath();
 
-        return "$scheme://$host$path";
+        // Spatie accepts bare hostnames (scheme empty). Keep original input when we
+        // cannot build a real absolute URL — call sites must not get "://host".
+        if ($scheme === '' || $host === '') {
+            return $fqdn;
+        }
+
+        // Match updateCompose(): omit a bare "/" path so port re-append stays valid
+        // ("http://host:80" not "http://host/:80").
+        $base = "$scheme://$host";
+        if ($path !== '' && $path !== '/') {
+            return $base.$path;
+        }
+
+        return $base;
     } catch (Throwable) {
         return $fqdn;
     }
@@ -2538,7 +2551,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($env) {
                                 $env_url = Url::fromString($savedService->fqdn);
                                 $env_port = $env_url->getPort();
-                                if ($env_port !== $predefinedPort) {
+                                if ((int) $env_port !== (int) $predefinedPort) {
                                     $env_url = $env_url->withPort($predefinedPort);
                                     $savedService->fqdn = $env_url->__toString();
                                     $savedService->save();
@@ -2623,7 +2636,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             if ($env) {
                                                 $env_url = Url::fromString($env->value);
                                                 $env_port = $env_url->getPort();
-                                                if ($env_port !== $predefinedPort) {
+                                                if ((int) $env_port !== (int) $predefinedPort) {
                                                     $env_url = $env_url->withPort($predefinedPort);
                                                     $savedService->fqdn = $env_url->__toString();
                                                     $savedService->save();
