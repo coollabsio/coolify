@@ -3,6 +3,7 @@
 use App\Actions\Database\BuildPostgresqlWalGEnvironment;
 use App\Actions\Database\BuildPostgresqlWalGPostgresConfig;
 use App\Actions\Database\ResolvePostgresqlDataDirectory;
+use App\Actions\Database\SelectPostgresqlWalBaseBackupForTargetTime;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\ValidatePostgresqlWalGImage;
 use App\Livewire\Project\Database\Postgresql\General;
@@ -103,6 +104,39 @@ it('builds restore settings with an explicit UTC target offset', function () {
         "recovery_target_time = '2026-07-24 10:00:00+00'",
         "recovery_target_action = 'promote'",
     ]));
+});
+
+it('selects the newest base backup that finished at or before the target', function () {
+    $selected = SelectPostgresqlWalBaseBackupForTargetTime::run([
+        [
+            'backup_name' => 'base_finished_after_target',
+            'start_time' => '2026-07-24 09:00:00+00',
+            'finish_time' => '2026-07-24 10:01:00+00',
+        ],
+        [
+            'backup_name' => 'base_older',
+            'start_time' => '2026-07-24 07:00:00+00',
+            'finish_time' => '2026-07-24 08:00:00+00',
+        ],
+        [
+            'backup_name' => 'base_selected',
+            'start_time' => '2026-07-24 08:30:00+00',
+            'finish_time' => '2026-07-24 09:30:00+00',
+        ],
+    ], CarbonImmutable::parse('2026-07-24 10:00:00', 'UTC'));
+
+    expect($selected['backup_name'])->toBe('base_selected');
+});
+
+it('rejects restore targets without a completed base backup', function () {
+    expect(fn () => SelectPostgresqlWalBaseBackupForTargetTime::run([
+        [
+            'backup_name' => 'base_too_new',
+            'start_time' => '2026-07-24 09:00:00+00',
+            'finish_time' => '2026-07-24 10:01:00+00',
+        ],
+    ], CarbonImmutable::parse('2026-07-24 10:00:00', 'UTC')))
+        ->toThrow(RuntimeException::class, 'finished at or before');
 });
 
 it('validates supported WAL-G image tags', function (string $image, int $majorVersion) {
@@ -301,6 +335,23 @@ it('uses source repository settings and forces archiving off in restore mode', f
         ->and((string) data_get($activity, 'properties.command'))->not->toContain("test secret'with quote")
         ->and(collect(data_get($service, 'volumes'))->contains(fn ($volume) => data_get($volume, 'target') === '/etc/wal-g/env'))
         ->toBeTrue();
+});
+
+it('can prepare restore configuration without starting or dispatching the container', function () {
+    Queue::fake();
+    Process::fake(['*' => new FakeProcessResult]);
+
+    $action = StartPostgresql::make();
+    $activity = $action->handle(
+        $this->database,
+        startContainer: false,
+        execute: false,
+    );
+    $commands = implode("\n", $action->commands);
+
+    expect($activity)->toBeNull()
+        ->and($commands)->toContain('Database restore configuration prepared.')
+        ->and($commands)->not->toContain('docker-compose.yml up -d');
 });
 
 function createPostgresqlWalDeploymentConfiguration(

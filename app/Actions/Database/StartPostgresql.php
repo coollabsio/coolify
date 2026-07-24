@@ -38,6 +38,8 @@ class StartPostgresql
         StandalonePostgresql $database,
         ?PostgresqlWalBackupConfiguration $restoreSourceConfiguration = null,
         ?CarbonInterface $restoreTargetTime = null,
+        bool $startContainer = true,
+        bool $execute = true,
     ): ?Activity {
         $this->database = $database;
         $this->commands = [];
@@ -275,12 +277,20 @@ class StartPostgresql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
-        if ($this->database->enable_ssl) {
-            $postgresUser = escapeshellarg($this->database->postgres_user);
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$postgresUser}:{$postgresUser} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
+        if ($startContainer) {
+            $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
+            if ($this->database->enable_ssl) {
+                $postgresUser = escapeshellarg($this->database->postgres_user);
+                $this->commands[] = executeInDocker($this->database->uuid, "chown {$postgresUser}:{$postgresUser} /var/lib/postgresql/certs/server.key /var/lib/postgresql/certs/server.crt");
+            }
+            $this->commands[] = "echo 'Database started.'";
+        } else {
+            $this->commands[] = "echo 'Database restore configuration prepared.'";
         }
-        $this->commands[] = "echo 'Database started.'";
+
+        if (! $execute) {
+            return null;
+        }
 
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
