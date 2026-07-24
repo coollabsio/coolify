@@ -27,17 +27,19 @@ use App\Livewire\Project\CloneMe as ProjectCloneMe;
 use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
-use App\Livewire\Project\Edit as ProjectEdit;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Index as ProjectIndex;
 use App\Livewire\Project\Resource\Create as ResourceCreate;
-use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
-use App\Livewire\Project\Show as ProjectShow;
+use App\Livewire\Railway\Canvas as RailwayCanvas;
+use App\Livewire\Railway\Logs as RailwayLogs;
+use App\Livewire\Railway\Observability as RailwayObservability;
+use App\Livewire\Railway\Projects as RailwayProjects;
+use App\Livewire\Railway\Settings as RailwaySettings;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\CloudInitScript\Show as SecurityCloudInitScriptShow;
 use App\Livewire\Security\CloudInitScripts;
@@ -116,9 +118,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/force-password-reset', ForcePasswordReset::class)->name('auth.force-password-reset');
     });
 
-    Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/', RailwayProjects::class)->name('dashboard');
+    Route::get('/classic', Dashboard::class)->name('dashboard.classic');
     Route::get('/admin', AdminIndex::class)->name('admin.index');
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
+
+    // Railway 1:1 UI (skin over Coolify backend). Additive — coexists with the classic UI.
+    Route::prefix('railway')->group(function () {
+        Route::get('/', RailwayProjects::class)->name('railway.projects');
+        Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
+            Route::get('/', RailwayCanvas::class)->name('railway.canvas');
+            Route::get('/observability', RailwayObservability::class)->name('railway.observability');
+            Route::get('/logs', RailwayLogs::class)->name('railway.logs');
+            Route::get('/settings', RailwaySettings::class)->name('railway.settings');
+        });
+    });
 
     Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
     Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
@@ -211,11 +225,34 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
     Route::prefix('project/{project_uuid}')->group(function () {
-        Route::get('/', ProjectShow::class)->name('project.show');
-        Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');
+        // Project overview is the Railway canvas of the default environment.
+        Route::get('/', function (string $project_uuid) {
+            $project = currentTeam()->projects()->where('uuid', $project_uuid)->firstOrFail();
+            $environment = $project->environments()->where('name', 'production')->first()
+                ?? $project->environments()->first();
+            if (! $environment) {
+                return redirect()->route('dashboard');
+            }
+
+            return redirect()->route('railway.canvas', ['project_uuid' => $project_uuid, 'environment_uuid' => $environment->uuid]);
+        })->name('project.show');
+        // Project settings is the Railway settings page of the default environment.
+        Route::get('/edit', function (string $project_uuid) {
+            $project = currentTeam()->projects()->where('uuid', $project_uuid)->firstOrFail();
+            $environment = $project->environments()->where('name', 'production')->first()
+                ?? $project->environments()->first();
+            if (! $environment) {
+                return redirect()->route('dashboard');
+            }
+
+            return redirect()->route('railway.settings', ['project_uuid' => $project_uuid, 'environment_uuid' => $environment->uuid]);
+        })->name('project.edit');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
-        Route::get('/', ResourceIndex::class)->name('project.resource.index');
+        // The environment page is the Railway canvas.
+        Route::get('/', function (string $project_uuid, string $environment_uuid) {
+            return redirect()->route('railway.canvas', ['project_uuid' => $project_uuid, 'environment_uuid' => $environment_uuid]);
+        })->name('project.resource.index');
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');

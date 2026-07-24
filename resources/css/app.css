@@ -4,6 +4,8 @@
 
 @import "./utilities.css";
 
+@import "./railway.css";
+
 @plugin 'tailwind-scrollbar';
 @plugin '@tailwindcss/typography';
 @plugin '@tailwindcss/forms';
@@ -43,6 +45,24 @@
     --color-coolgray-300: #242424;
     --color-coolgray-400: #282828;
     --color-coolgray-500: #323232;
+
+    /* Railway UI palette (Railway 1:1 skin over Coolify backend) */
+    --color-rw-bg: #0b0b0f;
+    --color-rw-surface: #101014;
+    --color-rw-panel: #16161c;
+    --color-rw-elevated: #1c1c23;
+    --color-rw-hover: #202028;
+    --color-rw-border: #26262e;
+    --color-rw-border-strong: #34343f;
+    --color-rw-text: #ffffff;
+    --color-rw-muted: #9a9aa5;
+    --color-rw-subtle: #66666f;
+    --color-rw-accent: #8b5cf6;
+    --color-rw-accent-hover: #7c4dff;
+    --color-rw-accent-soft: #6d5bd0;
+    --color-rw-online: #4ba15f;
+    --color-rw-online-bright: #3fb950;
+    --color-rw-danger: #e5484d;
 }
 
 /*

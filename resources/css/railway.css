@@ -1,0 +1,172 @@
+/*
+ | Railway UI skin
+ |
+ | Component utilities for the Railway-style interface layered on top of
+ | Coolify's backend. Kept isolated from the classic Coolify styles so the
+ | two UIs can coexist. Everything here is scoped under `.rw` surfaces or
+ | prefixed `rw-` to avoid collisions with existing utilities.
+ |
+ | Palette tokens live in app.css `@theme` (--color-rw-*).
+*/
+
+/* Root surface for every Railway page. */
+@utility rw-root {
+    @apply min-h-screen w-full bg-rw-bg text-rw-text;
+    font-family: 'Geist Sans', Inter, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+}
+
+/* The infinite dotted canvas background used in the architecture view. */
+@utility rw-canvas-grid {
+    background-color: var(--color-rw-bg);
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+}
+
+/* A resource node card on the canvas. */
+@utility rw-node {
+    @apply relative flex flex-col rounded-[10px] border bg-rw-panel px-4 py-3 select-none;
+    border-color: var(--color-rw-border);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    transition: border-color 120ms ease, box-shadow 120ms ease, transform 60ms ease;
+}
+
+@utility rw-node-hover {
+    border-color: var(--color-rw-border-strong);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -12px rgba(0, 0, 0, 0.8);
+}
+
+@utility rw-node-selected {
+    border-color: var(--color-rw-accent);
+    box-shadow: 0 0 0 1px var(--color-rw-accent), 0 12px 32px -12px rgba(0, 0, 0, 0.8);
+}
+
+/* Environment / group container that wraps a subset of nodes. */
+@utility rw-group {
+    @apply rounded-xl border;
+    border-color: var(--color-rw-border);
+    background: rgba(255, 255, 255, 0.012);
+}
+
+/* Buttons -------------------------------------------------------------- */
+@utility rw-btn {
+    @apply inline-flex items-center gap-1.5 rounded-md border px-2.5 h-8 text-[13px] font-medium text-rw-text cursor-pointer whitespace-nowrap;
+    background: var(--color-rw-elevated);
+    border-color: var(--color-rw-border);
+    transition: background 120ms ease, border-color 120ms ease;
+}
+
+@utility rw-btn-hover {
+    background: var(--color-rw-hover);
+    border-color: var(--color-rw-border-strong);
+}
+
+@utility rw-btn-primary {
+    @apply inline-flex items-center gap-1.5 rounded-md px-3 h-8 text-[13px] font-medium text-white cursor-pointer whitespace-nowrap border-0;
+    background: var(--color-rw-accent);
+    transition: background 120ms ease;
+}
+
+@utility rw-btn-primary-hover {
+    background: var(--color-rw-accent-hover);
+}
+
+@utility rw-icon-btn {
+    @apply inline-flex items-center justify-center rounded-md w-8 h-8 text-rw-muted cursor-pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+@utility rw-icon-btn-hover {
+    background: var(--color-rw-hover);
+    color: var(--color-rw-text);
+}
+
+/* Status dot ----------------------------------------------------------- */
+@utility rw-dot {
+    @apply inline-block w-2 h-2 rounded-full shrink-0;
+}
+
+@utility rw-dot-online {
+    background: var(--color-rw-online-bright);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-rw-online-bright) 22%, transparent);
+}
+
+@utility rw-dot-offline {
+    background: var(--color-rw-subtle);
+}
+
+@utility rw-dot-degraded {
+    background: var(--color-warning);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-warning) 22%, transparent);
+}
+
+/* Panels / slide-over -------------------------------------------------- */
+@utility rw-panel {
+    @apply border bg-rw-surface;
+    border-color: var(--color-rw-border);
+}
+
+/* A soft pill/badge used for tabs, statuses, etc. */
+@utility rw-pill {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium;
+    background: var(--color-rw-elevated);
+    color: var(--color-rw-muted);
+}
+
+/* Left icon rail item (inside a project). */
+@utility rw-rail-item {
+    @apply flex items-center justify-center w-9 h-9 rounded-lg text-rw-muted cursor-pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+@utility rw-rail-item-hover {
+    background: var(--color-rw-hover);
+    color: var(--color-rw-text);
+}
+
+@utility rw-rail-item-active {
+    background: var(--color-rw-elevated);
+    color: var(--color-rw-text);
+}
+
+/* Dashboard sidebar nav item. */
+@utility rw-nav-item {
+    @apply flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium text-rw-muted cursor-pointer;
+    transition: background 120ms ease, color 120ms ease;
+}
+
+@utility rw-nav-item-hover {
+    background: var(--color-rw-hover);
+    color: var(--color-rw-text);
+}
+
+@utility rw-nav-item-active {
+    background: var(--color-rw-elevated);
+    color: var(--color-rw-text);
+}
+
+/* Dropdown menu surface (project / environment switchers). */
+@utility rw-menu {
+    @apply rounded-xl border p-1.5 shadow-2xl;
+    background: var(--color-rw-panel);
+    border-color: var(--color-rw-border);
+    box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.8);
+}
+
+@utility rw-menu-item {
+    @apply flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-rw-text cursor-pointer;
+    transition: background 120ms ease;
+}
+
+@utility rw-menu-item-hover {
+    background: var(--color-rw-hover);
+}
+
+/* Dashed connection edge (SVG stroke helper). */
+@utility rw-edge {
+    stroke: var(--color-rw-border-strong);
+    stroke-width: 1.5;
+    stroke-dasharray: 4 4;
+    fill: none;
+}
