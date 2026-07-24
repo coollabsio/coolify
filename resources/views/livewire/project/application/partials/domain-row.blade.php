@@ -44,10 +44,10 @@
             @endif
         </div>
         <div class="flex flex-wrap items-center gap-2 shrink-0">
-            <x-forms.button wire:click="checkDomainDns({{ $index }})">
-                Check DNS
-            </x-forms.button>
             @can('update', $application)
+                <x-forms.button wire:click="checkDomainDns({{ $index }})">
+                    Check DNS
+                </x-forms.button>
                 @unless ($isReadonlyLabels)
                     @if ($isSuggested)
                         @if ($row['needs_force_add'] ?? false)

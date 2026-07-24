@@ -110,6 +110,40 @@ it('adds a domain to a selected service application', function () {
     expect($this->webApp->fqdn)->toBe('https://web.example.com');
 });
 
+it('saves after confirming both a domain conflict and a missing required port', function () {
+    $this->service->update([
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    environment:
+      SERVICE_URL_WEB_8000: ""
+  api:
+    image: node:alpine
+YAML,
+    ]);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->webApp->id)
+        ->set('newDomain', 'https://api.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->call('confirmDomainUsage')
+        ->assertSet('showDomainConflictModal', false)
+        ->assertSet('showPortWarningModal', true)
+        ->assertSet('forceSaveDomains', true);
+
+    $component
+        ->call('confirmRemovePort')
+        ->assertSet('showPortWarningModal', false)
+        ->assertSet('forceSaveDomains', false)
+        ->assertSet('forceRemovePort', false)
+        ->assertSet('pendingAction', null)
+        ->assertDispatched('success');
+
+    expect($this->webApp->fresh()->fqdn)->toBe('https://api.example.com');
+});
+
 it('loads persisted dns status for service applications', function () {
     $this->apiApp->update([
         'domain_dns_statuses' => [
@@ -142,6 +176,27 @@ it('hides dns message text when service domain dns status is ok', function () {
         ->assertSee('DNS OK')
         ->assertDontSee('DNS points to 203.0.113.10')
         ->assertDontSee('Last checked');
+});
+
+it('forbids read-only users from checking service domain dns', function (string $action, array $parameters) {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call($action, ...$parameters)
+        ->assertForbidden();
+
+    expect($this->apiApp->fresh()->domain_dns_statuses)->toBeNull();
+})->with([
+    'all domains' => ['checkAllDns', []],
+    'one domain' => ['checkDomainDns', [0]],
+]);
+
+it('hides dns check controls from read-only users', function () {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertDontSee('Recheck DNS')
+        ->assertDontSee('Check DNS');
 });
 
 it('exposes the stack domains route', function () {

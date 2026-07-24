@@ -288,6 +288,34 @@ it('marks dns status as skipped when dns validation is disabled', function () {
         ->and($statuses['https://app.example.com']['status'] ?? null)->toBe('skipped');
 });
 
+it('prevents members from running dns check actions', function (string $action, array $parameters) {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'domain_dns_statuses' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call($action, ...$parameters)
+        ->assertForbidden();
+
+    expect($this->application->fresh()->domain_dns_statuses)->toBeNull();
+})->with([
+    'all domains' => ['checkAllDns', []],
+    'single domain' => ['checkDomainDns', [0]],
+]);
+
+it('hides dns check buttons from members', function () {
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('Recheck DNS')
+        ->assertDontSee('Check DNS');
+});
+
 it('loads persisted dns status on page load', function () {
     $this->application->update([
         'fqdn' => 'https://app.example.com',

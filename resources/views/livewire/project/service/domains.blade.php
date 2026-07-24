@@ -178,10 +178,10 @@
                                     @endif
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2 shrink-0">
-                                    <x-forms.button wire:click="checkDomainDns({{ $index }})">
-                                        Check DNS
-                                    </x-forms.button>
                                     @can('update', $service)
+                                        <x-forms.button wire:click="checkDomainDns({{ $index }})">
+                                            Check DNS
+                                        </x-forms.button>
                                         @if ($isSuggested)
                                             @if ($row['needs_force_add'] ?? false)
                                                 <x-forms.button wire:click="addSuggestedDomain({{ $index }})" isError>

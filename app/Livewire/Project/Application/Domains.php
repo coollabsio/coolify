@@ -393,6 +393,8 @@ class Domains extends Component
 
     public function checkAllDns(): void
     {
+        $this->authorize('update', $this->application);
+
         $this->isCheckingDns = true;
 
         try {
@@ -427,6 +429,8 @@ class Domains extends Component
 
     public function checkDomainDns(int $index): void
     {
+        $this->authorize('update', $this->application);
+
         if (! isset($this->domainRows[$index])) {
             return;
         }

@@ -295,6 +295,8 @@ class Domains extends Component
 
     public function checkAllDns(): void
     {
+        $this->authorize('update', $this->service);
+
         $this->isCheckingDns = true;
 
         try {
@@ -323,6 +325,8 @@ class Domains extends Component
 
     public function checkDomainDns(int $index): void
     {
+        $this->authorize('update', $this->service);
+
         if (! isset($this->domainRows[$index])) {
             return;
         }
@@ -480,6 +484,7 @@ class Domains extends Component
     public function cancelRemovePort(): void
     {
         $this->showPortWarningModal = false;
+        $this->forceSaveDomains = false;
         $this->forceRemovePort = false;
         $this->pendingAction = null;
     }
@@ -818,8 +823,6 @@ class Domains extends Component
 
                 return false;
             }
-        } else {
-            $this->forceSaveDomains = false;
         }
 
         if (! $this->forceRemovePort) {
@@ -835,8 +838,6 @@ class Domains extends Component
                     }
                 }
             }
-        } else {
-            $this->forceRemovePort = false;
         }
 
         if ($checkDns && $domainString && $this->shouldValidateDns()) {
