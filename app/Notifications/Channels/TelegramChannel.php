@@ -24,7 +24,8 @@ class TelegramChannel
             \App\Notifications\Container\ContainerStopped::class => $settings->telegram_notifications_status_change_thread_id,
 
             \App\Notifications\Database\BackupSuccess::class => $settings->telegram_notifications_backup_success_thread_id,
-            \App\Notifications\Database\BackupFailed::class => $settings->telegram_notifications_backup_failure_thread_id,
+            \App\Notifications\Database\BackupFailed::class,
+            \App\Notifications\Database\PostgresqlWalArchivingFailed::class => $settings->telegram_notifications_backup_failure_thread_id,
 
             \App\Notifications\ScheduledTask\TaskSuccess::class => $settings->telegram_notifications_scheduled_task_success_thread_id,
             \App\Notifications\ScheduledTask\TaskFailed::class => $settings->telegram_notifications_scheduled_task_failure_thread_id,

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Shared\DeleteScheduledVolumeBackup;
+use App\Models\PostgresqlWalBackupConfiguration;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
@@ -117,6 +118,15 @@ class ScheduledJobManager implements ShouldQueue
             $this->processScheduledVolumeBackups();
         } catch (\Exception $e) {
             Log::channel('scheduled-errors')->error('Failed to process scheduled volume backups', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        try {
+            $this->processPostgresqlWalBackups();
+        } catch (\Exception $e) {
+            Log::channel('scheduled-errors')->error('Failed to process PostgreSQL WAL-G backups', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -364,6 +374,95 @@ class ScheduledJobManager implements ShouldQueue
                     $this->processScheduledVolumeBackup($backup);
                 }
             });
+    }
+
+    private function processPostgresqlWalBackups(): void
+    {
+        PostgresqlWalBackupConfiguration::query()
+            ->with(['database.destination.server.settings', 'team.subscription'])
+            ->where('status', '!=', 'disabled')
+            ->chunkById(self::CHUNK_SIZE, function ($configurations): void {
+                foreach ($configurations as $configuration) {
+                    $this->processPostgresqlWalBackup($configuration);
+                }
+            });
+    }
+
+    private function processPostgresqlWalBackup(PostgresqlWalBackupConfiguration $configuration): void
+    {
+        try {
+            $database = $configuration->database;
+            $server = $database?->destination?->server;
+
+            if (! $database || ! $server) {
+                $this->skippedCount++;
+                $this->logSkip('postgresql_wal_backup', 'database_or_server_missing', [
+                    'configuration_id' => $configuration->id,
+                    'team_id' => $configuration->team_id,
+                ]);
+
+                return;
+            }
+            if (! $server->isFunctional()) {
+                $this->skippedCount++;
+                $this->logSkip('postgresql_wal_backup', 'server_not_functional', [
+                    'configuration_id' => $configuration->id,
+                    'database_id' => $database->id,
+                    'team_id' => $configuration->team_id,
+                    'server_id' => $server->id,
+                ]);
+
+                return;
+            }
+            if (isCloud() && $configuration->team_id !== 0 && ! data_get($configuration, 'team.subscription.stripe_invoice_paid', false)) {
+                $this->skippedCount++;
+                $this->logSkip('postgresql_wal_backup', 'subscription_unpaid', [
+                    'configuration_id' => $configuration->id,
+                    'database_id' => $database->id,
+                    'team_id' => $configuration->team_id,
+                    'server_id' => $server->id,
+                ]);
+
+                return;
+            }
+
+            if ($configuration->enabled
+                && in_array($configuration->status, ['healthy', 'warning'], true)
+                && $this->shouldDispatch(
+                    $configuration->base_backup_frequency,
+                    $server,
+                    "postgresql-wal-base-backup:{$configuration->id}",
+                )) {
+                PostgresqlWalBaseBackupJob::dispatch($configuration);
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('PostgreSQL WAL-G base backup dispatched', [
+                    'configuration_id' => $configuration->id,
+                    'database_id' => $database->id,
+                    'team_id' => $configuration->team_id,
+                    'server_id' => $server->id,
+                ]);
+            }
+
+            if ($this->shouldDispatch(
+                '*/5 * * * *',
+                $server,
+                "postgresql-wal-health-check:{$configuration->id}",
+            )) {
+                PostgresqlWalHealthCheckJob::dispatch($configuration);
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('PostgreSQL WAL-G health check dispatched', [
+                    'configuration_id' => $configuration->id,
+                    'database_id' => $database->id,
+                    'team_id' => $configuration->team_id,
+                    'server_id' => $server->id,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::channel('scheduled-errors')->error('Error processing PostgreSQL WAL-G backup', [
+                'configuration_id' => $configuration->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function recoverStoppedVolumeBackupContainers(): void
