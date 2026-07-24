@@ -458,17 +458,25 @@ class GetContainersStatus
                     continue;
                 }
 
-                // Track restart counts first
+                // Containers excluded from health checks (exclude_from_hc: true or restart: no)
+                // must also be excluded from the crash restart limit. Otherwise legitimately
+                // scheduled / one-shot sidecars (e.g. Ofelia jobs) inflate the restart count
+                // and wrongly trip the limit, stopping the whole application. See issue #10624.
+                $excludedContainers = $this->getExcludedContainersFromDockerCompose(data_get($application, 'docker_compose_raw'));
+
+                // Track restart counts first (ignoring excluded containers)
                 $maxRestartCount = 0;
                 if (isset($this->applicationContainerRestartCounts) && $this->applicationContainerRestartCounts->has($applicationId)) {
-                    $containerRestartCounts = $this->applicationContainerRestartCounts->get($applicationId);
-                    $maxRestartCount = $containerRestartCounts->max() ?? 0;
+                    $maxRestartCount = $this->maxRestartCountExcludingExcluded(
+                        $this->applicationContainerRestartCounts->get($applicationId),
+                        $excludedContainers
+                    );
                 }
 
                 // Wrap all database updates in a transaction to ensure consistency
                 $restartLimitReached = false;
 
-                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, &$restartLimitReached) {
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, $excludedContainers, &$restartLimitReached) {
                     $previousRestartCount = $application->restart_count ?? 0;
 
                     if ($maxRestartCount > $previousRestartCount) {
@@ -487,7 +495,7 @@ class GetContainersStatus
                     }
 
                     // Aggregate status after tracking restart counts
-                    $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
+                    $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount, $excludedContainers);
                     if ($aggregatedStatus) {
                         $statusFromDb = $application->status;
                         if ($statusFromDb !== $aggregatedStatus) {
@@ -512,11 +520,25 @@ class GetContainersStatus
         ServiceChecked::dispatch($this->server->team->id);
     }
 
-    private function aggregateApplicationStatus($application, Collection $containerStatuses, int $maxRestartCount = 0): ?string
+    /**
+     * Return the highest restart count across an application's containers, ignoring any
+     * containers that are excluded from health checks (exclude_from_hc: true or restart: no).
+     * This keeps the crash restart limit from counting legitimately scheduled / one-shot
+     * sidecar containers (e.g. Ofelia jobs). See issue #10624.
+     */
+    private function maxRestartCountExcludingExcluded(Collection $restartCounts, Collection $excludedContainers): int
     {
-        // Parse docker compose to check for excluded containers
-        $dockerComposeRaw = data_get($application, 'docker_compose_raw');
-        $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
+        return (int) ($restartCounts
+            ->reject(function ($count, $containerName) use ($excludedContainers) {
+                return $excludedContainers->contains($containerName);
+            })
+            ->max() ?? 0);
+    }
+
+    private function aggregateApplicationStatus($application, Collection $containerStatuses, int $maxRestartCount = 0, ?Collection $excludedContainers = null): ?string
+    {
+        // Parse docker compose to check for excluded containers (reuse precomputed set when provided)
+        $excludedContainers ??= $this->getExcludedContainersFromDockerCompose(data_get($application, 'docker_compose_raw'));
 
         // Filter out excluded containers
         $relevantStatuses = $containerStatuses->filter(function ($status, $containerName) use ($excludedContainers) {
