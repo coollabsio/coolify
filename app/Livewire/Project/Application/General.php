@@ -773,9 +773,13 @@ class General extends Component
 
             // Process FQDN with intermediate variable to avoid Collection/string confusion
             $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
-            $warning = sslipDomainWarning($this->fqdn);
-            if ($warning) {
-                $this->dispatch('warning', __('warning.sslipdomain'));
+
+            // fqdn may be null for docker compose, in which case don't check
+            if ($this->fqdn !== null) {
+                $warning = sslipDomainWarning($this->fqdn);
+                if ($warning) {
+                    $this->dispatch('warning', __('warning.sslipdomain'));
+                }
             }
 
             $this->syncData(toModel: true);
