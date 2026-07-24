@@ -1,0 +1,201 @@
+name: PostgreSQL WAL-G Images
+
+on:
+  push:
+    branches: ["v4.x", "main"]
+    paths:
+      - .github/workflows/postgresql-walg.yml
+      - docker/postgresql-walg/Dockerfile
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: coollabsio/postgres-walg
+
+jobs:
+  build-test-push:
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres-major: ["16", "17", "18"]
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build PostgreSQL ${{ matrix.postgres-major }} (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/postgresql-walg/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            POSTGRES_MAJOR=${{ matrix.postgres-major }}
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.postgres-major }}-${{ matrix.arch }}
+          labels: |
+            coolify.managed=true
+
+      - name: Verify WAL-G and PostgreSQL startup
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.postgres-major }}-${{ matrix.arch }}
+        run: |
+          docker run --rm --platform "${{ matrix.platform }}" "$IMAGE" wal-g --version
+          container="postgres-walg-startup-${{ matrix.postgres-major }}-${{ matrix.arch }}"
+          docker run -d --name "$container" --platform "${{ matrix.platform }}" -e POSTGRES_PASSWORD=test "$IMAGE"
+          for _ in {1..30}; do
+            if docker exec "$container" pg_isready -U postgres; then
+              docker rm -f "$container"
+              break
+            fi
+            sleep 1
+          done
+          if docker inspect "$container" >/dev/null 2>&1; then
+            docker logs "$container"
+            exit 1
+          fi
+
+      - name: Verify backup-push and backup-fetch against S3
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.postgres-major }}-${{ matrix.arch }}
+          SOURCE_CONTAINER: postgres-walg-source-${{ matrix.postgres-major }}-${{ matrix.arch }}
+          RESTORE_CONTAINER: postgres-walg-restored-${{ matrix.postgres-major }}-${{ matrix.arch }}
+          SOURCE_VOLUME: postgres-walg-source-${{ matrix.postgres-major }}-${{ matrix.arch }}
+          RESTORE_VOLUME: postgres-walg-restore-${{ matrix.postgres-major }}-${{ matrix.arch }}
+          POSTGRES_MAJOR: ${{ matrix.postgres-major }}
+        run: |
+          network="postgres-walg-${{ matrix.postgres-major }}-${{ matrix.arch }}"
+          minio="minio-${{ matrix.postgres-major }}-${{ matrix.arch }}"
+          docker network create "$network"
+          docker run -d --name "$minio" --network "$network" \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for _ in {1..30}; do
+            if docker run --rm --network "$network" --entrypoint /bin/sh minio/mc:latest \
+              -c "mc alias set local 'http://$minio:9000' minioadmin minioadmin >/dev/null && mc ready local"; then
+              break
+            fi
+            sleep 1
+          done
+          docker run --rm --network "$network" --entrypoint /bin/sh minio/mc:latest \
+            -c "mc alias set local 'http://$minio:9000' minioadmin minioadmin >/dev/null && mc mb --ignore-existing local/walg"
+
+          pgdata=$(docker run --rm --entrypoint sh "$IMAGE" -c 'printf "%s" "$PGDATA"')
+          if [ "$POSTGRES_MAJOR" -ge 18 ]; then
+            data_mount=/var/lib/postgresql
+          else
+            data_mount=/var/lib/postgresql/data
+          fi
+          docker volume create "$SOURCE_VOLUME"
+          docker run -d --name "$SOURCE_CONTAINER" --network "$network" \
+            -e POSTGRES_PASSWORD=test \
+            -e WALG_S3_PREFIX=s3://walg/postgresql/${{ matrix.postgres-major }} \
+            -e AWS_ACCESS_KEY_ID=minioadmin -e AWS_SECRET_ACCESS_KEY=minioadmin \
+            -e AWS_ENDPOINT="http://$minio:9000" -e AWS_REGION=us-east-1 \
+            -e AWS_S3_FORCE_PATH_STYLE=true \
+            -v "$SOURCE_VOLUME:$data_mount" "$IMAGE" \
+            -c archive_mode=on -c "archive_command=wal-g wal-push %p"
+          for _ in {1..30}; do
+            if docker exec "$SOURCE_CONTAINER" pg_isready -U postgres; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$SOURCE_CONTAINER" psql -U postgres -c 'create table coolify_walg_test (id integer primary key); insert into coolify_walg_test values (1);'
+          docker exec --user postgres \
+            -e WALG_S3_PREFIX=s3://walg/postgresql/${{ matrix.postgres-major }} \
+            -e AWS_ACCESS_KEY_ID=minioadmin -e AWS_SECRET_ACCESS_KEY=minioadmin \
+            -e AWS_ENDPOINT="http://$minio:9000" -e AWS_REGION=us-east-1 \
+            -e AWS_S3_FORCE_PATH_STYLE=true \
+            "$SOURCE_CONTAINER" wal-g backup-push "$pgdata"
+          docker stop "$SOURCE_CONTAINER"
+          docker volume create "$RESTORE_VOLUME"
+          docker run --rm --entrypoint /bin/sh \
+            -v "$RESTORE_VOLUME:$data_mount" "$IMAGE" \
+            -c "mkdir -p '$pgdata' && chown -R postgres:postgres '$data_mount'"
+          docker run --rm --user postgres --network "$network" --entrypoint /usr/local/bin/wal-g \
+            -e WALG_S3_PREFIX=s3://walg/postgresql/${{ matrix.postgres-major }} \
+            -e AWS_ACCESS_KEY_ID=minioadmin -e AWS_SECRET_ACCESS_KEY=minioadmin \
+            -e AWS_ENDPOINT="http://$minio:9000" -e AWS_REGION=us-east-1 \
+            -e AWS_S3_FORCE_PATH_STYLE=true \
+            -v "$RESTORE_VOLUME:$data_mount" "$IMAGE" \
+            backup-fetch "$pgdata" LATEST
+          docker run --rm --user postgres --entrypoint /bin/sh \
+            -v "$RESTORE_VOLUME:$data_mount" "$IMAGE" \
+            -c "touch '$pgdata/recovery.signal' && test -f '$pgdata/PG_VERSION'"
+          docker run -d --name "$RESTORE_CONTAINER" --network "$network" \
+            -e WALG_S3_PREFIX=s3://walg/postgresql/${{ matrix.postgres-major }} \
+            -e AWS_ACCESS_KEY_ID=minioadmin -e AWS_SECRET_ACCESS_KEY=minioadmin \
+            -e AWS_ENDPOINT="http://$minio:9000" -e AWS_REGION=us-east-1 \
+            -e AWS_S3_FORCE_PATH_STYLE=true \
+            -v "$RESTORE_VOLUME:$data_mount" "$IMAGE" \
+            -c "restore_command=wal-g wal-fetch %f %p"
+          for _ in {1..30}; do
+            if docker exec "$RESTORE_CONTAINER" pg_isready -U postgres; then
+              break
+            fi
+            sleep 1
+          done
+          docker exec "$RESTORE_CONTAINER" psql -U postgres -tAc \
+            'select count(*) from coolify_walg_test' | grep -qx 1
+
+      - name: Push verified image
+        run: docker push "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.postgres-major }}-${{ matrix.arch }}"
+
+      - name: Cleanup smoke-test containers
+        if: always()
+        run: |
+          docker rm -f "postgres-walg-startup-${{ matrix.postgres-major }}-${{ matrix.arch }}" \
+            "postgres-walg-source-${{ matrix.postgres-major }}-${{ matrix.arch }}" \
+            "postgres-walg-restored-${{ matrix.postgres-major }}-${{ matrix.arch }}" \
+            "minio-${{ matrix.postgres-major }}-${{ matrix.arch }}" 2>/dev/null || true
+          docker network rm "postgres-walg-${{ matrix.postgres-major }}-${{ matrix.arch }}" 2>/dev/null || true
+          docker volume rm "postgres-walg-source-${{ matrix.postgres-major }}-${{ matrix.arch }}" \
+            "postgres-walg-restore-${{ matrix.postgres-major }}-${{ matrix.arch }}" 2>/dev/null || true
+
+  publish-manifests:
+    runs-on: ubuntu-24.04
+    needs: build-test-push
+    strategy:
+      matrix:
+        postgres-major: ["16", "17", "18"]
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish PostgreSQL ${{ matrix.postgres-major }} manifest
+        run: |
+          docker buildx imagetools create \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.postgres-major }}-amd64" \
+            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.postgres-major }}-arm64" \
+            --tag "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.postgres-major }}"
