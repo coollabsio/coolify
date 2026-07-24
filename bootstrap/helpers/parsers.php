@@ -1286,15 +1286,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $isDatabase = isDatabaseImage($image, $service);
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
-            $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return getFqdnWithoutPort($fqdn);
-            });
-            $coolifyEnvironments->put('COOLIFY_URL', $fqdnsWithoutPort->implode(','));
-
-            $urls = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
-            });
-            $coolifyEnvironments->put('COOLIFY_FQDN', $urls->implode(','));
+            $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
+            $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
         }
         add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
         if ($environment->count() > 0) {
@@ -1784,7 +1777,7 @@ function serviceParser(Service $resource): Collection
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
                     // FQDN may be a comma-separated list; use the first entry (same as updateCompose).
-                    $firstFqdn = trim((string) str($savedService->fqdn)->explode(',')->first());
+                    $firstFqdn = firstDomainFromList($savedService->fqdn);
                     $fqdn = getFqdnWithoutPort($firstFqdn);
                     $url = $fqdn;
                 } else {
@@ -2558,14 +2551,8 @@ function serviceParser(Service $resource): Collection
 
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
-            $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
-            });
-            $coolifyEnvironments->put('COOLIFY_FQDN', $fqdnsWithoutPort->implode(','));
-            $urls = $fqdns->map(function ($fqdn) {
-                return getFqdnWithoutPort($fqdn);
-            });
-            $coolifyEnvironments->put('COOLIFY_URL', $urls->implode(','));
+            $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
+            $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
         }
         add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
         if ($environment->count() > 0) {

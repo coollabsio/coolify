@@ -749,31 +749,71 @@ function base_ip(): string
 
     return 'localhost';
 }
-function getFqdnWithoutPort(string $fqdn)
+/**
+ * Parse a domain URL into scheme/host/path pieces used by COOLIFY_* and SERVICE_* env builders.
+ * Omits a bare "/" path so port re-append stays valid ("http://host:80" not "http://host/:80").
+ *
+ * @return array{scheme: string, host: string, path: string}|null
+ */
+function parseDomainUrlParts(string $fqdn): ?array
 {
     try {
         $url = Url::fromString($fqdn);
         $host = $url->getHost();
-        $scheme = $url->getScheme();
+        if ($host === '') {
+            return null;
+        }
+
         $path = $url->getPath();
-
-        // Spatie accepts bare hostnames (scheme empty). Keep original input when we
-        // cannot build a real absolute URL — call sites must not get "://host".
-        if ($scheme === '' || $host === '') {
-            return $fqdn;
+        if ($path === '' || $path === '/') {
+            $path = '';
         }
 
-        // Match updateCompose(): omit a bare "/" path so port re-append stays valid
-        // ("http://host:80" not "http://host/:80").
-        $base = "$scheme://$host";
-        if ($path !== '' && $path !== '/') {
-            return $base.$path;
-        }
-
-        return $base;
+        return [
+            'scheme' => $url->getScheme(),
+            'host' => $host,
+            'path' => $path,
+        ];
     } catch (Throwable) {
+        return null;
+    }
+}
+
+/**
+ * Absolute URL without port (and without a bare trailing slash).
+ * Used for COOLIFY_URL / SERVICE_URL base values.
+ */
+function getFqdnWithoutPort(string $fqdn): string
+{
+    $parts = parseDomainUrlParts($fqdn);
+    if ($parts === null || $parts['scheme'] === '') {
+        // Spatie accepts bare hostnames (empty scheme). Do not invent "://host".
         return $fqdn;
     }
+
+    return $parts['scheme'].'://'.$parts['host'].$parts['path'];
+}
+
+/**
+ * Host (+ optional path) without scheme or port.
+ * Used for COOLIFY_FQDN / SERVICE_FQDN base values.
+ */
+function getHostWithoutPort(string $fqdn): string
+{
+    $parts = parseDomainUrlParts($fqdn);
+    if ($parts === null) {
+        return $fqdn;
+    }
+
+    return $parts['host'].$parts['path'];
+}
+
+/**
+ * First entry from a comma-separated FQDN list (service apps may store multiple).
+ */
+function firstDomainFromList(?string $fqdns): string
+{
+    return trim((string) str($fqdns ?? '')->explode(',')->first());
 }
 /**
  * If fqdn is set, return it, otherwise return public ip.
