@@ -1,5 +1,8 @@
 <nav wire:poll.10000ms="checkStatus" class="pb-6">
     @php
+        $hasPointInTimeRecovery = $database->type() === 'standalone-postgresql'
+            && $database->walBackupConfiguration
+            && auth()->user()?->can('view', $database);
         $databasePageItems = [
             ['label' => 'Configuration', 'route' => 'project.database.configuration', 'active' => request()->routeIs('project.database.configuration')],
             [
@@ -7,6 +10,12 @@
                 'route' => 'project.database.backup.index',
                 'active' => request()->routeIs('project.database.backup.*'),
                 'visible' => $database->isBackupSolutionAvailable(),
+            ],
+            [
+                'label' => 'Point-in-Time Recovery',
+                'route' => 'project.database.pitr',
+                'active' => request()->routeIs('project.database.pitr'),
+                'visible' => $hasPointInTimeRecovery,
             ],
             ['label' => 'Logs', 'route' => 'project.database.logs', 'active' => request()->routeIs('project.database.logs')],
             ['label' => 'Terminal', 'route' => 'project.database.command', 'active' => request()->routeIs('project.database.command'), 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
@@ -189,6 +198,12 @@
                 <a class="shrink-0 {{ request()->routeIs('project.database.backup.*') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
                     href="{{ route('project.database.backup.index', $parameters) }}">
                     Backups
+                </a>
+            @endif
+            @if ($hasPointInTimeRecovery)
+                <a class="shrink-0 {{ request()->routeIs('project.database.pitr') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
+                    href="{{ route('project.database.pitr', $parameters) }}">
+                    Point-in-Time Recovery
                 </a>
             @endif
             <a class="shrink-0 {{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"

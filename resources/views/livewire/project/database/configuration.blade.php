@@ -15,6 +15,10 @@
                 href="{{ route('project.database.servers', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Servers</span></a>
             <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
                 href="{{ route('project.database.persistent-storage', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Persistent Storage</span></a>
+            @if ($database->type() === 'standalone-postgresql' && $database->walBackupConfiguration)
+                <a class='sub-menu-item' {{ wireNavigate() }} wire:current.exact="menu-item-active"
+                    href="{{ route('project.database.pitr', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Point-in-Time Recovery</span></a>
+            @endif
             @can('update', $database)
                 <a class='sub-menu-item' wire:current.exact="menu-item-active"
                     href="{{ route('project.database.import-backup', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'database_uuid' => $database->uuid]) }}"><span class="menu-item-label">Import Backup</span></a>

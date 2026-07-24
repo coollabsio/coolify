@@ -181,6 +181,14 @@ it('makes initial base backup dispatches unique per WAL-G configuration', functi
         ->and($job->uniqueFor)->toBeGreaterThan($job->timeout);
 });
 
+it('retries a user-requested base backup when the repository is busy', function () {
+    $job = new PostgresqlWalBaseBackupJob($this->configuration, retryWhenBusy: true);
+    $middleware = $job->middleware()[0];
+
+    expect($middleware->releaseAfter)->toBe(30)
+        ->and($job->tries)->toBeGreaterThan(1);
+});
+
 it('re-baselines a reset archiver failure counter without treating it as recovery', function () {
     Notification::fake();
     $this->configuration->update([

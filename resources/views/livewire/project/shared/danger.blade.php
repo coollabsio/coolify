@@ -4,6 +4,13 @@
     <h4 class="pt-4">Delete Resource</h4>
     <div class="pb-4">This will stop your containers, delete all related data, etc. Beware! There is no coming back!
     </div>
+    @if ($retainedWalBackupPrefix)
+        <x-callout type="warning" title="WAL-G backups are retained" class="mb-4">
+            Deleting this database does not delete its point-in-time recovery data from
+            <span class="font-mono">{{ $retainedWalBackupPrefix }}</span>. Remove those S3 objects manually when they
+            are no longer needed.
+        </x-callout>
+    @endif
 
     @if ($canDelete)
         <x-modal-confirmation title="Confirm Resource Deletion?" buttonTitle="Delete" isErrorButton submitAction="delete"

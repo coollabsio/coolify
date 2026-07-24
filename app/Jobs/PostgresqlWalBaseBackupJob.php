@@ -23,14 +23,20 @@ class PostgresqlWalBaseBackupJob implements ShouldBeEncrypted, ShouldBeUnique, S
 
     public int $maxExceptions = 1;
 
+    public int $tries = 5;
+
+    public array $backoff = [30, 60, 120, 240];
+
     public int $timeout;
 
     public int $uniqueFor;
 
     private ?PostgresqlWalBackupExecution $execution = null;
 
-    public function __construct(public PostgresqlWalBackupConfiguration $configuration)
-    {
+    public function __construct(
+        public PostgresqlWalBackupConfiguration $configuration,
+        public bool $retryWhenBusy = false,
+    ) {
         $this->onQueue(crons_queue());
         $this->timeout = $configuration->timeout;
         $this->uniqueFor = $configuration->timeout + 300;
@@ -48,11 +54,14 @@ class PostgresqlWalBaseBackupJob implements ShouldBeEncrypted, ShouldBeUnique, S
 
     public function middleware(): array
     {
+        $lock = (new WithoutOverlapping(self::repositoryLockKey($this->configuration->id)))
+            ->shared()
+            ->expireAfter($this->timeout + 300);
+
         return [
-            (new WithoutOverlapping(self::repositoryLockKey($this->configuration->id)))
-                ->shared()
-                ->expireAfter($this->timeout + 300)
-                ->dontRelease(),
+            $this->retryWhenBusy
+                ? $lock->releaseAfter(30)
+                : $lock->dontRelease(),
         ];
     }
 

@@ -6,6 +6,7 @@ use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -34,6 +35,8 @@ class Danger extends Component
     public string $resourceDomain = '';
 
     public bool $canDelete = false;
+
+    public ?string $retainedWalBackupPrefix = null;
 
     public function mount()
     {
@@ -78,6 +81,16 @@ class Danger extends Component
             'service-database' => $this->resource->name ?? 'Service Database',
             default => 'Unknown Resource',
         };
+
+        if ($this->resource instanceof StandalonePostgresql) {
+            $configuration = $this->resource->walBackupConfiguration()->with('s3:id,bucket')->first();
+            if ($configuration) {
+                $path = "coolify/postgresql/{$this->resource->uuid}/pg{$configuration->postgres_major_version}";
+                $this->retainedWalBackupPrefix = $configuration->s3
+                    ? "s3://{$configuration->s3->bucket}/{$path}"
+                    : $path;
+            }
+        }
 
         // Check if user can delete this resource
         try {
