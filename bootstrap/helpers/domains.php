@@ -4,6 +4,21 @@ use App\Models\Application;
 use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 
+/**
+ * Count domains in a comma-separated FQDN string (e.g. "https://a.com,https://b.com").
+ */
+function countDomains(?string $fqdn): int
+{
+    if (! filled($fqdn)) {
+        return 0;
+    }
+
+    return collect(explode(',', $fqdn))
+        ->map(fn ($d) => trim($d))
+        ->filter()
+        ->count();
+}
+
 function isValidDomainUrl(string $url): bool
 {
     $components = parse_url($url);

@@ -104,4 +104,26 @@ describe('Application Redirect', function () {
         expect($application->redirect)->toBe('both');
     });
 
+    test('setRedirect only classifies domains whose hostname starts with www', function (string $fqdn) {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'fqdn' => $fqdn,
+            'redirect' => 'both',
+        ]);
+
+        Livewire::test(Domains::class, ['application' => $application])
+            ->assertSuccessful()
+            ->set('redirect', 'www')
+            ->call('setRedirect')
+            ->assertDispatched('error');
+
+        $application->refresh();
+        expect($application->redirect)->toBe('both');
+    })->with([
+        'www in path' => 'https://example.com/www.example.com',
+        'www in unrelated hostname label' => 'https://app.www.example.com',
+    ]);
+
 });

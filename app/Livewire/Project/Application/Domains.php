@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\Server;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -60,7 +61,7 @@ class Domains extends Component
 
     public bool $isCompose = false;
 
-    public bool $isReadonlyLabels = false;
+    public bool $labelsAreWritable = false;
 
     public bool $isCheckingDns = false;
 
@@ -114,7 +115,7 @@ class Domains extends Component
         $this->application->loadMissing(['destination.server', 'settings', 'additional_servers']);
 
         $this->isCompose = $this->application->build_pack === 'dockercompose';
-        $this->isReadonlyLabels = $this->application->settings->is_container_label_readonly_enabled === false;
+        $this->labelsAreWritable = $this->application->settings->is_container_label_readonly_enabled === false;
         $this->redirect = $this->application->redirect ?? 'both';
 
         $settings = instanceSettings();
@@ -452,7 +453,7 @@ class Domains extends Component
         $this->persistDomainDnsStatuses();
     }
 
-    protected function applyDnsStatus(int $index, string $url, $server): void
+    protected function applyDnsStatus(int $index, string $url, Server $server): void
     {
         $target = $this->dnsTargetLabel();
 
@@ -645,7 +646,7 @@ class Domains extends Component
         try {
             $this->authorize('update', $this->application);
 
-            if ($this->isReadonlyLabels) {
+            if ($this->labelsAreWritable) {
                 $this->dispatch('error', 'Domains cannot be edited while container labels are writable. Set domains in the Labels section on General.');
 
                 return;
@@ -819,7 +820,7 @@ class Domains extends Component
         try {
             $this->authorize('update', $this->application);
 
-            if ($this->isReadonlyLabels) {
+            if ($this->labelsAreWritable) {
                 $this->dispatch('error', 'Domains cannot be edited while container labels are writable.');
 
                 return;
@@ -919,7 +920,7 @@ class Domains extends Component
         try {
             $this->authorize('update', $this->application);
 
-            if ($this->isReadonlyLabels) {
+            if ($this->labelsAreWritable) {
                 $this->dispatch('error', 'Domains cannot be edited while container labels are writable.');
 
                 return;
@@ -988,7 +989,7 @@ class Domains extends Component
         try {
             $this->authorize('update', $this->application);
 
-            if ($this->isReadonlyLabels) {
+            if ($this->labelsAreWritable) {
                 $this->dispatch('error', 'Domains cannot be edited while container labels are writable.');
 
                 return;
@@ -1002,7 +1003,7 @@ class Domains extends Component
             $service = $this->domainRows[$index]['service'];
             $updated = $this->currentDomainList($service)->reject(fn (string $item) => $item === $url)->values();
 
-            if (! $this->saveDomainList($updated, $service, checkConflicts: false)) {
+            if (! $this->saveDomainList($updated, $service, checkConflicts: false, checkDns: false)) {
                 return;
             }
 
@@ -1023,7 +1024,7 @@ class Domains extends Component
         try {
             $this->authorize('update', $this->application);
 
-            if ($this->isReadonlyLabels) {
+            if ($this->labelsAreWritable) {
                 $this->dispatch('error', 'Domains cannot be edited while container labels are writable.');
 
                 return;
@@ -1080,8 +1081,12 @@ class Domains extends Component
             $this->validateOnly('redirect');
 
             $this->application->redirect = $this->redirect;
-            $hasWww = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
-            $hasNonWww = collect($this->application->fqdns)->filter(fn ($fqdn) => ! str($fqdn)->contains('www.'))->count();
+            $hasWww = collect($this->application->fqdns)->filter(
+                fn ($fqdn) => str_starts_with(strtolower((string) $this->domainHost($fqdn)), 'www.')
+            )->count();
+            $hasNonWww = collect($this->application->fqdns)->filter(
+                fn ($fqdn) => ! str_starts_with(strtolower((string) $this->domainHost($fqdn)), 'www.')
+            )->count();
 
             $dnsHint = dnsMismatchGuidanceMessage(
                 $this->dnsTargetLabel() ?? $this->serverIp,

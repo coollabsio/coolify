@@ -90,9 +90,7 @@
                             <div class="flex flex-col gap-2 sm:flex-row">
                                 @if (!$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
                                     @php
-                                        $domainCount = filled($serviceApplication->fqdn)
-                                            ? collect(explode(',', $serviceApplication->fqdn))->map(fn ($d) => trim($d))->filter()->count()
-                                            : 0;
+                                        $domainCount = countDomains($serviceApplication->fqdn);
                                     @endphp
                                     <div class="flex-1 text-sm dark:text-neutral-400">
                                         @if ($domainCount === 0)

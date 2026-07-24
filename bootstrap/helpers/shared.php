@@ -1752,6 +1752,9 @@ function getRealtime()
  * When a server uses a hostname (e.g. coolify-testing-host) instead of a literal
  * IP, A-record validation and UI copy need the actual IP the user should point DNS to.
  *
+ * Successful hostname resolutions are cached briefly so Livewire mounts/domain state
+ * loads do not re-query DNS on every request.
+ *
  * @return array{ip: ?string, configured: ?string, resolved_from_hostname: bool}
  */
 function resolveServerIpAddress(?string $ipOrHost): array
@@ -1774,6 +1777,17 @@ function resolveServerIpAddress(?string $ipOrHost): array
             'ip' => $candidate,
             'configured' => $configured,
             'resolved_from_hostname' => false,
+        ];
+    }
+
+    $cacheKey = 'server-ip-resolve:'.mb_strtolower($candidate);
+    $cachedIp = Cache::get($cacheKey);
+
+    if (is_string($cachedIp) && filter_var($cachedIp, FILTER_VALIDATE_IP) !== false) {
+        return [
+            'ip' => $cachedIp,
+            'configured' => $configured,
+            'resolved_from_hostname' => true,
         ];
     }
 
@@ -1814,6 +1828,10 @@ function resolveServerIpAddress(?string $ipOrHost): array
         if (is_string($resolved) && $resolved !== $candidate && filter_var($resolved, FILTER_VALIDATE_IP) !== false) {
             $resolvedIp = $resolved;
         }
+    }
+
+    if ($resolvedIp !== null) {
+        Cache::put($cacheKey, $resolvedIp, now()->addSeconds(60));
     }
 
     return [
@@ -1910,9 +1928,6 @@ function dnsMismatchGuidanceMessage(?string $targetLabel, ?string $ipForRecordTy
 
 function validateDNSEntry(string $fqdn, Server $server)
 {
-    // https://www.cloudflare.com/ips-v4/#
-    $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
-
     $url = Url::fromString($fqdn);
     $host = $url->getHost();
     if (str($host)->contains('sslip.io')) {
@@ -1936,8 +1951,7 @@ function validateDNSEntry(string $fqdn, Server $server)
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        // Cloudflare allow-list is IPv4-only; skip for AAAA checks.
-                        if ($type === DNSTypes::NAME_A && ipMatch($result->getData(), $cloudflare_ips->toArray(), $match)) {
+                        if (isCloudflareIp($result->getData())) {
                             $found_matching_ip = true;
                             break;
                         }
@@ -1955,11 +1969,48 @@ function validateDNSEntry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
+function isCloudflareIp(string $ip): bool
+{
+    // https://www.cloudflare.com/ips/
+    $cloudflareIps = [
+        '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+        '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+        '172.64.0.0/13', '131.0.72.0/22', '2400:cb00::/32', '2606:4700::/32',
+        '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29',
+        '2c0f:f248::/32',
+    ];
+
+    return ipMatch($ip, $cloudflareIps);
+}
+
 function ipMatch($ip, $cidrs, &$match = null)
 {
     foreach ((array) $cidrs as $cidr) {
-        [$subnet, $mask] = explode('/', $cidr);
-        if (((ip2long($ip) & ($mask = ~((1 << (32 - $mask)) - 1))) == (ip2long($subnet) & $mask))) {
+        [$subnet, $prefixLength] = explode('/', $cidr);
+        $packedIp = inet_pton($ip);
+        $packedSubnet = inet_pton($subnet);
+
+        if ($packedIp === false || $packedSubnet === false || strlen($packedIp) !== strlen($packedSubnet)) {
+            continue;
+        }
+
+        $addressBits = strlen($packedIp) * 8;
+        $prefixLength = (int) $prefixLength;
+        if ($prefixLength < 0 || $prefixLength > $addressBits) {
+            continue;
+        }
+
+        $fullBytes = intdiv($prefixLength, 8);
+        $remainingBits = $prefixLength % 8;
+        $matches = substr($packedIp, 0, $fullBytes) === substr($packedSubnet, 0, $fullBytes);
+
+        if ($matches && $remainingBits > 0) {
+            $mask = (0xFF << (8 - $remainingBits)) & 0xFF;
+            $matches = (ord($packedIp[$fullBytes]) & $mask) === (ord($packedSubnet[$fullBytes]) & $mask);
+        }
+
+        if ($matches) {
             $match = $cidr;
 
             return true;

@@ -22,9 +22,7 @@
             @endif
             @if ($isApplication)
                 @php
-                    $domainCount = filled($resource->fqdn)
-                        ? collect(explode(',', $resource->fqdn))->map(fn ($d) => trim($d))->filter()->count()
-                        : 0;
+                    $domainCount = countDomains($resource->fqdn);
                 @endphp
                 <span class="flex flex-wrap items-center gap-1 text-xs dark:text-neutral-400">
                     @if ($domainCount === 0)

@@ -8,7 +8,8 @@
                         :closeOutside="false">
                         <form wire:submit="addDomain" class="flex flex-col gap-4">
                             @if (count($serviceApps) > 0)
-                                <x-forms.select label="Service application" id="newServiceApplicationId" required>
+                                <x-forms.select canGate="update" :canResource="$service" label="Service application"
+                                    id="newServiceApplicationId" required>
                                     @foreach ($serviceApps as $app)
                                         <option value="{{ $app['id'] }}">
                                             {{ $app['name'] }}
@@ -33,7 +34,8 @@
                                 </x-callout>
                             @endif
 
-                            <x-forms.input id="newDomain" label="Domain URL" placeholder="https://app.example.com"
+                            <x-forms.input canGate="update" :canResource="$service" id="newDomain" label="Domain URL"
+                                placeholder="https://app.example.com"
                                 helper="Full URL including scheme. Optional path and container port are supported."
                                 required />
 
@@ -50,16 +52,19 @@
                             @endif
 
                             <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-                                <x-forms.button type="button" wire:click="generateDomain">
+                                <x-forms.button canGate="update" :canResource="$service" type="button"
+                                    wire:click="generateDomain">
                                     Generate Domain
                                 </x-forms.button>
                                 <div class="flex flex-wrap gap-2">
                                     @if ($addDomainDnsFailed)
-                                        <x-forms.button type="button" wire:click="confirmAddDomainDespiteDns" isError>
+                                        <x-forms.button canGate="update" :canResource="$service" type="button"
+                                            wire:click="confirmAddDomainDespiteDns" isError>
                                             Continue
                                         </x-forms.button>
                                     @else
-                                        <x-forms.button type="submit" isHighlighted>
+                                        <x-forms.button canGate="update" :canResource="$service" type="submit"
+                                            isHighlighted>
                                             Save
                                         </x-forms.button>
                                     @endif
@@ -68,7 +73,7 @@
                         </form>
                     </x-modal-input>
                 @endif
-                <x-forms.button wire:click="checkAllDns">
+                <x-forms.button canGate="update" :canResource="$service" wire:click="checkAllDns">
                     Recheck DNS
                 </x-forms.button>
             @endcan
@@ -179,22 +184,25 @@
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2 shrink-0">
                                     @can('update', $service)
-                                        <x-forms.button wire:click="checkDomainDns({{ $index }})">
+                                        <x-forms.button canGate="update" :canResource="$service"
+                                            wire:click="checkDomainDns({{ $index }})">
                                             Check DNS
                                         </x-forms.button>
                                         @if ($isSuggested)
                                             @if ($row['needs_force_add'] ?? false)
-                                                <x-forms.button wire:click="addSuggestedDomain({{ $index }})" isError>
+                                                <x-forms.button canGate="update" :canResource="$service"
+                                                    wire:click="addSuggestedDomain({{ $index }})" isError>
                                                     Continue
                                                 </x-forms.button>
                                             @else
-                                                <x-forms.button wire:click="addSuggestedDomain({{ $index }})"
-                                                    isHighlighted>
+                                                <x-forms.button canGate="update" :canResource="$service"
+                                                    wire:click="addSuggestedDomain({{ $index }})" isHighlighted>
                                                     Add
                                                 </x-forms.button>
                                             @endif
                                         @else
-                                            <x-forms.button wire:click="startEdit({{ $index }})">Edit</x-forms.button>
+                                            <x-forms.button canGate="update" :canResource="$service"
+                                                wire:click="startEdit({{ $index }})">Edit</x-forms.button>
                                             <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?"
                                                 buttonTitle="Remove" isErrorButton
                                                 submitAction="removeDomain({{ $index }})" :actions="[
@@ -251,28 +259,30 @@
                                         $editApp = collect($serviceApps)->firstWhere('id', $editingServiceApplicationId);
                                     @endphp
                                     @if ($editApp)
-                                        <x-forms.input label="Service application" value="{{ $editApp['name'] }}"
-                                            readonly />
+                                        <x-forms.input canGate="update" :canResource="$service"
+                                            label="Service application" value="{{ $editApp['name'] }}" readonly />
                                     @endif
-                                    <x-forms.input id="editingDomain" label="Domain URL"
-                                        placeholder="https://app.example.com" required />
+                                    <x-forms.input canGate="update" :canResource="$service" id="editingDomain"
+                                        label="Domain URL" placeholder="https://app.example.com" required />
                                     @if ($editDomainDnsFailed)
                                         <x-callout type="danger" title="DNS validation failed">
                                             {{ $editDomainDnsMessage }}
                                         </x-callout>
                                     @endif
                                     <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
-                                        <x-forms.button type="button" wire:click="cancelEdit"
+                                        <x-forms.button canGate="update" :canResource="$service" type="button"
+                                            wire:click="cancelEdit"
                                             class="dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                                             Cancel
                                         </x-forms.button>
                                         @if ($editDomainDnsFailed)
-                                            <x-forms.button type="button" wire:click="confirmUpdateDomainDespiteDns"
-                                                isError>
+                                            <x-forms.button canGate="update" :canResource="$service" type="button"
+                                                wire:click="confirmUpdateDomainDespiteDns" isError>
                                                 Continue
                                             </x-forms.button>
                                         @else
-                                            <x-forms.button type="submit" isHighlighted>
+                                            <x-forms.button canGate="update" :canResource="$service" type="submit"
+                                                isHighlighted>
                                                 Save
                                             </x-forms.button>
                                         @endif
@@ -314,11 +324,12 @@
                             missing a port number.
                         </x-callout>
                         <div class="flex flex-wrap gap-2 justify-between mt-4">
-                            <x-forms.button wire:click="cancelRemovePort"
+                            <x-forms.button canGate="update" :canResource="$service" wire:click="cancelRemovePort"
                                 class="w-auto dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
                                 Cancel - Keep Port
                             </x-forms.button>
-                            <x-forms.button wire:click="confirmRemovePort" isError class="w-auto">
+                            <x-forms.button canGate="update" :canResource="$service" wire:click="confirmRemovePort"
+                                isError class="w-auto">
                                 I understand, remove port anyway
                             </x-forms.button>
                         </div>

@@ -48,7 +48,7 @@
                 <x-forms.button wire:click="checkDomainDns({{ $index }})">
                     Check DNS
                 </x-forms.button>
-                @unless ($isReadonlyLabels)
+                @unless ($labelsAreWritable)
                     @if ($isSuggested)
                         @if ($row['needs_force_add'] ?? false)
                             <x-forms.button wire:click="addSuggestedDomain({{ $index }})" isError>

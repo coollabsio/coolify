@@ -110,6 +110,76 @@ it('adds a domain to a selected service application', function () {
     expect($this->webApp->fqdn)->toBe('https://web.example.com');
 });
 
+it('prunes dns status when a service domain is removed', function () {
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            'https://api.example.com' => [
+                'status' => 'failed',
+                'message' => 'Stale DNS result.',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('removeDomain', 0)
+        ->assertDispatched('success');
+
+    expect($this->apiApp->fresh()->domain_dns_statuses)->toBeNull();
+});
+
+it('prunes the previous dns status when a service domain is renamed', function () {
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            'https://api.example.com' => [
+                'status' => 'ok',
+                'message' => 'Stale DNS result.',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->set('editingDomain', 'https://renamed.example.com')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $this->apiApp->refresh();
+
+    expect($this->apiApp->fqdn)->toBe('https://renamed.example.com')
+        ->and($this->apiApp->domain_dns_statuses)->toBeNull();
+});
+
+it('does not restore stale dns status when a removed service domain is re-added', function () {
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            'https://api.example.com' => [
+                'status' => 'failed',
+                'message' => 'Stale DNS result.',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('removeDomain', 0)
+        ->set('newServiceApplicationId', $this->apiApp->id)
+        ->set('newDomain', 'https://api.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $this->apiApp->refresh();
+
+    expect($this->apiApp->fqdn)->toBe('https://api.example.com')
+        ->and($this->apiApp->domain_dns_statuses)->toBeNull();
+});
+
 it('saves after confirming both a domain conflict and a missing required port', function () {
     $this->service->update([
         'docker_compose_raw' => <<<'YAML'

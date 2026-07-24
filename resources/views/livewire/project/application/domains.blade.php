@@ -3,9 +3,9 @@
         <div class="flex flex-wrap items-center gap-2">
             <h2>Domains</h2>
             @can('update', $application)
-                @unless ($isReadonlyLabels)
+                @unless ($labelsAreWritable)
                     <x-modal-input buttonTitle="+ Add" title="Add Domain" isHighlightedButton :wireIgnore="false"
-                        :closeOutside="false">
+                        :closeOutside="false" canGate="update" :canResource="$application">
                         <form wire:submit="addDomain" class="flex flex-col gap-4">
                             @if ($isCompose && count($composeServices) > 0)
                                 <x-forms.select label="Service" id="newDomainService" required>
@@ -64,7 +64,7 @@
         </div>
     </div>
 
-    @if ($isReadonlyLabels)
+    @if ($labelsAreWritable)
         <x-callout type="warning" title="Domains managed via labels">
             Container label readonly mode is disabled. Domains must be set in the Labels section on the General page.
         </x-callout>
@@ -85,7 +85,7 @@
 
     @if (! $isCompose)
         <div class="flex flex-col gap-2 md:flex-row md:items-end md:max-w-xl">
-            @if ($isReadonlyLabels)
+            @if ($labelsAreWritable)
                 @if ($application->redirect === 'both')
                     <x-forms.input label="Direction" value="Allow www & non-www." readonly
                         helper="Readonly labels are disabled. You can set the direction in the labels section." />
@@ -111,7 +111,7 @@
                         confirmationText="{{ ($application->fqdn ?: 'domains') . '/' }}"
                         confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
                         shortConfirmationLabel="Application URL" :confirmWithPassword="false"
-                        step2ButtonText="Set Direction">
+                        step2ButtonText="Set Direction" canGate="update" :canResource="$application">
                         <x-slot:customButton>
                             <div class="w-[7.2rem]">Set Direction</div>
                         </x-slot:customButton>
@@ -144,7 +144,7 @@
             <div class="p-6 text-sm border border-dashed rounded-sm dark:border-coolgray-300 dark:text-neutral-400">
                 No domains configured yet.
                 @can('update', $application)
-                    @unless ($isReadonlyLabels)
+                    @unless ($labelsAreWritable)
                         Use <strong>+ Add</strong> or generate one with the server wildcard domain.
                     @endunless
                 @endcan
@@ -182,7 +182,7 @@
                                 class="p-4 text-sm border border-dashed rounded-sm dark:border-coolgray-300 dark:text-neutral-400">
                                 No domains for this service yet.
                                 @can('update', $application)
-                                    @unless ($isReadonlyLabels)
+                                    @unless ($labelsAreWritable)
                                         Use <strong>+ Add</strong> and select <span class="font-mono">{{ $serviceName }}</span>.
                                     @endunless
                                 @endcan
@@ -200,7 +200,7 @@
                                     'index' => $index,
                                     'row' => $row,
                                     'application' => $application,
-                                    'isReadonlyLabels' => $isReadonlyLabels,
+                                    'labelsAreWritable' => $labelsAreWritable,
                                 ])
                             @endforeach
                         @endif
@@ -214,7 +214,7 @@
                         'index' => $index,
                         'row' => $row,
                         'application' => $application,
-                        'isReadonlyLabels' => $isReadonlyLabels,
+                        'labelsAreWritable' => $labelsAreWritable,
                     ])
                 @endforeach
             </div>

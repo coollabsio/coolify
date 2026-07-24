@@ -33,15 +33,12 @@
                     foreach ($composeDomains as $serviceDomain) {
                         $domainString = data_get($serviceDomain, 'domain');
                         if (filled($domainString)) {
-                            $domainCount += collect(explode(',', $domainString))
-                                ->map(fn ($d) => trim($d))
-                                ->filter()
-                                ->count();
+                            $domainCount += countDomains($domainString);
                         }
                     }
                 }
             } elseif (filled($fqdn)) {
-                $domainCount = collect(explode(',', $fqdn))->map(fn ($d) => trim($d))->filter()->count();
+                $domainCount = countDomains($fqdn);
             }
         @endphp
         <div class="pt-2 text-sm dark:text-neutral-400">

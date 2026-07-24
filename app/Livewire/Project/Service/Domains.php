@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Support\ValidationPatterns;
@@ -345,7 +346,7 @@ class Domains extends Component
         $this->persistAllDomainDnsStatuses();
     }
 
-    protected function applyDnsStatus(int $index, string $url, $server): void
+    protected function applyDnsStatus(int $index, string $url, Server $server): void
     {
         $target = $this->dnsTargetLabel();
 
@@ -413,6 +414,12 @@ class Domains extends Component
         }
 
         $this->service->load('applications');
+    }
+
+    protected function pruneDomainDnsStatusesToCurrentDomains(): void
+    {
+        $this->refreshDomains();
+        $this->persistAllDomainDnsStatuses();
     }
 
     public function updatedNewDomain(): void
@@ -552,7 +559,7 @@ class Domains extends Component
             $this->pendingAction = null;
             $this->dispatch('close-modal');
             $this->dispatch('success', 'Domain added.');
-            $this->refreshDomains();
+            $this->pruneDomainDnsStatusesToCurrentDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -648,7 +655,7 @@ class Domains extends Component
             $this->forceRemovePort = false;
             $this->pendingAction = null;
             $this->dispatch('success', 'Domain updated.');
-            $this->refreshDomains();
+            $this->pruneDomainDnsStatusesToCurrentDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -680,7 +687,7 @@ class Domains extends Component
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
             $this->dispatch('success', 'Domain removed.');
-            $this->refreshDomains();
+            $this->pruneDomainDnsStatusesToCurrentDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -753,7 +760,7 @@ class Domains extends Component
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
             $this->dispatch('success', 'Domain added.');
-            $this->refreshDomains();
+            $this->pruneDomainDnsStatusesToCurrentDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }

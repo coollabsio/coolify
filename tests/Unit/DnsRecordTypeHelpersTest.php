@@ -41,3 +41,8 @@ it('prefers the bare ip over a hostname label', function () {
 it('falls back when no target is available', function () {
     expect(dnsMismatchGuidanceMessage(null))->toBe('DNS validation failed. Check your DNS records.');
 });
+
+it('accepts Cloudflare ipv6 proxy addresses', function () {
+    expect(isCloudflareIp('2606:4700:3037::6815:4f2b'))->toBeTrue()
+        ->and(isCloudflareIp('2001:db8::1'))->toBeFalse();
+});

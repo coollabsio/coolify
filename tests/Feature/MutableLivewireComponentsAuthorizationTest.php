@@ -59,4 +59,15 @@ it('authorizes every volume backup form control', function (string $path, array 
             '/<x-forms\.checkbox(?=[^>]*id="disableLocalBackup")(?=[^>]*disabled)(?=[^>]*canGate="update")(?=[^>]*:canResource="\$backup")[^>]*\/\>/s',
         ],
     ],
+    'service domains controls' => [
+        'resources/views/livewire/project/service/domains.blade.php',
+        [
+            '/<x-forms\.select(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*id="newServiceApplicationId")[^>]*>/s',
+            '/<x-forms\.input(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*id="newDomain")[^>]*\/\>/s',
+            '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*wire:click="generateDomain")[^>]*>/s',
+            '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*type="submit")[^>]*>/s',
+            '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*wire:click="checkAllDns")[^>]*>/s',
+            '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*wire:click="startEdit\(\{\{ \$index \}\}\)")[^>]*>/s',
+        ],
+    ],
 ]);

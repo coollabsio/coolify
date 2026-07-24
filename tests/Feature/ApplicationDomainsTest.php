@@ -241,6 +241,25 @@ it('removes a domain', function () {
     expect($this->application->fqdn)->toBe('https://www.example.com');
 });
 
+it('does not revalidate dns on remaining domains when removing one', function () {
+    $settings = InstanceSettings::get();
+    $settings->is_dns_validation_enabled = true;
+    $settings->save();
+
+    $this->application->update([
+        'fqdn' => 'https://keep-this-should-not-resolve-for-coolify-tests.invalid,https://remove-this-should-not-resolve-for-coolify-tests.invalid',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomain', 1)
+        ->assertDispatched('success')
+        ->assertNotDispatched('error');
+
+    $this->application->refresh();
+
+    expect($this->application->fqdn)->toBe('https://keep-this-should-not-resolve-for-coolify-tests.invalid');
+});
+
 it('sets redirect direction when www domain exists', function () {
     $this->application->update([
         'fqdn' => 'https://example.com,https://www.example.com',
