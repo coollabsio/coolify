@@ -239,6 +239,19 @@ it('builds MinIO client resolve options for S3 backup uploads', function () {
     expect($options)->toContain('localhost:9000=127.0.0.1');
 });
 
+it('collapses dual-stack S3 hosts to a single bracket-free IPv4 resolve entry', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['localhost'],
+        'webhook_allow_localhost' => true,
+    ]));
+
+    // localhost resolves to both 127.0.0.1 and ::1. The MinIO client keeps one IP per
+    // host and rejects bracketed IPv6, so exactly one bracket-free IPv4 entry is produced.
+    $options = SafeWebhookUrl::minioClientResolveOptions('http://localhost:9000');
+
+    expect($options)->toBe(['localhost:9000=127.0.0.1']);
+});
+
 it('rejects trailing-dot hostnames to avoid DNS pinning mismatch', function () {
     $rule = new SafeWebhookUrl(fn (string $host): array => ['93.184.216.34']);
 
