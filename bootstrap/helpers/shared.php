@@ -3444,16 +3444,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             if ($resource->serviceType()) {
                 $fqdns = generateServiceSpecificFqdns($resource);
             } else {
-                $domains = collect(json_decode($resource->docker_compose_domains)) ?? [];
+                $domains = json_decode($resource->docker_compose_domains ?: '[]', true) ?: [];
                 if ($domains) {
-                    $fqdns = data_get($domains, "$serviceName.domain");
+                    // Dual-read: original compose name or legacy underscore key.
+                    $fqdns = getComposeServiceDomainString($domains, (string) $serviceName);
                     if ($fqdns) {
                         $fqdns = str($fqdns)->explode(',');
                         if ($pull_request_id !== 0) {
                             $preview = $resource->previews()->find($preview_id);
-                            $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
-                            if ($docker_compose_domains->count() > 0) {
-                                $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                            $docker_compose_domains = json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: [];
+                            if (count($docker_compose_domains) > 0) {
+                                $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                                 if ($found_fqdn) {
                                     $fqdns = collect($found_fqdn);
                                 } else {

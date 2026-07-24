@@ -507,17 +507,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             // Also populate docker_compose_domains for dockercompose apps from direct SERVICE_* declarations.
             if ($resource->build_pack === 'dockercompose' && ($key->startsWith('SERVICE_FQDN_') || $key->startsWith('SERVICE_URL_'))) {
                 $parsed = parseServiceEnvironmentVariable($key->value());
-                $normalizedServiceName = str($parsed['service_name'])->replace('-', '_')->replace('.', '_')->value();
-                $serviceExists = false;
-                foreach (array_keys($services) as $serviceNameKey) {
-                    if (str($serviceNameKey)->replace('-', '_')->replace('.', '_')->value() === $normalizedServiceName) {
-                        $serviceExists = true;
-                        break;
-                    }
-                }
-                if ($serviceExists) {
-                    $domains = collect(json_decode(data_get($resource, 'docker_compose_domains') ?: '[]'));
-                    $domainExists = data_get($domains->get($normalizedServiceName), 'domain');
+                $normalizedServiceName = normalizeComposeServiceName((string) $parsed['service_name']);
+                $originalServiceName = findComposeServiceName($normalizedServiceName, array_keys($services));
+                if ($originalServiceName !== null) {
+                    $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
+                    $domainExists = getComposeServiceDomainString($domains, $originalServiceName);
                     if (is_null($domainExists)) {
                         $serviceNameForDomain = str($parsed['service_name'])->replace('_', '-')->value();
                         $domainValue = generateUrl(server: $server, random: "$serviceNameForDomain-$uuid");
@@ -530,8 +524,12 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         if ($parsed['port'] && is_numeric($parsed['port'])) {
                             $domainValue = "$domainValue:{$parsed['port']}";
                         }
-                        $domains->put($normalizedServiceName, ['domain' => $domainValue]);
-                        $resource->docker_compose_domains = $domains->toJson();
+                        $resource->docker_compose_domains = json_encode(putComposeServiceDomain(
+                            $domains,
+                            $originalServiceName,
+                            $domainValue,
+                            array_keys($services),
+                        ));
                         $resource->save();
                     }
                 }
@@ -568,8 +566,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     }
 
                     $originalServiceName = str($serviceName)->replace('_', '-')->value();
-                    // Always normalize service names to match docker_compose_domains lookup
-                    $serviceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
+                    // Env var SERVICE_* names still use underscores; domain map keys use original compose names.
+                    $serviceName = normalizeComposeServiceName((string) $serviceName);
 
                     // Generate BOTH FQDN & URL
                     $fqdn = generateFqdn(server: $server, random: "$originalServiceName-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -630,29 +628,24 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     }
 
                     if ($resource->build_pack === 'dockercompose') {
-                        // Check if a service with this name actually exists
-                        $serviceExists = false;
-                        foreach ($services as $serviceNameKey => $service) {
-                            $transformedServiceName = str($serviceNameKey)->replace('-', '_')->replace('.', '_')->value();
-                            if ($transformedServiceName === $serviceName) {
-                                $serviceExists = true;
-                                break;
-                            }
-                        }
+                        // Match env-derived name to the real compose service key (hyphens/dots preserved).
+                        $composeServiceName = findComposeServiceName($serviceName, array_keys($services));
 
                         // Only add domain if the service exists
-                        if ($serviceExists) {
-                            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains') ?: '[]'));
-                            $domainExists = data_get($domains->get($serviceName), 'domain');
+                        if ($composeServiceName !== null) {
+                            $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
+                            $domainExists = getComposeServiceDomainString($domains, $composeServiceName);
 
                             // Update domain using URL with port if applicable
                             $domainValue = $port ? $urlWithPort : $url;
 
                             if (is_null($domainExists)) {
-                                $domains->put($serviceName, [
-                                    'domain' => $domainValue,
-                                ]);
-                                $resource->docker_compose_domains = $domains->toJson();
+                                $resource->docker_compose_domains = json_encode(putComposeServiceDomain(
+                                    $domains,
+                                    $composeServiceName,
+                                    $domainValue,
+                                    array_keys($services),
+                                ));
                                 $resource->save();
                             }
                         }
@@ -1186,21 +1179,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
         if ($isPullRequest) {
             $preview = $resource->previews()->find($preview_id);
-            $domains = collect(json_decode(data_get($preview, 'docker_compose_domains'))) ?? collect([]);
+            $domains = collect(json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: []);
         } else {
-            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
+            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: []);
         }
 
         // Only process domains for dockercompose applications to prevent SERVICE variable recreation
         if ($resource->build_pack !== 'dockercompose') {
             $domains = collect([]);
         }
-        $changedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
-        $fqdns = data_get($domains, "$changedServiceName.domain");
+        // Prefer original compose service key; fall back to legacy underscore storage keys.
+        $fqdns = getComposeServiceDomainString($domains, (string) $serviceName);
         // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
         if ($resource->build_pack === 'dockercompose') {
             foreach ($domains as $forServiceName => $domain) {
-                $parsedDomain = data_get($domain, 'domain');
+                $parsedDomain = composeDomainEntryString($domain);
                 $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
 
                 if (filled($parsedDomain)) {
@@ -1209,12 +1202,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $coolifyScheme = $coolifyUrl->getScheme();
                     $coolifyFqdn = $coolifyUrl->getHost();
                     $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                    $coolifyEnvironments->put('SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'), $coolifyUrl->__toString());
-                    $coolifyEnvironments->put('SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'), $coolifyFqdn);
+                    $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
+                    $coolifyEnvironments->put('SERVICE_URL_'.$serviceEnvKey, $coolifyUrl->__toString());
+                    $coolifyEnvironments->put('SERVICE_FQDN_'.$serviceEnvKey, $coolifyFqdn);
                     $resource->environment_variables()->updateOrCreate([
                         'resourceable_type' => Application::class,
                         'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'),
+                        'key' => 'SERVICE_URL_'.$serviceEnvKey,
                     ], [
                         'value' => $coolifyUrl->__toString(),
                         'is_preview' => false,
@@ -1222,7 +1216,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $resource->environment_variables()->updateOrCreate([
                         'resourceable_type' => Application::class,
                         'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'),
+                        'key' => 'SERVICE_FQDN_'.$serviceEnvKey,
                     ], [
                         'value' => $coolifyFqdn,
                         'is_preview' => false,
@@ -1248,9 +1242,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $fqdns = str($fqdns)->explode(',');
             if ($isPullRequest) {
                 $preview = $resource->previews()->find($preview_id);
-                $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
+                $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: []);
                 if ($docker_compose_domains->count() > 0) {
-                    $found_fqdn = data_get($docker_compose_domains, "$changedServiceName.domain");
+                    $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                     if ($found_fqdn) {
                         $fqdns = collect($found_fqdn);
                     } else {
@@ -1905,12 +1899,12 @@ function serviceParser(Service $resource): Collection
                         ->where('key', 'LIKE', $key->value().'_%')
                         ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
                         ->exists();
-                    $serviceExists = ServiceApplication::where('name', str($fqdnFor)->replace('_', '-')->value())->where('service_id', $resource->id)->first();
+                    $serviceExists = findServiceApplicationForEnvName($resource, (string) $fqdnFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
                     // Only set FQDN if it's for the current service being processed (prevent race conditions)
                     $isCurrentService = $serviceExists && $serviceExists->id === $savedService->id;
-                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService && (data_get($serviceExists, 'name') === str($fqdnFor)->replace('_', '-')->value())) {
+                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService) {
                         // Save URL otherwise it won't work.
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
@@ -1950,12 +1944,12 @@ function serviceParser(Service $resource): Collection
                         ->where('key', 'LIKE', $key->value().'_%')
                         ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
                         ->exists();
-                    $serviceExists = ServiceApplication::where('name', str($urlFor)->replace('_', '-')->value())->where('service_id', $resource->id)->first();
+                    $serviceExists = findServiceApplicationForEnvName($resource, (string) $urlFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
                     // Only set FQDN if it's for the current service being processed (prevent race conditions)
                     $isCurrentService = $serviceExists && $serviceExists->id === $savedService->id;
-                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService && (data_get($serviceExists, 'name') === str($urlFor)->replace('_', '-')->value())) {
+                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService) {
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
                     }
