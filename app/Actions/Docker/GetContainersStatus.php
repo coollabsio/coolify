@@ -458,11 +458,15 @@ class GetContainersStatus
                     continue;
                 }
 
-                // Track restart counts first
+                // Exclude health-check-excluded containers from the restart limit too
+                $excludedContainers = $this->getExcludedContainersFromDockerCompose(data_get($application, 'docker_compose_raw'));
+
                 $maxRestartCount = 0;
                 if (isset($this->applicationContainerRestartCounts) && $this->applicationContainerRestartCounts->has($applicationId)) {
-                    $containerRestartCounts = $this->applicationContainerRestartCounts->get($applicationId);
-                    $maxRestartCount = $containerRestartCounts->max() ?? 0;
+                    $maxRestartCount = $this->maxRestartCountExcluding(
+                        $this->applicationContainerRestartCounts->get($applicationId),
+                        $excludedContainers
+                    );
                 }
 
                 // Wrap all database updates in a transaction to ensure consistency
@@ -510,6 +514,16 @@ class GetContainersStatus
         $this->aggregateServiceContainerStatuses($services);
 
         ServiceChecked::dispatch($this->server->team->id);
+    }
+
+    // Highest restart count across containers, ignoring health-check-excluded ones.
+    private function maxRestartCountExcluding(Collection $restartCounts, Collection $excludedContainers): int
+    {
+        return (int) ($restartCounts
+            ->reject(function ($count, $containerName) use ($excludedContainers) {
+                return $excludedContainers->contains($containerName);
+            })
+            ->max() ?? 0);
     }
 
     private function aggregateApplicationStatus($application, Collection $containerStatuses, int $maxRestartCount = 0): ?string
