@@ -23,7 +23,7 @@
                             @endif
                         </span>
 
-                        <span>Frequency: {{ $task->frequency }}</span>
+                        <span>Frequency: {{ $task->frequency }}@if ($task->day_condition) <span class="text-xs text-neutral-500">(only {{ SCHEDULED_TASK_DAY_CONDITIONS[$task->day_condition] ?? $task->day_condition }})</span>@endif</span>
                         <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
                         </span>
                     </span>
@@ -37,7 +37,7 @@
                                 <span class="text-xs font-normal">({{ $task->container }})</span>
                             @endif
                         </span>
-                        <span>Frequency: {{ $task->frequency }}</span>
+                        <span>Frequency: {{ $task->frequency }}@if ($task->day_condition) <span class="text-xs text-neutral-500">(only {{ SCHEDULED_TASK_DAY_CONDITIONS[$task->day_condition] ?? $task->day_condition }})</span>@endif</span>
                         <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
                         </span>
                     </span>

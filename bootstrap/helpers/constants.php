@@ -34,6 +34,16 @@ const VALID_CRON_STRINGS = [
     '@monthly' => '0 0 1 * *',
     '@yearly' => '0 0 1 1 *',
 ];
+const SCHEDULED_TASK_DAY_CONDITIONS = [
+    '' => 'Any day',
+    '0' => 'Sunday',
+    '1' => 'Monday',
+    '2' => 'Tuesday',
+    '3' => 'Wednesday',
+    '4' => 'Thursday',
+    '5' => 'Friday',
+    '6' => 'Saturday',
+];
 const RESTART_MODE = 'unless-stopped';
 const DEFAULT_STOP_GRACE_PERIOD_SECONDS = 30;
 const MIN_STOP_GRACE_PERIOD_SECONDS = 1;

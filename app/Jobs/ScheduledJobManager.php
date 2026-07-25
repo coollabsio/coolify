@@ -266,7 +266,7 @@ class ScheduledJobManager implements ShouldQueue
                     continue;
                 }
 
-                if ($this->isDueCandidateBeforeExpensiveChecks($task->frequency, $server, "scheduled-task:{$task->id}")) {
+                if ($this->isScheduledTaskDueCandidateBeforeExpensiveChecks($task, $server, "scheduled-task:{$task->id}")) {
                     $dueTasks[] = [
                         'task' => $task,
                         'server' => $server,
@@ -326,7 +326,7 @@ class ScheduledJobManager implements ShouldQueue
                 return;
             }
 
-            if (! $this->shouldDispatch($task->frequency, $server, "scheduled-task:{$task->id}")) {
+            if (! $this->shouldDispatchScheduledTask($task, $server, "scheduled-task:{$task->id}")) {
                 return;
             }
 
@@ -616,6 +616,43 @@ class ScheduledJobManager implements ShouldQueue
             'skip_reason' => $reason,
             'execution_time' => $this->executionTime?->toIso8601String(),
         ], $context));
+    }
+
+    private function shouldDispatchScheduledTask(ScheduledTask $task, Server $server, string $dedupKey): bool
+    {
+        return shouldRunScheduledTaskNow(
+            $this->normalizeFrequency($task->frequency),
+            $task->day_condition,
+            $this->serverTimezone($server),
+            $dedupKey,
+            $this->executionTime,
+        );
+    }
+
+    private function isScheduledTaskDueCandidateBeforeExpensiveChecks(ScheduledTask $task, Server $server, string $dedupKey): bool
+    {
+        $frequency = $this->normalizeFrequency($task->frequency);
+        $executionTime = ($this->executionTime ?? Carbon::now())->copy()->setTimezone($this->serverTimezone($server));
+        $lastDispatched = Cache::get($dedupKey);
+        $previousDue = get_previous_scheduled_task_run_date($frequency, $task->day_condition, $executionTime);
+
+        if ($lastDispatched === null) {
+            $isDue = scheduled_task_is_due_now($frequency, $task->day_condition, $executionTime);
+
+            if (! $isDue) {
+                Cache::put($dedupKey, $previousDue->toIso8601String(), 2592000);
+            }
+
+            return $isDue;
+        }
+
+        $shouldFire = $previousDue->gt(Carbon::parse($lastDispatched));
+
+        if (! $shouldFire) {
+            Cache::put($dedupKey, $previousDue->toIso8601String(), 2592000);
+        }
+
+        return $shouldFire;
     }
 
     private function shouldDispatch(string $frequency, Server $server, string $dedupKey): bool

@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
+use App\Models\Application;
 use App\Models\ScheduledTask;
+use App\Models\Service;
+use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -32,6 +35,8 @@ class Add extends Component
 
     public string $frequency;
 
+    public ?string $dayCondition = '';
+
     public ?string $container = '';
 
     public int $timeout = 300;
@@ -40,6 +45,7 @@ class Add extends Component
         'name' => 'required|string',
         'command' => 'required|string',
         'frequency' => 'required|string',
+        'dayCondition' => 'nullable|string',
         'container' => 'nullable|string',
         'timeout' => 'required|integer|min:60|max:36000',
     ];
@@ -59,13 +65,13 @@ class Add extends Component
         // Get the resource based on type and id
         switch ($this->type) {
             case 'application':
-                $this->resource = \App\Models\Application::findOrFail($this->id);
+                $this->resource = Application::findOrFail($this->id);
                 break;
             case 'service':
-                $this->resource = \App\Models\Service::findOrFail($this->id);
+                $this->resource = Service::findOrFail($this->id);
                 break;
             case 'standalone-postgresql':
-                $this->resource = \App\Models\StandalonePostgresql::findOrFail($this->id);
+                $this->resource = StandalonePostgresql::findOrFail($this->id);
                 break;
             default:
                 throw new \Exception('Invalid resource type');
@@ -84,6 +90,11 @@ class Add extends Component
             $isValid = validate_cron_expression($this->frequency);
             if (! $isValid) {
                 $this->dispatch('error', 'Invalid Cron / Human expression.');
+
+                return;
+            }
+            if (! validate_day_condition($this->dayCondition)) {
+                $this->dispatch('error', 'Invalid day condition.');
 
                 return;
             }
@@ -106,6 +117,7 @@ class Add extends Component
             $task->name = $this->name;
             $task->command = $this->command;
             $task->frequency = $this->frequency;
+            $task->day_condition = blank($this->dayCondition) ? null : $this->dayCondition;
             $task->container = $this->container;
             $task->timeout = $this->timeout;
             $task->team_id = currentTeam()->id;
@@ -134,6 +146,7 @@ class Add extends Component
         $this->name = '';
         $this->command = '';
         $this->frequency = '';
+        $this->dayCondition = '';
         $this->container = '';
         $this->timeout = 300;
     }

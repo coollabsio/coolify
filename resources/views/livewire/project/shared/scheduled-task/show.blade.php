@@ -31,6 +31,7 @@
                 <x-forms.input :disabled="!auth()->user()->can('update', $resource)" placeholder="Name" id="name" label="Name" required />
                 <x-forms.input :disabled="!auth()->user()->can('update', $resource)" placeholder="0 0 * * * or daily" id="frequency" label="Frequency"
                     helper="You can use every_minute, hourly, daily, weekly, monthly, yearly or a cron expression." required />
+                <x-scheduled-task.day-condition-select :disabled="!auth()->user()->can('update', $resource)" />
                 <x-forms.input :disabled="!auth()->user()->can('update', $resource)" type="number" placeholder="300" id="timeout"
                     helper="Maximum execution time in seconds (60-36000)." label="Timeout (seconds)" required />
                 @if ($type === 'application')
