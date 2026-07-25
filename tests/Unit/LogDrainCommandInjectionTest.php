@@ -21,12 +21,14 @@ it('does not interpolate axiom api key into shell commands', function () {
     $settings->is_logdrain_custom_enabled = false;
     $settings->logdrain_axiom_dataset_name = 'test-dataset';
     $settings->logdrain_axiom_api_key = $maliciousPayload;
+    $settings->logdrain_axiom_base_uri = 'https://us-east-1.aws.edge.axiom.co';
 
     $server->name = 'test-server';
     $server->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
 
     // Build the env content the same way StartLogDrain does after the fix
-    $envContent = "AXIOM_DATASET_NAME={$settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$settings->logdrain_axiom_api_key}\n";
+    $axiomHost = parse_url($settings->logdrain_axiom_base_uri, PHP_URL_HOST);
+    $envContent = "AXIOM_DATASET_NAME={$settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$settings->logdrain_axiom_api_key}\nAXIOM_HOST={$axiomHost}\n";
     $envEncoded = base64_encode($envContent);
 
     // The malicious payload must NOT appear directly in the encoded string
@@ -62,12 +64,20 @@ it('does not interpolate highlight project id into shell commands', function () 
 it('produces correct env file content for axiom type', function () {
     $datasetName = 'my-dataset';
     $apiKey = 'xaat-abc123-def456';
+    $axiomHost = parse_url('https://us-east-1.aws.edge.axiom.co', PHP_URL_HOST);
 
-    $envContent = "AXIOM_DATASET_NAME={$datasetName}\nAXIOM_API_KEY={$apiKey}\n";
+    $envContent = "AXIOM_DATASET_NAME={$datasetName}\nAXIOM_API_KEY={$apiKey}\nAXIOM_HOST={$axiomHost}\n";
     $decoded = base64_decode(base64_encode($envContent));
 
-    expect($decoded)->toBe("AXIOM_DATASET_NAME=my-dataset\nAXIOM_API_KEY=xaat-abc123-def456\n");
+    expect($decoded)->toBe("AXIOM_DATASET_NAME=my-dataset\nAXIOM_API_KEY=xaat-abc123-def456\nAXIOM_HOST=us-east-1.aws.edge.axiom.co\n");
 });
+
+it('extracts axiom host from us and eu base uris', function (string $baseUri, string $expectedHost) {
+    expect(parse_url($baseUri, PHP_URL_HOST))->toBe($expectedHost);
+})->with([
+    ['https://us-east-1.aws.edge.axiom.co', 'us-east-1.aws.edge.axiom.co'],
+    ['https://eu-central-1.aws.edge.axiom.co', 'eu-central-1.aws.edge.axiom.co'],
+]);
 
 it('produces correct env file content for newrelic type', function () {
     $licenseKey = 'nr-license-123';

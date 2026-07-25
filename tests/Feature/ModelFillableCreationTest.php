@@ -338,6 +338,7 @@ it('creates ServerSetting with all fillable attributes', function () {
         'is_logdrain_axiom_enabled' => true,
         'logdrain_axiom_dataset_name' => 'coolify-logs',
         'logdrain_axiom_api_key' => 'axiom-key-456',
+        'logdrain_axiom_base_uri' => 'https://us-east-1.aws.edge.axiom.co',
         'is_swarm_worker' => false,
         'is_logdrain_custom_enabled' => false,
         'logdrain_custom_config' => '{"endpoint":"https://logs.example.com"}',

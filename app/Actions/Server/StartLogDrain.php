@@ -116,9 +116,9 @@ class StartLogDrain
 [OUTPUT]
     Name            http
     Match           *
-    Host            api.axiom.co
+    Host            \${AXIOM_HOST}
     Port            443
-    URI             /v1/datasets/\${AXIOM_DATASET_NAME}/ingest
+    URI             /v1/ingest/\${AXIOM_DATASET_NAME}
     # Authorization Bearer should be an API token
     Header Authorization Bearer \${AXIOM_API_KEY}
     compress gzip
@@ -183,7 +183,11 @@ Files:
             } elseif ($type === 'highlight') {
                 $envContent = "HIGHLIGHT_PROJECT_ID={$server->settings->logdrain_highlight_project_id}\n";
             } elseif ($type === 'axiom') {
-                $envContent = "AXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$server->settings->logdrain_axiom_api_key}\n";
+                $axiomHost = parse_url($server->settings->logdrain_axiom_base_uri, PHP_URL_HOST);
+                if (empty($axiomHost)) {
+                    throw new \Exception('Axiom base URI is invalid.');
+                }
+                $envContent = "AXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name}\nAXIOM_API_KEY={$server->settings->logdrain_axiom_api_key}\nAXIOM_HOST={$axiomHost}\n";
             } elseif ($type === 'custom') {
                 $envContent = '';
             } else {
