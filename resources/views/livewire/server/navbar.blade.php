@@ -1,4 +1,4 @@
-<div class="pb-6">
+<div class="pb-0 md:pb-6">
     <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
@@ -12,68 +12,58 @@
             <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
     </x-slide-over>
-    <div class="flex items-center gap-2">
         <h1>Server</h1>
-        @if ($server->proxySet())
-            <div class="flex">
-                <div class="flex items-center">
-                    @if ($proxyStatus === 'running')
-                        <x-status.running status="Proxy Running" noLoading />
-                    @elseif ($proxyStatus === 'restarting')
-                        <x-status.restarting status="Proxy Restarting" noLoading />
-                    @elseif ($proxyStatus === 'stopping')
-                        <x-status.restarting status="Proxy Stopping" noLoading />
-                    @elseif ($proxyStatus === 'starting')
-                        <x-status.restarting status="Proxy Starting" noLoading />
-                    @elseif (data_get($server, 'proxy.force_stop'))
-                        <div wire:loading.remove wire:target="checkProxy">
-                            <x-status.stopped status="Proxy Stopped (Force Stop)" noLoading />
-                        </div>
-                    @elseif ($proxyStatus === 'exited')
-                        <div wire:loading.remove wire:target="checkProxy">
-                            <x-status.stopped status="Proxy Exited" noLoading />
+    <div class="pt-2 pb-4 md:pb-10">
+        <div class="flex-col md:flex-row flex gap-2">
+            <div data-testid="server-subtitle" class="text-xs lg:text-sm min-w-0 truncate text-neutral-600 dark:text-neutral-400">
+                {{ data_get($server, 'name') }}
+            </div>
+            @php
+                $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
+            @endphp
+            @if ($server->proxySet() || $showSentinelStatus)
+                <div data-testid="server-status-summary" class="flex flex-wrap items-center gap-1">
+                    @if ($server->proxySet())
+                        <div class="flex items-center gap-1">
+                            @if ($proxyStatus === 'running')
+                                <x-status-badge label="Proxy" status="Running" type="success" />
+                            @elseif ($proxyStatus === 'restarting')
+                                <x-status-badge label="Proxy" status="Restarting" type="warning" />
+                            @elseif ($proxyStatus === 'stopping')
+                                <x-status-badge label="Proxy" status="Stopping" type="warning" />
+                            @elseif ($proxyStatus === 'starting')
+                                <x-status-badge label="Proxy" status="Starting" type="warning" />
+                            @elseif (data_get($server, 'proxy.force_stop'))
+                                <x-status-badge wire:loading.remove wire:target="checkProxy" label="Proxy"
+                                    status="Force stopped" type="error" />
+                            @elseif ($proxyStatus === 'exited')
+                                <x-status-badge wire:loading.remove wire:target="checkProxy" label="Proxy" status="Exited"
+                                    type="error" />
+                            @endif
+                            <x-status-badge wire:loading wire:target="checkProxy" label="Proxy" status="Checking..."
+                                type="warning" />
                         </div>
                     @endif
-                    <div wire:loading wire:target="checkProxy" class="badge badge-warning"></div>
-                    <div wire:loading wire:target="checkProxy"
-                        class="pl-2 pr-1 text-xs font-bold tracking-wider dark:text-warning">
-                        Checking Ports Availability...
-                    </div>
-                    @if ($proxyStatus !== 'exited')
-                        <button wire:loading.remove title="Refresh Status" wire:click='checkProxyStatus'
-                            class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path
-                                    d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                            </svg>
-                        </button>
-                        <button wire:loading title="Refreshing Status" wire:click='checkProxyStatus'
-                            class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                            <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path
-                                    d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                            </svg>
-                        </button>
+                    @if ($showSentinelStatus)
+                        @if ($server->isSentinelLive())
+                            <x-status-badge label="Sentinel" status="In sync" type="success" />
+                        @else
+                            <x-status-badge label="Sentinel" status="Out of sync" type="error" />
+                        @endif
+                    @endif
+                    @if ($server->proxySet())
+                        <x-status-badge as="button" wire:target="checkProxyStatus" wire:loading.attr="disabled"
+                            wire:click='checkProxyStatus' status="Refresh" type="neutral" title="Refresh Status"
+                            aria-label="Refresh proxy status"
+                            class="min-w-[4.5rem] justify-center cursor-pointer border-transparent hover:bg-neutral-200 disabled:cursor-wait disabled:opacity-70 dark:hover:bg-coolgray-300" />
                     @endif
                 </div>
-            </div>
-        @endif
-        @if ($server->isSentinelEnabled())
-            <div class="flex">
-                <div class="flex items-center">
-                    @if ($server->isSentinelLive())
-                        <x-status.running status="Sentinel In Sync" noLoading />
-                    @else
-                        <x-status.stopped status="Sentinel Out of Sync" noLoading />
-                    @endif
-                </div>
-            </div>
-        @endif
+            @endif
+        </div>
     </div>
-    <div class="subtitle">{{ data_get($server, 'name') }}</div>
     <div class="navbar-main">
         <nav
-            class="flex items-center gap-6 overflow-x-scroll sm:overflow-x-hidden scrollbar min-h-10 whitespace-nowrap pt-2">
+            class="scrollbar hidden min-h-10 w-full flex-nowrap items-center gap-6 overflow-x-scroll overflow-y-hidden pb-1 whitespace-nowrap md:flex md:w-auto md:overflow-visible">
             <a class="{{ request()->routeIs('server.show') ? 'dark:text-white' : '' }}" href="{{ route('server.show', [
     'server_uuid' => data_get($server, 'uuid'),
 ]) }}" {{ wireNavigate() }}>
@@ -93,7 +83,7 @@
                             @endif
                         </a>
             @endif
-            @if ($server->isFunctional() && !$server->isSwarm() && !$server->settings->is_build_server)
+            @if ($server->isFunctional() && !$server->isSwarm() && !$server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server))
                         <a class="{{ request()->routeIs('server.sentinel') || request()->routeIs('server.sentinel.*') ? 'dark:text-white' : '' }} flex items-center gap-1" href="{{ route('server.sentinel', [
                     'server_uuid' => data_get($server, 'uuid'),
                 ]) }}" {{ wireNavigate() }}>
@@ -126,11 +116,70 @@
                         </a>
             @endcan
         </nav>
-        <div class="order-first sm:order-last">
+        <div class="order-first w-full md:order-last md:w-auto">
             <div>
                 @if ($server->proxySet())
+                    @can('manageProxy', $server)
+                    <div id="server-mobile-actions" class="mt-2 mb-3 md:hidden">
+                        <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Actions</div>
                     @if ($proxyStatus === 'running')
-                            <div class="flex gap-2">
+                            <div class="flex flex-nowrap gap-2 overflow-x-auto">
+                                <button type="button" class="button shrink-0"
+                                    @click="document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
+                                    <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
+                                        xmlns="http://www.w3.org/2000/svg">
+                                        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                            stroke-width="2">
+                                            <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                            <path d="M20 4v5h-5" />
+                                        </g>
+                                    </svg>
+                                    Restart Proxy
+                                </button>
+                                <button type="button" class="button shrink-0 text-error"
+                                    @click="document.getElementById('server-mobile-stop-proxy-trigger')?.click()">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                                        stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                        <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                        </path>
+                                        <path
+                                            d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
+                                        </path>
+                                    </svg>
+                                    Stop Proxy
+                                </button>
+                                @if ($traefikDashboardAvailable)
+                                    <a class="button shrink-0" target="_blank" href="http://{{ $serverIp }}:8080">
+                                        Traefik Dashboard
+                                        <x-external-link />
+                                    </a>
+                                @endif
+                            </div>
+                    </div>
+                            <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
+                                submitAction="restart" :actions="[
+                        'This proxy will be stopped and started again.',
+                        'All resources hosted on coolify will be unavailable during the restart.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Proxy"
+                                :dispatchEvent="true" dispatchEventType="restartEvent">
+                                <x-slot:trigger>
+                                    <button id="server-mobile-restart-proxy-trigger" type="button" class="hidden">Restart Proxy</button>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
+                            <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
+                                submitAction="stop(true)" :actions="[
+                        'The coolify proxy will be stopped.',
+                        'All resources hosted on coolify will be unavailable.',
+                    ]" :confirmWithText="false"
+                                :confirmWithPassword="false" step2ButtonText="Stop Proxy" :dispatchEvent="true"
+                                dispatchEventType="stopEvent">
+                                <x-slot:trigger>
+                                    <button id="server-mobile-stop-proxy-trigger" type="button" class="hidden">Stop Proxy</button>
+                                </x-slot:trigger>
+                            </x-modal-confirmation>
+                            <div class="hidden gap-2 md:flex">
                                 <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
                                     <x-loading text="Checking Traefik dashboard" />
                                 </div>
@@ -192,7 +241,9 @@
                             </svg>
                             Start Proxy
                         </button>
+                    </div>
                     @endif
+                    @endcan
                 @endif
                 @script
                 <script>

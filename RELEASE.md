@@ -3,6 +3,7 @@
 This guide outlines the release process for Coolify, intended for developers and those interested in understanding how Coolify releases are managed and deployed.
 
 ## Table of Contents
+- [Branch Strategy](#branch-strategy)
 - [Release Process](#release-process)
 - [Version Types](#version-types)
   - [Stable](#stable)
@@ -13,22 +14,71 @@ This guide outlines the release process for Coolify, intended for developers and
   - [Cloud](#cloud)
 - [Manually Update to Specific Versions](#manually-update-to-specific-versions)
 
+## Branch Strategy
+
+Coolify uses two long-lived branches so production fixes can ship without waiting on unfinished feature work.
+
+| Branch | Role | Docker image tags | How it ships |
+| --- | --- | --- | --- |
+| **`v4.x`** | Production / releasable line | `sha-<commit>` via **Build Coolify (SHA)** | GitHub release promotes the SHA image to a semantic version (and `latest` for stable releases) |
+| **`next`** | Development line for features and larger changes | Branch tag (for example `next`) via **Staging Build** | Becomes production only after merge into `v4.x` |
+
+### Where to merge
+
+- **Fixes and release-ready patches** → open PRs against **`v4.x`**. This is the fast path for patch releases.
+- **Features, refactors, and experimental work** → open PRs against **`next`** (or a feature branch that targets `next`).
+- **Shipping features to production** → merge `next` into `v4.x` when the feature set is ready for a stable (or beta) release. Prefer a deliberate merge, not ad-hoc cherry-picks of large feature stacks.
+
+### Keeping the branches in sync
+
+- After each fix lands on `v4.x` (and after each production release), **merge `v4.x` back into `next`** so fixes are not lost and `next` does not reintroduce already-shipped bugs.
+- When `next` has unfinished work and you need a hotfix, **open a small PR to `v4.x`** or **cherry-pick the fix commit** onto `v4.x`. Do not merge half-finished feature work from `next` just to ship a fix.
+- Treat **database migrations and irreversible data changes** carefully when the branches diverge. Prefer minimal, forward-compatible migrations on the fix path.
+
+### Mental model
+
+```
+next  ── features, refactors, experiments ──► (when ready) merge into v4.x
+  ▲
+  │  regularly merge fixes back
+  │
+v4.x ── fixes / release prep ──► Build Coolify (SHA) ──► Release Coolify ──► CDN
+```
+
+Only commits on **`v4.x`** produce production SHA images and can be tagged for a GitHub release.
+
 ## Release Process
 
-1. **Development on `next` or Feature Branches**
-   - Improvements, fixes, and new features are developed on the `next` branch or separate feature branches.
+1. **Prepare the Release**
+   - Land the work on **`v4.x`**: merge a fix PR into `v4.x`, or merge ready work from `next` into `v4.x` for a feature release.
+   - Set the release version in `config/constants.php` and `versions.json` on the commit you will tag. Both values must match the planned Git tag without the `v` prefix (for example, `4.2.0` for tag `v4.2.0`).
+   - Verify the changelog and required tests before merging.
+   - After the release (or after the fix merges), merge `v4.x` back into `next` if those branches have diverged.
 
-2. **Merging to `main`**
-   - Once ready, changes are merged from the `next` branch into the `main` branch (via a pull request).
+2. **Build the Release Commit**
+   - Merge the release commit into `v4.x` through a pull request.
+   - The `Build Coolify (SHA)` workflow builds AMD64 and ARM64 images and publishes them to Docker Hub and GHCR using immutable architecture tags.
+   - After both builds complete, the workflow creates the multi-architecture `sha-<commit-sha>` manifest in both registries.
+   - This workflow does not update a semantic version tag or `latest`.
 
-3. **Building the Release**
-   - After merging to `main`, GitHub Actions automatically builds release images for all architectures and pushes them to the GitHub Container Registry and Docker Hub with the specific version tag and the `latest` tag.
+3. **Wait for the SHA Image**
+   - Confirm the complete `Build Coolify (SHA)` workflow, including its `merge-manifest` job, succeeded.
+   - Do not publish the release before the multi-architecture SHA image exists in both registries.
 
-4. **Creating a GitHub Release**
-   - A new GitHub release is manually created with details of the changes made in the version.
+4. **Create and Publish the GitHub Release**
+   - Create a GitHub release with a semantic version tag such as `v4.2.0`, targeting the exact commit that produced the SHA image.
+   - Mark beta or other test releases as prereleases. Publish production versions as stable releases.
+   - Publishing the release starts the `Release Coolify` workflow. It verifies that the Git tag matches `config/constants.php`, then promotes the existing SHA image without rebuilding it.
+   - The workflow assigns the semantic version tag in Docker Hub and GHCR. Stable releases also update `latest`; prereleases do not.
 
-5. **Updating the CDN**
-   - To make a new version publicly available, the version information on the CDN needs to be updated manually. After that the new version number will be available at [https://cdn.coollabs.io/coolify/versions.json](https://cdn.coollabs.io/coolify/versions.json).
+5. **Verify the Promotion**
+   - Confirm the `Release Coolify` workflow succeeded.
+   - Verify the semantic version image has the same manifest digest as `sha-<commit-sha>` in Docker Hub and GHCR.
+   - For stable releases, also verify `latest` points to the promoted release manifest.
+
+6. **Update the CDN**
+   - To make a new version available to self-hosted instances, update the version information on the CDN manually.
+   - Confirm the new version is available at [https://cdn.coollabs.io/coolify/versions.json](https://cdn.coollabs.io/coolify/versions.json).
 
 > [!NOTE]
 > The CDN update may not occur immediately after the GitHub release. It can take hours or even days due to additional testing, stability checks, or potential hotfixes. **The update becomes available only after the CDN is updated. After the CDN is updated, a discord announcement will be made in the Production Release channel.**
@@ -36,7 +86,7 @@ This guide outlines the release process for Coolify, intended for developers and
 ## Version Types
 
 <details>
-  <summary><strong>Stable (coming soon)</strong></summary>
+  <summary><strong>Stable</strong></summary>
 
 - **Stable**
   - The production version suitable for stable, production environments (recommended).
@@ -72,7 +122,7 @@ This guide outlines the release process for Coolify, intended for developers and
   - Test releases for the upcoming stable version.
   - **Purpose:** Allows users to test and provide feedback on new features and changes before they become stable.
   - **Update Frequency:** Available if we think beta testing is necessary.
-  - **Release Size:** Same size as stable release as it will become the next stabe release after some time.
+  - **Release Size:** Same size as stable release as it will become the next stable release after some time.
   - **Versioning Scheme:** Follows semantic versioning (e.g., `4.1.0-beta.1`, `4.1.0-beta.2`, etc.).
   - **Installation Command:**
   ```bash
@@ -115,7 +165,7 @@ When a new version is released and a new GitHub release is created, it doesn't i
   - Updates are managed by Andras, who ensures each cloud version is thoroughly tested and stable before releasing it.
 
 > [!IMPORTANT]
-> The cloud version of Coolify may be several versions behind the latest GitHub releases even if the CDN is updated. This is intentional to ensure stability and reliability for cloud users and Andras will manully update the cloud version when the update is ready.
+> The cloud version of Coolify may be several versions behind the latest GitHub releases even if the CDN is updated. This is intentional to ensure stability and reliability for cloud users and Andras will manually update the cloud version when the update is ready.
 
 ## Manually Update/ Downgrade to Specific Versions
 

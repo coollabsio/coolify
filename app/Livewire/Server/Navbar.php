@@ -39,6 +39,7 @@ class Navbar extends Component
         return [
             'refreshServerShow' => 'refreshServer',
             "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'showNotification',
+            "echo-private:team.{$teamId},SentinelRestarted" => 'refreshSentinelStatus',
         ];
     }
 
@@ -201,6 +202,15 @@ class Navbar extends Component
     {
         $this->server->refresh();
         $this->server->load('settings');
+    }
+
+    public function refreshSentinelStatus($event = null): void
+    {
+        if (isset($event['serverUuid']) && $event['serverUuid'] !== $this->server->uuid) {
+            return;
+        }
+
+        $this->refreshServer();
     }
 
     /**

@@ -1,10 +1,10 @@
 <div>
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+    <div class="flex flex-col h-full gap-2 md:gap-8 md:flex-row">
         @if ($resourceType === 'database')
             <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" :isImportSupported="$isImportSupported" />
         @else
-            <div class="sub-menu-wrapper">
+            <div class="sub-menu-wrapper hidden md:flex">
                 <a class="sub-menu-item"
                     class="{{ request()->routeIs('project.service.configuration') ? 'menu-item-active' : '' }}"
                     {{ wireNavigate() }}

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Models\Service;
@@ -222,6 +223,28 @@ class ScheduledTasksController extends Controller
         });
 
         return response()->json($executions);
+    }
+
+    private function executeTask(Request $request, Application|Service $resource): JsonResponse
+    {
+        $this->authorize('update', $resource);
+
+        $task = $resource->scheduled_tasks()->where('uuid', $request->task_uuid)->first();
+        if (! $task) {
+            return response()->json(['message' => 'Scheduled task not found.'], 404);
+        }
+
+        ScheduledTaskJob::dispatch($task);
+
+        auditLog('api.scheduled_task.executed', [
+            'team_id' => getTeamIdFromToken(),
+            'task_uuid' => $task->uuid,
+            'task_name' => $task->name,
+            'resource_type' => $resource instanceof Application ? 'application' : 'service',
+            'resource_uuid' => $resource->uuid,
+        ]);
+
+        return response()->json(['message' => 'Scheduled task execution queued.']);
     }
 
     #[OA\Get(
@@ -948,5 +971,69 @@ class ScheduledTasksController extends Controller
         }
 
         return $this->getExecutions($request, $service);
+    }
+
+    #[OA\Post(
+        summary: 'Execute Task',
+        description: 'Queue immediate execution of a scheduled task for an application.',
+        path: '/applications/{uuid}/scheduled-tasks/{task_uuid}/execute',
+        operationId: 'execute-scheduled-task-by-application-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Scheduled Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Scheduled task execution queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function execute_scheduled_task_by_application_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = $this->resolveApplication($request, $teamId);
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        return $this->executeTask($request, $application);
+    }
+
+    #[OA\Post(
+        summary: 'Execute Task',
+        description: 'Queue immediate execution of a scheduled task for a service.',
+        path: '/services/{uuid}/scheduled-tasks/{task_uuid}/execute',
+        operationId: 'execute-scheduled-task-by-service-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Scheduled Tasks'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the service.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'task_uuid', in: 'path', required: true, description: 'UUID of the scheduled task.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Scheduled task execution queued.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function execute_scheduled_task_by_service_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $service = $this->resolveService($request, $teamId);
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        return $this->executeTask($request, $service);
     }
 }

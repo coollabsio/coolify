@@ -8,26 +8,26 @@ use App\Models\Project;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
-use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
 
-#[Name('list_databases')]
-#[Description('List standalone databases owned by the authenticated team. Returns summary (uuid, name, status, type). Use get_database for full details.')]
 class ListDatabases extends Tool
 {
+    protected string $name = 'list_databases';
+
+    protected string $description = 'List standalone databases owned by the authenticated team. Returns summary (uuid, name, status, type). Use get_database for full details.';
+
     use BuildsResponse;
     use ResolvesTeam;
 
     public function handle(Request $request): Response
     {
-        if ($error = $this->ensureAbility($request, 'read')) {
+        if ($error = $this->ensureAbility($request, 'read', $this->name)) {
             return $error;
         }
 
         $teamId = $this->resolveTeamId($request);
         if (is_null($teamId)) {
-            return Response::error('Invalid token.');
+            return $this->mcpError($request, 'Invalid token.');
         }
 
         $args = $this->paginationArgs($request);
@@ -52,11 +52,11 @@ class ListDatabases extends Tool
             ->values()
             ->all();
 
-        return $this->respond(
+        return $this->mcpSuccess($request, $this->respond(
             $summaries,
             [],
             $this->paginationMeta('list_databases', $args, $total),
-        );
+        ));
     }
 
     public function schema(JsonSchema $schema): array

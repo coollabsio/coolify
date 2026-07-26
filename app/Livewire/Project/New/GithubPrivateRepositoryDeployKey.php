@@ -10,12 +10,15 @@ use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
+    use AuthorizesRequests;
+
     public $current_step = 'private_keys';
 
     public $parameters;
@@ -128,10 +131,12 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate();
         try {
             $destination_uuid = $this->query['destination'] ?? null;
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }
@@ -180,7 +185,8 @@ class GithubPrivateRepositoryDeployKey extends Component
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }
-            $application = Application::create($application_init);
+            $application = new Application($application_init);
+            $application->save();
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 

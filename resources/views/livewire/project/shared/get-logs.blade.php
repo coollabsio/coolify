@@ -139,10 +139,6 @@
             const range = selection.getRangeAt(0);
             return logsContainer.contains(range.commonAncestorContainer);
         },
-        decodeHtml(text) {
-            const doc = new DOMParser().parseFromString(text, 'text/html');
-            return doc.documentElement.textContent;
-        },
         applySearch() {
             const logs = document.getElementById('logs');
             if (!logs) return;
@@ -163,7 +159,7 @@
 
                 // Update highlighting
                 if (textSpan) {
-                    const originalText = this.decodeHtml(textSpan.dataset.lineText || '');
+                    const originalText = textSpan.dataset.lineText || '';
                     if (!query) {
                         textSpan.textContent = originalText;
                     } else if (matches) {
@@ -346,8 +342,17 @@
                         <button
                             x-on:click="
                                 $wire.copyLogs().then(logs => {
-                                    navigator.clipboard.writeText(logs);
-                                    Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    if (!navigator.clipboard?.writeText) {
+                                        Livewire.dispatch('error', ['Clipboard is not available. Please use HTTPS or localhost.']);
+                                        return;
+                                    }
+                                    navigator.clipboard.writeText(logs).then(() => {
+                                        Livewire.dispatch('success', ['Logs copied to clipboard.']);
+                                    }).catch(() => {
+                                        Livewire.dispatch('error', ['Failed to copy logs to clipboard.']);
+                                    });
+                                }).catch(() => {
+                                    Livewire.dispatch('error', ['Failed to prepare logs for clipboard.']);
                                 });
                             "
                             title="Copy Logs"

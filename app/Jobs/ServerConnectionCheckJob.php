@@ -6,7 +6,6 @@ use App\Events\ServerReachabilityChanged;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use App\Services\ConfigurationRepository;
-use App\Services\HetznerService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -42,8 +41,12 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         $configRepository->disableSshMux();
     }
 
-    public function handle()
+    public function handle(): void
     {
+        if ($this->server->hasPlaceholderIp()) {
+            return;
+        }
+
         $wasReachable = (bool) $this->server->settings->is_reachable;
         $wasNotified = (bool) $this->server->unreachable_notification_sent;
 
@@ -60,11 +63,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
 
                 return;
-            }
-
-            // Check Hetzner server status if applicable
-            if ($this->server->hetzner_server_id && $this->server->cloudProviderToken) {
-                $this->checkHetznerStatus();
             }
 
             // Temporarily disable mux if requested
@@ -128,17 +126,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         if ($exception instanceof TimeoutExceededException) {
-            $wasReachable = (bool) $this->server->settings->is_reachable;
-            $wasNotified = (bool) $this->server->unreachable_notification_sent;
-
-            $this->server->settings->update([
-                'is_reachable' => false,
-                'is_usable' => false,
-            ]);
-            $this->server->increment('unreachable_count');
-
-            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
-
             // Delete the queue job so it doesn't appear in Horizon's failed list.
             $this->job?->delete();
         }
@@ -161,29 +148,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->server->unreachable_count >= 2 && ! $wasNotified) {
             ServerReachabilityChanged::dispatch($this->server);
         }
-    }
-
-    private function checkHetznerStatus(): void
-    {
-        $status = null;
-
-        try {
-            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
-            $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
-            $status = $serverData['status'] ?? null;
-
-        } catch (\Throwable) {
-            // Silently ignore — server may have been deleted from Hetzner.
-        }
-        if ($this->server->hetzner_server_status !== $status) {
-            $this->server->update(['hetzner_server_status' => $status]);
-            $this->server->hetzner_server_status = $status;
-            if ($status === 'off') {
-                ray('Server is powered off, marking as unreachable');
-                throw new \Exception('Server is powered off');
-            }
-        }
-
     }
 
     private function checkConnection(): bool

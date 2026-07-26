@@ -20,6 +20,10 @@ class SslCertificate extends Model
         'is_ca_certificate',
     ];
 
+    protected $hidden = [
+        'ssl_private_key',
+    ];
+
     protected $casts = [
         'ssl_certificate' => 'encrypted',
         'ssl_private_key' => 'encrypted',

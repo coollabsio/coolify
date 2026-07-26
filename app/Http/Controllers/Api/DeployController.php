@@ -15,7 +15,6 @@ use App\Models\Tag;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 class DeployController extends Controller
 {
@@ -23,6 +22,10 @@ class DeployController extends Controller
     {
         if (request()->attributes->get('can_read_sensitive', false) === false) {
             $deployment->makeHidden([
+                'logs',
+            ]);
+        } else {
+            $deployment->makeVisible([
                 'logs',
             ]);
         }
@@ -301,9 +304,9 @@ class DeployController extends Controller
         }
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Deploy',
-        description: 'Deploy by tag or uuid. `Post` request also accepted with `uuid` and `tag` json body.',
+        description: 'Deploy by tag or UUID using query parameters or a JSON body.',
         path: '/deploy',
         operationId: 'deploy-by-tag-or-uuid',
         security: [
@@ -366,7 +369,7 @@ class DeployController extends Controller
 
         $uuids = $request->input('uuid');
         $tags = $request->input('tag');
-        $force = $request->input('force') ?? false;
+        $force = $request->boolean('force');
         $pullRequestId = $request->input('pull_request_id', $request->input('pr'));
         $pr = $pullRequestId ? max((int) $pullRequestId, 0) : 0;
         $dockerTag = $request->string('docker_tag')->trim()->value() ?: null;
@@ -426,7 +429,7 @@ class DeployController extends Controller
                 }
                 ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
-                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid]);
                 } else {
                     $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid]);
                 }
@@ -472,7 +475,7 @@ class DeployController extends Controller
                 }
                 ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
                 if ($deployment_uuid) {
-                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid]);
                 }
                 $message = $message->merge($return_message);
             }
@@ -511,7 +514,7 @@ class DeployController extends Controller
                 if ($dockerTag !== null && $resource->build_pack !== 'dockerimage') {
                     return ['message' => 'docker_tag can only be used with Docker Image applications.', 'deployment_uuid' => null];
                 }
-                $deployment_uuid = new Cuid2;
+                $deployment_uuid = new_public_id();
                 $result = queue_application_deployment(
                     application: $resource,
                     deployment_uuid: $deployment_uuid,
@@ -530,7 +533,7 @@ class DeployController extends Controller
                         'resource_type' => 'application',
                         'application_uuid' => $resource->uuid,
                         'application_name' => $resource->name,
-                        'deployment_uuid' => $deployment_uuid?->toString(),
+                        'deployment_uuid' => $deployment_uuid,
                         'force_rebuild' => $force,
                         'pull_request_id' => $pr,
                     ]);
@@ -699,6 +702,9 @@ class DeployController extends Controller
         $this->authorize('view', $application);
 
         $deployments = $application->deployments($skip, $take);
+        if ($request->attributes->get('can_read_sensitive', false) === true) {
+            $deployments['deployments']->each->makeVisible(['logs']);
+        }
 
         return response()->json($deployments);
     }

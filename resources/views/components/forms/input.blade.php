@@ -10,6 +10,9 @@
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
+            @isset($labelSuffix)
+                {{ $labelSuffix }}
+            @endisset
         </label>
     @endif
     @if ($type === 'password')

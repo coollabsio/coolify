@@ -12,12 +12,15 @@ use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
+use App\Http\Middleware\EnsureTeamMcpEnabled;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustHosts;
 use App\Http\Middleware\TrustProxies;
+use App\Http\Middleware\V5\EnsureCurrentTeam as V5EnsureCurrentTeam;
+use App\Http\Middleware\V5\HandleInertiaRequests as V5HandleInertiaRequests;
 use App\Http\Middleware\ValidateSignature;
 use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Auth\Middleware\AuthenticateWithBasicAuth;
@@ -76,6 +79,23 @@ class Kernel extends HttpKernel
 
         ],
 
+        'v5.web' => [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            ShareErrorsFromSession::class,
+            VerifyCsrfToken::class,
+            SubstituteBindings::class,
+            V5HandleInertiaRequests::class,
+        ],
+
+        'v5.authenticated' => [
+            'auth',
+            'verified',
+            'throttle:v5',
+            V5EnsureCurrentTeam::class,
+        ],
+
         'api' => [
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             ThrottleRequests::class.':api',
@@ -110,5 +130,6 @@ class Kernel extends HttpKernel
         'can.update.resource' => CanUpdateResource::class,
         'can.access.terminal' => CanAccessTerminal::class,
         'mcp.enabled' => EnsureMcpEnabled::class,
+        'mcp.team.enabled' => EnsureTeamMcpEnabled::class,
     ];
 }

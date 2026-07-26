@@ -18,6 +18,8 @@ use App\Livewire\Notifications\Telegram as NotificationTelegram;
 use App\Livewire\Notifications\Webhook as NotificationWebhook;
 use App\Livewire\Profile\Appearance as ProfileAppearance;
 use App\Livewire\Profile\Index as ProfileIndex;
+use App\Livewire\Project\Application\Backup\Index as ApplicationBackupIndex;
+use App\Livewire\Project\Application\Backup\Show as ApplicationBackupShow;
 use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
@@ -37,7 +39,9 @@ use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Show as ProjectShow;
 use App\Livewire\Security\ApiTokens;
+use App\Livewire\Security\CloudInitScript\Show as SecurityCloudInitScriptShow;
 use App\Livewire\Security\CloudInitScripts;
+use App\Livewire\Security\CloudProviderToken\Show as SecurityCloudProviderTokenShow;
 use App\Livewire\Security\CloudTokens;
 use App\Livewire\Security\PrivateKey\Index as SecurityPrivateKeyIndex;
 use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
@@ -46,6 +50,7 @@ use App\Livewire\Server\CaCertificate\Show as CaCertificateShow;
 use App\Livewire\Server\Charts as ServerCharts;
 use App\Livewire\Server\CloudflareTunnel;
 use App\Livewire\Server\CloudProviderToken\Show as CloudProviderTokenShow;
+use App\Livewire\Server\CreatePage as ServerCreatePage;
 use App\Livewire\Server\Delete as DeleteServer;
 use App\Livewire\Server\Destinations as ServerDestinations;
 use App\Livewire\Server\DockerCleanup;
@@ -78,6 +83,7 @@ use App\Livewire\SharedVariables\Server\Index as ServerSharedVariablesIndex;
 use App\Livewire\SharedVariables\Server\Show as ServerSharedVariablesShow;
 use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
 use App\Livewire\Source\Github\Change as GitHubChange;
+use App\Livewire\Source\Gitlab\Change as GitLabChange;
 use App\Livewire\Storage\Index as StorageIndex;
 use App\Livewire\Storage\Show as StorageShow;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
@@ -88,11 +94,12 @@ use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
 use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledVolumeBackupExecution;
+use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot')->middleware('throttle:forgot-password');
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
@@ -220,6 +227,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
         Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
         Route::get('/persistent-storage', ApplicationConfiguration::class)->name('project.application.persistent-storage');
+        Route::get('/backups', ApplicationBackupIndex::class)->name('project.application.backup.index');
+        Route::get('/backups/{backup_uuid}', ApplicationBackupShow::class)->name('project.application.backup.show');
+        Route::get('/backups/{backup_uuid}/s3', ApplicationBackupShow::class)->name('project.application.backup.s3');
+        Route::get('/backups/{backup_uuid}/retention', ApplicationBackupShow::class)->name('project.application.backup.retention');
+        Route::get('/backups/{backup_uuid}/executions', ApplicationBackupShow::class)->name('project.application.backup.executions');
+        Route::get('/backups/{backup_uuid}/danger', ApplicationBackupShow::class)->name('project.application.backup.danger');
         Route::get('/source', ApplicationConfiguration::class)->name('project.application.source');
         Route::get('/servers', ApplicationConfiguration::class)->name('project.application.servers');
         Route::get('/scheduled-tasks', ApplicationConfiguration::class)->name('project.application.scheduled-tasks.show');
@@ -257,6 +270,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
         Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
+        Route::get('/backups/{backup_uuid}/s3', DatabaseBackupExecution::class)->name('project.database.backup.s3');
+        Route::get('/backups/{backup_uuid}/retention', DatabaseBackupExecution::class)->name('project.database.backup.retention');
+        Route::get('/backups/{backup_uuid}/executions', DatabaseBackupExecution::class)->name('project.database.backup.executions');
+        Route::get('/backups/{backup_uuid}/danger', DatabaseBackupExecution::class)->name('project.database.backup.danger');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
@@ -270,6 +287,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}', ServiceDatabaseBackups::class)->name('project.service.database.backup.show');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/s3', ServiceDatabaseBackups::class)->name('project.service.database.backup.s3');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/retention', ServiceDatabaseBackups::class)->name('project.service.database.backup.retention');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/executions', ServiceDatabaseBackups::class)->name('project.service.database.backup.executions');
+        Route::get('/{stack_service_uuid}/backups/{backup_uuid}/danger', ServiceDatabaseBackups::class)->name('project.service.database.backup.danger');
         Route::get('/{stack_service_uuid}/import', ServiceIndex::class)->name('project.service.database.import')->middleware('can.update.resource');
         Route::get('/{stack_service_uuid}/advanced', ServiceIndex::class)->name('project.service.index.advanced');
         Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
@@ -277,7 +299,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
-    // Route::get('/server/new', ServerCreate::class)->name('server.create');
+    Route::get('/servers/new', ServerCreatePage::class)->name('server.create')->middleware('can:create,'.Server::class);
+    Route::get('/servers/new/{type}/{token_uuid}', ServerCreatePage::class)->name('server.create.token')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean']);
+    Route::get('/servers/new/{type}', ServerCreatePage::class)->name('server.create.type')->middleware('can:create,'.Server::class)->whereIn('type', ['hetzner', 'vultr', 'digital-ocean', 'manual']);
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
@@ -313,7 +337,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/cloud-tokens', CloudTokens::class)->name('security.cloud-tokens');
+    Route::get('/security/cloud-tokens/{cloud_token_uuid}', SecurityCloudProviderTokenShow::class)->name('security.cloud-tokens.show');
     Route::get('/security/cloud-init-scripts', CloudInitScripts::class)->name('security.cloud-init-scripts');
+    Route::get('/security/cloud-init-scripts/{cloud_init_script_uuid}', SecurityCloudInitScriptShow::class)->name('security.cloud-init-scripts.show');
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
 });
 
@@ -328,6 +354,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/github/{github_app_uuid}/permissions', GitHubChange::class)->name('source.github.permissions');
     Route::get('/source/github/{github_app_uuid}/resources', GitHubChange::class)->name('source.github.resources');
+    Route::get('/source/gitlab/{gitlab_app_uuid}', GitLabChange::class)->name('source.gitlab.show');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -363,45 +390,51 @@ Route::middleware(['auth'])->group(function () {
                 $server = $execution->scheduledDatabaseBackup->database->destination->server;
             }
 
-            $privateKeyLocation = $server->privateKey->getKeyLocation();
-            $disk = Storage::build([
-                'driver' => 'sftp',
-                'host' => $server->ip,
-                'port' => (int) $server->port,
-                'username' => $server->user,
-                'privateKey' => $privateKeyLocation,
-                'root' => '/',
-            ]);
-            if (! $disk->exists($filename)) {
-                if ($execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
-                    return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
-                }
-
-                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
+            return streamBackupFromServer($server, $filename, 'application/octet-stream');
+        } catch (FileNotFoundException) {
+            if (isset($execution) && $execution->scheduledDatabaseBackup->disable_local_backup === true && $execution->scheduledDatabaseBackup->save_s3 === true) {
+                return response()->json(['message' => 'Backup not available locally, but available on S3.'], 404);
             }
 
-            return new StreamedResponse(function () use ($disk, $filename) {
-                if (ob_get_level()) {
-                    ob_end_clean();
-                }
-                $stream = $disk->readStream($filename);
-                if ($stream === false || is_null($stream)) {
-                    abort(500, 'Failed to open stream for the requested file.');
-                }
-                while (! feof($stream)) {
-                    echo fread($stream, 2048);
-                    flush();
-                }
-
-                fclose($stream);
-            }, 200, [
-                'Content-Type' => 'application/octet-stream',
-                'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
-            ]);
+            return response()->json(['message' => 'Backup not found locally on the server.'], 404);
         } catch (Throwable $e) {
             return response()->json(['message' => 'Failed to download backup.'], 500);
         }
     })->name('download.backup');
+
+    Route::get('/download/volume-backup/{executionId}', function () {
+        try {
+            $user = auth()->user();
+            $team = $user->currentTeam();
+            if (is_null($team)) {
+                return response()->json(['message' => 'Team not found.'], 404);
+            }
+            if ($user->isAdminFromSession() === false) {
+                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            }
+
+            $execution = ScheduledVolumeBackupExecution::query()
+                ->with('scheduledVolumeBackup.backupable.resource')
+                ->findOrFail(request()->route('executionId'));
+            if ($team->id !== 0 && $team->id !== $execution->scheduledVolumeBackup->team_id) {
+                return response()->json(['message' => 'Permission denied.'], 403);
+            }
+            if ($execution->local_storage_deleted || blank($execution->filename)) {
+                return response()->json(['message' => 'Backup not found locally on the server.'], 404);
+            }
+
+            $server = $execution->scheduledVolumeBackup->server();
+            if (! $server) {
+                return response()->json(['message' => 'Server not found.'], 404);
+            }
+
+            return streamBackupFromServer($server, $execution->filename, 'application/gzip');
+        } catch (FileNotFoundException) {
+            return response()->json(['message' => 'Backup not found locally on the server.'], 404);
+        } catch (Throwable) {
+            return response()->json(['message' => 'Failed to download backup.'], 500);
+        }
+    })->name('download.volume-backup');
 
 });
 

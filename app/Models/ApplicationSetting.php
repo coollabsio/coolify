@@ -4,7 +4,49 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'Application settings.',
+    type: 'object',
+    properties: [
+        'is_static' => ['type' => 'boolean'],
+        'is_git_submodules_enabled' => ['type' => 'boolean'],
+        'is_git_lfs_enabled' => ['type' => 'boolean'],
+        'is_auto_deploy_enabled' => ['type' => 'boolean'],
+        'is_force_https_enabled' => ['type' => 'boolean'],
+        'is_debug_enabled' => ['type' => 'boolean'],
+        'is_preview_deployments_enabled' => ['type' => 'boolean'],
+        'is_log_drain_enabled' => ['type' => 'boolean'],
+        'is_gpu_enabled' => ['type' => 'boolean'],
+        'gpu_driver' => ['type' => 'string', 'nullable' => true],
+        'gpu_count' => ['type' => 'string', 'nullable' => true],
+        'gpu_device_ids' => ['type' => 'string', 'nullable' => true],
+        'gpu_options' => ['type' => 'string', 'nullable' => true],
+        'is_include_timestamps' => ['type' => 'boolean'],
+        'is_swarm_only_worker_nodes' => ['type' => 'boolean'],
+        'is_raw_compose_deployment_enabled' => ['type' => 'boolean'],
+        'is_build_server_enabled' => ['type' => 'boolean'],
+        'is_consistent_container_name_enabled' => ['type' => 'boolean'],
+        'is_gzip_enabled' => ['type' => 'boolean'],
+        'is_stripprefix_enabled' => ['type' => 'boolean'],
+        'connect_to_docker_network' => ['type' => 'boolean'],
+        'custom_internal_name' => ['type' => 'string', 'nullable' => true],
+        'is_container_label_escape_enabled' => ['type' => 'boolean'],
+        'is_env_sorting_enabled' => ['type' => 'boolean'],
+        'is_container_label_readonly_enabled' => ['type' => 'boolean'],
+        'is_preserve_repository_enabled' => ['type' => 'boolean'],
+        'disable_build_cache' => ['type' => 'boolean'],
+        'is_spa' => ['type' => 'boolean'],
+        'is_git_shallow_clone_enabled' => ['type' => 'boolean'],
+        'is_pr_deployments_public_enabled' => ['type' => 'boolean'],
+        'use_build_secrets' => ['type' => 'boolean'],
+        'inject_build_args_to_dockerfile' => ['type' => 'boolean'],
+        'include_source_commit_in_build' => ['type' => 'boolean'],
+        'docker_images_to_keep' => ['type' => 'integer'],
+        'stop_grace_period' => ['type' => 'integer', 'nullable' => true],
+    ]
+)]
 class ApplicationSetting extends Model
 {
     protected $casts = [
@@ -27,6 +69,17 @@ class ApplicationSetting extends Model
         'is_git_shallow_clone_enabled' => 'boolean',
         'docker_images_to_keep' => 'integer',
         'stop_grace_period' => 'integer',
+        'is_log_drain_enabled' => 'boolean',
+        'is_gpu_enabled' => 'boolean',
+        'is_include_timestamps' => 'boolean',
+        'is_swarm_only_worker_nodes' => 'boolean',
+        'is_raw_compose_deployment_enabled' => 'boolean',
+        'is_consistent_container_name_enabled' => 'boolean',
+        'is_gzip_enabled' => 'boolean',
+        'is_stripprefix_enabled' => 'boolean',
+        'connect_to_docker_network' => 'boolean',
+        'is_env_sorting_enabled' => 'boolean',
+        'disable_build_cache' => 'boolean',
     ];
 
     protected $fillable = [

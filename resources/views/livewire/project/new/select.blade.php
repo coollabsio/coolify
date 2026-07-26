@@ -75,7 +75,9 @@
                     </div>
                 </div>
             </div>
-            <div x-show="loading">Loading...</div>
+            <div x-show="loading" class="flex items-center justify-center py-8">
+                <x-loading text="Loading resources..." />
+            </div>
             <div x-show="!loading" class="flex flex-col gap-4 py-4">
                 <h2 x-show="filteredGitBasedApplications.length > 0">Applications</h2>
                 <div x-show="filteredGitBasedApplications.length > 0 || filteredDockerBasedApplications.length > 0"
@@ -138,9 +140,14 @@
                     </div>
                 </div>
                 <div x-show="filteredServices.length > 0" class="mt-8">
-                    <div class="flex items-center gap-4" x-init="loadResources">
+                    <div class="flex flex-wrap items-center gap-4" x-init="loadResources">
                         <h2>Services</h2>
                         <x-forms.button x-on:click="loadResources">Reload List</x-forms.button>
+                        <div x-show="serviceTemplatesLastUpdated"
+                            class="text-xs text-neutral-500 dark:text-neutral-400">
+                            Last Updated on Service Templates:
+                            <span x-text="serviceTemplatesLastUpdated"></span>
+                        </div>
                     </div>
                     <x-callout type="info" title="Trademarks Policy" class="mt-4 mb-6">
                         The respective trademarks mentioned here are owned by the respective companies, and use of them
@@ -149,12 +156,19 @@
 
                     <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                         <template x-for="service in filteredServices" :key="service.name">
-                            <div class="relative" x-on:click="setType('one-click-service-' + service.name)"
+                            <div class="relative" x-on:click="setType('one-click-service-' + service.id)"
                                 :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }">
                                 <x-resource-view>
                                     <x-slot:title>
                                         <template x-if="service.name">
-                                            <span x-text="service.name"></span>
+                                            <div>
+                                                <span x-text="service.name"></span>
+                                                <template x-if="service.templateLastUpdated">
+                                                    <div class="mt-1 text-[0.7rem] font-normal text-neutral-500 dark:text-neutral-500">
+                                                        Updated: <span x-text="service.templateLastUpdated"></span>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </template>
                                     </x-slot>
                                     <x-slot:description>
@@ -202,7 +216,7 @@
                                     </div>
                                 </template>
                                 <template x-if="shouldShowDocIcon(service)">
-                                    <a :href="getDocLink(service) || coolifyDocsUrl(service.name)" target="_blank"
+                                    <a :href="getDocLink(service) || coolifyDocsUrl(service)" target="_blank"
                                         @click.stop @mouseenter="resolveDocLink(service)"
                                         class="absolute top-2 right-2 p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-coolgray-300 transition-colors"
                                         :class="{ 'opacity-50': docCheckInProgress[service.name] }"
@@ -237,6 +251,7 @@
                         isSticky: false,
                         selecting: false,
                         services: [],
+                        serviceTemplatesLastUpdated: null,
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
                         databases: [],
@@ -251,12 +266,14 @@
                             this.loading = true;
                             const {
                                 services,
+                                serviceTemplatesLastUpdated,
                                 categories,
                                 gitBasedApplications,
                                 dockerBasedApplications,
                                 databases
                             } = await this.$wire.loadServices();
                             this.services = services;
+                            this.serviceTemplatesLastUpdated = serviceTemplatesLastUpdated;
                             this.categories = categories || [];
                             this.gitBasedApplications = gitBasedApplications;
                             this.dockerBasedApplications = dockerBasedApplications;
@@ -272,8 +289,8 @@
                             // Remove flavor suffixes: -with-*, -without-*
                             return normalized.replace(/-(with|without)-.+$/, '');
                         },
-                        coolifyDocsUrl(serviceName) {
-                            const baseName = this.extractBaseServiceName(serviceName);
+                        coolifyDocsUrl(service) {
+                            const baseName = service.docsSlug || this.extractBaseServiceName(service.name);
                             return 'https://coolify.io/docs/services/' + baseName;
                         },
                         officialDocsUrl(service) {
@@ -307,7 +324,7 @@
                             this.docCheckInProgress[serviceName] = true;
 
                             // 1. Try Coolify docs first
-                            const coolifyUrl = this.coolifyDocsUrl(serviceName);
+                            const coolifyUrl = this.coolifyDocsUrl(service);
                             const coolifyExists = await this.checkUrlExists(coolifyUrl);
 
                             if (coolifyExists) {
@@ -416,28 +433,40 @@
                     server. <a class="underline dark:text-white" href="/servers" {{ wireNavigate() }}>
                         Go to servers page
                     </a> </div>
-            @else
-                @forelse($servers as $server)
-                    <div class="w-full coolbox group" wire:click="setServer({{ $server }})">
-                        <div class="flex flex-col mx-6">
-                            <div class="box-title">
-                                {{ $server->name }}
-                            </div>
-                            <div class="box-description">
-                                {{ $server->description }}
-                            </div>
+            @endif
+            @forelse($servers as $server)
+                <div class="w-full coolbox group" wire:click="setServer({{ $server }})">
+                    <div class="flex flex-col mx-6">
+                        <div class="box-title">
+                            {{ $server->name }}
+                        </div>
+                        <div class="box-description">
+                            {{ $server->description }}
                         </div>
                     </div>
-                @empty
+                </div>
+            @empty
+                @if ($buildServers?->isEmpty() && ! $onlyBuildServerAvailable)
                     <div>
-
                         <div>No validated & reachable servers found. <a class="underline dark:text-white"
                                 href="/servers" {{ wireNavigate() }}>
                                 Go to servers page
                             </a></div>
                     </div>
-                @endforelse
-            @endif
+                @endif
+            @endforelse
+            @foreach($buildServers ?? [] as $buildServer)
+                <div class="w-full coolbox opacity-60 cursor-not-allowed">
+                    <div class="flex flex-col mx-6">
+                        <div class="box-title">{{ $buildServer->name }}</div>
+                        <div class="box-description">
+                            This server is configured as a build server and cannot host resources.
+                            <a class="underline dark:text-white" href="{{ route('server.show', ['server_uuid' => $buildServer->uuid]) }}"
+                                {{ wireNavigate() }}>Change server settings</a>
+                        </div>
+                    </div>
+                </div>
+            @endforeach
         </div>
     @endif
     @if ($current_step === 'destinations')

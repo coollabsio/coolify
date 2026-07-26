@@ -5,6 +5,7 @@ namespace App\Livewire\Tags;
 use App\Http\Controllers\Api\DeployController;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
@@ -13,6 +14,8 @@ use Livewire\Component;
 #[Title('Tags | Coolify')]
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     #[Locked]
     public ?string $tagName = null;
 
@@ -73,6 +76,12 @@ class Show extends Component
     public function redeployAll()
     {
         try {
+            $this->applications->each(function ($resource) {
+                $this->authorize('deploy', $resource);
+            });
+            $this->services->each(function ($resource) {
+                $this->authorize('deploy', $resource);
+            });
             $message = collect([]);
             $this->applications->each(function ($resource) use ($message) {
                 $deploy = new DeployController;

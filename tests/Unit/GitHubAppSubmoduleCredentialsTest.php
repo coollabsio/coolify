@@ -42,8 +42,8 @@ namespace {
 
         expect($result['commands'])
             ->not->toContain('git config --global')
-            ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' clone --recurse-submodules -b 'main'")
-            ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' submodule sync")
-            ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' submodule update --init --recursive");
+            ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' -c http.version=HTTP/1.1 clone --recurse-submodules -b 'main'")
+            ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' -c http.version=HTTP/1.1 submodule sync")
+            ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' -c http.version=HTTP/1.1 submodule update --init --recursive");
     });
 }

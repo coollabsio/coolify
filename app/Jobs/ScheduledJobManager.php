@@ -2,8 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Team;
 use Cron\CronExpression;
@@ -104,6 +107,16 @@ class ScheduledJobManager implements ShouldQueue
             $this->processScheduledBackupsAndTasks();
         } catch (\Exception $e) {
             Log::channel('scheduled-errors')->error('Failed to process scheduled backups and tasks', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        try {
+            $this->recoverStoppedVolumeBackupContainers();
+            $this->processScheduledVolumeBackups();
+        } catch (\Exception $e) {
+            Log::channel('scheduled-errors')->error('Failed to process scheduled volume backups', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -341,6 +354,112 @@ class ScheduledJobManager implements ShouldQueue
         }
     }
 
+    private function processScheduledVolumeBackups(): void
+    {
+        ScheduledVolumeBackup::query()
+            ->with(['backupable', 'team.subscription'])
+            ->where('enabled', true)
+            ->chunkById(self::CHUNK_SIZE, function ($backups): void {
+                foreach ($backups as $backup) {
+                    $this->processScheduledVolumeBackup($backup);
+                }
+            });
+    }
+
+    private function recoverStoppedVolumeBackupContainers(): void
+    {
+        ScheduledVolumeBackupExecution::query()
+            ->where(fn (Builder $query) => $query
+                ->where('stop_recovery_pending', true)
+                ->orWhere('s3_cleanup_pending', true))
+            ->chunkById(self::CHUNK_SIZE, function ($executions): void {
+                foreach ($executions as $execution) {
+                    VolumeBackupRecoveryJob::dispatch($execution);
+                }
+            });
+    }
+
+    private function processScheduledVolumeBackup(ScheduledVolumeBackup $backup): void
+    {
+        try {
+            $server = $backup->server();
+
+            if ($backup->executions()
+                ->where(fn (Builder $query) => $query
+                    ->where('stop_recovery_pending', true)
+                    ->orWhere('s3_cleanup_pending', true))
+                ->exists()) {
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'container_recovery_pending', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                ]);
+
+                return;
+            }
+
+            if (! $backup->backupable) {
+                DeleteScheduledVolumeBackup::run($backup, $server);
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'resource_deleted', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                ]);
+
+                return;
+            }
+
+            if (! $server) {
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'server_missing', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                ]);
+
+                return;
+            }
+
+            if (! $server->isFunctional()) {
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'server_not_functional', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                    'server_id' => $server->id,
+                ]);
+
+                return;
+            }
+
+            if (isCloud() && $backup->team_id !== 0 && ! data_get($backup, 'team.subscription.stripe_invoice_paid', false)) {
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'subscription_unpaid', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                    'server_id' => $server->id,
+                ]);
+
+                return;
+            }
+
+            if ($this->shouldDispatch($backup->frequency, $server, "scheduled-volume-backup:{$backup->id}")) {
+                VolumeBackupJob::dispatch($backup);
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Volume backup dispatched', [
+                    'backup_id' => $backup->id,
+                    'backupable_type' => $backup->backupable_type,
+                    'backupable_id' => $backup->backupable_id,
+                    'team_id' => $backup->team_id,
+                    'server_id' => $server->id,
+                ]);
+            }
+        } catch (\Exception $e) {
+            Log::channel('scheduled-errors')->error('Error processing volume backup', [
+                'backup_id' => $backup->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function getBackupSkipReason(ScheduledDatabaseBackup $backup, ?Server $server): ?string
     {
         if (blank(data_get($backup, 'database'))) {
@@ -457,7 +576,9 @@ class ScheduledJobManager implements ShouldQueue
     private function getServersForCleanupQuery(): Builder
     {
         $query = Server::with('settings')
-            ->where('ip', '!=', '1.2.3.4');
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->whereNotIn('ip', Server::PLACEHOLDER_IPS);
 
         if (isCloud()) {
             $query

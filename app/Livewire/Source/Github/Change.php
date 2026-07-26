@@ -10,9 +10,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Lcobucci\JWT\Configuration;
-use Lcobucci\JWT\Signer\Key\InMemory;
-use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class Change extends Component
@@ -82,11 +80,15 @@ class Change extends Component
 
     public string $activeTab = 'general';
 
+    public bool $isConnected = false;
+
+    private bool $shouldDeriveApiUrlAfterHtmlUrlUpdate = false;
+
     protected function rules(): array
     {
         return [
             'name' => 'required|string',
-            'organization' => 'nullable|string',
+            'organization' => ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'],
             'apiUrl' => ['required', 'string', 'url', new SafeExternalUrl],
             'htmlUrl' => ['required', 'string', 'url', new SafeExternalUrl],
             'customUser' => 'required|string',
@@ -107,6 +109,19 @@ class Change extends Component
         ];
     }
 
+    public function updatingHtmlUrl(): void
+    {
+        $this->shouldDeriveApiUrlAfterHtmlUrlUpdate = blank($this->apiUrl)
+            || $this->apiUrl === githubApiUrlFromHtmlUrl($this->htmlUrl);
+    }
+
+    public function updatedHtmlUrl(): void
+    {
+        if ($this->shouldDeriveApiUrlAfterHtmlUrlUpdate) {
+            $this->apiUrl = githubApiUrlFromHtmlUrl($this->htmlUrl);
+        }
+    }
+
     public function boot()
     {
         if ($this->github_app) {
@@ -123,6 +138,11 @@ class Change extends Component
     {
         if ($toModel) {
             // Sync TO model (before save)
+            $this->organization = normalizeGithubOrganization($this->organization);
+            $this->apiUrl = filled($this->apiUrl)
+                ? $this->apiUrl
+                : githubApiUrlFromHtmlUrl($this->htmlUrl);
+
             $this->github_app->name = $this->name;
             $this->github_app->organization = $this->organization;
             $this->github_app->api_url = $this->apiUrl;
@@ -208,14 +228,66 @@ class Change extends Component
                 return;
             }
 
+            syncGithubAppName($this->github_app);
+
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->syncData(false);
+            $this->isConnected = $this->github_app->isConnected();
             $this->name = str($this->github_app->name)->kebab();
 
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
             // Provide better error message for unsupported key formats
+            $errorMessage = $e->getMessage();
+            if (str_contains($errorMessage, 'DECODER routines::unsupported') ||
+                str_contains($errorMessage, 'parse your key')) {
+                $this->dispatch('error', 'The selected private key format is not supported for GitHub Apps. <br><br>Please use an RSA private key in PEM format (BEGIN RSA PRIVATE KEY). <br><br>OpenSSH format keys (BEGIN OPENSSH PRIVATE KEY) are not supported.');
+
+                return;
+            }
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function testConnection()
+    {
+        try {
+            $this->authorize('view', $this->github_app);
+
+            if (! $this->github_app->isConnected()) {
+                $this->dispatch('error', 'GitHub App is not fully set up. Please complete installation first.');
+
+                return;
+            }
+
+            if (! $this->github_app->private_key_id || ! $this->github_app->privateKey) {
+                $this->dispatch('error', 'Private Key not found. Please select a valid private key.');
+
+                return;
+            }
+
+            $jwt = generateGithubJwt($this->github_app);
+            $appResponse = Http::withHeaders([
+                'Authorization' => "Bearer $jwt",
+                'Accept' => 'application/vnd.github+json',
+            ])->timeout(10)->get("{$this->github_app->api_url}/app");
+
+            if (! $appResponse->successful()) {
+                $error = data_get($appResponse->json(), 'message', 'Unknown error');
+                $this->dispatch('error', "Connection failed: {$error}");
+
+                return;
+            }
+
+            // Confirm installation credentials can mint an installation access token.
+            generateGithubInstallationToken($this->github_app);
+
+            $appName = data_get($appResponse->json(), 'name')
+                ?? data_get($appResponse->json(), 'slug', 'unknown');
+            $this->dispatch('success', "Connection successful! Authenticated as GitHub App: {$appName}");
+        } catch (\Throwable $e) {
             $errorMessage = $e->getMessage();
             if (str_contains($errorMessage, 'DECODER routines::unsupported') ||
                 str_contains($errorMessage, 'parse your key')) {
@@ -241,6 +313,7 @@ class Change extends Component
 
             // Sync data from model to properties
             $this->syncData(false);
+            $this->isConnected = $this->github_app->isConnected();
 
             // Override name with kebab case for display
             $this->name = str($this->github_app->name)->kebab();
@@ -296,31 +369,14 @@ class Change extends Component
 
     public function getGithubAppNameUpdatePath()
     {
-        if (str($this->github_app->organization)->isNotEmpty()) {
-            return "{$this->github_app->html_url}/organizations/{$this->github_app->organization}/settings/apps/{$this->github_app->name}";
+        $name = encodeGithubPathSegment($this->github_app->name);
+        $organization = normalizeGithubOrganization($this->github_app->organization);
+
+        if (filled($organization)) {
+            return rtrim($this->github_app->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
         }
 
-        return "{$this->github_app->html_url}/settings/apps/{$this->github_app->name}";
-    }
-
-    private function generateGithubJwt($private_key, $app_id): string
-    {
-        $configuration = Configuration::forAsymmetricSigner(
-            new Sha256,
-            InMemory::plainText($private_key),
-            InMemory::plainText($private_key)
-        );
-
-        $now = time();
-
-        return $configuration->builder()
-            ->issuedBy((string) $app_id)
-            ->permittedFor('https://api.github.com')
-            ->identifiedBy((string) $now)
-            ->issuedAt(new \DateTimeImmutable("@{$now}"))
-            ->expiresAt(new \DateTimeImmutable('@'.($now + 600)))
-            ->getToken($configuration->signer(), $configuration->signingKey())
-            ->toString();
+        return rtrim($this->github_app->html_url, '/')."/settings/apps/{$name}";
     }
 
     public function updateGithubAppName()
@@ -328,39 +384,29 @@ class Change extends Component
         try {
             $this->authorize('update', $this->github_app);
 
-            $privateKey = PrivateKey::ownedByCurrentTeam()->find($this->github_app->private_key_id);
+            $this->github_app->app_id = $this->appId;
+            $this->github_app->private_key_id = $this->privateKeyId;
+            $this->github_app->unsetRelation('privateKey');
 
-            if (! $privateKey) {
+            if (! $this->appId) {
+                $this->dispatch('error', 'App ID is required before synchronizing the GitHub App name.');
+
+                return;
+            }
+
+            if (! PrivateKey::ownedByCurrentTeam()->find($this->privateKeyId)) {
                 $this->dispatch('error', 'No private key found for this GitHub App.');
 
                 return;
             }
 
-            $jwt = $this->generateGithubJwt($privateKey->private_key, $this->github_app->app_id);
+            $appSlug = syncGithubAppName($this->github_app, true);
 
-            $response = Http::withHeaders([
-                'Accept' => 'application/vnd.github+json',
-                'X-GitHub-Api-Version' => '2022-11-28',
-                'Authorization' => "Bearer {$jwt}",
-            ])->get("{$this->github_app->api_url}/app");
-
-            if ($response->successful()) {
-                $app_data = $response->json();
-                $app_slug = $app_data['slug'] ?? null;
-
-                if ($app_slug) {
-                    $this->github_app->name = $app_slug;
-                    $this->name = str($app_slug)->kebab();
-                    $privateKey->name = "github-app-{$app_slug}";
-                    $privateKey->save();
-                    $this->github_app->save();
-                    $this->dispatch('success', 'GitHub App name and SSH key name synchronized successfully.');
-                } else {
-                    $this->dispatch('info', 'Could not find App Name (slug) in GitHub response.');
-                }
+            if ($appSlug) {
+                $this->name = str($appSlug)->kebab();
+                $this->dispatch('success', 'GitHub App name and private key name synchronized successfully.');
             } else {
-                $error_message = $response->json()['message'] ?? 'Unknown error';
-                $this->dispatch('error', "Failed to fetch GitHub App information: {$error_message}");
+                $this->dispatch('info', 'Could not find App Name (slug) in GitHub response.');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -373,11 +419,18 @@ class Change extends Component
             $this->authorize('update', $this->github_app);
 
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->organization = normalizeGithubOrganization($this->organization);
+            $this->apiUrl = filled($this->apiUrl)
+                ? $this->apiUrl
+                : githubApiUrlFromHtmlUrl($this->htmlUrl);
             $this->validate();
 
             $this->syncData(true);
             $this->github_app->save();
+            $this->isConnected = $this->github_app->isConnected();
             $this->dispatch('success', 'Github App updated.');
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -406,6 +459,7 @@ class Change extends Component
 
             $this->syncData(true);
             $this->github_app->save();
+            $this->isConnected = $this->github_app->isConnected();
             $this->dispatch('success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
