@@ -1,47 +1,68 @@
-<div>
-    <h2>Tags</h2>
-    @can('update', $resource)
-        <form wire:submit='submit' class="flex items-end gap-2">
-            <div class="w-64">
-                <x-forms.input label="Create new or assign existing tags"
-                    helper="You add more at once with space separated list: web api something<br><br>If the tag does not exists, it will be created."
-                    wire:model="newTags" placeholder="example: prod app1 user" />
-            </div>
-            <x-forms.button type="submit">Add</x-forms.button>
-        </form>
-    @else
-        <x-callout type="danger" title="Insufficient Permissions" class="mt-4">
-            You don't have permission to manage this resource. Contact your team administrator for access.
-        </x-callout>
-    @endcan
-    @if (data_get($this->resource, 'tags') && count(data_get($this->resource, 'tags')) > 0)
-        <h3 class="pt-4">Assigned Tags</h3>
-        <div class="flex flex-wrap gap-2 pt-4">
-            @foreach (data_get($this->resource, 'tags') as $tagId => $tag)
-                <div class="button">
-                    {{ $tag->name }}
-                    @can('update', $resource)
-                        <svg wire:click="deleteTag('{{ $tag->id }}')" xmlns="http://www.w3.org/2000/svg" fill="none"
-                            viewBox="0 0 24 24"
-                            class="inline-block w-3 h-3 rounded-sm cursor-pointer stroke-current hover:bg-red-500">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
-                            </path>
-                        </svg>
-                    @endcan
+<div class="flex flex-col gap-6">
+    <x-application.settings-section id="tag-assignment-section" title="Tags"
+        helper="Organize this resource with reusable team tags. Separate multiple tag names with spaces.">
+        @can('update', $resource)
+            <form wire:submit="submit"
+                class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <x-forms.input id="newTags" label="Tag names"
+                    helper="Existing tags are assigned automatically. New names create team tags."
+                    placeholder="production api customer-a" />
+                <x-forms.button type="submit"
+                    class="bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                    <x-reicon name="plus" class="size-3.5" />
+                    Add tags
+                </x-forms.button>
+            </form>
+        @else
+            <x-callout type="danger" title="Insufficient permissions">
+                You do not have permission to manage tags for this resource.
+            </x-callout>
+        @endcan
+    </x-application.settings-section>
+
+    <x-application.settings-section id="assigned-tags-section" title="Assigned tags"
+        helper="Tags currently attached to this resource." flush>
+        @forelse (data_get($this->resource, 'tags', []) as $tag)
+            <div wire:key="assigned-tag-{{ $tag->id }}"
+                class="flex min-h-12 items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 dark:border-white/[0.07]">
+                <div
+                    class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
+                    <x-reicon name="tags" class="size-4" />
                 </div>
-            @endforeach
-        </div>
-    @endif
+                <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-fg">
+                    {{ $tag->name }}
+                </span>
+                @can('update', $resource)
+                    <x-forms.button wire:click="deleteTag('{{ $tag->id }}')"
+                        class="h-7! text-neutral-500 dark:text-fg-dim">
+                        Remove
+                    </x-forms.button>
+                @endcan
+            </div>
+        @empty
+            <x-empty size="sm" title="No tags assigned"
+                description="Add a tag above or select one from your team's available tags.">
+                <x-slot:icon>
+                    <x-reicon name="tags" class="size-8" />
+                </x-slot:icon>
+            </x-empty>
+        @endforelse
+    </x-application.settings-section>
+
     @can('update', $resource)
         @if (count($filteredTags) > 0)
-            <h3 class="pt-4">Existing Tags</h3>
-            <div>Click to add quickly</div>
-            <div class="flex flex-wrap gap-2 pt-4">
-                @foreach ($filteredTags as $tag)
-                    <x-forms.button wire:click="addTag('{{ $tag->id }}','{{ $tag->name }}')">
-                        {{ $tag->name }}</x-forms.button>
-                @endforeach
-            </div>
+            <x-application.settings-section id="available-tags-section" title="Available tags"
+                helper="Assign an existing team tag with one click.">
+                <div class="flex flex-wrap gap-2">
+                    @foreach ($filteredTags as $tag)
+                        <x-forms.button wire:key="available-tag-{{ $tag->id }}"
+                            wire:click="addTag('{{ $tag->id }}', '{{ $tag->name }}')">
+                            <x-reicon name="plus" class="size-3.5 text-coollabs dark:text-warning" />
+                            {{ $tag->name }}
+                        </x-forms.button>
+                    @endforeach
+                </div>
+            </x-application.settings-section>
         @endif
     @endcan
 </div>

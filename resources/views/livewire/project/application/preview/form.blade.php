@@ -1,17 +1,27 @@
-<form wire:submit='submit'>
-    <div class="flex items-center gap-2">
-        <h2>Preview Deployments</h2>
-        @can('update', $application)
-            <x-forms.button type="submit">Save</x-forms.button>
-            <x-forms.button isHighlighted wire:click="resetToDefault">Reset template to default</x-forms.button>
-        @endcan
-    </div>
-    <div class="pb-4 ">Preview Deployments based on pull requests are here.</div>
-    <div class="flex flex-col gap-2 pb-4">
-        <x-forms.input id="previewUrlTemplate" label="Preview URL Template"
-            helper="Templates:<br/><span class='text-helper'>@@{{ random }}</span> to generate random sub-domain each time a PR is deployed<br/><span class='text-helper'>@@{{ pr_id }}</span> to use pull request ID as sub-domain or <span class='text-helper'>@@{{ domain }}</span> to replace the domain name with the application's domain name." canGate="update" :canResource="$application" />
+<form wire:submit="submit" class="application-settings-form flex flex-col">
+    <x-unsaved-bar action="submit" />
+    <x-application.settings-section id="preview-template-section" title="Preview URL template"
+        helper="Define how Coolify generates domains for pull request deployments.">
+        <x-slot:actions>
+            @can('update', $application)
+                <x-forms.button type="button" wire:click="resetToDefault">
+                    Reset template
+                </x-forms.button>
+            @endcan
+        </x-slot:actions>
+
+        <x-forms.input id="previewUrlTemplate" label="URL template"
+            helper="Use @@{{ random }} for a random subdomain, @@{{ pr_id }} for the pull request number, or @@{{ domain }} for the application domain."
+            canGate="update" :canResource="$application" />
+
         @if ($previewUrlTemplate)
-            <div class="">Domain Preview: {{ $previewUrlTemplate }}</div>
+            <div
+                class="mt-4 flex items-center justify-between gap-3 rounded-lg bg-neutral-100 px-3 py-2.5 ring-1 ring-neutral-200 dark:bg-white/[0.04] dark:ring-white/[0.07]">
+                <span class="text-[13px] text-neutral-500 dark:text-fg-dim">Generated pattern</span>
+                <code class="break-all text-right font-mono text-xs text-neutral-700 dark:text-fg">
+                    {{ $previewUrlTemplate }}
+                </code>
+            </div>
         @endif
-    </div>
+    </x-application.settings-section>
 </form>

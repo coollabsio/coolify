@@ -25,9 +25,12 @@
         </label>
     @endif
     @if ($useMonacoEditor)
-        <x-forms.monaco-editor id="{{ $modelBinding }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
-            name="{{ $modelBinding }}" model="{{ $value ?? $modelBinding }}" wire:model="{{ $value ?? $modelBinding }}"
-            readonly="{{ $readonly }}" label="dockerfile" autofocus="{{ $autofocus }}" />
+        @php $monacoRows = (int) $attributes->get('rows', 0); @endphp
+        <div class="w-full" @if ($monacoRows > 0) style="--editor-height: {{ $monacoRows * 23 + 38 }}px" @endif>
+            <x-forms.monaco-editor id="{{ $modelBinding }}" language="{{ $monacoEditorLanguage }}" name="{{ $name }}"
+                name="{{ $modelBinding }}" model="{{ $value ?? $modelBinding }}" wire:model="{{ $value ?? $modelBinding }}"
+                readonly="{{ $readonly }}" label="dockerfile" autofocus="{{ $autofocus }}" />
+        </div>
     @else
         @if ($type === 'password')
             <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">

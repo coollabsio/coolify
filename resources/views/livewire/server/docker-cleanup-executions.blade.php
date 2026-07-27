@@ -1,128 +1,101 @@
-<div class="flex flex-col gap-2" wire:poll.5000ms="refreshExecutions" x-data="{
+<div wire:poll.5000ms="refreshExecutions" x-data="{
     init() {
         let interval;
         $wire.$watch('isPollingActive', value => {
+            clearInterval(interval);
             if (value) {
-                interval = setInterval(() => {
-                    $wire.polling();
-                }, 1000);
-            } else {
-                if (interval) clearInterval(interval);
+                interval = setInterval(() => $wire.polling(), 1000);
             }
         });
     }
 }">
     @forelse($executions as $execution)
-    <a wire:click="selectExecution({{ data_get($execution, 'id') }})" @class([
-        'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
-        'bg-gray-200 dark:bg-coolgray-200' => data_get($execution, 'id') == $selectedKey,
-        'border-blue-500/50 border-dashed' => data_get($execution, 'status') === 'running',
-        'border-error' => data_get($execution, 'status') === 'failed',
-        'border-success' => data_get($execution, 'status') === 'success',
-    ])>
-        @if (data_get($execution, 'status') === 'running')
-        <div class="absolute top-2 right-2">
-            <x-loading />
-        </div>
-        @endif
-        <div class="flex items-center gap-2 mb-2">
-            <span @class([
-                'px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs',
-                'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 dark:shadow-blue-900/5' => data_get($execution, 'status') === 'running',
-                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/5' => data_get($execution, 'status') === 'failed',
-                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 dark:shadow-green-900/5' => data_get($execution, 'status') === 'success',
-            ])>
-                @php
-                $statusText = match(data_get($execution, 'status')) {
-                    'success' => 'Success',
-                    'running' => 'In Progress',
-                    'failed' => 'Failed',
-                    default => ucfirst(data_get($execution, 'status'))
-                };
-                @endphp
-                {{ $statusText }}
-            </span>
-        </div>
-        <div class="text-gray-600 dark:text-gray-400 text-sm">
-            Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at', now()), $server) }}
-            @if(data_get($execution, 'status') !== 'running')
-            <br>Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}
-            <br>Duration: {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
-            <br>Finished {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
-            @endif
-        </div>
-    </a>
-    @if (strlen(data_get($execution, 'message', '')) > 0)
-    <div class="flex flex-col">
-        <x-forms.button wire:click.prevent="downloadLogs({{ data_get($execution, 'id') }})">
-            Download Logs
-        </x-forms.button>
-    </div>
-    @endif
-    @if (data_get($execution, 'id') == $selectedKey)
-    <div class="flex flex-col">
-        <div class="p-4 mb-2 bg-gray-100 dark:bg-coolgray-200 rounded-sm">
-            @if (data_get($execution, 'status') === 'running')
-            <div class="flex items-center gap-2 mb-2">
-                <span>Execution is running...</span>
-                <x-loading class="w-4 h-4" />
-            </div>
-            @endif
-            @if ($this->logLines->isNotEmpty())
-            <div>
-                <h3 class="font-semibold mb-2">Status Message:</h3>
-                <pre class="whitespace-pre-wrap">
-@foreach ($this->logLines as $line)
-{{ $line }}
-@endforeach
-</pre>
-                <div class="flex gap-2">
-                    @if ($this->hasMoreLogs())
-                    <x-forms.button wire:click.prevent="loadMoreLogs" isHighlighted>
-                        Load More
-                    </x-forms.button>
-                    @endif
-                </div>
-            </div>
-            @else
-            <div>
-                <div class="font-semibold mb-2">Status Message:</div>
-                <div>No output was recorded for this execution.</div>
-            </div>
-            @endif
-
-            @if (data_get($execution, 'cleanup_log'))
-            <div class="mt-6 space-y-6">
-                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Cleanup Log:</h3>
-                @foreach(json_decode(data_get($execution, 'cleanup_log'), true) as $result)
-                <div class="overflow-hidden rounded-lg border border-gray-200 dark:border-coolgray-400 bg-white dark:bg-coolgray-100 shadow-xs">
-                    <div class="flex items-center gap-2 px-4 py-3 bg-gray-50 dark:bg-coolgray-200 border-b border-gray-200 dark:border-coolgray-400">
-                        <svg class="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <code class="flex-1 text-sm font-logs text-gray-700 dark:text-gray-300">{{ data_get($result, 'command') }}</code>
-                    </div>
-                    @php
-                    $output = data_get($result, 'output');
-                    $hasOutput = !empty(trim($output));
-                    @endphp
-                    <div class="p-4">
-                        @if($hasOutput)
-                        <pre class="font-logs text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{{ $output }}</pre>
+        <div class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
+            <button type="button" wire:click="selectExecution({{ data_get($execution, 'id') }})"
+                class="flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.03]">
+                <x-status-badge
+                    :status="match (data_get($execution, 'status')) {
+                        'success' => 'Success',
+                        'running' => 'In progress',
+                        'failed' => 'Failed',
+                        default => str(data_get($execution, 'status'))->headline(),
+                    }"
+                    :type="match (data_get($execution, 'status')) {
+                        'success' => 'success',
+                        'running' => 'warning',
+                        'failed' => 'error',
+                        default => 'neutral',
+                    }" />
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-neutral-950 dark:text-fg">
+                        {{ formatDateInServerTimezone(data_get($execution, 'created_at', now()), $server) }}
+                    </p>
+                    <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">
+                        @if (data_get($execution, 'status') === 'running')
+                            Cleanup is currently running
                         @else
-                        <p class="text-sm text-gray-500 dark:text-gray-400 italic">
-                            No output returned - command completed successfully
+                            {{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }}
+                            · finished {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
+                        @endif
+                    </p>
+                </div>
+                <x-chevron-down
+                    class="size-4 shrink-0 text-neutral-400 transition-transform {{ data_get($execution, 'id') == $selectedKey ? 'rotate-180' : '' }}" />
+            </button>
+
+            @if (data_get($execution, 'id') == $selectedKey)
+                <div class="border-t border-neutral-200 bg-neutral-50/60 p-4 dark:border-white/[0.08] dark:bg-black/20">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                        <p class="text-xs font-medium uppercase tracking-wide text-neutral-500 dark:text-fg-dim">
+                            Execution output
                         </p>
+                        @if (strlen(data_get($execution, 'message', '')) > 0)
+                            <x-forms.button wire:click.prevent="downloadLogs({{ data_get($execution, 'id') }})">
+                                Download logs
+                            </x-forms.button>
                         @endif
                     </div>
+
+                    @if ($this->logLines->isNotEmpty())
+                        <pre class="max-h-80 overflow-auto rounded-lg bg-neutral-950 p-4 font-mono text-xs leading-5 text-neutral-300">@foreach ($this->logLines as $line)
+{{ $line }}
+@endforeach</pre>
+                        @if ($this->hasMoreLogs())
+                            <div class="mt-3">
+                                <x-forms.button wire:click.prevent="loadMoreLogs">Load more</x-forms.button>
+                            </div>
+                        @endif
+                    @else
+                        <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                            {{ data_get($execution, 'status') === 'running'
+                                ? 'Waiting for cleanup output…'
+                                : 'No output was recorded for this execution.' }}
+                        </p>
+                    @endif
+
+                    @if (data_get($execution, 'cleanup_log'))
+                        <div class="mt-4 space-y-3">
+                            @foreach (json_decode(data_get($execution, 'cleanup_log'), true) as $result)
+                                <div class="overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-white/[0.08]">
+                                    <div
+                                        class="border-b border-neutral-200 bg-neutral-100 px-3 py-2 dark:border-white/[0.08] dark:bg-white/[0.04]">
+                                        <code
+                                            class="break-all text-xs text-neutral-700 dark:text-neutral-300">{{ data_get($result, 'command') }}</code>
+                                    </div>
+                                    <pre class="overflow-auto p-3 font-mono text-xs leading-5 text-neutral-600 dark:text-neutral-300">{{ filled(trim(data_get($result, 'output', ''))) ? data_get($result, 'output') : 'No output returned.' }}</pre>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
-                @endforeach
-            </div>
             @endif
         </div>
-    </div>
-    @endif
     @empty
-    <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
+        <x-empty size="sm" title="No cleanup executions"
+            description="Run a manual cleanup or wait for the next scheduled execution.">
+            <x-slot:icon>
+                <x-reicon name="storages" class="size-8" />
+            </x-slot:icon>
+        </x-empty>
     @endforelse
 </div>

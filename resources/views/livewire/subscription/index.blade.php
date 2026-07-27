@@ -1,63 +1,45 @@
-<div>
+<div class="application-settings-form w-full max-w-[1180px]">
     <x-slot:title>
         Subscribe | Coolify
     </x-slot>
+
+    <x-dashboard.navbar section="subscription" />
+
     @if (auth()->user()->isAdminFromSession())
-        <div class="flex gap-2">
-            <h1>Subscriptions</h1>
-        </div>
         @if ($loading)
-            <div class="flex items-center justify-center min-h-[60vh]" wire:init="getStripeStatus">
+            <div class="flex min-h-80 items-center justify-center" wire:init="getStripeStatus">
                 <x-loading text="Loading your subscription status..." />
             </div>
         @else
             @if ($isUnpaid)
-                <x-banner :closable="false">
-                    <div class="flex items-center gap-2">
-                        <svg class="w-5 h-5 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        <span><span class="font-bold text-red-500">Payment Failed.</span> Your last payment for Coolify
-                            Cloud has failed.</span>
+                <x-application.settings-section title="Payment failed"
+                    description="Your latest Coolify Cloud payment could not be processed.">
+                    <x-callout type="danger" title="Subscription payment is past due">
+                        Update the payment method or settle the outstanding invoice in the billing portal.
+                    </x-callout>
+                    <div class="mt-4">
+                        <x-forms.button wire:click="stripeCustomerPortal" isHighlighted>Open billing
+                            portal</x-forms.button>
                     </div>
-                </x-banner>
-                <div>
-                    <p class="mb-2">Open the following link, navigate to the button and pay your unpaid/past due
-                        subscription.
-                    </p>
-                    <x-forms.button wire:click='stripeCustomerPortal'>Billing Portal</x-forms.button>
-                </div>
+                </x-application.settings-section>
             @else
                 @if (config('subscription.provider') === 'stripe')
                     @if ($isCancelled)
-                        <x-banner :closable="false">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-5 h-5 text-red-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                        clip-rule="evenodd" />
-                                </svg>
-                                <span><span class="font-bold text-red-500">No Active Subscription.</span> Subscribe to
-                                    a plan to start using Coolify Cloud.</span>
-                            </div>
-                        </x-banner>
+                        <x-callout type="warning" title="No active subscription" class="mb-6">
+                            Choose a plan to continue using Coolify Cloud.
+                        </x-callout>
                     @endif
-                    <div @class(['pt-4 pb-4' => $isCancelled, 'pb-10' => !$isCancelled])></div>
                     <livewire:subscription.pricing-plans />
                 @endif
             @endif
         @endif
     @else
-        <div class="flex flex-col justify-center mx-10">
-            <div class="flex gap-2">
-                <h1>Subscription</h1>
-            </div>
+        <x-application.settings-section title="Subscription"
+            description="Only team administrators can manage billing and plan limits.">
             <x-callout type="danger" title="Insufficient Permissions">
                 You are not an admin so you cannot manage your Team's subscription. If this does not make sense, please
                 <span class="underline cursor-pointer dark:text-white" wire:click="help">contact us</span>.
             </x-callout>
-        </div>
+        </x-application.settings-section>
     @endif
 </div>

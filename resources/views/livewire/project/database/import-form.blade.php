@@ -47,115 +47,141 @@
         };
     </script>
     @endscript
-        <div class="pt-2 rounded-sm alert-error">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>This is a destructive action, existing data will be replaced!</span>
-        </div>
-        {{-- Restore Command Configuration --}}
+        <div class="application-settings-workspace flex flex-col gap-6">
+            <x-callout type="danger" title="Existing data will be replaced">
+                Restoring a backup is destructive. Review the source and import command before continuing.
+            </x-callout>
+
+            <x-application.settings-section title="Restore configuration"
+                description="Configure how the selected backup is applied to this database.">
+                <div class="space-y-4">
             @if ($resourceDbType === 'standalone-postgresql')
                 @if ($dumpAll)
-                    <x-forms.textarea rows="6" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText' canGate="update" :canResource="$this->resource"></x-forms.textarea>
+                            <x-forms.textarea rows="6" readonly label="Import command"
+                                wire:model="restoreCommandText" canGate="update"
+                                :canResource="$this->resource" />
                 @else
-                    <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand' canGate="update" :canResource="$this->resource"></x-forms.input>
-                    <div class="flex flex-col gap-1 pt-1">
-                        <span class="text-xs">You can add "--clean" to drop objects before creating them, avoiding
-                            conflicts.</span>
-                        <span class="text-xs">You can add "--verbose" to log more things.</span>
-                    </div>
+                            <x-forms.input label="Import command"
+                                helper="Add --clean to replace conflicting objects or --verbose for detailed logs."
+                                wire:model="postgresqlRestoreCommand" canGate="update"
+                                :canResource="$this->resource" />
                 @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll' canGate="update" :canResource="$this->resource"></x-forms.checkbox>
-                </div>
             @elseif ($resourceDbType === 'standalone-mysql')
                 @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText' canGate="update" :canResource="$this->resource"></x-forms.textarea>
+                            <x-forms.textarea rows="10" readonly label="Import command"
+                                wire:model="restoreCommandText" canGate="update"
+                                :canResource="$this->resource" />
                 @else
-                    <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand' canGate="update" :canResource="$this->resource"></x-forms.input>
+                            <x-forms.input label="Import command" wire:model="mysqlRestoreCommand"
+                                canGate="update" :canResource="$this->resource" />
                 @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll' canGate="update" :canResource="$this->resource"></x-forms.checkbox>
-                </div>
             @elseif ($resourceDbType === 'standalone-mariadb')
                 @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText' canGate="update" :canResource="$this->resource"></x-forms.textarea>
+                            <x-forms.textarea rows="10" readonly label="Import command"
+                                wire:model="restoreCommandText" canGate="update"
+                                :canResource="$this->resource" />
                 @else
-                    <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand' canGate="update" :canResource="$this->resource"></x-forms.input>
+                            <x-forms.input label="Import command" wire:model="mariadbRestoreCommand"
+                                canGate="update" :canResource="$this->resource" />
                 @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll' canGate="update" :canResource="$this->resource"></x-forms.checkbox>
-                </div>
             @endif
-
-            {{-- Restore Type Selection Boxes --}}
-            <h3 class="pt-6">Choose Restore Method</h3>
-            <div class="flex gap-4 pt-2">
-                <div @click="restoreType = 'file'"
-                     class="flex-1 p-6 border-2 rounded-sm cursor-pointer transition-all"
-                     :class="restoreType === 'file' ? 'border-warning bg-warning/10' : 'border-neutral-200 dark:border-neutral-800 hover:border-warning/50'">
-                    <div class="flex flex-col gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <h4 class="text-lg font-bold">Restore from File</h4>
-                        <p class="text-sm text-neutral-600 dark:text-neutral-400">Upload a backup file or specify a file path on the server</p>
+                    <div class="max-w-sm">
+                        <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
+                            ['value' => true, 'label' => 'Backup contains all databases'],
+                            ['value' => false, 'label' => 'Backup contains one database'],
+                        ]" />
                     </div>
                 </div>
+            </x-application.settings-section>
+
+            <x-application.settings-section title="Backup source"
+                description="Choose a local file or an object stored in S3.">
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <button type="button" @click="restoreType = 'file'"
+                        class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
+                        :class="restoreType === 'file'
+                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                        <span
+                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
+                            <x-reicon name="file" class="size-4" />
+                        </span>
+                        <span>
+                            <span class="block text-[13px] font-semibold">File</span>
+                            <span class="mt-0.5 block text-[11px] text-neutral-500 dark:text-fg-faint">Upload a
+                                backup or use a server path.</span>
+                        </span>
+                    </button>
 
                 @if (count($availableS3Storages) > 0)
-                    <div @click="restoreType = 's3'"
-                         class="flex-1 p-6 border-2 rounded-sm cursor-pointer transition-all"
-                         :class="restoreType === 's3' ? 'border-warning bg-warning/10' : 'border-neutral-200 dark:border-neutral-800 hover:border-warning/50'">
-                        <div class="flex flex-col gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                            </svg>
-                            <h4 class="text-lg font-bold">Restore from S3</h4>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400">Download and restore a backup from S3 storage</p>
-                        </div>
-                    </div>
+                        <button type="button" @click="restoreType = 's3'"
+                            class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
+                            :class="restoreType === 's3'
+                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-warning/30 dark:bg-warning/[0.08] dark:text-warning'
+                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]'">
+                            <span
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
+                                <x-reicon name="storages" class="size-4" />
+                            </span>
+                            <span>
+                                <span class="block text-[13px] font-semibold">S3 storage</span>
+                                <span class="mt-0.5 block text-[11px] text-neutral-500 dark:text-fg-faint">Download
+                                    a backup from an S3 bucket.</span>
+                            </span>
+                        </button>
                 @endif
-            </div>
+                </div>
 
             {{-- File Restore Section --}}
             @can('update', $this->resource)
-                <div x-show="restoreType === 'file'" class="pt-6">
-                    <h3>Backup File</h3>
-                    <form class="flex gap-2 items-end pt-2">
-                        <x-forms.input label="Location of the backup file on the server" placeholder="e.g. /home/user/backup.sql.gz"
-                            wire:model='customLocation' x-model="$wire.customLocation" canGate="update" :canResource="$this->resource"></x-forms.input>
-                        <x-forms.button class="w-full" wire:click='checkFile' x-bind:disabled="!$wire.customLocation" canGate="update" :canResource="$this->resource">Check File</x-forms.button>
+                <div x-cloak x-show="restoreType === 'file'"
+                    class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    <form class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div class="min-w-0 flex-1">
+                            <x-forms.input label="File path on the server"
+                                placeholder="/home/user/backup.sql.gz" wire:model="customLocation"
+                                x-model="$wire.customLocation" canGate="update"
+                                :canResource="$this->resource" />
+                        </div>
+                        <x-forms.button wire:click="checkFile" x-bind:disabled="!$wire.customLocation"
+                            canGate="update" :canResource="$this->resource">Check file</x-forms.button>
                     </form>
-                    <div class="pt-2 text-center text-xl font-bold">
-                        Or
-                    </div>
-                    <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}" class="dropzone" id="my-dropzone" wire:ignore>
-                        @csrf
-                    </form>
-                    <div x-show="isUploading">
-                        <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
+
+                    <div class="my-4 flex items-center gap-3 text-[10px] font-medium uppercase tracking-wide text-neutral-400 dark:text-fg-faint">
+                        <span class="h-px flex-1 bg-neutral-200 dark:bg-white/[0.08]"></span>
+                        or upload
+                        <span class="h-px flex-1 bg-neutral-200 dark:bg-white/[0.08]"></span>
                     </div>
 
-                    <div x-show="filename && !error" class="pt-6">
-                        <h3>File Information</h3>
-                        <div class="pt-2">Location: <span x-text="filename ?? 'N/A'"></span><span x-show="filesize" x-text="' / ' + filesize"></span></div>
-                        <div class="pt-2">
+                    <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
+                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.025]!"
+                        id="my-dropzone" wire:ignore>
+                        @csrf
+                    </form>
+                    <div x-show="isUploading" class="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
+                        <div class="h-full rounded-full bg-coollabs dark:bg-warning"
+                            :style="`width: ${progress}%`"></div>
+                    </div>
+
+                    <div x-cloak x-show="filename && !error"
+                        class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="truncate text-[12px] font-medium" x-text="filename ?? 'N/A'"></p>
+                            <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
+                                x-show="filesize" x-text="filesize"></p>
+                        </div>
+                        <div class="shrink-0">
                             <x-modal-confirmation title="Restore Database from File?" buttonTitle="Restore from File"
                                 submitAction="runImport" isErrorButton>
                                 <x-slot:button-title>
-                                    Restore Database from File
+                                    Restore from file
                                 </x-slot:button-title>
-                                This will perform the following actions:
+                                This will:
                                 <ul class="list-disc list-inside pt-2">
                                     <li>Copy backup file to database container</li>
                                     <li>Execute restore command</li>
                                 </ul>
-                                <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
+                                <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
                             </x-modal-confirmation>
                         </div>
                     </div>
@@ -165,56 +191,66 @@
             {{-- S3 Restore Section --}}
             @if (count($availableS3Storages) > 0)
                 @can('update', $this->resource)
-                    <div x-show="restoreType === 's3'" class="pt-6">
-                        <h3>Restore from S3</h3>
-                        <div class="flex flex-col gap-2 pt-2">
-                            <x-forms.select label="S3 Storage" wire:model.live="s3StorageId" canGate="update" :canResource="$this->resource">
-                                <option value="">Select S3 Storage</option>
-                                @foreach ($availableS3Storages as $storage)
-                                    <option value="{{ $storage['id'] }}">{{ $storage['name'] }}
-                                        @if ($storage['description'])
-                                            - {{ $storage['description'] }}
-                                        @endif
-                                    </option>
-                                @endforeach
-                            </x-forms.select>
+                    @php
+                        $s3StorageOptions = collect($availableS3Storages)
+                            ->map(fn ($storage) => [
+                                'value' => $storage['id'],
+                                'label' => $storage['name']
+                                    .($storage['description'] ? ' — '.$storage['description'] : ''),
+                            ])
+                            ->values()
+                            ->all();
+                    @endphp
+                    <div x-cloak x-show="restoreType === 's3'"
+                        class="mt-4 rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-forms.listbox id="s3StorageId" label="S3 storage" :options="$s3StorageOptions"
+                                placeholder="Select storage" live />
 
-                            <x-forms.input label="S3 File Path (within bucket)"
+                            <x-forms.input label="File path"
                                 helper="Path to the backup file in your S3 bucket, e.g., /backups/database-2025-01-15.gz"
-                                placeholder="/backups/database-backup.gz" wire:model.blur='s3Path'
-                                wire:keydown.enter='checkS3File' canGate="update" :canResource="$this->resource"></x-forms.input>
+                                placeholder="/backups/database-backup.gz" wire:model.blur="s3Path"
+                                wire:keydown.enter="checkS3File" canGate="update"
+                                :canResource="$this->resource" />
+                        </div>
 
-                            <div class="flex gap-2">
-                                <x-forms.button class="w-full" wire:click='checkS3File' x-bind:disabled="!s3StorageId || !s3Path" canGate="update" :canResource="$this->resource">
-                                    Check File
-                                </x-forms.button>
-                            </div>
+                        <div class="mt-3 flex justify-end">
+                            <x-forms.button wire:click="checkS3File" x-bind:disabled="!s3StorageId || !s3Path"
+                                canGate="update" :canResource="$this->resource">
+                                Check file
+                            </x-forms.button>
+                        </div>
 
                             @if ($s3FileSize)
-                                <div class="pt-6">
-                                    <h3>File Information</h3>
-                                    <div class="pt-2">Location: {{ $s3Path }} {{ formatBytes($s3FileSize ?? 0) }}</div>
-                                    <div class="pt-2">
+                            <div
+                                class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="truncate text-[12px] font-medium">{{ $s3Path }}</p>
+                                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        {{ formatBytes($s3FileSize ?? 0) }}</p>
+                                </div>
+                                <div class="shrink-0">
                                         <x-modal-confirmation title="Restore Database from S3?" buttonTitle="Restore from S3"
                                             submitAction="restoreFromS3" isErrorButton>
                                             <x-slot:button-title>
-                                                Restore Database from S3
+                                            Restore from S3
                                             </x-slot:button-title>
-                                            This will perform the following actions:
+                                        This will:
                                             <ul class="list-disc list-inside pt-2">
                                                 <li>Download backup from S3 storage</li>
                                                 <li>Copy file into database container</li>
                                                 <li>Execute restore command</li>
                                             </ul>
-                                            <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
+                                        <p class="pt-2 font-semibold text-error">All existing data will be replaced.</p>
                                         </x-modal-confirmation>
-                                    </div>
                                 </div>
+                            </div>
                             @endif
-                        </div>
                     </div>
                 @endcan
             @endif
+            </x-application.settings-section>
+        </div>
 
             {{-- Slide-over for activity monitor (all restore operations) --}}
             <x-slide-over @databaserestore.window="slideOverOpen = true" closeWithX fullScreen>

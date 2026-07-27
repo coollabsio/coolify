@@ -1,66 +1,63 @@
-<form wire:submit="submit" class="flex flex-col gap-4">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <h2>General</h2>
-        <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-            <x-forms.button type="submit" class="w-full sm:w-auto">Save</x-forms.button>
-            @if (!$backupEnabled)
-                <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
-                    wire:target="toggleEnabled" isHighlighted>Enable Backup</x-forms.button>
-            @else
-                <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
-                    wire:target="toggleEnabled">Disable Backup</x-forms.button>
-            @endif
-            @if (str($status)->startsWith('running'))
-                <x-forms.button wire:click="backupNow" class="w-full sm:w-auto">Backup Now</x-forms.button>
-            @endif
-        </div>
-    </div>
+<form wire:submit="submit">
+    <x-unsaved-bar action="submit" />
 
-    <div class="flex flex-col gap-2">
-        <div class="flex flex-col gap-2">
-            @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0)
-                <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
-                </div>
-                @if (!$backup->dump_all)
-                    <x-forms.input label="Databases To Backup"
-                        helper="Comma separated list of databases to backup. Empty will include the default one."
-                        id="databasesToBackup" />
+    <section class="application-settings-section">
+        <div class="application-settings-section-header">
+            <div>
+                <h2>Backup schedule</h2>
+                <p>Choose what to back up, when it runs, and how long it may run.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                @if (! $backupEnabled)
+                    <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
+                        wire:target="toggleEnabled" isHighlighted>
+                        Enable backup
+                    </x-forms.button>
+                @else
+                    <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
+                        wire:target="toggleEnabled">
+                        Disable backup
+                    </x-forms.button>
                 @endif
+                @if (str($status)->startsWith('running'))
+                    <x-forms.button type="button" wire:click="backupNow">Back up now</x-forms.button>
+                @endif
+            </div>
+        </div>
+
+        <div class="application-settings-section-body space-y-5">
+            @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0
+                    || $backup->database_type === 'App\Models\StandaloneMysql'
+                    || $backup->database_type === 'App\Models\StandaloneMariadb')
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <x-forms.listbox id="dumpAll" label="Database selection" onChange="instantSave" :options="[
+                        ['value' => true, 'label' => 'Back up all databases'],
+                        ['value' => false, 'label' => 'Choose databases'],
+                    ]" />
+                    @if (! $backup->dump_all)
+                        <x-forms.input label="Databases to back up"
+                            helper="Comma-separated database names. Leave empty to include the default database."
+                            id="databasesToBackup" />
+                    @endif
+                </div>
             @elseif ($backup->database_type === 'App\Models\StandaloneMongodb')
-                <x-forms.input label="Databases To Include"
-                    helper="A list of databases to backup. You can specify which collection(s) per database to exclude from the backup. Empty will include all databases and collections.<br><br>Example:<br><br>database1:collection1,collection2|database2:collection3,collection4<br><br> database1 will include all collections except collection1 and collection2. <br>database2 will include all collections except collection3 and collection4.<br><br>Another Example:<br><br>database1:collection1|database2<br><br> database1 will include all collections except collection1.<br>database2 will include ALL collections."
+                <x-forms.input label="Databases to include"
+                    helper="Use database:collection1,collection2|database2 to exclude selected collections. Leave empty to include all databases and collections."
                     id="databasesToBackup" />
-            @elseif ($backup->database_type === 'App\Models\StandaloneMysql')
-                <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
-                </div>
-                @if (!$backup->dump_all)
-                    <x-forms.input label="Databases To Backup"
-                        helper="Comma separated list of databases to backup. Empty will include the default one."
-                        id="databasesToBackup" />
-                @endif
-            @elseif ($backup->database_type === 'App\Models\StandaloneMariadb')
-                <div class="w-48">
-                    <x-forms.checkbox label="Backup All Databases" id="dumpAll" instantSave />
-                </div>
-                @if (!$backup->dump_all)
-                    <x-forms.input label="Databases To Backup"
-                        helper="Comma separated list of databases to backup. Empty will include the default one."
-                        id="databasesToBackup" />
-                @endif
             @elseif ($backup->database_type === 'App\Models\StandaloneClickhouse')
-                <x-forms.input label="Databases To Backup"
-                    helper="Comma separated list of databases to backup. Empty will include the default one."
+                <x-forms.input label="Databases to back up"
+                    helper="Comma-separated database names. Leave empty to include the default database."
                     id="databasesToBackup" />
             @endif
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <x-forms.input label="Frequency" id="frequency" required />
+                <x-forms.input label="Timezone" id="timezone" disabled
+                    helper="Uses the deployment server timezone, or the instance timezone when none is configured."
+                    required />
+                <x-forms.input label="Timeout" id="timeout" type="number" min="60"
+                    helper="Maximum backup runtime in seconds." required />
+            </div>
         </div>
-        <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <x-forms.input label="Frequency" id="frequency" required />
-            <x-forms.input label="Timezone" id="timezone" disabled
-                helper="The timezone of the server where the backup is scheduled to run (if not set, the instance timezone will be used)" required />
-            <x-forms.input label="Timeout" id="timeout" type="number" min="60"
-                helper="The timeout of the backup job in seconds." required />
-        </div>
-    </div>
+    </section>
 </form>

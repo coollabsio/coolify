@@ -161,19 +161,22 @@ class Select extends Component
             [
                 'id' => 'public',
                 'name' => 'Public Repository',
-                'description' => 'You can deploy any kind of public repositories from the supported git providers.',
+                'description' => 'Connect any public Git repository and let Coolify build and deploy it from source.',
+                'documentation' => 'https://coolify.io/docs/applications/ci-cd',
                 'logo' => asset('svgs/git.svg'),
             ],
             [
                 'id' => 'private-gh-app',
                 'name' => 'Private Repository (with GitHub App)',
-                'description' => 'You can deploy public & private repositories through your GitHub Apps.',
+                'description' => 'Deploy a private GitHub repository with automatic webhooks and pull request support.',
+                'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/setup-app',
                 'logo' => asset('svgs/github.svg'),
             ],
             [
                 'id' => 'private-deploy-key',
                 'name' => 'Private Repository (with Deploy Key)',
-                'description' => 'You can deploy private repositories with a deploy key.',
+                'description' => 'Connect a private Git repository over SSH using a repository-scoped deploy key.',
+                'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/deploy-key',
                 'logo' => asset('svgs/git.svg'),
             ],
         ];
@@ -181,19 +184,22 @@ class Select extends Component
             [
                 'id' => 'dockerfile',
                 'name' => 'Dockerfile',
-                'description' => 'You can deploy a simple Dockerfile, without Git.',
+                'description' => 'Build and deploy an application from a Dockerfile without connecting a Git repository.',
+                'documentation' => 'https://coolify.io/docs/applications/build-packs/dockerfile',
                 'logo' => asset('svgs/docker.svg'),
             ],
             [
                 'id' => 'docker-compose-empty',
                 'name' => 'Docker Compose Empty',
-                'description' => 'You can deploy complex application easily with Docker Compose, without Git.',
+                'description' => 'Create a multi-container application and provide the Docker Compose definition manually.',
+                'documentation' => 'https://coolify.io/docs/applications/build-packs/docker-compose',
                 'logo' => asset('svgs/docker.svg'),
             ],
             [
                 'id' => 'docker-image',
                 'name' => 'Docker Image',
-                'description' => 'You can deploy an existing Docker Image from any Registry, without Git.',
+                'description' => 'Run a prebuilt image from Docker Hub or another compatible container registry.',
+                'documentation' => 'https://coolify.io/docs/applications',
                 'logo' => asset('svgs/docker.svg'),
             ],
         ];

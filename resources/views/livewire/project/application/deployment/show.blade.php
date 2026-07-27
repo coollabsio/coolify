@@ -1,8 +1,7 @@
-<div class="flex h-[calc(100vh-10rem)] min-h-[50rem] flex-col overflow-hidden">
+<div class="flex h-[calc(100vh-8rem)] min-h-[42rem] flex-col overflow-hidden">
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
-        <h1 class="py-0">Deployment</h1>
         <livewire:project.shared.configuration-checker :resource="$application" />
         <livewire:project.application.heading :application="$application" />
         <div x-data="{
@@ -267,42 +266,38 @@
                 :application_deployment_queue="$application_deployment_queue" />
             <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-4 flex flex-1 min-h-0 flex-col overflow-hidden'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                    class="flex min-h-0 flex-col w-full overflow-hidden bg-white dark:text-white dark:bg-coolgray-100 dark:border-coolgray-300"
-                    :class="fullscreen ? 'h-full' : 'flex-1 border border-dotted rounded-sm'">
+                    class="flex min-h-0 w-full flex-col overflow-hidden bg-[#0d0d0d] text-neutral-100"
+                    :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-800 shadow-sm'">
                     <div
-                        class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
+                        class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] bg-white/[0.035] px-3 py-2">
                         <div class="flex items-center gap-3">
                             @if (data_get($application_deployment_queue, 'status') === 'in_progress')
-                                <div class="flex items-center gap-1">
-                                    <span>Deployment is</span>
-                                    <span class="dark:text-warning">In Progress</span>
-                                    <x-loading class="loading-ring loading-xs" />
-                                </div>
+                                <x-status-badge status="In progress" type="warning" />
                             @else
-                                <div class="flex items-center gap-1">
-                                    <span>Deployment is</span>
-                                    <span class="dark:text-warning">{{ Str::headline(data_get($application_deployment_queue, 'status')) }}</span>
-                                </div>
+                                @php
+                                    $deploymentStatus = data_get($application_deployment_queue, 'status');
+                                    $deploymentStatusType = match ($deploymentStatus) {
+                                        'finished' => 'success',
+                                        'failed' => 'error',
+                                        'queued' => 'warning',
+                                        default => 'neutral',
+                                    };
+                                @endphp
+                                <x-status-badge :status="Str::headline($deploymentStatus)"
+                                    :type="$deploymentStatusType" />
                             @endif
                             <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                                 class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                         </div>
                         <div class="flex flex-wrap items-center justify-end gap-2 flex-1">
                             <div class="relative">
-                                <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                    stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                                </svg>
+                                <x-reicon name="search"
+                                    class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-neutral-500" />
                                 <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
-                                    class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-200" />
+                                    class="h-8! w-48 rounded-lg! border-white/[0.08]! bg-white/[0.05]! py-0! pr-8! pl-8! text-[12px]! text-white! shadow-none! placeholder:text-neutral-500 focus:border-white/[0.14]! focus:ring-0!" />
                                 <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
-                                    class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
-                                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-                                    </svg>
+                                    class="absolute top-1/2 right-2 -translate-y-1/2 text-neutral-500 hover:text-white">
+                                    <x-reicon name="x" class="size-3.5" />
                                 </button>
                             </div>
                             <div class="flex flex-wrap items-center gap-1">
@@ -332,10 +327,10 @@
                                     x-transition:leave="transition ease-in duration-75"
                                     x-transition:leave-start="transform opacity-100 scale-100"
                                     x-transition:leave-end="transform opacity-0 scale-95"
-                                    class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-md bg-white dark:bg-coolgray-200 shadow-lg ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:outline-none">
-                                    <div class="py-1">
+                                    class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-white/[0.1] bg-[#181818] p-1 shadow-modal focus:outline-none">
+                                    <div>
                                         <button x-on:click="downloadLogs(); downloadMenuOpen = false"
-                                            class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                            class="listbox-option text-neutral-200! hover:bg-white/[0.07]!">
                                             Download displayed logs
                                         </button>
                                         @can('update', $application)
@@ -359,7 +354,7 @@
                                         "
                                             :disabled="downloadingAllLogs"
                                             :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
-                                            class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                            class="listbox-option text-neutral-200! hover:bg-white/[0.07]!">
                                             <span x-show="!downloadingAllLogs">Download all logs</span>
                                             <span x-show="downloadingAllLogs" class="flex items-center gap-2">
                                                 <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

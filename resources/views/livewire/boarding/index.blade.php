@@ -2,78 +2,49 @@
 <x-slot:title>
     Onboarding | Coolify
     </x-slot>
-    <section class="w-full">
-        <div class="flex flex-col items-center w-full space-y-8">
+    <section class="application-settings-form w-full py-6">
+        <div class="flex w-full flex-col items-center space-y-6">
             @if ($currentState === 'welcome')
-                <div class="w-full max-w-2xl text-center space-y-8">
-                    <div class="space-y-4">
-                        <h1 class="text-4xl font-bold lg:text-6xl">Welcome to Coolify</h1>
-                        <p class="text-lg lg:text-xl dark:text-neutral-400">
-                            Connect your first server and start deploying in minutes
+                <div class="w-full max-w-3xl">
+                    <div class="mb-6 text-center">
+                        <div
+                            class="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border border-neutral-200 bg-white text-coollabs shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-warning">
+                            <x-reicon name="play-circle" class="size-5" />
+                        </div>
+                        <h1 class="text-2xl! font-semibold!">Welcome to Coolify</h1>
+                        <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                            Connect your first server and start deploying in minutes.
                         </p>
                     </div>
 
-                    <div class="text-left space-y-4 p-8 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                        <h2 class="text-sm font-bold uppercase tracking-wide dark:text-neutral-400">
-                            What You'll Set Up
-                        </h2>
-                        <div class="space-y-3">
-                            <div class="flex items-start gap-3">
-                                <div class="flex-shrink-0 mt-0.5">
-                                    <svg class="size-5 text-success" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
+                    <x-application.settings-section title="What you will set up" flush>
+                        <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
+                            @foreach ([
+                                ['icon' => 'servers', 'title' => 'Server connection', 'description' => 'Connect through SSH to host your resources.'],
+                                ['icon' => 'settings', 'title' => 'Docker environment', 'description' => 'Validate and configure the deployment runtime.'],
+                                ['icon' => 'projects', 'title' => 'Project structure', 'description' => 'Create a project and its first environment.'],
+                            ] as $onboardingItem)
+                                <div class="flex min-h-14 items-center gap-3 px-4 py-3">
+                                    <span
+                                        class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                        <x-reicon :name="$onboardingItem['icon']" class="size-4" />
+                                    </span>
+                                    <span class="min-w-0">
+                                        <span class="block text-[13px] font-semibold">{{ $onboardingItem['title'] }}</span>
+                                        <span class="mt-0.5 block text-[11px] text-neutral-500 dark:text-fg-faint">{{ $onboardingItem['description'] }}</span>
+                                    </span>
                                 </div>
-                                <div>
-                                    <div class="font-semibold text-base dark:text-white">Server Connection</div>
-                                    <div class="text-sm dark:text-neutral-400">Connect via SSH to deploy your resources
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <div class="flex-shrink-0 mt-0.5">
-                                    <svg class="size-5 text-success" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <div class="font-semibold text-base dark:text-white">Docker Environment</div>
-                                    <div class="text-sm dark:text-neutral-400">Automated installation and configuration
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-3">
-                                <div class="flex-shrink-0 mt-0.5">
-                                    <svg class="size-5 text-success" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
-                                        fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <div class="font-semibold text-base dark:text-white">Project Structure</div>
-                                    <div class="text-sm dark:text-neutral-400">Organize your applications and resources
-                                    </div>
-                                </div>
-                            </div>
+                            @endforeach
                         </div>
-                    </div>
+                    </x-application.settings-section>
 
-                    <div class="flex flex-col items-center gap-3 pt-4">
-                        <x-forms.button class="justify-center px-12 py-4 text-lg font-bold box-boarding"
-                            wire:click="explanation">
-                            Let's go!
+                    <div class="mt-5 flex flex-col items-center gap-3">
+                        <x-forms.button class="justify-center px-6" wire:click="explanation" isHighlighted>
+                            Continue
                         </x-forms.button>
-                        <button wire:click="skipBoarding"
-                            class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">
-                            Skip Setup
+                        <button type="button" wire:click="skipBoarding"
+                            class="text-[12px] text-neutral-500 transition-colors hover:text-coollabs dark:text-fg-dim dark:hover:text-warning">
+                            Skip setup
                         </button>
                     </div>
                 </div>
@@ -100,8 +71,8 @@
                         </p>
                     </x-slot:explanation>
                     <x-slot:actions>
-                        <x-forms.button class="justify-center w-full lg:w-auto px-8 py-3 box-boarding"
-                            wire:click="explanation">
+                        <x-forms.button class="w-full justify-center lg:w-auto" wire:click="explanation"
+                            isHighlighted>
                             Continue
                         </x-forms.button>
                     </x-slot:actions>
@@ -115,7 +86,7 @@
                     <x-slot:actions>
                         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 w-full">
                             <button
-                                class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6"
+                                class="group relative min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]"
                                 wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">
                                 <div class="flex flex-col gap-4 text-left">
                                     <div class="flex items-center justify-between">
@@ -130,7 +101,7 @@
                                         </span>
                                     </div>
                                     <div>
-                                        <h3 class="text-xl font-bold mb-2">This Machine</h3>
+                                        <h3 class="mb-1 text-[14px] font-semibold">This machine</h3>
                                         <p class="text-sm dark:text-neutral-400">
                                             Deploy on the server running Coolify. Best for testing and single-server setups.
                                         </p>
@@ -141,7 +112,7 @@
 
 
                             <button
-                                class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6"
+                                class="group relative min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]"
                                 wire:target="setServerType('remote')" wire:click="setServerType('remote')">
                                 <div class="flex flex-col gap-4 text-left">
                                     <div class="flex items-center justify-between">
@@ -156,7 +127,7 @@
                                         </span>
                                     </div>
                                     <div>
-                                        <h3 class="text-xl font-bold mb-2">Remote Server</h3>
+                                        <h3 class="mb-1 text-[14px] font-semibold">Remote server</h3>
                                         <p class="text-sm dark:text-neutral-400">
                                             Connect via SSH to any server—cloud VPS, bare metal, or home infrastructure.
                                         </p>
@@ -168,7 +139,7 @@
                                     <x-modal-input title="Connect a Hetzner Server" isFullWidth>
                                         <x-slot:content>
                                             <div
-                                                class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6 h-full min-h-[210px]">
+                                                class="group relative h-full min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]">
                                                 <div class="flex flex-col gap-4 text-left">
                                                     <div class="flex items-center justify-between">
                                                         <svg class="size-10" viewBox="0 0 200 200"
@@ -183,7 +154,7 @@
                                                         </span>
                                                     </div>
                                                     <div>
-                                                        <h3 class="text-xl font-bold mb-2">Hetzner Cloud</h3>
+                                                        <h3 class="mb-1 text-[14px] font-semibold">Hetzner Cloud</h3>
                                                         <p class="text-sm dark:text-neutral-400">
                                                             Deploy servers directly from your Hetzner Cloud account.
                                                         </p>
@@ -196,7 +167,7 @@
                                     <x-modal-input title="Connect a Vultr Server" isFullWidth>
                                         <x-slot:content>
                                             <div
-                                                class="group relative box-without-bg cursor-pointer hover:border-coollabs transition-all duration-200 p-6 h-full min-h-[210px]">
+                                                class="group relative h-full min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]">
                                                 <div class="flex flex-col gap-4 text-left">
                                                     <div class="flex items-center justify-between">
                                                         <svg class="size-10" viewBox="0 0 200 200"
@@ -207,7 +178,7 @@
                                                         </svg>
                                                     </div>
                                                     <div>
-                                                        <h3 class="text-xl font-bold mb-2">Vultr Cloud</h3>
+                                                        <h3 class="mb-1 text-[14px] font-semibold">Vultr Cloud</h3>
                                                         <p class="text-sm dark:text-neutral-400">
                                                             Deploy servers directly from your Vultr account.
                                                         </p>
@@ -260,8 +231,9 @@
                                 <x-forms.input readonly id="serverPublicKey" class="mb-4"
                                     label="Current Public Key"></x-forms.input>
 
-                                <x-forms.button class="w-full box-boarding" wire:click="saveAndValidateServer">
-                                    Check Again
+                                <x-forms.button class="w-full justify-center" wire:click="saveAndValidateServer"
+                                    isHighlighted>
+                                    Check again
                                 </x-forms.button>
                             </div>
                         @endif
@@ -289,17 +261,25 @@
                     </x-slot:question>
                     <x-slot:actions>
                         @if ($privateKeys && $privateKeys->count() > 0)
+                            @php
+                                $privateKeyOptions = $privateKeys
+                                    ->map(fn ($privateKey) => [
+                                        'value' => $privateKey->id,
+                                        'label' => $privateKey->name,
+                                    ])
+                                    ->values()
+                                    ->all();
+                            @endphp
                             <div class="w-full space-y-4">
-                                <div class="p-4 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                                    <form wire:submit='selectExistingPrivateKey' class="flex flex-col gap-4">
-                                        <x-forms.select label="Existing SSH Keys" id='selectedExistingPrivateKey'>
-                                            @foreach ($privateKeys as $privateKey)
-                                                <option wire:key="{{ $loop->index }}" value="{{ $privateKey->id }}">
-                                                    {{ $privateKey->name }}
-                                                </option>
-                                            @endforeach
-                                        </x-forms.select>
-                                        <x-forms.button type="submit" class="w-full lg:w-auto">Use Selected Key</x-forms.button>
+                                <div
+                                    class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                                    <form wire:submit="selectExistingPrivateKey"
+                                        class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                        <div class="min-w-0 flex-1">
+                                            <x-forms.listbox id="selectedExistingPrivateKey"
+                                                label="Existing SSH key" :options="$privateKeyOptions" />
+                                        </div>
+                                        <x-forms.button type="submit">Use selected key</x-forms.button>
                                     </form>
                                 </div>
                                 <div class="relative">
@@ -317,7 +297,7 @@
                         @endif
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
                             <x-forms.button
-                                class="justify-center h-auto py-6 box-without-bg hover:border-coollabs transition-all duration-200"
+                                class="h-auto justify-center rounded-[10px]! border-neutral-200! bg-white! py-5! hover:border-coollabs/35! hover:bg-coollabs/[0.03]! dark:border-white/[0.08]! dark:bg-white/[0.025]! dark:hover:border-warning/25! dark:hover:bg-warning/[0.04]!"
                                 wire:target="setPrivateKey('own')" wire:click="setPrivateKey('own')">
                                 <div class="flex flex-col items-center gap-2">
                                     <svg class="size-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -326,13 +306,13 @@
                                             d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
                                     </svg>
                                     <div class="text-center">
-                                        <h3 class="text-xl font-bold mb-2">Use Existing Key</h3>
+                                        <h3 class="mb-1 text-[14px] font-semibold">Use existing key</h3>
                                         <p class="text-sm dark:text-neutral-400">I have my own SSH key</p>
                                     </div>
                                 </div>
                             </x-forms.button>
                             <x-forms.button
-                                class="justify-center h-auto py-6 box-without-bg hover:border-coollabs transition-all duration-200"
+                                class="h-auto justify-center rounded-[10px]! border-neutral-200! bg-white! py-5! hover:border-coollabs/35! hover:bg-coollabs/[0.03]! dark:border-white/[0.08]! dark:bg-white/[0.025]! dark:hover:border-warning/25! dark:hover:bg-warning/[0.04]!"
                                 wire:target="setPrivateKey('create')" wire:click="setPrivateKey('create')">
                                 <div class="flex flex-col items-center gap-2">
                                     <svg class="size-8" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -341,7 +321,7 @@
                                             d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
                                     </svg>
                                     <div class="text-center">
-                                        <h3 class="text-xl font-bold mb-2">Generate New Key</h3>
+                                        <h3 class="mb-1 text-[14px] font-semibold">Generate new key</h3>
                                         <p class="text-sm dark:text-neutral-400">Create ED25519 key pair</p>
                                     </div>
                                 </div>
@@ -582,9 +562,9 @@
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$this->createdServer" />
                                 </x-slot:content>
-                                <x-forms.button @click="slideOverOpen=true" class="w-full font-bold py-4 box-boarding"
+                                <x-forms.button @click="slideOverOpen=true" class="w-full justify-center"
                                     wire:click.prevent='installServer' isHighlighted>
-                                    Start Validation
+                                    Start validation
                                 </x-forms.button>
                             </x-slide-over>
                         </div>
@@ -618,12 +598,21 @@
                     </x-slot:question>
                     <x-slot:actions>
                         <div class="w-full space-y-4">
-                            <x-forms.button class="justify-center w-full py-4 font-bold box-boarding"
+                            <x-forms.button class="w-full justify-center"
                                 wire:click="createNewProject" isHighlighted>
                                 Create "My First Project"
                             </x-forms.button>
 
                             @if ($projects && $projects->count() > 0)
+                                @php
+                                    $projectOptions = $projects
+                                        ->map(fn ($project) => [
+                                            'value' => $project->id,
+                                            'label' => $project->name,
+                                        ])
+                                        ->values()
+                                        ->all();
+                                @endphp
                                 <div class="relative">
                                     <div class="absolute inset-0 flex items-center">
                                         <div class="w-full border-t border-neutral-300 dark:border-coolgray-400"></div>
@@ -632,15 +621,13 @@
                                         <span class="px-2 text-neutral-500 dark:text-neutral-400">Or use existing</span>
                                     </div>
                                 </div>
-                                <form wire:submit='selectExistingProject' class="flex flex-col gap-4">
-                                    <x-forms.select label="Existing Projects" id='selectedProject'>
-                                        @foreach ($projects as $project)
-                                            <option wire:key="{{ $loop->index }}" value="{{ $project->id }}">
-                                                {{ $project->name }}
-                                            </option>
-                                        @endforeach
-                                    </x-forms.select>
-                                    <x-forms.button type="submit" class="w-full lg:w-auto">Use Selected Project</x-forms.button>
+                                <form wire:submit="selectExistingProject"
+                                    class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                    <div class="min-w-0 flex-1">
+                                        <x-forms.listbox id="selectedProject" label="Existing project"
+                                            :options="$projectOptions" />
+                                    </div>
+                                    <x-forms.button type="submit">Use selected project</x-forms.button>
                                 </form>
                             @endif
                         </div>
@@ -673,7 +660,7 @@
                                     d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
-                        <h1 class="text-4xl font-bold lg:text-5xl">Setup Complete!</h1>
+                        <h1 class="text-2xl! font-semibold!">Setup complete</h1>
                         <p class="text-lg dark:text-neutral-400">
                             Your server is connected and ready. Start deploying your first resource.
                         </p>
@@ -733,9 +720,9 @@
                     </div>
 
                     <div class="flex flex-col gap-3">
-                        <x-forms.button class="justify-center w-full py-4 text-lg font-bold box-boarding"
+                        <x-forms.button class="w-full justify-center"
                             wire:click="showNewResource" isHighlighted>
-                            Deploy Your First Resource
+                            Deploy your first resource
                         </x-forms.button>
                         <button wire:click="skipBoarding"
                             class="text-sm dark:text-neutral-400 hover:text-coollabs dark:hover:text-warning hover:underline transition-colors">

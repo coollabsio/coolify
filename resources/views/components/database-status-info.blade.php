@@ -18,7 +18,7 @@
     $urlHelper = 'If you change the user/password/port, this could be different. This is with the default values.';
 @endphp
 
-<div class="flex flex-col gap-2">
+<div class="space-y-5">
     @if ($isPasswordHiddenForMember)
         <x-forms.input :label="$label . ' URL (internal)'" disabled value="Hidden (only admins can view)" />
         <x-forms.input :label="$label . ' URL (public)'" disabled value="Hidden (only admins can view)" />
@@ -35,10 +35,14 @@
     @endif
 
     @if ($supportsSsl)
-        <div class="flex flex-col gap-2 pt-4">
-            <div class="flex items-center justify-between py-2">
-                <div class="flex items-center justify-between w-full">
-                    <h3>SSL Configuration</h3>
+        <div class="border-t border-neutral-200 pt-5 dark:border-white/[0.06]">
+            <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-black dark:text-fg">SSL configuration</h3>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                            Encryption settings can only be changed while the database is stopped.
+                        </p>
+                    </div>
                     @if ($enableSsl && $certificateValidUntil)
                         <x-modal-confirmation title="Regenerate SSL Certificates"
                             buttonTitle="Regenerate SSL Certificates" :actions="[
@@ -47,10 +51,9 @@
                             ]"
                             submitAction="regenerateSslCertificate" :confirmWithText="false" :confirmWithPassword="false" />
                     @endif
-                </div>
             </div>
             @if ($enableSsl && $certificateValidUntil)
-                <span class="text-sm">Valid until:
+                <div class="mb-4 text-sm text-neutral-600 dark:text-fg-dim">Valid until:
                     @if (now()->gt($certificateValidUntil))
                         <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} - Expired</span>
                     @elseif(now()->addDays(30)->gt($certificateValidUntil))
@@ -59,40 +62,24 @@
                     @else
                         <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }}</span>
                     @endif
-                </span>
-            @endif
-            <div class="flex flex-col gap-2">
-                <div class="w-64" wire:key="enable_ssl">
-                    @if ($isExited)
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL" wire:model.live="enableSsl"
-                            instantSave="instantSaveSSL" canGate="update" :canResource="$database" />
-                    @else
-                        <x-forms.checkbox id="enableSsl" label="Enable SSL" wire:model.live="enableSsl"
-                            instantSave="instantSaveSSL" disabled
-                            helper="Database should be stopped to change this setting." canGate="update"
-                            :canResource="$database" />
-                    @endif
                 </div>
+            @endif
+            <div class="grid gap-4 sm:grid-cols-2">
+                <x-forms.listbox id="enableSsl" label="SSL"
+                    onChange="instantSaveSSL"
+                    :disabled="! $isExited || ! auth()->user()?->can('update', $database)"
+                    :options="[
+                        ['value' => true, 'label' => 'Enabled'],
+                        ['value' => false, 'label' => 'Disabled'],
+                    ]" />
                 @if ($sslModeOptions && $enableSsl)
-                    <div class="mx-2">
-                        @if ($isExited)
-                            <x-forms.select id="sslMode" label="SSL Mode" wire:model.live="sslMode"
-                                instantSave="instantSaveSSL" :helper="$sslModeHelper" canGate="update"
-                                :canResource="$database">
-                                @foreach ($sslModeOptions as $value => $option)
-                                    <option value="{{ $value }}" title="{{ $option['title'] ?? '' }}">{{ $option['label'] }}</option>
-                                @endforeach
-                            </x-forms.select>
-                        @else
-                            <x-forms.select id="sslMode" label="SSL Mode" instantSave="instantSaveSSL" disabled
-                                helper="Database should be stopped to change this setting." canGate="update"
-                                :canResource="$database">
-                                @foreach ($sslModeOptions as $value => $option)
-                                    <option value="{{ $value }}" title="{{ $option['title'] ?? '' }}">{{ $option['label'] }}</option>
-                                @endforeach
-                            </x-forms.select>
-                        @endif
-                    </div>
+                    <x-forms.listbox id="sslMode" label="SSL mode" :helper="$sslModeHelper"
+                        onChange="instantSaveSSL"
+                        :disabled="! $isExited || ! auth()->user()?->can('update', $database)"
+                        :options="collect($sslModeOptions)->map(fn ($option, $value) => [
+                            'value' => $value,
+                            'label' => $option['label'],
+                        ])->values()->all()" />
                 @endif
             </div>
         </div>

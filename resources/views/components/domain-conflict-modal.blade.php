@@ -10,27 +10,25 @@
         :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
         <template x-teleport="body">
             <div x-show="modalOpen"
-                class="fixed top-0 lg:pt-10 left-0 z-99 flex items-start justify-center w-screen h-screen" x-cloak>
-                <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
+                class="fixed inset-0 z-99 flex min-h-full items-center justify-center overflow-y-auto p-4" x-cloak>
+                <div x-show="modalOpen" class="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
                 <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
                     x-transition:leave="ease-in duration-100"
                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                     x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                    class="relative w-full py-6 border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] bg-neutral-100 border-neutral-400 dark:bg-base px-7 dark:border-coolgray-300">
-                    <div class="flex justify-between items-center pb-3">
-                        <h2 class="pr-8 font-bold">Domain Already In Use</h2>
+                    class="application-settings-form application-settings-section relative w-full lg:min-w-[36rem] lg:max-w-2xl"
+                    style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                    <header>
+                        <h3>Domain already in use</h3>
                         <button @click="modalOpen = false; $wire.set('showDomainConflictModal', false)"
-                            class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
-                            <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                            <x-reicon name="x" class="size-4" />
                         </button>
-                    </div>
-                    <div class="relative w-auto">
-                        <x-callout type="danger" title="Domain Conflict Detected" class="mb-4">
+                    </header>
+                    <div class="application-settings-section-body">
+                        <x-callout type="danger" title="Domain conflict detected" class="mb-4">
                             The following domain(s) are already in use by other resources. Using the same domain for
                             multiple resources can cause routing conflicts and unpredictable behavior.
                         </x-callout>
@@ -38,7 +36,7 @@
                         <div class="mb-4">
                             <ul class="space-y-2">
                                 @foreach ($conflicts as $conflict)
-                                    <li class="flex items-start text-red-500">
+                                    <li class="flex items-start text-[12px] leading-5 text-red-600 dark:text-red-400">
                                         <div>
                                             <strong>{{ $conflict['domain'] }}</strong> is used by
                                             @if ($conflict['resource_type'] === 'instance')
@@ -69,14 +67,12 @@
                             @endif
                         </x-callout>
 
-                        <div class="flex flex-wrap gap-2 justify-between mt-4">
-                            <x-forms.button @click="modalOpen = false; $wire.set('showDomainConflictModal', false)"
-                                class="w-auto dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                        <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                            <x-forms.button @click="modalOpen = false; $wire.set('showDomainConflictModal', false)">
                                 Cancel
                             </x-forms.button>
-                            <x-forms.button wire:click="{{ $confirmAction }}" @click="modalOpen = false" class="w-auto"
-                                isError>
-                                I understand, proceed anyway
+                            <x-forms.button wire:click="{{ $confirmAction }}" @click="modalOpen = false" isError>
+                                Proceed anyway
                             </x-forms.button>
                         </div>
                     </div>

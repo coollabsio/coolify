@@ -35,6 +35,10 @@ class Show extends Component
 
     public string $type;
 
+    public int $tableAlphabeticalOrder = 0;
+
+    public int $tableCreationOrder = 0;
+
     public string $key;
 
     public ?string $value = null;

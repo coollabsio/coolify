@@ -43,6 +43,22 @@
     --color-coolgray-300: #242424;
     --color-coolgray-400: #282828;
     --color-coolgray-500: #323232;
+
+    /* Graphite design language (ported from ref/frontend). Layered neutral
+       surfaces + translucent hairlines. See UI_REDESIGN.md. */
+    --color-app: #0c0c0d;
+    /* Canvas: neutral near-black (oklch), not pure black */
+    --color-panel: oklch(10% 0 0);
+    --color-surface: #161618;
+    --color-raised: #1c1c1e;
+    --color-selected: #26262a;
+    --color-fg: #f2f2f2;
+    --color-fg-dim: #b4b4b8;
+    --color-fg-faint: #6e6e74;
+    --color-accent: #6b16ed;
+    --color-hairline: rgba(255, 255, 255, 0.08);
+
+    --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 /*
@@ -57,6 +73,69 @@
 @layer components {
     .terminal-mobile-key {
         @apply min-h-10 rounded-md border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white shadow-inner active:bg-white/25;
+    }
+
+    /* Accent bar on the active sidebar item (Linear/Wave-style) */
+    .menu-item-active::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-left: 3px solid var(--color-accent);
+        border-radius: inherit;
+        pointer-events: none;
+    }
+    .menu-subitem-active::before {
+        content: "";
+        position: absolute;
+        top: 4px;
+        bottom: 4px;
+        left: calc(-0.25rem - 4px);
+        z-index: 1;
+        width: 3px;
+        border-radius: 999px;
+        background: var(--color-accent);
+        pointer-events: none;
+    }
+    .menu-subitem-active {
+        overflow: visible !important;
+    }
+    .sidebar-collapsed .menu-item-active::before {
+        display: none;
+    }
+    /* active icon picks up full-strength foreground */
+    .menu-item-active .menu-item-icon,
+    .menu-subitem-active .menu-item-icon {
+        opacity: 1;
+    }
+
+    .menu-item-active,
+    .menu-subitem-active {
+        background-image: linear-gradient(
+            90deg,
+            rgba(107, 22, 237, 0.2) 0%,
+            rgba(107, 22, 237, 0.1) 42%,
+            rgba(107, 22, 237, 0.035) 76%,
+            transparent 100%
+        );
+    }
+
+    .dark .menu-item-active,
+    .dark .menu-subitem-active {
+        background-image: linear-gradient(
+            90deg,
+            rgba(252, 212, 82, 0.2) 0%,
+            rgba(252, 212, 82, 0.1) 42%,
+            rgba(252, 212, 82, 0.035) 76%,
+            transparent 100%
+        );
+    }
+
+    /* vertical connector line for a nested nav group */
+    .nav-children {
+        position: relative;
+        margin-left: 1.1rem;
+        padding-left: 0.25rem;
+        border-left: 1px solid var(--color-hairline);
     }
 }
 
@@ -186,7 +265,7 @@
 */
 html,
 body {
-    @apply w-full min-h-full bg-gray-50 dark:bg-base dark:text-neutral-400;
+    @apply w-full min-h-full bg-gray-50 dark:bg-app dark:text-fg-dim;
 }
 
 body {
@@ -195,7 +274,9 @@ body {
 
 .coolify-monaco-editor {
     @apply min-w-0 w-full;
-    overflow-x: hidden;
+    overflow: hidden;
+    border-radius: 10px;
+    border: 1px solid var(--coollabs-line, #e5e5e5);
 }
 
 .coolify-monaco-editor .monaco-editor,
@@ -212,7 +293,7 @@ button[isError]:not(:disabled) {
 }
 
 button[isHighlighted]:not(:disabled) {
-    @apply text-coollabs-200 dark:text-white bg-coollabs-50 dark:bg-coollabs/20 border-coollabs dark:border-coollabs-100 hover:bg-coollabs hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white;
+    @apply text-coollabs-200 bg-coollabs-50 border-coollabs hover:bg-coollabs hover:text-white dark:bg-warning/15 dark:text-warning dark:border-warning/25 dark:hover:bg-warning/20 dark:hover:text-warning;
 }
 
 h1 {
@@ -276,10 +357,6 @@ tr td:first-child {
     @apply pr-3 pl-4 font-bold sm:pl-6;
 }
 
-section {
-    @apply mb-12;
-}
-
 /*
 * Utility classes
 */
@@ -300,4 +377,1330 @@ section {
 
 .dark .log-highlight {
     background-color: rgba(234, 179, 8, 0.3);
+}
+
+/* Wave-style application console: transparent viewport and an overlay
+   scrollbar that stays out of the terminal content until it is used. */
+#terminal[data-terminal-style="application"] .xterm-viewport {
+    background-color: transparent !important;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+#terminal[data-terminal-style="application"] .xterm-viewport::-webkit-scrollbar {
+    width: 4px;
+}
+
+#terminal[data-terminal-style="application"] .xterm-viewport::-webkit-scrollbar-thumb {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#terminal[data-terminal-style="application"] .xterm-viewport::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.application-console-shell {
+    position: relative;
+    isolation: isolate;
+    color: #f2f2f2;
+    background-color: #121214;
+    box-shadow:
+        inset 0 0 0 1px rgb(255 255 255 / 0.08),
+        0 18px 50px rgb(0 0 0 / 0.18);
+}
+
+.application-console-shell::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--console-theme-background);
+    opacity: var(--console-theme-opacity);
+    content: "";
+    transition:
+        background 220ms ease,
+        opacity 220ms ease;
+}
+
+.application-console-shell[data-console-theme="shadows-midnight"] {
+    --console-theme-background: linear-gradient(135deg, #2a3b4c, rgb(42 59 76 / 0.4));
+    --console-theme-opacity: 0.9;
+}
+
+.application-console-shell[data-console-theme="shadows-golden-hour"] {
+    --console-theme-background: linear-gradient(135deg, #d58a42, rgb(213 138 66 / 0.4));
+    --console-theme-opacity: 0.4;
+}
+
+.application-console-shell[data-console-theme="shadows-cosmic-purple"] {
+    --console-theme-background: linear-gradient(135deg, #5d3e66, rgb(93 62 102 / 0.4));
+    --console-theme-opacity: 0.8;
+}
+
+.application-console-shell[data-console-theme="shadows-neon-glow"] {
+    --console-theme-background: linear-gradient(135deg, #f300a6, rgb(243 0 166 / 0.3));
+    --console-theme-opacity: 0.45;
+}
+
+.application-console-shell[data-console-theme="shadows-icy-mist"] {
+    --console-theme-background: linear-gradient(135deg, #d0d8e2, rgb(208 216 226 / 0.2));
+    --console-theme-opacity: 0.5;
+}
+
+.application-console-shell[data-console-theme="shadows-tropical-storm"] {
+    --console-theme-background: linear-gradient(135deg, #00b894, #1fa771, #2ecc71, #27ae60);
+    --console-theme-opacity: 0.3;
+}
+
+.application-console-shell[data-console-theme="shadows-golden-nebula"] {
+    --console-theme-background: linear-gradient(135deg, #ffd700, #ff6347, #d4a20e, #ffcc00, #1f3d6f);
+    --console-theme-opacity: 0.44;
+}
+
+.application-console-shell[data-console-theme="shadows-cosmic-lagoon"] {
+    --console-theme-background: linear-gradient(135deg, #1d2b64, #2f4f96, #00b5b8, #9c27b0, #8e24aa);
+    --console-theme-opacity: 0.59;
+}
+
+.application-console-shell[data-console-theme="shadows-neon-nebula"] {
+    --console-theme-background: linear-gradient(135deg, #00d9d9, #ff55aa, #1e1e2f, #2f3b57, #ff99ff);
+    --console-theme-opacity: 0.6;
+}
+
+.application-console-shell[data-console-theme="shadows-transparent"] {
+    --console-theme-background: rgb(0 0 0 / 0.7);
+    --console-theme-opacity: 0.7;
+}
+
+.application-console-header {
+    position: relative;
+    z-index: 2;
+    background: rgb(0 0 0 / 0.24);
+    backdrop-filter: blur(20px);
+}
+
+.application-console-block {
+    position: relative;
+    z-index: 1;
+    background: rgb(0 0 0 / 0.56);
+    backdrop-filter: blur(10px);
+}
+
+/*
+* Coollabs layer-card settings surfaces.
+* Anatomy: root shell = elevated bg + hairline ring; the header is a compact
+* strip on the shell; the body is a nested rounded panel with base bg + fill
+* ring. Depth comes from the neutral oklch surface ladder below.
+* Deliberately unlayered plain CSS: the global element rules above (h3, h4,
+* section, label) and the .input/.button utilities would otherwise override
+* utility classes placed in the card markup.
+*/
+:root {
+    --coollabs-canvas: oklch(98.75% 0 0);
+    --coollabs-elevated: oklch(98% 0 0);
+    --coollabs-recessed: oklch(96% 0 0);
+    --coollabs-base: #ffffff;
+    --coollabs-fill: oklch(92.2% 0 0);
+    --coollabs-line: oklch(14.5% 0 0 / 0.1);
+    --coollabs-hairline: oklch(93.5% 0 0);
+    --coollabs-subtle: oklch(55.6% 0 0);
+}
+
+.dark {
+    --color-accent: #fcd452;
+    --coollabs-canvas: oklch(10% 0 0);
+    /* elevated (card shells/headers) and recessed (input fills) sit a touch
+       above the canvas so they read lighter than near-black */
+    --coollabs-elevated: oklch(15% 0 0);
+    --coollabs-recessed: oklch(20% 0 0);
+    --coollabs-base: oklch(17% 0 0);
+    --coollabs-fill: oklch(26.9% 0 0);
+    --coollabs-line: oklch(32% 0 0);
+    --coollabs-hairline: oklch(26.9% 0 0);
+    --coollabs-subtle: oklch(70.8% 0 0);
+}
+
+/* Public authentication surfaces */
+.auth-shell {
+    min-height: 100dvh;
+    display: flex;
+    background:
+        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-accent) 9%, transparent), transparent 34rem),
+        var(--coollabs-canvas);
+    color: #171717;
+}
+
+.dark .auth-shell {
+    color: var(--color-fg);
+}
+
+.auth-shell-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    width: 100%;
+    padding: 2rem 1rem;
+}
+
+.auth-card {
+    width: min(100%, 27rem);
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--coollabs-elevated);
+    box-shadow: 0 0 0 1px var(--coollabs-hairline), 0 20px 60px rgb(0 0 0 / 0.14);
+}
+
+.auth-card-heading {
+    padding: 1.25rem 1.25rem 1rem;
+}
+
+.auth-card-heading h1 {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: #171717;
+}
+
+.dark .auth-card-heading h1 {
+    color: var(--color-fg);
+}
+
+.auth-card-heading p {
+    margin-top: 0.25rem;
+    max-width: 38ch;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--coollabs-subtle);
+}
+
+.auth-card-body {
+    border-radius: 10px;
+    padding: 1.25rem;
+    background: var(--coollabs-base);
+    box-shadow: 0 0 0 1px var(--coollabs-fill);
+}
+
+.auth-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 3rem;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.8125rem;
+    color: var(--coollabs-subtle);
+}
+
+.auth-text-link {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #525252;
+    text-underline-offset: 3px;
+    transition: color 0.15s ease;
+}
+
+.dark .auth-text-link {
+    color: var(--color-fg-dim);
+}
+
+.auth-text-link:hover {
+    color: var(--color-accent);
+    text-decoration: underline;
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--coollabs-subtle);
+    font-size: 0.75rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--coollabs-fill);
+}
+
+.auth-guidance {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    border-radius: 8px;
+    padding: 0.625rem 0.75rem;
+    background: var(--coollabs-recessed);
+    color: var(--coollabs-subtle);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+/* Layer card root: elevated shell with a hairline ring. overflow stays
+   visible so floating panels (listbox, tooltips) can escape the card. */
+.application-settings-section {
+    margin: 0;
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    border-radius: 8px;
+    border: none;
+    background: var(--coollabs-elevated);
+    box-shadow: 0 0 0 1px var(--coollabs-hairline);
+    /* keep anchored scrolls (scrollIntoView) clear of the fixed topbar + layer-2 nav */
+    scroll-margin-top: 7rem;
+}
+
+/* Modals reuse the layer-card shell but size to content on large screens */
+@media (min-width: 1024px) {
+    .application-settings-section.application-settings-form {
+        width: auto;
+    }
+}
+
+/* Layer card header: compact strip on the shell, subtle title color */
+.application-settings-section > :is(header, .application-settings-section-header) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+    border-radius: 8px 8px 0 0;
+    background: var(--coollabs-elevated);
+    font-weight: 500;
+    color: var(--coollabs-subtle);
+}
+
+.application-settings-section > :is(header, .application-settings-section-header) :is(h2, h3) {
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    letter-spacing: 0;
+    color: inherit;
+}
+
+.application-settings-section > .application-settings-section-header p {
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--coollabs-subtle);
+}
+
+/* Layer card body: nested rounded panel with base bg + fill ring */
+.application-settings-section-body {
+    position: relative;
+    border-radius: 8px;
+    background: var(--coollabs-base);
+    box-shadow: 0 0 0 1px var(--coollabs-fill);
+    padding: 1rem;
+}
+
+/* Server pages share the application settings grid. The small desktop offset
+   aligns the first card edge with the visible sidebar section label. */
+.server-settings-workspace > :not(.application-settings-navigation) {
+    min-width: 0;
+}
+
+@media (min-width: 1280px) {
+    .server-settings-workspace > :not(.application-settings-navigation) {
+        margin-top: 0.75rem;
+    }
+}
+
+/* Field labels */
+.application-settings-workspace label,
+.application-settings-form label {
+    margin-bottom: 0.375rem;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--coollabs-subtle);
+}
+
+/* Inputs & selects: recessed fill + line border (surface hierarchy) */
+.application-settings-workspace .input,
+.application-settings-workspace .select,
+.application-settings-form .input,
+.application-settings-form .select {
+    height: 2rem;
+    border-radius: 8px;
+    border-color: var(--coollabs-line);
+    background-color: var(--coollabs-recessed);
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    font-size: 0.875rem;
+    box-shadow: none !important;
+}
+
+.application-settings-workspace .input:focus-visible,
+.application-settings-workspace .select:focus-visible,
+.application-settings-form .input:focus-visible,
+.application-settings-form .select:focus-visible {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent) !important;
+}
+
+.application-settings-workspace textarea.input,
+.application-settings-form textarea.input {
+    height: auto;
+    min-height: 5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    line-height: 1.25rem;
+}
+
+/* Buttons */
+.application-settings-workspace .button,
+.application-settings-form .button {
+    height: 2rem;
+    border-radius: 8px;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+
+.application-settings-workspace .form-control,
+.application-settings-form .form-control {
+    border-radius: 8px;
+}
+
+.dark .application-settings-workspace .form-control:hover,
+.dark .application-settings-form .form-control:hover {
+    background: transparent;
+}
+
+/* Heading action group: buttons + dropdown triggers styled like the tabs */
+.application-heading-actions .button,
+.application-heading-actions .relative > button[x-ref='trigger'] {
+    height: 1.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0 0.625rem;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #737373;
+    min-width: 0;
+    white-space: nowrap;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.dark .application-heading-actions .button,
+.dark .application-heading-actions .relative > button[x-ref='trigger'] {
+    color: var(--color-fg-dim);
+}
+
+.application-heading-actions .button:hover:not(:disabled),
+.application-heading-actions .relative > button[x-ref='trigger']:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #000000;
+}
+
+.dark .application-heading-actions .button:hover:not(:disabled),
+.dark .application-heading-actions .relative > button[x-ref='trigger']:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-fg);
+}
+
+.application-heading-actions .relative > button[x-ref='trigger'] {
+    padding-right: 0.625rem;
+}
+
+/* dropdown chevron: inline instead of absolutely positioned */
+.application-heading-actions .relative > button[x-ref='trigger'] > svg {
+    position: static;
+    margin: 0;
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+    opacity: 0.6;
+}
+
+/* dropdown label: kill the h-full/flex-col title wrapper so text centers
+   on the same baseline as the sibling buttons */
+.application-heading-actions .relative > button[x-ref='trigger'] > span {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+    line-height: 1.25;
+}
+
+.application-heading-actions .button svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Custom listbox (replaces native <select>) */
+.listbox-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    height: 2rem;
+    padding: 0 0.625rem 0 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--coollabs-line);
+    background: var(--coollabs-recessed);
+    font-size: 0.875rem;
+    color: #000000;
+    text-align: left;
+    cursor: pointer;
+}
+
+.dark .listbox-trigger {
+    color: var(--color-fg);
+}
+
+.listbox-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.listbox-trigger:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.listbox-panel {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 100%;
+    max-height: 16rem;
+    overflow-y: auto;
+    padding: 0.25rem;
+    border-radius: 10px;
+    border: 1px solid var(--coollabs-line);
+    background: var(--coollabs-recessed);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.listbox-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    width: 100%;
+    height: 2rem;
+    padding: 0 0.5rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    color: #000000;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dark .listbox-option {
+    color: var(--color-fg);
+}
+
+.listbox-option:hover {
+    background: var(--coollabs-fill);
+}
+
+.listbox-option-disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.listbox-option-disabled:hover {
+    background: transparent;
+}
+
+/* Flush layer-card body (tables and other full-bleed content) */
+.application-settings-section-body.is-flush {
+    padding: 0;
+}
+
+/* Data table (layer-card body, full-bleed) */
+.data-table-header {
+    display: grid;
+    align-items: center;
+    gap: 1rem;
+    padding: 0 1rem;
+    height: 2.5rem;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--coollabs-subtle);
+    background: rgba(0, 0, 0, 0.02);
+    border-bottom: 1px solid var(--coollabs-fill);
+    border-radius: 8px 8px 0 0;
+}
+
+.dark .data-table-header {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.data-table > .env-table-item {
+    border-bottom: 1px solid var(--coollabs-fill);
+}
+
+.data-table > .env-table-item:last-child {
+    border-bottom: none;
+}
+
+.data-table-row {
+    display: grid;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.625rem 1rem;
+    min-height: 3rem;
+    transition: background-color 0.15s;
+}
+
+.data-table-row:hover {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.dark .data-table-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.env-table-grid {
+    grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+.backup-table-grid {
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(8rem, 1fr) 5rem 1.5rem;
+}
+
+.deployment-table-grid {
+    grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr) 1.5rem;
+}
+
+.dashboard-deployment-table-grid {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem 1rem;
+}
+
+.team-members-table-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem minmax(10rem, 0.9fr);
+}
+
+.admin-users-table-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 5rem;
+}
+
+.api-tokens-table-grid {
+    grid-template-columns: minmax(9rem, 1.15fr) minmax(14rem, 1.9fr) 7rem 6.5rem 6.5rem 5.5rem;
+}
+
+.scheduled-executions-table-grid {
+    grid-template-columns: 5.5rem minmax(9rem, 1fr) minmax(7rem, 0.7fr) 8.5rem 5rem minmax(12rem, 1.5fr);
+}
+
+.scheduler-runs-table-grid {
+    grid-template-columns: 9rem minmax(12rem, 1.5fr) 6rem 6rem 6rem;
+}
+
+.skipped-jobs-table-grid {
+    grid-template-columns: 9rem 7rem minmax(10rem, 1fr) minmax(12rem, 1.4fr);
+}
+
+.server-resources-managed-table-grid {
+    grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) 8rem 9.5rem;
+}
+
+.server-resources-unmanaged-table-grid {
+    grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
+}
+
+.package-updates-table-grid {
+    grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1fr) 6rem;
+}
+
+.scheduled-backups-table-grid {
+    grid-template-columns: minmax(10rem, 1.25fr) 8rem minmax(9rem, 1fr) 6rem 5rem;
+}
+
+.backup-executions-table-grid {
+    grid-template-columns: 7.5rem minmax(9rem, 1fr) 8rem 6rem 5rem minmax(9rem, 1fr) minmax(9rem, auto);
+}
+
+.clone-destinations-table-grid {
+    grid-template-columns: 2rem minmax(10rem, 1fr) minmax(10rem, 1fr);
+}
+
+.clone-resources-table-grid {
+    grid-template-columns: minmax(10rem, 1fr) 7rem minmax(12rem, 1.5fr);
+}
+
+.admin-search-table-grid {
+    grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.2fr) 8rem 7rem;
+}
+
+@media (max-width: 900px) {
+    .backup-table-grid {
+        grid-template-columns: minmax(10rem, 1.5fr) 6rem 7.5rem minmax(8rem, 1fr) 1.5rem;
+    }
+
+    .backup-table-grid > :nth-child(3),
+    .backup-table-grid > :nth-child(6) {
+        display: none;
+    }
+
+    .deployment-table-grid {
+        grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(10rem, 1.4fr) minmax(8rem, 0.9fr) 1.5rem;
+    }
+
+    .deployment-table-grid > :nth-child(5),
+    .deployment-table-grid > :nth-child(6) {
+        display: none;
+    }
+
+    .team-members-table-grid {
+        grid-template-columns: minmax(0, 1fr) 7rem 7rem;
+    }
+
+    .team-members-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .api-tokens-table-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(9rem, 1.3fr) 6.5rem 4.5rem;
+    }
+
+    .api-tokens-table-grid > :nth-child(3),
+    .api-tokens-table-grid > :nth-child(4) {
+        display: none;
+    }
+
+    .scheduled-executions-table-grid {
+        grid-template-columns: 5.5rem minmax(8rem, 1fr) 8.5rem minmax(10rem, 1.3fr);
+    }
+
+    .scheduled-executions-table-grid > :nth-child(3),
+    .scheduled-executions-table-grid > :nth-child(5) {
+        display: none;
+    }
+
+    .server-resources-managed-table-grid {
+        grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 0.8fr) 8rem 9.5rem;
+    }
+
+    .server-resources-managed-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .backup-executions-table-grid {
+        grid-template-columns: 7.5rem minmax(9rem, 1fr) 8rem 6rem minmax(9rem, auto);
+    }
+
+    .backup-executions-table-grid > :nth-child(5),
+    .backup-executions-table-grid > :nth-child(6) {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .application-settings-section > :is(header, .application-settings-section-header) > :nth-child(2) {
+        width: 100%;
+    }
+
+    .backup-table-grid {
+        grid-template-columns: minmax(0, 1fr) 7.5rem 1.5rem;
+    }
+
+    .backup-table-grid > :nth-child(2),
+    .backup-table-grid > :nth-child(5) {
+        display: none;
+    }
+
+    .deployment-table-grid {
+        grid-template-columns: 7.5rem minmax(0, 1fr) 1.5rem;
+    }
+
+    .deployment-table-grid > :nth-child(2),
+    .deployment-table-grid > :nth-child(4) {
+        display: none;
+    }
+
+    .team-members-table-grid {
+        grid-template-columns: minmax(0, 1fr) 6.5rem;
+    }
+
+    .team-members-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .admin-users-table-grid {
+        grid-template-columns: minmax(0, 1fr) 5rem;
+    }
+
+    .admin-users-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .api-tokens-table-grid {
+        grid-template-columns: minmax(0, 1fr) 6.5rem 4.5rem;
+    }
+
+    .api-tokens-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .scheduled-executions-table-grid {
+        grid-template-columns: 5.5rem minmax(0, 1fr) 8.5rem;
+    }
+
+    .scheduled-executions-table-grid > :nth-child(6) {
+        display: none;
+    }
+
+    .scheduler-runs-table-grid {
+        grid-template-columns: 8.5rem minmax(0, 1fr) 5.5rem;
+    }
+
+    .scheduler-runs-table-grid > :nth-child(3),
+    .scheduler-runs-table-grid > :nth-child(4) {
+        display: none;
+    }
+
+    .skipped-jobs-table-grid {
+        grid-template-columns: 8.5rem minmax(0, 1fr);
+    }
+
+    .skipped-jobs-table-grid > :nth-child(2),
+    .skipped-jobs-table-grid > :nth-child(4) {
+        display: none;
+    }
+
+    .server-resources-managed-table-grid {
+        grid-template-columns: minmax(0, 1fr) 8rem 9.5rem;
+    }
+
+    .server-resources-managed-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .server-resources-unmanaged-table-grid {
+        grid-template-columns: minmax(0, 1fr) 7rem minmax(5rem, auto);
+    }
+
+    .server-resources-unmanaged-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .package-updates-table-grid {
+        grid-template-columns: minmax(0, 1fr) 5rem;
+    }
+
+    .package-updates-table-grid > :nth-child(2) {
+        display: none;
+    }
+
+    .scheduled-backups-table-grid {
+        grid-template-columns: minmax(0, 1fr) 8rem 5rem;
+    }
+
+    .scheduled-backups-table-grid > :nth-child(3),
+    .scheduled-backups-table-grid > :nth-child(4) {
+        display: none;
+    }
+
+    .backup-executions-table-grid {
+        grid-template-columns: 7.5rem minmax(0, 1fr) minmax(7rem, auto);
+    }
+
+    .backup-executions-table-grid > :nth-child(3),
+    .backup-executions-table-grid > :nth-child(4) {
+        display: none;
+    }
+
+    .clone-destinations-table-grid {
+        grid-template-columns: 2rem minmax(0, 1fr);
+    }
+
+    .clone-destinations-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .clone-resources-table-grid {
+        grid-template-columns: minmax(0, 1fr) 7rem;
+    }
+
+    .clone-resources-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .admin-search-table-grid {
+        grid-template-columns: minmax(0, 1fr) 7rem;
+    }
+
+    .admin-search-table-grid > :nth-child(2),
+    .admin-search-table-grid > :nth-child(3) {
+        display: none;
+    }
+}
+
+.data-table-cell-check {
+    display: flex;
+    justify-content: center;
+    color: #171717;
+}
+
+.dark .data-table-cell-check {
+    color: var(--color-fg);
+}
+
+.data-table-cell-dash {
+    display: flex;
+    justify-content: center;
+    color: #a3a3a3;
+}
+
+.dark .data-table-cell-dash {
+    color: var(--color-fg-faint);
+}
+
+/* Runtime log viewer */
+.runtime-log-shell {
+    overflow: visible;
+    border-radius: 8px;
+    background: var(--coollabs-elevated);
+    box-shadow: 0 0 0 1px var(--coollabs-hairline);
+}
+
+.runtime-log-trigger {
+    display: flex;
+    min-height: 2.75rem;
+    cursor: pointer;
+    user-select: none;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 8px;
+    padding: 0.625rem 0.875rem;
+    color: #171717;
+    transition: background-color 0.15s;
+}
+
+.runtime-log-trigger:hover {
+    background: rgba(0, 0, 0, 0.025);
+}
+
+.dark .runtime-log-trigger {
+    color: var(--color-fg);
+}
+
+.dark .runtime-log-trigger:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.runtime-log-trigger h4 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.runtime-log-panel {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    overflow: visible;
+    border-radius: 8px;
+    background: var(--coollabs-base);
+    box-shadow: 0 0 0 1px var(--coollabs-fill);
+}
+
+.settings-log-panel .runtime-log-panel {
+    box-shadow: none;
+}
+
+.runtime-log-toolbar {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--coollabs-fill);
+    padding: 0.5rem 0.75rem;
+}
+
+.runtime-log-icon-button {
+    display: inline-flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: #737373;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.runtime-log-icon-button:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #171717;
+}
+
+.dark .runtime-log-icon-button {
+    color: var(--color-fg-faint);
+}
+
+.dark .runtime-log-icon-button:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-fg);
+}
+
+.runtime-log-icon-button-active {
+    background: color-mix(in oklab, var(--color-coollabs) 10%, transparent);
+    color: var(--color-coollabs);
+}
+
+.dark .runtime-log-icon-button-active {
+    background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+    color: var(--color-warning);
+}
+
+.runtime-log-viewport {
+    min-height: 18rem;
+    border-radius: 0 0 8px 8px;
+    background: #fafafa;
+    color: #262626;
+}
+
+.dark .runtime-log-viewport {
+    background: oklch(11.5% 0 0);
+    color: var(--color-fg-dim);
+}
+
+.env-table-detail {
+    padding: 0.25rem 1rem 1.25rem;
+}
+
+/* Small pill badges for table cells */
+.table-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    height: 20px;
+    padding: 0 0.5rem;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: nowrap;
+    background: var(--coollabs-fill);
+    color: #52525b;
+}
+
+.dark .table-badge {
+    color: var(--color-fg-dim);
+}
+
+.table-badge-danger {
+    background: rgba(248, 113, 113, 0.14);
+    color: #dc2626;
+}
+
+.dark .table-badge-danger {
+    color: #f87171;
+}
+
+/* Chip/tag input (comma-free multi-value entry, e.g. Domains) */
+.chip-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    width: 100%;
+    /* 3px block padding: 24px chip row + 6px + 2px border = 32px, matching .input/.button */
+    padding: 0.1875rem 0.375rem;
+    border-radius: 8px;
+    border: 1px solid var(--coollabs-line);
+    background: var(--coollabs-recessed);
+    cursor: text;
+}
+
+.chip-input:focus-within {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.chip-input input {
+    flex: 1 1 10rem;
+    min-width: 10rem;
+    height: 1.5rem;
+    margin: 0;
+    padding: 0 0.25rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.875rem;
+    color: #000000;
+    outline: none;
+    box-shadow: none;
+}
+
+.dark .chip-input input {
+    color: var(--color-fg);
+}
+
+.chip-input input:focus,
+.chip-input input:focus-visible {
+    outline: none;
+    box-shadow: none;
+    border: none;
+}
+
+.chip-input input::placeholder {
+    color: var(--coollabs-subtle);
+    opacity: 0.7;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.5rem;
+    max-width: 100%;
+    padding: 0 0.375rem 0 0.625rem;
+    border-radius: 6px;
+    border: none;
+    background: var(--coollabs-fill);
+    font-size: 0.8125rem;
+    color: #000000;
+    white-space: nowrap;
+}
+
+.dark .chip {
+    color: var(--color-fg);
+}
+
+.chip > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 3px;
+    color: var(--coollabs-subtle);
+    transition: color 0.15s;
+}
+
+.chip-remove:hover {
+    color: inherit;
+}
+
+/* Detached pill options (segmented radio groups rendered as separate pills) */
+.option-pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.option-pill-group label {
+    margin-bottom: 0;
+}
+
+.option-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    height: 2rem;
+    padding: 0 0.875rem;
+    border-radius: 8px;
+    border: 1px solid var(--coollabs-line);
+    background: var(--coollabs-elevated);
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    color: #000000;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.dark .option-pill {
+    color: var(--color-fg);
+}
+
+.option-pill:hover {
+    background: var(--coollabs-recessed);
+}
+
+.peer:checked + .option-pill {
+    background: var(--coollabs-fill);
+    border-color: var(--coollabs-line);
+}
+
+.peer:disabled + .option-pill {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Label column + content rows inside a card body */
+.application-purpose-row {
+    display: grid;
+    gap: 1rem;
+    border-top: 1px solid var(--coollabs-fill);
+    padding-top: 1.25rem;
+}
+
+@media (min-width: 768px) {
+    .application-purpose-row {
+        grid-template-columns: 13rem minmax(0, 1fr);
+        gap: 2rem;
+    }
+}
+
+.application-purpose-copy h4 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #000000;
+}
+
+.dark .application-purpose-copy h4 {
+    color: var(--color-fg);
+}
+
+.application-purpose-copy p {
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: #71717a;
+}
+
+.dark .application-purpose-copy p {
+    color: var(--color-fg-dim);
+}
+
+.application-details-card .application-purpose-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+}
+
+/* In-card sub-headings (e.g. "Container labels", "Docker Compose") */
+.application-settings-form h4,
+.application-settings-form .application-settings-section-body h3 {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* Compact resource table on the project environment page. */
+.environment-resource-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(240px, 2fr)
+        minmax(100px, 0.7fr)
+        minmax(110px, 0.8fr)
+        minmax(180px, 1.2fr)
+        minmax(120px, 0.8fr)
+        minmax(140px, 1fr)
+        1.75rem;
+    column-gap: 1rem;
+}
+
+.projects-table-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(220px, 1.7fr)
+        minmax(100px, 0.65fr)
+        minmax(90px, 0.6fr)
+        minmax(220px, 1.5fr)
+        6rem;
+    column-gap: 1rem;
+}
+
+.environments-table-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(220px, 1.5fr)
+        minmax(90px, 0.55fr)
+        minmax(240px, 1.6fr)
+        6rem;
+    column-gap: 1rem;
+}
+
+@media (max-width: 900px) {
+    .environments-table-grid {
+        grid-template-columns: minmax(220px, 1fr) 6rem 6rem;
+    }
+
+    .environments-table-grid .environment-description {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .environments-table-grid {
+        grid-template-columns: minmax(0, 1fr) 5rem;
+        column-gap: 0.75rem;
+    }
+
+    .environments-table-grid > :nth-child(2) {
+        display: none;
+    }
+}
+
+@media (max-width: 1050px) {
+    .projects-table-grid {
+        grid-template-columns: minmax(220px, 1fr) 7rem 6rem 6rem;
+    }
+
+    .projects-table-grid .project-description {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .projects-table-grid {
+        grid-template-columns: minmax(0, 1fr) 5rem;
+        column-gap: 0.75rem;
+    }
+
+    .projects-table-grid > :nth-child(2),
+    .projects-table-grid > :nth-child(3) {
+        display: none;
+    }
+}
+
+@media (max-width: 1200px) {
+    .environment-resource-grid {
+        grid-template-columns:
+            minmax(220px, 2fr)
+            minmax(100px, 0.8fr)
+            minmax(110px, 0.8fr)
+            minmax(120px, 1fr)
+            1.75rem;
+    }
+
+    .environment-resource-grid .resource-domain,
+    .environment-resource-grid .resource-tags {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .environment-resource-grid {
+        grid-template-columns: minmax(0, 1fr) 6.5rem 1.75rem;
+        column-gap: 0.75rem;
+    }
+
+    .environment-resource-grid > :nth-child(2),
+    .environment-resource-grid > :nth-child(5) {
+        display: none;
+    }
 }

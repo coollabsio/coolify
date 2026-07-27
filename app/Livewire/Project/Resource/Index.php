@@ -161,24 +161,26 @@ class Index extends Component
             'dragonflies' => $this->dragonflies,
             'clickhouses' => $this->clickhouses,
             'services' => $this->services,
-            'applicationsJs' => $this->toSearchableArray($this->applications),
-            'postgresqlsJs' => $this->toSearchableArray($this->postgresqls),
-            'redisJs' => $this->toSearchableArray($this->redis),
-            'mongodbsJs' => $this->toSearchableArray($this->mongodbs),
-            'mysqlsJs' => $this->toSearchableArray($this->mysqls),
-            'mariadbsJs' => $this->toSearchableArray($this->mariadbs),
-            'keydbsJs' => $this->toSearchableArray($this->keydbs),
-            'dragonfliesJs' => $this->toSearchableArray($this->dragonflies),
-            'clickhousesJs' => $this->toSearchableArray($this->clickhouses),
-            'servicesJs' => $this->toSearchableArray($this->services),
+            'applicationsJs' => $this->toSearchableArray($this->applications, 'application', 'Application'),
+            'postgresqlsJs' => $this->toSearchableArray($this->postgresqls, 'database', 'PostgreSQL'),
+            'redisJs' => $this->toSearchableArray($this->redis, 'database', 'Redis'),
+            'mongodbsJs' => $this->toSearchableArray($this->mongodbs, 'database', 'MongoDB'),
+            'mysqlsJs' => $this->toSearchableArray($this->mysqls, 'database', 'MySQL'),
+            'mariadbsJs' => $this->toSearchableArray($this->mariadbs, 'database', 'MariaDB'),
+            'keydbsJs' => $this->toSearchableArray($this->keydbs, 'database', 'KeyDB'),
+            'dragonfliesJs' => $this->toSearchableArray($this->dragonflies, 'database', 'Dragonfly'),
+            'clickhousesJs' => $this->toSearchableArray($this->clickhouses, 'database', 'ClickHouse'),
+            'servicesJs' => $this->toSearchableArray($this->services, 'service', 'Service'),
         ]);
     }
 
-    private function toSearchableArray(Collection $items): array
+    private function toSearchableArray(Collection $items, string $type, string $typeLabel): array
     {
         return $items->map(fn ($item) => [
             'uuid' => $item->uuid,
             'name' => $item->name,
+            'type' => $type,
+            'typeLabel' => $typeLabel,
             'fqdn' => $item->fqdn ?? null,
             'description' => $item->description ?? null,
             'status' => $item->status ?? '',

@@ -1096,16 +1096,101 @@ class Application extends BaseModel
         return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
     }
 
-    public function deployments(int $skip = 0, int $take = 10, ?string $pullRequestId = null)
-    {
-        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');
+    /**
+     * @return array{count: int, deployments: Collection<int, ApplicationDeploymentQueue>}
+     */
+    public function deployments(
+        int $skip = 0,
+        int $take = 10,
+        ?string $pullRequestId = null,
+        ?string $search = null,
+        string $filter = 'all',
+        string $sort = 'newest',
+    ): array {
+        $deployments = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->id);
 
         if ($pullRequestId) {
-            $deployments = $deployments->where('pull_request_id', $pullRequestId);
+            $deployments->where('pull_request_id', $pullRequestId);
+        }
+
+        $search = trim((string) $search);
+        if ($search !== '') {
+            $normalizedSearch = Str::lower($search);
+            $statusAliases = [
+                'success' => ApplicationDeploymentStatus::FINISHED->value,
+                'in progress' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+                'cancelled' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+            ];
+
+            $deployments->where(function ($query) use ($search, $normalizedSearch, $statusAliases) {
+                $query
+                    ->whereLike('deployment_uuid', "%{$search}%")
+                    ->orWhereLike('commit', "%{$search}%")
+                    ->orWhereLike('commit_message', "%{$search}%")
+                    ->orWhereLike('server_name', "%{$search}%")
+                    ->orWhereLike('status', "%{$search}%");
+
+                if (isset($statusAliases[$normalizedSearch])) {
+                    $query->orWhere('status', $statusAliases[$normalizedSearch]);
+                }
+
+                if (is_numeric($search) && (int) $search > 0) {
+                    $query->orWhere('pull_request_id', (int) $search);
+                }
+
+                match ($normalizedSearch) {
+                    'pull request', 'pull requests', 'pr' => $query->orWhere('pull_request_id', '>', 0),
+                    'webhook', 'webhooks' => $query->orWhere('is_webhook', true),
+                    'rollback', 'rollbacks' => $query->orWhere('rollback', true),
+                    'api' => $query->orWhere('is_api', true),
+                    'manual' => $query->orWhere(function ($sourceQuery) {
+                        $sourceQuery
+                            ->where('pull_request_id', '<=', 0)
+                            ->where('is_webhook', false)
+                            ->where('rollback', false)
+                            ->where('is_api', false);
+                    }),
+                    default => null,
+                };
+            });
+        }
+
+        if (Str::startsWith($filter, 'status:')) {
+            $deployments->where('status', Str::after($filter, 'status:'));
+        }
+
+        if (Str::startsWith($filter, 'source:')) {
+            match (Str::after($filter, 'source:')) {
+                'pull-request' => $deployments->where('pull_request_id', '>', 0),
+                'webhook' => $deployments
+                    ->where('pull_request_id', '<=', 0)
+                    ->where('is_webhook', true),
+                'rollback' => $deployments
+                    ->where('pull_request_id', '<=', 0)
+                    ->where('is_webhook', false)
+                    ->where('rollback', true),
+                'api' => $deployments
+                    ->where('pull_request_id', '<=', 0)
+                    ->where('is_webhook', false)
+                    ->where('rollback', false)
+                    ->where('is_api', true),
+                'manual' => $deployments
+                    ->where('pull_request_id', '<=', 0)
+                    ->where('is_webhook', false)
+                    ->where('rollback', false)
+                    ->where('is_api', false),
+                default => null,
+            };
         }
 
         $count = $deployments->count();
-        $deployments = $deployments->skip($skip)->take($take)->get();
+        $deployments = $deployments
+            ->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc')
+            ->orderBy('id', $sort === 'oldest' ? 'asc' : 'desc')
+            ->skip($skip)
+            ->take($take)
+            ->get();
 
         return [
             'count' => $count,

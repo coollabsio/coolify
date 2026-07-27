@@ -1,100 +1,132 @@
 <div>
-    <x-security.navbar />
-    <div class="flex items-center gap-2 pb-4">
-        <h2>Private Keys</h2>
-        @can('create', App\Models\PrivateKey::class)
-            <div x-data="{ dropdownOpen: false }" class="relative w-fit" @click.outside="dropdownOpen = false">
-                <x-forms.button isHighlighted @click="dropdownOpen = !dropdownOpen" type="button">
-                    + Add
-                    <svg class="w-4 h-4 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                        stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                    </svg>
-                </x-forms.button>
+    <x-slot:title>
+        Keys & Tokens | Coolify
+    </x-slot>
 
-                <div x-show="dropdownOpen" @click.away="dropdownOpen=false" x-transition:enter="ease-out duration-200"
-                    x-transition:enter-start="-translate-y-2" x-transition:enter-end="translate-y-0"
-                    class="absolute top-0 z-50 mt-10 min-w-max" x-cloak>
-                    <div
-                        class="p-1 mt-1 bg-white border rounded-sm shadow-sm dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
-                        <div class="flex flex-col gap-1">
-                            <a class="dropdown-item" wire:click="generatePrivateKey('ed25519')"
-                                @click="dropdownOpen = false">
-                                <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
+    <x-security.navbar>
+        <x-slot:actions>
+            @can('create', App\Models\PrivateKey::class)
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-modal-confirmation title="Confirm unused SSH Key Deletion?"
+                        buttonTitle="Delete unused keys" isErrorButton submitAction="cleanupUnusedKeys"
+                        :actions="['All unused SSH keys (marked with unused) are permanently deleted.']"
+                        :confirmWithText="false" :confirmWithPassword="false" />
+
+                    <div x-data="{ dropdownOpen: false }" class="relative"
+                        @click.outside="dropdownOpen = false">
+                        <button type="button" @click="dropdownOpen = !dropdownOpen"
+                            class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                            :aria-expanded="dropdownOpen">
+                            <x-reicon name="plus" class="size-3.5" />
+                            New private key
+                        </button>
+
+                        <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right
+                            class="absolute top-9 right-0 z-50 w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                            <button type="button" class="listbox-option justify-start!"
+                                wire:click="generatePrivateKey('ed25519')" @click="dropdownOpen = false">
+                                <x-reicon name="keys" class="size-3.5 opacity-70" />
                                 Generate ED25519
-                            </a>
-                            <a class="dropdown-item" wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false">
-                                <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
+                            </button>
+                            <button type="button" class="listbox-option justify-start!"
+                                wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false">
+                                <x-reicon name="keys" class="size-3.5 opacity-70" />
                                 Generate RSA
-                            </a>
+                            </button>
                             <x-modal-input title="Add Private Key Manually">
                                 <x-slot:content>
-                                    <div class="dropdown-item" @click="dropdownOpen = false">
-                                        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 4.5v15m7.5-7.5h-15" />
-                                        </svg>
+                                    <button type="button" @click="dropdownOpen = false"
+                                        class="listbox-option justify-start!">
+                                        <x-reicon name="plus" class="size-3.5 opacity-70" />
                                         Add manually
-                                    </div>
+                                    </button>
                                 </x-slot:content>
                                 <livewire:security.private-key.create />
                             </x-modal-input>
                         </div>
                     </div>
                 </div>
-            </div>
-        @endcan
-        @can('create', App\Models\PrivateKey::class)
-            <x-modal-confirmation title="Confirm unused SSH Key Deletion?" buttonTitle="Delete unused SSH Keys" isErrorButton
-                submitAction="cleanupUnusedKeys" :actions="['All unused SSH keys (marked with unused) are permanently deleted.']" :confirmWithText="false" :confirmWithPassword="false" />
-        @endcan
-    </div>
-    <div class="grid gap-4 lg:grid-cols-2">
-        @forelse ($privateKeys as $key)
-            @can('view', $key)
-                {{-- Admin/Owner: Clickable link --}}
-                <a class="coolbox group"
-                    href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}" {{ wireNavigate() }}>
-                    <div class="flex flex-col justify-center mx-6">
-                        <div class="box-title">
-                            {{ data_get($key, 'name') }}
-                        </div>
-                        <div class="box-description">
-                            {{ $key->description }}
-                            @if (!$key->isInUse())
-                                <span
-                                    class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-warning-400 text-black">Unused</span>
-                            @endif
-                        </div>
-                    </div>
-                </a>
-            @else
-                {{-- Member: Visible but not clickable --}}
-                <div class="coolbox opacity-60 !cursor-not-allowed hover:bg-transparent dark:hover:bg-transparent" title="You don't have permission to view this private key">
-                    <div class="flex flex-col justify-center mx-6">
-                        <div class="box-title">
-                            {{ data_get($key, 'name') }}
-                            <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-gray-400 dark:bg-gray-600 text-white">View Only</span>
-                        </div>
-                        <div class="box-description">
-                            {{ $key->description }}
-                            @if (!$key->isInUse())
-                                <span
-                                    class="inline-flex items-center px-2 py-0.5 rounded-sm text-xs font-medium bg-warning-400 text-black">Unused</span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
             @endcan
-        @empty
-            <div>No private keys found.</div>
-        @endforelse
+        </x-slot:actions>
+    </x-security.navbar>
+
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <h2 class="text-[15px]! leading-5! font-semibold!">Private keys</h2>
+            <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                {{ $privateKeys->count() }} {{ Str::plural('SSH key', $privateKeys->count()) }} available to this team
+            </p>
+        </div>
+
     </div>
+
+    @if ($privateKeys->isEmpty())
+        <div
+            class="flex min-h-80 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 text-center dark:border-white/[0.1] dark:bg-white/[0.02]">
+            <div
+                class="mb-4 flex size-11 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-400 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">
+                <x-reicon name="keys" class="size-5" />
+            </div>
+            <h2 class="text-[15px] font-semibold">No private keys yet</h2>
+            <p class="mt-1 max-w-sm text-[13px] text-neutral-500 dark:text-fg-dim">
+                Generate or add an SSH key to connect Coolify to servers and private repositories.
+            </p>
+        </div>
+    @else
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            @foreach ($privateKeys as $key)
+                @can('view', $key)
+                    <a class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                        href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}"
+                        {{ wireNavigate() }}>
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <x-reicon name="keys" class="size-4" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                    {{ data_get($key, 'name') }}
+                                </h3>
+                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    {{ $key->description ?: 'SSH private key' }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-auto pt-4">
+                            @if ($key->isInUse())
+                                <x-status-badge label="In use" type="success" />
+                            @else
+                                <x-status-badge label="Unused" type="warning" />
+                            @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="flex min-h-28 cursor-not-allowed flex-col rounded-xl border border-neutral-200 bg-neutral-50 p-3 opacity-65 dark:border-white/[0.08] dark:bg-white/[0.015]"
+                        title="You do not have permission to view this private key">
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-400 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                                <x-reicon name="keys" class="size-4" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                    {{ data_get($key, 'name') }}
+                                </h3>
+                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    {{ $key->description ?: 'SSH private key' }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-auto flex flex-wrap gap-2 pt-4">
+                            <x-status-badge label="View only" type="neutral" />
+                            @if (!$key->isInUse())
+                                <x-status-badge label="Unused" type="warning" />
+                            @endif
+                        </div>
+                    </div>
+                @endcan
+            @endforeach
+        </div>
+    @endif
 </div>

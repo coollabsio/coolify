@@ -200,8 +200,8 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-0 sm:p-4" x-cloak>
-            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
+            class="fixed inset-0 z-99 flex min-h-full items-center justify-center overflow-y-auto p-4" x-cloak>
+            <div x-show="modalOpen" class="absolute inset-0 bg-black/50 backdrop-blur-[2px]">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -209,18 +209,17 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full border rounded-none sm:rounded-sm min-w-full lg:min-w-[36rem] max-w-full sm:max-w-[48rem] h-screen sm:h-auto max-h-screen sm:max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
-                <div class="flex justify-between items-center py-6 px-7 shrink-0">
-                    <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
+                class="application-settings-form application-settings-section relative flex max-h-[calc(100dvh-2rem)] w-full flex-col lg:min-w-[36rem] lg:max-w-2xl"
+                style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                <header>
+                    <h3>{{ $title }}</h3>
                     <button @click="modalOpen = false; resetModal()"
-                        class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
-                        <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                        <x-reicon name="x" class="size-4" />
                     </button>
-                </div>
-                <div class="relative w-auto overflow-y-auto px-7 pb-6" style="-webkit-overflow-scrolling: touch;">
+                </header>
+                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                    style="-webkit-overflow-scrolling: touch;">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
@@ -233,9 +232,8 @@
                                 </div>
                             @endforeach
 
-                            <div class="flex flex-wrap gap-2 justify-between mt-4">
-                                <x-forms.button @click="modalOpen = false; resetModal()"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                                <x-forms.button @click="modalOpen = false; resetModal()">
                                     Cancel
                                 </x-forms.button>
                                 <x-forms.button @click="step++" class="w-auto" isError>
@@ -250,37 +248,25 @@
                         <x-callout type="danger" title="Warning" class="mb-4">
                             {!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
                         </x-callout>
-                        <div class="mb-4">The following actions will be performed:</div>
+                        <div class="mb-2 text-[12px] font-medium text-neutral-700 dark:text-fg-dim">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
-                                <li class="flex items-center text-red-500">
-                                    <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
+                                <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                    <x-reicon name="x" class="mt-1 size-3 shrink-0" />
                                     <span>{{ $action }}</span>
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
-                                    <li class="flex items-center text-red-500">
-                                        <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
+                                    <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                        <x-reicon name="x" class="mt-1 size-3 shrink-0" />
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
-                                        <li class="flex items-center text-red-500">
-                                            <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M6 18L18 6M6 6l12 12"></path>
-                                            </svg>
+                                        <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                            <x-reicon name="x" class="mt-1 size-3 shrink-0" />
                                             <span>{{ $checkbox['default_warning'] }}</span>
                                         </li>
                                     </template>
@@ -290,8 +276,8 @@
                         @if (!$disableTwoStepConfirmation)
                             @if ($confirmWithText)
                                 <div class="mb-4">
-                                    <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
-                                    <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
+                                    <h4 class="mb-1 text-[12px] font-semibold">Confirm actions</h4>
+                                    <p class="mb-2 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2" x-data="{ decodedText: confirmationText }">
                                         <div class="relative">
                                             <input type="text" x-model="decodedText" readonly class="input">
@@ -310,24 +296,21 @@
                                     </div>
 
                                     <label for="userConfirmationText"
-                                        class="block mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        class="mt-4 mb-1.5 block text-[12px] font-medium text-neutral-700 dark:text-fg-dim">
                                         {{ $shortConfirmationLabel }}
                                     </label>
-                                    <input type="text" x-model="userConfirmationText"
-                                        class="p-2 mt-1 px-3 w-full  rounded-sm input">
+                                    <input type="text" x-model="userConfirmationText" class="input w-full">
                                 </div>
                             @endif
                         @endif
 
-                        <div class="flex flex-wrap gap-2 justify-between mt-4">
+                        <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
                             @if (!empty($checkboxes))
-                                <x-forms.button @click="step--"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                <x-forms.button @click="step--">
                                     Back
                                 </x-forms.button>
                             @else
-                                <x-forms.button @click="modalOpen = false; resetModal()"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                <x-forms.button @click="modalOpen = false; resetModal()">
                                     Cancel
                                 </x-forms.button>
                             @endif
@@ -386,9 +369,8 @@
                                 @enderror
                             </div>
 
-                            <div class="flex flex-wrap gap-2 justify-between mt-4">
-                                <x-forms.button @click="step--"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                                <x-forms.button @click="step--">
                                     Back
                                 </x-forms.button>
                                 <x-forms.button x-bind:disabled="!password || submitting" class="w-auto" isError

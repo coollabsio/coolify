@@ -1,91 +1,42 @@
-<div>
-    <div class="flex items-center gap-2">
-        <h2>Cloud Provider Tokens</h2>
-        @can('create', App\Models\CloudProviderToken::class)
-            <div x-data="{ dropdownOpen: false }" class="relative w-fit" @click.outside="dropdownOpen = false">
-                <x-forms.button isHighlighted @click="dropdownOpen = !dropdownOpen" type="button">
-                    + Add
-                    <svg class="w-4 h-4 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                        stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                    </svg>
-                </x-forms.button>
-
-                <div x-show="dropdownOpen" @click.away="dropdownOpen=false" x-transition:enter="ease-out duration-200"
-                    x-transition:enter-start="-translate-y-2" x-transition:enter-end="translate-y-0"
-                    class="absolute top-0 z-50 mt-10 min-w-max" x-cloak>
-                    <div
-                        class="p-1 mt-1 bg-white border rounded-sm shadow-sm dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
-                        <div class="flex flex-col gap-1">
-                            <x-modal-input title="Add Hetzner Token">
-                                <x-slot:content>
-                                    <div class="dropdown-item" @click="dropdownOpen = false">
-                                        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 4.5v15m7.5-7.5h-15" />
-                                        </svg>
-                                        Hetzner
-                                    </div>
-                                </x-slot:content>
-                                <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner"
-                                    wire:key="cloud-provider-token-hetzner" />
-                            </x-modal-input>
-
-                            <x-modal-input title="Add DigitalOcean Token">
-                                <x-slot:content>
-                                    <div class="dropdown-item" @click="dropdownOpen = false">
-                                        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 4.5v15m7.5-7.5h-15" />
-                                        </svg>
-                                        DigitalOcean
-                                    </div>
-                                </x-slot:content>
-                                <livewire:security.cloud-provider-token-form :modal_mode="true" provider="digitalocean"
-                                    wire:key="cloud-provider-token-digitalocean" />
-                            </x-modal-input>
-
-                            <x-modal-input title="Add Vultr Token">
-                                <x-slot:content>
-                                    <div class="dropdown-item" @click="dropdownOpen = false">
-                                        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 4.5v15m7.5-7.5h-15" />
-                                        </svg>
-                                        Vultr
-                                    </div>
-                                </x-slot:content>
-                                <livewire:security.cloud-provider-token-form :modal_mode="true" provider="vultr"
-                                    wire:key="cloud-provider-token-vultr" />
-                            </x-modal-input>
+<div class="application-settings-form">
+    <x-application.settings-section title="Cloud tokens" flush>
+        @if ($tokens->isEmpty())
+            <x-empty title="No cloud tokens"
+                description="Add a provider token to provision new cloud servers." size="sm">
+                <x-slot:icon>
+                    <x-reicon name="keys" class="size-6" />
+                </x-slot:icon>
+            </x-empty>
+        @else
+            <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
+                @foreach ($tokens as $savedToken)
+                    <a wire:key="cloud-token-{{ $savedToken->id }}"
+                        class="group flex min-h-28 min-w-0 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                        href="{{ route('security.cloud-tokens.show', ['cloud_token_uuid' => $savedToken->uuid]) }}"
+                        {{ wireNavigate() }}>
+                        <div class="flex min-w-0 items-start gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <x-reicon name="keys" class="size-4" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                    {{ $savedToken->name }}
+                                </h3>
+                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    {{ $savedToken->description ?: 'No description' }}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                        <div class="mt-auto pt-4">
+                            <span
+                                class="inline-flex rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+                                {{ $savedToken->provider === 'digitalocean' ? 'DigitalOcean' : ucfirst($savedToken->provider) }}
+                            </span>
+                        </div>
+                    </a>
+                @endforeach
             </div>
-        @endcan
-    </div>
-    <div class="pb-4">Manage API tokens for cloud providers (Hetzner, Vultr, etc.).</div>
-    <div class="grid gap-4 lg:grid-cols-2">
-        @forelse ($tokens as $savedToken)
-            <a wire:key="token-{{ $savedToken->id }}" class="coolbox group"
-                href="{{ route('security.cloud-tokens.show', ['cloud_token_uuid' => $savedToken->uuid]) }}" {{ wireNavigate() }}>
-                <div class="flex flex-col justify-center mx-6">
-                    <div class="box-title">
-                        {{ $savedToken->name }}
-                    </div>
-                    <div class="box-description">
-                        {{ strtoupper($savedToken->provider) }}
-                    @if ($savedToken->description)
-                        · {{ $savedToken->description }}
-                    @endif
-                </div>
-            </div>
-        </a>
-        @empty
-            <div>
-                <div>No cloud provider tokens found.</div>
-            </div>
-        @endforelse
-    </div>
+        @endif
+    </x-application.settings-section>
 </div>

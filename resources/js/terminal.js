@@ -10,6 +10,96 @@ import { FitAddon } from '@xterm/addon-fit';
 
 const terminalDebugEnabled = import.meta.env.DEV;
 
+const baseApplicationTerminalTheme = {
+    black: '#675f70',
+    red: '#ef7272',
+    green: '#7bd88f',
+    yellow: '#e7bd68',
+    blue: '#85aacb',
+    magenta: '#c792ea',
+    cyan: '#72d5d0',
+    white: '#d8d2df',
+    brightBlack: '#8a8292',
+    brightRed: '#ff9b9b',
+    brightGreen: '#a5e7b2',
+    brightYellow: '#f2d596',
+    brightBlue: '#b0c8df',
+    brightMagenta: '#ddb3f4',
+    brightCyan: '#a7e8e4',
+    brightWhite: '#ffffff',
+    foreground: '#eee9f2',
+    background: '#00000000',
+    overviewRulerBorder: '#00000000',
+};
+
+function createApplicationTerminalTheme(accent, colors = {}) {
+    return {
+        ...baseApplicationTerminalTheme,
+        cursor: accent,
+        cursorAccent: '#101012',
+        selectionBackground: `${accent}66`,
+        ...colors,
+    };
+}
+
+const applicationTerminalThemes = {
+    'shadows-midnight': createApplicationTerminalTheme('#6d7a7c', {
+        blue: '#7392ad',
+        cyan: '#7fa3a6',
+        brightBlue: '#9bb4c9',
+        brightCyan: '#a8c4c6',
+    }),
+    'shadows-golden-hour': createApplicationTerminalTheme('#bf8c3c', {
+        yellow: '#d9a759',
+        red: '#df7756',
+        brightYellow: '#edc987',
+        brightRed: '#efa086',
+    }),
+    'shadows-cosmic-purple': createApplicationTerminalTheme('#A76DBE', {
+        blue: '#8f86d9',
+        magenta: '#c58ad8',
+        brightBlue: '#b1a9ed',
+        brightMagenta: '#ddb0e9',
+    }),
+    'shadows-neon-glow': createApplicationTerminalTheme('#DB425A', {
+        red: '#ed5d72',
+        magenta: '#f35fc2',
+        brightRed: '#ff8c9d',
+        brightMagenta: '#ff93d7',
+    }),
+    'shadows-icy-mist': createApplicationTerminalTheme('#93b7c4', {
+        blue: '#8fb7d0',
+        cyan: '#9acbd0',
+        brightBlue: '#b9d5e5',
+        brightCyan: '#c0e3e5',
+    }),
+    'shadows-tropical-storm': createApplicationTerminalTheme('#1fa771', {
+        green: '#45c98b',
+        cyan: '#4ec7ad',
+        brightGreen: '#7de0ad',
+        brightCyan: '#80dfcc',
+    }),
+    'shadows-golden-nebula': createApplicationTerminalTheme('#d4a20e', {
+        yellow: '#e5bb35',
+        red: '#ee755f',
+        blue: '#718fc1',
+        brightYellow: '#f4d375',
+    }),
+    'shadows-cosmic-lagoon': createApplicationTerminalTheme('#00b5b8', {
+        blue: '#668de0',
+        magenta: '#ba6ad0',
+        cyan: '#38c6c8',
+        brightCyan: '#76e0e2',
+    }),
+    'shadows-neon-nebula': createApplicationTerminalTheme('#ff55aa', {
+        blue: '#6f91dd',
+        magenta: '#ff72c1',
+        cyan: '#51d5d5',
+        brightMagenta: '#ffa1d4',
+    }),
+    'shadows-transparent': createApplicationTerminalTheme('#8C8E9C'),
+};
+
 function logTerminal(level, message, ...context) {
     if (!terminalDebugEnabled) {
         return;
@@ -62,6 +152,9 @@ export function initializeTerminalComponent() {
             terminalSessionStartedAt: null,
             terminalSessionRemainingSeconds: null,
             terminalSessionCountdownInterval: null,
+            selectedTheme: applicationTerminalThemes[localStorage.getItem('coolify-console-theme')]
+                ? localStorage.getItem('coolify-console-theme')
+                : 'shadows-cosmic-purple',
 
             init() {
                 this.setupTerminal();
@@ -103,7 +196,9 @@ export function initializeTerminalComponent() {
                                 this.resizeObserver.observe(this.$refs.terminalWrapper);
                             }
                         } else {
-                            this.$refs.terminalWrapper.style.display = 'none';
+                            const terminalElement = document.getElementById('terminal');
+                            this.$refs.terminalWrapper.style.display =
+                                terminalElement?.dataset.terminalStyle === 'application' ? 'block' : 'none';
 
                             // Stop observing when terminal is inactive
                             if (this.resizeObserver) {
@@ -232,6 +327,32 @@ export function initializeTerminalComponent() {
                 return 'text-neutral-300 bg-black/70 border-white/10';
             },
 
+            setTerminalTheme(themeName) {
+                if (!applicationTerminalThemes[themeName]) {
+                    return;
+                }
+
+                this.selectedTheme = themeName;
+                localStorage.setItem('coolify-console-theme', themeName);
+
+                if (this.term) {
+                    const cursorBlink = this.term.options.cursorBlink;
+                    this.term.options.cursorBlink = false;
+                    this.term.options.theme = { ...applicationTerminalThemes[themeName] };
+                    this.term.refresh(0, Math.max(0, this.term.rows - 1));
+
+                    requestAnimationFrame(() => {
+                        if (!this.term) {
+                            return;
+                        }
+
+                        this.term.options.cursorBlink = cursorBlink;
+                        this.term.refresh(0, Math.max(0, this.term.rows - 1));
+                        this.term.focus();
+                    });
+                }
+            },
+
             resetTerminal() {
                 if (this.term) {
                     this.$wire.dispatch('error', 'Terminal websocket connection lost. Reconnecting...');
@@ -265,14 +386,23 @@ export function initializeTerminalComponent() {
             setupTerminal() {
                 const terminalElement = document.getElementById('terminal');
                 if (terminalElement) {
+                    const isApplicationConsole = terminalElement.dataset.terminalStyle === 'application';
                     this.term = new Terminal({
                         cols: 80,
                         rows: 30,
                         fontFamily: '"Geist Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace, "Powerline Extra Symbols"',
+                        fontSize: isApplicationConsole ? 13 : 14,
+                        fontWeight: isApplicationConsole ? 550 : 'normal',
+                        fontWeightBold: 700,
+                        lineHeight: isApplicationConsole ? 1.15 : 1,
                         cursorBlink: true,
+                        cursorStyle: 'block',
                         rendererType: 'canvas',
                         convertEol: true,
-                        disableStdin: false
+                        disableStdin: false,
+                        theme: isApplicationConsole
+                            ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes['shadows-cosmic-purple']
+                            : undefined
                     });
                     this.fitAddon = new FitAddon();
                     this.term.loadAddon(this.fitAddon);

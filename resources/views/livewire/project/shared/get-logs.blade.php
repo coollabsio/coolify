@@ -1,4 +1,4 @@
-<div class="{{ $collapsible ? 'my-4 border dark:border-coolgray-200 border-neutral-200' : '' }}">
+<div class="{{ $collapsible ? 'runtime-log-shell' : '' }}">
     <div id="screen" x-data="{
         collapsible: {{ $collapsible ? 'true' : 'false' }},
         expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},
@@ -253,7 +253,7 @@
         }
     }" @keydown.window="handleKeyDown($event)">
         @if ($collapsible)
-            <div class="flex gap-2 items-center p-4 cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-coolgray-200"
+            <div class="runtime-log-trigger"
                 x-on:click="expanded = !expanded; if (expanded && !logsLoaded) { $wire.getLogs(true); logsLoaded = true; }">
                 <svg class="w-4 h-4 transition-transform" :class="expanded ? 'rotate-90' : ''" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
@@ -278,33 +278,28 @@
             <div class="sr-only" wire:poll.2000ms="getLogs(true)" aria-hidden="true"></div>
         @endif
         <div x-show="expanded" {{ $collapsible ? 'x-collapse' : '' }}
-            :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full {{ $collapsible ? 'py-4' : '' }} mx-auto'"
+            :class="fullscreen ? 'fullscreen flex flex-col !overflow-visible' : 'relative w-full mx-auto'"
             :style="fullscreen ? 'max-height: none !important; height: 100% !important;' : ''">
-            <div class="flex flex-col dark:text-white dark:border-coolgray-300 border-neutral-200"
-                :class="fullscreen ? 'h-full w-full bg-white dark:bg-coolgray-100' : 'bg-white dark:bg-coolgray-100 border border-solid rounded-sm'">
-                <div
-                    class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b dark:border-coolgray-300 border-neutral-200 shrink-0">
+            <div class="runtime-log-panel"
+                :class="fullscreen ? 'h-full w-full' : ''">
+                <div class="runtime-log-toolbar">
                     <div class="flex items-center gap-2">
                         <form wire:submit="getLogs(true)" class="relative flex items-center">
                             <span
                                 class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">Lines:</span>
                             <input type="number" wire:model="numberOfLines" placeholder="100" min="1" max="50000"
                                 title="Number of Lines (max 50,000)" {{ $streamLogs ? 'readonly' : '' }}
-                                class="input input-sm w-32 pl-11 dark:bg-coolgray-300" />
+                                class="input w-32 pl-11!" />
                         </form>
                         <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                             class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
                     </div>
                     <div class="flex flex-wrap items-center justify-end gap-2 flex-1">
                         <div class="relative">
-                            <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                            </svg>
+                            <x-reicon name="search"
+                                class="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                             <input type="text" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
-                                class="input input-sm w-48 pl-8 pr-8 dark:bg-coolgray-300" />
+                                class="input w-48 pl-8! pr-8!" />
                             <button x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -315,16 +310,12 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-1">
                             <button wire:click="getLogs(true)" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 disabled:opacity-50">
-                            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                            </svg>
+                            class="runtime-log-icon-button">
+                            <x-reicon name="refresh" class="size-3.5" />
                         </button>
                         <button wire:click="toggleStreamLogs"
                             title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $streamLogs ? '!text-warning' : '' }}">
+                            class="runtime-log-icon-button {{ $streamLogs ? 'runtime-log-icon-button-active' : '' }}">
                             @if ($streamLogs)
                                 {{-- Pause icon --}}
                                 <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
@@ -356,7 +347,7 @@
                                 });
                             "
                             title="Copy Logs"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            class="runtime-log-icon-button">
                             <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -365,7 +356,7 @@
                         </button>
                         <div x-data="{ downloadMenuOpen: false, downloadingAllLogs: false }" class="relative">
                             <button x-on:click="downloadMenuOpen = !downloadMenuOpen" title="Download Logs"
-                                class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                class="runtime-log-icon-button">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -379,10 +370,10 @@
                                 x-transition:leave="transition ease-in duration-75"
                                 x-transition:leave-start="transform opacity-100 scale-100"
                                 x-transition:leave-end="transform opacity-0 scale-95"
-                                class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-md bg-white dark:bg-coolgray-200 shadow-lg ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:outline-none">
-                                <div class="py-1">
+                                class="listbox-panel left-auto! right-0! min-w-52!">
+                                <div>
                                     <button x-on:click="downloadLogs(); downloadMenuOpen = false"
-                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                        class="listbox-option">
                                         Download displayed logs
                                     </button>
                                     <button x-on:click="
@@ -405,7 +396,7 @@
                                     "
                                         :disabled="downloadingAllLogs"
                                         :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
-                                        class="block w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300">
+                                        class="listbox-option">
                                         <span x-show="!downloadingAllLogs">Download all logs</span>
                                         <span x-show="downloadingAllLogs" class="flex items-center gap-2">
                                             <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -419,7 +410,7 @@
                             </div>
                         </div>
                         <button wire:click="toggleTimestamps" title="Toggle Timestamps"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 {{ $showTimeStamps ? '!text-warning' : '' }}">
+                            class="runtime-log-icon-button {{ $showTimeStamps ? 'runtime-log-icon-button-active' : '' }}">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
                                 stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -427,8 +418,8 @@
                             </svg>
                         </button>
                         <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
-                            :class="colorLogs ? '!text-warning' : ''"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            :class="colorLogs ? 'runtime-log-icon-button-active' : ''"
+                            class="runtime-log-icon-button">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
                                 stroke="currentColor" stroke-width="1.5">
                                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -437,8 +428,8 @@
                         </button>
                         <div x-data="{ filterOpen: false }" class="relative">
                             <button x-on:click="filterOpen = !filterOpen" title="Filter Log Levels"
-                                :class="Object.values(logFilters).some(v => !v) ? '!text-warning' : ''"
-                                class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                :class="Object.values(logFilters).some(v => !v) ? 'runtime-log-icon-button-active' : ''"
+                                class="runtime-log-icon-button">
                                 <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -452,45 +443,41 @@
                                 x-transition:leave="transition ease-in duration-75"
                                 x-transition:leave-start="transform opacity-100 scale-100"
                                 x-transition:leave-end="transform opacity-0 scale-95"
-                                class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-md bg-white dark:bg-coolgray-200 shadow-lg ring-1 ring-neutral-200 dark:ring-coolgray-300 focus:outline-none">
-                                <div class="py-1">
-                                    <label class="flex items-center gap-2 px-4 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300 cursor-pointer select-none">
-                                        <input type="checkbox" :checked="logFilters.error" x-on:change="toggleLogFilter('error')"
-                                            class="rounded border-gray-300 dark:border-gray-600 text-warning focus:ring-warning dark:bg-coolgray-300" />
+                                class="listbox-panel left-auto! right-0! min-w-40!">
+                                <div>
+                                    <button type="button" class="listbox-option" x-on:click="toggleLogFilter('error')">
                                         <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                                        Error
-                                    </label>
-                                    <label class="flex items-center gap-2 px-4 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300 cursor-pointer select-none">
-                                        <input type="checkbox" :checked="logFilters.warning" x-on:change="toggleLogFilter('warning')"
-                                            class="rounded border-gray-300 dark:border-gray-600 text-warning focus:ring-warning dark:bg-coolgray-300" />
+                                        <span class="flex-1 text-left">Error</span>
+                                        <span x-show="logFilters.error">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" x-on:click="toggleLogFilter('warning')">
                                         <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
-                                        Warning
-                                    </label>
-                                    <label class="flex items-center gap-2 px-4 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300 cursor-pointer select-none">
-                                        <input type="checkbox" :checked="logFilters.debug" x-on:change="toggleLogFilter('debug')"
-                                            class="rounded border-gray-300 dark:border-gray-600 text-warning focus:ring-warning dark:bg-coolgray-300" />
+                                        <span class="flex-1 text-left">Warning</span>
+                                        <span x-show="logFilters.warning">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" x-on:click="toggleLogFilter('debug')">
                                         <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
-                                        Debug
-                                    </label>
-                                    <label class="flex items-center gap-2 px-4 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-coolgray-300 cursor-pointer select-none">
-                                        <input type="checkbox" :checked="logFilters.info" x-on:change="toggleLogFilter('info')"
-                                            class="rounded border-gray-300 dark:border-gray-600 text-warning focus:ring-warning dark:bg-coolgray-300" />
+                                        <span class="flex-1 text-left">Debug</span>
+                                        <span x-show="logFilters.debug">✓</span>
+                                    </button>
+                                    <button type="button" class="listbox-option" x-on:click="toggleLogFilter('info')">
                                         <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                                        Info
-                                    </label>
+                                        <span class="flex-1 text-left">Info</span>
+                                        <span x-show="logFilters.info">✓</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        <button title="Follow Logs" :class="alwaysScroll ? '!text-warning' : ''"
+                        <button title="Follow Logs" :class="alwaysScroll ? 'runtime-log-icon-button-active' : ''"
                             x-on:click="toggleScroll"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            class="runtime-log-icon-button">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                     stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                             </svg>
                         </button>
                         <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            class="runtime-log-icon-button">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none">
                                     <path
@@ -501,7 +488,7 @@
                             </svg>
                         </button>
                         <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen"
-                            class="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                            class="runtime-log-icon-button">
                             <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                     stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
@@ -512,7 +499,7 @@
                 </div>
                 <div id="logsContainer" @scroll="handleScroll" @wheel="handleWheel"
                     @touchstart="handleTouchStart" @touchmove="handleTouchMove" @keydown="handleKeyScroll" tabindex="0"
-                    class="flex overflow-y-auto overflow-x-hidden flex-col px-4 py-2 w-full min-w-0 scrollbar"
+                    class="runtime-log-viewport flex overflow-y-auto overflow-x-hidden flex-col px-4 py-3 w-full min-w-0 scrollbar"
                     :class="fullscreen ? 'flex-1' : 'max-h-[40rem]'">
                     @if ($outputs)
                         @php

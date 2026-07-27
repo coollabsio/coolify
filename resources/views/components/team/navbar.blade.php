@@ -1,28 +1,14 @@
-<div class="pb-6">
-    <div class="flex items-end gap-2">
-        <h1>Team</h1>
-        <x-modal-input buttonTitle="+ Add" title="New Team">
+<x-dashboard.navbar section="team">
+    <x-slot:actions>
+        <x-modal-input title="New Team">
+            <x-slot:content>
+                <button type="button"
+                    class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                    <x-reicon name="plus" class="size-3.5" />
+                    New team
+                </button>
+            </x-slot:content>
             <livewire:team.create />
         </x-modal-input>
-    </div>
-    <div class="subtitle">Team wide configurations.</div>
-    <div class="navbar-main">
-        <nav class="flex items-center gap-6 min-h-10">
-            <a class="{{ request()->routeIs('team.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('team.index') }}">
-                General
-            </a>
-            <a class="{{ request()->routeIs('team.member.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('team.member.index') }}">
-                Members
-            </a>
-            @if (isInstanceAdmin())
-                <a class="{{ request()->routeIs('team.admin-view') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                    href="{{ route('team.admin-view') }}">
-                    Admin View
-                </a>
-            @endif
-            <div class="flex-1"></div>
-        </nav>
-    </div>
-</div>
+    </x-slot:actions>
+</x-dashboard.navbar>

@@ -6,26 +6,15 @@
     })">
     @if ($isUpgradeAvailable)
         <div :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
-            <button title="Upgrade in progress" aria-label="Upgrade in progress" class="menu-item" @click="modalOpen=true" x-show="showProgress">
-                <svg xmlns="http://www.w3.org/2000/svg"
-                    class="text-pink-500 transition-colors menu-item-icon hover:text-pink-300 lds-heart" viewBox="0 0 24 24"
-                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M19.5 13.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
-                </svg>
-                <span class="text-left menu-item-label sidebar-collapsed-label">In progress</span>
+            <button type="button" title="Upgrade in progress" aria-label="Upgrade in progress"
+                @click="modalOpen=true" x-show="showProgress" x-cloak
+                class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20">
+                Updating
             </button>
-            <button title="Upgrade" aria-label="Upgrade" class="menu-item cursor-pointer" @click="modalOpen=true" x-show="!showProgress">
-                <svg xmlns="http://www.w3.org/2000/svg" class="text-pink-500 transition-colors menu-item-icon hover:text-pink-300"
-                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                    stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path
-                        d="M9 12h-3.586a1 1 0 0 1 -.707 -1.707l6.586 -6.586a1 1 0 0 1 1.414 0l6.586 6.586a1 1 0 0 1 -.707 1.707h-3.586v3h-6v-3z" />
-                    <path d="M9 21h6" />
-                    <path d="M9 18h6" />
-                </svg>
-                <span class="text-left menu-item-label sidebar-collapsed-label">Upgrade</span>
+            <button type="button" title="Update available" aria-label="Update available"
+                @click="modalOpen=true" x-show="!showProgress" x-cloak
+                class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20">
+                Update available
             </button>
             <template x-teleport="body">
                 <div x-show="modalOpen"

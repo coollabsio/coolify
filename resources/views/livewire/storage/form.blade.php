@@ -1,29 +1,35 @@
-<div>
-    <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
-        <div class="flex gap-2">
+<form wire:submit="submit" class="application-settings-form">
+    <x-unsaved-bar action="submit" />
+
+    <x-application.settings-section title="{{ $storage->name }}"
+        description="S3-compatible destination used by database and volume backups.">
+        <x-slot:actions>
+            @can('validateConnection', $storage)
+                <button type="button" class="button" wire:click="testConnection">
+                    <x-reicon name="check-circle" class="size-3.5" />
+                    Validate connection
+                </button>
+            @endcan
+        </x-slot:actions>
+
+        <div class="grid gap-4 lg:grid-cols-2">
             <x-forms.input canGate="update" :canResource="$storage" label="Name" id="name" />
             <x-forms.input canGate="update" :canResource="$storage" label="Description" id="description" />
-        </div>
-        <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$storage" required label="Endpoint" id="endpoint" />
+            <div class="lg:col-span-2">
+                <x-forms.input canGate="update" :canResource="$storage" required label="Endpoint"
+                    id="endpoint" />
+            </div>
             <x-forms.input canGate="update" :canResource="$storage" required label="Bucket" id="bucket" />
             <x-forms.input canGate="update" :canResource="$storage" required label="Region" id="region" />
-        </div>
-        <div class="flex gap-2">
             @if ($isPasswordHiddenForMember)
-                <x-forms.input label="Access Key" disabled value="Hidden (only admins can view)" />
-                <x-forms.input label="Secret Key" disabled value="Hidden (only admins can view)" />
+                <x-forms.input label="Access key" disabled value="Hidden (only admins can view)" />
+                <x-forms.input label="Secret key" disabled value="Hidden (only admins can view)" />
             @else
-                <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Access Key"
-                    id="key" />
-                <x-forms.input canGate="update" :canResource="$storage" required type="password" label="Secret Key"
-                    id="secret" />
+                <x-forms.input canGate="update" :canResource="$storage" required type="password"
+                    label="Access key" id="key" />
+                <x-forms.input canGate="update" :canResource="$storage" required type="password"
+                    label="Secret key" id="secret" />
             @endif
         </div>
-        @can('validateConnection', $storage)
-            <x-forms.button class="mt-4" isHighlighted wire:click="testConnection">
-                Validate Connection
-            </x-forms.button>
-        @endcan
-    </form>
-</div>
+    </x-application.settings-section>
+</form>

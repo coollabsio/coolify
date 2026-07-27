@@ -94,6 +94,9 @@ class General extends Component
 
     public bool $isSpa = false;
 
+    /** UI-only aggregate of isStatic/isSpa: dynamic | static | spa */
+    public string $siteType = 'dynamic';
+
     public bool $isBuildServerEnabled = false;
 
     public bool $isPreserveRepositoryEnabled = false;
@@ -442,11 +445,19 @@ class General extends Component
             // Application settings properties
             $this->isStatic = $this->application->settings->is_static;
             $this->isSpa = $this->application->settings->is_spa;
+            $this->siteType = $this->isStatic ? ($this->isSpa ? 'spa' : 'static') : 'dynamic';
             $this->isBuildServerEnabled = $this->application->settings->is_build_server_enabled;
             $this->isPreserveRepositoryEnabled = $this->application->settings->is_preserve_repository_enabled;
             $this->isContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $this->isContainerLabelReadonlyEnabled = $this->application->settings->is_container_label_readonly_enabled;
         }
+    }
+
+    public function setSiteType(): void
+    {
+        $this->isStatic = $this->siteType !== 'dynamic';
+        $this->isSpa = $this->siteType === 'spa';
+        $this->instantSave();
     }
 
     public function instantSave()

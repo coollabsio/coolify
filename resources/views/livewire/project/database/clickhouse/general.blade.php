@@ -1,91 +1,101 @@
-<div>
-    <form wire:submit="submit" class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit" canGate="update" :canResource="$database">
-                Save
-            </x-forms.button>
-            <x-modal-input title="Resource Details" buttonTitle="Details">
-                <livewire:project.shared.resource-details :resource="$database" />
-            </x-modal-input>
-        </div>
-        <div class="flex gap-2">
-            <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
-            <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
-            <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/r/clickhouse/clickhouse-server/'>https://hub.docker.com/r/clickhouse/clickhouse-server/</a>" />
-        </div>
+<div class="application-settings-form">
+    <form wire:submit="submit" class="flex flex-col gap-6">
+        <x-unsaved-bar action="submit" />
 
-        @if ($database->started_at)
-            <div class="flex gap-2">
-                <x-forms.input label="Initial Username" id="clickhouseAdminUser" placeholder="If empty: clickhouse"
-                    readonly helper="You can only change this in the database." canGate="update" :canResource="$database" />
-                @if ($isPasswordHiddenForMember)
-                    <x-forms.input label="Initial Password" disabled value="Hidden (only admins can view)" />
-                @else
-                    <x-forms.input label="Initial Password" id="clickhouseAdminPassword" type="password" required readonly
-                        helper="You can only change this in the database." canGate="update" :canResource="$database" />
-                @endif
+        <x-application.settings-section title="Database details"
+            description="Manage the identity and container image for this ClickHouse database.">
+            <x-slot:actions>
+                <x-modal-input title="Resource details" buttonTitle="Details">
+                    <livewire:project.shared.resource-details :resource="$database" />
+                </x-modal-input>
+            </x-slot:actions>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
+                <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
+                <div class="lg:col-span-2">
+                    <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
+                        helper="Use a published clickhouse/clickhouse-server image from Docker Hub." />
+                </div>
             </div>
-        @else
-            <div class=" dark:text-warning">Please verify these values. You can only modify them before the initial
-                start. After that, you need to modify it in the database.
-            </div>
-            <div class="flex gap-2">
-                <x-forms.input label="Username" id="clickhouseAdminUser" required canGate="update" :canResource="$database" />
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Credentials"
+            description="Keep these values aligned with the credentials configured inside ClickHouse.">
+            @if (!$database->started_at)
+                <x-callout type="warning" title="Verify the initial credentials">
+                    You can only change these credentials here before the first start. Later changes must be made inside
+                    the database.
+                </x-callout>
+            @endif
+            <div class="{{ !$database->started_at ? 'mt-4 ' : '' }}grid gap-4 lg:grid-cols-2">
+                <x-forms.input label="{{ $database->started_at ? 'Initial username' : 'Username' }}"
+                    id="clickhouseAdminUser" placeholder="If empty: clickhouse"
+                    :readonly="(bool) $database->started_at" required canGate="update" :canResource="$database" />
                 @if ($isPasswordHiddenForMember)
                     <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
                 @else
-                    <x-forms.input label="Password" id="clickhouseAdminPassword" type="password" required canGate="update"
-                        :canResource="$database" />
+                    <x-forms.input label="{{ $database->started_at ? 'Initial password' : 'Password' }}"
+                        id="clickhouseAdminPassword" type="password" required
+                        :readonly="(bool) $database->started_at" canGate="update" :canResource="$database"
+                        helper="{{ $database->started_at ? 'You can only change this in the database.' : null }}" />
                 @endif
             </div>
-        @endif
-        <x-forms.input
-            helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
-            placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
-            id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
-        <div class="flex flex-col gap-2">
-            <h3 class="py-2">Network</h3>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="3000:5432" id="portsMappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Runtime and network"
+            description="Configure Docker runtime options and host port mappings.">
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="lg:col-span-2">
+                    <x-forms.input
+                        helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
+                        placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
+                        id="customDockerRunOptions" label="Custom Docker options" canGate="update"
+                        :canResource="$database" />
+                </div>
+                <x-forms.input placeholder="3000:8123" id="portsMappings" label="Port mappings"
+                    helper="Comma-separated host-to-container mappings, for example 3000:8123."
                     canGate="update" :canResource="$database" />
             </div>
-        </div>
-        <livewire:project.database.clickhouse.status-info :database="$database" />
-            <div class="flex flex-col py-2 w-64">
-                <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
-                    </div>
-                    @if ($isPublic)
-                        <x-slide-over fullScreen>
-                            <x-slot:title>Proxy Logs</x-slot:title>
-                            <x-slot:content>
-                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
-                            </x-slot:content>
-                            <x-forms.button disabled="{{ !$isPublic }}"
-                                @click="slideOverOpen=true">Logs</x-forms.button>
-                        </x-slide-over>
-                    @endif
-                </div>
-                <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available" canGate="update"
-                    :canResource="$database" />
+            <div class="mt-4">
+                <livewire:project.database.clickhouse.status-info :database="$database" />
             </div>
-            <div class="flex flex-col gap-2">
-            <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}" id="publicPort" label="Public Port"
-                canGate="update" :canResource="$database" />
-            <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
-                label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Public access"
+            description="Expose this database through the managed TCP proxy.">
+            <x-slot:actions>
+                @if ($isPublic)
+                    <x-slide-over fullScreen>
+                        <x-slot:title>Proxy logs</x-slot:title>
+                        <x-slot:content>
+                            <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
+                        </x-slot:content>
+                        <x-forms.button @click="slideOverOpen=true">View logs</x-forms.button>
+                    </x-slide-over>
+                @endif
+            </x-slot:actions>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
+                    :disabled="! auth()->user()->can('update', $database)" :options="[
+                        ['value' => false, 'label' => 'Private'],
+                        ['value' => true, 'label' => 'Public through TCP proxy'],
+                    ]" />
+                <x-forms.input type="number" placeholder="8123" disabled="{{ $isPublic }}" id="publicPort"
+                    label="Public port" canGate="update" :canResource="$database" />
+                <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
+                    label="Proxy timeout" helper="Timeout in seconds. The default is 3600."
+                    canGate="update" :canResource="$database" />
             </div>
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Log delivery"
+            description="Forward container logs to the drain configured on the server.">
+            <x-forms.listbox id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
+                :disabled="! auth()->user()->can('update', $database)" :options="[
+                    ['value' => false, 'label' => 'Do not forward logs'],
+                    ['value' => true, 'label' => 'Forward logs to the server drain'],
+                ]" />
+        </x-application.settings-section>
     </form>
-    <h3 class="pt-4">Advanced</h3>
-    <div class="w-64">
-        <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-            instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs" canGate="update"
-            :canResource="$database" />
-    </div>
 </div>

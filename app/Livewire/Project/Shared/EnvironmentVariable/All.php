@@ -29,6 +29,12 @@ class All extends Component
 
     public string $search = '';
 
+    public string $environmentFilter = 'all';
+
+    public int $page = 1;
+
+    public int $perPage = 10;
+
     public bool $is_env_sorting_enabled = false;
 
     public bool $use_build_secrets = false;
@@ -41,6 +47,7 @@ class All extends Component
 
     public function updatedSearch(): void
     {
+        $this->page = 1;
         $this->clearEnvironmentVariableCaches();
     }
 
@@ -51,6 +58,11 @@ class All extends Component
         unset($this->hardcodedEnvironmentVariables);
         unset($this->hardcodedEnvironmentVariablesPreview);
         unset($this->hasEnvironmentVariables);
+        unset($this->environmentVariableRows);
+        unset($this->environmentVariablePageRows);
+        unset($this->environmentVariableRowCount);
+        unset($this->environmentVariableLastPage);
+        unset($this->currentEnvironmentVariablePage);
     }
 
     public function mount()
@@ -71,6 +83,7 @@ class All extends Component
         try {
             $this->authorize('manageEnvironment', $this->resource);
 
+            $this->page = 1;
             $this->resource->settings->is_env_sorting_enabled = $this->is_env_sorting_enabled;
             $this->resource->settings->use_build_secrets = $this->use_build_secrets;
             $this->resource->settings->save();
@@ -168,6 +181,112 @@ class All extends Component
     public function getHardcodedEnvironmentVariablesPreviewProperty()
     {
         return $this->getHardcodedVariables(true);
+    }
+
+    public function getEnvironmentVariableRowsProperty(): Collection
+    {
+        $rows = collect();
+
+        foreach ($this->environmentVariables as $environmentVariable) {
+            $rows->push([
+                'id' => 'environment-'.$environmentVariable->id,
+                'kind' => 'managed',
+                'scope' => 'production',
+                'environmentVariable' => $environmentVariable,
+            ]);
+        }
+
+        if ($this->showsHardcodedEnvironmentVariables()) {
+            foreach ($this->hardcodedEnvironmentVariables as $index => $environmentVariable) {
+                $rows->push([
+                    'id' => 'hardcoded-production-'.$environmentVariable['key'].'-'.($environmentVariable['service_name'] ?? 'default').'-'.$index,
+                    'kind' => 'hardcoded',
+                    'scope' => 'production',
+                    'environmentVariable' => $environmentVariable,
+                ]);
+            }
+        }
+
+        if ($this->supportsPreviewEnvironmentVariables()) {
+            foreach ($this->environmentVariablesPreview as $environmentVariable) {
+                $rows->push([
+                    'id' => 'environment-'.$environmentVariable->id,
+                    'kind' => 'managed',
+                    'scope' => 'preview',
+                    'environmentVariable' => $environmentVariable,
+                ]);
+            }
+
+            if ($this->showsHardcodedEnvironmentVariables()) {
+                foreach ($this->hardcodedEnvironmentVariablesPreview as $index => $environmentVariable) {
+                    $rows->push([
+                        'id' => 'hardcoded-preview-'.$environmentVariable['key'].'-'.($environmentVariable['service_name'] ?? 'default').'-'.$index,
+                        'kind' => 'hardcoded',
+                        'scope' => 'preview',
+                        'environmentVariable' => $environmentVariable,
+                    ]);
+                }
+            }
+        }
+
+        if ($this->environmentFilter !== 'all') {
+            $rows = $rows->where('scope', $this->environmentFilter);
+        }
+
+        return $rows->values();
+    }
+
+    public function getEnvironmentVariablePageRowsProperty(): Collection
+    {
+        return $this->environmentVariableRows
+            ->forPage($this->currentEnvironmentVariablePage, $this->perPage)
+            ->values();
+    }
+
+    public function getEnvironmentVariableRowCountProperty(): int
+    {
+        return $this->environmentVariableRows->count();
+    }
+
+    public function getEnvironmentVariableLastPageProperty(): int
+    {
+        return max(1, (int) ceil($this->environmentVariableRowCount / $this->perPage));
+    }
+
+    public function getCurrentEnvironmentVariablePageProperty(): int
+    {
+        return min($this->page, $this->environmentVariableLastPage);
+    }
+
+    public function setEnvironmentFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'production', 'preview'], true)) {
+            return;
+        }
+
+        $this->environmentFilter = $filter;
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    public function setEnvironmentVariablePage(int $page): void
+    {
+        $this->page = max(1, min($page, $this->environmentVariableLastPage));
+    }
+
+    public function previousEnvironmentVariablePage(): void
+    {
+        $this->setEnvironmentVariablePage($this->currentEnvironmentVariablePage - 1);
+    }
+
+    public function nextEnvironmentVariablePage(): void
+    {
+        $this->setEnvironmentVariablePage($this->currentEnvironmentVariablePage + 1);
+    }
+
+    private function showsHardcodedEnvironmentVariables(): bool
+    {
+        return $this->resource->type() === 'service' || $this->resource?->build_pack === 'dockercompose';
     }
 
     protected function getHardcodedVariables(bool $isPreview)
