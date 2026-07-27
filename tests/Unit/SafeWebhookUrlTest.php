@@ -219,8 +219,30 @@ it('builds HTTP client options that pin resolved DNS for the request', function 
     expect($options['allow_redirects'])->toBeFalse();
 
     if (defined('CURLOPT_RESOLVE')) {
-        expect($options['curl'][CURLOPT_RESOLVE])->toContain('localhost:8080:127.0.0.1');
+        expect($options['curl'][CURLOPT_RESOLVE])->toContain('localhost:8080:127.0.0.1,[::1]');
     }
+});
+
+it('pins every resolved address in a single CURLOPT_RESOLVE entry', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['localhost'],
+        'webhook_allow_localhost' => true,
+    ]));
+
+    if (! defined('CURLOPT_RESOLVE')) {
+        expect(true)->toBeTrue();
+
+        return;
+    }
+
+    $entries = SafeWebhookUrl::httpClientOptions('http://localhost:8080/webhook')['curl'][CURLOPT_RESOLVE];
+
+    // localhost resolves to both 127.0.0.1 and ::1. libcurl overrides an
+    // existing host:port cache entry with each new one, so multiple entries
+    // would leave only [::1] pinned and break every request on hosts without
+    // IPv6 egress.
+    expect($entries)->toHaveCount(1)
+        ->and($entries[0])->toBe('localhost:8080:127.0.0.1,[::1]');
 });
 
 it('fails closed while building HTTP options when the send-time resolution is unsafe', function () {
