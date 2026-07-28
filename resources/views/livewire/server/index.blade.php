@@ -40,7 +40,9 @@
                         @if (!$server->settings->is_usable)
                             <span>Not usable by Coolify</span>
                         @endif
-                        @if ($server->settings->force_disabled)
+                        @if ($server->isTransferredAway())
+                            <span>Transferred to another instance</span>
+                        @elseif ($server->settings->force_disabled)
                             <span>Disabled by the system</span>
                         @endif
                     </div>

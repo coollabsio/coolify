@@ -516,7 +516,7 @@
                                 </div>
                             </div>
                         @endif
-                        @if ($server->isFunctional())
+                        @if ($server->isFunctional() && $server->canBeValidated())
                             <x-slide-over closeWithX fullScreen>
                                 <x-slot:title>Validate & configure</x-slot:title>
                                 <x-slot:content>
@@ -530,7 +530,12 @@
                         @endif
                     @endif
                 </div>
-                @if ($server->isFunctional())
+                @if ($server->isTransferredAway())
+                    <x-callout type="warning" title="Transferred to another instance" class="mt-2">
+                        This server was migrated away from this Coolify instance. It cannot be revalidated or managed
+                        here. Use the target instance, or delete this server when you no longer need the archive.
+                    </x-callout>
+                @elseif ($server->isFunctional())
                     Server is reachable and validated.
                 @else
                     You can't use this server until it is validated.
@@ -559,7 +564,8 @@
                     </div>
                 @endif
                 @if (
-                    (!$isReachable || !$isUsable) &&
+                    $server->canBeValidated() &&
+                        (!$isReachable || !$isUsable) &&
                         $server->id !== 0 &&
                         !$isValidating &&
                         !in_array($hetznerServerStatus, ['initializing', 'starting', 'stopping', 'off']) &&

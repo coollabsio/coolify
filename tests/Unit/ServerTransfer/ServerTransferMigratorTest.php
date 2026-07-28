@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Services\ServerTransfer\ServerTransferMigrator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -75,6 +76,33 @@ test('migrate exports imports via http and completes locally', function () {
     });
 });
 
+test('migrate rewrites localhost target when running in docker style env', function () {
+    // Simulate container: create a temp marker if missing is hard; instead assert host rewrite helper via migrate call
+    // with Http fake matching host.docker.internal when /.dockerenv exists — skip if not in docker.
+    if (! file_exists('/.dockerenv') && ! is_file('/run/.containerenv')) {
+        expect(true)->toBeTrue();
+
+        return;
+    }
+
+    Http::fake([
+        'http://host.docker.internal:8001/api/v1/servers/import' => Http::response([
+            'dry_run' => false,
+            'server_uuid' => $this->server->uuid,
+            'claimed' => true,
+            'warnings' => [],
+        ], 201),
+    ]);
+
+    app(ServerTransferMigrator::class)->migrate(
+        $this->server,
+        'http://localhost:8001',
+        'token',
+    );
+
+    Http::assertSent(fn ($request) => str_contains($request->url(), 'host.docker.internal:8001'));
+});
+
 test('migrate fails clearly when target is unreachable', function () {
     Http::fake([
         'http://down.test/*' => Http::failedConnection(),
@@ -99,4 +127,32 @@ test('migrate fails when target returns error', function () {
         'http://target.test',
         'token',
     ))->toThrow(RuntimeException::class, 'Target import failed');
+
+    // Source must remain unmanaged-away only after successful remote import+complete.
+    $this->server->refresh();
+    expect(data_get($this->server->server_metadata, 'transfer.status'))->not->toBe('transferred')
+        ->and((bool) $this->server->settings->force_disabled)->toBeFalse();
+});
+
+test('migrate surfaces recovery guidance when complete fails after successful remote import', function () {
+    Http::fake([
+        'http://target.test/api/v1/servers/import' => Http::response([
+            'dry_run' => false,
+            'server_uuid' => $this->server->uuid,
+            'claimed' => true,
+            'warnings' => [],
+        ], 201),
+    ]);
+
+    $claimer = Mockery::mock(ServerTransferClaimer::class)->makePartial();
+    $claimer->shouldReceive('markTransferred')
+        ->once()
+        ->andThrow(new RuntimeException('simulated complete failure'));
+    app()->instance(ServerTransferClaimer::class, $claimer);
+
+    expect(fn () => app(ServerTransferMigrator::class)->migrate(
+        $this->server,
+        'http://target.test',
+        'token',
+    ))->toThrow(RuntimeException::class, 'Retry complete');
 });

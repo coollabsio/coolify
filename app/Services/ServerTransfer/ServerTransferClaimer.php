@@ -3,6 +3,7 @@
 namespace App\Services\ServerTransfer;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -12,8 +13,9 @@ class ServerTransferClaimer
     /**
      * Claim a managed host for this Coolify instance.
      *
-     * Writes ownership claim file, rebinds Sentinel endpoint/token, and records metadata.
-     * Does not remove the source instance's SSH key (operator responsibility / optional).
+     * Database ownership (metadata + Sentinel settings) is committed in one transaction so a
+     * mid-flight failure rolls back. Remote SSH claim-file writes happen after commit and are
+     * best-effort — they cannot participate in the DB transaction.
      *
      * @return array{
      *     server_uuid: string,
@@ -45,45 +47,60 @@ class ServerTransferClaimer
             'schema_version' => ServerTransferBundle::SCHEMA_VERSION,
         ];
 
+        $result = DB::transaction(function () use ($server, $claim, $rebindSentinel, $instanceUrl) {
+            $server = Server::query()->with('settings')->lockForUpdate()->findOrFail($server->id);
+
+            $sentinelRebound = false;
+            if ($rebindSentinel && $server->settings) {
+                $server->settings->sentinel_custom_url = $instanceUrl;
+                $server->settings->ensureValidSentinelToken();
+                // Leave sentinel disabled until operator enables metrics; endpoint is ready.
+                $server->settings->save();
+                $sentinelRebound = true;
+            }
+
+            $metadata = $server->server_metadata ?? [];
+            $metadata['transfer'] = array_merge((array) data_get($metadata, 'transfer', []), [
+                'status' => 'claimed',
+                'claimed_at' => $claim['claimed_at'],
+                'claim' => $claim,
+                'claim_written' => false,
+                'sentinel_rebound' => $sentinelRebound,
+            ]);
+            $server->server_metadata = $metadata;
+            $server->save();
+
+            return [
+                'server_uuid' => $server->uuid,
+                'claim' => $claim,
+                'sentinel_rebound' => $sentinelRebound,
+                'claim_written' => false,
+            ];
+        });
+
+        // Remote host I/O is outside the transaction (cannot be rolled back with DB rows).
         $claimWritten = false;
         if ($writeRemote) {
             $claimWritten = $this->writeClaimFile($server, $claim);
+            if ($claimWritten) {
+                $this->persistClaimWritten($server);
+            }
         }
 
-        $sentinelRebound = false;
-        if ($rebindSentinel && $server->settings) {
-            $server->settings->sentinel_custom_url = $instanceUrl;
-            $server->settings->ensureValidSentinelToken();
-            // Leave sentinel disabled until operator enables metrics; endpoint is ready.
-            $server->settings->save();
-            $sentinelRebound = true;
-        }
+        $result['claim_written'] = $claimWritten;
+        $result['message'] = $claimWritten
+            ? 'Server claimed. Ownership file written and Sentinel rebound to this instance.'
+            : 'Server claimed in Coolify. Remote ownership file was not written (SSH unavailable or skipped).';
 
-        $metadata = $server->server_metadata ?? [];
-        $metadata['transfer'] = array_merge((array) data_get($metadata, 'transfer', []), [
-            'status' => 'claimed',
-            'claimed_at' => $claim['claimed_at'],
-            'claim' => $claim,
-            'claim_written' => $claimWritten,
-            'sentinel_rebound' => $sentinelRebound,
-        ]);
-        $server->server_metadata = $metadata;
-        $server->save();
-
-        return [
-            'server_uuid' => $server->uuid,
-            'claim' => $claim,
-            'sentinel_rebound' => $sentinelRebound,
-            'claim_written' => $claimWritten,
-            'message' => $claimWritten
-                ? 'Server claimed. Ownership file written and Sentinel rebound to this instance.'
-                : 'Server claimed in Coolify. Remote ownership file was not written (SSH unavailable or skipped).',
-        ];
+        return $result;
     }
 
     /**
      * Mark a server as transferred away from this instance (source side).
      * Disables automations to prevent dual management.
+     *
+     * All database writes run in one transaction so partial disable state cannot stick on failure.
+     * Local SSH key cache cleanup runs after commit (filesystem; not transactional).
      *
      * @return array{server_uuid: string, message: string}
      */
@@ -93,27 +110,66 @@ class ServerTransferClaimer
             throw new RuntimeException('Cannot transfer the Coolify host itself.');
         }
 
-        $server->forceDisableServer();
+        $result = DB::transaction(function () use ($server, $exportId, $targetInstanceUrl) {
+            $server = Server::query()->with('settings')->lockForUpdate()->findOrFail($server->id);
 
-        if ($server->settings) {
-            $server->settings->is_sentinel_enabled = false;
-            $server->settings->save();
+            if ($server->settings) {
+                $server->settings->force_disabled = true;
+                $server->settings->is_sentinel_enabled = false;
+                $server->settings->save();
+            }
+
+            $metadata = $server->server_metadata ?? [];
+            $metadata['transfer'] = array_merge((array) data_get($metadata, 'transfer', []), [
+                'status' => 'transferred',
+                'export_id' => $exportId ?? data_get($metadata, 'transfer.export_id'),
+                'target_instance_url' => $targetInstanceUrl,
+                'transferred_at' => now()->toIso8601String(),
+            ]);
+            $server->server_metadata = $metadata;
+            $server->save();
+
+            return [
+                'server_uuid' => $server->uuid,
+                'message' => 'Server marked as transferred. Automations disabled on this instance.',
+            ];
+        });
+
+        $this->clearLocalSshArtifacts($server);
+
+        return $result;
+    }
+
+    private function persistClaimWritten(Server $server): void
+    {
+        DB::transaction(function () use ($server) {
+            $server = Server::query()->lockForUpdate()->find($server->id);
+            if (! $server) {
+                return;
+            }
+
+            $metadata = $server->server_metadata ?? [];
+            data_set($metadata, 'transfer.claim_written', true);
+            $server->server_metadata = $metadata;
+            $server->save();
+        });
+    }
+
+    /**
+     * Best-effort local SSH mux/key cleanup after transfer (filesystem; not part of DB rollback).
+     * forceDisableServer is idempotent for force_disabled and also clears cached SSH key material.
+     */
+    private function clearLocalSshArtifacts(Server $server): void
+    {
+        try {
+            $server->refresh();
+            $server->forceDisableServer();
+        } catch (Throwable $e) {
+            Log::warning('Failed to clear local SSH artifacts after transfer', [
+                'server_uuid' => $server->uuid,
+                'error' => $e->getMessage(),
+            ]);
         }
-
-        $metadata = $server->server_metadata ?? [];
-        $metadata['transfer'] = array_merge((array) data_get($metadata, 'transfer', []), [
-            'status' => 'transferred',
-            'export_id' => $exportId ?? data_get($metadata, 'transfer.export_id'),
-            'target_instance_url' => $targetInstanceUrl,
-            'transferred_at' => now()->toIso8601String(),
-        ]);
-        $server->server_metadata = $metadata;
-        $server->save();
-
-        return [
-            'server_uuid' => $server->uuid,
-            'message' => 'Server marked as transferred. Automations disabled on this instance.',
-        ];
     }
 
     /**

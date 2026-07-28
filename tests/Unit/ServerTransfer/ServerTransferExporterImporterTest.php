@@ -328,6 +328,38 @@ test('import fails when server ip already exists', function () {
     $this->importer->import($bundle, teamId: $this->team->id);
 })->throws(ValidationException::class);
 
+test('import rolls back all created rows when a later resource fails', function () {
+    $bundle = $this->exporter->export($this->server);
+    $originalServerUuid = $this->server->uuid;
+
+    // Force a failure after private keys / server would have been created.
+    $bundle['projects'][0]['environments'][0]['databases'][] = [
+        'type' => 'NotARealDatabaseType',
+        'uuid' => 'broken-db-uuid',
+        'attributes' => ['name' => 'broken'],
+        'destination_uuid' => $this->destination->uuid,
+    ];
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    $this->privateKey->delete();
+
+    expect(fn () => $this->importer->import(
+        $bundle,
+        teamId: $this->team->id,
+        dryRun: false,
+        preserveUuids: true,
+        adoptMode: true,
+        claim: false,
+    ))->toThrow(RuntimeException::class, 'Unsupported database type');
+
+    expect(Server::where('uuid', $originalServerUuid)->exists())->toBeFalse()
+        ->and(PrivateKey::where('uuid', data_get($bundle, 'private_key.uuid'))->exists())->toBeFalse()
+        ->and(Application::where('uuid', data_get($bundle, 'projects.0.environments.0.applications.0.uuid'))->exists())->toBeFalse();
+});
+
 test('import fails on invalid schema', function () {
     $this->importer->import(['schema_version' => 1], teamId: $this->team->id);
 })->throws(ValidationException::class);
