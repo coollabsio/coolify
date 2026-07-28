@@ -4,7 +4,7 @@
         [
             'label' => 'Configuration',
             'route' => 'server.show',
-            'active' => request()->routeIs('server.show', 'server.advanced', 'server.private-key', 'server.cloud-provider-token', 'server.ca-certificate', 'server.cloudflare-tunnel', 'server.docker-cleanup', 'server.destinations', 'server.log-drains', 'server.metrics', 'server.swarm', 'server.delete'),
+            'active' => request()->routeIs('server.show', 'server.advanced', 'server.private-key', 'server.cloud-provider-token', 'server.ca-certificate', 'server.cloudflare-tunnel', 'server.docker-cleanup', 'server.destinations', 'server.log-drains', 'server.metrics', 'server.swarm', 'server.transfer', 'server.delete'),
         ],
         [
             'label' => 'Proxy',
@@ -100,6 +100,12 @@
             'route' => 'server.swarm',
             'active' => $activeMenu === 'swarm',
             'visible' => ! $server->isBuildServer() && ! $server->settings->is_cloudflare_tunnel,
+        ],
+        [
+            'label' => 'Transfer',
+            'route' => 'server.transfer',
+            'active' => $activeMenu === 'transfer',
+            'visible' => ! $server->isLocalhost() && auth()->user()?->can('view', $server),
         ],
         [
             'label' => 'Danger',

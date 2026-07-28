@@ -9,6 +9,11 @@
                 <x-forms.button>+ Add</x-forms.button>
             </a>
         @endcan
+        @can('create', App\Models\Server::class)
+            <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}>
+                <x-forms.button>Import transfer</x-forms.button>
+            </a>
+        @endcan
     </div>
     <div class="subtitle">All your servers are here.</div>
     <div class="grid gap-4 lg:grid-cols-2 -mt-1">

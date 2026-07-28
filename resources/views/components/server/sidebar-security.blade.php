@@ -3,7 +3,7 @@
         [
             'label' => 'Configuration',
             'route' => 'server.show',
-            'active' => request()->routeIs('server.show', 'server.advanced', 'server.private-key', 'server.cloud-provider-token', 'server.ca-certificate', 'server.cloudflare-tunnel', 'server.docker-cleanup', 'server.destinations', 'server.log-drains', 'server.metrics', 'server.swarm', 'server.delete'),
+            'active' => request()->routeIs('server.show', 'server.advanced', 'server.private-key', 'server.cloud-provider-token', 'server.ca-certificate', 'server.cloudflare-tunnel', 'server.docker-cleanup', 'server.destinations', 'server.log-drains', 'server.metrics', 'server.swarm', 'server.transfer', 'server.delete'),
         ],
         [
             'label' => 'Proxy',
