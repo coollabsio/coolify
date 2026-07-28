@@ -328,12 +328,20 @@ class StartPostgresql
         }
 
         $content = $this->database->postgres_conf;
-        if (! str($content)->contains('listen_addresses')) {
+        if (! self::hasListenAddresses($content)) {
             $content .= "\nlisten_addresses = '*'";
             $this->database->postgres_conf = $content;
             $this->database->save();
         }
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $config_file_path > /dev/null";
+    }
+
+    /**
+     * Detects an active (uncommented) listen_addresses setting in a custom postgresql.conf.
+     */
+    public static function hasListenAddresses(?string $conf): bool
+    {
+        return preg_match('/^[ \t]*listen_addresses[ \t]*=/mi', (string) $conf) === 1;
     }
 }
