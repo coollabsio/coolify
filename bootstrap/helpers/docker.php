@@ -1025,7 +1025,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
 {
     $options = [];
     $compose_options = collect([]);
-    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?([^\s-]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?((?!--)[^\s]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
         '--cap-add',
         '--cap-drop',
@@ -1052,6 +1052,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
         '--entrypoint' => 'entrypoint',
+        '--pids-limit' => 'pids_limit',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -1143,6 +1144,10 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         } elseif ($option === '--shm-size' || $option === '--hostname') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
                 $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--pids-limit') {
+            if (is_array($value) && isset($value[0]) && preg_match('/^-?\d+$/', $value[0])) {
+                $compose_options->put($mapping[$option], (int) $value[0]);
             }
         } elseif ($option === '--entrypoint') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {

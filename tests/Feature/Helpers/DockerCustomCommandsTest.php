@@ -37,6 +37,33 @@ test('ConvertCapAdd', function () {
     ]);
 });
 
+test('ConvertSecurityOptPreservesHyphenatedValues', function () {
+    $input = '--security-opt no-new-privileges:true --security-opt=apparmor=docker-default';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'security_opt' => ['no-new-privileges:true', 'apparmor=docker-default'],
+    ]);
+});
+
+test('ConvertPidsLimit', function () {
+    expect(convertDockerRunToCompose('--pids-limit 256'))->toBe([
+        'pids_limit' => 256,
+    ])->and(convertDockerRunToCompose('--pids-limit=-1'))->toBe([
+        'pids_limit' => -1,
+    ]);
+});
+
+test('ConvertTenantHardeningOptionsTogether', function () {
+    $input = '--cap-drop ALL --security-opt no-new-privileges:true --pids-limit 256 --init';
+    $output = convertDockerRunToCompose($input);
+    expect($output)->toBe([
+        'cap_drop' => ['ALL'],
+        'security_opt' => ['no-new-privileges:true'],
+        'pids_limit' => 256,
+        'init' => true,
+    ]);
+});
+
 test('ConvertIp', function () {
     $input = '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add SYS_ADMIN --ip 127.0.0.1 --ip 127.0.0.2';
     $output = convertDockerRunToCompose($input);
