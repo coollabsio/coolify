@@ -3803,8 +3803,17 @@ function loggy($message = null, array $context = [])
 
     return app('log')->debug($message, $context);
 }
-function sslipDomainWarning(string $domains)
+/**
+ * Warn when any domain uses HTTPS with an sslip hostname.
+ *
+ * Empty/null domain lists are valid (domains removed) and produce no warning.
+ */
+function sslipDomainWarning(?string $domains): bool
 {
+    if (blank($domains)) {
+        return false;
+    }
+
     $domains = str($domains)->trim()->explode(',');
     $showSslipHttpsWarning = false;
     $domains->each(function ($domain) use (&$showSslipHttpsWarning) {
