@@ -405,7 +405,7 @@
                 <div x-data="{ showRaw: true }">
                     <div class="flex items-center gap-2">
                         <h3>Docker Compose</h3>
-                        <x-forms.button x-show="!($application->settings->is_raw_compose_deployment_enabled)"
+                        <x-forms.button x-show="!@js($application->settings->is_raw_compose_deployment_enabled)"
                             @click.prevent="showRaw = !showRaw"
                             x-text="showRaw ? 'Show Deployable Compose' : 'Show Raw Compose'"></x-forms.button>
                     </div>
