@@ -166,6 +166,16 @@ test('handles if statements by adding sudo to condition', function () {
     expect($result[0])->toBe('if sudo command -v docker');
 });
 
+test('handles negated if statements by adding sudo after negation', function () {
+    $commands = collect([
+        'if ! docker ps; then',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('if ! sudo docker ps; then');
+});
+
 test('skips sudo for fi statements', function () {
     $commands = collect([
         'fi',
@@ -439,6 +449,7 @@ test('handles real-world proxy startup with for loop from StartProxy action', fu
 
     // Verify other control structures remain correct
     expect($result[0])->toStartWith('if sudo docker ps');
+    expect($result[6])->toBe('        if ! sudo docker ps -a --format "{{.Names}}" | sudo grep -q "^coolify-proxy$"; then');
     expect($result[8])->toBe('        fi');
     expect($result[13])->toBe('fi');
 });

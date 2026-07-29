@@ -63,9 +63,9 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
         // Match keyword followed by space, semicolon, or end of line
         foreach ($bashKeywords as $keyword) {
             if (preg_match('/^'.preg_quote($keyword, '/').'(\s|;|$)/', $trimmedLine)) {
-                // Special handling for 'if' - insert sudo after 'if '
+                // Special handling for 'if' - insert sudo after 'if' and an optional negation operator
                 if ($keyword === 'if') {
-                    return preg_replace('/^(\s*)if\s+/', '$1if sudo ', $line);
+                    return preg_replace('/^(\s*)if\s+(!\s+)?/', '$1if $2sudo ', $line);
                 }
 
                 return $line;
