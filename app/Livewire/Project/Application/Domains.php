@@ -17,6 +17,17 @@ class Domains extends Component
 
     public string $redirect = 'both';
 
+    /**
+     * Per compose-service www/non-www redirect direction.
+     * Keys are wire-safe (dots encoded) — use serviceRedirectWireKey().
+     *
+     * @var array<string, string>
+     */
+    public array $serviceRedirects = [];
+
+    /** Compose service name when a pending domain conflict belongs to setServiceRedirect. */
+    public ?string $pendingRedirectService = null;
+
     public string $newDomain = '';
 
     public ?string $newDomainService = null;
@@ -56,7 +67,7 @@ class Domains extends Component
 
     public string $editDomainDnsMessage = '';
 
-    /** Pending save path after conflict confirmation: add | update | suggested */
+    /** Pending save path after conflict confirmation: add | update | suggested | redirect */
     public ?string $pendingAction = null;
 
     public bool $isCompose = false;
@@ -83,7 +94,9 @@ class Domains extends Component
         return [
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
-            'redirect' => 'string|required',
+            'redirect' => 'string|required|in:both,www,non-www',
+            'serviceRedirects' => 'array',
+            'serviceRedirects.*' => 'string|in:both,www,non-www',
         ];
     }
 
@@ -94,6 +107,8 @@ class Domains extends Component
             [
                 'redirect.required' => 'The Redirect setting is required.',
                 'redirect.string' => 'The Redirect setting must be a string.',
+                'redirect.in' => 'The Redirect setting must be both, www, or non-www.',
+                'serviceRedirects.*.in' => 'The Redirect setting must be both, www, or non-www.',
             ]
         );
     }
@@ -142,6 +157,7 @@ class Domains extends Component
         }
 
         $this->composeServices = [];
+        $this->serviceRedirects = [];
         if ($this->isCompose) {
             try {
                 $parsed = $this->application->parse() ?? [];
@@ -157,9 +173,57 @@ class Domains extends Component
             if ($this->newDomainService === null && count($this->composeServices) > 0) {
                 $this->newDomainService = $this->composeServices[0];
             }
+
+            $domains = $this->application->docker_compose_domains
+                ? json_decode($this->application->docker_compose_domains, true)
+                : [];
+            if (! is_array($domains)) {
+                $domains = [];
+            }
+
+            $serviceNames = $this->composeServices;
+            foreach (array_keys($domains) as $serviceName) {
+                if (! in_array($serviceName, $serviceNames, true)) {
+                    $serviceNames[] = $serviceName;
+                }
+            }
+
+            foreach ($serviceNames as $serviceName) {
+                // data_get treats dots as path separators; read the service entry by array key.
+                $serviceEntry = $domains[$serviceName] ?? null;
+                $storedRedirect = is_array($serviceEntry) ? ($serviceEntry['redirect'] ?? null) : null;
+                $this->serviceRedirects[$this->serviceRedirectWireKey($serviceName)] = $this->normalizeRedirect(
+                    is_string($storedRedirect) ? $storedRedirect : null
+                );
+            }
         }
 
         $this->domainRows = $this->buildDomainRows();
+    }
+
+    /**
+     * Livewire wire:model treats dots as nesting (serviceRedirects.api.test).
+     * Encode them so compose service names like "api.test" stay flat string values.
+     */
+    public function serviceRedirectWireKey(string $serviceName): string
+    {
+        return str_replace('.', '__dot__', $serviceName);
+    }
+
+    protected function normalizeRedirect(?string $redirect): string
+    {
+        return in_array($redirect, ['www', 'non-www', 'both'], true) ? $redirect : 'both';
+    }
+
+    protected function serviceRedirectFor(?string $serviceName): string
+    {
+        if ($serviceName === null) {
+            return $this->normalizeRedirect($this->redirect);
+        }
+
+        return $this->normalizeRedirect(
+            $this->serviceRedirects[$this->serviceRedirectWireKey($serviceName)] ?? null
+        );
     }
 
     /**
@@ -188,7 +252,10 @@ class Domains extends Component
 
             foreach ($serviceNames as $serviceName) {
                 $configured = [];
-                $domainString = data_get($domains, "{$serviceName}.domain");
+                // Array key access: data_get() would treat dots in service names as path separators.
+                $domainString = is_array($domains[$serviceName] ?? null)
+                    ? ($domains[$serviceName]['domain'] ?? null)
+                    : null;
                 foreach ($this->splitDomains(is_string($domainString) ? $domainString : null) as $url) {
                     $row = $this->domainRowFromStored($url, $serviceName, $stored);
                     $rows[] = $row;
@@ -254,8 +321,7 @@ class Domains extends Component
 
             $base = $this->domainRowFromStored($counterpart, $rowService, $stored);
             $isWww = str_starts_with($hostKey, 'www.');
-            // Compose has no Direction UI: always use simple pair messaging.
-            $meta = $this->suggestedDomainMeta($isWww, $this->isCompose ? 'both' : null);
+            $meta = $this->suggestedDomainMeta($isWww, $this->serviceRedirectFor(is_string($rowService) ? $rowService : null));
 
             $base['is_suggested'] = true;
             $base['suggested_for'] = $url;
@@ -476,7 +542,11 @@ class Domains extends Component
         // Clarify purpose for redirect-source / canonical suggested hosts.
         if ($this->domainRows[$index]['is_suggested'] ?? false) {
             $isWww = str_starts_with(strtolower((string) $this->domainHost((string) $this->domainRows[$index]['url'])), 'www.');
-            $meta = $this->suggestedDomainMeta($isWww, $this->isCompose ? 'both' : null);
+            $serviceName = $this->domainRows[$index]['service'] ?? null;
+            $meta = $this->suggestedDomainMeta(
+                $isWww,
+                $this->serviceRedirectFor(is_string($serviceName) ? $serviceName : null)
+            );
             if ($meta['dns_suffix'] !== '') {
                 $this->domainRows[$index]['dns_message'] = trim($this->domainRows[$index]['dns_message'].' '.$meta['dns_suffix']);
             }
@@ -625,6 +695,18 @@ class Domains extends Component
             return;
         }
 
+        if ($this->pendingAction === 'redirect') {
+            if ($this->isCompose && filled($this->pendingRedirectService)) {
+                $this->setServiceRedirect($this->pendingRedirectService);
+
+                return;
+            }
+
+            $this->setRedirect();
+
+            return;
+        }
+
         $this->addDomain();
     }
 
@@ -736,14 +818,6 @@ class Domains extends Component
             ? "DNS points to {$target} (or Cloudflare)."
             : 'DNS looks correct.';
         $this->rememberDomainDnsResults($urls, 'ok', $message, $service);
-    }
-
-    /**
-     * Refresh suggested www/non-www rows when Direction changes (before Set Direction is saved).
-     */
-    public function updatedRedirect(): void
-    {
-        $this->domainRows = $this->buildDomainRows();
     }
 
     protected function shouldValidateDnsForAdd(): bool
@@ -1078,40 +1152,224 @@ class Domains extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $this->validateOnly('redirect');
 
-            $this->application->redirect = $this->redirect;
-            $hasWww = collect($this->application->fqdns)->filter(
-                fn ($fqdn) => str_starts_with(strtolower((string) $this->domainHost($fqdn)), 'www.')
-            )->count();
-            $hasNonWww = collect($this->application->fqdns)->filter(
-                fn ($fqdn) => ! str_starts_with(strtolower((string) $this->domainHost($fqdn)), 'www.')
-            )->count();
-
-            $dnsHint = dnsMismatchGuidanceMessage(
-                $this->dnsTargetLabel() ?? $this->serverIp,
-                $this->serverIp,
-            );
-
-            if ($hasWww === 0 && $this->application->redirect === 'www') {
-                $this->dispatch('error', "You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list ({$dnsHint}).");
+            if ($this->isCompose) {
+                $this->dispatch('error', 'Set the redirect direction per compose service.');
 
                 return;
             }
 
-            if ($hasNonWww === 0 && $this->application->redirect === 'non-www') {
-                $this->dispatch('error', "You want to redirect to non-www, but you do not have a non-www domain set.<br><br>Please add the apex domain to your domain list ({$dnsHint}).");
+            $this->validateOnly('redirect');
 
+            $this->application->redirect = $this->redirect;
+
+            // www / non-www redirects need both hosts configured as real domains so the
+            // proxy can serve the canonical host and redirect the other. Auto-add missing
+            // counterparts instead of leaving them as optional suggestions.
+            if (in_array($this->redirect, ['www', 'non-www'], true)) {
+                if (! $this->ensureWwwNonWwwPairsConfigured(null)) {
+                    return;
+                }
+
+                $this->application->refresh();
+                $this->application->redirect = $this->redirect;
+            }
+
+            $domains = collect($this->application->fqdns);
+            if (! $this->assertRedirectDomainsPresent($this->redirect, $domains)) {
                 return;
             }
 
             $this->application->save();
+            $this->pendingAction = null;
+            $this->pendingRedirectService = null;
+            $this->forceSaveDomains = false;
             $this->resetDefaultLabels();
             $this->dispatch('success', 'Redirect updated.');
             $this->refreshDomains();
+            $this->pruneDomainDnsStatusesToCurrentDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * @param  mixed  ...$modalArgs  Extra args from modal-confirmation (password, etc.)
+     */
+    public function setServiceRedirect(string $serviceName, mixed ...$modalArgs): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            if (! $this->isCompose) {
+                $this->dispatch('error', 'Per-service redirect is only available for Docker Compose applications.');
+
+                return;
+            }
+
+            // modal-confirmation passes string args with surrounding quotes intact.
+            $serviceName = trim($serviceName, " \t\n\r\0\x0B'\"");
+
+            if (blank($serviceName)) {
+                $this->dispatch('error', 'A service is required.');
+
+                return;
+            }
+
+            // Drop any nested arrays left from broken wire:model paths (e.g. service names with dots).
+            $this->serviceRedirects = collect($this->serviceRedirects)
+                ->filter(fn ($value) => is_string($value) || is_numeric($value))
+                ->map(fn ($value) => $this->normalizeRedirect(is_string($value) ? $value : (string) $value))
+                ->all();
+
+            $wireKey = $this->serviceRedirectWireKey($serviceName);
+            if (! array_key_exists($wireKey, $this->serviceRedirects)) {
+                $this->serviceRedirects[$wireKey] = 'both';
+            }
+
+            $this->validateOnly("serviceRedirects.{$wireKey}");
+            $redirect = $this->normalizeRedirect($this->serviceRedirects[$wireKey] ?? null);
+            $this->serviceRedirects[$wireKey] = $redirect;
+            $this->pendingRedirectService = $serviceName;
+
+            // Promote the optional www/non-www suggestion to a real domain for redirects.
+            if (in_array($redirect, ['www', 'non-www'], true)) {
+                if (! $this->ensureWwwNonWwwPairsConfigured($serviceName)) {
+                    return;
+                }
+                // Ensure we re-read domains after pair save before writing redirect.
+                $this->application->refresh();
+            }
+
+            $allDomains = $this->application->docker_compose_domains
+                ? json_decode($this->application->docker_compose_domains, true)
+                : [];
+            if (! is_array($allDomains)) {
+                $allDomains = [];
+            }
+
+            $existing = is_array($allDomains[$serviceName] ?? null) ? $allDomains[$serviceName] : [];
+            $allDomains[$serviceName] = array_merge($existing, [
+                'redirect' => $redirect,
+            ]);
+
+            // Keep domain key present when only redirect is set.
+            if (! array_key_exists('domain', $allDomains[$serviceName])) {
+                $allDomains[$serviceName]['domain'] = null;
+            }
+
+            $this->application->docker_compose_domains = json_encode($allDomains);
+            $this->application->save();
+
+            $domains = $this->currentDomainList($serviceName);
+            if (! $this->assertRedirectDomainsPresent($redirect, $domains)) {
+                return;
+            }
+
+            $this->pendingAction = null;
+            $this->pendingRedirectService = null;
+            $this->forceSaveDomains = false;
+            $this->resetDefaultLabels();
+            $this->dispatch('success', "Redirect updated for {$serviceName}.");
+            $this->refreshDomains();
+            $this->pruneDomainDnsStatusesToCurrentDomains();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * @param  Collection<int, string>  $domains
+     */
+    protected function assertRedirectDomainsPresent(string $redirect, Collection $domains): bool
+    {
+        if (! in_array($redirect, ['www', 'non-www'], true)) {
+            return true;
+        }
+
+        $hasWww = $domains->filter(
+            fn ($fqdn) => str_starts_with(strtolower((string) $this->domainHost((string) $fqdn)), 'www.')
+        )->count();
+        $hasNonWww = $domains->filter(
+            function ($fqdn) {
+                $host = strtolower((string) $this->domainHost((string) $fqdn));
+
+                return $host !== '' && ! str_starts_with($host, 'www.');
+            }
+        )->count();
+
+        $dnsHint = dnsMismatchGuidanceMessage(
+            $this->dnsTargetLabel() ?? $this->serverIp,
+            $this->serverIp,
+        );
+
+        // Redirects need both hosts: canonical target + source the proxy redirects from.
+        if ($hasWww === 0 || $hasNonWww === 0) {
+            $missing = $hasWww === 0 ? 'www' : 'non-www';
+            $this->dispatch(
+                'error',
+                "Redirect requires both www and non-www domains, but the {$missing} host could not be added automatically (e.g. only IP/sslip hosts).<br><br>Please add the {$missing} domain manually ({$dnsHint})."
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Persist missing www/non-www counterparts as normal domains (not suggestions).
+     *
+     * @return bool false when save was blocked (e.g. domain conflict modal shown)
+     */
+    protected function ensureWwwNonWwwPairsConfigured(?string $serviceName = null): bool
+    {
+        $current = $this->currentDomainList($serviceName);
+        $knownHosts = [];
+
+        foreach ($current as $url) {
+            $host = $this->domainHost($url);
+            if ($host !== null) {
+                $knownHosts[strtolower($host)] = true;
+            }
+        }
+
+        $toAdd = collect();
+        foreach ($current as $url) {
+            // Include sslip/nip so compose/dev hosts can still get redirect pairs.
+            $counterpart = $this->wwwCounterpartUrl($url, forRedirectPairing: true);
+            if ($counterpart === null) {
+                continue;
+            }
+
+            $counterpartHost = $this->domainHost($counterpart);
+            if ($counterpartHost === null) {
+                continue;
+            }
+
+            $hostKey = strtolower($counterpartHost);
+            if (isset($knownHosts[$hostKey])) {
+                continue;
+            }
+
+            $knownHosts[$hostKey] = true;
+            $toAdd->push($counterpart);
+        }
+
+        if ($toAdd->isEmpty()) {
+            return true;
+        }
+
+        $merged = $current->merge($toAdd)->unique()->values();
+        $this->pendingAction = 'redirect';
+        $this->pendingRedirectService = $serviceName;
+
+        // Skip DNS: pairing for redirects must still be configured even when DNS is not ready.
+        if (! $this->saveDomainList($merged, $serviceName, checkDns: false)) {
+            return false;
+        }
+
+        return true;
     }
 
     protected function domainHost(string $url): ?string
@@ -1125,7 +1383,13 @@ class Domains extends Component
         }
     }
 
-    protected function wwwCounterpartUrl(string $url): ?string
+    /**
+     * Build the www/non-www counterpart URL for a host.
+     *
+     * @param  bool  $forRedirectPairing  When true, also pair sslip/nip hosts so www↔non-www
+     *                                    redirects can be configured (suggestions still skip them).
+     */
+    protected function wwwCounterpartUrl(string $url, bool $forRedirectPairing = false): ?string
     {
         $host = $this->domainHost($url);
         if ($host === null) {
@@ -1134,12 +1398,16 @@ class Domains extends Component
 
         $lowerHost = strtolower($host);
 
-        // Skip IPs, localhost, and auto-generated sslip domains.
+        // Always skip bare IPs and localhost.
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
+            return null;
+        }
+
+        // Optional suggestions skip auto-generated hosts; redirect pairing includes them so
+        // Set Direction can promote the missing side to a real domain.
         if (
-            filter_var($host, FILTER_VALIDATE_IP) !== false
-            || $lowerHost === 'localhost'
-            || str_contains($lowerHost, 'sslip.io')
-            || str_contains($lowerHost, 'nip.io')
+            ! $forRedirectPairing
+            && (str_contains($lowerHost, 'sslip.io') || str_contains($lowerHost, 'nip.io'))
         ) {
             return null;
         }
@@ -1180,9 +1448,11 @@ class Domains extends Component
                 $domains = [];
             }
 
-            $domainString = data_get($domains, "{$serviceName}.domain");
+            $domainString = is_array($domains[$serviceName] ?? null)
+                ? ($domains[$serviceName]['domain'] ?? null)
+                : null;
 
-            return collect($this->splitDomains($domainString));
+            return collect($this->splitDomains(is_string($domainString) ? $domainString : null));
         }
 
         return collect($this->splitDomains($this->application->fqdn));
@@ -1224,19 +1494,12 @@ class Domains extends Component
                 $allDomains = [];
             }
 
-            if ($domainString === null) {
-                if (isset($allDomains[$serviceName])) {
-                    unset($allDomains[$serviceName]['domain']);
-                    if (empty(array_filter($allDomains[$serviceName] ?? []))) {
-                        // Keep service key with empty domain for compose structure stability
-                        $allDomains[$serviceName] = ['domain' => null];
-                    }
-                } else {
-                    $allDomains[$serviceName] = ['domain' => null];
-                }
-            } else {
-                $allDomains[$serviceName] = array_merge($allDomains[$serviceName] ?? [], ['domain' => $domainString]);
-            }
+            $existing = is_array($allDomains[$serviceName] ?? null) ? $allDomains[$serviceName] : [];
+            // Preserve stored redirect only — pending Direction dropdown values must not
+            // persist until setServiceRedirect() runs.
+            $allDomains[$serviceName] = array_merge($existing, [
+                'domain' => $domainString,
+            ]);
 
             $this->application->docker_compose_domains = json_encode($allDomains);
             $this->application->fqdn = null;

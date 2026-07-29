@@ -98,6 +98,52 @@ it('lists domains grouped by service application on the stack domains page', fun
         ->assertSee('Web');
 });
 
+it('does not persist service redirect until Set Direction is called', function () {
+    $this->webApp->update(['fqdn' => 'https://web.example.com', 'redirect' => 'both']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set("serviceRedirects.{$this->webApp->id}", 'www');
+
+    expect($this->webApp->fresh()->redirect)->toBe('both')
+        ->and($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
+});
+
+it('sets redirect direction per service application without changing other apps', function () {
+    $this->webApp->update(['fqdn' => 'https://web.example.com', 'redirect' => 'both']);
+    $this->apiApp->update(['redirect' => 'both']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set("serviceRedirects.{$this->webApp->id}", 'www')
+        ->call('setServiceRedirect', $this->webApp->id)
+        ->assertDispatched('success');
+
+    expect($this->webApp->fresh()->redirect)->toBe('www')
+        ->and(explode(',', (string) $this->webApp->fresh()->fqdn))
+        ->toContain('https://web.example.com')
+        ->toContain('https://www.web.example.com')
+        ->and($this->apiApp->fresh()->redirect)->toBe('both')
+        ->and($this->apiApp->fresh()->fqdn)->toBe('https://api.example.com');
+});
+
+it('auto-adds missing non-www pair for a service application redirect', function () {
+    $this->apiApp->update([
+        'fqdn' => 'https://www.api.example.com',
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set("serviceRedirects.{$this->apiApp->id}", 'non-www')
+        ->call('setServiceRedirect', $this->apiApp->id)
+        ->assertDispatched('success');
+
+    $this->apiApp->refresh();
+
+    expect($this->apiApp->redirect)->toBe('non-www')
+        ->and(explode(',', (string) $this->apiApp->fqdn))
+        ->toContain('https://www.api.example.com')
+        ->toContain('https://api.example.com');
+});
+
 it('adds a domain to a selected service application', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('newServiceApplicationId', $this->webApp->id)

@@ -17,6 +17,7 @@ class ServiceApplication extends BaseModel
         'human_name',
         'description',
         'fqdn',
+        'redirect',
         'domain_dns_statuses',
         'ports',
         'exposes',

@@ -8,6 +8,8 @@
         "typecheck": "tsc --noEmit",
         "test": "vitest run",
         "test:watch": "vitest",
+        "migrate": "docker exec coolify php artisan migrate --force --no-interaction",
+        "migrate:seed": "docker exec coolify php artisan migrate:fresh --seed --force --no-interaction",
         "clean": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans"
     },
     "devDependencies": {

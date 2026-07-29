@@ -85,7 +85,7 @@ describe('Application Redirect', function () {
         expect($application->redirect)->toBe('www');
     });
 
-    test('setRedirect rejects www redirect when no www domain exists', function () {
+    test('setRedirect auto-adds missing www domain instead of rejecting', function () {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,
             'destination_id' => $this->destination->id,
@@ -98,13 +98,16 @@ describe('Application Redirect', function () {
             ->assertSuccessful()
             ->set('redirect', 'www')
             ->call('setRedirect')
-            ->assertDispatched('error');
+            ->assertDispatched('success');
 
         $application->refresh();
-        expect($application->redirect)->toBe('both');
+        expect($application->redirect)->toBe('www')
+            ->and(explode(',', (string) $application->fqdn))
+            ->toContain('https://example.com')
+            ->toContain('https://www.example.com');
     });
 
-    test('setRedirect only classifies domains whose hostname starts with www', function (string $fqdn) {
+    test('setRedirect only treats hostname-leading www as www and auto-adds the real pair', function (string $fqdn, string $expectedWww) {
         $application = Application::factory()->create([
             'environment_id' => $this->environment->id,
             'destination_id' => $this->destination->id,
@@ -117,13 +120,16 @@ describe('Application Redirect', function () {
             ->assertSuccessful()
             ->set('redirect', 'www')
             ->call('setRedirect')
-            ->assertDispatched('error');
+            ->assertDispatched('success');
 
         $application->refresh();
-        expect($application->redirect)->toBe('both');
+        expect($application->redirect)->toBe('www')
+            ->and(explode(',', (string) $application->fqdn))
+            ->toContain($fqdn)
+            ->toContain($expectedWww);
     })->with([
-        'www in path' => 'https://example.com/www.example.com',
-        'www in unrelated hostname label' => 'https://app.www.example.com',
+        'www in path' => ['https://example.com/www.example.com', 'https://www.example.com/www.example.com'],
+        'www in unrelated hostname label' => ['https://app.www.example.com', 'https://www.app.www.example.com'],
     ]);
 
 });

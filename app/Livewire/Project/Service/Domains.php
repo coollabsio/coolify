@@ -19,6 +19,16 @@ class Domains extends Component
     /** @var array<int, array{id: int, name: string, image: ?string, required_port: ?int}> */
     public array $serviceApps = [];
 
+    /**
+     * Per service-application www/non-www redirect direction.
+     *
+     * @var array<int|string, string>
+     */
+    public array $serviceRedirects = [];
+
+    /** Service application id when a pending domain conflict belongs to setServiceRedirect. */
+    public ?int $pendingRedirectServiceApplicationId = null;
+
     /** @var array<int, array<string, mixed>> */
     public array $domainRows = [];
 
@@ -83,6 +93,8 @@ class Domains extends Component
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
             'newServiceApplicationId' => 'nullable|integer',
+            'serviceRedirects' => 'array',
+            'serviceRedirects.*' => 'string|in:both,www,non-www',
         ];
     }
 
@@ -134,11 +146,30 @@ class Domains extends Component
             ])
             ->all();
 
+        $this->serviceRedirects = [];
+        foreach ($this->service->applications as $app) {
+            $this->serviceRedirects[$app->id] = $this->normalizeRedirect($app->redirect ?? null);
+        }
+
         if ($this->newServiceApplicationId === null && count($this->serviceApps) > 0) {
             $this->newServiceApplicationId = $this->serviceApps[0]['id'];
         }
 
         $this->domainRows = $this->buildDomainRows();
+    }
+
+    protected function normalizeRedirect(?string $redirect): string
+    {
+        return in_array($redirect, ['www', 'non-www', 'both'], true) ? $redirect : 'both';
+    }
+
+    protected function serviceRedirectFor(?int $serviceApplicationId): string
+    {
+        if (! $serviceApplicationId) {
+            return 'both';
+        }
+
+        return $this->normalizeRedirect($this->serviceRedirects[$serviceApplicationId] ?? null);
     }
 
     /**
@@ -244,15 +275,20 @@ class Domains extends Component
 
             $base = $this->domainRowFromStored($counterpart, $app, $stored);
             $isWww = str_starts_with($hostKey, 'www.');
-            $pointDns = dnsMismatchGuidanceMessage($this->dnsTargetLabel(), $this->serverIp);
+            $meta = $this->suggestedDomainMeta($isWww, $this->serviceRedirectFor($app->id));
 
             $base['is_suggested'] = true;
             $base['suggested_for'] = $url;
-            $base['suggestion_label'] = $isWww ? 'Suggested www' : 'Suggested non-www';
+            $base['suggestion_label'] = $meta['label'];
+            $base['suggestion_role'] = $meta['role'];
             $base['needs_force_add'] = false;
 
             if (($base['dns_status'] ?? 'pending') === 'pending') {
-                $base['dns_message'] = "Also add this host so both www and non-www work. {$pointDns}";
+                $base['dns_message'] = $meta['pending_message'];
+            } elseif (in_array($base['dns_status'], ['ok', 'failed', 'skipped'], true)) {
+                if ($meta['role'] !== 'pair' && ! str_contains((string) $base['dns_message'], 'redirect')) {
+                    $base['dns_message'] = trim((string) $base['dns_message'].' '.$meta['dns_suffix']);
+                }
             }
 
             $suggested[] = $base;
@@ -465,7 +501,214 @@ class Domains extends Component
             return;
         }
 
+        if ($this->pendingAction === 'redirect' && $this->pendingRedirectServiceApplicationId) {
+            $this->setServiceRedirect((int) $this->pendingRedirectServiceApplicationId);
+
+            return;
+        }
+
         $this->addDomain();
+    }
+
+    /**
+     * Labels/copy for a suggested www or non-www host based on Direction.
+     *
+     * @return array{label: string, role: string, pending_message: string, dns_suffix: string}
+     */
+    protected function suggestedDomainMeta(bool $suggestedIsWww, ?string $redirectOverride = null): array
+    {
+        $pointDns = dnsMismatchGuidanceMessage($this->dnsTargetLabel(), $this->serverIp);
+        $redirect = $this->normalizeRedirect($redirectOverride);
+
+        return match ($redirect) {
+            'www' => $suggestedIsWww
+                ? [
+                    'label' => 'Canonical www',
+                    'role' => 'canonical',
+                    'pending_message' => "Required as the redirect target (www). {$pointDns}",
+                    'dns_suffix' => 'This is the canonical www host traffic should land on.',
+                ]
+                : [
+                    'label' => 'Redirect source',
+                    'role' => 'redirect_source',
+                    'pending_message' => "Needed so Coolify can redirect non-www to www. {$pointDns}",
+                    'dns_suffix' => 'Used only so Coolify can redirect this host to www. Still needs DNS to the server, not a provider URL-redirect record.',
+                ],
+            'non-www' => $suggestedIsWww
+                ? [
+                    'label' => 'Redirect source',
+                    'role' => 'redirect_source',
+                    'pending_message' => "Needed so Coolify can redirect www to non-www. {$pointDns}",
+                    'dns_suffix' => 'Used only so Coolify can redirect this host to non-www. Still needs DNS to the server, not a provider URL-redirect record.',
+                ]
+                : [
+                    'label' => 'Canonical non-www',
+                    'role' => 'canonical',
+                    'pending_message' => "Required as the redirect target (non-www). {$pointDns}",
+                    'dns_suffix' => 'This is the canonical non-www host traffic should land on.',
+                ],
+            default => [
+                'label' => $suggestedIsWww ? 'Suggested www' : 'Suggested non-www',
+                'role' => 'pair',
+                'pending_message' => "Also add this host so both www and non-www work. {$pointDns}",
+                'dns_suffix' => '',
+            ],
+        };
+    }
+
+    /**
+     * @param  mixed  ...$modalArgs  Extra args from modal-confirmation (password, etc.)
+     */
+    public function setServiceRedirect(int $serviceApplicationId, mixed ...$modalArgs): void
+    {
+        try {
+            $this->authorize('update', $this->service);
+
+            $app = $this->findServiceApp($serviceApplicationId);
+            if (! $app) {
+                $this->dispatch('error', 'Service application not found.');
+
+                return;
+            }
+
+            $this->validateOnly("serviceRedirects.{$serviceApplicationId}");
+            $redirect = $this->normalizeRedirect($this->serviceRedirects[$serviceApplicationId] ?? null);
+            $this->serviceRedirects[$serviceApplicationId] = $redirect;
+            $this->pendingRedirectServiceApplicationId = $serviceApplicationId;
+
+            // Promote the optional www/non-www suggestion to a real domain for redirects.
+            if (in_array($redirect, ['www', 'non-www'], true)) {
+                if (! $this->ensureWwwNonWwwPairsConfigured($app)) {
+                    return;
+                }
+                $app->refresh();
+            }
+
+            $app->redirect = $redirect;
+            $app->save();
+
+            $domains = collect($this->splitDomains($app->fqdn));
+            if (! $this->assertRedirectDomainsPresent($redirect, $domains)) {
+                return;
+            }
+
+            try {
+                updateCompose($app);
+            } catch (\Throwable) {
+                // Compose generation may fail in incomplete test environments.
+            }
+
+            try {
+                $this->service->parse();
+            } catch (\Throwable) {
+                // Parse may fail without a full compose template.
+            }
+
+            $this->pendingAction = null;
+            $this->pendingRedirectServiceApplicationId = null;
+            $this->forceSaveDomains = false;
+            $this->forceRemovePort = false;
+            $this->dispatch('success', 'Redirect updated.');
+            $this->dispatch('refresh');
+            $this->dispatch('refreshServices');
+            $this->dispatch('configurationChanged');
+            $this->pruneDomainDnsStatusesToCurrentDomains();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * @param  Collection<int, string>  $domains
+     */
+    protected function assertRedirectDomainsPresent(string $redirect, Collection $domains): bool
+    {
+        if (! in_array($redirect, ['www', 'non-www'], true)) {
+            return true;
+        }
+
+        $hasWww = $domains->filter(
+            fn ($fqdn) => str_starts_with(strtolower((string) $this->domainHost((string) $fqdn)), 'www.')
+        )->count();
+        $hasNonWww = $domains->filter(
+            function ($fqdn) {
+                $host = strtolower((string) $this->domainHost((string) $fqdn));
+
+                return $host !== '' && ! str_starts_with($host, 'www.');
+            }
+        )->count();
+
+        $dnsHint = dnsMismatchGuidanceMessage(
+            $this->dnsTargetLabel() ?? $this->serverIp,
+            $this->serverIp,
+        );
+
+        // Redirects need both hosts: canonical target + source the proxy redirects from.
+        if ($hasWww === 0 || $hasNonWww === 0) {
+            $missing = $hasWww === 0 ? 'www' : 'non-www';
+            $this->dispatch(
+                'error',
+                "Redirect requires both www and non-www domains, but the {$missing} host could not be added automatically (e.g. only IP/sslip hosts).<br><br>Please add the {$missing} domain manually ({$dnsHint})."
+            );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Persist missing www/non-www counterparts as normal domains (not suggestions).
+     *
+     * @return bool false when save was blocked (e.g. domain conflict modal shown)
+     */
+    protected function ensureWwwNonWwwPairsConfigured(ServiceApplication $app): bool
+    {
+        $current = collect($this->splitDomains($app->fqdn));
+        $knownHosts = [];
+
+        foreach ($current as $url) {
+            $host = $this->domainHost($url);
+            if ($host !== null) {
+                $knownHosts[strtolower($host)] = true;
+            }
+        }
+
+        $toAdd = collect();
+        foreach ($current as $url) {
+            $counterpart = $this->wwwCounterpartUrl($url, forRedirectPairing: true);
+            if ($counterpart === null) {
+                continue;
+            }
+
+            $counterpartHost = $this->domainHost($counterpart);
+            if ($counterpartHost === null) {
+                continue;
+            }
+
+            $hostKey = strtolower($counterpartHost);
+            if (isset($knownHosts[$hostKey])) {
+                continue;
+            }
+
+            $knownHosts[$hostKey] = true;
+            $toAdd->push($counterpart);
+        }
+
+        if ($toAdd->isEmpty()) {
+            return true;
+        }
+
+        $merged = $current->merge($toAdd)->unique()->values();
+        $this->pendingAction = 'redirect';
+        $this->pendingRedirectServiceApplicationId = $app->id;
+
+        // Skip DNS: pairing for redirects must still be configured even when DNS is not ready.
+        if (! $this->saveDomainListForApp($app, $merged, checkDns: false)) {
+            return false;
+        }
+
+        return true;
     }
 
     public function confirmRemovePort(): void
@@ -994,7 +1237,10 @@ class Domains extends Component
         }
     }
 
-    protected function wwwCounterpartUrl(string $url): ?string
+    /**
+     * @param  bool  $forRedirectPairing  When true, also pair sslip/nip hosts for www↔non-www redirects.
+     */
+    protected function wwwCounterpartUrl(string $url, bool $forRedirectPairing = false): ?string
     {
         $host = $this->domainHost($url);
         if ($host === null) {
@@ -1002,11 +1248,14 @@ class Domains extends Component
         }
 
         $lowerHost = strtolower($host);
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false || $lowerHost === 'localhost') {
+            return null;
+        }
+
         if (
-            filter_var($host, FILTER_VALIDATE_IP) !== false
-            || $lowerHost === 'localhost'
-            || str_contains($lowerHost, 'sslip.io')
-            || str_contains($lowerHost, 'nip.io')
+            ! $forRedirectPairing
+            && (str_contains($lowerHost, 'sslip.io') || str_contains($lowerHost, 'nip.io'))
         ) {
             return null;
         }

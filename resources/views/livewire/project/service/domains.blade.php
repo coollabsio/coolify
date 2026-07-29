@@ -131,6 +131,32 @@
                         </span>
                     </div>
 
+                    <div class="flex flex-col gap-2 md:flex-row md:items-end md:max-w-xl">
+                        <div class="flex-1 min-w-0">
+                            <x-forms.select canGate="update" :canResource="$service" label="Direction"
+                                id="serviceRedirects.{{ $appId }}" wire:model="serviceRedirects.{{ $appId }}"
+                                required
+                                helper="Per-service www/non-www redirect. Add <strong>both</strong> hosts for this service when using a redirect. Both hostnames must resolve to this server so the proxy can serve or redirect them. Changes apply when you click Set Direction.">
+                                <option value="both">Allow www & non-www.</option>
+                                <option value="www">Redirect to www.</option>
+                                <option value="non-www">Redirect to non-www.</option>
+                            </x-forms.select>
+                        </div>
+                        @can('update', $service)
+                            <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
+                                submitAction="setServiceRedirect({{ (int) $appId }})"
+                                :actions="['Traffic for this service will be redirected to the selected direction.']"
+                                confirmationText="{{ ($heading ?: 'service') . '/' }}"
+                                confirmationLabel="Please confirm by entering the service name below"
+                                shortConfirmationLabel="Service name" :confirmWithPassword="false"
+                                step2ButtonText="Set Direction" canGate="update" :canResource="$service">
+                                <x-slot:customButton>
+                                    <div class="w-[7.2rem]">Set Direction</div>
+                                </x-slot:customButton>
+                            </x-modal-confirmation>
+                        @endcan
+                    </div>
+
                     @foreach ($rows as $row)
                         @php
                             $index = collect($domainRows)->search(

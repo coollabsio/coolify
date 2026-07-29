@@ -98,8 +98,8 @@
                 @endif
             @else
                 <div class="flex-1 min-w-0">
-                    <x-forms.select label="Direction" id="redirect" wire:model.live="redirect" required
-                        helper="Add <strong>both</strong> www and non-www in Coolify. Both hostnames must resolve to this server so the proxy can serve or redirect them. Do not use a DNS-provider URL redirect record for the non-canonical host; Coolify handles the HTTP redirect.">
+                    <x-forms.select label="Direction" id="redirect" wire:model="redirect" required
+                        helper="Add <strong>both</strong> www and non-www in Coolify. Both hostnames must resolve to this server so the proxy can serve or redirect them. Do not use a DNS-provider URL redirect record for the non-canonical host; Coolify handles the HTTP redirect. Changes apply when you click Set Direction.">
                         <option value="both">Allow www & non-www.</option>
                         <option value="www">Redirect to www.</option>
                         <option value="non-www">Redirect to non-www.</option>
@@ -176,6 +176,37 @@
                                 @endif
                             </span>
                         </div>
+
+                        @unless ($labelsAreWritable)
+                            @php
+                                $redirectWireKey = $this->serviceRedirectWireKey($serviceName);
+                            @endphp
+                            <div class="flex flex-col gap-2 md:flex-row md:items-end md:max-w-xl">
+                                <div class="flex-1 min-w-0">
+                                    <x-forms.select label="Direction" id="serviceRedirects.{{ $redirectWireKey }}"
+                                        wire:model="serviceRedirects.{{ $redirectWireKey }}" required
+                                        helper="Per-service www/non-www redirect. Add <strong>both</strong> hosts for this service when using a redirect. Both hostnames must resolve to this server so the proxy can serve or redirect them. Changes apply when you click Set Direction.">
+                                        <option value="both">Allow www & non-www.</option>
+                                        <option value="www">Redirect to www.</option>
+                                        <option value="non-www">Redirect to non-www.</option>
+                                    </x-forms.select>
+                                </div>
+                                @can('update', $application)
+                                    {{-- Single-quoted attr so Js::from double-quotes don't break HTML. --}}
+                                    <x-modal-confirmation title="Confirm Redirection Setting?" buttonTitle="Set Direction"
+                                        submitAction='setServiceRedirect({{ \Illuminate\Support\Js::from($serviceName) }})'
+                                        :actions="['Traffic for this service will be redirected to the selected direction. Missing www/non-www counterparts will be added automatically when possible.']"
+                                        confirmationText="{{ $serviceName }}/"
+                                        confirmationLabel="Please confirm by entering the service name below"
+                                        shortConfirmationLabel="Service name" :confirmWithPassword="false"
+                                        step2ButtonText="Set Direction" canGate="update" :canResource="$application">
+                                        <x-slot:customButton>
+                                            <div class="w-[7.2rem]">Set Direction</div>
+                                        </x-slot:customButton>
+                                    </x-modal-confirmation>
+                                @endcan
+                            </div>
+                        @endunless
 
                         @if ($rows->isEmpty())
                             <div

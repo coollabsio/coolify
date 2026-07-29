@@ -276,7 +276,7 @@ it('sets redirect direction when www domain exists', function () {
     expect($this->application->redirect)->toBe('www');
 });
 
-it('rejects www redirect when no www domain exists', function () {
+it('auto-adds missing www counterpart as a normal domain when setting www redirect', function () {
     $this->application->update([
         'fqdn' => 'https://example.com',
         'redirect' => 'both',
@@ -285,11 +285,71 @@ it('rejects www redirect when no www domain exists', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->set('redirect', 'www')
         ->call('setRedirect')
-        ->assertDispatched('error');
+        ->assertDispatched('success')
+        ->assertSet('domainRows.0.is_suggested', false)
+        ->assertSet('domainRows.1.is_suggested', false)
+        ->assertSet('domainRows.0.url', 'https://example.com')
+        ->assertSet('domainRows.1.url', 'https://www.example.com');
 
     $this->application->refresh();
 
-    expect($this->application->redirect)->toBe('both');
+    expect($this->application->redirect)->toBe('www')
+        ->and(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://example.com')
+        ->toContain('https://www.example.com');
+});
+
+it('auto-adds missing non-www counterpart as a normal domain when setting non-www redirect', function () {
+    $this->application->update([
+        'fqdn' => 'https://www.example.com',
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('redirect', 'non-www')
+        ->call('setRedirect')
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+
+    expect($this->application->redirect)->toBe('non-www')
+        ->and(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://www.example.com')
+        ->toContain('https://example.com');
+});
+
+it('saves redirect after confirming a conflict for an auto-added www pair', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'WWW Taken App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => 'https://www.example.com',
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $this->application->update([
+        'fqdn' => 'https://example.com',
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('redirect', 'www')
+        ->call('setRedirect')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('pendingAction', 'redirect')
+        ->call('confirmDomainUsage')
+        ->assertSet('showDomainConflictModal', false)
+        ->assertSet('pendingAction', null)
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+
+    expect($this->application->redirect)->toBe('www')
+        ->and(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://example.com')
+        ->toContain('https://www.example.com');
 });
 
 it('marks dns status as skipped when dns validation is disabled', function () {
@@ -499,24 +559,172 @@ it('shows the missing www counterpart as a suggested domain row', function () {
         ->assertSee('https://www.example.com');
 });
 
-it('changes suggested domain labels when redirect direction changes', function () {
+it('does not change suggested domain labels or persist until Set Direction saves', function () {
     $this->application->update([
         'fqdn' => 'https://example.com',
         'redirect' => 'both',
     ]);
 
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSet('domainRows.1.suggestion_label', 'Suggested www')
         ->assertSet('domainRows.1.suggestion_role', 'pair')
         ->set('redirect', 'www')
-        ->assertSet('domainRows.1.suggestion_label', 'Canonical www')
-        ->assertSet('domainRows.1.suggestion_role', 'canonical')
-        ->assertSee('redirect target')
-        ->set('redirect', 'non-www')
-        ->assertSet('domainRows.1.suggestion_label', 'Redirect source')
-        ->assertSet('domainRows.1.suggestion_role', 'redirect_source')
-        ->assertSee('redirect www to non-www')
-        ->assertSee('A record');
+        // Dropdown alone must not rebuild suggestions or persist redirect.
+        ->assertSet('domainRows.1.suggestion_label', 'Suggested www')
+        ->assertSet('domainRows.1.suggestion_role', 'pair');
+
+    expect($this->application->fresh()->redirect)->toBe('both');
+
+    $component
+        ->call('setRedirect')
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    expect($this->application->redirect)->toBe('www')
+        ->and(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://example.com')
+        ->toContain('https://www.example.com');
+});
+
+it('does not persist compose service redirect until Set Direction is called', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['web'])
+        ->set('serviceRedirects.web', 'www');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'web.redirect'))->toBe('both');
+});
+
+it('sets redirect for compose services whose names contain dots', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  api:\n    image: node:alpine\n  api.test:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
+            'api.test' => ['domain' => 'https://api-test.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $wireKey = str_replace('.', '__dot__', 'api.test');
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['api', 'api.test'])
+        ->set("serviceRedirects.{$wireKey}", 'non-www')
+        ->call('setServiceRedirect', 'api.test')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+
+    expect($domains['api.test']['redirect'] ?? null)->toBe('non-www')
+        ->and($domains['api']['redirect'] ?? null)->toBe('both')
+        // api remains a string-valued sibling, not nested by the dotted service binding
+        ->and($domains['api']['domain'] ?? null)->toBe('https://api.example.com');
+});
+
+it('accepts service names wrapped in quotes from modal-confirmation', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  api:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['api'])
+        ->set('serviceRedirects.api', 'www')
+        // modal-confirmation historically passed quoted string params + empty password
+        ->call('setServiceRedirect', '"api"', '')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+
+    expect($domains['api']['redirect'] ?? null)->toBe('www')
+        ->and(explode(',', (string) ($domains['api']['domain'] ?? '')))
+        ->toContain('https://api.example.com')
+        ->toContain('https://www.api.example.com');
+});
+
+it('auto-adds www pair for compose sslip domains when setting redirect', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  api:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'api' => [
+                'domain' => 'http://api-docker-compose.127.0.0.1.sslip.io',
+                'redirect' => 'both',
+            ],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['api'])
+        ->set('serviceRedirects.api', 'www')
+        ->call('setServiceRedirect', 'api')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+    $apiDomains = explode(',', (string) ($domains['api']['domain'] ?? ''));
+
+    expect($domains['api']['redirect'] ?? null)->toBe('www')
+        ->and($apiDomains)->toContain('http://api-docker-compose.127.0.0.1.sslip.io')
+        ->and($apiDomains)->toContain('http://www.api-docker-compose.127.0.0.1.sslip.io');
+});
+
+it('recovers when serviceRedirects.api is corrupted to a nested array by dotted service names', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  api:\n    image: node:alpine\n  api.test:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
+            'api.test' => ['domain' => 'https://api-test.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['api', 'api.test'])
+        // Simulate broken nested state from wire:model="serviceRedirects.api.test"
+        ->set('serviceRedirects', [
+            'api' => ['test' => 'www'],
+            'api__dot__test' => 'both',
+        ])
+        ->set('serviceRedirects.api', 'www')
+        ->call('setServiceRedirect', 'api')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+
+    expect($domains['api']['redirect'] ?? null)->toBe('www')
+        ->and(explode(',', (string) ($domains['api']['domain'] ?? '')))
+        ->toContain('https://www.api.example.com');
 });
 
 it('checks dns on suggested www domain rows', function () {
@@ -718,4 +926,85 @@ it('exposes the domains route in the application configuration menu', function (
         ->assertSuccessful()
         ->assertSeeLivewire(Domains::class)
         ->assertSee('Domains');
+});
+
+it('sets redirect direction per compose service without changing other services', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
+            'api' => ['domain' => 'https://api.example.com,https://www.api.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['web', 'api'])
+        ->set('serviceRedirects.web', 'www')
+        ->call('setServiceRedirect', 'web')
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'web.redirect'))->toBe('www')
+        ->and(data_get($domains, 'web.domain'))->toContain('https://www.web.example.com')
+        ->and(data_get($domains, 'api.redirect'))->toBe('both')
+        ->and(data_get($domains, 'api.domain'))->toBe('https://api.example.com,https://www.api.example.com');
+});
+
+it('auto-adds missing www pair for a single compose service redirect', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['web'])
+        ->set('serviceRedirects.web', 'www')
+        ->call('setServiceRedirect', 'web')
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+    $webDomains = explode(',', (string) data_get($domains, 'web.domain'));
+
+    expect(data_get($domains, 'web.redirect'))->toBe('www')
+        ->and($webDomains)->toContain('https://web.example.com')
+        ->and($webDomains)->toContain('https://www.web.example.com');
+});
+
+it('uses compose service redirect for suggested domain messaging', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'www'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['web'])
+        ->set('serviceRedirects.web', 'www');
+
+    $component->instance()->domainRows = (function () use ($component) {
+        $method = new ReflectionMethod($component->instance(), 'buildDomainRows');
+
+        return $method->invoke($component->instance());
+    })();
+
+    $suggested = collect($component->get('domainRows'))->firstWhere('is_suggested', true);
+
+    expect($suggested)->not->toBeNull()
+        ->and($suggested['suggestion_role'] ?? null)->toBe('canonical')
+        ->and($suggested['url'] ?? null)->toBe('https://www.web.example.com');
 });
