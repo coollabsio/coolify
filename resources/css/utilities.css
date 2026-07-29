@@ -44,17 +44,17 @@
     }
 
     &:where(.dark, .dark *):focus-visible {
-        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 1px #242424;
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 1px #242424;
     }
 }
 
 @utility input-sticky-active {
-    @apply text-black border-2 border-coollabs dark:border-warning dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-warning;
+    @apply text-black border-2 border-coollabs dark:border-coollabs dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-coollabs;
 }
 
 /* Focus */
 @utility input-focus {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
 }
 
 /*  input, select before */
@@ -86,7 +86,7 @@
     }
 
     &:where(.dark, .dark *):focus-visible {
-        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424;
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #242424;
     }
 
     &:read-only {
@@ -117,12 +117,20 @@
     }
 
     &:where(.dark, .dark *):focus-visible {
-        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424;
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 2px #242424;
     }
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-neutral-200 dark:disabled:border-coolgray-300 disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-neutral-200 dark:disabled:border-coolgray-300 disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+}
+
+@utility button-primary {
+    @apply flex gap-2 justify-center items-center px-4 h-9 text-sm font-semibold text-white normal-case rounded-lg outline-0 cursor-pointer bg-coollabs hover:bg-coollabs-100 shadow-sm transition-colors min-w-fit disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+}
+
+@utility resource-avatar {
+    @apply flex items-center justify-center rounded-lg size-10 shrink-0 bg-coollabs/10 text-coollabs dark:bg-coollabs/20;
 }
 
 @utility auth-tooltip {
@@ -193,7 +201,7 @@
 }
 
 @utility menu-item-active {
-    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-warning bg-neutral-200 overflow-hidden;
+    @apply text-white rounded-sm bg-coollabs dark:bg-coollabs overflow-hidden;
 }
 
 @utility sub-menu-wrapper {
@@ -209,7 +217,7 @@
 }
 
 @utility heading-item-active {
-    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-warning;
+    @apply text-white rounded-sm bg-coollabs dark:bg-coollabs;
 }
 
 @utility icon {
@@ -233,11 +241,11 @@
 }
 
 @utility loading {
-    @apply w-4 dark:text-warning text-coollabs;
+    @apply w-4 text-coollabs;
 }
 
 @utility kbd-custom {
-    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-warning;
+    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-coollabs;
 }
 
 @utility box {
@@ -257,7 +265,7 @@
 }
 
 @utility coolbox {
-    @apply relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-warning hover:ring-coollabs cursor-pointer min-h-[4rem];
+    @apply relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded-xl border border-neutral-200 dark:border-coolgray-300 hover:ring-2 hover:ring-coollabs cursor-pointer min-h-[4rem];
 }
 
 @utility on-box {
@@ -281,11 +289,11 @@
 }
 
 @utility text-helper {
-    @apply inline-block font-bold text-coollabs dark:text-warning;
+    @apply inline-block font-bold text-coollabs;
 }
 
 @utility info-helper {
-    @apply cursor-pointer text-coollabs dark:text-warning;
+    @apply cursor-pointer text-coollabs;
 }
 
 @utility info-helper-popup {

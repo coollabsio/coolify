@@ -20,7 +20,9 @@ class Dashboard extends Component
     {
         $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
         $this->servers = Server::ownedByCurrentTeamCached();
-        $this->projects = Project::ownedByCurrentTeam()->with('environments')->get();
+        $this->projects = Project::ownedByCurrentTeam()
+            ->with(['environments.applications', 'environments.services'])
+            ->get();
     }
 
     public function render()

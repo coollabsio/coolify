@@ -6,21 +6,25 @@
     }
 }">
     <form wire:submit='submit' class="flex flex-col pb-32">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            @if (isDev())
-                <div>{{ $application->compose_parsing_version }}</div>
-            @endif
-            <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
-            <x-modal-input title="Resource Details" buttonTitle="Details">
-                <livewire:project.shared.resource-details :resource="$application" />
-            </x-modal-input>
-            @if ($buildPack === 'dockercompose')
-                <x-forms.button canGate="update" :canResource="$application" wire:target='initLoadingCompose'
-                    x-on:click="$wire.dispatch('loadCompose', false)">
-                    {{ $application->docker_compose_raw ? 'Reload Compose File' : 'Load Compose File' }}
-                </x-forms.button>
-            @endif
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <h2>General</h2>
+                @if (isDev())
+                    <div>{{ $application->compose_parsing_version }}</div>
+                @endif
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <x-modal-input title="Resource Details" buttonTitle="Details">
+                    <livewire:project.shared.resource-details :resource="$application" />
+                </x-modal-input>
+                @if ($buildPack === 'dockercompose')
+                    <x-forms.button canGate="update" :canResource="$application" wire:target='initLoadingCompose'
+                        x-on:click="$wire.dispatch('loadCompose', false)">
+                        {{ $application->docker_compose_raw ? 'Reload Compose File' : 'Load Compose File' }}
+                    </x-forms.button>
+                @endif
+                <x-forms.button canGate="update" :canResource="$application" type="submit">Save</x-forms.button>
+            </div>
         </div>
         <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
