@@ -151,10 +151,10 @@
         inset: 0;
         border-radius: inherit;
         background:
-            linear-gradient(var(--color-warning), var(--color-warning)),
-            linear-gradient(var(--color-warning), var(--color-warning)),
-            linear-gradient(var(--color-warning), var(--color-warning)),
-            linear-gradient(var(--color-warning), var(--color-warning));
+            linear-gradient(var(--color-coollabs), var(--color-coollabs)),
+            linear-gradient(var(--color-coollabs), var(--color-coollabs)),
+            linear-gradient(var(--color-coollabs), var(--color-coollabs)),
+            linear-gradient(var(--color-coollabs), var(--color-coollabs));
         background-repeat: no-repeat;
         animation: coolbox-border-track 2400ms linear infinite;
         pointer-events: none;
@@ -208,11 +208,16 @@ option {
 }
 
 button[isError]:not(:disabled) {
-    @apply text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800 hover:bg-red-300 hover:text-white dark:hover:bg-red-800 dark:hover:text-white;
+    @apply text-white bg-red-700 dark:bg-red-700 border-red-700 dark:border-red-700 hover:bg-red-800 hover:border-red-800 hover:text-white dark:hover:bg-red-800 dark:hover:border-red-800 dark:hover:text-white;
 }
 
 button[isHighlighted]:not(:disabled) {
     @apply text-coollabs-200 dark:text-white bg-coollabs-50 dark:bg-coollabs/20 border-coollabs dark:border-coollabs-100 hover:bg-coollabs hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white;
+}
+
+/* Primary form-submit buttons ("Save") get the brand accent everywhere, without touching every form. */
+button[type='submit'].button:not(:disabled) {
+    @apply text-white bg-coollabs border-coollabs hover:bg-coollabs-100 hover:border-coollabs-100 hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white;
 }
 
 h1 {
@@ -237,7 +242,7 @@ a {
 
 button:focus-visible,
 a:focus-visible {
-    @apply outline-none ring-2 ring-coollabs dark:ring-warning ring-offset-2 dark:ring-offset-coolgray-100;
+    @apply outline-none ring-2 ring-coollabs ring-offset-2 dark:ring-offset-coolgray-100;
 }
 
 label {

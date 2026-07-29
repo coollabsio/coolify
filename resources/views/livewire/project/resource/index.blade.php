@@ -3,31 +3,36 @@
         {{ data_get_str($project, 'name')->limit(10) }} > Resources | Coolify
     </x-slot>
     <div class="flex flex-col">
-        <div class="flex min-w-0 flex-nowrap items-center gap-1">
+        <div class="flex flex-wrap items-start justify-between min-w-0 gap-2">
             <h1>Resources</h1>
-            @if ($environment->isEmpty())
-                @can('createAnyResource')
-                    <a class="button" {{ wireNavigate() }}
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
-                    </a>
+            <div class="flex items-center gap-2">
+                @if ($environment->isEmpty())
+                    @can('createAnyResource')
+                        <a class="button" {{ wireNavigate() }}
+                            href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
+                            Clone
+                        </a>
+                    @endcan
+                @else
+                    @can('createAnyResource')
+                        <a class="button" {{ wireNavigate() }}
+                            href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
+                            Clone
+                        </a>
+                        <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
+                            {{ wireNavigate() }} class="button-primary">
+                            <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                stroke-width="2.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            New Resource
+                        </a>
+                    @endcan
+                @endif
+                @can('delete', $environment)
+                    <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
                 @endcan
-            @else
-                @can('createAnyResource')
-                    <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                        {{ wireNavigate() }} class="button">+
-                        New</a>
-                @endcan
-                @can('createAnyResource')
-                    <a class="button" {{ wireNavigate() }}
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
-                    </a>
-                @endcan
-            @endif
-            @can('delete', $environment)
-                <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
-            @endcan
+            </div>
         </div>
         <nav class="flex pt-2 pb-6">
             <ol class="flex items-center">
@@ -193,10 +198,14 @@
     @if ($environment->isEmpty())
         @can('createAnyResource')
             <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                {{ wireNavigate() }} class="items-center justify-center coolbox">+ Add Resource</a>
+                {{ wireNavigate() }}
+                class="flex flex-col items-center justify-center gap-2 p-8 text-center border border-dashed rounded-xl border-neutral-300 dark:border-coolgray-400 text-neutral-500 dark:text-coolgray-500 hover:border-coollabs hover:text-coollabs transition-colors">
+                <span class="flex items-center justify-center rounded-full size-9 bg-neutral-100 dark:bg-coolgray-200 text-lg">+</span>
+                <span class="text-sm font-medium">Add Resource</span>
+            </a>
         @else
             <div
-                class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-lg">
+                class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-xl">
                 <h3 class="mb-2 text-lg font-semibold text-neutral-600 dark:text-neutral-400">No Resources Found</h3>
                 <p class="text-sm text-neutral-600 dark:text-neutral-400">
                     This environment doesn't have any resources yet.<br>
@@ -232,50 +241,41 @@
             <div x-show="filteredApplications.length > 0"
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
+                    <div class="relative flex flex-col gap-3 p-5 border rounded-xl group border-neutral-200 dark:border-coolgray-300 bg-white dark:bg-coolgray-100 hover:border-coollabs transition-colors">
+                        <a class="absolute inset-0" :href="item.hrefLink" {{ wireNavigate() }}></a>
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start flex-1 min-w-0 gap-3">
+                                <div class="resource-avatar">
+                                    <svg class="size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                                    </svg>
                                 </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
+                                <div class="min-w-0 pt-0.5">
+                                    <div class="font-semibold truncate text-black dark:text-white" x-text="item.name"></div>
+                                    <div class="text-sm truncate text-neutral-500 dark:text-coolgray-500"
+                                        x-text="item.description || item.fqdn || 'No description'"></div>
+                                </div>
                             </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
+                            <span class="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-neutral-100 dark:bg-coolgray-200 shrink-0"
+                                :class="statusTextClass(item.status)">
+                                <span class="rounded-full size-1.5" :class="statusDotClass(item.status)"></span>
+                                <span x-text="statusLabel(item.status)"></span>
+                            </span>
                         </div>
-                    </span>
+                        <template x-if="item.server_status == false">
+                            <div class="text-xs font-semibold text-error">Server unreachable or misconfigured</div>
+                        </template>
+                        <div class="relative z-10 flex items-center justify-between gap-2 pt-3 mt-auto border-t border-neutral-100 dark:border-coolgray-300">
+                            <span class="text-xs truncate text-neutral-400 dark:text-coolgray-500"
+                                x-text="item.destination?.server?.name || 'Unknown'"></span>
+                            <div class="flex flex-wrap justify-end gap-1">
+                                <template x-for="tag in item.tags" :key="tag.id">
+                                    <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name"></a>
+                                </template>
+                                <a :href="`${item.hrefLink}/tags`" class="add-tag">Add tag</a>
+                            </div>
+                        </div>
+                    </div>
                 </template>
             </div>
             <template x-if="filteredDatabases.length > 0">
@@ -284,50 +284,41 @@
             <div x-show="filteredDatabases.length > 0"
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredDatabases" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
+                    <div class="relative flex flex-col gap-3 p-5 border rounded-xl group border-neutral-200 dark:border-coolgray-300 bg-white dark:bg-coolgray-100 hover:border-coollabs transition-colors">
+                        <a class="absolute inset-0" :href="item.hrefLink" {{ wireNavigate() }}></a>
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start flex-1 min-w-0 gap-3">
+                                <div class="resource-avatar">
+                                    <svg class="size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                                    </svg>
                                 </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
+                                <div class="min-w-0 pt-0.5">
+                                    <div class="font-semibold truncate text-black dark:text-white" x-text="item.name"></div>
+                                    <div class="text-sm truncate text-neutral-500 dark:text-coolgray-500"
+                                        x-text="item.description || item.fqdn || 'No description'"></div>
+                                </div>
                             </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
+                            <span class="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-neutral-100 dark:bg-coolgray-200 shrink-0"
+                                :class="statusTextClass(item.status)">
+                                <span class="rounded-full size-1.5" :class="statusDotClass(item.status)"></span>
+                                <span x-text="statusLabel(item.status)"></span>
+                            </span>
                         </div>
-                    </span>
+                        <template x-if="item.server_status == false">
+                            <div class="text-xs font-semibold text-error">Server unreachable or misconfigured</div>
+                        </template>
+                        <div class="relative z-10 flex items-center justify-between gap-2 pt-3 mt-auto border-t border-neutral-100 dark:border-coolgray-300">
+                            <span class="text-xs truncate text-neutral-400 dark:text-coolgray-500"
+                                x-text="item.destination?.server?.name || 'Unknown'"></span>
+                            <div class="flex flex-wrap justify-end gap-1">
+                                <template x-for="tag in item.tags" :key="tag.id">
+                                    <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name"></a>
+                                </template>
+                                <a :href="`${item.hrefLink}/tags`" class="add-tag">Add tag</a>
+                            </div>
+                        </div>
+                    </div>
                 </template>
             </div>
             <template x-if="filteredServices.length > 0">
@@ -336,50 +327,41 @@
             <div x-show="filteredServices.length > 0"
                 class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredServices" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
+                    <div class="relative flex flex-col gap-3 p-5 border rounded-xl group border-neutral-200 dark:border-coolgray-300 bg-white dark:bg-coolgray-100 hover:border-coollabs transition-colors">
+                        <a class="absolute inset-0" :href="item.hrefLink" {{ wireNavigate() }}></a>
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex items-start flex-1 min-w-0 gap-3">
+                                <div class="resource-avatar">
+                                    <svg class="size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                                    </svg>
                                 </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
+                                <div class="min-w-0 pt-0.5">
+                                    <div class="font-semibold truncate text-black dark:text-white" x-text="item.name"></div>
+                                    <div class="text-sm truncate text-neutral-500 dark:text-coolgray-500"
+                                        x-text="item.description || item.fqdn || 'No description'"></div>
+                                </div>
                             </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
+                            <span class="flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-neutral-100 dark:bg-coolgray-200 shrink-0"
+                                :class="statusTextClass(item.status)">
+                                <span class="rounded-full size-1.5" :class="statusDotClass(item.status)"></span>
+                                <span x-text="statusLabel(item.status)"></span>
+                            </span>
                         </div>
-                    </span>
+                        <template x-if="item.server_status == false">
+                            <div class="text-xs font-semibold text-error">Server unreachable or misconfigured</div>
+                        </template>
+                        <div class="relative z-10 flex items-center justify-between gap-2 pt-3 mt-auto border-t border-neutral-100 dark:border-coolgray-300">
+                            <span class="text-xs truncate text-neutral-400 dark:text-coolgray-500"
+                                x-text="item.destination?.server?.name || 'Unknown'"></span>
+                            <div class="flex flex-wrap justify-end gap-1">
+                                <template x-for="tag in item.tags" :key="tag.id">
+                                    <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name"></a>
+                                </template>
+                                <a :href="`${item.hrefLink}/tags`" class="add-tag">Add tag</a>
+                            </div>
+                        </div>
+                    </div>
                 </template>
             </div>
         </div>
@@ -434,6 +416,26 @@
             },
             get filteredServices() {
                 return this.filterAndSort(this.services)
+            },
+            statusLabel(status) {
+                if (status.startsWith('running')) return 'running';
+                if (status.startsWith('exited')) return 'exited';
+                if (status.startsWith('restarting')) return 'restarting';
+                if (status.startsWith('degraded')) return 'degraded';
+                if (status.startsWith('starting')) return 'starting';
+                return 'idle';
+            },
+            statusDotClass(status) {
+                if (status.startsWith('running')) return 'bg-success';
+                if (status.startsWith('exited')) return 'bg-error';
+                if (status.startsWith('starting') || status.startsWith('restarting') || status.startsWith('degraded')) return 'bg-warning';
+                return 'bg-neutral-400 dark:bg-coolgray-400';
+            },
+            statusTextClass(status) {
+                if (status.startsWith('running')) return 'text-success';
+                if (status.startsWith('exited')) return 'text-error';
+                if (status.startsWith('starting') || status.startsWith('restarting') || status.startsWith('degraded')) return 'text-warning';
+                return 'text-neutral-500 dark:text-coolgray-500';
             }
         };
     }

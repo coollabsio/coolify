@@ -18,7 +18,9 @@ class Index extends Component
     public function mount()
     {
         $this->private_keys = PrivateKey::ownedByCurrentTeamCached();
-        $this->projects = Project::ownedByCurrentTeamCached();
+        $this->projects = Project::ownedByCurrentTeam()
+            ->with(['environments.applications', 'environments.services'])
+            ->get();
         $this->servers = Server::ownedByCurrentTeamCached();
     }
 
