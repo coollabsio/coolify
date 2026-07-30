@@ -280,6 +280,13 @@ class Select extends Component
 
     private function serviceTemplatesLastUpdated(): ?string
     {
+        $fetchedAt = get_service_templates_fetched_at();
+        if ($fetchedAt instanceof CarbonImmutable) {
+            return $fetchedAt
+                ->timezone(config('app.timezone'))
+                ->format('M j, Y H:i');
+        }
+
         return $this->formatLastModified($this->serviceTemplatesPath());
     }
 
