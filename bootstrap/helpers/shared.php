@@ -1263,23 +1263,92 @@ function sslip(Server $server)
     return "http://{$server->ip}.sslip.io";
 }
 
+function service_templates_cache_key(): string
+{
+    return (string) config('constants.services.cache_key', 'coolify:service-templates-bundle');
+}
+
+function service_templates_path(): string
+{
+    return base_path('templates/'.config('constants.services.file_name'));
+}
+
+/**
+ * Persist the CDN service-templates bundle to local disk and shared cache.
+ *
+ * The shared cache entry is what multi-node Cloud relies on: Horizon (or any
+ * single node) pulls once; every HTTP node reads the same Redis payload.
+ */
+function store_service_templates_bundle(string $json, ?string $fetchedAt = null): bool
+{
+    $fetchedAt ??= now()->toIso8601String();
+    $path = service_templates_path();
+
+    $written = File::put($path, $json) !== false;
+
+    Cache::forever(service_templates_cache_key(), [
+        'fetched_at' => $fetchedAt,
+        'json' => $json,
+    ]);
+
+    return $written;
+}
+
+function get_service_templates_fetched_at(): ?CarbonImmutable
+{
+    $bundle = Cache::get(service_templates_cache_key());
+    if (is_array($bundle) && filled(data_get($bundle, 'fetched_at'))) {
+        try {
+            return CarbonImmutable::parse((string) data_get($bundle, 'fetched_at'));
+        } catch (Throwable) {
+            // fall through to local file mtime
+        }
+    }
+
+    $path = service_templates_path();
+    if (File::exists($path)) {
+        $mtime = filemtime($path);
+        if ($mtime !== false) {
+            return CarbonImmutable::createFromTimestamp($mtime);
+        }
+    }
+
+    return null;
+}
+
 function get_service_templates(bool $force = false): Collection
 {
     if ($force) {
         try {
-            $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+            $response = Http::retry(3, 1000, throw: false)
+                ->timeout(60)
+                ->connectTimeout(10)
+                ->get(config('constants.services.official'));
             if ($response->failed()) {
                 return collect([]);
             }
-            $services = $response->json();
+            store_service_templates_bundle($response->body());
 
-            return collect($services);
+            return collect(json_decode($response->body()))->sortKeys();
         } catch (Throwable) {
             return get_service_templates();
         }
     }
 
-    $path = base_path('templates/'.config('constants.services.file_name'));
+    $bundle = Cache::get(service_templates_cache_key());
+    if (is_array($bundle) && is_string(data_get($bundle, 'json')) && data_get($bundle, 'json') !== '') {
+        $fetchedAt = (string) data_get($bundle, 'fetched_at', '0');
+
+        return Cache::remember("service-templates:shared:{$fetchedAt}", now()->addDay(), function () use ($bundle) {
+            return collect(json_decode((string) data_get($bundle, 'json')))->sortKeys();
+        });
+    }
+
+    $path = service_templates_path();
+    if (! File::exists($path)) {
+        return collect([]);
+    }
+
     $mtime = filemtime($path) ?: 0;
 
     return Cache::remember("service-templates:{$mtime}", now()->addDay(), function () use ($path) {
