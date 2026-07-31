@@ -10,6 +10,7 @@ use SocialiteProviders\Discord\DiscordExtendSocialite;
 use SocialiteProviders\Google\GoogleExtendSocialite;
 use SocialiteProviders\Infomaniak\InfomaniakExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\OIDC\OIDCExtendSocialite;
 use SocialiteProviders\Zitadel\ZitadelExtendSocialite;
 
 class EventServiceProvider extends ServiceProvider
@@ -23,6 +24,7 @@ class EventServiceProvider extends ServiceProvider
             GoogleExtendSocialite::class.'@handle',
             InfomaniakExtendSocialite::class.'@handle',
             ZitadelExtendSocialite::class.'@handle',
+            OIDCExtendSocialite::class.'@handle',
         ],
     ];
 

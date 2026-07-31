@@ -1,5 +1,6 @@
 {
     "auth.login": "Anmelden",
+    "auth.login.oidc": "Mit SSO anmelden",
     "auth.login.azure": "Mit Microsoft anmelden",
     "auth.login.bitbucket": "Mit Bitbucket anmelden",
     "auth.login.clerk": "Mit Clerk anmelden",

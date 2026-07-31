@@ -1,5 +1,6 @@
 {
     "auth.login": "Zaloguj",
+    "auth.login.oidc": "Zaloguj przez SSO",
     "auth.login.authentik": "Zaloguj się przez Authentik",
     "auth.login.azure": "Zaloguj się przez Microsoft",
     "auth.login.bitbucket": "Zaloguj się przez Bitbucket",
