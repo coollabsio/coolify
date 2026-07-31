@@ -6,7 +6,7 @@
 
 services:
   appwrite:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     container_name: appwrite
     volumes:
       - appwrite-uploads:/storage/uploads:rw
@@ -157,9 +157,10 @@ services:
       interval: 20s
       timeout: 5s
       retries: 3
+      start_period: 120s
 
   appwrite-console:
-    image: appwrite/console:8.7.5
+    image: appwrite/console:8.7.30
     container_name: appwrite-console
     environment:
       - SERVICE_URL_APPWRITE=/console
@@ -170,7 +171,7 @@ services:
       retries: 3
 
   appwrite-realtime:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: realtime
     container_name: appwrite-realtime
     depends_on:
@@ -207,7 +208,7 @@ services:
       retries: 3
 
   appwrite-worker-audits:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-audits
     container_name: appwrite-worker-audits
     depends_on:
@@ -241,7 +242,7 @@ services:
 
 
   appwrite-worker-webhooks:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-webhooks
     container_name: appwrite-worker-webhooks
     depends_on:
@@ -277,7 +278,7 @@ services:
       retries: 3
 
   appwrite-worker-deletes:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-deletes
     container_name: appwrite-worker-deletes
     depends_on:
@@ -345,7 +346,7 @@ services:
       retries: 3
 
   appwrite-worker-databases:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-databases
     container_name: appwrite-worker-databases
     depends_on:
@@ -381,7 +382,7 @@ services:
 
 
   appwrite-worker-builds:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-builds
     container_name: appwrite-worker-builds
     depends_on:
@@ -459,7 +460,7 @@ services:
       retries: 3
 
   appwrite-worker-certificates:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-certificates
     container_name: appwrite-worker-certificates
     depends_on:
@@ -503,7 +504,7 @@ services:
       retries: 3
 
   appwrite-worker-functions:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-functions
     container_name: appwrite-worker-functions
     depends_on:
@@ -550,7 +551,7 @@ services:
       retries: 3
 
   appwrite-worker-mails:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-mails
     container_name: appwrite-worker-mails
     depends_on:
@@ -593,7 +594,7 @@ services:
 
 
   appwrite-worker-messaging:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-messaging
     container_name: appwrite-worker-messaging
     volumes:
@@ -652,7 +653,7 @@ services:
       retries: 3
       
   appwrite-worker-migrations:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-migrations
     container_name: appwrite-worker-migrations
     volumes:
@@ -692,7 +693,7 @@ services:
     exclude_from_hc: true
 
   appwrite-task-maintenance:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: maintenance
     container_name: appwrite-task-maintenance
     depends_on:
@@ -740,7 +741,7 @@ services:
 
 
   appwrite-task-stats-resources:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     container_name: appwrite-task-stats-resources
     entrypoint: stats-resources
     depends_on:
@@ -775,7 +776,7 @@ services:
       retries: 3
 
   appwrite-worker-stats-resources:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-stats-resources
     container_name: appwrite-worker-stats-resources
     depends_on:
@@ -809,7 +810,7 @@ services:
       retries: 3
 
   appwrite-worker-stats-usage:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-stats-usage
     container_name: appwrite-worker-stats-usage
     depends_on:
@@ -845,7 +846,7 @@ services:
 
 
   appwrite-task-scheduler-functions:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: schedule-functions
     container_name: appwrite-task-scheduler-functions
     depends_on:
@@ -879,7 +880,7 @@ services:
       retries: 3
 
   appwrite-task-scheduler-executions:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: schedule-executions
     container_name: appwrite-task-scheduler-executions
     depends_on:
@@ -913,7 +914,7 @@ services:
       retries: 3
 
   appwrite-task-scheduler-messages:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: schedule-messages
     container_name: appwrite-task-scheduler-messages
     depends_on:
@@ -956,7 +957,7 @@ services:
       retries: 3
 
   appwrite-browser:
-    image: appwrite/browser:0.3.2
+    image: appwrite/browser:0.3.3
     container_name: appwrite-browser
     hostname: appwrite-browser
     exclude_from_hc: true
@@ -965,7 +966,7 @@ services:
     container_name: openruntimes-executor
     hostname: openruntimes-executor
     stop_signal: SIGINT
-    image: openruntimes/executor:0.25.1
+    image: openruntimes/executor:0.25.4
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -1012,7 +1013,7 @@ services:
       - OPR_EXECUTOR_STORAGE_WASABI_BUCKET=${_APP_STORAGE_WASABI_BUCKET}
 
   appwrite-worker-screenshots:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-screenshots
     container_name: appwrite-worker-screenshots
     depends_on:
@@ -1072,7 +1073,7 @@ services:
       retries: 3
 
   appwrite-worker-executions:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: worker-executions
     container_name: appwrite-worker-executions
     depends_on:
@@ -1105,7 +1106,7 @@ services:
       retries: 3
 
   appwrite-task-interval:
-    image: appwrite/appwrite:1.9.5
+    image: appwrite/appwrite:1.9.6
     entrypoint: interval
     container_name: appwrite-task-interval
     restart: on-failure:3
@@ -1202,7 +1203,7 @@ services:
         - CMD-SHELL
         - >
           mongosh -u root -p "$SERVICE_PASSWORD_MARIADBROOT" --authenticationDatabase admin --quiet --eval "
-            try { const hello = db.adminCommand({hello: 1}); if (hello.isWritablePrimary) { quit(0); } } catch (e) {}
+            try { const hello = db.adminCommand({hello: 1}); if (hello.isWritablePrimary && hello.setName === 'rs0') { quit(0); } } catch (e) {}
             try { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'appwrite-mongodb:27017'}]}); } catch (e) {}
             quit(1);
           " 2>/dev/null
