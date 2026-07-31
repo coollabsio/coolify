@@ -4,8 +4,14 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
-use App\Models\Project;
+use App\Models\Application;
+use App\Models\Service;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -47,69 +53,12 @@ class ListResources extends Tool
 
         $args = $this->paginationArgs($request);
 
-        $projectsQuery = Project::where('team_id', $teamId);
-        if (is_string($projectUuid)) {
-            $projectsQuery->where('uuid', $projectUuid);
-        }
-        $projects = $projectsQuery->get();
-
-        $items = collect();
-
-        foreach ($projects as $project) {
-            if ($typeFilter === null || $typeFilter === 'application') {
-                $appsQuery = $project->applications();
-                if (is_string($tagName)) {
-                    $appsQuery->whereHas('tags', fn ($q) => $q->where('name', $tagName));
-                }
-                foreach ($appsQuery->get() as $app) {
-                    $items->push([
-                        'uuid' => $app->uuid,
-                        'name' => $app->name,
-                        'type' => 'application',
-                        'status' => $app->status,
-                        'project_uuid' => $project->uuid,
-                        'project_name' => $project->name,
-                    ]);
-                }
-            }
-
-            if ($typeFilter === null || $typeFilter === 'service') {
-                $servicesQuery = $project->services();
-                if (is_string($tagName)) {
-                    $servicesQuery->whereHas('tags', fn ($q) => $q->where('name', $tagName));
-                }
-                foreach ($servicesQuery->get() as $svc) {
-                    $items->push([
-                        'uuid' => $svc->uuid,
-                        'name' => $svc->name,
-                        'type' => 'service',
-                        'status' => $svc->status ?? null,
-                        'project_uuid' => $project->uuid,
-                        'project_name' => $project->name,
-                    ]);
-                }
-            }
-
-            if ($typeFilter === null || $typeFilter === 'database') {
-                foreach ($project->databases() as $db) {
-                    if (is_string($tagName) && method_exists($db, 'tags') && ! $db->tags->contains('name', $tagName)) {
-                        continue;
-                    }
-                    $items->push([
-                        'uuid' => $db->uuid,
-                        'name' => $db->name,
-                        'type' => method_exists($db, 'type') ? $db->type() : 'database',
-                        'status' => $db->status ?? null,
-                        'project_uuid' => $project->uuid,
-                        'project_name' => $project->name,
-                    ]);
-                }
-            }
-        }
-
-        $sorted = $items->sortBy('name')->values();
-        $total = $sorted->count();
-        $page = $sorted->slice($args['offset'], $args['per_page'])->values()->all();
+        $union = $this->buildResourceUnion(
+            $teamId,
+            is_string($typeFilter) ? $typeFilter : null,
+            is_string($projectUuid) ? $projectUuid : null,
+            is_string($tagName) ? $tagName : null,
+        );
 
         $extra = array_filter([
             'type' => $typeFilter,
@@ -117,11 +66,214 @@ class ListResources extends Tool
             'tag' => $tagName,
         ], fn ($v) => $v !== null);
 
+        if ($union === null) {
+            return $this->mcpSuccess($request, $this->respond(
+                [],
+                [],
+                $this->paginationMeta('list_resources', $args, 0, $extra),
+            ));
+        }
+
+        $total = (int) DB::query()->fromSub($union, 'resources')->count();
+
+        $rows = DB::query()
+            ->fromSub($union, 'resources')
+            ->orderBy('name')
+            ->offset($args['offset'])
+            ->limit($args['per_page'])
+            ->get();
+
+        $page = $this->mapPageRows($rows);
+
         return $this->mcpSuccess($request, $this->respond(
             $page,
             [],
             $this->paginationMeta('list_resources', $args, $total, $extra),
         ));
+    }
+
+    /**
+     * Build a UNION ALL of team-scoped resource queries (apps, services, DBs).
+     * Sorting and pagination are applied by the caller on the outer query so only
+     * one page of rows is materialised.
+     */
+    private function buildResourceUnion(
+        int $teamId,
+        ?string $typeFilter,
+        ?string $projectUuid,
+        ?string $tagName,
+    ): ?QueryBuilder {
+        $parts = [];
+
+        if ($typeFilter === null || $typeFilter === 'application') {
+            $parts[] = $this->applicationQuery($teamId, $projectUuid, $tagName);
+        }
+
+        if ($typeFilter === null || $typeFilter === 'service') {
+            $parts[] = $this->serviceQuery($teamId, $projectUuid, $tagName);
+        }
+
+        if ($typeFilter === null || $typeFilter === 'database') {
+            foreach (STANDALONE_DATABASE_MODELS as $typeKey => $modelClass) {
+                $parts[] = $this->databaseQuery($modelClass, (string) $typeKey, $teamId, $projectUuid, $tagName);
+            }
+        }
+
+        if ($parts === []) {
+            return null;
+        }
+
+        /** @var Builder $union */
+        $union = array_shift($parts);
+        foreach ($parts as $part) {
+            $union->unionAll($part);
+        }
+
+        return $union->toBase();
+    }
+
+    private function applicationQuery(int $teamId, ?string $projectUuid, ?string $tagName): Builder
+    {
+        // Drop withCount global scope so UNION column counts match other resource selects.
+        $query = Application::query()
+            ->withoutGlobalScope('withRelations')
+            ->select([
+                'applications.uuid',
+                'applications.name',
+                DB::raw("'application' as type"),
+                'applications.status',
+                'projects.uuid as project_uuid',
+                'projects.name as project_name',
+            ])
+            ->join('environments', 'applications.environment_id', '=', 'environments.id')
+            ->join('projects', 'environments.project_id', '=', 'projects.id')
+            ->where('projects.team_id', $teamId);
+
+        $this->applyProjectAndTagFilters($query, 'applications', Application::class, $projectUuid, $tagName);
+
+        return $query;
+    }
+
+    private function serviceQuery(int $teamId, ?string $projectUuid, ?string $tagName): Builder
+    {
+        // Service status is a computed accessor, not a column — fill per page later.
+        $query = Service::query()
+            ->select([
+                'services.uuid',
+                'services.name',
+                DB::raw("'service' as type"),
+                DB::raw('NULL as status'),
+                'projects.uuid as project_uuid',
+                'projects.name as project_name',
+            ])
+            ->join('environments', 'services.environment_id', '=', 'environments.id')
+            ->join('projects', 'environments.project_id', '=', 'projects.id')
+            ->where('projects.team_id', $teamId);
+
+        $this->applyProjectAndTagFilters($query, 'services', Service::class, $projectUuid, $tagName);
+
+        return $query;
+    }
+
+    /**
+     * @param  class-string  $modelClass
+     */
+    private function databaseQuery(
+        string $modelClass,
+        string $typeKey,
+        int $teamId,
+        ?string $projectUuid,
+        ?string $tagName,
+    ): Builder {
+        /** @var Model $model */
+        $model = new $modelClass;
+        $table = $model->getTable();
+        $resourceType = method_exists($model, 'type') ? $model->type() : 'standalone-'.$typeKey;
+
+        // Type string is model-controlled (e.g. standalone-postgresql), not user input.
+        $typeLiteral = "'".str_replace("'", "''", $resourceType)."'";
+
+        $query = $modelClass::query()
+            ->select([
+                "{$table}.uuid",
+                "{$table}.name",
+                DB::raw("{$typeLiteral} as type"),
+                "{$table}.status",
+                'projects.uuid as project_uuid',
+                'projects.name as project_name',
+            ])
+            ->join('environments', "{$table}.environment_id", '=', 'environments.id')
+            ->join('projects', 'environments.project_id', '=', 'projects.id')
+            ->where('projects.team_id', $teamId);
+
+        $this->applyProjectAndTagFilters($query, $table, $modelClass, $projectUuid, $tagName);
+
+        return $query;
+    }
+
+    /**
+     * @param  class-string  $modelClass
+     */
+    private function applyProjectAndTagFilters(
+        Builder $query,
+        string $table,
+        string $modelClass,
+        ?string $projectUuid,
+        ?string $tagName,
+    ): void {
+        if (is_string($projectUuid)) {
+            $query->where('projects.uuid', $projectUuid);
+        }
+
+        if (is_string($tagName)) {
+            $morphClass = (new $modelClass)->getMorphClass();
+            $query->whereExists(function (QueryBuilder $sub) use ($table, $morphClass, $tagName) {
+                $sub->select(DB::raw(1))
+                    ->from('taggables')
+                    ->join('tags', 'tags.id', '=', 'taggables.tag_id')
+                    ->whereColumn('taggables.taggable_id', "{$table}.id")
+                    ->where('taggables.taggable_type', $morphClass)
+                    ->where('tags.name', $tagName);
+            });
+        }
+    }
+
+    /**
+     * @param  Collection<int, object>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function mapPageRows($rows): array
+    {
+        $items = $rows->map(fn ($row) => [
+            'uuid' => $row->uuid,
+            'name' => $row->name,
+            'type' => $row->type,
+            'status' => $row->status,
+            'project_uuid' => $row->project_uuid,
+            'project_name' => $row->project_name,
+        ])->values();
+
+        $serviceUuids = $items->where('type', 'service')->pluck('uuid')->filter()->values();
+        if ($serviceUuids->isNotEmpty()) {
+            $services = Service::query()
+                ->whereIn('uuid', $serviceUuids->all())
+                ->with([
+                    'applications:id,service_id,status,exclude_from_status',
+                    'databases:id,service_id,status,exclude_from_status',
+                ])
+                ->get()
+                ->keyBy('uuid');
+
+            $items = $items->map(function (array $item) use ($services) {
+                if ($item['type'] === 'service') {
+                    $item['status'] = $services->get($item['uuid'])?->status;
+                }
+
+                return $item;
+            });
+        }
+
+        return $items->all();
     }
 
     public function schema(JsonSchema $schema): array

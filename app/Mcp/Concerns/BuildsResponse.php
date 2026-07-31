@@ -198,7 +198,9 @@ trait BuildsResponse
         ];
 
         $s = strtolower((string) $status);
-        if (str_starts_with($s, 'running') && ! str_contains($s, 'unhealthy')) {
+        // Control treats any status containing "running" as already started (including unhealthy).
+        // Suggest logs/restart for those; only non-running statuses get start.
+        if (str_starts_with($s, 'running')) {
             $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'database', 'uuid' => $uuid], 'hint' => 'Live logs if running'];
             $actions[] = ['tool' => 'control', 'args' => ['resource' => 'database', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
         } else {
@@ -223,7 +225,9 @@ trait BuildsResponse
         ];
 
         $s = strtolower((string) $status);
-        if (str_contains($s, 'running') && ! str_contains($s, 'unhealthy')) {
+        // Control treats any status containing "running" as already started (including unhealthy).
+        // Suggest logs/restart for those; only non-running statuses get start.
+        if (str_contains($s, 'running')) {
             $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'service', 'uuid' => $uuid], 'hint' => 'Live logs if running'];
             $actions[] = ['tool' => 'control', 'args' => ['resource' => 'service', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
         } else {

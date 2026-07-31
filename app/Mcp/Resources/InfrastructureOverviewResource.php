@@ -35,7 +35,7 @@ class InfrastructureOverviewResource extends Resource
         $servers = Server::whereTeamId($teamId)
             ->with('settings:id,server_id,is_reachable,is_usable')
             ->get()
-            ->map(fn ($s) => [
+            ->map(fn (Server $s) => [
                 'uuid' => $s->uuid,
                 'name' => $s->name,
                 'ip' => $s->ip,
@@ -45,15 +45,38 @@ class InfrastructureOverviewResource extends Resource
             ->values()
             ->all();
 
-        $projects = Project::where('team_id', $teamId)->get()->map(fn ($p) => [
-            'uuid' => $p->uuid,
-            'name' => $p->name,
-            'counts' => [
-                'applications' => $p->applications()->count(),
-                'services' => $p->services()->count(),
-                'databases' => $p->databases()->count(),
-            ],
-        ])->values()->all();
+        // databases() is a Collection helper (not an Eloquent relation), so withCount
+        // must target the individual standalone DB relations and sum them.
+        $projects = Project::where('team_id', $teamId)
+            ->withCount([
+                'applications',
+                'services',
+                'postgresqls',
+                'redis',
+                'mongodbs',
+                'mysqls',
+                'mariadbs',
+                'keydbs',
+                'dragonflies',
+                'clickhouses',
+            ])
+            ->get()
+            ->map(fn (Project $project) => [
+                'uuid' => $project->uuid,
+                'name' => $project->name,
+                'counts' => [
+                    'applications' => $project->applications_count,
+                    'services' => $project->services_count,
+                    'databases' => $project->postgresqls_count
+                        + $project->redis_count
+                        + $project->mongodbs_count
+                        + $project->mysqls_count
+                        + $project->mariadbs_count
+                        + $project->keydbs_count
+                        + $project->dragonflies_count
+                        + $project->clickhouses_count,
+                ],
+            ])->values()->all();
 
         return Response::text(json_encode([
             'coolify_version' => config('constants.coolify.version'),

@@ -108,17 +108,28 @@ test('control requires deploy ability and stop requires confirm', function () {
     expect($denied->json('result.content.0.text'))->toContain('Missing required permissions');
 
     session(['currentTeam' => $this->team]);
-    $deployToken = $this->user->createToken('mcp-deploy-stop', ['root'])->plainTextToken;
+    $tokenModel = $this->user->createToken('mcp-deploy-stop', ['read', 'deploy']);
+    $deployToken = $tokenModel->plainTextToken;
+    dump([
+        'abilities' => $tokenModel->accessToken->abilities,
+        'can_deploy' => $tokenModel->accessToken->can('deploy'),
+        'can_root' => $tokenModel->accessToken->can('root'),
+        'team_id' => $tokenModel->accessToken->team_id,
+        'session_team' => session('currentTeam')?->id,
+    ]);
     $stop = mcpImproveCall('control', [
         'resource' => 'application',
         'action' => 'stop',
         'uuid' => $this->application->uuid,
     ], $deployToken);
 
-    // Prefer confirm guard; if ability wiring differs in this environment, still assert denial.
+    dump([
+        'status' => $stop->status(),
+        'body' => $stop->json(),
+        'text' => $stop->json('result.content.0.text'),
+    ]);
     expect($stop->json('result.isError'))->toBeTrue();
-    $msg = (string) $stop->json('result.content.0.text');
-    expect($msg)->toMatch('/confirm=true|Missing required permissions/');
+    expect((string) $stop->json('result.content.0.text'))->toContain('confirm=true');
 });
 
 test('tools list includes coolify_help and control', function () {

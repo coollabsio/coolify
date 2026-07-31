@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneMysql;
@@ -21,6 +22,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -253,6 +256,86 @@ test('list_resources only returns team resources', function () {
     expect($names)->not->toContain('OtherTeamApp');
 });
 
+test('list_resources paginates sorts and filters at the query layer', function () {
+    $this->application->update(['name' => 'Charlie App']);
+
+    $alphaApp = Application::factory()->create([
+        'name' => 'Alpha App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $bravoService = Service::factory()->create([
+        'name' => 'Bravo Service',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $deltaDb = StandalonePostgresql::create([
+        'name' => 'Delta DB',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $tag = Tag::create([
+        'name' => 'mcp-listed',
+        'team_id' => $this->team->id,
+    ]);
+    $alphaApp->tags()->attach($tag->id);
+    $bravoService->tags()->attach($tag->id);
+
+    $otherProject = Project::factory()->create(['team_id' => $this->team->id, 'name' => 'Other Project']);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    Application::factory()->create([
+        'name' => 'Zed Other Project App',
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $page1 = mcpReadCall('list_resources', ['page' => 1, 'per_page' => 2]);
+    $page1->assertOk();
+    $body1 = mcpReadJson($page1);
+    expect($body1['_pagination']['total'])->toBe(5)
+        ->and($body1['_pagination']['per_page'])->toBe(2)
+        ->and($body1['_pagination']['page'])->toBe(1)
+        ->and(collect($body1['data'])->pluck('name')->all())->toBe(['Alpha App', 'Bravo Service']);
+
+    $page2 = mcpReadCall('list_resources', ['page' => 2, 'per_page' => 2]);
+    $page2->assertOk();
+    $body2 = mcpReadJson($page2);
+    expect(collect($body2['data'])->pluck('name')->all())->toBe(['Charlie App', 'Delta DB']);
+
+    $appsOnly = mcpReadCall('list_resources', ['type' => 'application']);
+    $appsOnly->assertOk();
+    $appsBody = mcpReadJson($appsOnly);
+    expect(collect($appsBody['data'])->pluck('type')->unique()->values()->all())->toBe(['application'])
+        ->and($appsBody['_pagination']['total'])->toBe(3);
+
+    $dbsOnly = mcpReadCall('list_resources', ['type' => 'database']);
+    $dbsOnly->assertOk();
+    $dbsBody = mcpReadJson($dbsOnly);
+    expect($dbsBody['_pagination']['total'])->toBe(1)
+        ->and($dbsBody['data'][0]['uuid'])->toBe($deltaDb->uuid)
+        ->and($dbsBody['data'][0]['type'])->toBe('standalone-postgresql');
+
+    $tagged = mcpReadCall('list_resources', ['tag' => 'mcp-listed']);
+    $tagged->assertOk();
+    $taggedBody = mcpReadJson($tagged);
+    expect(collect($taggedBody['data'])->pluck('uuid')->sort()->values()->all())
+        ->toBe(collect([$alphaApp->uuid, $bravoService->uuid])->sort()->values()->all());
+
+    $byProject = mcpReadCall('list_resources', ['project_uuid' => $otherProject->uuid]);
+    $byProject->assertOk();
+    $projectBody = mcpReadJson($byProject);
+    expect($projectBody['_pagination']['total'])->toBe(1)
+        ->and($projectBody['data'][0]['name'])->toBe('Zed Other Project App')
+        ->and($projectBody['data'][0]['project_uuid'])->toBe($otherProject->uuid);
+});
+
 test('list_deployments and get_deployment are team scoped and scrub logs', function () {
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $this->application->id,
@@ -366,6 +449,9 @@ test('get_server_domains and get_server_resources are team scoped', function () 
     $domains->assertOk();
     $domainBody = mcpReadJson($domains);
     expect($domainBody['data']['server_uuid'])->toBe($this->server->uuid);
+    expect($domainBody['data']['domains'])->toHaveCount(1);
+    expect($domainBody['data']['domains'][0]['resource_uuid'])->toBe($this->application->uuid);
+    expect($domainBody['data']['domains'][0]['domains'])->toContain('app.example.com');
 
     $resources = mcpReadCall('get_server_resources', ['uuid' => $this->server->uuid]);
     $resources->assertOk();
@@ -529,6 +615,79 @@ test('list_unhealthy_resources includes non-running apps and is team scoped', fu
     $names = collect($body['data']['unhealthy'])->pluck('name');
     expect($names)->toContain($this->application->name);
     expect($names)->not->toContain('OtherDown');
+});
+
+test('get_infrastructure_overview health_hints and project counts stay accurate', function () {
+    $this->application->update(['status' => 'exited:unhealthy']);
+    Application::factory()->create([
+        'name' => 'HealthyApp',
+        'status' => 'running:healthy',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    StandalonePostgresql::create([
+        'name' => 'DownDb',
+        'postgres_password' => 'password',
+        'status' => 'exited:unhealthy',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    StandalonePostgresql::create([
+        'name' => 'UpDb',
+        'postgres_password' => 'password',
+        'status' => 'running:healthy',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    Service::factory()->create([
+        'name' => 'EmptyService',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDest = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    Application::factory()->create([
+        'name' => 'OtherTeamDown',
+        'status' => 'exited:unhealthy',
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+    StandalonePostgresql::create([
+        'name' => 'OtherTeamDb',
+        'postgres_password' => 'password',
+        'status' => 'exited:unhealthy',
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+
+    $response = mcpReadCall('get_infrastructure_overview');
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    $data = $body['data'];
+
+    expect($data['counts']['applications'])->toBe(2)
+        ->and($data['counts']['services'])->toBe(1)
+        ->and($data['counts']['databases'])->toBe(2)
+        ->and($data['projects'][0]['counts']['applications'])->toBe(2)
+        ->and($data['projects'][0]['counts']['services'])->toBe(1)
+        ->and($data['projects'][0]['counts']['databases'])->toBe(2)
+        ->and($data['health_hints']['applications_not_running'])->toBe(1)
+        ->and($data['health_hints']['databases_not_running'])->toBe(1)
+        // Empty service has no containers → aggregated status is not healthy.
+        ->and($data['health_hints']['services_not_running'])->toBe(1);
 });
 
 test('list_application_previews is team scoped', function () {
@@ -702,6 +861,92 @@ test('list_applications status and server_uuid filters work', function () {
     expect(mcpReadJson($missingServer)['data'])->toBe([]);
 });
 
+test('list_databases filters by project, name, status, and server and is team scoped', function () {
+    $matching = StandalonePostgresql::create([
+        'name' => 'prod-postgres',
+        'status' => 'running:healthy',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $otherName = StandalonePostgresql::create([
+        'name' => 'dev-redis-like',
+        'status' => 'exited:unhealthy',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $otherProject = Project::factory()->create(['team_id' => $this->team->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    StandalonePostgresql::create([
+        'name' => 'other-project-db',
+        'status' => 'running:healthy',
+        'postgres_password' => 'password',
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $otherTeam = Team::factory()->create();
+    $otherTeamProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherTeamEnv = $otherTeamProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherTeamProject->id]);
+    $otherTeamServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherTeamDest = StandaloneDocker::query()->where('server_id', $otherTeamServer->id)->firstOrFail();
+    StandalonePostgresql::create([
+        'name' => 'foreign-db',
+        'status' => 'running:healthy',
+        'postgres_password' => 'password',
+        'environment_id' => $otherTeamEnv->id,
+        'destination_id' => $otherTeamDest->id,
+        'destination_type' => $otherTeamDest->getMorphClass(),
+    ]);
+
+    $all = mcpReadCall('list_databases');
+    $all->assertOk();
+    $allUuids = collect(mcpReadJson($all)['data'])->pluck('uuid');
+    expect($allUuids)
+        ->toContain($matching->uuid, $otherName->uuid)
+        ->not->toContain(StandalonePostgresql::where('name', 'foreign-db')->value('uuid'));
+
+    $byProject = mcpReadCall('list_databases', ['project_uuid' => $this->project->uuid]);
+    $byProject->assertOk();
+    $projectUuids = collect(mcpReadJson($byProject)['data'])->pluck('uuid');
+    expect($projectUuids)
+        ->toContain($matching->uuid)
+        ->not->toContain(StandalonePostgresql::where('name', 'other-project-db')->value('uuid'));
+
+    $byName = mcpReadCall('list_databases', ['name' => 'prod-']);
+    $byName->assertOk();
+    expect(collect(mcpReadJson($byName)['data'])->pluck('uuid'))
+        ->toContain($matching->uuid)
+        ->not->toContain($otherName->uuid);
+
+    $byStatus = mcpReadCall('list_databases', ['status' => 'exited']);
+    $byStatus->assertOk();
+    expect(collect(mcpReadJson($byStatus)['data'])->pluck('uuid'))
+        ->toContain($otherName->uuid)
+        ->not->toContain($matching->uuid);
+
+    $byServer = mcpReadCall('list_databases', ['server_uuid' => $this->server->uuid]);
+    $byServer->assertOk();
+    expect(collect(mcpReadJson($byServer)['data'])->pluck('uuid'))->toContain($matching->uuid);
+
+    $missingServer = mcpReadCall('list_databases', ['server_uuid' => 'no-such-server']);
+    $missingServer->assertOk();
+    expect(mcpReadJson($missingServer)['data'])->toBe([]);
+
+    $row = collect(mcpReadJson($byProject)['data'])->firstWhere('uuid', $matching->uuid);
+    expect($row)
+        ->toHaveKeys(['uuid', 'name', 'status', 'type', 'project_uuid', 'project_name'])
+        ->and($row['project_uuid'])->toBe($this->project->uuid)
+        ->and($row['type'])->toBe('standalone-postgresql');
+});
+
 test('list_services filters by its computed status before pagination', function () {
     Service::factory()->create([
         'name' => 'Matching service',
@@ -727,6 +972,91 @@ test('list_services filters by its computed status before pagination', function 
     expect($body['_pagination']['total'])->toBe(2)
         ->and($body['data'])->toHaveCount(1)
         ->and($body['data'][0]['status'])->toContain('unknown');
+});
+
+test('get_service_application returns a field whitelist and is team scoped', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+    ]);
+    $app = ServiceApplication::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'web',
+        'human_name' => 'Web',
+        'description' => 'Frontend container',
+        'service_id' => $service->id,
+        'image' => 'nginx:alpine',
+        'fqdn' => 'https://web.example.com',
+        'status' => 'running:healthy',
+    ]);
+
+    $response = mcpReadCall('get_service_application', [
+        'service_uuid' => $service->uuid,
+        'uuid' => $app->uuid,
+    ]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    $data = $body['data'];
+
+    expect($data['uuid'])->toBe($app->uuid)
+        ->and($data['service_uuid'])->toBe($service->uuid)
+        ->and($data['name'])->toBe('web')
+        ->and($data['human_name'])->toBe('Web')
+        ->and($data['status'])->toBe('running:healthy')
+        ->and($data['fqdn'])->toBe('https://web.example.com')
+        ->and($data['image'])->toBe('nginx:alpine')
+        ->and($data)->toHaveKeys([
+            'uuid',
+            'service_uuid',
+            'name',
+            'human_name',
+            'description',
+            'status',
+            'fqdn',
+            'ports',
+            'exposes',
+            'image',
+            'exclude_from_status',
+            'required_fqdn',
+            'is_log_drain_enabled',
+            'is_include_timestamps',
+            'is_gzip_enabled',
+            'is_stripprefix_enabled',
+            'last_online_at',
+            'created_at',
+            'updated_at',
+        ])
+        ->and($data)->not->toHaveKey('id')
+        ->and($data)->not->toHaveKey('service_id')
+        ->and($data)->not->toHaveKey('is_migrated');
+
+    $otherTeam = Team::factory()->create();
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherDest = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    $otherService = Service::factory()->create([
+        'environment_id' => $otherEnv->id,
+        'server_id' => $otherServer->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+    $otherApp = ServiceApplication::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'theirs',
+        'service_id' => $otherService->id,
+        'image' => 'nginx:alpine',
+    ]);
+
+    $denied = mcpReadCall('get_service_application', [
+        'service_uuid' => $otherService->uuid,
+        'uuid' => $otherApp->uuid,
+    ]);
+    expect($denied->json('result.isError'))->toBeTrue();
 });
 
 test('MCP lists prompts for troubleshooting workflows', function () {
@@ -931,6 +1261,11 @@ test('deploy tool queues application deployment', function () {
 });
 
 test('cancel_deployment cancels team deployment and rejects other team', function () {
+    // Avoid real SSH via instant_remote_process during cancellation cleanup.
+    Process::fake([
+        '*' => Process::result(output: ''),
+    ]);
+
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $this->application->id,
         'deployment_uuid' => 'dep-cancel-'.fake()->uuid(),
@@ -1001,7 +1336,51 @@ test('cancel_deployment cancels team deployment and rejects other team', functio
     expect($otherDep->fresh()->status)->toBe('in_progress');
 });
 
+test('cancel_deployment rejects other team deployment even on owned server', function () {
+    // Shared-server case: caller's team owns the host server, but the application belongs to another team.
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApp = Application::factory()->create([
+        'environment_id' => $otherEnv->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $sharedServerDep = ApplicationDeploymentQueue::create([
+        'application_id' => $otherApp->id,
+        'deployment_uuid' => 'dep-shared-server-cancel-'.fake()->uuid(),
+        'status' => 'in_progress',
+        'server_id' => $this->server->id,
+        'application_name' => $otherApp->name,
+        'server_name' => $this->server->name,
+    ]);
+
+    $token = $this->user->createToken('mcp-shared-server-cancel', ['read', 'deploy'])->plainTextToken;
+    $denied = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'cancel_deployment',
+            'arguments' => (object) ['uuid' => $sharedServerDep->deployment_uuid],
+        ],
+    ]);
+
+    expect($denied->json('result.isError'))->toBeTrue();
+    expect($sharedServerDep->fresh()->status)->toBe('in_progress');
+});
+
 test('cancel_deployment updates only a still cancellable deployment', function () {
+    // Avoid real SSH via instant_remote_process during cancellation cleanup.
+    Process::fake([
+        '*' => Process::result(output: ''),
+    ]);
+
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $this->application->id,
         'deployment_uuid' => 'dep-atomic-cancel-'.fake()->uuid(),
@@ -1061,4 +1440,52 @@ test('MCP resources list includes overview and application template', function (
     // Static resource may appear under resources; templates under list or templates/list depending on server.
     $all = collect($uris)->merge($templates)->implode(' ');
     expect($all)->toContain('coolify://');
+});
+
+test('MCP overview resource returns batched project resource counts', function () {
+    StandalonePostgresql::create([
+        'name' => 'overview-postgres',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    Service::create([
+        'name' => 'overview-service',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => 'services: {}',
+    ]);
+
+    $token = mcpReadToken();
+    $response = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'resources/read',
+        'params' => [
+            'uri' => 'coolify://overview',
+        ],
+    ]);
+
+    $response->assertOk();
+
+    $text = collect($response->json('result.contents'))->pluck('text')->first();
+    expect($text)->not->toBeNull();
+
+    $body = json_decode($text, true);
+    expect($body)->toHaveKeys(['coolify_version', 'servers', 'projects', 'counts']);
+    expect($body['counts']['projects'])->toBe(1);
+
+    $project = collect($body['projects'])->firstWhere('uuid', $this->project->uuid);
+    expect($project)->not->toBeNull();
+    expect($project['counts'])->toMatchArray([
+        'applications' => 1,
+        'services' => 1,
+        'databases' => 1,
+    ]);
 });

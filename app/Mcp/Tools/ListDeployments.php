@@ -71,6 +71,7 @@ class ListDeployments extends Tool
         }
 
         $query = ApplicationDeploymentQueue::query()
+            ->with('application:id,uuid')
             ->whereIn('server_id', $serverIds)
             ->orderByDesc('id');
 

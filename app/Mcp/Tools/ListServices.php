@@ -9,6 +9,8 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -96,14 +98,14 @@ class ListServices extends Tool
             ->when(is_string($name), fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
 
         if (is_string($status)) {
-            $services = $query
-                ->with(['applications', 'databases'])
-                ->orderBy('name')
-                ->get()
-                ->filter(fn (Service $service) => str_contains(strtolower((string) $service->status), strtolower(trim($status))))
-                ->values();
-            $total = $services->count();
-            $services = $services->slice($args['offset'], $args['per_page']);
+            // Status is a computed accessor over applications/databases, so filter
+            // in PHP — but scan in chunks so large teams never hydrate every service.
+            [$total, $services] = $this->paginateServicesByStatus(
+                $query,
+                trim($status),
+                $args['offset'],
+                $args['per_page'],
+            );
         } else {
             $total = (clone $query)->count();
             $services = $query
@@ -152,5 +154,41 @@ class ListServices extends Tool
             'page' => $schema->integer()->description('Page number (default 1).'),
             'per_page' => $schema->integer()->description('Items per page (default 50, max 100).'),
         ];
+    }
+
+    /**
+     * Filter services by computed status in chunks, keeping only the requested page in memory.
+     *
+     * @param  Builder<Service>  $query
+     * @return array{0: int, 1: Collection<int, Service>}
+     */
+    private function paginateServicesByStatus(Builder $query, string $status, int $offset, int $perPage): array
+    {
+        $statusNeedle = strtolower($status);
+        $matched = collect();
+        $total = 0;
+        $pageEnd = $offset + $perPage;
+
+        $query
+            ->with([
+                'applications:id,service_id,status,exclude_from_status',
+                'databases:id,service_id,status,exclude_from_status',
+            ])
+            ->orderBy('name')
+            ->chunk(100, function ($chunk) use ($statusNeedle, $offset, $pageEnd, &$matched, &$total) {
+                foreach ($chunk as $service) {
+                    if (! str_contains(strtolower((string) $service->status), $statusNeedle)) {
+                        continue;
+                    }
+
+                    if ($total >= $offset && $total < $pageEnd) {
+                        $matched->push($service);
+                    }
+
+                    $total++;
+                }
+            });
+
+        return [$total, $matched->values()];
     }
 }

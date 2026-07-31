@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 trait ResolvesResource
@@ -69,7 +70,7 @@ trait ResolvesResource
         if ($resourceType === 'service_application') {
             $query = ServiceApplication::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid);
             if (is_string($parentUuid) && $parentUuid !== '') {
-                $query->whereHas('service', fn ($q) => $q->where('uuid', $parentUuid));
+                $query->whereHas('service', fn (Builder $q) => $q->where('uuid', $parentUuid));
             }
 
             return $query->first();
@@ -78,7 +79,7 @@ trait ResolvesResource
         if ($resourceType === 'service_database') {
             $query = ServiceDatabase::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid);
             if (is_string($parentUuid) && $parentUuid !== '') {
-                $query->whereHas('service', fn ($q) => $q->where('uuid', $parentUuid));
+                $query->whereHas('service', fn (Builder $q) => $q->where('uuid', $parentUuid));
             }
 
             return $query->first();

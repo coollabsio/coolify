@@ -42,8 +42,10 @@ class CancelDeployment extends Tool
             return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 
-        $serverIds = Server::whereTeamId($teamId)->pluck('id');
-        if (! $serverIds->contains($deployment->server_id)) {
+        // Match deployment_by_uuid: authorize by application ownership, not server ownership.
+        // Server-scoped checks allow a shared-server host team to cancel another team's deployment.
+        $application = $deployment->application;
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
             return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 

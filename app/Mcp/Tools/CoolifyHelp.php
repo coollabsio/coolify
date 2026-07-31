@@ -13,7 +13,7 @@ class CoolifyHelp extends Tool
 {
     protected string $name = 'coolify_help';
 
-    protected string $description = 'Tool catalog by intent. Call first when unsure which Coolify MCP tool to use. Optional intent: overview | search | debug | deploy | inventory | github | team.';
+    protected string $description = 'Tool catalog by intent. Call first when unsure which Coolify MCP tool to use. Optional intent: overview | search | inventory | debug | deploy | github | team | essentials.';
 
     use BuildsResponse;
     use ResolvesTeam;

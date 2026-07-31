@@ -58,30 +58,50 @@ class ListDatabases extends Tool
         }
 
         $args = $this->paginationArgs($request);
+        $extra = array_filter([
+            'project_uuid' => $projectUuid,
+            'environment_uuid' => $environmentUuid,
+            'server_uuid' => $serverUuid,
+            'status' => $status,
+            'name' => $name,
+        ], fn ($v) => $v !== null);
 
-        $projectsQuery = Project::where('team_id', $teamId);
+        $projectsQuery = Project::where('team_id', $teamId)->select('id', 'uuid', 'name');
         if (is_string($projectUuid)) {
             $projectsQuery->where('uuid', $projectUuid);
         }
-        $projects = $projectsQuery->get();
+        $projects = $projectsQuery->get()->keyBy('id');
 
-        $envIdFilter = null;
+        if ($projects->isEmpty()) {
+            return $this->mcpSuccess($request, $this->respond(
+                [],
+                [],
+                $this->paginationMeta('list_databases', $args, 0, $extra),
+            ));
+        }
+
+        $envQuery = Environment::query()->whereIn('project_id', $projects->keys());
         if (is_string($environmentUuid)) {
             $env = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
-            if (! $env) {
+            if (! $env || ! $projects->has($env->project_id)) {
                 return $this->mcpSuccess($request, $this->respond(
                     [],
                     [],
-                    $this->paginationMeta('list_databases', $args, 0, array_filter([
-                        'project_uuid' => $projectUuid,
-                        'environment_uuid' => $environmentUuid,
-                        'server_uuid' => $serverUuid,
-                        'status' => $status,
-                        'name' => $name,
-                    ], fn ($v) => $v !== null)),
+                    $this->paginationMeta('list_databases', $args, 0, $extra),
                 ));
             }
-            $envIdFilter = $env->id;
+            $envQuery->where('id', $env->id);
+        }
+
+        $envToProject = $envQuery->pluck('project_id', 'id');
+        $envIds = $envToProject->keys();
+
+        if ($envIds->isEmpty()) {
+            return $this->mcpSuccess($request, $this->respond(
+                [],
+                [],
+                $this->paginationMeta('list_databases', $args, 0, $extra),
+            ));
         }
 
         $destinationIds = null;
@@ -91,13 +111,7 @@ class ListDatabases extends Tool
                 return $this->mcpSuccess($request, $this->respond(
                     [],
                     [],
-                    $this->paginationMeta('list_databases', $args, 0, array_filter([
-                        'project_uuid' => $projectUuid,
-                        'environment_uuid' => $environmentUuid,
-                        'server_uuid' => $serverUuid,
-                        'status' => $status,
-                        'name' => $name,
-                    ], fn ($v) => $v !== null)),
+                    $this->paginationMeta('list_databases', $args, 0, $extra),
                 ));
             }
             $destinationIds = $server->standaloneDockers()->pluck('id')
@@ -106,30 +120,25 @@ class ListDatabases extends Tool
         }
 
         $databases = collect();
-        foreach ($projects as $project) {
-            foreach ($project->databases() as $db) {
-                if ($envIdFilter !== null && (int) $db->environment_id !== $envIdFilter) {
-                    continue;
-                }
-                if (is_array($destinationIds) && ! in_array($db->destination_id, $destinationIds, true)) {
-                    continue;
-                }
-                if (is_string($name) && ! str_contains(strtolower((string) $db->name), strtolower($name))) {
-                    continue;
-                }
-                if (is_string($status)) {
-                    $dbStatus = strtolower((string) ($db->status ?? ''));
-                    if (! str_contains($dbStatus, strtolower($status))) {
-                        continue;
-                    }
-                }
+        foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+            $dq = $modelClass::query()
+                ->whereIn('environment_id', $envIds)
+                ->when(is_array($destinationIds), fn ($q) => $q->whereIn('destination_id', $destinationIds))
+                ->when(is_string($name), fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']))
+                ->when(is_string($status), fn ($q) => $q->whereRaw('LOWER(status) LIKE ?', ['%'.strtolower($status).'%']));
+
+            $rows = $dq->get(['uuid', 'name', 'status', 'environment_id']);
+
+            foreach ($rows as $db) {
+                $projectId = $envToProject[$db->environment_id] ?? null;
+                $project = $projectId ? $projects->get($projectId) : null;
                 $databases->push([
                     'uuid' => $db->uuid,
                     'name' => $db->name,
                     'status' => $db->status ?? null,
                     'type' => method_exists($db, 'type') ? $db->type() : class_basename($db),
-                    'project_uuid' => $project->uuid,
-                    'project_name' => $project->name,
+                    'project_uuid' => $project?->uuid,
+                    'project_name' => $project?->name,
                 ]);
             }
         }
@@ -137,14 +146,6 @@ class ListDatabases extends Tool
         $sorted = $databases->sortBy('name')->values();
         $total = $sorted->count();
         $summaries = $sorted->slice($args['offset'], $args['per_page'])->values()->all();
-
-        $extra = array_filter([
-            'project_uuid' => $projectUuid,
-            'environment_uuid' => $environmentUuid,
-            'server_uuid' => $serverUuid,
-            'status' => $status,
-            'name' => $name,
-        ], fn ($v) => $v !== null);
 
         return $this->mcpSuccess($request, $this->respond(
             $summaries,

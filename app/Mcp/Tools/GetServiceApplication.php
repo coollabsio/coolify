@@ -49,9 +49,28 @@ class GetServiceApplication extends Tool
             return $this->mcpError($request, "Service application [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 
-        $app->setRelations([]);
-        $data = $this->scrubSensitive($app->toArray());
-        $data['service_uuid'] = $serviceUuid;
+        // Explicit whitelist so new model columns stay private by default (fail-closed).
+        $data = $this->scrubSensitive([
+            'uuid' => $app->uuid,
+            'service_uuid' => $serviceUuid,
+            'name' => $app->name,
+            'human_name' => $app->human_name,
+            'description' => $app->description,
+            'status' => $app->status,
+            'fqdn' => $app->fqdn,
+            'ports' => $app->ports,
+            'exposes' => $app->exposes,
+            'image' => $app->image,
+            'exclude_from_status' => $app->exclude_from_status,
+            'required_fqdn' => $app->required_fqdn,
+            'is_log_drain_enabled' => $app->is_log_drain_enabled,
+            'is_include_timestamps' => $app->is_include_timestamps,
+            'is_gzip_enabled' => $app->is_gzip_enabled,
+            'is_stripprefix_enabled' => $app->is_stripprefix_enabled,
+            'last_online_at' => $app->last_online_at,
+            'created_at' => $app->created_at,
+            'updated_at' => $app->updated_at,
+        ]);
 
         return $this->mcpSuccess($request, $this->respond($data, [
             ['tool' => 'get_logs', 'args' => ['resource' => 'service_application', 'uuid' => $uuid, 'parent_uuid' => $serviceUuid], 'hint' => 'Container logs'],

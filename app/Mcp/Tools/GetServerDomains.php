@@ -4,7 +4,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
-use App\Models\Project;
+use App\Models\Application;
 use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Stringable;
@@ -42,12 +42,14 @@ class GetServerDomains extends Tool
             return $this->mcpError($request, "Server [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 
-        $projects = Project::where('team_id', $teamId)->get();
-        $domains = collect();
+        $destinationIds = $server->standaloneDockers()->pluck('id')
+            ->merge($server->swarmDockers()->pluck('id'));
 
-        $applications = $projects->pluck('applications')->flatten()->filter(function ($application) use ($server) {
-            return $application->destination?->server?->id === $server->id;
-        });
+        $applications = Application::ownedByCurrentTeamAPI($teamId)
+            ->whereIn('destination_id', $destinationIds)
+            ->get(['uuid', 'name', 'fqdn']);
+
+        $domains = collect();
 
         foreach ($applications as $application) {
             $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
