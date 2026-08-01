@@ -22,6 +22,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
@@ -524,6 +525,61 @@ test('list_github_apps is team scoped and scrubs secrets', function () {
     expect($raw)->not->toContain('super-client-secret');
     expect($raw)->not->toContain('super-webhook-secret');
     expect(collect($body['data'])->pluck('uuid'))->toContain($app->uuid);
+});
+
+test('list_github_repositories rejects public github sources cleanly', function () {
+    $publicApp = GithubApp::create([
+        'name' => 'Public Source',
+        'uuid' => 'github-public-test',
+        'team_id' => $this->team->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'is_public' => true,
+        'is_system_wide' => false,
+    ]);
+
+    $response = mcpReadCall('list_github_repositories', [
+        'github_app_uuid' => $publicApp->uuid,
+    ]);
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeTrue();
+    expect($response->json('result.content.0.text'))
+        ->toContain('public or missing app installation credentials')
+        ->not->toContain('private_key');
+});
+
+test('list_github_branches uses anonymous github api for public sources', function () {
+    $publicApp = GithubApp::create([
+        'name' => 'Public Source',
+        'uuid' => 'github-public-branches',
+        'team_id' => $this->team->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'is_public' => true,
+        'is_system_wide' => false,
+    ]);
+
+    Http::fake([
+        'https://api.github.com/repos/coollabsio/coolify/branches*' => Http::response([
+            ['name' => 'v4.x', 'protected' => true, 'commit' => ['sha' => 'abc123']],
+            ['name' => 'next', 'protected' => false, 'commit' => ['sha' => 'def456']],
+        ], 200),
+    ]);
+
+    $response = mcpReadCall('list_github_branches', [
+        'github_app_uuid' => $publicApp->uuid,
+        'owner' => 'coollabsio',
+        'repo' => 'coolify',
+    ]);
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeFalse();
+    $body = mcpReadJson($response);
+    expect(collect($body['data']['branches'])->pluck('name')->all())->toContain('v4.x', 'next');
+    expect($body['data']['branches'][0]['commit_sha'])->toBe('abc123');
 });
 
 test('list_applications project_uuid filter is team scoped', function () {
@@ -1098,7 +1154,10 @@ test('team members cannot retrieve logs with sensitive read ability', function (
         'uuid' => $this->application->uuid,
     ]);
 
-    expect($response->status())->toBeIn([403]);
+    // Elevated member tokens are rejected as JSON-RPC errors (HTTP 200) so MCP clients can parse them.
+    $response->assertOk();
+    expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
+        ->toMatch('/team role|Missing required/i');
 });
 
 test('get_logs returns structured next_tools when application is not running', function () {
@@ -1195,9 +1254,10 @@ test('team member with deploy ability cannot call lifecycle tools', function () 
         ],
     ]);
 
-    // Middleware returns 403; ensureAbility would also deny if middleware were bypassed.
-    expect($response->status())->toBeIn([403]);
-    expect($response->json('message') ?? $response->json('result.content.0.text') ?? '')
+    // Middleware returns a JSON-RPC error envelope (HTTP 200) for MCP clients.
+    $response->assertOk();
+    expect($response->json('jsonrpc'))->toBe('2.0');
+    expect($response->json('error.message') ?? $response->json('result.content.0.text') ?? '')
         ->toMatch('/team role|Missing required/i');
 });
 

@@ -39,10 +39,10 @@ class ListTeamMembers extends Tool
         $members = $team->members()->orderBy('name')->get();
         $total = $members->count();
 
+        // Users have no public UUID column; email is the stable public identifier.
         $page = $members
             ->slice($args['offset'], $args['per_page'])
             ->map(fn ($user) => $this->scrubSensitive([
-                'uuid' => $user->uuid ?? null,
                 'name' => $user->name,
                 'email' => $user->email,
                 'role' => $user->pivot->role ?? null,

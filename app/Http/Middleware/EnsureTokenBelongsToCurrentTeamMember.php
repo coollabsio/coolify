@@ -35,6 +35,19 @@ class EnsureTokenBelongsToCurrentTeamMember
             || $token->can('read:sensitive');
 
         if ($elevated && ! in_array($role, ['admin', 'owner'], true)) {
+            // MCP clients expect JSON-RPC envelopes (often only parsed on HTTP 200).
+            // Keep REST API clients on plain 403 JSON.
+            if ($request->is('mcp') || $request->is('mcp/*')) {
+                return response()->json([
+                    'jsonrpc' => '2.0',
+                    'id' => $request->input('id'),
+                    'error' => [
+                        'code' => -32003,
+                        'message' => 'Missing required team role.',
+                    ],
+                ]);
+            }
+
             return response()->json(['message' => 'Missing required team role.'], 403);
         }
 

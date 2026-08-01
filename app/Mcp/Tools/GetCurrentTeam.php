@@ -35,11 +35,12 @@ class GetCurrentTeam extends Tool
             return $this->mcpError($request, 'Team not found.');
         }
 
+        // Teams have no public UUID column; expose stable name + flags only.
+        // Numeric team ids are intentionally omitted (scrubSensitive policy).
         return $this->mcpSuccess($request, $this->respond($this->scrubSensitive([
-            'uuid' => $team->uuid ?? null,
             'name' => $team->name,
             'description' => $team->description ?? null,
-            'personal_team' => $team->personal_team ?? null,
+            'personal_team' => (bool) ($team->personal_team ?? false),
             'member_count' => $team->members()->count(),
             'is_mcp_server_enabled' => (bool) $team->is_mcp_server_enabled,
         ])));

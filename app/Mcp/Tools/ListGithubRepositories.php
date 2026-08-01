@@ -52,6 +52,16 @@ class ListGithubRepositories extends Tool
             return $this->mcpError($request, "GitHub app [{$appUuid}] not found.", ['resource_uuid' => $appUuid]);
         }
 
+        // Public (anonymous) GitHub sources have no app credentials / installation.
+        // Listing installation repositories requires a GitHub App installation token.
+        if ($githubApp->is_public || blank($githubApp->app_id) || blank($githubApp->installation_id) || blank($githubApp->private_key_id)) {
+            return $this->mcpError(
+                $request,
+                'This GitHub source is public or missing app installation credentials. list_github_repositories requires a configured GitHub App with installation access. Use list_github_apps to pick a non-public app, or list_github_branches with owner/repo for public repositories.',
+                ['resource_uuid' => $appUuid],
+            );
+        }
+
         try {
             $token = generateGithubInstallationToken($githubApp);
             $repositories = collect();

@@ -62,7 +62,14 @@ class ListGithubBranches extends Tool
         }
 
         try {
-            $token = generateGithubInstallationToken($githubApp);
+            // Public sources (and apps without installation credentials) can still list
+            // public repo branches anonymously. Private apps use installation tokens.
+            $useAnonymous = $githubApp->is_public
+                || blank($githubApp->app_id)
+                || blank($githubApp->installation_id)
+                || blank($githubApp->private_key_id);
+
+            $token = $useAnonymous ? null : generateGithubInstallationToken($githubApp);
             $branches = collect();
             $page = 1;
             $maxPages = 20;
