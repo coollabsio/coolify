@@ -9,7 +9,7 @@ services:
     restart: always
     environment:
       - SERVICE_URL_PORTABASE_80
-      - 'PROJECT_URL=http://$SERVICE_FQDN_PORTABASE_80'
+      - 'PROJECT_URL=$SERVICE_URL_PORTABASE'
       - PROJECT_SECRET=$SERVICE_PASSWORD_64_PORTABASE
       - 'DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@db:5432/${POSTGRES_DB:-portabase}?schema=public'
       - PROJECT_NAME=${PROJECT_NAME:-Portabase}
