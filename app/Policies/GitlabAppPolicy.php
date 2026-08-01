@@ -44,6 +44,11 @@ class GitlabAppPolicy
             return $user->canAccessSystemResources();
         }
 
+        // Guard null team_id (e.g. post-delete Livewire re-render of @can checks).
+        if ($gitlabApp->team_id === null) {
+            return false;
+        }
+
         return $user->isAdminOfTeam($gitlabApp->team_id);
     }
 
@@ -54,6 +59,11 @@ class GitlabAppPolicy
     {
         if ($gitlabApp->is_system_wide) {
             return $user->canAccessSystemResources();
+        }
+
+        // Guard null team_id (e.g. post-delete Livewire re-render of @can checks).
+        if ($gitlabApp->team_id === null) {
+            return false;
         }
 
         return $user->isAdminOfTeam($gitlabApp->team_id);
