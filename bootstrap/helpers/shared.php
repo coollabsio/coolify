@@ -2716,7 +2716,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
-                                        image: data_get($service, 'image')
+                                        image: data_get($service, 'image'),
+                                        network: $resource->destination->network,
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -2742,7 +2743,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
-                                image: data_get($service, 'image')
+                                image: data_get($service, 'image'),
+                                network: $resource->destination->network,
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -3492,6 +3494,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            network: $resource->destination->network,
                                         )
                                     );
                                     break;
@@ -3521,6 +3524,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    network: $resource->destination->network,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(

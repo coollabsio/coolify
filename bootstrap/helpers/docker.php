@@ -445,10 +445,15 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?string $network = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
+    if ($serviceLabels) {
+        $labels->push("traefik.docker.network={$uuid}");
+    } elseif ($network) {
+        $labels->push("traefik.docker.network={$network}");
+    }
     if ($is_gzip_enabled) {
         $labels->push('traefik.http.middlewares.gzip.compress=true');
     }
