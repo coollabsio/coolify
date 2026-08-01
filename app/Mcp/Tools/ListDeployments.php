@@ -6,7 +6,6 @@ use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -38,7 +37,6 @@ class ListDeployments extends Tool
         }
 
         $args = $this->paginationArgs($request);
-        $serverIds = Server::whereTeamId($teamId)->pluck('id');
 
         if (is_string($applicationUuid)) {
             $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $applicationUuid)->first();
@@ -72,7 +70,7 @@ class ListDeployments extends Tool
 
         $query = ApplicationDeploymentQueue::query()
             ->with('application:id,uuid')
-            ->whereIn('server_id', $serverIds)
+            ->whereHas('application.environment.project', fn ($query) => $query->where('team_id', $teamId))
             ->orderByDesc('id');
 
         if (is_array($statuses)) {

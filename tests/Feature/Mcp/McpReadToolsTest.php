@@ -387,6 +387,43 @@ test('list_deployments and get_deployment are team scoped and scrub logs', funct
     expect($denied->json('result.isError'))->toBeTrue();
 });
 
+test('deployment listings and overview scope shared server deployments by application team', function () {
+    $teamDeployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-team-'.fake()->uuid(),
+        'status' => 'in_progress',
+        'server_id' => $this->server->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+    ]);
+
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $otherDeployment = ApplicationDeploymentQueue::create([
+        'application_id' => $otherApplication->id,
+        'deployment_uuid' => 'dep-other-shared-server-'.fake()->uuid(),
+        'status' => 'in_progress',
+        'server_id' => $this->server->id,
+        'application_name' => $otherApplication->name,
+        'server_name' => $this->server->name,
+    ]);
+
+    $listBody = mcpReadJson(mcpReadCall('list_deployments'));
+    expect(collect($listBody['data'])->pluck('deployment_uuid'))
+        ->toContain($teamDeployment->deployment_uuid)
+        ->not->toContain($otherDeployment->deployment_uuid);
+
+    $overviewBody = mcpReadJson(mcpReadCall('get_infrastructure_overview'));
+    expect($overviewBody['data']['counts']['open_deployments'])->toBe(1);
+});
+
 test('list_env_keys never returns values and is team scoped', function () {
     EnvironmentVariable::create([
         'key' => 'DATABASE_URL',

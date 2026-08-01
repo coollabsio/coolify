@@ -109,13 +109,10 @@ class GetInfrastructureOverview extends Tool
             ];
         }
 
-        $serverIds = $servers->pluck('id');
-        $openDeployments = $serverIds->isEmpty()
-            ? 0
-            : ApplicationDeploymentQueue::query()
-                ->whereIn('server_id', $serverIds)
-                ->whereIn('status', ['in_progress', 'queued'])
-                ->count();
+        $openDeployments = ApplicationDeploymentQueue::query()
+            ->whereHas('application.environment.project', fn ($query) => $query->where('team_id', $teamId))
+            ->whereIn('status', ['in_progress', 'queued'])
+            ->count();
 
         // Count-only health hints (SQL for apps/DBs; chunked scan for service aggregated status).
         $appNotRunningQuery = Application::ownedByCurrentTeamAPI($teamId);
