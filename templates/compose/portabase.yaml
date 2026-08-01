@@ -5,7 +5,7 @@
 # port: 80
 services:
   portabase:
-    image: 'portabase/portabase:latest'
+    image: 'portabase/portabase:1.27' # Jul 31 2026
     restart: always
     environment:
       - SERVICE_URL_PORTABASE_80
