@@ -144,6 +144,26 @@ it('denies team member to delete non-system-wide github app', function () {
     expect($policy->delete($user, $model))->toBeFalse();
 });
 
+it('denies update when team_id is null without type error', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldNotReceive('isAdminOfTeam');
+
+    $model = mockGithubApp(teamId: null, isSystemWide: false);
+
+    $policy = new GithubAppPolicy;
+    expect($policy->update($user, $model))->toBeFalse();
+});
+
+it('denies delete when team_id is null without type error', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldNotReceive('isAdminOfTeam');
+
+    $model = mockGithubApp(teamId: null, isSystemWide: false);
+
+    $policy = new GithubAppPolicy;
+    expect($policy->delete($user, $model))->toBeFalse();
+});
+
 it('denies restore of github app', function () {
     $user = Mockery::mock(User::class)->makePartial();
 
@@ -162,7 +182,7 @@ it('denies force delete of github app', function () {
     expect($policy->forceDelete($user, $model))->toBeFalse();
 });
 
-function mockGithubApp(int $teamId, bool $isSystemWide): GithubApp
+function mockGithubApp(?int $teamId, bool $isSystemWide): GithubApp
 {
     $githubApp = Mockery::mock(GithubApp::class)->makePartial();
     $githubApp->team_id = $teamId;

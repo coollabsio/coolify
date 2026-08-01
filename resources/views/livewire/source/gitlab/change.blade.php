@@ -9,14 +9,16 @@
                 <div class="flex gap-2">
                     <x-forms.button canGate="update" :canResource="$gitlab_app" type="submit">Save</x-forms.button>
                     <x-forms.button wire:click.prevent="testConnection">Test Connection</x-forms.button>
-                    @can('delete', $gitlab_app)
-                        <x-modal-confirmation title="Confirm GitLab App Deletion?" isErrorButton buttonTitle="Delete"
-                            submitAction="delete" :actions="['The selected GitLab App will be permanently deleted.']"
-                            confirmationText="{{ data_get($gitlab_app, 'name') }}"
-                            confirmationLabel="Please confirm by entering the GitLab App Name below"
-                            shortConfirmationLabel="GitLab App Name" :confirmWithPassword="false"
-                            step2ButtonText="Permanently Delete" />
-                    @endcan
+                    @if ($gitlab_app)
+                        @can('delete', $gitlab_app)
+                            <x-modal-confirmation title="Confirm GitLab App Deletion?" isErrorButton buttonTitle="Delete"
+                                submitAction="delete" :actions="['The selected GitLab App will be permanently deleted.']"
+                                confirmationText="{{ data_get($gitlab_app, 'name') }}"
+                                confirmationLabel="Please confirm by entering the GitLab App Name below"
+                                shortConfirmationLabel="GitLab App Name" :confirmWithPassword="false"
+                                step2ButtonText="Permanently Delete" />
+                        @endcan
+                    @endif
                 </div>
             </div>
             <div class="subtitle">Your GitLab App for private repositories.</div>
@@ -120,14 +122,16 @@
         <div class="flex flex-col sm:flex-row sm:items-center gap-2">
             <h1>GitLab App</h1>
             <div class="flex gap-2">
-                @can('delete', $gitlab_app)
-                    <x-modal-confirmation title="Confirm GitLab App Deletion?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete" :actions="['The selected GitLab App will be permanently deleted.']"
-                        confirmationText="{{ data_get($gitlab_app, 'name') }}"
-                        confirmationLabel="Please confirm by entering the GitLab App Name below"
-                        shortConfirmationLabel="GitLab App Name" :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete" />
-                @endcan
+                @if ($gitlab_app)
+                    @can('delete', $gitlab_app)
+                        <x-modal-confirmation title="Confirm GitLab App Deletion?" isErrorButton buttonTitle="Delete"
+                            submitAction="delete" :actions="['The selected GitLab App will be permanently deleted.']"
+                            confirmationText="{{ data_get($gitlab_app, 'name') }}"
+                            confirmationLabel="Please confirm by entering the GitLab App Name below"
+                            shortConfirmationLabel="GitLab App Name" :confirmWithPassword="false"
+                            step2ButtonText="Permanently Delete" />
+                    @endcan
+                @endif
             </div>
         </div>
         <div class="subtitle">Connect your GitLab instance to deploy private repositories.</div>
