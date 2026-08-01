@@ -36,6 +36,10 @@ class TagPolicy
      */
     public function update(User $user, Tag $tag): bool
     {
+        if ($tag->team_id === null) {
+            return false;
+        }
+
         return $user->isAdminOfTeam((int) $tag->team_id);
     }
 
@@ -44,6 +48,10 @@ class TagPolicy
      */
     public function delete(User $user, Tag $tag): bool
     {
+        if ($tag->team_id === null) {
+            return false;
+        }
+
         return $user->isAdminOfTeam((int) $tag->team_id);
     }
 

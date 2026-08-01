@@ -36,6 +36,10 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
+        if ($project->team_id === null) {
+            return false;
+        }
+
         return $user->isAdminOfTeam($project->team_id);
     }
 
@@ -44,6 +48,10 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
+        if ($project->team_id === null) {
+            return false;
+        }
+
         return $user->isAdminOfTeam($project->team_id);
     }
 

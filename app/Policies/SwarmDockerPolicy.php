@@ -20,7 +20,9 @@ class SwarmDockerPolicy
      */
     public function view(User $user, SwarmDocker $swarmDocker): bool
     {
-        return $user->teams->contains('id', $swarmDocker->server->team_id);
+        $teamId = $swarmDocker->server?->team_id;
+
+        return $teamId !== null && $user->teams->contains('id', $teamId);
     }
 
     /**
@@ -36,7 +38,9 @@ class SwarmDockerPolicy
      */
     public function update(User $user, SwarmDocker $swarmDocker): bool
     {
-        return $user->isAdminOfTeam($swarmDocker->server->team_id);
+        $teamId = $swarmDocker->server?->team_id;
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -44,7 +48,9 @@ class SwarmDockerPolicy
      */
     public function delete(User $user, SwarmDocker $swarmDocker): bool
     {
-        return $user->isAdminOfTeam($swarmDocker->server->team_id);
+        $teamId = $swarmDocker->server?->team_id;
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**

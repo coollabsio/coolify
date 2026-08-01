@@ -36,7 +36,7 @@ class S3StoragePolicy
      */
     public function update(User $user, S3Storage $storage): bool
     {
-        return $user->teams->contains('id', $storage->team_id) && $user->isAdminOfTeam($storage->team_id);
+        return $this->isTeamAdmin($user, $storage);
     }
 
     /**
@@ -44,7 +44,7 @@ class S3StoragePolicy
      */
     public function delete(User $user, S3Storage $storage): bool
     {
-        return $user->teams->contains('id', $storage->team_id) && $user->isAdminOfTeam($storage->team_id);
+        return $this->isTeamAdmin($user, $storage);
     }
 
     /**
@@ -68,6 +68,15 @@ class S3StoragePolicy
      */
     public function validateConnection(User $user, S3Storage $storage): bool
     {
+        return $this->isTeamAdmin($user, $storage);
+    }
+
+    private function isTeamAdmin(User $user, S3Storage $storage): bool
+    {
+        if ($storage->team_id === null) {
+            return false;
+        }
+
         return $user->teams->contains('id', $storage->team_id) && $user->isAdminOfTeam($storage->team_id);
     }
 }

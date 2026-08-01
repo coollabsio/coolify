@@ -478,6 +478,9 @@ class Change extends Component
                 return;
             }
             $this->github_app->delete();
+            // Clear so post-delete Livewire re-render / modal $refresh does not re-run
+            // @can and canGate checks against a deleted model (null team_id TypeError).
+            $this->github_app = null;
 
             return redirect()->route('source.all');
         } catch (\Throwable $e) {

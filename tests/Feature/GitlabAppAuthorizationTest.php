@@ -144,4 +144,38 @@ describe('GitLab App authorization', function () {
 
         expect(Application::count())->toBe($applicationsBefore);
     });
+
+    test('team owner can delete a gitlab app without type error', function () {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        $gitlabAppId = $this->gitlabApp->id;
+
+        Livewire::withQueryParams(['gitlab_app_uuid' => $this->gitlabApp->uuid])
+            ->test(Change::class)
+            ->call('delete')
+            ->assertRedirect(route('source.all'));
+
+        expect(GitlabApp::find($gitlabAppId))->toBeNull();
+    });
+
+    test('delete policy is safe when team_id becomes null after model is removed', function () {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        // Reproduce the post-delete Livewire re-render path: @can('delete') runs while
+        // the in-memory model may have a null team_id (TypeError in isAdminOfTeam).
+        $orphaned = new GitlabApp([
+            'name' => 'Orphaned',
+            'api_url' => 'https://gitlab.example.com/api/v4',
+            'html_url' => 'https://gitlab.example.com',
+            'is_system_wide' => false,
+            'team_id' => null,
+        ]);
+
+        expect(fn () => $this->owner->can('delete', $orphaned))->not->toThrow(\TypeError::class);
+        expect($this->owner->can('delete', $orphaned))->toBeFalse();
+        expect(fn () => $this->owner->can('update', $orphaned))->not->toThrow(\TypeError::class);
+        expect($this->owner->can('update', $orphaned))->toBeFalse();
+    });
 });

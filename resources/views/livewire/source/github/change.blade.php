@@ -15,22 +15,24 @@
                         <x-forms.button canGate="view" :canResource="$github_app"
                             wire:click.prevent="testConnection">Test Connection</x-forms.button>
                     @endif
-                    @can('delete', $github_app)
-                        @if ($applications->count() > 0)
-                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Delete" />
-                        @else
-                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                                submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
-                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name"
-                                confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Delete" />
-                        @endif
-                    @endcan
+                    @if ($github_app)
+                        @can('delete', $github_app)
+                            @if ($applications->count() > 0)
+                                <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                                    submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
+                                    confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                                    shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                                    step2ButtonText="Permanently Delete" />
+                            @else
+                                <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                                    submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']"
+                                    confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                                    shortConfirmationLabel="GitHub App Name"
+                                    confirmationText="{{ data_get($github_app, 'name') }}" :confirmWithPassword="false"
+                                    step2ButtonText="Permanently Delete" />
+                            @endif
+                        @endcan
+                    @endif
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
@@ -232,13 +234,15 @@
         <div class="flex flex-col sm:flex-row sm:items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                @can('delete', $github_app)
-                    <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
-                        submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                        shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete" />
-                @endcan
+                @if ($github_app)
+                    @can('delete', $github_app)
+                        <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton buttonTitle="Delete"
+                            submitAction="delete" :actions="['The selected GitHub App will be permanently deleted.']" confirmationText="{{ data_get($github_app, 'name') }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                            shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                            step2ButtonText="Permanently Delete" />
+                    @endcan
+                @endif
             </div>
         </div>
         <div class="flex items-center justify-center min-h-[calc(100vh-12rem)]">
