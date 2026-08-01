@@ -17,7 +17,7 @@
             Pull Latest Images & Restart
         </div>
     @elseif (str($service->status)->contains('degraded'))
-        <div class="dropdown-item" @if(!auth()->user()->can('deploy', $service)) data-disabled @endif @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+        <div class="dropdown-item" @if(!auth()->user()->can('deploy', $service)) data-disabled @endif @click="$wire.dispatch('forceDeployEvent')">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-linecap="round" stroke-linejoin="round" data-darkreader-inline-stroke=""
                 style="--darkreader-inline-stroke: currentColor;" class="w-6 h-6" stroke-width="2">
@@ -27,7 +27,7 @@
             Force Restart
         </div>
     @else
-        <div class="dropdown-item" @if(!auth()->user()->can('deploy', $service)) data-disabled @endif @click="document.getElementById('service-forceDeploy-trigger')?.click()">
+        <div class="dropdown-item" @if(!auth()->user()->can('deploy', $service)) data-disabled @endif @click="$wire.dispatch('forceDeployEvent')">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-linecap="round" stroke-linejoin="round" data-darkreader-inline-stroke=""
                 style="--darkreader-inline-stroke: currentColor;" class="w-4 h-4" stroke-width="2">
