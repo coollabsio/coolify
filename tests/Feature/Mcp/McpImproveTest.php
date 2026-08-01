@@ -46,6 +46,9 @@ function mcpImproveCall(string $name, array $arguments = [], ?string $token = nu
 {
     $token ??= mcpImproveToken();
 
+    // Ensure each call resolves the Bearer token freshly (no guard bleed between tokens).
+    auth()->forgetGuards();
+
     return test()->withHeaders([
         'Content-Type' => 'application/json',
         'Accept' => 'application/json, text/event-stream',
@@ -107,27 +110,13 @@ test('control requires deploy ability and stop requires confirm', function () {
     expect($denied->json('result.isError'))->toBeTrue();
     expect($denied->json('result.content.0.text'))->toContain('Missing required permissions');
 
-    session(['currentTeam' => $this->team]);
-    $tokenModel = $this->user->createToken('mcp-deploy-stop', ['read', 'deploy']);
-    $deployToken = $tokenModel->plainTextToken;
-    dump([
-        'abilities' => $tokenModel->accessToken->abilities,
-        'can_deploy' => $tokenModel->accessToken->can('deploy'),
-        'can_root' => $tokenModel->accessToken->can('root'),
-        'team_id' => $tokenModel->accessToken->team_id,
-        'session_team' => session('currentTeam')?->id,
-    ]);
+    $deployToken = $this->user->createToken('mcp-deploy-stop', ['read', 'deploy'])->plainTextToken;
     $stop = mcpImproveCall('control', [
         'resource' => 'application',
         'action' => 'stop',
         'uuid' => $this->application->uuid,
     ], $deployToken);
 
-    dump([
-        'status' => $stop->status(),
-        'body' => $stop->json(),
-        'text' => $stop->json('result.content.0.text'),
-    ]);
     expect($stop->json('result.isError'))->toBeTrue();
     expect((string) $stop->json('result.content.0.text'))->toContain('confirm=true');
 });
