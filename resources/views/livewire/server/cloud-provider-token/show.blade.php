@@ -17,11 +17,8 @@
                     <x-slot:actions>
                         <div class="flex items-center gap-2">
                             <x-forms.button canGate="update" :canResource="$server"
-                                wire:click.prevent="validateToken" :showLoadingIndicator="false"
-                                wire:loading.attr="disabled" wire:target="validateToken">
-                                <x-loading-on-button wire:loading wire:target="validateToken" />
-                                <x-reicon name="refresh" class="size-3.5" wire:loading.remove
-                                    wire:target="validateToken" />
+                                wire:click.prevent="validateToken">
+                                <x-reicon name="refresh" class="size-3.5" />
                                 Validate token
                             </x-forms.button>
                             @can('create', App\Models\CloudProviderToken::class)

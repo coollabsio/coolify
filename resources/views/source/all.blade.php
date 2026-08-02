@@ -4,8 +4,13 @@
     </x-slot>
 
     <div class="application-settings-form w-full">
-    <header class="mb-5 flex items-center justify-between gap-4">
-        <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Sources</h1>
+    <header class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0">
+            <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Sources</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                {{ $sources->count() }} {{ Str::plural('Git source', $sources->count()) }} connected to your team
+            </p>
+        </div>
         <div class="shrink-0">
             @can('createAnyResource')
                 <x-modal-input title="New GitHub App" :closeOutside="false">
@@ -21,10 +26,6 @@
             @endcan
         </div>
     </header>
-
-    <p class="mb-4 text-[11px] text-neutral-500 dark:text-fg-faint">
-        {{ $sources->count() }} {{ Str::plural('Git source', $sources->count()) }} connected to your team
-    </p>
 
     @if ($sources->isEmpty())
         <div

@@ -5,10 +5,10 @@
 
     <x-settings.navbar>
         <x-slot:actions>
-            <button type="button" class="button" wire:click="refresh">
+            <x-forms.button type="button" wire:click="refresh">
                 <x-reicon name="refresh" class="size-3.5" />
                 Refresh
-            </button>
+            </x-forms.button>
         </x-slot:actions>
     </x-settings.navbar>
 
@@ -69,7 +69,7 @@
                                 Filter
                             </button>
                             <div x-show="filterOpen" x-cloak x-transition.opacity.duration.120ms
-                                class="listbox-panel right-0 left-auto! min-w-52">
+                                class="listbox-panel left-auto! right-0! z-[90]! min-w-52!">
                                 <div
                                     class="px-2 py-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
                                     Type
@@ -108,7 +108,7 @@
                                 Sort
                             </button>
                             <div x-show="sortOpen" x-cloak x-transition.opacity.duration.120ms
-                                class="listbox-panel right-0 left-auto! min-w-44">
+                                class="listbox-panel left-auto! right-0! z-[90]! min-w-44!">
                                 @foreach (['newest' => 'Newest first', 'oldest' => 'Oldest first'] as $value => $label)
                                     <button type="button" class="listbox-option"
                                         wire:click="$set('sortOrder', '{{ $value }}')"

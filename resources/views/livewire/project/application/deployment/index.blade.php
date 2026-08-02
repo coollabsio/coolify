@@ -41,8 +41,8 @@
                             <x-reicon name="filter" class="size-3.5" />
                             Filter
                         </button>
-                        <div class="listbox-panel left-auto! right-0 w-48!" x-show="open" x-cloak
-                            role="listbox">
+                        <div class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!" x-show="open"
+                            x-cloak role="listbox">
                             <button type="button" class="listbox-option" role="option"
                                 aria-selected="{{ !$hasActiveFilter ? 'true' : 'false' }}"
                                 wire:click="clearFilter" @click="open = false">
@@ -127,8 +127,8 @@
                             <x-reicon name="sort-direction" class="size-3.5" />
                             Sort
                         </button>
-                        <div class="listbox-panel left-auto! right-0 w-40!" x-show="open" x-cloak
-                            role="listbox">
+                        <div class="listbox-panel left-auto! right-0! z-[90]! w-44! min-w-44!" x-show="open"
+                            x-cloak role="listbox">
                             @foreach ([
                                 'newest' => 'Newest first',
                                 'oldest' => 'Oldest first',

@@ -33,10 +33,10 @@
 
     <x-application.settings-section :title="$title" flush>
         <x-slot:actions>
-            <button type="button" class="button" wire:click="switch">
+            <x-forms.button type="button" wire:click="switch">
                 <x-reicon :name="$view === 'normal' ? 'browser-code' : 'unordered-list'" class="size-3.5" />
                 {{ $view === 'normal' ? 'Developer view' : 'Normal view' }}
-            </button>
+            </x-forms.button>
         </x-slot:actions>
 
         @if ($view === 'normal')
@@ -61,7 +61,7 @@
                             Sort
                         </button>
                         <div x-show="sortOpen" x-cloak x-transition.opacity.duration.120ms
-                            class="listbox-panel right-0 left-auto! min-w-48">
+                            class="listbox-panel left-auto! right-0! z-[90]! min-w-48!">
                             <button type="button" class="listbox-option"
                                 @click="sharedSort = 'alphabetical'; sortOpen = false">
                                 <span>Alphabetical</span>

@@ -9,10 +9,11 @@
         <div class="application-settings-form w-full">
             <x-application.settings-section title="Proxy logs"
                 helper="Search, filter, follow, copy, or download recent output from the Coolify proxy container."
-                flush>
+                flush class="logs-settings-section">
                 <x-slot:actions>
                     <x-status-badge :status="str($server->proxy->status)->headline()"
-                        :type="str($server->proxy->status)->contains('running') ? 'success' : 'neutral'" />
+                        :type="str($server->proxy->status)->contains('running') ? 'success' : 'neutral'"
+                        class="logs-section-status-badge" />
                 </x-slot:actions>
                 <div class="settings-log-panel">
                     <livewire:project.shared.get-logs :server="$server" container="coolify-proxy"

@@ -3,8 +3,13 @@
         Destinations | Coolify
     </x-slot>
 
-    <header class="mb-5 flex items-center justify-between gap-4">
-        <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Destinations</h1>
+    <header class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0">
+            <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Destinations</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                {{ $destinations->count() }} {{ Str::plural('network endpoint', $destinations->count()) }}
+            </p>
+        </div>
         <div class="shrink-0">
             @if ($servers->count() > 0)
                 @can('createAnyResource')
@@ -22,10 +27,6 @@
             @endif
         </div>
     </header>
-
-    <p class="mb-4 text-[11px] text-neutral-500 dark:text-fg-faint">
-        {{ $destinations->count() }} {{ Str::plural('network endpoint', $destinations->count()) }}
-    </p>
 
     @if ($destinations->isEmpty())
         <div

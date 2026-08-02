@@ -297,7 +297,7 @@ button[isHighlighted]:not(:disabled) {
 }
 
 h1 {
-    @apply text-3xl font-bold dark:text-white;
+    @apply text-[24px] leading-7 font-semibold tracking-tight dark:text-white;
 }
 
 h2 {
@@ -885,8 +885,15 @@ tr td:first-child {
     display: flex;
     flex-direction: column;
     gap: 1px;
-    min-width: 100%;
+    /* At least as wide as the trigger, but never narrower than a readable
+       menu. Unlayered so it wins over layered Tailwind min-w-* utilities —
+       floating action menus should still set an explicit width with ! when
+       they need a fixed size (e.g. w-52!). */
+    min-width: max(100%, 13rem);
+    width: max-content;
+    max-width: min(24rem, calc(100vw - 1.5rem));
     max-height: 16rem;
+    overflow-x: hidden;
     overflow-y: auto;
     padding: 0.25rem;
     border-radius: 10px;
@@ -901,10 +908,12 @@ tr td:first-child {
     justify-content: space-between;
     gap: 0.5rem;
     width: 100%;
-    height: 2rem;
-    padding: 0 0.5rem;
+    min-height: 2rem;
+    height: auto;
+    padding: 0.375rem 0.5rem;
     border-radius: 6px;
     font-size: 0.875rem;
+    line-height: 1.25rem;
     color: #000000;
     text-align: left;
     cursor: pointer;
@@ -1113,8 +1122,9 @@ tr td:first-child {
 }
 
 @media (max-width: 640px) {
-    /* Only force full-width for action rows (divs), never modal close buttons. */
-    .application-settings-section > :is(header, .application-settings-section-header) > div:nth-child(2) {
+    /* Keep header actions compact; log sections override via .logs-settings-section.
+       Only stretch when the actions row needs the full width (multi-control toolbars). */
+    .application-settings-section:not(.logs-settings-section) > :is(header, .application-settings-section-header) > div:nth-child(2) {
         width: 100%;
     }
 
@@ -1274,6 +1284,250 @@ tr td:first-child {
     color: var(--color-fg-faint);
 }
 
+/* Shared logs viewer (deployment + runtime) — mobile-first toolbar
+   Mobile stacks: search → meta → full-width actions (no side-by-side overlap). */
+.logs-viewer-toolbar {
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.035);
+    padding: 0.5rem 0.75rem;
+}
+
+.logs-viewer-toolbar-controls {
+    display: flex;
+    min-width: 0;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+.logs-viewer-search {
+    position: relative;
+    min-width: 0;
+    width: 100%;
+}
+
+/* Search field uses the same pl-8!/pr-8! + z-10 icon pattern as server/project
+   list filters. Avoid .input here — settings form .input padding (0.75rem)
+   overrides custom padding and makes the search icon overlap the placeholder. */
+
+.logs-viewer-meta {
+    display: flex;
+    min-width: 0;
+    width: 100%;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Compact lines control (runtime/proxy/sentinel logs) */
+.logs-viewer-lines {
+    display: inline-flex;
+    min-width: 0;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.logs-viewer-lines-label {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: #737373;
+    white-space: nowrap;
+}
+
+.dark .logs-viewer-lines-label {
+    color: var(--color-fg-faint, #6e6e74);
+}
+
+.logs-viewer-lines-input {
+    width: 4.5rem !important;
+    min-width: 4.5rem !important;
+    max-width: 5rem !important;
+    height: 2rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.375rem !important;
+    font-size: 0.75rem !important;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.logs-viewer-lines-input::-webkit-outer-spin-button,
+.logs-viewer-lines-input::-webkit-inner-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+/* Compact badge that fits the dark logs chrome */
+.logs-viewer-status-badge {
+    height: 1.5rem !important;
+    flex-shrink: 0;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
+    padding-inline: 0.5rem !important;
+    font-size: 0.6875rem !important;
+    font-weight: 500 !important;
+    color: #d4d4d4 !important;
+}
+
+/* Section header status (proxy/sentinel) stays inline with title on mobile */
+.logs-settings-section > :is(header, .application-settings-section-header) {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+}
+
+.logs-settings-section > :is(header, .application-settings-section-header) > div:first-child {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.logs-settings-section > :is(header, .application-settings-section-header) > div:nth-child(2) {
+    width: auto !important;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.logs-section-status-badge {
+    height: 1.5rem !important;
+    padding-inline: 0.5rem !important;
+    font-size: 0.6875rem !important;
+}
+
+/* Full-width action strip on mobile — icons never sit beside Lines */
+.logs-viewer-actions {
+    display: flex;
+    min-width: 0;
+    width: 100%;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.125rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    isolation: isolate;
+}
+
+.logs-viewer-actions::-webkit-scrollbar {
+    display: none;
+}
+
+.logs-viewer-actions > * {
+    flex-shrink: 0;
+}
+
+.logs-viewer-btn,
+.runtime-log-icon-button {
+    position: relative;
+    z-index: 0;
+}
+
+.logs-viewer-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    color: #a3a3a3;
+    transition: color 0.15s, background-color 0.15s;
+}
+
+.logs-viewer-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: #f5f5f5;
+}
+
+.logs-viewer-btn-active {
+    background: color-mix(in oklab, var(--color-warning) 14%, transparent);
+    color: var(--color-warning);
+}
+
+.logs-viewer-viewport {
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+}
+
+.logs-viewer-line {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.125rem;
+    padding-block: 0.125rem;
+}
+
+.logs-viewer-timestamp {
+    flex-shrink: 0;
+    font-size: 0.625rem;
+    line-height: 1rem;
+    color: #737373;
+    letter-spacing: 0.01em;
+}
+
+.logs-viewer-line-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+@media (min-width: 640px) {
+    /* Desktop: [meta] [search] [actions] single row */
+    .logs-viewer-toolbar-controls {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem 0.75rem;
+    }
+
+    .logs-viewer-meta {
+        order: 0;
+        width: auto;
+        flex: 0 0 auto;
+    }
+
+    .logs-viewer-search {
+        order: 1;
+        width: auto;
+        max-width: 16rem;
+        flex: 1 1 12rem;
+    }
+
+    .logs-viewer-actions {
+        order: 2;
+        width: auto;
+        flex: 0 0 auto;
+        max-width: 100%;
+        justify-content: flex-end;
+        overflow: visible;
+    }
+
+    .logs-viewer-btn {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 0.375rem;
+    }
+
+    .logs-viewer-viewport {
+        padding: 0.5rem 1rem;
+    }
+
+    .logs-viewer-line {
+        flex-direction: row;
+        gap: 0.5rem;
+        padding-block: 0;
+    }
+
+    .logs-viewer-timestamp {
+        font-size: 0.75rem;
+        line-height: inherit;
+    }
+}
+
 /* Runtime log viewer */
 .runtime-log-shell {
     overflow: visible;
@@ -1332,25 +1586,28 @@ tr td:first-child {
 }
 
 .runtime-log-toolbar {
-    display: flex;
-    flex-shrink: 0;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    border-bottom: 1px solid var(--coollabs-fill);
-    padding: 0.5rem 0.75rem;
+    border-bottom-color: var(--coollabs-fill);
+    background: transparent;
 }
 
 .runtime-log-icon-button {
     display: inline-flex;
-    width: 1.75rem;
-    height: 1.75rem;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: 0.5rem;
     color: #737373;
     transition: color 0.15s, background-color 0.15s;
+}
+
+@media (min-width: 640px) {
+    .runtime-log-icon-button {
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 6px;
+    }
 }
 
 .runtime-log-icon-button:hover {
@@ -1378,10 +1635,16 @@ tr td:first-child {
 }
 
 .runtime-log-viewport {
-    min-height: 18rem;
+    min-height: 12rem;
     border-radius: 0 0 8px 8px;
     background: #fafafa;
     color: #262626;
+}
+
+@media (min-width: 640px) {
+    .runtime-log-viewport {
+        min-height: 18rem;
+    }
 }
 
 .dark .runtime-log-viewport {

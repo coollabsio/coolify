@@ -44,31 +44,33 @@
 
                         @can('create', App\Models\PrivateKey::class)
                             <div x-data="{ dropdownOpen: false }" class="relative shrink-0"
-                                @click.outside="dropdownOpen = false">
-                                <button type="button" class="button" @click="dropdownOpen = !dropdownOpen">
+                                @click.outside="dropdownOpen = false"
+                                @keydown.escape.window="dropdownOpen = false">
+                                <button type="button" class="button" @click="dropdownOpen = !dropdownOpen"
+                                    aria-haspopup="menu" :aria-expanded="dropdownOpen">
                                     <x-reicon name="plus" class="size-3.5" />
                                     New key
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
                                 </button>
-                                <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right
-                                    class="absolute right-0 top-9 z-50 w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
-                                    <button type="button"
-                                        class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12px] text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right role="menu"
+                                    class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         wire:click="generatePrivateKey('ed25519')"
-                                        @click="dropdownOpen = false">
-                                        <x-reicon name="keys" class="size-3.5" />
+                                        @click="dropdownOpen = false" role="menuitem">
+                                        <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
                                         Generate ED25519
                                     </button>
-                                    <button type="button"
-                                        class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12px] text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                        wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false">
-                                        <x-reicon name="keys" class="size-3.5" />
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false"
+                                        role="menuitem">
+                                        <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
                                         Generate RSA
                                     </button>
                                     <x-modal-input title="Add Private Key Manually">
                                         <x-slot:content>
                                             <button type="button" @click="dropdownOpen = false"
-                                                class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[12px] text-neutral-600 hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                                                <x-reicon name="plus" class="size-3.5" />
+                                                class="listbox-option justify-start! gap-2.5!" role="menuitem">
+                                                <x-reicon name="plus" class="size-3.5 shrink-0 opacity-70" />
                                                 Add manually
                                             </button>
                                         </x-slot:content>

@@ -11,11 +11,11 @@
             <x-application.settings-section title="Discord"
                 description="Send team notifications to a Discord channel through an incoming webhook.">
                 <x-slot:actions>
-                    <button type="button" class="button" wire:click="sendTestNotification"
-                        @disabled(!$discordEnabled)>
+                    <x-forms.button type="button" wire:click="sendTestNotification"
+                        :disabled="!$discordEnabled">
                         <x-reicon name="notifications" class="size-3.5" />
                         Send test
-                    </button>
+                    </x-forms.button>
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">

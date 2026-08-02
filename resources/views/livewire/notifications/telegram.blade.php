@@ -11,11 +11,11 @@
             <x-application.settings-section title="Telegram"
                 description="Deliver team notifications through a Telegram bot and chat.">
                 <x-slot:actions>
-                    <button type="button" class="button" wire:click="sendTestNotification"
-                        @disabled(!$telegramEnabled)>
+                    <x-forms.button type="button" wire:click="sendTestNotification"
+                        :disabled="!$telegramEnabled">
                         <x-reicon name="notifications" class="size-3.5" />
                         Send test
-                    </button>
+                    </x-forms.button>
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">

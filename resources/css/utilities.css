@@ -129,6 +129,11 @@
     @apply inline-flex gap-1.5 justify-center items-center px-2.5 h-8 text-[13px] text-black normal-case rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
 }
 
+/* Hide static icons while a Livewire loading spinner is shown on the button. */
+.button.is-loading > svg:not(.animate-spin) {
+    display: none;
+}
+
 /* Compact resource tab pill */
 @utility app-tab {
     @apply inline-flex items-center h-7 px-2.5 rounded-md text-[13px] font-medium text-neutral-500 dark:text-fg-dim hover:bg-neutral-100 dark:hover:bg-white/[0.05] hover:text-black dark:hover:text-fg transition-colors;

@@ -5,13 +5,10 @@
 
     <x-security.navbar>
         <x-slot:actions>
-            <button type="button" class="button" wire:click="validateToken"
-                wire:loading.attr="disabled" wire:target="validateToken">
-                <x-loading-on-button wire:loading wire:target="validateToken" />
-                <x-reicon name="check-circle" class="size-3.5" wire:loading.remove
-                    wire:target="validateToken" />
+            <x-forms.button type="button" wire:click="validateToken">
+                <x-reicon name="check-circle" class="size-3.5" />
                 Validate
-            </button>
+            </x-forms.button>
             @can('delete', $cloudProviderToken)
                 <x-modal-confirmation title="Confirm Token Deletion?" isErrorButton buttonTitle="Delete"
                     submitAction="delete" :actions="[

@@ -77,7 +77,8 @@
                             </svg>
                             Filter
                         </button>
-                        <div class="listbox-panel left-auto! right-0" x-show="open" x-cloak role="listbox">
+                        <div class="listbox-panel left-auto! right-0! z-[90]! min-w-48!" x-show="open" x-cloak
+                            role="listbox">
                             @foreach ([
                                 'all' => 'All environments',
                                 'production' => 'Production',
@@ -111,7 +112,8 @@
                                 </svg>
                                 Sort
                             </button>
-                            <div class="listbox-panel left-auto! right-0" x-show="open" x-cloak role="listbox">
+                            <div class="listbox-panel left-auto! right-0! z-[90]! min-w-48!" x-show="open" x-cloak
+                                role="listbox">
                                 @foreach ([
                                     1 => 'Alphabetical',
                                     0 => 'Creation order',

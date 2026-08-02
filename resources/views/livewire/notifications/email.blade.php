@@ -69,9 +69,9 @@
 
                         @if (isInstanceAdmin())
                             <div class="lg:col-span-2">
-                                <button type="button" class="button" wire:click="copyFromInstanceSettings">
+                                <x-forms.button type="button" wire:click="copyFromInstanceSettings">
                                     Copy from instance settings
-                                </button>
+                                </x-forms.button>
                             </div>
                         @endif
                     @endif

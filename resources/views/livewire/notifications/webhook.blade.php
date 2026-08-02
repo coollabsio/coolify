@@ -11,11 +11,11 @@
             <x-application.settings-section title="Webhook"
                 description="Send JSON event payloads to your own HTTP endpoint.">
                 <x-slot:actions>
-                    <button type="button" class="button" wire:click="sendTestNotification"
-                        @disabled(!$webhookEnabled)>
+                    <x-forms.button type="button" wire:click="sendTestNotification"
+                        :disabled="!$webhookEnabled">
                         <x-reicon name="notifications" class="size-3.5" />
                         Send test
-                    </button>
+                    </x-forms.button>
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">

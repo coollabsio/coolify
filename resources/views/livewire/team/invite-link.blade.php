@@ -5,10 +5,10 @@
                 description="Create a reusable invitation link or deliver it by email.">
                 <x-slot:actions>
                     @if (is_transactional_emails_enabled())
-                        <button type="button" class="button" wire:click.prevent="viaEmail">
+                        <x-forms.button type="button" wire:click.prevent="viaEmail">
                             <x-reicon name="notifications" class="size-3.5" />
                             Send email
-                        </button>
+                        </x-forms.button>
                     @endif
                     <button type="submit"
                         class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">

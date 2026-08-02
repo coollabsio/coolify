@@ -63,17 +63,8 @@
                         helper="Configure how Coolify identifies and connects to this server.">
                         <x-slot:actions>
                             <x-forms.button type="button" wire:click.prevent="checkLocalhostConnection"
-                                wire:loading.attr="disabled" wire:target="checkLocalhostConnection"
-                                :showLoadingIndicator="false" canGate="update" :canResource="$server">
-                                <x-reicon name="refresh" wire:loading.remove wire:target="checkLocalhostConnection"
-                                    class="size-3.5" />
-                                <svg wire:loading wire:target="checkLocalhostConnection"
-                                    class="size-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                                    <circle class="opacity-25" cx="12" cy="12" r="9"
-                                        stroke="currentColor" stroke-width="3" />
-                                    <path class="opacity-75" d="M21 12a9 9 0 0 0-9-9" stroke="currentColor"
-                                        stroke-width="3" stroke-linecap="round" />
-                                </svg>
+                                canGate="update" :canResource="$server">
+                                <x-reicon name="refresh" class="size-3.5" />
                                 Validate connection
                             </x-forms.button>
                         </x-slot:actions>

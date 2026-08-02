@@ -68,26 +68,23 @@
                                 <x-status-badge :label="$provider . ($providerStatus ? ' · ' . ucfirst($providerStatus) : '')"
                                     :type="$providerStatusType" />
                                 @if ($provider === 'Hetzner')
-                                    <button type="button" class="button size-8! px-0!"
+                                    <x-forms.button type="button" class="size-8! px-0!"
                                         wire:click.prevent="checkHetznerServerStatus(true)"
-                                        wire:loading.attr="disabled" wire:target="checkHetznerServerStatus"
                                         title="Refresh provider status">
                                         <x-reicon name="refresh" class="size-3.5" />
-                                    </button>
+                                    </x-forms.button>
                                 @elseif ($provider === 'DigitalOcean')
-                                    <button type="button" class="button size-8! px-0!"
+                                    <x-forms.button type="button" class="size-8! px-0!"
                                         wire:click.prevent="checkDigitalOceanDropletStatus(true)"
-                                        wire:loading.attr="disabled" wire:target="checkDigitalOceanDropletStatus"
                                         title="Refresh provider status">
                                         <x-reicon name="refresh" class="size-3.5" />
-                                    </button>
+                                    </x-forms.button>
                                 @elseif ($provider === 'Vultr')
-                                    <button type="button" class="button size-8! px-0!"
+                                    <x-forms.button type="button" class="size-8! px-0!"
                                         wire:click.prevent="checkVultrInstanceStatus(true)"
-                                        wire:loading.attr="disabled" wire:target="checkVultrInstanceStatus"
                                         title="Refresh provider status">
                                         <x-reicon name="refresh" class="size-3.5" />
-                                    </button>
+                                    </x-forms.button>
                                 @endif
                             @endif
                             <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
@@ -137,11 +134,10 @@
                             </dl>
                         @else
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <button type="button" class="button" wire:click="refreshServerMetadata"
-                                    wire:loading.attr="disabled" wire:target="refreshServerMetadata">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata">
                                     <x-reicon name="refresh" class="size-3.5" />
                                     Fetch server details
-                                </button>
+                                </x-forms.button>
                             </div>
                         @endif
                     </x-application.settings-section>
@@ -199,12 +195,11 @@
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$server" :ask="$server->isFunctional()" />
                                 </x-slot:content>
-                                <button type="button" class="button"
-                                    @click="slideOverOpen=true" wire:click.prevent="validateServer"
-                                    wire:loading.attr="disabled" wire:target="validateServer">
+                                <x-forms.button type="button"
+                                    @click="slideOverOpen=true" wire:click.prevent="validateServer">
                                     <x-reicon name="refresh" class="size-3.5" />
                                     {{ $server->isFunctional() ? 'Revalidate connection' : 'Validate connection' }}
-                                </button>
+                                </x-forms.button>
                             </x-slide-over>
                         </x-slot:actions>
 

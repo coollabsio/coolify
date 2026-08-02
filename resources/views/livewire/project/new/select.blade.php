@@ -27,7 +27,7 @@
                                 Filter
                             </button>
                             <div x-show="filterOpen" x-cloak x-transition.opacity.duration.120ms
-                                class="listbox-panel right-0 left-auto! min-w-48">
+                                class="listbox-panel left-auto! right-0! z-[90]! min-w-48!">
                                 <div
                                     class="px-2 py-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
                                     Resource type
@@ -57,7 +57,7 @@
                                 </svg>
                             </button>
                             <div x-show="categoryOpen" x-cloak x-transition.opacity.duration.120ms
-                                class="listbox-panel right-0 left-auto! min-w-56">
+                                class="listbox-panel left-auto! right-0! z-[90]! min-w-56!">
                                 <div class="border-b border-neutral-200 p-2 dark:border-white/[0.08]">
                                     <input type="search" x-ref="categorySearchInput" x-model="categorySearch"
                                         placeholder="Search categories"

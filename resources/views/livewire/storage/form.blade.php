@@ -1,14 +1,14 @@
 <form wire:submit="submit" class="application-settings-form">
     <x-unsaved-bar action="submit" />
 
-    <x-application.settings-section title="{{ $storage->name }}"
+    <x-application.settings-section title="General"
         description="S3-compatible destination used by database and volume backups.">
         <x-slot:actions>
             @can('validateConnection', $storage)
-                <button type="button" class="button" wire:click="testConnection">
+                <x-forms.button type="button" wire:click="testConnection">
                     <x-reicon name="check-circle" class="size-3.5" />
                     Validate connection
-                </button>
+                </x-forms.button>
             @endcan
         </x-slot:actions>
 

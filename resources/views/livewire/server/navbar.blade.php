@@ -161,7 +161,7 @@
         <div class="w-full md:hidden">
             <div class="mb-3 flex min-w-0 flex-wrap items-center gap-2">
                 <h1 data-testid="server-subtitle"
-                    class="min-w-0 truncate text-lg font-semibold text-black dark:text-fg">
+                    class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $server->name }}
                 </h1>
                 @if ($server->proxySet())

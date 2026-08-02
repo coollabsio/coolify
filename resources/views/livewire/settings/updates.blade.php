@@ -14,10 +14,10 @@
 
             <x-application.settings-section title="Update checks">
                 <x-slot:actions>
-                    <button type="button" class="button" wire:click="checkManually">
+                    <x-forms.button type="button" wire:click="checkManually">
                         <x-reicon name="refresh" class="size-3.5" />
                         Check now
-                    </button>
+                    </x-forms.button>
                 </x-slot:actions>
                 <x-forms.input required id="update_check_frequency" label="Check frequency"
                     placeholder="0 * * * *"

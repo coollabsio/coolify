@@ -13,31 +13,34 @@
                         :confirmWithText="false" :confirmWithPassword="false" />
 
                     <div x-data="{ dropdownOpen: false }" class="relative"
-                        @click.outside="dropdownOpen = false">
+                        @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
                         <button type="button" @click="dropdownOpen = !dropdownOpen"
                             class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
-                            :aria-expanded="dropdownOpen">
+                            aria-haspopup="menu" :aria-expanded="dropdownOpen">
                             <x-reicon name="plus" class="size-3.5" />
                             New private key
+                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
                         </button>
 
-                        <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
-                            <button type="button" class="listbox-option justify-start!"
-                                wire:click="generatePrivateKey('ed25519')" @click="dropdownOpen = false">
-                                <x-reicon name="keys" class="size-3.5 opacity-70" />
+                        <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right role="menu"
+                            class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!">
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                wire:click="generatePrivateKey('ed25519')" @click="dropdownOpen = false"
+                                role="menuitem">
+                                <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
                                 Generate ED25519
                             </button>
-                            <button type="button" class="listbox-option justify-start!"
-                                wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false">
-                                <x-reicon name="keys" class="size-3.5 opacity-70" />
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false"
+                                role="menuitem">
+                                <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
                                 Generate RSA
                             </button>
                             <x-modal-input title="Add Private Key Manually">
                                 <x-slot:content>
                                     <button type="button" @click="dropdownOpen = false"
-                                        class="listbox-option justify-start!">
-                                        <x-reicon name="plus" class="size-3.5 opacity-70" />
+                                        class="listbox-option justify-start! gap-2.5!" role="menuitem">
+                                        <x-reicon name="plus" class="size-3.5 shrink-0 opacity-70" />
                                         Add manually
                                     </button>
                                 </x-slot:content>

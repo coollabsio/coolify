@@ -3,8 +3,13 @@
         Storages | Coolify
     </x-slot>
 
-    <header class="mb-5 flex items-center justify-between gap-4">
-        <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">S3 Storage</h1>
+    <header class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0">
+            <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">S3 Storage</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                {{ $s3->count() }} {{ Str::plural('storage destination', $s3->count()) }} for backups
+            </p>
+        </div>
         <div class="shrink-0">
             @can('create', App\Models\S3Storage::class)
                 <x-modal-input title="New S3 Storage" :closeOutside="false">
@@ -20,10 +25,6 @@
             @endcan
         </div>
     </header>
-
-    <p class="mb-4 text-[11px] text-neutral-500 dark:text-fg-faint">
-        {{ $s3->count() }} {{ Str::plural('storage destination', $s3->count()) }} for backups
-    </p>
 
     @if ($s3->isEmpty())
         <div

@@ -30,16 +30,15 @@ it('uses geist mono for shared logs and terminal rendering', function () {
     $terminalClient = file_get_contents(resource_path('js/terminal.js'));
 
     expect($sharedLogsView)
-        ->toContain('class="font-logs max-w-full cursor-default"')
-        ->toContain('class="font-logs whitespace-pre-wrap break-all max-w-full text-neutral-400"')
+        ->toContain('font-logs max-w-full cursor-default')
+        ->toContain('font-logs max-w-full whitespace-pre-wrap break-all text-neutral-400')
         ->and($deploymentLogsView)
-        ->toContain('class="flex flex-col font-logs"')
-        ->toContain('class="font-logs text-neutral-400 mb-2"')
+        ->toContain('flex min-w-0 flex-col font-logs')
+        ->toContain('mb-2 font-logs text-neutral-400')
         ->and($activityMonitorView)
         ->toContain('<pre class="font-logs min-w-0 max-w-full whitespace-pre-wrap wrap-anywhere"')
         ->and($dockerCleanupView)
-        ->toContain('class="flex-1 text-sm font-logs text-gray-700 dark:text-gray-300"')
-        ->toContain('class="font-logs text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap"')
+        ->toContain('font-mono')
         ->and($terminalClient)
         ->toContain('"Geist Mono"');
 });

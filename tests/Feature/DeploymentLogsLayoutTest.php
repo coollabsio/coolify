@@ -69,11 +69,63 @@ it('renders deployment logs in a full-height layout', function () {
 
     $response->assertSuccessful();
     $response->assertSee('rolling update started');
-    $response->assertSee('flex h-[calc(100vh-10rem)] min-h-40 flex-col overflow-hidden', false);
+    $response->assertSee('logs-viewer', false);
+    $response->assertSee('logs-viewer-toolbar', false);
+    $response->assertSee('logs-viewer-search', false);
+    $response->assertSee('logs-viewer-actions', false);
+    $response->assertSee('logs-viewer-viewport', false);
+    $response->assertSee('logs-viewer-line', false);
+    $response->assertSee('h-[calc(100dvh-7.5rem)]', false);
     $response->assertSee('flex flex-1 min-h-0 flex-col overflow-hidden', false);
-    $response->assertSee('mt-4 flex flex-1 min-h-0 flex-col overflow-hidden', false);
-    $response->assertSee('flex min-h-0 flex-col w-full overflow-hidden bg-white', false);
-    $response->assertSee('flex min-h-40 flex-1 flex-col overflow-y-auto p-2 px-4 scrollbar', false);
 
     expect($response->getContent())->not->toContain('max-h-[30rem]');
+});
+
+it('uses a mobile-friendly stacked logs toolbar markup', function () {
+    $deploymentView = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
+    $sharedLogsView = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($deploymentView)
+        ->toContain('logs-viewer-toolbar')
+        ->toContain('logs-viewer-toolbar-controls')
+        ->toContain('logs-viewer-meta')
+        ->toContain('logs-viewer-status-badge')
+        ->toContain('logs-viewer-line')
+        ->toContain('logs-viewer-timestamp')
+        ->toContain('logs-viewer-line-text')
+        ->and($sharedLogsView)
+        ->toContain('logs-viewer-toolbar')
+        ->toContain('logs-viewer-toolbar-controls')
+        ->toContain('logs-viewer-meta')
+        ->toContain('logs-viewer-lines')
+        ->toContain('logs-viewer-actions')
+        ->toContain('logs-viewer-line')
+        ->toContain('pl-8!')
+        ->toContain('z-10 size-3.5')
+        ->and($deploymentView)
+        ->toContain('pl-8!')
+        ->toContain('z-10 size-3.5')
+        ->and($appCss)
+        ->toContain('.logs-viewer-toolbar')
+        ->toContain('.logs-viewer-status-badge')
+        ->toContain('.logs-viewer-lines')
+        ->toContain('.logs-viewer-actions')
+        ->toContain('.logs-settings-section')
+        ->toContain('flex-direction: column')
+        ->toContain('@media (min-width: 640px)');
+});
+
+it('uses the shared mobile logs layout for proxy and sentinel log pages', function () {
+    $proxyLogsView = file_get_contents(resource_path('views/livewire/server/proxy/logs.blade.php'));
+    $sentinelLogsView = file_get_contents(resource_path('views/livewire/server/sentinel/logs.blade.php'));
+
+    expect($proxyLogsView)
+        ->toContain('logs-settings-section')
+        ->toContain('logs-section-status-badge')
+        ->toContain('livewire:project.shared.get-logs')
+        ->and($sentinelLogsView)
+        ->toContain('logs-settings-section')
+        ->toContain('logs-section-status-badge')
+        ->toContain('livewire:project.shared.get-logs');
 });

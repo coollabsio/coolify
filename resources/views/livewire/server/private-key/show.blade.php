@@ -21,25 +21,34 @@
                         </x-forms.button>
 
                         @can('createAnyResource')
-                            <div x-data="{ open: false }" class="relative" @click.outside="open = false">
-                                <x-forms.button isHighlighted type="button" @click="open = !open">
+                            <div x-data="{ open: false }" class="relative" @click.outside="open = false"
+                                @keydown.escape.window="open = false">
+                                <x-forms.button isHighlighted type="button" @click="open = !open"
+                                    aria-haspopup="menu" x-bind:aria-expanded="open">
                                     <x-reicon name="plus" class="size-3.5" />
                                     Add
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
                                 </x-forms.button>
-                                <div x-show="open" x-cloak class="listbox-panel right-0 left-auto min-w-52"
-                                    role="menu">
-                                    <button type="button" class="listbox-option"
-                                        wire:click="generatePrivateKey('ed25519')" @click="open = false">
+                                <div x-show="open" x-cloak x-transition.origin.top.right role="menu"
+                                    class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        wire:click="generatePrivateKey('ed25519')" @click="open = false"
+                                        role="menuitem">
+                                        <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
                                         Generate ED25519
                                     </button>
-                                    <button type="button" class="listbox-option"
-                                        wire:click="generatePrivateKey('rsa')" @click="open = false">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        wire:click="generatePrivateKey('rsa')" @click="open = false"
+                                        role="menuitem">
+                                        <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
                                         Generate RSA
                                     </button>
                                     <x-modal-input title="Add Private Key Manually">
                                         <x-slot:content>
-                                            <button type="button" class="listbox-option w-full"
-                                                @click="open = false">
+                                            <button type="button"
+                                                class="listbox-option justify-start! gap-2.5! w-full"
+                                                @click="open = false" role="menuitem">
+                                                <x-reicon name="plus" class="size-3.5 shrink-0 opacity-70" />
                                                 Add manually
                                             </button>
                                         </x-slot:content>

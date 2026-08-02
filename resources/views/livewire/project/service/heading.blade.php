@@ -70,7 +70,7 @@
     <div x-data>
         <div class="w-full md:hidden">
             <div class="mb-3 flex min-w-0 flex-wrap items-center gap-2">
-                <h1 class="min-w-0 truncate text-lg font-semibold text-black dark:text-fg">
+                <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $service->name }}
                 </h1>
                 <x-status-badge :status="$serviceStatusLabel" :type="$serviceStatusType" />

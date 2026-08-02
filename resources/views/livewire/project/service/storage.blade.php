@@ -46,7 +46,7 @@
 
                                 <div x-show="dropdownOpen" x-cloak role="menu"
                                     x-transition.origin.top.left
-                                    class="absolute top-9 left-0 z-[90] w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised sm:left-auto sm:right-0">
+                                    class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!">
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
                                         @click="volumeModalOpen = true; dropdownOpen = false">
                                         <x-reicon name="storages" class="size-3.5 shrink-0 opacity-70" />
