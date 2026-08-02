@@ -5,18 +5,20 @@
 
     <div x-data="projectsIndex()" class="w-full">
         <header class="mb-5 flex items-center justify-between gap-4">
-            <h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Projects</h1>
+            <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Projects</h1>
             @can('createAnyResource')
-                <x-modal-input title="New Project">
-                    <x-slot:content>
-                        <button type="button"
-                            class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
-                            <x-reicon name="plus" class="size-3.5" />
-                            New project
-                        </button>
-                    </x-slot:content>
-                    <livewire:project.add-empty />
-                </x-modal-input>
+                <div class="shrink-0">
+                    <x-modal-input title="New Project">
+                        <x-slot:content>
+                            <button type="button"
+                                class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                <x-reicon name="plus" class="size-3.5" />
+                                New project
+                            </button>
+                        </x-slot:content>
+                        <livewire:project.add-empty />
+                    </x-modal-input>
+                </div>
             @endcan
         </header>
 

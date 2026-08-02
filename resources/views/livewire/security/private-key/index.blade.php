@@ -4,64 +4,56 @@
     </x-slot>
 
     <x-security.navbar>
-        <x-slot:actions>
+        <x-slot:titleActions>
             @can('create', App\Models\PrivateKey::class)
-                <div class="flex flex-wrap items-center gap-2">
-                    <x-modal-confirmation title="Confirm unused SSH Key Deletion?"
-                        buttonTitle="Delete unused keys" isErrorButton submitAction="cleanupUnusedKeys"
-                        :actions="['All unused SSH keys (marked with unused) are permanently deleted.']"
-                        :confirmWithText="false" :confirmWithPassword="false" />
+                <div x-data="{ dropdownOpen: false }" class="relative"
+                    @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
+                    <button type="button" @click="dropdownOpen = !dropdownOpen"
+                        class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                        aria-haspopup="menu" :aria-expanded="dropdownOpen">
+                        <x-reicon name="plus" class="size-3.5" />
+                        New private key
+                        <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                    </button>
 
-                    <div x-data="{ dropdownOpen: false }" class="relative"
-                        @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
-                        <button type="button" @click="dropdownOpen = !dropdownOpen"
-                            class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
-                            aria-haspopup="menu" :aria-expanded="dropdownOpen">
-                            <x-reicon name="plus" class="size-3.5" />
-                            New private key
-                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                    <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right role="menu"
+                        class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!">
+                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                            wire:click="generatePrivateKey('ed25519')" @click="dropdownOpen = false"
+                            role="menuitem">
+                            <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
+                            Generate ED25519
                         </button>
-
-                        <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right role="menu"
-                            class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!">
-                            <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                wire:click="generatePrivateKey('ed25519')" @click="dropdownOpen = false"
-                                role="menuitem">
-                                <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
-                                Generate ED25519
-                            </button>
-                            <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false"
-                                role="menuitem">
-                                <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
-                                Generate RSA
-                            </button>
-                            <x-modal-input title="Add Private Key Manually">
-                                <x-slot:content>
-                                    <button type="button" @click="dropdownOpen = false"
-                                        class="listbox-option justify-start! gap-2.5!" role="menuitem">
-                                        <x-reicon name="plus" class="size-3.5 shrink-0 opacity-70" />
-                                        Add manually
-                                    </button>
-                                </x-slot:content>
-                                <livewire:security.private-key.create />
-                            </x-modal-input>
-                        </div>
+                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                            wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false"
+                            role="menuitem">
+                            <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
+                            Generate RSA
+                        </button>
+                        <x-modal-input title="Add Private Key Manually">
+                            <x-slot:content>
+                                <button type="button" @click="dropdownOpen = false"
+                                    class="listbox-option justify-start! gap-2.5!" role="menuitem">
+                                    <x-reicon name="plus" class="size-3.5 shrink-0 opacity-70" />
+                                    Add manually
+                                </button>
+                            </x-slot:content>
+                            <livewire:security.private-key.create />
+                        </x-modal-input>
                     </div>
                 </div>
             @endcan
-        </x-slot:actions>
+        </x-slot:titleActions>
     </x-security.navbar>
 
-    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h2 class="text-[15px]! leading-5! font-semibold!">Private keys</h2>
-            <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
-                {{ $privateKeys->count() }} {{ Str::plural('SSH key', $privateKeys->count()) }} available to this team
-            </p>
+    @can('create', App\Models\PrivateKey::class)
+        <div class="mb-4 flex justify-end">
+            <x-modal-confirmation title="Confirm unused SSH Key Deletion?"
+                buttonTitle="Delete unused keys" isErrorButton submitAction="cleanupUnusedKeys"
+                :actions="['All unused SSH keys (marked with unused) are permanently deleted.']"
+                :confirmWithText="false" :confirmWithPassword="false" />
         </div>
-
-    </div>
+    @endcan
 
     @if ($privateKeys->isEmpty())
         <div

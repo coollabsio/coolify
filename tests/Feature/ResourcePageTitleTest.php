@@ -43,16 +43,39 @@ it('renders the source name as a large page title before the navbar', function (
 
     $response->assertSuccessful();
     $response->assertSee('text-[24px]! leading-7! font-semibold! tracking-tight!', false);
-    $response->assertSee('order-1 mb-4 min-w-0 lg:order-2', false);
+    $response->assertSee('order-1 mb-4 flex items-start justify-between gap-4 lg:order-2', false);
     $response->assertSee('order-2 lg:order-1', false);
     $response->assertSee('coolify-laravel-dev-public');
     $response->assertSee('GitHub App for coollabsio');
     $response->assertSee('>General</h3>', false);
 
     $html = $response->getContent();
-    $titlePos = strpos($html, 'order-1 mb-4 min-w-0 lg:order-2');
+    $titlePos = strpos($html, 'order-1 mb-4 flex items-start justify-between gap-4 lg:order-2');
     $navbarPos = strpos($html, 'order-2 lg:order-1');
     expect($titlePos)->toBeLessThan($navbarPos);
+});
+
+it('renders family page titles before tabs for team notifications and keys', function () {
+    $this->get(route('team.index'))
+        ->assertSuccessful()
+        ->assertSee('Team')
+        ->assertSee('Members, roles, and team settings')
+        ->assertSee('order-1 mb-4 flex items-start justify-between gap-4 lg:order-2', false)
+        ->assertSee('New team');
+
+    $this->get(route('notifications.email'))
+        ->assertSuccessful()
+        ->assertSee('Notifications')
+        ->assertSee('Delivery channels for team events');
+
+    $keys = $this->get(route('security.private-key.index'));
+    $keys->assertSuccessful();
+    $keys->assertSee('Keys &amp; Tokens', false);
+    $keys->assertSee('SSH keys, cloud tokens, and API access');
+    $keys->assertSee('Private Keys');
+    $keys->assertSee('New private key');
+    $keys->assertDontSee('SSH keys available to this team');
+    expect($keys->getContent())->not->toContain('>Private keys</h2>');
 });
 
 it('renders the destination name as a large page title', function () {
@@ -101,12 +124,30 @@ it('uses the same page title size on application database service and server hea
         resource_path('views/livewire/server/navbar.blade.php'),
         resource_path('views/livewire/project/show.blade.php'),
         resource_path('views/livewire/project/resource/index.blade.php'),
-        resource_path('views/livewire/source/github/change.blade.php'),
-        resource_path('views/livewire/destination/show.blade.php'),
-        resource_path('views/livewire/storage/show.blade.php'),
+        resource_path('views/components/dashboard/navbar.blade.php'),
+        resource_path('views/livewire/server/index.blade.php'),
+        resource_path('views/source/all.blade.php'),
     ];
 
     foreach ($views as $view) {
         expect(file_get_contents($view))->toContain($titleClass);
     }
+});
+
+it('keeps new-action buttons on the same row as page titles', function () {
+    $serversPattern = 'flex items-center justify-between gap-4';
+    $titleRowPattern = 'flex items-start justify-between gap-4';
+
+    expect(file_get_contents(resource_path('views/livewire/server/index.blade.php')))
+        ->toContain($serversPattern);
+    expect(file_get_contents(resource_path('views/source/all.blade.php')))
+        ->toContain($titleRowPattern);
+    expect(file_get_contents(resource_path('views/livewire/destination/index.blade.php')))
+        ->toContain($titleRowPattern);
+    expect(file_get_contents(resource_path('views/livewire/storage/index.blade.php')))
+        ->toContain($titleRowPattern);
+    expect(file_get_contents(resource_path('views/components/dashboard/navbar.blade.php')))
+        ->toContain('titleActions');
+    expect(file_get_contents(resource_path('views/livewire/security/private-key/index.blade.php')))
+        ->toContain('titleActions');
 });

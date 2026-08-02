@@ -29,7 +29,8 @@
         return this.rows.filter(row => [row.key, row.comment, row.scope].some(value => value.includes(query))).length;
     }
 }">
-    <x-dashboard.navbar section="shared-variables" />
+    <x-dashboard.navbar section="shared-variables" title="Shared variables"
+        subtitle="Reusable environment variables across resources" />
 
     <x-application.settings-section :title="$title" flush>
         <x-slot:actions>

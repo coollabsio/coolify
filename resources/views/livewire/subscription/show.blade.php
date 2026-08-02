@@ -3,7 +3,8 @@
         Subscription | Coolify
     </x-slot>
 
-    <x-dashboard.navbar section="subscription" />
+    <x-dashboard.navbar section="subscription" title="Subscription"
+        subtitle="Plan and billing for Coolify Cloud" />
 
     <livewire:subscription.actions />
 </div>

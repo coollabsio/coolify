@@ -1,6 +1,8 @@
 @props([
     'section',
     'parameters' => [],
+    'title' => null,
+    'subtitle' => null,
 ])
 
 @php
@@ -82,14 +84,33 @@
     };
 
     $items = array_values(array_filter($items, fn (array $item): bool => $item['visible'] ?? true));
+    $hasTitle = filled($title);
 @endphp
+
+@if ($hasTitle)
+    <div class="flex flex-col">
+        <header class="order-1 mb-4 flex items-start justify-between gap-4 lg:order-2 lg:mb-8">
+            <div class="min-w-0">
+                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $title }}</h1>
+                @if (filled($subtitle))
+                    <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">{{ $subtitle }}</p>
+                @endif
+            </div>
+            @isset($titleActions)
+                <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    {{ $titleActions }}
+                </div>
+            @endisset
+        </header>
+        <div class="order-2 lg:order-1">
+@endif
 
 <nav class="mb-6 w-full lg:mb-0">
     <div class="w-full lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pr-4 lg:pl-2 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
         :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
         <div class="flex w-full items-center justify-between gap-4 lg:h-full">
             <div
-                class="flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                class="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
                 @foreach ($items as $item)
                     <a @class([
                         'app-tab shrink-0',
@@ -114,3 +135,8 @@
 
     <div class="hidden lg:block lg:h-10" aria-hidden="true"></div>
 </nav>
+
+@if ($hasTitle)
+        </div>
+    </div>
+@endif

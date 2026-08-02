@@ -3,7 +3,8 @@
         {{ $cloudProviderToken->name }} | Cloud Tokens | Coolify
     </x-slot>
 
-    <x-security.navbar>
+    <x-security.navbar :title="$cloudProviderToken->name"
+        :subtitle="filled($cloudProviderToken->description) ? $cloudProviderToken->description : 'Cloud provider API credential'">
         <x-slot:actions>
             <x-forms.button type="button" wire:click="validateToken">
                 <x-reicon name="check-circle" class="size-3.5" />
@@ -24,7 +25,7 @@
 
     <form wire:submit="save" class="application-settings-form">
         <x-unsaved-bar action="save" />
-        <x-application.settings-section title="{{ $cloudProviderToken->name }}"
+        <x-application.settings-section title="General"
             description="Identity and provider details for this cloud API credential.">
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input canGate="update" :canResource="$cloudProviderToken" id="name"

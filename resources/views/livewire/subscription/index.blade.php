@@ -3,7 +3,8 @@
         Subscribe | Coolify
     </x-slot>
 
-    <x-dashboard.navbar section="subscription" />
+    <x-dashboard.navbar section="subscription" title="Subscription"
+        subtitle="Choose a plan for Coolify Cloud" />
 
     @if (auth()->user()->isAdminFromSession())
         @if ($loading)

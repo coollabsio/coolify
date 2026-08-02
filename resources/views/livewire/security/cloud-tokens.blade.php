@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-security.navbar>
-        <x-slot:actions>
+        <x-slot:titleActions>
             @can('create', App\Models\CloudProviderToken::class)
                 <x-modal-input title="New Cloud Token">
                     <x-slot:content>
@@ -18,7 +18,7 @@
                         wire:key="new-cloud-provider-token" />
                 </x-modal-input>
             @endcan
-        </x-slot:actions>
+        </x-slot:titleActions>
     </x-security.navbar>
 
     <livewire:security.cloud-provider-tokens />

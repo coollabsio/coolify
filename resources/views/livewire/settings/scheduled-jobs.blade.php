@@ -23,8 +23,6 @@
             history.replaceState(null, '', `#${tab}`);
         }
     }">
-        <h1 class="mb-5 text-[24px]! leading-7! font-semibold! tracking-tight!">Scheduled jobs</h1>
-
         <x-application.settings-section title="Scheduler activity" flush>
             <x-slot:actions>
                 <div

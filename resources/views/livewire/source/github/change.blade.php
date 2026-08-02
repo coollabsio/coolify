@@ -4,42 +4,27 @@
     </x-slot>
 
     @if (data_get($github_app, 'app_id'))
-        <div class="flex flex-col">
-            <header class="order-1 mb-4 min-w-0 lg:order-2 lg:mb-8">
-                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">
-                    {{ $name ?: 'GitHub App' }}
-                </h1>
-                <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                    @if (filled($organization))
-                        GitHub App for {{ $organization }}
-                    @else
-                        Private GitHub source
-                    @endif
-                </p>
-            </header>
+        <x-dashboard.navbar section="source" :parameters="['github_app_uuid' => $github_app->uuid]"
+            :title="$name ?: 'GitHub App'"
+            :subtitle="filled($organization) ? 'GitHub App for '.$organization : 'Private GitHub source'">
+            <x-slot:actions>
+                @if (data_get($github_app, 'installation_id'))
+                    <x-status-badge label="Connected" type="success" />
+                @else
+                    <x-status-badge label="Setup incomplete" type="warning" />
+                @endif
+                @can('delete', $github_app)
+                    <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton
+                        buttonTitle="Delete" submitAction="delete"
+                        :actions="['The selected GitHub App will be permanently deleted.']"
+                        confirmationText="{{ data_get($github_app, 'name') }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                        shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                        step2ButtonText="Permanently Delete" />
+                @endcan
+            </x-slot:actions>
+        </x-dashboard.navbar>
 
-            <div class="order-2 lg:order-1">
-                <x-dashboard.navbar section="source" :parameters="['github_app_uuid' => $github_app->uuid]">
-                    <x-slot:actions>
-                        @if (data_get($github_app, 'installation_id'))
-                            <x-status-badge label="Connected" type="success" />
-                        @else
-                            <x-status-badge label="Setup incomplete" type="warning" />
-                        @endif
-                        @can('delete', $github_app)
-                            <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton
-                                buttonTitle="Delete" submitAction="delete"
-                                :actions="['The selected GitHub App will be permanently deleted.']"
-                                confirmationText="{{ data_get($github_app, 'name') }}"
-                                confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                                shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
-                                step2ButtonText="Permanently Delete" />
-                        @endcan
-                    </x-slot:actions>
-                </x-dashboard.navbar>
-            </div>
-
-            <div class="order-3">
         @if (!data_get($github_app, 'installation_id'))
             <div class="application-settings-form">
                 <x-application.settings-section title="Complete GitHub installation"
@@ -228,8 +213,6 @@
                 </x-application.settings-section>
             </div>
         @endif
-            </div>
-        </div>
     @else
         <header class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">

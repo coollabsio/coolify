@@ -3,7 +3,8 @@
         {{ $private_key->name }} | Private Keys | Coolify
     </x-slot>
 
-    <x-security.navbar>
+    <x-security.navbar :title="$private_key->name"
+        :subtitle="filled($private_key->description) ? $private_key->description : 'SSH private key'">
         <x-slot:actions>
             @if ($isGitRelated)
                 <x-status-badge label="Used by GitHub App" type="neutral" />
@@ -27,7 +28,7 @@
 
     <form wire:submit="changePrivateKey" class="application-settings-form" x-data="{ showPrivateKey: false }">
         <x-unsaved-bar action="changePrivateKey" />
-        <x-application.settings-section title="{{ $private_key->name }}">
+        <x-application.settings-section title="General">
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input canGate="update" :canResource="$private_key" id="name" label="Name" required />
                 <x-forms.input canGate="update" :canResource="$private_key" id="description"

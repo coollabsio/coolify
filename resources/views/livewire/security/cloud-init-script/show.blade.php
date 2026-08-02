@@ -3,7 +3,8 @@
         {{ $cloudInitScript->name }} | Cloud-Init Scripts | Coolify
     </x-slot>
 
-    <x-security.navbar>
+    <x-security.navbar :title="$cloudInitScript->name"
+        subtitle="Reusable cloud-init script for server provisioning">
         <x-slot:actions>
             @can('delete', $cloudInitScript)
                 <x-modal-confirmation title="Confirm Script Deletion?" isErrorButton buttonTitle="Delete"
@@ -20,7 +21,7 @@
 
     <form wire:submit="save" class="application-settings-form">
         <x-unsaved-bar action="save" />
-        <x-application.settings-section title="{{ $cloudInitScript->name }}"
+        <x-application.settings-section title="General"
             description="Edit the reusable initialization script used during cloud server creation.">
             <div class="flex flex-col gap-4">
                 <x-forms.input canGate="update" :canResource="$cloudInitScript" id="name"

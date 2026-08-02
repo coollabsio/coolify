@@ -3,21 +3,13 @@
         {{ $destination->name }} Resources | Coolify
     </x-slot>
 
-    <div class="flex flex-col">
-        <header class="order-1 mb-4 min-w-0 lg:order-2 lg:mb-8">
-            <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">
-                {{ $destination->name }}
-            </h1>
-            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                Applications, databases, and services on this network
-            </p>
-        </header>
+    @include('livewire.destination.navbar', [
+        'destination' => $destination,
+        'title' => $destination->name,
+        'subtitle' => 'Applications, databases, and services on this network',
+    ])
 
-        <div class="order-2 lg:order-1">
-            @include('livewire.destination.navbar', ['destination' => $destination])
-        </div>
-
-        <div x-data="{ search: '' }" class="order-3 application-settings-form">
+    <div x-data="{ search: '' }" class="application-settings-form">
         <x-application.settings-section title="Resources"
             description="Applications, databases, and services connected to this Docker network." flush>
             @if (count($resources) === 0)
@@ -74,6 +66,5 @@
                 </div>
             @endif
         </x-application.settings-section>
-        </div>
     </div>
 </div>

@@ -3,11 +3,10 @@
         Project Variables | Coolify
     </x-slot>
 
-    <x-dashboard.navbar section="shared-variables" />
+    <x-dashboard.navbar section="shared-variables" title="Shared variables"
+        subtitle="Project-wide variables for every environment in a project" />
 
     <div class="w-full">
-        <h1 class="mb-5 text-[24px]! leading-7! font-semibold! tracking-tight!">Project variables</h1>
-
     @if ($projects->isEmpty())
         <div
             class="flex min-h-80 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 text-center dark:border-white/[0.1] dark:bg-white/[0.02]">
