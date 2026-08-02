@@ -11,6 +11,7 @@ use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -232,6 +233,8 @@ test('get_environment is team scoped via project', function () {
 
     expect($body['data']['uuid'])->toBe($this->environment->uuid);
     expect(collect($body['data']['applications'])->pluck('uuid'))->toContain($this->application->uuid);
+    expect($body['data']['counts']['applications'])->toBeGreaterThanOrEqual(1);
+    expect($body['data']['truncated']['applications'])->toBeFalse();
 
     $otherTeam = Team::factory()->create();
     $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
@@ -242,6 +245,31 @@ test('get_environment is team scoped via project', function () {
         'environment_name_or_uuid' => $otherEnv->uuid,
     ]);
     expect($denied->json('result.isError'))->toBeTrue();
+});
+
+test('get_environment caps resource samples and points to list tools when truncated', function () {
+    foreach (['env-app-a', 'env-app-b', 'env-app-c'] as $name) {
+        Application::factory()->create([
+            'name' => $name,
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+    }
+
+    $response = mcpReadCall('get_environment', [
+        'project_uuid' => $this->project->uuid,
+        'environment_name_or_uuid' => $this->environment->uuid,
+        'sample_per_type' => 2,
+    ]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+
+    // beforeEach already has one application in this environment.
+    expect($body['data']['counts']['applications'])->toBeGreaterThanOrEqual(4)
+        ->and($body['data']['applications'])->toHaveCount(2)
+        ->and($body['data']['truncated']['applications'])->toBeTrue()
+        ->and(collect($body['data']['next_tools'])->pluck('tool')->all())->toContain('list_applications');
 });
 
 test('list_resources only returns team resources', function () {
@@ -356,14 +384,14 @@ test('list_deployments and get_deployment are team scoped and scrub logs', funct
         'application_name' => $this->application->name,
         'server_name' => $this->server->name,
         'commit' => 'abc123',
-        'logs' => json_encode([['name' => 'build', 'output' => 'SECRET_TOKEN=supersecret']]),
+        'logs' => json_encode([['name' => 'build', 'output' => 'SECRET_TOKEN=redactme01']]),
     ]);
 
     $list = mcpReadCall('list_deployments');
     $list->assertOk();
     $listBody = mcpReadJson($list);
     expect(collect($listBody['data'])->pluck('deployment_uuid'))->toContain($deployment->deployment_uuid);
-    expect(json_encode($listBody))->not->toContain('supersecret');
+    expect(json_encode($listBody))->not->toContain('redactme01');
     expect(json_encode($listBody))->not->toContain('"logs"');
 
     $get = mcpReadCall('get_deployment', ['uuid' => $deployment->deployment_uuid]);
@@ -371,7 +399,7 @@ test('list_deployments and get_deployment are team scoped and scrub logs', funct
     $getBody = mcpReadJson($get);
     expect($getBody['data']['deployment_uuid'])->toBe($deployment->deployment_uuid);
     expect($getBody['data']['application_uuid'])->toBe($this->application->uuid);
-    expect(json_encode($getBody))->not->toContain('supersecret');
+    expect(json_encode($getBody))->not->toContain('redactme01');
 
     $otherTeam = Team::factory()->create();
     $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
@@ -557,6 +585,88 @@ test('get_server_domains filters polymorphic destinations by type and id', funct
     expect($resourceUuids)->not->toContain($otherServerApp->uuid);
 });
 
+test('list_applications list_databases list_services server_uuid filters use destination type', function () {
+    // Other server gets the next standalone_dockers id (typically 2).
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $otherStandalone = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+
+    // Swarm on this server with the same numeric id as the other server's standalone docker.
+    DB::table('swarm_dockers')->insert([
+        'id' => $otherStandalone->id,
+        'uuid' => (string) Str::uuid(),
+        'server_id' => $this->server->id,
+        'name' => 'swarm-network-list-filter',
+        'network' => 'swarm-network-list-filter',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $swarmOnThisServer = SwarmDocker::query()->findOrFail($otherStandalone->id);
+    expect($swarmOnThisServer->id)->toBe($otherStandalone->id);
+
+    $swarmApp = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $swarmOnThisServer->id,
+        'destination_type' => SwarmDocker::class,
+        'name' => 'swarm-list-app',
+    ]);
+    $otherServerApp = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $otherStandalone->id,
+        'destination_type' => StandaloneDocker::class,
+        'name' => 'other-server-list-app',
+    ]);
+
+    $swarmDb = StandalonePostgresql::create([
+        'name' => 'swarm-list-db',
+        'status' => 'running:healthy',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $swarmOnThisServer->id,
+        'destination_type' => SwarmDocker::class,
+    ]);
+    $otherServerDb = StandalonePostgresql::create([
+        'name' => 'other-server-list-db',
+        'status' => 'running:healthy',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $otherStandalone->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    $swarmService = Service::factory()->create([
+        'name' => 'swarm-list-svc',
+        'environment_id' => $this->environment->id,
+        'server_id' => null,
+        'destination_id' => $swarmOnThisServer->id,
+        'destination_type' => SwarmDocker::class,
+    ]);
+    $otherServerService = Service::factory()->create([
+        'name' => 'other-server-list-svc',
+        'environment_id' => $this->environment->id,
+        'server_id' => null,
+        'destination_id' => $otherStandalone->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    $apps = mcpReadCall('list_applications', ['server_uuid' => $this->server->uuid]);
+    $apps->assertOk();
+    $appUuids = collect(mcpReadJson($apps)['data'])->pluck('uuid');
+    expect($appUuids)->toContain($this->application->uuid, $swarmApp->uuid)
+        ->not->toContain($otherServerApp->uuid);
+
+    $dbs = mcpReadCall('list_databases', ['server_uuid' => $this->server->uuid]);
+    $dbs->assertOk();
+    $dbUuids = collect(mcpReadJson($dbs)['data'])->pluck('uuid');
+    expect($dbUuids)->toContain($swarmDb->uuid)
+        ->not->toContain($otherServerDb->uuid);
+
+    $services = mcpReadCall('list_services', ['server_uuid' => $this->server->uuid]);
+    $services->assertOk();
+    $serviceUuids = collect(mcpReadJson($services)['data'])->pluck('uuid');
+    expect($serviceUuids)->toContain($swarmService->uuid)
+        ->not->toContain($otherServerService->uuid);
+});
+
 test('list_tags and get_current_team and list_team_members are team scoped', function () {
     Tag::create(['name' => 'prod', 'team_id' => $this->team->id]);
     Tag::create(['name' => 'theirs', 'team_id' => Team::factory()->create()->id]);
@@ -705,6 +815,42 @@ test('list_github_branches rejects private apps missing installation credentials
     expect($response->json('result.content.0.text'))
         ->toContain('missing installation credentials')
         ->not->toContain('private_key');
+    Http::assertNothingSent();
+});
+
+test('list_github_branches rejects owner or repo path segment injection', function () {
+    $publicApp = GithubApp::create([
+        'name' => 'Public Source Path Check',
+        'uuid' => 'github-public-path-check',
+        'team_id' => $this->team->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'is_public' => true,
+        'is_system_wide' => false,
+    ]);
+
+    Http::fake();
+
+    $badOwner = mcpReadCall('list_github_branches', [
+        'github_app_uuid' => $publicApp->uuid,
+        'owner' => 'cool/../labs',
+        'repo' => 'coolify',
+    ]);
+    $badOwner->assertOk();
+    expect($badOwner->json('result.isError'))->toBeTrue();
+    expect($badOwner->json('result.content.0.text'))->toContain('valid GitHub login');
+
+    $badRepo = mcpReadCall('list_github_branches', [
+        'github_app_uuid' => $publicApp->uuid,
+        'owner' => 'coollabsio',
+        'repo' => 'coolify/extra',
+    ]);
+    $badRepo->assertOk();
+    expect($badRepo->json('result.isError'))->toBeTrue();
+    expect($badRepo->json('result.content.0.text'))->toContain('valid GitHub repository');
+
     Http::assertNothingSent();
 });
 
@@ -957,7 +1103,7 @@ test('get_deployment include_log_summary requires sensitive read ability', funct
 test('get_deployment include_log_summary returns capped redacted text with sensitive read ability', function () {
     $logs = json_encode([
         ['output' => 'step 1 ok', 'type' => 'stdout', 'hidden' => false],
-        ['output' => 'password=supersecretvalue', 'type' => 'stderr', 'hidden' => false],
+        ['output' => 'password=redactme01', 'type' => 'stderr', 'hidden' => false],
         ['output' => 'done', 'type' => 'stdout', 'hidden' => false],
     ]);
 
@@ -982,7 +1128,7 @@ test('get_deployment include_log_summary returns capped redacted text with sensi
 
     expect($body['data']['log_summary']['available'])->toBeTrue();
     expect($body['data']['log_summary']['text'])->toContain('step 1 ok');
-    expect($body['data']['log_summary']['text'])->not->toContain('supersecretvalue');
+    expect($body['data']['log_summary']['text'])->not->toContain('redactme01');
     expect($body['data']['log_summary']['text'])->toContain('password=');
     // Full logs field still scrubbed from root payload
     expect(json_encode($body))->not->toContain('"logs":');
@@ -997,7 +1143,7 @@ test('get_deployment plain-text log summary respects the requested line limit', 
         'application_name' => $this->application->name,
         'server_name' => $this->server->name,
         'commit' => 'deadbeef',
-        'logs' => "first line\nsecond line token=supersecretvalue\nlast line",
+        'logs' => "first line\nsecond line token=redactme01\nlast line",
     ]);
 
     $response = mcpSensitiveReadCall('get_deployment', [
@@ -1011,7 +1157,7 @@ test('get_deployment plain-text log summary respects the requested line limit', 
     expect($summary['lines'])->toBe(1)
         ->and($summary['truncated'])->toBeTrue()
         ->and($summary['text'])->toBe('last line')
-        ->and($summary['text'])->not->toContain('supersecretvalue');
+        ->and($summary['text'])->not->toContain('redactme01');
 });
 
 test('list_servers reachable filter works', function () {
@@ -1041,6 +1187,35 @@ test('list_applications status and server_uuid filters work', function () {
     $missingServer = mcpReadCall('list_applications', ['server_uuid' => 'no-such-server']);
     $missingServer->assertOk();
     expect(mcpReadJson($missingServer)['data'])->toBe([]);
+});
+
+test('list_applications paginates with stable name order and disjoint pages', function () {
+    $this->application->update(['name' => 'app-z-original']);
+
+    foreach (['app-a', 'app-b', 'app-c'] as $name) {
+        Application::factory()->create([
+            'name' => $name,
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+    }
+
+    $page1 = mcpReadCall('list_applications', ['page' => 1, 'per_page' => 2]);
+    $page1->assertOk();
+    $page1Body = mcpReadJson($page1);
+    $page1Names = collect($page1Body['data'])->pluck('name')->all();
+    $page1Uuids = collect($page1Body['data'])->pluck('uuid')->all();
+
+    expect($page1Names)->toBe(collect($page1Names)->sort()->values()->all())
+        ->and($page1Body['_pagination']['total'])->toBeGreaterThanOrEqual(4)
+        ->and($page1Body['_pagination']['next']['args']['page'] ?? null)->toBe(2);
+
+    $page2 = mcpReadCall('list_applications', ['page' => 2, 'per_page' => 2]);
+    $page2->assertOk();
+    $page2Uuids = collect(mcpReadJson($page2)['data'])->pluck('uuid')->all();
+
+    expect(array_intersect($page1Uuids, $page2Uuids))->toBe([]);
 });
 
 test('list_databases filters by project, name, status, and server and is team scoped', function () {
@@ -1300,6 +1475,46 @@ test('get_logs returns structured next_tools when application is not running', f
     expect($body['data']['reason'])->toBe('not_running');
     expect($body['data']['next_tools'])->not->toBeEmpty();
     expect(collect($body['data']['next_tools'])->pluck('tool'))->toContain('list_deployments', 'list_unhealthy_resources');
+});
+
+test('get_logs returns structured choices when service has multiple containers', function () {
+    $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+
+    $service = Service::factory()->create([
+        'name' => 'multi-container-svc',
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $childApp = ServiceApplication::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'web',
+        'service_id' => $service->id,
+        'status' => 'running:healthy',
+        'image' => 'nginx:latest',
+    ]);
+    $childDb = ServiceDatabase::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'db',
+        'service_id' => $service->id,
+        'status' => 'running:healthy',
+        'image' => 'postgres:16',
+    ]);
+
+    $response = mcpSensitiveReadCall('get_logs', [
+        'resource' => 'service',
+        'uuid' => $service->uuid,
+    ]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+
+    expect($body['data']['ok'])->toBeFalse()
+        ->and($body['data']['reason'])->toBe('multiple_containers')
+        ->and($body['data']['choices'])->toBeArray()
+        ->and(collect($body['data']['choices'])->pluck('uuid')->all())
+        ->toContain($childApp->uuid, $childDb->uuid)
+        ->and(json_encode($body['data']['message'] ?? ''))->not->toContain('"uuid"');
 });
 
 test('coolify_help returns catalog intents', function () {
@@ -1923,7 +2138,7 @@ test('list_scheduled_tasks omits command without sensitive read ability', functi
     ScheduledTask::create([
         'uuid' => (string) Str::uuid(),
         'name' => 'nightly-backup',
-        'command' => 'pg_dump --password=supersecretvalue',
+        'command' => 'pg_dump --flag=redactme01',
         'frequency' => '0 2 * * *',
         'enabled' => true,
         'timeout' => 3600,
@@ -1941,7 +2156,7 @@ test('list_scheduled_tasks omits command without sensitive read ability', functi
         ->and($tasks[0]['name'])->toBe('nightly-backup')
         ->and($tasks[0]['command_included'])->toBeFalse()
         ->and($tasks[0])->not->toHaveKey('command');
-    expect(json_encode($tasks))->not->toContain('supersecretvalue');
+    expect(json_encode($tasks))->not->toContain('redactme01');
 
     $sensitive = mcpSensitiveReadCall('list_scheduled_tasks', [
         'resource' => 'application',
@@ -1956,9 +2171,68 @@ test('list_scheduled_tasks omits command without sensitive read ability', functi
         ->and($sensitiveTasks[0]['command'])->toContain('pg_dump');
 });
 
+test('list_scheduled_task_executions returns newest first across pages', function () {
+    $task = ScheduledTask::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'exec-history',
+        'command' => 'echo ok',
+        'frequency' => '0 1 * * *',
+        'enabled' => true,
+        'timeout' => 60,
+        'team_id' => $this->team->id,
+        'application_id' => $this->application->id,
+    ]);
+
+    $older = ScheduledTaskExecution::create([
+        'scheduled_task_id' => $task->id,
+        'status' => 'success',
+        'message' => 'older-run',
+        'started_at' => now()->subHours(2),
+        'finished_at' => now()->subHours(2)->addMinute(),
+        'created_at' => now()->subHours(2),
+        'updated_at' => now()->subHours(2),
+    ]);
+    $newer = ScheduledTaskExecution::create([
+        'scheduled_task_id' => $task->id,
+        'status' => 'failed',
+        'message' => 'newer-run',
+        'started_at' => now()->subHour(),
+        'finished_at' => now()->subHour()->addMinute(),
+        'created_at' => now()->subHour(),
+        'updated_at' => now()->subHour(),
+    ]);
+
+    $page1 = mcpReadCall('list_scheduled_task_executions', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+        'task_uuid' => $task->uuid,
+        'page' => 1,
+        'per_page' => 1,
+    ]);
+    $page1->assertOk();
+    $page1Body = mcpReadJson($page1);
+    expect($page1Body['data']['executions'])->toHaveCount(1)
+        ->and($page1Body['data']['executions'][0]['message'])->toBe('newer-run')
+        ->and($page1Body['_pagination']['total'])->toBe(2);
+
+    $page2 = mcpReadCall('list_scheduled_task_executions', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+        'task_uuid' => $task->uuid,
+        'page' => 2,
+        'per_page' => 1,
+    ]);
+    $page2->assertOk();
+    expect(mcpReadJson($page2)['data']['executions'][0]['message'])->toBe('older-run');
+
+    // Silence unused variable analysis when timestamps are forced via create attributes.
+    expect($older->id)->not->toBe($newer->id);
+});
+
 test('get_logs redacts secret-like values in container output', function () {
     // Preflight fails for non-running apps, so exercise redaction via the shared helper path
     // through get_deployment (already covered) and unit-level BuildsResponse redaction.
+    // Use low-entropy test markers so secret scanners do not flag fixtures.
     $trait = new class
     {
         use BuildsResponse;
@@ -1969,10 +2243,10 @@ test('get_logs redacts secret-like values in container output', function () {
         }
     };
 
-    $redacted = $trait->redact("boot ok\npassword=supersecretvalue\nAPI_TOKEN=abcd1234efgh\n");
+    $redacted = $trait->redact("boot ok\npassword=redactme01\nAPI_TOKEN=redactme02\n");
     expect($redacted)->toContain('boot ok')
-        ->and($redacted)->not->toContain('supersecretvalue')
-        ->and($redacted)->not->toContain('abcd1234efgh')
+        ->and($redacted)->not->toContain('redactme01')
+        ->and($redacted)->not->toContain('redactme02')
         ->and($redacted)->toContain('password=')
         ->and($redacted)->toContain(REDACTED);
 });
@@ -1988,21 +2262,21 @@ test('redactLogText redacts JSON secret fields in log lines', function () {
         }
     };
 
-    $jsonLine = '{"token":"secret-value","API_KEY":"another-secret-value","status":"ok"}';
+    $jsonLine = '{"token":"redactme01","API_KEY":"redactme02","status":"ok"}';
     $redacted = $trait->redact("request failed: {$jsonLine}");
 
     expect($redacted)->toContain('status')
         ->and($redacted)->toContain('ok')
-        ->and($redacted)->not->toContain('secret-value')
-        ->and($redacted)->not->toContain('another-secret-value')
+        ->and($redacted)->not->toContain('redactme01')
+        ->and($redacted)->not->toContain('redactme02')
         ->and($redacted)->toContain('token=')
         ->and($redacted)->toContain('API_KEY=')
         ->and($redacted)->toContain(REDACTED);
 
     // Shell-style still works alongside JSON
-    $mixed = $trait->redact('password=baresecret {"client_secret":"jsonsecret123"} export DB_PASSWORD=exportsecret');
-    expect($mixed)->not->toContain('baresecret')
-        ->and($mixed)->not->toContain('jsonsecret123')
-        ->and($mixed)->not->toContain('exportsecret')
+    $mixed = $trait->redact('password=redactme01 {"client_secret":"redactme02"} export DB_PASSWORD=redactme03');
+    expect($mixed)->not->toContain('redactme01')
+        ->and($mixed)->not->toContain('redactme02')
+        ->and($mixed)->not->toContain('redactme03')
         ->and($mixed)->toContain(REDACTED);
 });

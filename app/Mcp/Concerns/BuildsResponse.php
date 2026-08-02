@@ -198,7 +198,8 @@ trait BuildsResponse
         ];
 
         $s = strtolower((string) $status);
-        if (str_starts_with($s, 'running') && ! str_contains($s, 'unhealthy')) {
+        // Match GetLogs/control: any running* status (including unhealthy) can fetch logs / restart / stop.
+        if (str_starts_with($s, 'running')) {
             $actions[] = ['tool' => 'get_logs', 'args' => ['resource' => 'application', 'uuid' => $uuid], 'hint' => 'Live container logs (requires running)'];
             $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'restart', 'uuid' => $uuid], 'hint' => 'Restart (needs deploy ability)'];
             $actions[] = ['tool' => 'control', 'args' => ['resource' => 'application', 'action' => 'stop', 'uuid' => $uuid, 'confirm' => true], 'hint' => 'Stop (needs deploy + confirm)'];

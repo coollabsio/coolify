@@ -8,6 +8,8 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -89,10 +91,18 @@ class ListServices extends Tool
 
                     return;
                 }
-                $query->where(function ($q) use ($server) {
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function ($q) use ($server, $standaloneDockerIds, $swarmDockerIds) {
                     $q->where('server_id', $server->id)
-                        ->orWhereIn('destination_id', $server->standaloneDockers()->pluck('id')
-                            ->merge($server->swarmDockers()->pluck('id')));
+                        ->orWhere(function ($inner) use ($standaloneDockerIds) {
+                            $inner->where('destination_type', StandaloneDocker::class)
+                                ->whereIn('destination_id', $standaloneDockerIds);
+                        })
+                        ->orWhere(function ($inner) use ($swarmDockerIds) {
+                            $inner->where('destination_type', SwarmDocker::class)
+                                ->whereIn('destination_id', $swarmDockerIds);
+                        });
                 });
             })
             ->when(is_string($name), fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
@@ -110,6 +120,7 @@ class ListServices extends Tool
             $total = (clone $query)->count();
             $services = $query
                 ->orderBy('name')
+                ->orderBy('id')
                 ->skip($args['offset'])
                 ->take($args['per_page'])
                 ->get();

@@ -54,6 +54,7 @@ class ListUnhealthyResources extends Tool
                 $q->where('is_reachable', false)->orWhere('is_usable', false);
             })
             ->orderBy('name')
+            ->orderBy('id')
             ->get()
             ->map(function ($server) {
                 $reachable = (bool) $server->settings?->is_reachable;
@@ -104,6 +105,7 @@ class ListUnhealthyResources extends Tool
         if ($sampleOnly) {
             $unhealthyApps = (clone $appQuery)
                 ->orderBy('name')
+                ->orderBy('id')
                 ->limit($samplePerType)
                 ->get()
                 ->map(fn ($app) => $this->mapApplication($app));
@@ -177,6 +179,7 @@ class ListUnhealthyResources extends Tool
                 $take = min($need, $appCount - $skip);
                 $rows = (clone $appQuery)
                     ->orderBy('name')
+                    ->orderBy('id')
                     ->skip($skip)
                     ->take($take)
                     ->get()
@@ -277,7 +280,8 @@ class ListUnhealthyResources extends Tool
                 'applications:id,service_id,status,exclude_from_status',
                 'databases:id,service_id,status,exclude_from_status',
             ])
-            ->orderBy('name');
+            ->orderBy('name')
+            ->orderBy('id');
 
         $unhealthy = collect();
         $serviceCount = 0;
@@ -374,7 +378,7 @@ class ListUnhealthyResources extends Tool
 
             if ($sampleOnly) {
                 $remaining = $limit - $dbItems->count();
-                $rows = $dq->orderBy('name')->limit($remaining)->get(['uuid', 'name', 'status', 'environment_id']);
+                $rows = $dq->orderBy('name')->orderBy('id')->limit($remaining)->get(['uuid', 'name', 'status', 'environment_id']);
             } else {
                 if ($skipped + $count <= $skip) {
                     $skipped += $count;
@@ -388,7 +392,7 @@ class ListUnhealthyResources extends Tool
 
                     continue;
                 }
-                $rows = $dq->orderBy('name')->skip($localSkip)->take($localTake)->get(['uuid', 'name', 'status', 'environment_id']);
+                $rows = $dq->orderBy('name')->orderBy('id')->skip($localSkip)->take($localTake)->get(['uuid', 'name', 'status', 'environment_id']);
                 $skipped += $count;
             }
 

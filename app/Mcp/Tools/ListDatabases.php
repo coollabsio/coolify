@@ -7,6 +7,8 @@ use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -105,7 +107,7 @@ class ListDatabases extends Tool
             ));
         }
 
-        $destinationIds = null;
+        $destinationFilter = null;
         if (is_string($serverUuid)) {
             $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
             if (! $server) {
@@ -115,14 +117,17 @@ class ListDatabases extends Tool
                     $this->paginationMeta('list_databases', $args, 0, $extra),
                 ));
             }
-            $destinationIds = $server->standaloneDockers()->pluck('id')
-                ->merge($server->swarmDockers()->pluck('id'))
-                ->all();
+            // Keep morph type and ID sets separate so overlapping auto-increment IDs
+            // across standalone_dockers / swarm_dockers cannot cross-match.
+            $destinationFilter = [
+                StandaloneDocker::class => $server->standaloneDockers()->pluck('id')->all(),
+                SwarmDocker::class => $server->swarmDockers()->pluck('id')->all(),
+            ];
         }
 
         $union = $this->buildDatabaseUnion(
             $envIds->all(),
-            is_array($destinationIds) ? $destinationIds : null,
+            $destinationFilter,
             is_string($name) ? $name : null,
             is_string($status) ? $status : null,
         );
@@ -163,11 +168,11 @@ class ListDatabases extends Tool
 
     /**
      * @param  list<int|string>  $envIds
-     * @param  list<int|string>|null  $destinationIds
+     * @param  array<class-string, list<int|string>>|null  $destinationFilter  morph class => destination IDs
      */
     private function buildDatabaseUnion(
         array $envIds,
-        ?array $destinationIds,
+        ?array $destinationFilter,
         ?string $name,
         ?string $status,
     ): ?\Illuminate\Database\Query\Builder {
@@ -178,7 +183,7 @@ class ListDatabases extends Tool
                 $modelClass,
                 (string) $typeKey,
                 $envIds,
-                $destinationIds,
+                $destinationFilter,
                 $name,
                 $status,
             );
@@ -200,13 +205,13 @@ class ListDatabases extends Tool
     /**
      * @param  class-string  $modelClass
      * @param  list<int|string>  $envIds
-     * @param  list<int|string>|null  $destinationIds
+     * @param  array<class-string, list<int|string>>|null  $destinationFilter  morph class => destination IDs
      */
     private function databaseSelectQuery(
         string $modelClass,
         string $typeKey,
         array $envIds,
-        ?array $destinationIds,
+        ?array $destinationFilter,
         ?string $name,
         ?string $status,
     ): Builder {
@@ -228,7 +233,24 @@ class ListDatabases extends Tool
             ->join('environments', "{$table}.environment_id", '=', 'environments.id')
             ->join('projects', 'environments.project_id', '=', 'projects.id')
             ->whereIn("{$table}.environment_id", $envIds)
-            ->when(is_array($destinationIds), fn ($q) => $q->whereIn("{$table}.destination_id", $destinationIds))
+            ->when(is_array($destinationFilter), function ($q) use ($table, $destinationFilter) {
+                $q->where(function ($outer) use ($table, $destinationFilter) {
+                    $hasPredicate = false;
+                    foreach ($destinationFilter as $destinationType => $ids) {
+                        if ($ids === []) {
+                            continue;
+                        }
+                        $hasPredicate = true;
+                        $outer->orWhere(function ($inner) use ($table, $destinationType, $ids) {
+                            $inner->where("{$table}.destination_type", $destinationType)
+                                ->whereIn("{$table}.destination_id", $ids);
+                        });
+                    }
+                    if (! $hasPredicate) {
+                        $outer->whereRaw('1 = 0');
+                    }
+                });
+            })
             ->when(is_string($name), fn ($q) => $q->whereRaw("LOWER({$table}.name) LIKE ?", ['%'.strtolower($name).'%']))
             ->when(is_string($status), fn ($q) => $q->whereRaw("LOWER({$table}.status) LIKE ?", ['%'.strtolower($status).'%']));
     }

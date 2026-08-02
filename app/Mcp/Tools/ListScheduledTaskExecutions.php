@@ -64,7 +64,7 @@ class ListScheduledTaskExecutions extends Tool
         }
 
         $args = $this->paginationArgs($request);
-        $execQuery = $task->executions();
+        $execQuery = $task->executions()->orderByDesc('created_at')->orderByDesc('id');
         $total = (clone $execQuery)->count();
         $executions = $execQuery
             ->skip($args['offset'])

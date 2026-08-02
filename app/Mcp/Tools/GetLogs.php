@@ -69,6 +69,18 @@ class GetLogs extends Tool
             $logs = $this->redactLogText(
                 $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps)
             );
+        } catch (MultipleContainersException $e) {
+            $payload = $this->failurePayload(
+                reason: 'multiple_containers',
+                message: $e->getMessage(),
+                resourceType: $resourceType,
+                uuid: $uuid,
+                status: $resource->status ?? null,
+                server: $this->resolveServerMeta($resource, $resourceType),
+            );
+            $payload['choices'] = $e->choices;
+
+            return $this->mcpSuccess($request, $this->respond($payload), ['resource_uuid' => $uuid, 'outcome' => 'multiple_containers']);
         } catch (\Throwable $e) {
             return $this->mcpSuccess($request, $this->respond(
                 $this->failurePayload(
@@ -263,9 +275,9 @@ class GetLogs extends Tool
                     'name' => $db->name,
                 ]))->values()->all();
 
-                throw new \RuntimeException(
-                    'Service has multiple containers. Call get_logs with resource=service_application or service_database and the child uuid. Choices: '
-                    .json_encode($choices)
+                throw new MultipleContainersException(
+                    'Service has multiple containers. Call get_logs with resource=service_application or service_database and the child uuid.',
+                    $choices,
                 );
             }
 
@@ -306,5 +318,21 @@ class GetLogs extends Tool
             'lines' => $schema->integer()->description('Number of log lines (default 100, max 500).'),
             'show_timestamps' => $schema->boolean()->description('Include timestamps in log output.'),
         ];
+    }
+}
+
+/**
+ * Service has more than one child container; caller must pick service_application or service_database.
+ */
+class MultipleContainersException extends \RuntimeException
+{
+    /**
+     * @param  list<array{resource: string, uuid: string, name: mixed}>  $choices
+     */
+    public function __construct(
+        string $message,
+        public readonly array $choices,
+    ) {
+        parent::__construct($message);
     }
 }

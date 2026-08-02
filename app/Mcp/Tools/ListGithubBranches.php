@@ -49,6 +49,13 @@ class ListGithubBranches extends Tool
         if (! is_string($repo) || $repo === '') {
             return $this->mcpError($request, 'repo argument is required.');
         }
+        // GitHub path segments only — reject /, .., spaces, etc. before interpolating into the API path.
+        if (! $this->isValidGithubPathSegment($owner)) {
+            return $this->mcpError($request, 'owner must be a valid GitHub login or organization name.');
+        }
+        if (! $this->isValidGithubPathSegment($repo)) {
+            return $this->mcpError($request, 'repo must be a valid GitHub repository name.');
+        }
 
         $githubApp = GithubApp::query()
             ->where('uuid', $appUuid)
@@ -134,5 +141,13 @@ class ListGithubBranches extends Tool
             'owner' => $schema->string()->description('Repository owner.')->required(),
             'repo' => $schema->string()->description('Repository name.')->required(),
         ];
+    }
+
+    /**
+     * GitHub owner/repo path segments: letters, digits, underscore, period, hyphen only.
+     */
+    private function isValidGithubPathSegment(string $value): bool
+    {
+        return (bool) preg_match('/^[A-Za-z0-9_.-]+$/', $value);
     }
 }

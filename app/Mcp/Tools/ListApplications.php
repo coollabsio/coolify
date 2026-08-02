@@ -8,6 +8,8 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -95,9 +97,17 @@ class ListApplications extends Tool
 
                     return;
                 }
-                $destinationIds = $server->standaloneDockers()->pluck('id')
-                    ->merge($server->swarmDockers()->pluck('id'));
-                $query->whereIn('destination_id', $destinationIds);
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function ($q) use ($standaloneDockerIds, $swarmDockerIds) {
+                    $q->where(function ($inner) use ($standaloneDockerIds) {
+                        $inner->where('destination_type', StandaloneDocker::class)
+                            ->whereIn('destination_id', $standaloneDockerIds);
+                    })->orWhere(function ($inner) use ($swarmDockerIds) {
+                        $inner->where('destination_type', SwarmDocker::class)
+                            ->whereIn('destination_id', $swarmDockerIds);
+                    });
+                });
             })
             ->when(is_string($status), fn ($query) => $query->whereRaw('LOWER(status) LIKE ?', ['%'.strtolower($status).'%']))
             ->when(is_string($name), fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
@@ -105,6 +115,8 @@ class ListApplications extends Tool
         $total = (clone $query)->count();
 
         $summaries = $query
+            ->orderBy('name')
+            ->orderBy('id')
             ->skip($args['offset'])
             ->take($args['per_page'])
             ->get()
