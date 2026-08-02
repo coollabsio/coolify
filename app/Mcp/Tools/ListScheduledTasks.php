@@ -15,7 +15,7 @@ class ListScheduledTasks extends Tool
 {
     protected string $name = 'list_scheduled_tasks';
 
-    protected string $description = 'List scheduled tasks for an application or service owned by the authenticated team.';
+    protected string $description = 'List scheduled tasks for an application or service owned by the authenticated team. Task command bodies require read:sensitive; without it only metadata is returned.';
 
     use BuildsResponse;
     use ResolvesResource;
@@ -47,6 +47,11 @@ class ListScheduledTasks extends Tool
             return $this->mcpError($request, ucfirst($resourceType)." [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 
+        // Optional: command bodies are sensitive; omit unless token has read:sensitive/root.
+        // Do not call ensureAbility() here — lack of sensitive ability must not fail the tool.
+        $token = $request->user()?->currentAccessToken();
+        $includeCommand = $token !== null && ($token->can('root') || $token->can('read:sensitive'));
+
         $query = ScheduledTask::ownedByCurrentTeamAPI($teamId);
         if ($resourceType === 'application') {
             $query->where('application_id', $resource->id);
@@ -54,20 +59,28 @@ class ListScheduledTasks extends Tool
             $query->where('service_id', $resource->id);
         }
 
-        $tasks = $query->get()->map(fn ($task) => $this->scrubSensitive([
-            'uuid' => $task->uuid,
-            'name' => $task->name,
-            'enabled' => $task->enabled,
-            'command' => $task->command,
-            'frequency' => $task->frequency,
-            'container' => $task->container,
-            'timeout' => $task->timeout,
-        ]))->values()->all();
+        $tasks = $query->get()->map(function ($task) use ($includeCommand) {
+            $row = [
+                'uuid' => $task->uuid,
+                'name' => $task->name,
+                'enabled' => $task->enabled,
+                'frequency' => $task->frequency,
+                'container' => $task->container,
+                'timeout' => $task->timeout,
+                'command_included' => $includeCommand,
+            ];
+            if ($includeCommand) {
+                $row['command'] = $task->command;
+            }
+
+            return $this->scrubSensitive($row);
+        })->values()->all();
 
         return $this->mcpSuccess($request, $this->respond([
             'resource' => $resourceType,
             'uuid' => $uuid,
             'tasks' => $tasks,
+            'command_included' => $includeCommand,
         ]), ['resource_uuid' => $uuid]);
     }
 

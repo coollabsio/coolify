@@ -49,9 +49,30 @@ class GetServiceDatabase extends Tool
             return $this->mcpError($request, "Service database [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 
-        $db->setRelations([]);
-        $data = $this->scrubSensitive($db->toArray());
-        $data['service_uuid'] = $serviceUuid;
+        // Explicit whitelist so new model columns stay private by default (fail-closed).
+        $data = $this->scrubSensitive([
+            'uuid' => $db->uuid,
+            'service_uuid' => $serviceUuid,
+            'name' => $db->name,
+            'human_name' => $db->human_name,
+            'description' => $db->description,
+            'status' => $db->status,
+            'fqdn' => $db->fqdn,
+            'ports' => $db->ports,
+            'exposes' => $db->exposes,
+            'image' => $db->image,
+            'exclude_from_status' => $db->exclude_from_status,
+            'public_port' => $db->public_port,
+            'is_public' => $db->is_public,
+            'is_log_drain_enabled' => $db->is_log_drain_enabled,
+            'is_include_timestamps' => $db->is_include_timestamps,
+            'is_gzip_enabled' => $db->is_gzip_enabled,
+            'is_stripprefix_enabled' => $db->is_stripprefix_enabled,
+            'custom_type' => $db->custom_type,
+            'last_online_at' => $db->last_online_at,
+            'created_at' => $db->created_at,
+            'updated_at' => $db->updated_at,
+        ]);
 
         return $this->mcpSuccess($request, $this->respond($data, [
             ['tool' => 'get_logs', 'args' => ['resource' => 'service_database', 'uuid' => $uuid, 'parent_uuid' => $serviceUuid], 'hint' => 'Container logs'],

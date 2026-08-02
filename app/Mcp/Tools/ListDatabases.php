@@ -8,6 +8,9 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -93,9 +96,7 @@ class ListDatabases extends Tool
             $envQuery->where('id', $env->id);
         }
 
-        $envToProject = $envQuery->pluck('project_id', 'id');
-        $envIds = $envToProject->keys();
-
+        $envIds = $envQuery->pluck('id');
         if ($envIds->isEmpty()) {
             return $this->mcpSuccess($request, $this->respond(
                 [],
@@ -119,39 +120,117 @@ class ListDatabases extends Tool
                 ->all();
         }
 
-        $databases = collect();
-        foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
-            $dq = $modelClass::query()
-                ->whereIn('environment_id', $envIds)
-                ->when(is_array($destinationIds), fn ($q) => $q->whereIn('destination_id', $destinationIds))
-                ->when(is_string($name), fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']))
-                ->when(is_string($status), fn ($q) => $q->whereRaw('LOWER(status) LIKE ?', ['%'.strtolower($status).'%']));
+        $union = $this->buildDatabaseUnion(
+            $envIds->all(),
+            is_array($destinationIds) ? $destinationIds : null,
+            is_string($name) ? $name : null,
+            is_string($status) ? $status : null,
+        );
 
-            $rows = $dq->get(['uuid', 'name', 'status', 'environment_id']);
-
-            foreach ($rows as $db) {
-                $projectId = $envToProject[$db->environment_id] ?? null;
-                $project = $projectId ? $projects->get($projectId) : null;
-                $databases->push([
-                    'uuid' => $db->uuid,
-                    'name' => $db->name,
-                    'status' => $db->status ?? null,
-                    'type' => method_exists($db, 'type') ? $db->type() : class_basename($db),
-                    'project_uuid' => $project?->uuid,
-                    'project_name' => $project?->name,
-                ]);
-            }
+        if ($union === null) {
+            return $this->mcpSuccess($request, $this->respond(
+                [],
+                [],
+                $this->paginationMeta('list_databases', $args, 0, $extra),
+            ));
         }
 
-        $sorted = $databases->sortBy('name')->values();
-        $total = $sorted->count();
-        $summaries = $sorted->slice($args['offset'], $args['per_page'])->values()->all();
+        $total = (int) DB::query()->fromSub($union, 'databases')->count();
+
+        $summaries = DB::query()
+            ->fromSub($union, 'databases')
+            ->orderBy('name')
+            ->offset($args['offset'])
+            ->limit($args['per_page'])
+            ->get()
+            ->map(fn ($row) => [
+                'uuid' => $row->uuid,
+                'name' => $row->name,
+                'status' => $row->status,
+                'type' => $row->type,
+                'project_uuid' => $row->project_uuid,
+                'project_name' => $row->project_name,
+            ])
+            ->values()
+            ->all();
 
         return $this->mcpSuccess($request, $this->respond(
             $summaries,
             [],
             $this->paginationMeta('list_databases', $args, $total, $extra),
         ));
+    }
+
+    /**
+     * @param  list<int|string>  $envIds
+     * @param  list<int|string>|null  $destinationIds
+     */
+    private function buildDatabaseUnion(
+        array $envIds,
+        ?array $destinationIds,
+        ?string $name,
+        ?string $status,
+    ): ?\Illuminate\Database\Query\Builder {
+        $parts = [];
+
+        foreach (STANDALONE_DATABASE_MODELS as $typeKey => $modelClass) {
+            $parts[] = $this->databaseSelectQuery(
+                $modelClass,
+                (string) $typeKey,
+                $envIds,
+                $destinationIds,
+                $name,
+                $status,
+            );
+        }
+
+        if ($parts === []) {
+            return null;
+        }
+
+        /** @var Builder $union */
+        $union = array_shift($parts);
+        foreach ($parts as $part) {
+            $union->unionAll($part);
+        }
+
+        return $union->toBase();
+    }
+
+    /**
+     * @param  class-string  $modelClass
+     * @param  list<int|string>  $envIds
+     * @param  list<int|string>|null  $destinationIds
+     */
+    private function databaseSelectQuery(
+        string $modelClass,
+        string $typeKey,
+        array $envIds,
+        ?array $destinationIds,
+        ?string $name,
+        ?string $status,
+    ): Builder {
+        /** @var Model $model */
+        $model = new $modelClass;
+        $table = $model->getTable();
+        $resourceType = method_exists($model, 'type') ? $model->type() : 'standalone-'.$typeKey;
+        $typeLiteral = "'".str_replace("'", "''", $resourceType)."'";
+
+        return $modelClass::query()
+            ->select([
+                "{$table}.uuid",
+                "{$table}.name",
+                "{$table}.status",
+                DB::raw("{$typeLiteral} as type"),
+                'projects.uuid as project_uuid',
+                'projects.name as project_name',
+            ])
+            ->join('environments', "{$table}.environment_id", '=', 'environments.id')
+            ->join('projects', 'environments.project_id', '=', 'projects.id')
+            ->whereIn("{$table}.environment_id", $envIds)
+            ->when(is_array($destinationIds), fn ($q) => $q->whereIn("{$table}.destination_id", $destinationIds))
+            ->when(is_string($name), fn ($q) => $q->whereRaw("LOWER({$table}.name) LIKE ?", ['%'.strtolower($name).'%']))
+            ->when(is_string($status), fn ($q) => $q->whereRaw("LOWER({$table}.status) LIKE ?", ['%'.strtolower($status).'%']));
     }
 
     public function schema(JsonSchema $schema): array

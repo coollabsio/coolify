@@ -44,7 +44,8 @@ class CancelDeployment extends Tool
 
         // Match deployment_by_uuid: authorize by application ownership, not server ownership.
         // Server-scoped checks allow a shared-server host team to cancel another team's deployment.
-        $application = $deployment->application;
+        // Include soft-deleted apps so in-flight deploys remain cancellable after app delete.
+        $application = $deployment->application()->withTrashed()->first();
         if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
             return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }

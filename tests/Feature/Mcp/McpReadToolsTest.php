@@ -1,5 +1,6 @@
 <?php
 
+use App\Mcp\Concerns\BuildsResponse;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -9,9 +10,11 @@ use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneMysql;
@@ -1585,4 +1588,266 @@ test('MCP overview resource returns batched project resource counts', function (
         'services' => 1,
         'databases' => 1,
     ]);
+});
+
+test('get_deployment and cancel_deployment work for soft-deleted applications', function () {
+    Process::fake([
+        '*' => Process::result(output: ''),
+    ]);
+
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-soft-delete-'.fake()->uuid(),
+        'status' => 'in_progress',
+        'server_id' => $this->server->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+        'commit' => 'abc123',
+    ]);
+
+    $deployToken = $this->user->createToken('mcp-soft-cancel', ['read', 'deploy'])->plainTextToken;
+
+    $this->application->delete();
+    expect(Application::withTrashed()->find($this->application->id))->not->toBeNull();
+    expect(Application::find($this->application->id))->toBeNull();
+
+    // get_deployment still resolves soft-deleted applications for the team.
+    $get = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$deployToken,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'get_deployment',
+            'arguments' => (object) ['uuid' => $deployment->deployment_uuid],
+        ],
+    ]);
+    $get->assertOk();
+    expect($get->json('result.isError'))->toBeFalse();
+    $getBody = mcpReadJson($get);
+    expect($getBody['data']['deployment_uuid'])->toBe($deployment->deployment_uuid)
+        ->and($getBody['data']['application_uuid'])->toBe($this->application->uuid);
+
+    $cancel = test()->withHeaders([
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json, text/event-stream',
+        'Authorization' => 'Bearer '.$deployToken,
+    ])->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'cancel_deployment',
+            'arguments' => (object) ['uuid' => $deployment->deployment_uuid],
+        ],
+    ]);
+    $cancel->assertOk();
+    expect($cancel->json('result.isError'))->toBeFalse();
+    expect($deployment->fresh()->status)->toBe('cancelled-by-user');
+});
+
+test('list_databases paginates at the query layer', function () {
+    foreach (['alpha-db', 'beta-db', 'gamma-db'] as $name) {
+        StandalonePostgresql::create([
+            'name' => $name,
+            'status' => 'running:healthy',
+            'postgres_password' => 'password',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+    }
+
+    $page1 = mcpReadCall('list_databases', ['per_page' => 2, 'page' => 1]);
+    $page1->assertOk();
+    $body1 = mcpReadJson($page1);
+    expect($body1['_pagination']['total'])->toBe(3)
+        ->and($body1['data'])->toHaveCount(2)
+        ->and($body1['data'][0]['name'])->toBe('alpha-db')
+        ->and($body1['data'][1]['name'])->toBe('beta-db');
+
+    $page2 = mcpReadCall('list_databases', ['per_page' => 2, 'page' => 2]);
+    $page2->assertOk();
+    $body2 = mcpReadJson($page2);
+    expect($body2['data'])->toHaveCount(1)
+        ->and($body2['data'][0]['name'])->toBe('gamma-db');
+});
+
+test('list_unhealthy_resources full mode paginates without dropping summary totals', function () {
+    $this->application->update(['name' => 'AppA', 'status' => 'exited:unhealthy']);
+    Application::factory()->create([
+        'name' => 'AppB',
+        'status' => 'exited:unhealthy',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    Application::factory()->create([
+        'name' => 'AppC',
+        'status' => 'exited:unhealthy',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    // Ensure the default server is not counted as unhealthy (factory settings vary).
+    $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+
+    $page1 = mcpReadCall('list_unhealthy_resources', [
+        'sample_only' => false,
+        'per_page' => 2,
+        'page' => 1,
+    ]);
+    $page1->assertOk();
+    $body1 = mcpReadJson($page1);
+    expect($body1['data']['summary']['applications'])->toBe(3)
+        ->and($body1['data']['summary']['servers'])->toBe(0)
+        ->and($body1['_pagination']['total'])->toBe(3)
+        ->and($body1['data']['unhealthy'])->toHaveCount(2);
+
+    $page1Names = collect($body1['data']['unhealthy'])->pluck('name')->all();
+    expect($page1Names)->toBe(['AppA', 'AppB']);
+
+    $page2 = mcpReadCall('list_unhealthy_resources', [
+        'sample_only' => false,
+        'per_page' => 2,
+        'page' => 2,
+    ]);
+    $page2->assertOk();
+    $body2 = mcpReadJson($page2);
+    expect($body2['data']['unhealthy'])->toHaveCount(1)
+        ->and($body2['data']['unhealthy'][0]['name'])->toBe('AppC');
+});
+
+test('get_service_database returns a field whitelist and is team scoped', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'docker_compose_raw' => "services:\n  db:\n    image: postgres:16\n",
+    ]);
+    $db = ServiceDatabase::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'db',
+        'human_name' => 'Database',
+        'description' => 'Primary DB',
+        'service_id' => $service->id,
+        'image' => 'postgres:16',
+        'status' => 'running:healthy',
+    ]);
+
+    $response = mcpReadCall('get_service_database', [
+        'service_uuid' => $service->uuid,
+        'uuid' => $db->uuid,
+    ]);
+    $response->assertOk();
+    $data = mcpReadJson($response)['data'];
+
+    expect($data['uuid'])->toBe($db->uuid)
+        ->and($data['service_uuid'])->toBe($service->uuid)
+        ->and($data['name'])->toBe('db')
+        ->and($data)->toHaveKeys([
+            'uuid',
+            'service_uuid',
+            'name',
+            'human_name',
+            'description',
+            'status',
+            'image',
+            'created_at',
+            'updated_at',
+        ])
+        ->and($data)->not->toHaveKey('id')
+        ->and($data)->not->toHaveKey('service_id')
+        ->and($data)->not->toHaveKey('is_migrated');
+
+    $otherTeam = Team::factory()->create();
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnv = $otherProject->environments()->first()
+        ?? Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherDest = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+    $otherService = Service::factory()->create([
+        'environment_id' => $otherEnv->id,
+        'server_id' => $otherServer->id,
+        'destination_id' => $otherDest->id,
+        'destination_type' => $otherDest->getMorphClass(),
+    ]);
+    $otherDb = ServiceDatabase::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'theirs',
+        'service_id' => $otherService->id,
+        'image' => 'postgres:16',
+    ]);
+
+    $denied = mcpReadCall('get_service_database', [
+        'service_uuid' => $otherService->uuid,
+        'uuid' => $otherDb->uuid,
+    ]);
+    expect($denied->json('result.isError'))->toBeTrue();
+});
+
+test('list_scheduled_tasks omits command without sensitive read ability', function () {
+    ScheduledTask::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'nightly-backup',
+        'command' => 'pg_dump --password=supersecretvalue',
+        'frequency' => '0 2 * * *',
+        'enabled' => true,
+        'timeout' => 3600,
+        'team_id' => $this->team->id,
+        'application_id' => $this->application->id,
+    ]);
+
+    $readOnly = mcpReadCall('list_scheduled_tasks', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+    ]);
+    $readOnly->assertOk();
+    $tasks = mcpReadJson($readOnly)['data']['tasks'];
+    expect($tasks)->toHaveCount(1)
+        ->and($tasks[0]['name'])->toBe('nightly-backup')
+        ->and($tasks[0]['command_included'])->toBeFalse()
+        ->and($tasks[0])->not->toHaveKey('command');
+    expect(json_encode($tasks))->not->toContain('supersecretvalue');
+
+    // Avoid Sanctum auth state bleeding from the previous bearer token in this test.
+    app('auth')->forgetGuards();
+
+    $sensitive = mcpSensitiveReadCall('list_scheduled_tasks', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+    ]);
+    $sensitive->assertOk();
+    expect($sensitive->json('result.isError'))->toBeFalse();
+    $sensitiveBody = mcpReadJson($sensitive);
+    expect($sensitiveBody['data']['command_included'])->toBeTrue();
+    $sensitiveTasks = $sensitiveBody['data']['tasks'];
+    expect($sensitiveTasks[0]['command_included'])->toBeTrue()
+        ->and($sensitiveTasks[0]['command'])->toContain('pg_dump');
+});
+
+test('get_logs redacts secret-like values in container output', function () {
+    // Preflight fails for non-running apps, so exercise redaction via the shared helper path
+    // through get_deployment (already covered) and unit-level BuildsResponse redaction.
+    $trait = new class
+    {
+        use BuildsResponse;
+
+        public function redact(string $text): string
+        {
+            return $this->redactLogText($text);
+        }
+    };
+
+    $redacted = $trait->redact("boot ok\npassword=supersecretvalue\nAPI_TOKEN=abcd1234efgh\n");
+    expect($redacted)->toContain('boot ok')
+        ->and($redacted)->not->toContain('supersecretvalue')
+        ->and($redacted)->not->toContain('abcd1234efgh')
+        ->and($redacted)->toContain('password=')
+        ->and($redacted)->toContain(REDACTED);
 });

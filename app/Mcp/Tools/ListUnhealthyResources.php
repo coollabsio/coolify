@@ -11,6 +11,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -20,7 +21,7 @@ class ListUnhealthyResources extends Tool
 {
     protected string $name = 'list_unhealthy_resources';
 
-    protected string $description = 'List team resources that look unhealthy or down. Prefer sample_only=true first (cheap sample + counts). Apps/DBs use SQL filters; services need a lightweight status scan. Default per_page 20.';
+    protected string $description = 'List team resources that look unhealthy or down. Prefer sample_only=true first (cheap sample + counts). Apps/DBs use SQL filters; services need a lightweight status scan. Full mode paginates without hydrating the full unhealthy set. Default per_page 20.';
 
     use BuildsResponse;
     use McpStatusFilters;
@@ -74,25 +75,23 @@ class ListUnhealthyResources extends Tool
             ->with(['environment.project:id,uuid,name,team_id']);
         $this->scopeNotHealthyRunning($appQuery);
         $appCount = (clone $appQuery)->count();
-        $unhealthyApps = $appQuery
-            ->orderBy('name')
-            ->when($sampleOnly, fn ($q) => $q->limit($samplePerType))
-            ->get()
-            ->map(fn ($app) => [
-                'type' => 'application',
-                'uuid' => $app->uuid,
-                'name' => $app->name,
-                'status' => $app->status,
-                'project_uuid' => $app->environment?->project?->uuid,
-                'project_name' => $app->environment?->project?->name,
-                'reason' => 'status_not_running',
-            ]);
 
-        // --- Services: aggregated status accessor; chunk + early exit for samples ---
-        [$serviceCount, $unhealthyServices] = $this->collectUnhealthyServices($teamId, $sampleOnly, $samplePerType);
+        // --- Services / DBs: count always; hydrate samples only when sample_only ---
+        [$serviceCount, $serviceSamples] = $this->collectUnhealthyServices(
+            $teamId,
+            $sampleOnly,
+            $samplePerType,
+            skip: 0,
+            take: $sampleOnly ? $samplePerType : 0,
+        );
 
-        // --- Databases: SQL per standalone model, team env ids once ---
-        [$dbCount, $dbItems] = $this->collectUnhealthyDatabases($teamId, $sampleOnly, $samplePerType);
+        [$dbCount, $dbSamples] = $this->collectUnhealthyDatabases(
+            $teamId,
+            $sampleOnly,
+            $samplePerType,
+            skip: 0,
+            take: $sampleOnly ? $samplePerType : 0,
+        );
 
         $summary = [
             'total' => $unhealthyServers->count() + $appCount + $serviceCount + $dbCount,
@@ -103,6 +102,12 @@ class ListUnhealthyResources extends Tool
         ];
 
         if ($sampleOnly) {
+            $unhealthyApps = (clone $appQuery)
+                ->orderBy('name')
+                ->limit($samplePerType)
+                ->get()
+                ->map(fn ($app) => $this->mapApplication($app));
+
             return $this->mcpSuccess($request, $this->respond([
                 'sample_only' => true,
                 'sample_per_type' => $samplePerType,
@@ -110,8 +115,8 @@ class ListUnhealthyResources extends Tool
                 'samples' => [
                     'servers' => $unhealthyServers->take($samplePerType)->values()->all(),
                     'applications' => $unhealthyApps->values()->all(),
-                    'services' => $unhealthyServices->values()->all(),
-                    'databases' => $dbItems->values()->all(),
+                    'services' => $serviceSamples->values()->all(),
+                    'databases' => $dbSamples->values()->all(),
                 ],
                 'next' => [
                     'tool' => 'list_unhealthy_resources',
@@ -121,15 +126,18 @@ class ListUnhealthyResources extends Tool
             ]));
         }
 
-        $items = $unhealthyServers
-            ->concat($unhealthyApps)
-            ->concat($unhealthyServices)
-            ->concat($dbItems)
-            ->sortBy(['type', 'name'])
-            ->values();
-
-        $total = $items->count();
-        $page = $items->slice($args['offset'], $args['per_page'])->values()->all();
+        // Full mode: paginate by type group without loading the full unhealthy set.
+        // Global order matches sortBy(['type','name']): application, server, service, then standalone-*.
+        $page = $this->paginateFullList(
+            $teamId,
+            $appQuery,
+            $unhealthyServers,
+            $appCount,
+            $serviceCount,
+            $dbCount,
+            $args['offset'],
+            $args['per_page'],
+        );
 
         return $this->mcpSuccess($request, $this->respond(
             [
@@ -137,15 +145,127 @@ class ListUnhealthyResources extends Tool
                 'summary' => $summary,
             ],
             [],
-            $this->paginationMeta('list_unhealthy_resources', $args, $total, ['sample_only' => false]),
+            $this->paginationMeta('list_unhealthy_resources', $args, $summary['total'], ['sample_only' => false]),
         ));
+    }
+
+    /**
+     * Walk type groups in sorted order and fetch only the current page window.
+     *
+     * @param  Builder  $appQuery
+     * @param  Collection<int, array<string, mixed>>  $unhealthyServers
+     * @return list<array<string, mixed>>
+     */
+    private function paginateFullList(
+        int $teamId,
+        $appQuery,
+        Collection $unhealthyServers,
+        int $appCount,
+        int $serviceCount,
+        int $dbCount,
+        int $offset,
+        int $perPage,
+    ): array {
+        $skip = $offset;
+        $need = $perPage;
+        $page = [];
+
+        // 1) applications (type = application)
+        if ($need > 0) {
+            if ($skip >= $appCount) {
+                $skip -= $appCount;
+            } else {
+                $take = min($need, $appCount - $skip);
+                $rows = (clone $appQuery)
+                    ->orderBy('name')
+                    ->skip($skip)
+                    ->take($take)
+                    ->get()
+                    ->map(fn ($app) => $this->mapApplication($app))
+                    ->all();
+                $page = array_merge($page, $rows);
+                $need -= count($rows);
+                $skip = 0;
+            }
+        }
+
+        // 2) servers (type = server) — small set
+        $serverCount = $unhealthyServers->count();
+        if ($need > 0) {
+            if ($skip >= $serverCount) {
+                $skip -= $serverCount;
+            } else {
+                $rows = $unhealthyServers->slice($skip, $need)->values()->all();
+                $page = array_merge($page, $rows);
+                $need -= count($rows);
+                $skip = 0;
+            }
+        }
+
+        // 3) services (type = service)
+        if ($need > 0) {
+            if ($skip >= $serviceCount) {
+                $skip -= $serviceCount;
+            } else {
+                [, $serviceRows] = $this->collectUnhealthyServices(
+                    $teamId,
+                    sampleOnly: false,
+                    samplePerType: 1,
+                    skip: $skip,
+                    take: $need,
+                );
+                $rows = $serviceRows->values()->all();
+                $page = array_merge($page, $rows);
+                $need -= count($rows);
+                $skip = 0;
+            }
+        }
+
+        // 4) databases by type() alphabetically (standalone-*)
+        if ($need > 0) {
+            if ($skip >= $dbCount) {
+                // nothing left
+            } else {
+                [, $dbRows] = $this->collectUnhealthyDatabases(
+                    $teamId,
+                    sampleOnly: false,
+                    samplePerType: 1,
+                    skip: $skip,
+                    take: $need,
+                );
+                $page = array_merge($page, $dbRows->values()->all());
+            }
+        }
+
+        return $page;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function mapApplication(Application $app): array
+    {
+        return [
+            'type' => 'application',
+            'uuid' => $app->uuid,
+            'name' => $app->name,
+            'status' => $app->status,
+            'project_uuid' => $app->environment?->project?->uuid,
+            'project_name' => $app->environment?->project?->name,
+            'reason' => 'status_not_running',
+        ];
     }
 
     /**
      * @return array{0: int, 1: Collection<int, array<string, mixed>>}
      */
-    private function collectUnhealthyServices(int $teamId, bool $sampleOnly, int $samplePerType): array
-    {
+    private function collectUnhealthyServices(
+        int $teamId,
+        bool $sampleOnly,
+        int $samplePerType,
+        int $skip = 0,
+        ?int $take = null,
+    ): array {
         $base = Service::whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId))
             ->with([
                 'environment.project:id,uuid,name,team_id',
@@ -156,17 +276,29 @@ class ListUnhealthyResources extends Tool
 
         $unhealthy = collect();
         $serviceCount = 0;
+        $skipped = 0;
+        // take=0 means count-only (no row hydration beyond status check).
+        $limit = $take === null ? ($sampleOnly ? $samplePerType : PHP_INT_MAX) : max(0, $take);
 
         // Chunk so large teams do not hydrate every service at once.
-        $base->chunk(100, function ($chunk) use ($sampleOnly, $samplePerType, &$unhealthy, &$serviceCount) {
+        $base->chunk(100, function ($chunk) use ($skip, $limit, &$unhealthy, &$serviceCount, &$skipped) {
             foreach ($chunk as $svc) {
                 if ($this->looksHealthy($svc->status ?? null)) {
                     continue;
                 }
                 $serviceCount++;
-                if ($sampleOnly && $unhealthy->count() >= $samplePerType) {
+
+                if ($limit === 0 || $unhealthy->count() >= $limit) {
+                    // Still count remaining unhealthy services.
                     continue;
                 }
+
+                if ($skipped < $skip) {
+                    $skipped++;
+
+                    continue;
+                }
+
                 $unhealthy->push([
                     'type' => 'service',
                     'uuid' => $svc->uuid,
@@ -185,8 +317,13 @@ class ListUnhealthyResources extends Tool
     /**
      * @return array{0: int, 1: Collection<int, array<string, mixed>>}
      */
-    private function collectUnhealthyDatabases(int $teamId, bool $sampleOnly, int $samplePerType): array
-    {
+    private function collectUnhealthyDatabases(
+        int $teamId,
+        bool $sampleOnly,
+        int $samplePerType,
+        int $skip = 0,
+        ?int $take = null,
+    ): array {
         $projects = Project::where('team_id', $teamId)->select('id', 'uuid', 'name')->get()->keyBy('id');
         $envToProject = Environment::query()
             ->whereIn('project_id', $projects->keys())
@@ -200,20 +337,56 @@ class ListUnhealthyResources extends Tool
             return [0, $dbItems];
         }
 
-        foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        // Walk model types in alphabetical type() order to match global sortBy(['type','name']).
+        $models = collect(STANDALONE_DATABASE_MODELS)
+            ->mapWithKeys(function ($modelClass, $typeKey) {
+                /** @var class-string $modelClass */
+                $model = new $modelClass;
+                $type = method_exists($model, 'type') ? $model->type() : 'standalone-'.$typeKey;
+
+                return [$type => $modelClass];
+            })
+            ->sortKeys();
+
+        $skipped = 0;
+        // take=0 means count-only (no row hydration).
+        $limit = $take === null ? ($sampleOnly ? $samplePerType : PHP_INT_MAX) : max(0, $take);
+
+        foreach ($models as $type => $modelClass) {
             $dq = $modelClass::query()->whereIn('environment_id', $envIds);
             $this->scopeNotHealthyRunning($dq);
-            $dbCount += (clone $dq)->count();
+            $count = (clone $dq)->count();
+            $dbCount += $count;
 
-            $rows = $dq->orderBy('name')
-                ->when($sampleOnly, fn ($q) => $q->limit($samplePerType))
-                ->get(['uuid', 'name', 'status', 'environment_id']);
+            if ($limit === 0 || $dbItems->count() >= $limit) {
+                continue;
+            }
+
+            if ($sampleOnly) {
+                $remaining = $limit - $dbItems->count();
+                $rows = $dq->orderBy('name')->limit($remaining)->get(['uuid', 'name', 'status', 'environment_id']);
+            } else {
+                if ($skipped + $count <= $skip) {
+                    $skipped += $count;
+
+                    continue;
+                }
+                $localSkip = max(0, $skip - $skipped);
+                $localTake = min($count - $localSkip, $limit - $dbItems->count());
+                if ($localTake <= 0) {
+                    $skipped += $count;
+
+                    continue;
+                }
+                $rows = $dq->orderBy('name')->skip($localSkip)->take($localTake)->get(['uuid', 'name', 'status', 'environment_id']);
+                $skipped += $count;
+            }
 
             foreach ($rows as $db) {
                 $projectId = $envToProject[$db->environment_id] ?? null;
                 $project = $projectId ? $projects->get($projectId) : null;
                 $dbItems->push([
-                    'type' => method_exists($db, 'type') ? $db->type() : class_basename($db),
+                    'type' => $type,
                     'resource_kind' => 'database',
                     'uuid' => $db->uuid,
                     'name' => $db->name,
@@ -223,13 +396,17 @@ class ListUnhealthyResources extends Tool
                     'reason' => 'status_not_running',
                 ]);
             }
+
+            if ($sampleOnly && $dbItems->count() >= $limit) {
+                break;
+            }
         }
 
         if ($sampleOnly) {
             $dbItems = $dbItems->unique('uuid')->take($samplePerType)->values();
         }
 
-        return [$dbCount, $dbItems];
+        return [$dbCount, $dbItems->values()];
     }
 
     public function schema(JsonSchema $schema): array

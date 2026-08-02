@@ -51,7 +51,8 @@ class GetDeployment extends Tool
             return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 
-        $application = $deployment->application;
+        // Include soft-deleted apps so mid-deploy deletes remain inspectable/cancellable.
+        $application = $deployment->application()->withTrashed()->first();
         $appTeamId = $application?->team()?->id;
         if (! $application || (int) $appTeamId !== $teamId) {
             return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
@@ -160,31 +161,6 @@ class GetDeployment extends Tool
             'truncated' => $truncated,
             'text' => $text,
         ];
-    }
-
-    /**
-     * Best-effort redaction for deploy log tails shown to MCP clients.
-     * Uses remove_iip plus common KEY=value secret patterns; not a guarantee.
-     */
-    private function redactLogText(string $text): string
-    {
-        $text = remove_iip($text);
-
-        // password= / secret= / token= style assignments (quoted or bare)
-        $text = preg_replace(
-            '/\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token)\b\s*[=:]\s*[\'"]?[^\s\'"]{3,}[\'"]?/i',
-            '$1='.REDACTED,
-            $text
-        ) ?? $text;
-
-        // export FOO=bar style for sensitive-looking names
-        $text = preg_replace(
-            '/\b(export\s+)?([A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*[\'"]?[^\s\'"]{3,}[\'"]?/i',
-            '$1$2='.REDACTED,
-            $text
-        ) ?? $text;
-
-        return $text;
     }
 
     private function truncateText(string $text, int $max): string

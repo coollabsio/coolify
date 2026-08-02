@@ -18,7 +18,7 @@ class GetLogs extends Tool
 {
     protected string $name = 'get_logs';
 
-    protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Requires read:sensitive ability. Multi-container services require resource=service_application|service_database. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
+    protected string $description = 'Fetch recent container logs for an application, database, service, or service child. Requires read:sensitive ability. Output is best-effort redacted (not a guarantee). Multi-container services require resource=service_application|service_database. Requires a running container on a reachable server. On failure returns structured reason + next_tools (DB-only follow-ups). Default 100 lines, max 500.';
 
     use BuildsResponse;
     use ResolvesResource;
@@ -66,7 +66,9 @@ class GetLogs extends Tool
         }
 
         try {
-            $logs = $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps);
+            $logs = $this->redactLogText(
+                $this->fetchLogs($resource, $resourceType, $lines, $showTimestamps)
+            );
         } catch (\Throwable $e) {
             return $this->mcpSuccess($request, $this->respond(
                 $this->failurePayload(
@@ -86,6 +88,7 @@ class GetLogs extends Tool
             'uuid' => $uuid,
             'lines' => $lines,
             'logs' => $logs,
+            'redacted' => true,
         ]), ['resource_uuid' => $uuid]);
     }
 

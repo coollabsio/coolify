@@ -94,6 +94,31 @@ trait BuildsResponse
     }
 
     /**
+     * Best-effort redaction for free-form log text shown to MCP clients.
+     * Uses remove_iip plus common KEY=value secret patterns; not a guarantee.
+     */
+    protected function redactLogText(string $text): string
+    {
+        $text = remove_iip($text);
+
+        // password= / secret= / token= style assignments (quoted or bare)
+        $text = preg_replace(
+            '/\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|auth[_-]?token)\b\s*[=:]\s*[\'"]?[^\s\'"]{3,}[\'"]?/i',
+            '$1='.REDACTED,
+            $text
+        ) ?? $text;
+
+        // export FOO=bar style for sensitive-looking names
+        $text = preg_replace(
+            '/\b(export\s+)?([A-Z][A-Z0-9_]*(?:SECRET|PASSWORD|TOKEN|PASSWD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*)\s*=\s*[\'"]?[^\s\'"]{3,}[\'"]?/i',
+            '$1$2='.REDACTED,
+            $text
+        ) ?? $text;
+
+        return $text;
+    }
+
+    /**
      * @param  array<string, mixed>|array<int, mixed>  $data
      * @param  array<int, array<string, mixed>>  $actions
      * @param  array<string, mixed>|null  $pagination
