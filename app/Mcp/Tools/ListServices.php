@@ -175,6 +175,7 @@ class ListServices extends Tool
                 'databases:id,service_id,status,exclude_from_status',
             ])
             ->orderBy('name')
+            ->orderBy('id')
             ->chunk(100, function ($chunk) use ($statusNeedle, $offset, $pageEnd, &$matched, &$total) {
                 foreach ($chunk as $service) {
                     if (! str_contains(strtolower((string) $service->status), $statusNeedle)) {

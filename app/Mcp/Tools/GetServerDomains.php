@@ -6,6 +6,8 @@ use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Stringable;
 use Laravel\Mcp\Request;
@@ -42,11 +44,19 @@ class GetServerDomains extends Tool
             return $this->mcpError($request, "Server [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }
 
-        $destinationIds = $server->standaloneDockers()->pluck('id')
-            ->merge($server->swarmDockers()->pluck('id'));
+        $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+        $swarmDockerIds = $server->swarmDockers()->pluck('id');
 
         $applications = Application::ownedByCurrentTeamAPI($teamId)
-            ->whereIn('destination_id', $destinationIds)
+            ->where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+                $query->where(function ($q) use ($standaloneDockerIds) {
+                    $q->where('destination_type', StandaloneDocker::class)
+                        ->whereIn('destination_id', $standaloneDockerIds);
+                })->orWhere(function ($q) use ($swarmDockerIds) {
+                    $q->where('destination_type', SwarmDocker::class)
+                        ->whereIn('destination_id', $swarmDockerIds);
+                });
+            })
             ->get(['uuid', 'name', 'fqdn']);
 
         $domains = collect();

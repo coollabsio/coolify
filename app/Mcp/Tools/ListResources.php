@@ -242,7 +242,7 @@ class ListResources extends Tool
      * @param  Collection<int, object>  $rows
      * @return list<array<string, mixed>>
      */
-    private function mapPageRows($rows): array
+    private function mapPageRows(Collection $rows): array
     {
         $items = $rows->map(fn ($row) => [
             'uuid' => $row->uuid,

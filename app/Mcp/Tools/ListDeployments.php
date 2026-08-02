@@ -68,9 +68,15 @@ class ListDeployments extends Tool
             $statuses = null;
         }
 
+        // application_deployment_queues.application_id is varchar; whereHas joins to
+        // applications.id (bigint) and breaks on PostgreSQL. Scope via string IDs instead.
+        $teamApplicationIds = Application::ownedByCurrentTeamAPI($teamId)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id);
+
         $query = ApplicationDeploymentQueue::query()
             ->with('application:id,uuid')
-            ->whereHas('application.environment.project', fn ($query) => $query->where('team_id', $teamId))
+            ->whereIn('application_id', $teamApplicationIds)
             ->orderByDesc('id');
 
         if (is_array($statuses)) {

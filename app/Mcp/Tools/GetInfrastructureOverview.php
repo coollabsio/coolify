@@ -109,8 +109,14 @@ class GetInfrastructureOverview extends Tool
             ];
         }
 
+        // application_deployment_queues.application_id is varchar; whereHas joins to
+        // applications.id (bigint) and breaks on PostgreSQL. Scope via string IDs instead.
+        $teamApplicationIds = Application::ownedByCurrentTeamAPI($teamId)
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id);
+
         $openDeployments = ApplicationDeploymentQueue::query()
-            ->whereHas('application.environment.project', fn ($query) => $query->where('team_id', $teamId))
+            ->whereIn('application_id', $teamApplicationIds)
             ->whereIn('status', ['in_progress', 'queued'])
             ->count();
 
@@ -179,7 +185,7 @@ class GetInfrastructureOverview extends Tool
      *
      * @param  Collection<int, int|string>  $projectIds
      */
-    private function countUnhealthyDatabases($projectIds): int
+    private function countUnhealthyDatabases(Collection $projectIds): int
     {
         if ($projectIds->isEmpty()) {
             return 0;

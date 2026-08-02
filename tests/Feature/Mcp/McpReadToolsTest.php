@@ -19,6 +19,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
+use App\Models\SwarmDocker;
 use App\Models\Tag;
 use App\Models\Team;
 use App\Models\User;
@@ -65,6 +66,9 @@ function mcpReadToken(): string
 
 function mcpReadCall(string $name, array $arguments = [])
 {
+    // Ensure each call resolves the Bearer token freshly (no guard bleed between tokens).
+    auth()->forgetGuards();
+
     return test()->withHeaders([
         'Content-Type' => 'application/json',
         'Accept' => 'application/json, text/event-stream',
@@ -82,6 +86,9 @@ function mcpReadCall(string $name, array $arguments = [])
 
 function mcpSensitiveReadCall(string $name, array $arguments = [])
 {
+    // Ensure each call resolves the Bearer token freshly (no guard bleed between tokens).
+    auth()->forgetGuards();
+
     $token = test()->user->createToken('mcp-sensitive-read', ['read', 'read:sensitive'])->plainTextToken;
 
     return test()->withHeaders([
@@ -502,6 +509,54 @@ test('get_server_domains and get_server_resources are team scoped', function () 
     expect(mcpReadCall('get_server_resources', ['uuid' => $otherServer->uuid])->json('result.isError'))->toBeTrue();
 });
 
+test('get_server_domains filters polymorphic destinations by type and id', function () {
+    // Other server gets the next standalone_dockers id (typically 2).
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $otherStandalone = StandaloneDocker::query()->where('server_id', $otherServer->id)->firstOrFail();
+
+    // Swarm on this server with the same numeric id as the other server's
+    // standalone docker. Untyped whereIn(destination_id) would merge that id
+    // and wrongly attribute the other server's app to this server.
+    DB::table('swarm_dockers')->insert([
+        'id' => $otherStandalone->id,
+        'uuid' => (string) Str::uuid(),
+        'server_id' => $this->server->id,
+        'name' => 'swarm-network',
+        'network' => 'swarm-network',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $swarmOnThisServer = SwarmDocker::query()->findOrFail($otherStandalone->id);
+
+    expect($swarmOnThisServer->id)->toBe($otherStandalone->id);
+    expect($this->destination->id)->not->toBe($otherStandalone->id);
+
+    $swarmApp = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $swarmOnThisServer->id,
+        'destination_type' => SwarmDocker::class,
+        'fqdn' => 'https://swarm.example.com',
+        'name' => 'swarm-app',
+    ]);
+
+    $otherServerApp = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $otherStandalone->id,
+        'destination_type' => StandaloneDocker::class,
+        'fqdn' => 'https://other-server.example.com',
+        'name' => 'other-server-app',
+    ]);
+
+    $domains = mcpReadCall('get_server_domains', ['uuid' => $this->server->uuid]);
+    $domains->assertOk();
+    $domainBody = mcpReadJson($domains);
+    $resourceUuids = collect($domainBody['data']['domains'])->pluck('resource_uuid');
+
+    expect($resourceUuids)->toContain($this->application->uuid);
+    expect($resourceUuids)->toContain($swarmApp->uuid);
+    expect($resourceUuids)->not->toContain($otherServerApp->uuid);
+});
+
 test('list_tags and get_current_team and list_team_members are team scoped', function () {
     Tag::create(['name' => 'prod', 'team_id' => $this->team->id]);
     Tag::create(['name' => 'theirs', 'team_id' => Team::factory()->create()->id]);
@@ -620,6 +675,37 @@ test('list_github_branches uses anonymous github api for public sources', functi
     $body = mcpReadJson($response);
     expect(collect($body['data']['branches'])->pluck('name')->all())->toContain('v4.x', 'next');
     expect($body['data']['branches'][0]['commit_sha'])->toBe('abc123');
+});
+
+test('list_github_branches rejects private apps missing installation credentials', function () {
+    $privateApp = GithubApp::create([
+        'name' => 'Incomplete Private App',
+        'uuid' => 'github-private-incomplete',
+        'team_id' => $this->team->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'custom_user' => 'git',
+        'custom_port' => 22,
+        'app_id' => null,
+        'installation_id' => null,
+        'private_key_id' => null,
+        'is_public' => false,
+        'is_system_wide' => false,
+    ]);
+
+    Http::fake();
+
+    $response = mcpReadCall('list_github_branches', [
+        'github_app_uuid' => $privateApp->uuid,
+        'owner' => 'coollabsio',
+        'repo' => 'coolify',
+    ]);
+    $response->assertOk();
+    expect($response->json('result.isError'))->toBeTrue();
+    expect($response->json('result.content.0.text'))
+        ->toContain('missing installation credentials')
+        ->not->toContain('private_key');
+    Http::assertNothingSent();
 });
 
 test('list_applications project_uuid filter is team scoped', function () {
@@ -1722,6 +1808,48 @@ test('list_unhealthy_resources full mode paginates without dropping summary tota
         ->and($body2['data']['unhealthy'][0]['name'])->toBe('AppC');
 });
 
+test('list_unhealthy_resources full mode paginates services without dropping summary totals', function () {
+    // Keep apps/servers healthy so the page window is pure services.
+    $this->application->update(['status' => 'running:healthy']);
+    $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+
+    // Empty services have no running status → treated as unhealthy by the status scan.
+    foreach (['SvcA', 'SvcB', 'SvcC', 'SvcD', 'SvcE'] as $name) {
+        Service::factory()->create([
+            'name' => $name,
+            'environment_id' => $this->environment->id,
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+    }
+
+    $page1 = mcpReadCall('list_unhealthy_resources', [
+        'sample_only' => false,
+        'per_page' => 2,
+        'page' => 1,
+    ]);
+    $page1->assertOk();
+    $body1 = mcpReadJson($page1);
+    expect($body1['data']['summary']['services'])->toBe(5)
+        ->and($body1['data']['summary']['total'])->toBe(5)
+        ->and($body1['_pagination']['total'])->toBe(5)
+        ->and($body1['data']['unhealthy'])->toHaveCount(2)
+        ->and(collect($body1['data']['unhealthy'])->pluck('name')->all())->toBe(['SvcA', 'SvcB'])
+        ->and(collect($body1['data']['unhealthy'])->pluck('type')->unique()->all())->toBe(['service']);
+
+    $page3 = mcpReadCall('list_unhealthy_resources', [
+        'sample_only' => false,
+        'per_page' => 2,
+        'page' => 3,
+    ]);
+    $page3->assertOk();
+    $body3 = mcpReadJson($page3);
+    expect($body3['data']['summary']['services'])->toBe(5)
+        ->and($body3['data']['unhealthy'])->toHaveCount(1)
+        ->and($body3['data']['unhealthy'][0]['name'])->toBe('SvcE');
+});
+
 test('get_service_database returns a field whitelist and is team scoped', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,
@@ -1815,9 +1943,6 @@ test('list_scheduled_tasks omits command without sensitive read ability', functi
         ->and($tasks[0])->not->toHaveKey('command');
     expect(json_encode($tasks))->not->toContain('supersecretvalue');
 
-    // Avoid Sanctum auth state bleeding from the previous bearer token in this test.
-    app('auth')->forgetGuards();
-
     $sensitive = mcpSensitiveReadCall('list_scheduled_tasks', [
         'resource' => 'application',
         'uuid' => $this->application->uuid,
@@ -1850,4 +1975,34 @@ test('get_logs redacts secret-like values in container output', function () {
         ->and($redacted)->not->toContain('abcd1234efgh')
         ->and($redacted)->toContain('password=')
         ->and($redacted)->toContain(REDACTED);
+});
+
+test('redactLogText redacts JSON secret fields in log lines', function () {
+    $trait = new class
+    {
+        use BuildsResponse;
+
+        public function redact(string $text): string
+        {
+            return $this->redactLogText($text);
+        }
+    };
+
+    $jsonLine = '{"token":"secret-value","API_KEY":"another-secret-value","status":"ok"}';
+    $redacted = $trait->redact("request failed: {$jsonLine}");
+
+    expect($redacted)->toContain('status')
+        ->and($redacted)->toContain('ok')
+        ->and($redacted)->not->toContain('secret-value')
+        ->and($redacted)->not->toContain('another-secret-value')
+        ->and($redacted)->toContain('token=')
+        ->and($redacted)->toContain('API_KEY=')
+        ->and($redacted)->toContain(REDACTED);
+
+    // Shell-style still works alongside JSON
+    $mixed = $trait->redact('password=baresecret {"client_secret":"jsonsecret123"} export DB_PASSWORD=exportsecret');
+    expect($mixed)->not->toContain('baresecret')
+        ->and($mixed)->not->toContain('jsonsecret123')
+        ->and($mixed)->not->toContain('exportsecret')
+        ->and($mixed)->toContain(REDACTED);
 });

@@ -152,13 +152,12 @@ class ListUnhealthyResources extends Tool
     /**
      * Walk type groups in sorted order and fetch only the current page window.
      *
-     * @param  Builder  $appQuery
      * @param  Collection<int, array<string, mixed>>  $unhealthyServers
      * @return list<array<string, mixed>>
      */
     private function paginateFullList(
         int $teamId,
-        $appQuery,
+        Builder $appQuery,
         Collection $unhealthyServers,
         int $appCount,
         int $serviceCount,
@@ -207,12 +206,14 @@ class ListUnhealthyResources extends Tool
             if ($skip >= $serviceCount) {
                 $skip -= $serviceCount;
             } else {
+                // Count already known from the earlier full scan; stop once the page window is full.
                 [, $serviceRows] = $this->collectUnhealthyServices(
                     $teamId,
                     sampleOnly: false,
                     samplePerType: 1,
                     skip: $skip,
                     take: $need,
+                    needsCount: false,
                 );
                 $rows = $serviceRows->values()->all();
                 $page = array_merge($page, $rows);
@@ -257,6 +258,9 @@ class ListUnhealthyResources extends Tool
     }
 
     /**
+     * Scan services for unhealthy status. When $needsCount is false, stop once the page window is full
+     * (callers that already know the total can skip the rest of the table).
+     *
      * @return array{0: int, 1: Collection<int, array<string, mixed>>}
      */
     private function collectUnhealthyServices(
@@ -265,6 +269,7 @@ class ListUnhealthyResources extends Tool
         int $samplePerType,
         int $skip = 0,
         ?int $take = null,
+        bool $needsCount = true,
     ): array {
         $base = Service::whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId))
             ->with([
@@ -281,7 +286,7 @@ class ListUnhealthyResources extends Tool
         $limit = $take === null ? ($sampleOnly ? $samplePerType : PHP_INT_MAX) : max(0, $take);
 
         // Chunk so large teams do not hydrate every service at once.
-        $base->chunk(100, function ($chunk) use ($skip, $limit, &$unhealthy, &$serviceCount, &$skipped) {
+        $base->chunk(100, function ($chunk) use ($skip, $limit, $needsCount, &$unhealthy, &$serviceCount, &$skipped) {
             foreach ($chunk as $svc) {
                 if ($this->looksHealthy($svc->status ?? null)) {
                     continue;
@@ -289,6 +294,11 @@ class ListUnhealthyResources extends Tool
                 $serviceCount++;
 
                 if ($limit === 0 || $unhealthy->count() >= $limit) {
+                    if (! $needsCount) {
+                        // Page window full and total already known — stop scanning.
+                        return false;
+                    }
+
                     // Still count remaining unhealthy services.
                     continue;
                 }
