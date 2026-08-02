@@ -181,8 +181,8 @@
             <livewire:navbar-delete-team />
         @endif
     </ul>
-    {{-- Sticky sidebar collapser --}}
-    <div class="sticky bottom-0 mt-auto -mx-2 lg:-mx-3 border-t border-neutral-200 dark:border-white/[0.06] bg-white dark:bg-panel px-2 lg:px-3 py-2">
+    {{-- Sticky sidebar collapser (desktop only; mobile uses a temporary slide-over) --}}
+    <div class="sticky bottom-0 mt-auto -mx-2 hidden border-t border-neutral-200 bg-white px-2 py-2 dark:border-white/[0.06] dark:bg-panel lg:-mx-3 lg:block lg:px-3">
         <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
             class="menu-item mx-auto w-8 justify-center px-0">
             <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">

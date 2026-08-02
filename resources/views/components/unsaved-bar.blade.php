@@ -5,11 +5,15 @@
 
 {{-- Floating "unsaved changes" pill (bottom center). Reveals itself via
      Livewire's wire:dirty whenever the surrounding component has un-saved
-     model changes. --}}
+     model changes.
+
+     Mobile: stacked layout (full label, buttons on the next line) inset from
+     the viewport edges so body overflow-x-hidden cannot clip it.
+     Desktop: compact single-row centered pill. --}}
 <div wire:dirty.class.remove="opacity-0 translate-y-6 pointer-events-none"
-    class="pointer-events-none fixed bottom-6 left-1/2 z-[80] flex -translate-x-1/2 translate-y-6 items-center gap-4 rounded-2xl border border-white/10 bg-surface py-2 pr-2 pl-5 opacity-0 shadow-modal transition-all duration-200 ease-out sm:gap-8">
-    <span class="whitespace-nowrap text-[13px] font-semibold text-fg">{{ $label }}</span>
-    <div class="flex items-center gap-2">
+    class="pointer-events-none fixed inset-x-3 bottom-[max(1.5rem,env(safe-area-inset-bottom,0px)+0.75rem)] z-[80] flex max-w-full translate-y-6 flex-col items-stretch gap-2 rounded-2xl border border-white/10 bg-surface py-2.5 pr-2.5 pl-4 opacity-0 shadow-modal transition-all duration-200 ease-out sm:inset-x-auto sm:left-1/2 sm:bottom-6 sm:w-max sm:max-w-none sm:-translate-x-1/2 sm:flex-row sm:items-center sm:gap-8 sm:py-2 sm:pl-5 sm:pr-2">
+    <span class="text-[13px] font-semibold leading-snug text-fg sm:whitespace-nowrap">{{ $label }}</span>
+    <div class="flex shrink-0 items-center justify-end gap-2">
         <button type="button" onclick="window.location.reload()"
             class="h-8 rounded-lg bg-white/[0.07] px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-white/[0.12]">
             Reset

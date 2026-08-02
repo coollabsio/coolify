@@ -1,6 +1,5 @@
 <div>
-    <div
-        class="flex flex-col gap-4 rounded-lg bg-neutral-50 p-4 ring-1 ring-neutral-200 dark:bg-white/[0.025] dark:ring-white/[0.07]">
+    <div class="flex flex-col gap-4">
         @if ($fileStorage->is_too_large)
             <x-callout type="warning" title="File too large">
                 File on server exceeds 5 MB and cannot be edited from the UI. Edit it directly on the server.

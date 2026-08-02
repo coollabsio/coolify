@@ -1,13 +1,13 @@
 <div>
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
-    <section class="application-settings-workspace mt-8 w-full max-w-[1180px] xl:mt-0">
+    <section class="application-settings-workspace mt-0 md:mt-8 w-full max-w-[1180px] xl:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
         @if ($resourceType === 'database')
             <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" :isImportSupported="$isImportSupported" />
         @else
             <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
                 <nav aria-label="Compose resource settings"
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-4 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     <div class="nav-section hidden xl:block">Compose resource</div>
                 <a class="menu-item" {{ wireNavigate() }}
                     href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
@@ -186,7 +186,7 @@
                                                 </ul>
                                             </x-callout>
 
-                                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                                 <x-forms.button @click="modalOpen = false; $wire.call('cancelRemovePort')"
                                                     class="w-auto">
                                                     Keep port

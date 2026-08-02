@@ -64,7 +64,7 @@
                         <x-slot:actions>
                             <x-forms.button type="button" wire:click.prevent="checkLocalhostConnection"
                                 wire:loading.attr="disabled" wire:target="checkLocalhostConnection"
-                                canGate="update" :canResource="$server">
+                                :showLoadingIndicator="false" canGate="update" :canResource="$server">
                                 <x-reicon name="refresh" wire:loading.remove wire:target="checkLocalhostConnection"
                                     class="size-3.5" />
                                 <svg wire:loading wire:target="checkLocalhostConnection"

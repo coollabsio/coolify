@@ -11,7 +11,7 @@
             x-data="{ activeProvider: location.hash.slice(1).replace('-oauth-section', '') || '{{ $oauth_settings_map[0]['provider'] ?? '' }}' }"
             @hashchange.window="activeProvider = location.hash.slice(1).replace('-oauth-section', '')">
             <nav aria-label="OAuth providers"
-                class="grid max-h-[calc(100vh-8rem)] grid-cols-2 gap-0.5 overflow-y-auto border-y border-neutral-200 py-4 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+                class="grid max-h-[calc(100vh-8rem)] grid-cols-2 gap-0.5 overflow-y-auto border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                 <div class="nav-section hidden xl:block">Providers</div>
                 @foreach ($oauth_settings_map as $oauth_setting)
                     @php

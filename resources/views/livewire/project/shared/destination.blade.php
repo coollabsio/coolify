@@ -190,19 +190,21 @@
             @endif
         </div>
     @else
+        {{-- Databases and services are single-server only; match the application primary card without multi-server UI. --}}
         @php
-            $resourceStatus = str($resource->realStatus());
-            [$resourceStatusLabel, $resourceStatusType] = match (true) {
-                $resourceStatus->startsWith('running') => ['Running', 'success'],
-                $resourceStatus->startsWith(['starting', 'restarting']) => ['Starting', 'warning'],
-                $resourceStatus->startsWith('exited') => ['Stopped', 'error'],
-                default => [$resourceStatus->before(':')->headline()->value() ?: 'Unknown', 'neutral'],
+            $primaryStatus = str($resource->realStatus());
+            $primaryStatusType = match (true) {
+                $primaryStatus->startsWith('running') => 'success',
+                $primaryStatus->startsWith('exited') => 'error',
+                $primaryStatus->startsWith(['starting', 'restarting']) => 'warning',
+                default => 'neutral',
             };
+            $primaryStatusLabel = $primaryStatus->before(':')->headline()->value() ?: 'Unknown';
         @endphp
 
-        <div class="space-y-6">
-            <x-application.settings-section title="Primary server"
-                helper="The default server and network used by this resource.">
+        <div class="flex flex-col gap-6">
+            <x-application.settings-section id="primary-server-section" title="Primary server"
+                helper="The server and network used by this resource.">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex min-w-0 items-center gap-3">
                         <div
@@ -214,80 +216,32 @@
                                 <h4 class="truncate text-sm font-semibold text-black dark:text-fg">
                                     {{ data_get($resource, 'destination.server.name') }}
                                 </h4>
-                                <x-status-badge status="Primary" type="neutral" />
+                                <span
+                                    class="rounded-sm bg-coollabs/10 px-1.5 py-0.5 text-[11px] font-medium text-coollabs dark:bg-warning/10 dark:text-warning">
+                                    Primary
+                                </span>
                             </div>
-                            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                                Network
+                            <p class="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-neutral-500 dark:text-fg-dim">
+                                <span>Network</span>
                                 <code
-                                    class="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($resource, 'destination.network') }}</code>
+                                    class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($resource, 'destination.network') }}</code>
                             </p>
                         </div>
                     </div>
-                    <x-status-badge :status="$resourceStatusLabel" :type="$resourceStatusType" />
+
+                    <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+                        @if ($primaryStatus->startsWith('running'))
+                            <x-status.running :status="$primaryStatus->value()" />
+                        @elseif ($primaryStatus->startsWith(['starting', 'restarting']))
+                            <x-status.restarting :status="$primaryStatus->value()" />
+                        @elseif ($primaryStatus->startsWith('exited'))
+                            <x-status.stopped :status="$primaryStatus->value()" />
+                        @else
+                            <x-status-badge :status="$primaryStatusLabel" :type="$primaryStatusType" />
+                        @endif
+                    </div>
                 </div>
             </x-application.settings-section>
-
-            @if ($resource?->additional_networks?->count() > 0
-                    && data_get($resource, 'build_pack') !== 'dockercompose')
-                <x-application.settings-section title="Additional servers"
-                    helper="Other deployment destinations attached to this resource." flush>
-                    <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
-                        @foreach ($resource->additional_networks as $destination)
-                            @php
-                                $destinationStatus = str(data_get($destination, 'pivot.status'));
-                                [$destinationStatusLabel, $destinationStatusType] = match (true) {
-                                    $destinationStatus->startsWith('running') => ['Running', 'success'],
-                                    $destinationStatus->startsWith(['starting', 'restarting']) => ['Starting', 'warning'],
-                                    $destinationStatus->startsWith('exited') => ['Stopped', 'error'],
-                                    default => [$destinationStatus->before(':')->headline()->value() ?: 'Unknown', 'neutral'],
-                                };
-                            @endphp
-                            <div class="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
-                                wire:key="destination-{{ $destination->id }}">
-                                <div class="flex min-w-0 items-center gap-3">
-                                    <div
-                                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.05] dark:text-fg-dim">
-                                        <x-reicon name="servers" class="size-[18px]" />
-                                    </div>
-                                    <div class="min-w-0">
-                                        <h4 class="truncate text-sm font-semibold text-black dark:text-fg">
-                                            {{ data_get($destination, 'server.name') }}
-                                        </h4>
-                                        <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
-                                            Network
-                                            <code
-                                                class="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ data_get($destination, 'network') }}</code>
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <x-status-badge :status="$destinationStatusLabel"
-                                        :type="$destinationStatusType" />
-                                    <x-forms.button
-                                        wire:click="redeploy('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">
-                                        Deploy
-                                    </x-forms.button>
-                                    <x-forms.button
-                                        wire:click="promote('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">
-                                        Make primary
-                                    </x-forms.button>
-                                    @if ($destinationStatus->startsWith('running'))
-                                        <x-forms.button isError
-                                            wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
-                                    @endif
-                                    <x-modal-confirmation title="Remove server from resource?" isErrorButton
-                                        buttonTitle="Remove"
-                                        submitAction="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
-                                        :actions="['This deployment destination will be removed.']"
-                                        confirmationText="{{ data_get($destination, 'server.name') }}"
-                                        confirmationLabel="Enter the server name to confirm removal."
-                                        shortConfirmationLabel="Server Name" />
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </x-application.settings-section>
-            @endif
         </div>
     @endif
 </div>

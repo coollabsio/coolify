@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
     @php
         $routeIs = fn (string|array $routes): bool => \Illuminate\Support\Str::is($routes, $activeRouteName);
         $applicationMenuItems = [
@@ -132,143 +132,135 @@
             fn (array $item): bool => $item['visible'] ?? true,
         ));
         $activeConfigurationMenuItem = collect($configurationMenuItems)->firstWhere('active', true);
-        $activeApplicationMenuItem = collect($applicationMenuItems)->firstWhere('active', true);
-        $activeMobileMenuItem = $activeConfigurationMenuItem
-            ?? $activeApplicationMenuItem
-            ?? $applicationMenuItems[0];
-        $activeMobileMenuGroup = $activeConfigurationMenuItem ? 'configuration' : 'application';
-        $activeMobileNavigation = ($activeMobileMenuItem['navigate'] ?? true) ? 'navigate' : 'location';
-        $activeMobileMenuValue = $activeMobileNavigation.'|'.$activeMobileMenuGroup.'|'.route($activeMobileMenuItem['route'], $parameters);
-        $mobileSectionChangeHandler = <<<'JS'
-            const value = $event.target.value;
-
-            if (!value) {
-                return;
-            }
-
-            if (value.startsWith('navigate|')) {
-                const url = value.split('|').slice(2).join('|');
-                window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url;
-                return;
-            }
-
-            if (value.startsWith('location|')) {
-                const url = value.split('|').slice(2).join('|');
-                window.location.href = url;
-                return;
-            }
-
-            resetToCurrent();
-
-            if (value.startsWith('external:')) {
-                window.open(value.slice(9), '_blank', 'noopener');
-                return;
-            }
-
-            const action = value.slice(7);
-            document.getElementById(`application-mobile-${action}-trigger`)?.click();
-        JS;
+        $applicationStatus = str($application->status ?? 'exited');
+        [$applicationStatusLabel, $applicationStatusType] = match (true) {
+            $applicationStatus->startsWith('running') => ['Running', 'success'],
+            $applicationStatus->startsWith('degraded') => ['Degraded', 'warning'],
+            $applicationStatus->startsWith('restarting'),
+            $applicationStatus->startsWith('starting') => ['Starting', 'warning'],
+            $applicationStatus->startsWith('exited') => ['Stopped', 'neutral'],
+            default => ['Deploying', 'warning'],
+        };
     @endphp
     <div>
         <div class="w-full md:hidden">
+            <div class="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+                <h1 class="min-w-0 truncate text-lg font-semibold text-black dark:text-fg">
+                    {{ $application->name }}
+                </h1>
+                <x-status-badge :status="$applicationStatusLabel" :type="$applicationStatusType" />
+            </div>
+
             @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
-                <div id="application-mobile-actions" class="mt-2 mb-3 md:hidden">
-                    <div class="mb-1 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Actions</div>
-                    <div class="flex flex-nowrap items-center gap-2 overflow-x-auto">
-                    @if (!str($application->status)->startsWith('exited'))
-                        @if (!$application->destination->server->isSwarm())
-                            <button type="button" class="button shrink-0" wire:click="deploy">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-orange-400"
-                                    viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                    <path
-                                        d="M10.09 4.01l.496 -.495a2 2 0 0 1 2.828 0l7.071 7.07a2 2 0 0 1 0 2.83l-7.07 7.07a2 2 0 0 1 -2.83 0l-7.07 -7.07a2 2 0 0 1 0 -2.83l3.535 -3.535h-3.988">
-                                    </path>
-                                    <path d="M7.05 11.038v-3.988"></path>
-                                </svg>
-                                Redeploy
-                            </button>
-                        @endif
-                        @if ($application->build_pack !== 'dockercompose')
-                            @if ($application->destination->server->isSwarm())
-                                <button type="button" class="button shrink-0" wire:click="deploy">
-                                    <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <g fill="none" stroke="currentColor" stroke-linecap="round"
-                                            stroke-linejoin="round" stroke-width="2">
-                                            <path
-                                                d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                                            <path d="M20 4v5h-5" />
-                                        </g>
-                                    </svg>
-                                    Update Service
+                <div id="application-mobile-actions" class="relative mb-3 md:hidden"
+                    x-data="{ open: false }" @click.outside="open = false"
+                    @keydown.escape.window="open = false">
+                    <button type="button" class="button w-full justify-between" @click="open = !open"
+                        :aria-expanded="open" aria-haspopup="menu">
+                        <span class="inline-flex items-center gap-2">
+                            <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                            Actions
+                        </span>
+                        <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
+                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                        </span>
+                    </button>
+
+                    <div x-cloak x-show="open" x-transition.origin.top.left
+                        class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
+                        @if (!str($application->status)->startsWith('exited'))
+                            @if (!$application->destination->server->isSwarm())
+                                @can('deploy', $application)
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        wire:click="deploy" @click="open = false" role="menuitem">
+                                        <x-reicon name="refresh" class="size-3.5 text-orange-500 dark:text-orange-400" />
+                                        Redeploy
+                                    </button>
+                                @else
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                        role="menuitem">
+                                        <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                        Redeploy
+                                    </button>
+                                @endcan
+                            @endif
+                            @if ($application->build_pack !== 'dockercompose')
+                                @if ($application->destination->server->isSwarm())
+                                    @can('deploy', $application)
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            wire:click="deploy" @click="open = false" role="menuitem">
+                                            <x-reicon name="refresh" class="size-3.5 text-warning" />
+                                            Update Service
+                                        </button>
+                                    @else
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                            role="menuitem">
+                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                            Update Service
+                                        </button>
+                                    @endcan
+                                @else
+                                    @can('deploy', $application)
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @click="open = false; document.getElementById('application-mobile-restart-trigger')?.click()"
+                                            role="menuitem">
+                                            <x-reicon name="restart" class="size-3.5 text-warning" />
+                                            Restart
+                                        </button>
+                                    @else
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                            role="menuitem">
+                                            <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                            Restart
+                                        </button>
+                                    @endcan
+                                @endif
+                            @endif
+                            @can('deploy', $application)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    Stop
                                 </button>
                             @else
-                                <button type="button" class="button shrink-0"
-                                    @click="document.getElementById('application-mobile-restart-trigger')?.click()">
-                                    <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <g fill="none" stroke="currentColor" stroke-linecap="round"
-                                            stroke-linejoin="round" stroke-width="2">
-                                            <path
-                                                d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                                            <path d="M20 4v5h-5" />
-                                        </g>
-                                    </svg>
-                                    Restart
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 opacity-70" />
+                                    Stop
                                 </button>
-                            @endif
-                        @endif
-                        <x-forms.button isError class="shrink-0"
-                            @click="document.getElementById('application-mobile-stop-trigger')?.click()">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path
-                                    d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                                <path
-                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                            </svg>
-                            Stop
-                        </x-forms.button>
-                    @else
-                        <button type="button" class="button shrink-0" wire:click="deploy">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
-                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                                stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M7 4v16l13 -8z" />
-                            </svg>
-                            Deploy
-                        </button>
-                    @endif
-                    @if (!$application->destination->server->isSwarm())
-                        @if ($application->status === 'running')
-                            <button type="button" class="button shrink-0" wire:click="force_deploy_without_cache">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
-                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                    <path d="M7 4v16l13 -8z" />
-                                </svg>
-                                Force deploy (without cache)
-                            </button>
+                            @endcan
                         @else
-                            <button type="button" class="button shrink-0" wire:click="deploy(true)">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning"
-                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                                    stroke-linecap="round" stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                    <path d="M7 4v16l13 -8z" />
-                                </svg>
-                                Force deploy (without cache)
-                            </button>
+                            @can('deploy', $application)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    wire:click="deploy" @click="open = false" role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    Deploy
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    Deploy
+                                </button>
+                            @endcan
                         @endif
-                    @endif
+                        @if (!$application->destination->server->isSwarm())
+                            @can('deploy', $application)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    wire:click="{{ $application->status === 'running' ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                    @click="open = false" role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    Force deploy without cache
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    Force deploy without cache
+                                </button>
+                            @endcan
+                        @endif
                     </div>
                 </div>
             @endif
@@ -289,20 +281,6 @@
                     </a>
                 @endforeach
             </div>
-            @if ($activeConfigurationMenuItem)
-                <div
-                    class="mt-2 flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                    @foreach ($configurationMenuItems as $menuItem)
-                        <a @class([
-                            'app-tab shrink-0',
-                            'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $menuItem['active'],
-                        ])
-                            {{ wireNavigate() }} href="{{ route($menuItem['route'], $parameters) }}">
-                            {{ $menuItem['label'] }}
-                        </a>
-                    @endforeach
-                </div>
-            @endif
             <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
                 submitAction="stop" :checkboxes="$checkboxes" :actions="[
                     'This application will be stopped.',

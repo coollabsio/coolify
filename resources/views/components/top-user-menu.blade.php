@@ -2,13 +2,19 @@
     $user = auth()->user();
     $userName = $user?->name ?? 'Account';
     $userEmail = $user?->email ?? '';
+    $userInitial = strtoupper(mb_substr($user?->name ?: ($user?->email ?: 'A'), 0, 1));
 @endphp
 <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
     <button type="button" @click="open = !open" @click.outside="open = false"
-        class="flex h-8 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-3 shadow-sm transition-colors hover:bg-neutral-200 dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]">
+        title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
+        class="flex h-8 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 shadow-sm transition-colors hover:bg-neutral-200 sm:px-3 dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]">
+        <span
+            class="flex size-5 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-700 sm:hidden dark:bg-white/[0.1] dark:text-fg">
+            {{ $userInitial }}
+        </span>
         <span class="hidden sm:block max-w-[9rem] truncate text-[12px] font-medium text-black dark:text-fg">{{ $userName }}</span>
         <svg class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint transition-transform" :class="open && 'rotate-180'"
-            viewBox="0 0 24 24" fill="none">
+            viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
     </button>

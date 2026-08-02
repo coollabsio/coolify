@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
     @php
         $servicePageItems = [
             [
@@ -70,31 +70,103 @@
     <div x-data>
         <div class="w-full md:hidden">
             <div class="mb-3 flex min-w-0 flex-wrap items-center gap-2">
-                <span class="min-w-0 truncate text-sm font-medium text-neutral-700 dark:text-fg-dim">
+                <h1 class="min-w-0 truncate text-lg font-semibold text-black dark:text-fg">
                     {{ $service->name }}
-                </span>
+                </h1>
                 <x-status-badge :status="$serviceStatusLabel" :type="$serviceStatusType" />
             </div>
 
             @if ($service->isDeployable)
-                <div class="mb-3 flex flex-nowrap items-center gap-2 overflow-x-auto">
-                    @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
-                        <button type="button" class="button shrink-0"
-                            @click="document.getElementById('service-restart-trigger')?.click()">
-                            <x-reicon name="restart" class="size-4 text-orange-500 dark:text-warning" />
-                            Restart
-                        </button>
-                        <button type="button" class="button shrink-0 text-error"
-                            @click="document.getElementById('service-stop-trigger')?.click()">
-                            <x-reicon name="stop" class="size-4 text-error" />
-                            Stop
-                        </button>
-                    @else
-                        <button type="button" class="button shrink-0" @click="$wire.dispatch('startEvent')">
-                            <x-reicon name="play-circle" class="size-4 text-coollabs dark:text-warning" />
-                            Deploy
-                        </button>
-                    @endif
+                <div id="service-mobile-actions" class="relative mb-3"
+                    x-data="{ open: false }" @click.outside="open = false"
+                    @keydown.escape.window="open = false">
+                    <button type="button" class="button w-full justify-between" @click="open = !open"
+                        :aria-expanded="open" aria-haspopup="menu">
+                        <span class="inline-flex items-center gap-2">
+                            <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                            Actions
+                        </span>
+                        <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
+                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                        </span>
+                    </button>
+
+                    <div x-cloak x-show="open" x-transition.origin.top.left
+                        class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
+                        @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
+                            @can('deploy', $service)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('service-restart-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                    Restart
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    Restart
+                                </button>
+                            @endcan
+                            @can('stop', $service)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('service-stop-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    Stop
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 opacity-70" />
+                                    Stop
+                                </button>
+                            @endcan
+                            @if ($serviceStatus->contains('running'))
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @disabled(!auth()->user()->can('deploy', $service))
+                                    @click="$wire.dispatch('pullAndRestartEvent'); open = false"
+                                    role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    Pull Latest Images & Restart
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @disabled(!auth()->user()->can('deploy', $service))
+                                    @click="$wire.dispatch('forceDeployEvent'); open = false"
+                                    role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    Force Restart
+                                </button>
+                            @endif
+                        @else
+                            @can('deploy', $service)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; $wire.dispatch('startEvent')" role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    Deploy
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    Deploy
+                                </button>
+                            @endcan
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @disabled(!auth()->user()->can('deploy', $service))
+                                @click="$wire.dispatch('forceDeployEvent'); open = false" role="menuitem">
+                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                Force Deploy
+                            </button>
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @disabled(!auth()->user()->can('stop', $service))
+                                @click="$wire.dispatch('cleanupEvent'); open = false" role="menuitem">
+                                <x-reicon name="trash" class="size-3.5 opacity-70" />
+                                Force Cleanup Containers
+                            </button>
+                        @endif
+                    </div>
                 </div>
             @endif
 
@@ -131,14 +203,14 @@
                     @endforeach
                 </div>
                 <div
-                    class="flex shrink-0 items-center rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                    class="application-heading-actions flex shrink-0 items-center rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
                     <x-services.links :service="$service" />
                 </div>
             </div>
 
             @if ($service->isDeployable)
                 <div
-                    class="flex shrink-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                    class="application-heading-actions flex shrink-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
                     <x-services.advanced :service="$service" />
                     @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                         <x-forms.button canGate="deploy" :canResource="$service"

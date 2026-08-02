@@ -1,13 +1,9 @@
 <div x-data="{
-    dropdownOpen: false,
     search: '',
     allEntries: [],
     page: 1,
     perPage: 1,
-    darkColorContent: getComputedStyle($el).getPropertyValue('--color-base'),
-    whiteColorContent: getComputedStyle($el).getPropertyValue('--color-white'),
     init() {
-        this.mounted();
         // Load all entries when component initializes
         this.allEntries = @js($entries->toArray());
     },
@@ -27,60 +23,6 @@
         });
         // Call Livewire to update server-side
         $wire.markAllAsRead();
-    },
-    switchWidth() {
-        if (this.full === 'full') {
-            localStorage.setItem('pageWidth', 'center');
-        } else {
-            localStorage.setItem('pageWidth', 'full');
-        }
-        window.location.reload();
-    },
-    setZoom(zoom) {
-        localStorage.setItem('zoom', zoom);
-        window.location.reload();
-    },
-    setTheme(type) {
-        this.theme = type;
-        localStorage.setItem('theme', type);
-        this.queryTheme();
-    },
-    queryTheme() {
-        const darkModePreference = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const userSettings = localStorage.getItem('theme') || 'dark';
-        localStorage.setItem('theme', userSettings);
-
-        const themeMetaTag = document.querySelector('meta[name=theme-color]');
-        let isDark = false;
-
-        if (userSettings === 'dark') {
-            document.documentElement.classList.add('dark');
-            this.theme = 'dark';
-            isDark = true;
-        } else if (userSettings === 'light') {
-            document.documentElement.classList.remove('dark');
-            this.theme = 'light';
-            isDark = false;
-        } else if (userSettings === 'system') {
-            this.theme = 'system';
-            if (darkModePreference) {
-                document.documentElement.classList.add('dark');
-                isDark = true;
-            } else {
-                document.documentElement.classList.remove('dark');
-                isDark = false;
-            }
-        }
-
-        // Update theme-color meta tag
-        if (themeMetaTag) {
-            themeMetaTag.setAttribute('content', isDark ? '#101010' : '#ffffff');
-        }
-    },
-    mounted() {
-        this.full = localStorage.getItem('pageWidth');
-        this.zoom = localStorage.getItem('zoom');
-        this.queryTheme();
     },
     get filteredEntries() {
         let entries = [...this.allEntries];
@@ -122,8 +64,7 @@
     goToPage(page) {
         this.page = Math.min(Math.max(page, 1), this.lastPage);
     }
-}" @click.outside="dropdownOpen = false"
-    class="{{ in_array($trigger, ['changelog-sidebar', 'account-menu'], true) ? 'w-full' : '' }}">
+}" class="{{ in_array($trigger, ['changelog-sidebar', 'account-menu'], true) ? 'w-full' : '' }}">
     @if ($trigger === 'changelog-sidebar')
         <button wire:click="openWhatsNewModal" type="button" title="What's New" aria-label="What's New"
             class="relative text-left menu-item">
@@ -159,80 +100,6 @@
                 </span>
             @endif
         </button>
-    @else
-        <!-- Custom Dropdown without arrow -->
-        <div class="relative">
-            <button @click="dropdownOpen = !dropdownOpen"
-                class="relative p-2 dark:text-neutral-400 hover:dark:text-white transition-colors cursor-pointer"
-                title="Preferences">
-                <!-- Sliders Icon -->
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" title="Preferences">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                </svg>
-
-                <!-- Unread Count Badge -->
-                @if ($unreadCount > 0)
-                    <span
-                        class="absolute -top-1 -right-1 bg-error text-white text-xs rounded-full w-4.5 h-4.5 flex items-center justify-center">
-                        {{ $unreadCount > 9 ? '9+' : $unreadCount }}
-                    </span>
-                @endif
-            </button>
-
-            <!-- Dropdown Menu -->
-            <div x-show="dropdownOpen" x-transition:enter="ease-out duration-200"
-                x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
-                x-transition:leave-end="opacity-0 -translate-y-2" class="absolute right-0 top-full mt-1 z-50 w-48" x-cloak>
-                <div
-                    class="p-1 bg-white border rounded-sm shadow-lg dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
-                    <div class="flex flex-col gap-1">
-                        <!-- Width Section -->
-                        <div
-                            class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
-                            Width</div>
-                        <button @click="switchWidth(); dropdownOpen = false"
-                            class="px-1 dropdown-item-no-padding flex items-center gap-2" x-show="full === 'full'">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 6h16M4 12h16M4 18h7" />
-                            </svg>
-                            <span>Center</span>
-                        </button>
-                        <button @click="switchWidth(); dropdownOpen = false"
-                            class="px-1 dropdown-item-no-padding flex items-center gap-2" x-show="full === 'center'">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                            <span>Full</span>
-                        </button>
-
-                        <!-- Zoom Section -->
-                        <div
-                            class="my-1 font-bold border-b dark:border-coolgray-500 border-neutral-300 dark:text-white text-md">
-                            Zoom</div>
-                        <button @click="setZoom(100); dropdownOpen = false"
-                            class="px-1 dropdown-item-no-padding flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            <span>100%</span>
-                        </button>
-                        <button @click="setZoom(90); dropdownOpen = false"
-                            class="px-1 dropdown-item-no-padding flex items-center gap-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 10h4v4h-4v-4z" />
-                            </svg>
-                            <span>90%</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
     @endif
 
     <!-- What's New Modal -->

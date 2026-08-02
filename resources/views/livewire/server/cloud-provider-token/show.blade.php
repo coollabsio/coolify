@@ -6,7 +6,7 @@
     <livewire:server.navbar :server="$server" />
 
     <div
-        class="server-settings-workspace application-settings-workspace mt-8 grid w-full max-w-[1180px] min-w-0 gap-8 xl:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        class="server-settings-workspace application-settings-workspace mt-0 md:mt-8 grid w-full max-w-[1180px] min-w-0 gap-8 xl:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
         <x-server.sidebar :server="$server" activeMenu="cloud-provider-token" />
 
         <div class="application-settings-form w-full">
@@ -19,9 +19,10 @@
                             <x-forms.button canGate="update" :canResource="$server"
                                 wire:click.prevent="validateToken" :showLoadingIndicator="false"
                                 wire:loading.attr="disabled" wire:target="validateToken">
-                                <x-reicon name="refresh" class="size-3.5" />
-                                Validate token
                                 <x-loading-on-button wire:loading wire:target="validateToken" />
+                                <x-reicon name="refresh" class="size-3.5" wire:loading.remove
+                                    wire:target="validateToken" />
+                                Validate token
                             </x-forms.button>
                             @can('create', App\Models\CloudProviderToken::class)
                                 <x-modal-input buttonTitle="+ Add" title="Add {{ $providerName }} Token">

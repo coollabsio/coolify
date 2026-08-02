@@ -9,11 +9,23 @@
                 </div>
             </div>
             <div class="application-settings-section-body">
-                <div class="flex items-end gap-2">
-                    <x-forms.input required id="repository_url" label="Repository URL"
-                        helper="{!! __('repository.url') !!}" placeholder="https://github.com/owner/repository"
-                        autofocus />
-                    <x-forms.button type="submit">Check repository</x-forms.button>
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                    <div class="min-w-0 flex-1">
+                        <x-forms.input required id="repository_url" label="Repository URL"
+                            helper="{!! __('repository.url') !!}" placeholder="https://github.com/owner/repository"
+                            autofocus />
+                    </div>
+                    <x-forms.button type="submit" class="w-full justify-center sm:w-auto"
+                        wire:loading.attr="disabled" wire:target="loadBranch" :showLoadingIndicator="false">
+                        <svg wire:loading wire:target="loadBranch" class="size-3.5 shrink-0 animate-spin"
+                            viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor"
+                                stroke-width="3" />
+                            <path class="opacity-75" d="M21 12a9 9 0 0 0-9-9" stroke="currentColor"
+                                stroke-width="3" stroke-linecap="round" />
+                        </svg>
+                        Check repository
+                    </x-forms.button>
                 </div>
                 <p class="mt-2 text-xs text-neutral-500 dark:text-fg-dim">
                     Need a sample? Browse
@@ -55,6 +67,16 @@
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Docker Compose'],
                         ]" />
+                        @if ($show_is_static)
+                            <x-forms.listbox id="isStatic" label="Output type" onChange="instantSave"
+                                :options="[
+                                    ['value' => false, 'label' => 'Web application'],
+                                    ['value' => true, 'label' => 'Static site'],
+                                ]" />
+                            <x-forms.input type="number" id="port" label="Port"
+                                :readonly="$isStatic || $build_pack === 'static'"
+                                helper="Port the application listens on." />
+                        @endif
                         @if ($isStatic)
                             <x-forms.input id="publish_directory" label="Publish directory"
                                 helper="Directory containing the generated static assets." />
@@ -87,19 +109,6 @@
                     @else
                         <x-forms.input wire:model="base_directory" label="Base directory"
                             helper="Repository directory used as the build root." />
-                    @endif
-
-                    @if ($show_is_static)
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <x-forms.input type="number" id="port" label="Port"
-                                :readonly="$isStatic || $build_pack === 'static'"
-                                helper="Port the application listens on." />
-                            <x-forms.listbox id="isStatic" label="Output type" onChange="instantSave"
-                                :options="[
-                                    ['value' => false, 'label' => 'Web application'],
-                                    ['value' => true, 'label' => 'Static site'],
-                                ]" />
-                        </div>
                     @endif
                 </div>
             </section>

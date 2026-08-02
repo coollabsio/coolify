@@ -66,6 +66,15 @@
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Docker Compose'],
                         ]" />
+                        @if ($show_is_static)
+                            <x-forms.listbox id="is_static" label="Output type" onChange="instantSave"
+                                :options="[
+                                    ['value' => false, 'label' => 'Web application'],
+                                    ['value' => true, 'label' => 'Static site'],
+                                ]" />
+                            <x-forms.input type="number" required id="port" label="Port"
+                                :readonly="$is_static || $build_pack === 'static'" />
+                        @endif
                         @if ($is_static)
                             <x-forms.input id="publish_directory" required label="Publish directory" />
                         @endif
@@ -97,18 +106,6 @@
                     @else
                         <x-forms.input wire:model="base_directory" label="Base directory"
                             helper="Repository directory used as the build root." />
-                    @endif
-
-                    @if ($show_is_static)
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <x-forms.input type="number" required id="port" label="Port"
-                                :readonly="$is_static || $build_pack === 'static'" />
-                            <x-forms.listbox id="is_static" label="Output type" onChange="instantSave"
-                                :options="[
-                                    ['value' => false, 'label' => 'Web application'],
-                                    ['value' => true, 'label' => 'Static site'],
-                                ]" />
-                        </div>
                     @endif
                 </div>
             </section>

@@ -83,9 +83,9 @@
                         </x-forms.datalist>
                         <x-forms.button :showLoadingIndicator="false" wire:click.prevent="loadBranches"
                             wire:target="loadBranches,selected_repository_id">
-                            Load repository
                             <x-loading-on-button wire:loading.delay
                                 wire:target="loadBranches,selected_repository_id" />
+                            Load repository
                         </x-forms.button>
                     </div>
                 @else
@@ -119,6 +119,16 @@
                                 ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                                 ['value' => 'dockercompose', 'label' => 'Docker Compose'],
                             ]" />
+                            @if ($show_is_static)
+                                <x-forms.listbox id="is_static" label="Output type" onChange="instantSave"
+                                    :options="[
+                                        ['value' => false, 'label' => 'Web application'],
+                                        ['value' => true, 'label' => 'Static site'],
+                                    ]" />
+                                <x-forms.input type="number" id="port" label="Port"
+                                    :readonly="$is_static || $build_pack === 'static'"
+                                    helper="Port the application listens on." />
+                            @endif
                             @if ($is_static)
                                 <x-forms.input id="publish_directory" label="Publish directory"
                                     helper="Directory containing the generated static assets." />
@@ -151,19 +161,6 @@
                         @else
                             <x-forms.input wire:model="base_directory" label="Base directory"
                                 helper="Repository directory used as the build root." />
-                        @endif
-
-                        @if ($show_is_static)
-                            <div class="grid gap-4 sm:grid-cols-2">
-                                <x-forms.input type="number" id="port" label="Port"
-                                    :readonly="$is_static || $build_pack === 'static'"
-                                    helper="Port the application listens on." />
-                                <x-forms.listbox id="is_static" label="Output type" onChange="instantSave"
-                                    :options="[
-                                        ['value' => false, 'label' => 'Web application'],
-                                        ['value' => true, 'label' => 'Static site'],
-                                    ]" />
-                            </div>
                         @endif
                     </div>
                 </section>

@@ -2,6 +2,8 @@
     search: @js($search),
     typeFilter: 'all',
     sortBy: 'target_asc',
+    filterOpen: false,
+    sortOpen: false,
     backups: @js($backups->map(fn ($backup) => [
         'id' => (string) $backup->id,
         'name' => strtolower($backup->targetName()),
@@ -9,6 +11,18 @@
         'frequency' => strtolower($backup->frequency),
         'createdAt' => $backup->created_at?->timestamp ?? 0,
     ])->values()),
+    filterOptions: @js(collect([['value' => 'all', 'label' => 'All targets']])->merge(
+        $backups->map(fn ($backup) => [
+            'value' => strtolower($backup->targetType()),
+            'label' => $backup->targetType(),
+        ])->unique('value')->values()
+    )->values()),
+    sortOptions: [
+        { value: 'target_asc', label: 'Target A–Z' },
+        { value: 'target_desc', label: 'Target Z–A' },
+        { value: 'newest', label: 'Newest first' },
+        { value: 'oldest', label: 'Oldest first' },
+    ],
     get filteredBackups() {
         const query = this.search.toLowerCase();
         const filtered = this.backups.filter((backup) => {
@@ -77,32 +91,68 @@
             </div>
         </x-application.settings-section>
 
-        <div class="flex flex-wrap items-center justify-between gap-2">
-            <div class="relative min-w-0 max-w-md flex-1">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="relative w-full sm:max-w-sm">
+                <x-reicon name="search"
+                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                 <input type="search" x-model="search" placeholder="Search backups" aria-label="Search backups"
-                    class="input w-full pl-8!" />
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-                    <x-reicon name="search" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                </div>
+                    class="input h-8! w-full py-0! pr-8! pl-8!" />
+                <button x-cloak x-show="search" x-on:click="search = ''" type="button"
+                    class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                    aria-label="Clear search">
+                    <span class="text-sm leading-none">×</span>
+                </button>
             </div>
+
             <div class="flex items-center gap-2">
-                <div class="w-40">
-                    <x-forms.listbox id="backup-type-filter" :wire="false" x-model="typeFilter"
-                        :value="'all'" :options="collect([['value' => 'all', 'label' => 'All targets']])->merge(
-                            $backups->map(fn ($backup) => [
-                                'value' => strtolower($backup->targetType()),
-                                'label' => $backup->targetType(),
-                            ])->unique('value')->values()
-                        )->all()" />
+                <div class="relative" x-on:click.outside="filterOpen = false">
+                    <button type="button" class="button" x-on:click="filterOpen = !filterOpen; sortOpen = false">
+                        <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
+                                stroke-linecap="round" />
+                        </svg>
+                        Filter
+                    </button>
+                    <div x-cloak x-show="filterOpen" x-transition.origin.top.right
+                        class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                        <template x-for="option in filterOptions" :key="option.value">
+                            <button type="button"
+                                class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                x-on:click="typeFilter = option.value; filterOpen = false">
+                                <span class="flex-1" x-text="option.label"></span>
+                                <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
+                                    viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                    <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
                 </div>
-                <div class="w-40">
-                    <x-forms.listbox id="backup-sort" :wire="false" x-model="sortBy"
-                        :value="'target_asc'" :options="[
-                            ['value' => 'target_asc', 'label' => 'Target A–Z'],
-                            ['value' => 'target_desc', 'label' => 'Target Z–A'],
-                            ['value' => 'newest', 'label' => 'Newest first'],
-                            ['value' => 'oldest', 'label' => 'Oldest first'],
-                        ]" />
+
+                <div class="relative" x-on:click.outside="sortOpen = false">
+                    <button type="button" class="button" x-on:click="sortOpen = !sortOpen; filterOpen = false">
+                        <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3" stroke="currentColor"
+                                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        Sort
+                    </button>
+                    <div x-cloak x-show="sortOpen" x-transition.origin.top.right
+                        class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                        <template x-for="option in sortOptions" :key="option.value">
+                            <button type="button"
+                                class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                x-on:click="sortBy = option.value; sortOpen = false">
+                                <span class="flex-1" x-text="option.label"></span>
+                                <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                    viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                    <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>

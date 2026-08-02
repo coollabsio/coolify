@@ -28,7 +28,6 @@
             x-on:{{ explode('(', $confirmAction)[0] }}.window="$wire.{{ explode('(', $confirmAction)[0] }}"
         @endisset>
 
-    {{ $slot }}
     @if ($showLoadingIndicator)
         @if ($attributes->whereStartsWith('wire:click')->first())
             <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}"
@@ -38,6 +37,7 @@
                 wire:loading.delay />
         @endif
     @endif
+    {{ $slot }}
 </button>
 @if ($authDisabled || filled($tooltip))
     <div x-ref="tip" x-show="visible" x-cloak class="auth-tooltip">

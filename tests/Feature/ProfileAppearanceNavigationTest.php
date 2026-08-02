@@ -17,27 +17,22 @@ it('adds profile navigation with an appearance tab and route', function () {
         ->not->toContain('<h1>Profile</h1>\n    <div class="subtitle -mt-2">');
 });
 
-it('moves appearance preferences to the profile appearance view', function () {
+it('keeps color theme preferences on the profile appearance view without page width or density controls', function () {
     $appearanceView = file_get_contents(resource_path('views/livewire/profile/appearance.blade.php'));
 
     expect($appearanceView)
         ->toContain('<x-profile.navbar />')
-        ->toContain("setTheme('light')")
-        ->toContain("setTheme('system')")
-        ->toContain("setTheme('dark')")
-        ->toContain("setWidth('center')")
-        ->toContain("setWidth('full')")
-        ->toContain("setZoom('100')")
-        ->toContain("setZoom('90')")
-        ->toContain('aria-label="Use light theme"')
-        ->toContain('aria-label="Use system theme"')
-        ->toContain('aria-label="Use dark theme"')
-        ->toContain('aria-label="Use centered width"')
-        ->toContain('aria-label="Use full width"')
-        ->toContain('aria-label="Use 100 percent zoom"')
-        ->toContain('aria-label="Use 90 percent zoom"')
-        ->toContain('max-w-2xl')
-        ->toContain('class="space-y-1.5"')
-        ->toContain('gap-1.5')
-        ->toContain('px-2 py-1 text-sm');
+        ->toContain('Color theme')
+        ->toContain("setTheme('{{ \$option['value'] }}')")
+        ->toContain("['value' => 'light'")
+        ->toContain("['value' => 'system'")
+        ->toContain("['value' => 'dark'")
+        ->not->toContain('Page width')
+        ->not->toContain('Interface density')
+        ->not->toContain('setWidth(')
+        ->not->toContain('setZoom(')
+        ->not->toContain('pageWidth')
+        ->not->toContain("localStorage.getItem('zoom')")
+        ->not->toContain("localStorage.setItem('pageWidth'")
+        ->not->toContain("localStorage.setItem('zoom'");
 });

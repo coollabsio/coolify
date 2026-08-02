@@ -119,16 +119,16 @@
             'Persistent Storage' => 'storages',
             'Git Source' => 'sources',
             'Servers' => 'servers',
-            'Scheduled Tasks' => 'terminal',
+            'Scheduled Tasks' => 'calendar',
             'Webhooks' => 'notifications',
             'Preview Deployments' => 'eye',
             'Healthcheck' => 'feedback',
             'Rollback' => 'logout',
             'Resource Limits' => 'subscription',
-            'Resource Operations' => 'teams',
-            'Metrics' => 'dashboard',
+            'Resource Operations' => 'server-update',
+            'Metrics' => 'graph',
             'Tags' => 'tags',
-            'Danger Zone' => 'admin',
+            'Danger Zone' => 'shield-alert',
         ];
 
         // Discord-style groups for the settings sidebar
@@ -205,11 +205,11 @@
         ];
     @endphp
 
-    <section class="application-settings-workspace mt-8 w-full max-w-[1180px] xl:mt-0">
+    <section class="application-settings-workspace mt-0 w-full max-w-[1180px] md:mt-8 xl:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
             <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
                 <nav aria-label="Configuration sections"
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0">
+                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
                             <div class="hidden xl:block my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>

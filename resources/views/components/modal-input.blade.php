@@ -52,10 +52,10 @@
                     x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                     class="application-settings-form application-settings-section relative max-h-[calc(100dvh-2rem)] w-full lg:w-auto lg:min-w-2xl lg:max-w-4xl"
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                    <header>
-                        <h3>{{ $title }}</h3>
-                        <button @click="modalOpen=false"
-                            class="cursor-pointer flex items-center justify-center w-7 h-7 rounded-md text-neutral-500 dark:text-fg-faint hover:bg-neutral-100 dark:hover:bg-white/[0.06] hover:text-black dark:hover:text-fg outline-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent">
+                    <header class="flex-nowrap!">
+                        <h3 class="min-w-0 flex-1 truncate">{{ $title }}</h3>
+                        <button type="button" @click="modalOpen=false"
+                            class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
                             <x-reicon name="x" class="size-4" />
                         </button>
                     </header>

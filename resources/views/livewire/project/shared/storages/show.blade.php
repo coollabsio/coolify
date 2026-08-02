@@ -1,6 +1,5 @@
 <div>
-    <form wire:submit='submit'
-        class="flex flex-col gap-4 rounded-lg bg-neutral-50 p-4 ring-1 ring-neutral-200 dark:bg-white/[0.025] dark:ring-white/[0.07]">
+    <form wire:submit='submit' class="flex flex-col gap-4">
         @if ($isReadOnly)
             @if (!$storage->isServiceResource() && !$storage->isDockerComposeResource())
                 <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">

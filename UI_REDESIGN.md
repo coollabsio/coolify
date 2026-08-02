@@ -31,11 +31,12 @@ The interface is compact and product-focused:
 - 13–14px UI typography and 32px controls;
 - hairline rings instead of heavy borders;
 - full-width data tables for dense collections;
-- filled Reicon glyphs through `<x-reicon>`;
+- outline Reicon glyphs through `<x-reicon>`;
 - the Coolify purple brand accent in light mode;
 - the readable Coolify yellow accent in dark mode;
 - subtle active-item gradients that fade completely into the surrounding
-  background at the far edge;
+  background at the far edge, with the active pill rounded only on the left
+  (square on the right so it bleeds into the content edge);
 - sentence-case labels and headings.
 
 Avoid oversized titles, generic dashboard cards, strong shadows, thick
@@ -115,7 +116,7 @@ opacity rather than a fully saturated fill.
 
 ### Global shell
 
-- Main sidebar groups are compact, use filled Reicons, and keep a 32px row
+- Main sidebar groups are compact, use outline Reicons, and keep a 32px row
   height.
 - Active sidebar rows have a curved accent rail and a subtle horizontal
   gradient. The gradient must fade to the exact sidebar background at the
@@ -347,7 +348,7 @@ shows fewer controls.
 ### Inputs
 
 Use `x-forms.input` and `x-forms.textarea`. Fields need visible vertical spacing
-between the label and control. Password visibility uses the filled Reicon
+between the label and control. Password visibility uses the outline Reicon
 `eye`/`eye-off` treatment from the shared input component.
 
 ### Dropdowns
@@ -384,7 +385,7 @@ selected option is indicated inside the menu, not repeated on the trigger.
 - neutral actions use the shared `.button`;
 - primary actions use the theme-aware purple/yellow tint;
 - destructive actions use the existing error treatment;
-- use filled Reicons where a matching glyph exists;
+- use outline Reicons where a matching glyph exists;
 - avoid raw browser-default buttons and old dark-mode purple fills.
 
 ### Unsaved changes
@@ -395,6 +396,10 @@ bottom-center pill. It contains:
 - “You have changes that haven't been saved yet.”
 - a subtle Reset action;
 - a theme-aware Save changes button matching the tab accent.
+
+On small viewports the pill is inset (`inset-x-3`) and stacks: full label on
+the first line, Reset / Save on the second (right-aligned). From `sm` up it
+returns to the centered single-row nowrap pill.
 
 Do not restore the old full-width footer.
 
@@ -487,7 +492,7 @@ Do not bring back the old oversized dark rectangle.
 ### Terminals
 
 Application and server browser terminals use the same browser-oriented console
-shell, theme picker, compact header controls, and filled `browser-terminal`
+shell, theme picker, compact header controls, and outline `browser-terminal`
 Reicon. Hide a container switcher when only one container exists.
 
 ### Logs
@@ -547,7 +552,7 @@ Use these as implementation references:
 | Status pill | `resources/views/components/status-badge.blade.php` |
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |
-| Filled icons | `resources/views/components/reicon.blade.php` |
+| Outline icons | `resources/views/components/reicon.blade.php` |
 | Shared styling | `resources/css/app.css`, `resources/css/utilities.css` |
 
 Already restyled application configuration surfaces include General, Advanced,

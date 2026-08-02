@@ -31,6 +31,7 @@
 
 @php
     use App\Models\InstanceSettings;
+    use Illuminate\View\ComponentSlot;
     // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
     // Skip ONLY password confirmation for OAuth users (they have no password)
@@ -41,6 +42,8 @@
     }
     // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
     $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
+    // Prefer a rich HTML button title when callers pass <x-slot:button-title> (ComponentSlot).
+    $resolvedButtonTitle = $buttonTitle instanceof ComponentSlot ? $buttonTitle : $buttonTitle;
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
@@ -158,41 +161,41 @@
             @if ($disabled)
                 @if ($buttonFullWidth)
                     <x-forms.button class="w-full" isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
                     <x-forms.button isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif ($isErrorButton)
                 @if ($buttonFullWidth)
                     <x-forms.button class="w-full" isError @click="modalOpen=true">
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
                     <x-forms.button isError @click="modalOpen=true">
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif($isHighlightedButton)
                 @if ($buttonFullWidth)
                     <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
                     <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @else
                 @if ($buttonFullWidth)
                     <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
                     <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @endif
@@ -211,10 +214,10 @@
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
                 class="application-settings-form application-settings-section relative flex max-h-[calc(100dvh-2rem)] w-full flex-col lg:min-w-[36rem] lg:max-w-2xl"
                 style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                <header>
-                    <h3>{{ $title }}</h3>
-                    <button @click="modalOpen = false; resetModal()"
-                        class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                <header class="flex-nowrap!">
+                    <h3 class="min-w-0 flex-1 truncate">{{ $title }}</h3>
+                    <button type="button" @click="modalOpen = false; resetModal()"
+                        class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
                         <x-reicon name="x" class="size-4" />
                     </button>
                 </header>
@@ -232,7 +235,7 @@
                                 </div>
                             @endforeach
 
-                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.button @click="modalOpen = false; resetModal()">
                                     Cancel
                                 </x-forms.button>
@@ -304,7 +307,7 @@
                             @endif
                         @endif
 
-                        <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                        <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                             @if (!empty($checkboxes))
                                 <x-forms.button @click="step--">
                                     Back
@@ -315,6 +318,7 @@
                                 </x-forms.button>
                             @endif
                             <x-forms.button
+                                :showLoadingIndicator="false"
                                 x-bind:disabled="submitting || (!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
                                     confirmationText)"
                                 class="w-auto" isError
@@ -335,8 +339,8 @@
                                         });
                                     }
                                 ">
-                                <span x-show="!submitting" x-text="step2ButtonText"></span>
-                                <x-loading x-show="submitting" text="Processing..." />
+                                <x-loading-on-button x-show="submitting" x-cloak />
+                                <span x-text="step2ButtonText"></span>
                             </x-forms.button>
                         </div>
                     </div>
@@ -369,11 +373,12 @@
                                 @enderror
                             </div>
 
-                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.button @click="step--">
                                     Back
                                 </x-forms.button>
-                                <x-forms.button x-bind:disabled="!password || submitting" class="w-auto" isError
+                                <x-forms.button :showLoadingIndicator="false"
+                                    x-bind:disabled="!password || submitting" class="w-auto" isError
                                     @click="
                                     if (dispatchEvent) {
                                         $wire.dispatch(dispatchEventType, dispatchEventMessage);
@@ -392,8 +397,8 @@
                                         submitting = false;
                                     });
                                     ">
-                                    <span x-show="!submitting" x-text="step3ButtonText"></span>
-                                    <x-loading x-show="submitting" text="Processing..." />
+                                    <x-loading-on-button x-show="submitting" x-cloak />
+                                    <span x-text="step3ButtonText"></span>
                                 </x-forms.button>
                             </div>
                         </div>

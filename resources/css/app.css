@@ -774,6 +774,7 @@ tr td:first-child {
 
 /* Heading action group: buttons + dropdown triggers styled like the tabs */
 .application-heading-actions .button,
+.application-heading-actions .app-tab,
 .application-heading-actions .relative > button[x-ref='trigger'] {
     height: 1.75rem;
     display: inline-flex;
@@ -793,17 +794,20 @@ tr td:first-child {
 }
 
 .dark .application-heading-actions .button,
+.dark .application-heading-actions .app-tab,
 .dark .application-heading-actions .relative > button[x-ref='trigger'] {
     color: var(--color-fg-dim);
 }
 
 .application-heading-actions .button:hover:not(:disabled),
+.application-heading-actions .app-tab:hover,
 .application-heading-actions .relative > button[x-ref='trigger']:hover {
     background: rgba(0, 0, 0, 0.05);
     color: #000000;
 }
 
 .dark .application-heading-actions .button:hover:not(:disabled),
+.dark .application-heading-actions .app-tab:hover,
 .dark .application-heading-actions .relative > button[x-ref='trigger']:hover {
     background: rgba(255, 255, 255, 0.06);
     color: var(--color-fg);
@@ -833,9 +837,11 @@ tr td:first-child {
     line-height: 1.25;
 }
 
-.application-heading-actions .button svg {
-    width: 1rem;
-    height: 1rem;
+.application-heading-actions .button svg,
+.application-heading-actions .app-tab svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
 }
 
 /* Custom listbox (replaces native <select>) */
@@ -1107,7 +1113,8 @@ tr td:first-child {
 }
 
 @media (max-width: 640px) {
-    .application-settings-section > :is(header, .application-settings-section-header) > :nth-child(2) {
+    /* Only force full-width for action rows (divs), never modal close buttons. */
+    .application-settings-section > :is(header, .application-settings-section-header) > div:nth-child(2) {
         width: 100%;
     }
 

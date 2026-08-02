@@ -10,13 +10,8 @@
         <div x-data="{
             open: false,
             collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
-            pageWidth: localStorage.getItem('pageWidth') || 'full',
             sidebarReady: false,
             init() {
-                if (!localStorage.getItem('pageWidth')) {
-                    localStorage.setItem('pageWidth', this.pageWidth);
-                }
-
                 this.$nextTick(() => {
                     requestAnimationFrame(() => {
                         this.sidebarReady = true;

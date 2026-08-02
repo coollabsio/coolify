@@ -56,8 +56,8 @@ it('shows explicit loading spinners and disables cloud token action buttons whil
     $tokenShowView = file_get_contents(__DIR__.'/../../resources/views/livewire/security/cloud-provider-token/show.blade.php');
     $serverTokenView = file_get_contents(__DIR__.'/../../resources/views/livewire/server/cloud-provider-token/show.blade.php');
 
-    expect(substr_count($tokenFormView, 'wire:loading.attr="disabled" wire:target="addToken"'))->toBe(2)
-        ->and(substr_count($tokenFormView, '<x-loading-on-button wire:loading wire:target="addToken" />'))->toBe(2)
+    expect(substr_count($tokenFormView, 'wire:loading.attr="disabled" wire:target="addToken"'))->toBe(1)
+        ->and(substr_count($tokenFormView, '<x-loading-on-button wire:loading wire:target="addToken" />'))->toBe(1)
         ->and($tokenShowView)->toContain('wire:loading.attr="disabled" wire:target="validateToken"')
         ->and($tokenShowView)->toContain('<x-loading-on-button wire:loading wire:target="validateToken" />')
         ->and($serverTokenView)->toContain('wire:loading.attr="disabled"')

@@ -125,7 +125,7 @@
                         <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
                         <x-forms.textarea rows="16" placeholder="CREATE DATABASE test;" id="new_content"
                             label="Content" required />
-                        <div class="flex justify-end border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                        <div class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                             <x-forms.button type="submit">Add script</x-forms.button>
                         </div>
                     </form>

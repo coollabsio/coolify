@@ -82,7 +82,7 @@
             'label' => 'Metrics',
             'route' => 'server.metrics',
             'active' => $activeMenu === 'metrics',
-            'icon' => 'dashboard',
+            'icon' => 'graph',
             'group' => 'Operations',
             'visible' => $server->isFunctional(),
         ],
@@ -90,7 +90,7 @@
             'label' => 'Danger',
             'route' => 'server.delete',
             'active' => $activeMenu === 'danger',
-            'icon' => 'admin',
+            'icon' => 'shield-alert',
             'group' => 'Danger zone',
             'visible' => ! $server->isLocalhost(),
         ],
@@ -104,7 +104,7 @@
 
 <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
     <nav aria-label="Server configuration sections"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"

@@ -26,10 +26,10 @@
             ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
             ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
             ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'subscription'],
-            ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'teams'],
-            ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'dashboard'],
+            ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
+            ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
             ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
-            ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'admin'],
+            ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'shield-alert'],
         ];
 
         $configurationItems = collect($configurationItems)
@@ -50,11 +50,11 @@
             ->filter(fn ($items) => $items->isNotEmpty());
     @endphp
 
-    <section class="application-settings-workspace mt-8 w-full max-w-[1180px] xl:mt-0">
+    <section class="application-settings-workspace mt-0 md:mt-8 w-full max-w-[1180px] xl:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
             <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
                 <nav aria-label="Database settings"
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                     @foreach ($groupedItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
                             <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"

@@ -67,7 +67,7 @@
                             @endif
                         </x-callout>
 
-                        <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-border-subtle">
+                        <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                             <x-forms.button @click="modalOpen = false; $wire.set('showDomainConflictModal', false)">
                                 Cancel
                             </x-forms.button>

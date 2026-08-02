@@ -37,13 +37,13 @@
         ['key' => 's3', 'label' => 'S3 storage', 'icon' => 'storages'],
         ['key' => 'retention', 'label' => 'Retention', 'icon' => 'unordered-list'],
         ['key' => 'executions', 'label' => 'Executions', 'icon' => 'terminal'],
-        ['key' => 'danger', 'label' => 'Danger Zone', 'icon' => 'admin'],
+        ['key' => 'danger', 'label' => 'Danger Zone', 'icon' => 'shield-alert'],
     ];
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
     <nav aria-label="Backup settings"
-        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-4 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         <div class="nav-section hidden xl:block">Backup</div>
         <a class="menu-item" {{ wireNavigate() }} href="{{ route($routes['back'], $parameters) }}">
             <x-reicon name="logout" class="menu-item-icon rotate-180" />

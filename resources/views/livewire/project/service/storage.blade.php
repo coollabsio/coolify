@@ -17,8 +17,7 @@
             $resource->getMorphClass() == 'App\Models\StandaloneMongodb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMysql')
         <x-application.settings-section id="storage-mounts-section" title="Persistent storage"
-            helper="Preview deployment volumes can use a -pr-#PRNumber suffix so each pull request receives isolated storage."
-            flush>
+            helper="Preview deployment volumes can use a -pr-#PRNumber suffix so each pull request receives isolated storage.">
             <x-slot:actions>
                 @if ($resource?->build_pack !== 'dockercompose')
                     @can('update', $resource)
@@ -42,31 +41,30 @@
                                     x-bind:aria-expanded="dropdownOpen">
                                     <x-reicon name="plus" class="size-3.5" />
                                     Add mount
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
                                 </x-forms.button>
 
                                 <div x-show="dropdownOpen" x-cloak role="menu"
-                                    x-transition:enter="ease-out duration-100"
-                                    x-transition:enter-start="opacity-0 -translate-y-1"
-                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                    class="listbox-panel left-auto! right-0 min-w-0! w-44!">
+                                    x-transition.origin.top.left
+                                    class="absolute top-9 left-0 z-[90] w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised sm:left-auto sm:right-0">
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
                                         @click="volumeModalOpen = true; dropdownOpen = false">
-                                        <x-reicon name="storages" class="size-4" />
+                                        <x-reicon name="storages" class="size-3.5 shrink-0 opacity-70" />
                                         Volume mount
                                     </button>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
                                         @click="fileModalOpen = true; dropdownOpen = false">
-                                        <x-reicon name="file" class="size-4" />
+                                        <x-reicon name="file" class="size-3.5 shrink-0 opacity-70" />
                                         File mount
                                     </button>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
                                         @click="hostFileModalOpen = true; dropdownOpen = false">
-                                        <x-reicon name="file-content" class="size-4" />
+                                        <x-reicon name="file-content" class="size-3.5 shrink-0 opacity-70" />
                                         Host file mount
                                     </button>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
                                         @click="directoryModalOpen = true; dropdownOpen = false">
-                                        <x-reicon name="folder" class="size-4" />
+                                        <x-reicon name="folder" class="size-3.5 shrink-0 opacity-70" />
                                         Directory mount
                                     </button>
                                 </div>
@@ -391,48 +389,43 @@
                 </x-slot:icon>
             </x-empty>
         @else
-            <div>
-                {{-- Tab Content --}}
-                <div class="p-4">
-                    {{-- Volumes Tab --}}
-                    <div x-show="activeTab === 'volumes'" class="flex flex-col gap-4">
-                        @if ($hasVolumes)
-                            <livewire:project.shared.storages.all :resource="$resource" />
-                        @else
-                            <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                No volumes configured.
-                            </div>
-                        @endif
+            {{-- Volumes Tab --}}
+            <div x-show="activeTab === 'volumes'" class="flex flex-col gap-6">
+                @if ($hasVolumes)
+                    <livewire:project.shared.storages.all :resource="$resource" />
+                @else
+                    <div class="py-6 text-center text-neutral-400 dark:text-neutral-500">
+                        No volumes configured.
                     </div>
+                @endif
+            </div>
 
-                    {{-- Files Tab --}}
-                    <div x-show="activeTab === 'files'" class="flex flex-col gap-4">
-                        @if ($hasFiles)
-                            @foreach ($this->files as $fs)
-                                <livewire:project.service.file-storage :fileStorage="$fs"
-                                    wire:key="file-{{ $fs->id }}" />
-                            @endforeach
-                        @else
-                            <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                No file mounts configured.
-                            </div>
-                        @endif
+            {{-- Files Tab --}}
+            <div x-show="activeTab === 'files'" class="flex flex-col gap-6">
+                @if ($hasFiles)
+                    @foreach ($this->files as $fs)
+                        <livewire:project.service.file-storage :fileStorage="$fs"
+                            wire:key="file-{{ $fs->id }}" />
+                    @endforeach
+                @else
+                    <div class="py-6 text-center text-neutral-400 dark:text-neutral-500">
+                        No file mounts configured.
                     </div>
+                @endif
+            </div>
 
-                    {{-- Directories Tab --}}
-                    <div x-show="activeTab === 'directories'" class="flex flex-col gap-4">
-                        @if ($hasDirectories)
-                            @foreach ($this->directories as $fs)
-                                <livewire:project.service.file-storage :fileStorage="$fs"
-                                    wire:key="directory-{{ $fs->id }}" />
-                            @endforeach
-                        @else
-                            <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                No directory mounts configured.
-                            </div>
-                        @endif
+            {{-- Directories Tab --}}
+            <div x-show="activeTab === 'directories'" class="flex flex-col gap-6">
+                @if ($hasDirectories)
+                    @foreach ($this->directories as $fs)
+                        <livewire:project.service.file-storage :fileStorage="$fs"
+                            wire:key="directory-{{ $fs->id }}" />
+                    @endforeach
+                @else
+                    <div class="py-6 text-center text-neutral-400 dark:text-neutral-500">
+                        No directory mounts configured.
                     </div>
-                </div>
+                @endif
             </div>
         @endif
         </x-application.settings-section>
