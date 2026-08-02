@@ -32,15 +32,16 @@
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.tenant"
                                 label="Tenant" />
                         @endif
-                        @if ($oauth_setting['provider'] == 'google')
+                        @if ($oauth_setting['provider'] == 'google' || $oauth_setting['provider'] == 'keycloak')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.tenant"
-                                helper="Optional parameter that supplies a hosted domain (HD) to Google, which<br>triggers a login hint to be displayed on the OAuth screen with this domain.<br><br><a class='underline dark:text-warning text-coollabs' href='https://developers.google.com/identity/openid-connect/openid-connect#hd-param' target='_blank'>Google Documentation</a>"
-                                label="Tenant" />
+                                helper="{{ $oauth_setting['provider'] == 'google' ? 'Optional parameter that supplies a hosted domain (HD) to Google, which<br>triggers a login hint to be displayed on the OAuth screen with this domain.<br><br><a class=\'underline dark:text-warning text-coollabs\' href=\'https://developers.google.com/identity/openid-connect/openid-connect#hd-param\' target=\'_blank\'>Google Documentation</a>' : 'The Realm name for your Keycloak instance. Default is \'master\'.' }}"
+                                label="{{ $oauth_setting['provider'] == 'google' ? 'Tenant' : 'Realm' }}" />
                         @endif
                         @if (
                             $oauth_setting['provider'] == 'authentik' ||
                                 $oauth_setting['provider'] == 'clerk' ||
                                 $oauth_setting['provider'] == 'zitadel' ||
+                                $oauth_setting['provider'] == 'keycloak' ||
                                 $oauth_setting['provider'] == 'gitlab')
                             <x-forms.input id="oauth_settings_map.{{ $oauth_setting['provider'] }}.base_url"
                                 label="Base URL" />

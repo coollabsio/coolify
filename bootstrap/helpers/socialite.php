@@ -33,6 +33,17 @@ function get_socialite_provider(string $provider)
         return Socialite::driver($provider)->setConfig($authentik_clerk_config);
     }
 
+    if ($provider == 'keycloak') {
+        $keycloak_config = new \SocialiteProviders\Manager\Config(
+            $oauth_setting->client_id,
+            $oauth_setting->client_secret,
+            $oauth_setting->redirect_uri,
+            ['base_url' => $oauth_setting->base_url, 'realms' => $oauth_setting->tenant],
+        );
+
+        return Socialite::driver('keycloak')->setConfig($keycloak_config);
+    }
+
     if ($provider == 'zitadel') {
         $zitadel_config = new \SocialiteProviders\Manager\Config(
             $oauth_setting->client_id,
