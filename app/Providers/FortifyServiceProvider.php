@@ -61,6 +61,11 @@ class FortifyServiceProvider extends ServiceProvider
             $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
+
+            if (!request()->has('skip_oauth') && $settings->oauth_auto_redirect && $enabled_oauth_providers->where('provider', $settings->oauth_auto_redirect)->isNotEmpty()) {
+                return redirect()->route('auth.redirect', ['provider' => $settings->oauth_auto_redirect]);
+            }
+
             if ($users == 0) {
                 // If there are no users, redirect to registration
                 return redirect()->route('register');
