@@ -4,6 +4,7 @@
 # tags: analytics, product, open-source, self-hosted, ab-testing, event-tracking
 # logo: svgs/posthog.svg
 # minversion: 4.0.0-beta.222
+# fqdn_url_scheme: https
 services:
   db:
     image: postgres:15.12-alpine
@@ -1184,7 +1185,7 @@ services:
       - posthog-objectstorage:/data
 
   seaweedfs:
-    image: chrislusf/seaweedfs:4.03
+    image: chrislusf/seaweedfs:4.29
     entrypoint:
       - /bin/sh
       - '-c'

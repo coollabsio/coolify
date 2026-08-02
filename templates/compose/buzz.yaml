@@ -4,6 +4,7 @@
 # tags: buzz,chat,nostr,agents,ai,collaboration,relay,block
 # logo: svgs/buzz.svg
 # port: 3000
+# fqdn_url_scheme: https
 
 services:
   buzz:

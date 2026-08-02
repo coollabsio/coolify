@@ -159,8 +159,8 @@ class Services extends Command
         $documentation = $data->get('documentation');
         $documentation = $documentation ? $documentation.'?utm_source=coolify.io' : 'https://coolify.io/docs';
 
-        // Replace SERVICE_URL with SERVICE_FQDN in the content
-        $modifiedContent = str_replace('SERVICE_URL', 'SERVICE_FQDN', $content);
+        // Replace SERVICE_URL with SERVICE_FQDN in the FQDN catalog.
+        $modifiedContent = $this->replaceServiceUrlsWithFqdns($content, $data->get('fqdn_url_scheme'));
 
         $json = Yaml::parse($modifiedContent);
         $compose = base64_encode(Yaml::dump($json, 10, 2));
@@ -186,8 +186,8 @@ class Services extends Command
 
         if ($envFile = $data->get('env_file')) {
             $envFileContent = file_get_contents(base_path("templates/compose/$envFile"));
-            // Also replace SERVICE_URL with SERVICE_FQDN in env file content
-            $modifiedEnvContent = str_replace('SERVICE_URL', 'SERVICE_FQDN', $envFileContent);
+            // Also replace SERVICE_URL with scheme-bearing SERVICE_FQDN URLs in env files.
+            $modifiedEnvContent = $this->replaceServiceUrlsWithFqdns($envFileContent, $data->get('fqdn_url_scheme'));
             $payload['envs'] = base64_encode($modifiedEnvContent);
         }
 
@@ -200,6 +200,24 @@ class Services extends Command
         }
 
         return $payload;
+    }
+
+    private function replaceServiceUrlsWithFqdns(string $content, ?string $scheme = null): string
+    {
+        if ($scheme !== null) {
+            $content = preg_replace_callback(
+                '/(?<!:\/\/)\$\{SERVICE_URL/',
+                fn (array $matches): string => $scheme.'://${SERVICE_FQDN',
+                $content,
+            ) ?? $content;
+            $content = preg_replace_callback(
+                '/(?<!:\/\/)\$SERVICE_URL/',
+                fn (array $matches): string => $scheme.'://$SERVICE_FQDN',
+                $content,
+            ) ?? $content;
+        }
+
+        return str_replace('SERVICE_URL', 'SERVICE_FQDN', $content);
     }
 
     private function generateServiceTemplatesRaw(): void
@@ -237,8 +255,8 @@ class Services extends Command
         $documentation = $data->get('documentation');
         $documentation = $documentation ? $documentation.'?utm_source=coolify.io' : 'https://coolify.io/docs';
 
-        // Replace SERVICE_URL with SERVICE_FQDN in the content
-        $modifiedContent = str_replace('SERVICE_URL', 'SERVICE_FQDN', $content);
+        // Replace SERVICE_URL with SERVICE_FQDN in the FQDN catalog.
+        $modifiedContent = $this->replaceServiceUrlsWithFqdns($content, $data->get('fqdn_url_scheme'));
 
         $json = Yaml::parse($modifiedContent);
         $compose = Yaml::dump($json, 10, 2); // Not base64 encoded

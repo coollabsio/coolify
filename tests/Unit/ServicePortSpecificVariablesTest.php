@@ -1,5 +1,21 @@
 <?php
 
+it('builds base and routed service URL pairs without appending a port after a path', function () {
+    $cases = [
+        ['https://posthog.example', '3000', '/e', 'https://posthog.example', 'https://posthog.example:3000/e'],
+        ['posthog.example', '3000', '/s', 'posthog.example', 'posthog.example:3000/s'],
+        ['https://posthog.example', '8080', '/livestream', 'https://posthog.example', 'https://posthog.example:8080/livestream'],
+        ['https://posthog.example', '8000', '/', 'https://posthog.example', 'https://posthog.example:8000'],
+        ['https://[2001:db8::1]/e', '3000', null, 'https://[2001:db8::1]', 'https://[2001:db8::1]:3000/e'],
+    ];
+
+    foreach ($cases as [$value, $port, $path, $base, $routed]) {
+        expect(serviceEnvironmentUrlPair($value, $port, $path))
+            ->toBe(['base' => $base, 'routed' => $routed])
+            ->and($routed)->not->toContain('/e:3000');
+    }
+});
+
 /**
  * Unit tests to verify that SERVICE_URL_* and SERVICE_FQDN_* variables
  * with port suffixes are properly handled and populated.

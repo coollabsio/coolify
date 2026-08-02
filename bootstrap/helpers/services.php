@@ -139,7 +139,7 @@ function replaceVariables(string $variable): Stringable
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
-        if ($oneService->getMorphClass() === \App\Models\Application::class) {
+        if ($oneService->getMorphClass() === Application::class) {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
         } else {
@@ -204,17 +204,45 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 instant_remote_process(["mkdir -p $fileLocation"], $server);
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
+/**
+ * Build base and routed variants of a service URL.
+ *
+ * @return array{base: string, routed: string}
+ */
+function serviceEnvironmentUrlPair(string $value, ?string $port = null, ?string $path = null): array
+{
+    $hasScheme = (bool) preg_match('/^[a-z][a-z0-9+.-]*:\/\//i', $value);
+    $temporaryScheme = 'https://';
+    $url = Url::fromString($hasScheme ? $value : $temporaryScheme.$value);
+    $normalizedPath = $path ?? $url->getPath();
+    $normalizedPath = $normalizedPath === '/' ? '/' : '/'.ltrim($normalizedPath, '/');
+    $routedPort = $port ?? $url->getPort();
+
+    $base = (string) $url->withPort(null)->withPath('/')->withQuery('')->withFragment('');
+    $routed = (string) $url->withPort($routedPort)->withPath($normalizedPath);
+
+    if (! $hasScheme) {
+        $base = str($base)->after($temporaryScheme)->value();
+        $routed = str($routed)->after($temporaryScheme)->value();
+    }
+
+    return [
+        'base' => $base,
+        'routed' => $routed,
+    ];
+}
+
 function updateCompose(ServiceApplication|ServiceDatabase $resource)
 {
     try {
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
         if (! $dockerComposeRaw) {
-            throw new \Exception('No compose file found or not a valid YAML file.');
+            throw new Exception('No compose file found or not a valid YAML file.');
         }
         $dockerCompose = Yaml::parse($dockerComposeRaw);
 
@@ -327,20 +355,11 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         if ($resource->fqdn) {
             $resourceFqdns = str($resource->fqdn)->explode(',');
             $resourceFqdns = $resourceFqdns->first();
-            $url = Url::fromString($resourceFqdns);
+            $url = Url::fromString(str($resourceFqdns)->contains('://') ? $resourceFqdns : "https://{$resourceFqdns}");
             $port = $url->getPort();
-            $path = $url->getPath();
-
-            // Prepare URL value (with scheme and host)
-            $urlValue = $url->getScheme().'://'.$url->getHost();
-            $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
-
-            // Prepare FQDN value (host only, no scheme)
-            $fqdnHost = $url->getHost();
-            $fqdnValue = str($fqdnHost)->after('://');
-            if ($path !== '/') {
-                $fqdnValue = $fqdnValue.$path;
-            }
+            $urlPair = serviceEnvironmentUrlPair($resourceFqdns);
+            $urlValue = $urlPair['base'];
+            $fqdnValue = str($urlValue)->after('://')->value();
 
             // For each service name found in template, create BOTH SERVICE_URL and SERVICE_FQDN pairs
             foreach ($serviceNamesToProcess as $serviceInfo) {
@@ -373,8 +392,9 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                 }
 
                 foreach ($allPorts as $portNum) {
-                    $urlWithPort = $urlValue.':'.$portNum;
-                    $fqdnWithPort = $fqdnValue.':'.$portNum;
+                    $urlPair = serviceEnvironmentUrlPair($resourceFqdns, (string) $portNum);
+                    $urlWithPort = $urlPair['routed'];
+                    $fqdnWithPort = str($urlPair['routed'])->after('://')->value();
 
                     $resource->service->environment_variables()->updateOrCreate([
                         'resourceable_type' => Service::class,
@@ -396,7 +416,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
@@ -495,7 +515,7 @@ function applyServiceApplicationPrerequisites(Service $service): void
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Log error but don't throw - prerequisites are nice-to-have, not critical
         Log::error('Failed to apply service application prerequisites', [
             'service_id' => $service->id,

@@ -1788,43 +1788,23 @@ function serviceParser(Service $resource): Collection
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
-                    $fqdn = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
-                    $url = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
+                    $fqdn = $savedService->fqdn;
+                    $url = $savedService->fqdn;
                 } else {
                     // For ServiceDatabase, generate fqdn/url without saving to the model
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 }
 
-                // IMPORTANT: SERVICE_FQDN env vars should NOT contain scheme (host only)
-                // But $fqdn variable itself may contain scheme (used for database domain field)
-                // Strip scheme for environment variable values
-                $fqdnValueForEnv = str($fqdn)->after('://')->value();
-
-                if ($value && get_class($value) === Illuminate\Support\Stringable::class && $value->startsWith('/')) {
-                    $path = $value->value();
-                    if ($path !== '/') {
-                        // Only add path if it's not already present (prevents duplication on subsequent parse() calls)
-                        if (! str($fqdn)->endsWith($path)) {
-                            $fqdn = "$fqdn$path";
-                        }
-                        if (! str($url)->endsWith($path)) {
-                            $url = "$url$path";
-                        }
-                        if (! str($fqdnValueForEnv)->endsWith($path)) {
-                            $fqdnValueForEnv = "$fqdnValueForEnv$path";
-                        }
-                    }
-                }
-
-                $urlWithPort = $url;
-                $fqdnValueForEnvWithPort = $fqdnValueForEnv;
-                if ($fqdn && $port) {
-                    $fqdnValueForEnvWithPort = "$fqdnValueForEnv:$port";
-                }
-                if ($url && $port) {
-                    $urlWithPort = "$url:$port";
-                }
+                $path = $value && get_class($value) === Illuminate\Support\Stringable::class && $value->startsWith('/')
+                    ? $value->value()
+                    : null;
+                $urlPair = serviceEnvironmentUrlPair($url, $port, $path);
+                $fqdnPair = serviceEnvironmentUrlPair($fqdn, $port, $path);
+                $urlValueForEnv = $urlPair['base'];
+                $urlWithPort = $urlPair['routed'];
+                $fqdnValueForEnv = str($fqdnPair['base'])->after('://')->value();
+                $fqdnValueForEnvWithPort = str($fqdnPair['routed'])->after('://')->value();
 
                 // Only save fqdn to ServiceApplication, not ServiceDatabase
                 if ($isServiceApplication && is_null($savedService->fqdn)) {
@@ -1855,7 +1835,7 @@ function serviceParser(Service $resource): Collection
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
-                    'value' => $url,
+                    'value' => $urlValueForEnv,
                     'is_preview' => false,
                     'comment' => $envComments[$urlKey] ?? null,
                 ]);
