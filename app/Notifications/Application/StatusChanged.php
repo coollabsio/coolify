@@ -60,7 +60,7 @@ class StatusChanged extends CustomEmailNotification
     {
         return new DiscordMessage(
             title: ':cross_mark: Application stopped',
-            description: '[Open Application in Coolify]('.$this->resource_url.')',
+            description: "{$this->resource_name} has been stopped.\n\n[Open Application in Coolify]({$this->resource_url})",
             color: DiscordMessage::errorColor(),
             isCritical: true,
         );
