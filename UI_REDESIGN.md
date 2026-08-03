@@ -601,11 +601,18 @@ Use these as implementation references:
 | Command palette / global search | `resources/views/livewire/global-search.blade.php` |
 | Outline icons | `resources/views/components/reicon.blade.php` |
 | Shared styling | `resources/css/app.css`, `resources/css/utilities.css` |
+| HTTP error pages | `resources/views/components/error-page.blade.php`, `resources/views/errors/*` |
 
 Already restyled application configuration surfaces include General, Advanced,
 Environment Variables, Persistent Storage, Servers, Scheduled Tasks, Webhooks,
 Preview Deployments, Healthcheck, Rollback, Resource Limits, Resource
 Operations, Metrics, Tags, and Danger Zone.
+
+HTTP error pages (400, 401, 402, 403, 404, 419, 429, 500, 503) use the shared
+`<x-error-page>` component on the public auth-style canvas: theme-aware status
+code, compact title and muted description, neutral `.button` actions, and an
+`auth-text-link`-style Contact support link. Keep copy sentence-case and avoid
+oversized 200px status numbers.
 
 ---
 

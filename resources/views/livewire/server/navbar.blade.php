@@ -1,17 +1,21 @@
 <nav class="w-full max-w-[1180px] pb-3 lg:pb-0">
-    <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
+    <x-process-dialog @startproxy.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
-            @if ($server->id === 0)
-                <div class="mb-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
-                    <span class="font-semibold">Note:</span> This is the localhost server where Coolify runs.
-                    During proxy restart, the connection may be temporarily lost.
-                    If logs stop updating, please refresh the browser after a few minutes.
+            <div class="flex h-full min-h-0 flex-col gap-3">
+                @if ($server->id === 0)
+                    <div class="shrink-0 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
+                        <span class="font-semibold">Note:</span> This is the localhost server where Coolify runs.
+                        During proxy restart, the connection may be temporarily lost.
+                        If logs stop updating, please refresh the browser after a few minutes.
+                    </div>
+                @endif
+                <div class="flex min-h-0 flex-1 flex-col">
+                    <livewire:activity-monitor header="Logs" fullHeight />
                 </div>
-            @endif
-            <livewire:activity-monitor header="Logs" fullHeight />
+            </div>
         </x-slot:content>
-    </x-slide-over>
+    </x-process-dialog>
 
     @php
         $serverRouteParameters = ['server_uuid' => $server->uuid];

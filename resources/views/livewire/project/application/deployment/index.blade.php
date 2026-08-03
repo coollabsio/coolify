@@ -153,7 +153,9 @@
             </div>
 
             @if ($deployments->isNotEmpty())
-                <div class="data-table w-full">
+                <div class="data-table w-full transition-opacity"
+                    wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="goToPage,previousPage,nextPage">
                     <div class="data-table-header deployment-table-grid rounded-none!">
                         <span>Status</span>
                         <span>Source</span>
@@ -230,56 +232,11 @@
                         </a>
                     @endforeach
 
-                    <div class="flex items-center justify-between gap-3 px-4 py-3">
-                        <p class="shrink-0 whitespace-nowrap text-[13px] text-neutral-500 dark:text-fg-dim">
-                            Showing <span
-                                class="tabular-nums text-black dark:text-fg">{{ $firstVisibleRow }}–{{ $lastVisibleRow }}</span>
-                            of <span class="tabular-nums text-black dark:text-fg">{{ $deployments_count }}</span>
-                        </p>
-                        <div
-                            class="inline-flex h-8 overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.10]">
-                            <button type="button"
-                                class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                aria-label="First page" title="First page" wire:click="goToPage(1)"
-                                @disabled($currentPage === 1)>
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
-                                    <path d="M18 6L12 12L18 18M11 6L5 12L11 18" stroke="currentColor"
-                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                            <button type="button"
-                                class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                aria-label="Previous page" title="Previous page" wire:click="previousPage"
-                                @disabled($currentPage === 1)>
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
-                                    <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.8"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                            <span
-                                class="flex min-w-12 items-center justify-center border-r border-neutral-200 px-3 text-[13px] tabular-nums text-black dark:border-white/[0.10] dark:text-fg">
-                                {{ $currentPage }}
-                            </span>
-                            <button type="button"
-                                class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                aria-label="Next page" title="Next page" wire:click="nextPage"
-                                @disabled($currentPage >= $lastPage)>
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
-                                    <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.8"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                            <button type="button"
-                                class="flex w-10 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                aria-label="Last page" title="Last page" wire:click="goToPage({{ $lastPage }})"
-                                @disabled($currentPage >= $lastPage)>
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
-                                    <path d="M6 6L12 12L6 18M13 6L19 12L13 18" stroke="currentColor"
-                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
+                    <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$deployments_count"
+                        :current-page="$currentPage" :last-page="$lastPage"
+                        wire-target="goToPage,previousPage,nextPage" first-action="goToPage(1)"
+                        previous-action="previousPage" next-action="nextPage"
+                        last-action="goToPage({{ $lastPage }})" />
                 </div>
             @else
                 <x-empty size="sm" title="No deployments found"

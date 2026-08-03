@@ -243,9 +243,6 @@
                             @endforeach
 
                             <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button @click="modalOpen = false; resetModal()">
-                                    Cancel
-                                </x-forms.button>
                                 <x-forms.button @click="step++" class="w-auto" isError>
                                     <span x-text="step1ButtonText"></span>
                                 </x-forms.button>

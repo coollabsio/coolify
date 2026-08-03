@@ -205,7 +205,7 @@
 }
 
 @utility menu-item {
-    @apply relative flex gap-2.5 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-[9px] truncate min-w-0 transition-colors text-neutral-500 dark:text-fg-faint hover:bg-neutral-100 hover:text-black dark:hover:bg-white/[0.05] dark:hover:text-fg;
+    @apply relative flex gap-2.5 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-none truncate min-w-0 transition-colors text-neutral-500 dark:text-fg-faint hover:bg-neutral-100 hover:text-black dark:hover:bg-white/[0.05] dark:hover:text-fg;
 }
 @utility menu-item-icon {
     @apply shrink-0 size-[18px] opacity-90;
@@ -216,7 +216,7 @@
 }
 
 @utility menu-item-active {
-    @apply overflow-visible rounded-l-[9px] rounded-r-none bg-transparent text-black hover:bg-transparent dark:bg-transparent dark:text-fg dark:hover:bg-transparent;
+    @apply overflow-visible rounded-none bg-transparent text-black hover:bg-transparent dark:bg-transparent dark:text-fg dark:hover:bg-transparent;
 }
 
 /* Subtle Title-Case section header */
@@ -226,10 +226,10 @@
 
 /* Indented child rows in a collapsible nav group */
 @utility menu-subitem {
-    @apply relative flex gap-2.5 items-center h-8 pl-3 pr-2.5 w-full text-[13px] font-medium rounded-[9px] truncate min-w-0 transition-colors text-neutral-500 dark:text-fg-faint hover:bg-neutral-100 hover:text-black dark:hover:bg-white/[0.05] dark:hover:text-fg;
+    @apply relative flex gap-2.5 items-center h-8 pl-3 pr-2.5 w-full text-[13px] font-medium rounded-none truncate min-w-0 transition-colors text-neutral-500 dark:text-fg-faint hover:bg-neutral-100 hover:text-black dark:hover:bg-white/[0.05] dark:hover:text-fg;
 }
 @utility menu-subitem-active {
-    @apply rounded-l-[9px] rounded-r-none bg-transparent text-black hover:bg-transparent dark:bg-transparent dark:text-fg dark:hover:bg-transparent;
+    @apply rounded-none bg-transparent text-black hover:bg-transparent dark:bg-transparent dark:text-fg dark:hover:bg-transparent;
 }
 
 @utility sub-menu-wrapper {
@@ -237,7 +237,7 @@
 }
 
 @utility sub-menu-item {
-    @apply relative flex gap-2 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-md truncate min-w-0 transition-colors text-neutral-500 dark:text-fg-dim hover:bg-neutral-100 dark:hover:bg-white/[0.05] hover:text-black dark:hover:text-fg;
+    @apply relative flex gap-2 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-none truncate min-w-0 transition-colors text-neutral-500 dark:text-fg-dim hover:bg-neutral-100 dark:hover:bg-white/[0.05] hover:text-black dark:hover:text-fg;
 }
 
 @utility sub-menu-item-icon {

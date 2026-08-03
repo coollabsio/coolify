@@ -150,7 +150,9 @@
                     <x-empty size="sm" title="No environment variables found"
                         description="No variables match your search." />
                 @elseif ($totalRows > 0)
-                    <div class="data-table w-full">
+                    <div class="data-table w-full transition-opacity"
+                        wire:loading.class="opacity-50 pointer-events-none"
+                        wire:target="setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
                         <div class="data-table-header env-table-grid">
                             <span>Name</span>
                             <span>Type</span>
@@ -171,61 +173,13 @@
                                     :isPreview="$row['scope'] === 'preview'" />
                             @endif
                         @endforeach
-                        <div class="flex items-center justify-between gap-3 px-4 py-3">
-                            <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                                Showing <span
-                                    class="tabular-nums text-black dark:text-fg">{{ $firstVisibleRow }}–{{ $lastVisibleRow }}</span>
-                                of <span class="tabular-nums text-black dark:text-fg">{{ $totalRows }}</span>
-                            </p>
-                            <div
-                                class="inline-flex h-8 overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.10]">
-                                <button type="button"
-                                    class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                    aria-label="First page" title="First page"
-                                    wire:click="setEnvironmentVariablePage(1)" @disabled($currentPage === 1)>
-                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M18 6L12 12L18 18M11 6L5 12L11 18" stroke="currentColor"
-                                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </button>
-                                <button type="button"
-                                    class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                    aria-label="Previous page" title="Previous page"
-                                    wire:click="previousEnvironmentVariablePage" @disabled($currentPage === 1)>
-                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.8"
-                                            stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </button>
-                                <span
-                                    class="flex min-w-12 items-center justify-center border-r border-neutral-200 px-3 text-[13px] tabular-nums text-black dark:border-white/[0.10] dark:text-fg">
-                                    {{ $currentPage }}
-                                </span>
-                                <button type="button"
-                                    class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                    aria-label="Next page" title="Next page" wire:click="nextEnvironmentVariablePage"
-                                    @disabled($currentPage === $lastPage)>
-                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.8"
-                                            stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </button>
-                                <button type="button"
-                                    class="flex w-10 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                    aria-label="Last page" title="Last page"
-                                    wire:click="setEnvironmentVariablePage({{ $lastPage }})"
-                                    @disabled($currentPage === $lastPage)>
-                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path d="M6 6L12 12L6 18M13 6L19 12L13 18" stroke="currentColor"
-                                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
+                        <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$totalRows"
+                            :current-page="$currentPage" :last-page="$lastPage"
+                            wire-target="setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
+                            first-action="setEnvironmentVariablePage(1)"
+                            previous-action="previousEnvironmentVariablePage"
+                            next-action="nextEnvironmentVariablePage"
+                            last-action="setEnvironmentVariablePage({{ $lastPage }})" />
                     </div>
                 @else
                     <x-empty size="sm" title="No environment variables"

@@ -38,3 +38,8 @@ test('slide-over event shells use display contents', function () {
     expect(file_get_contents(resource_path('views/components/slide-over.blade.php')))
         ->toContain("'class' => 'contents'");
 });
+
+test('process dialog event shells use display contents', function () {
+    expect(file_get_contents(resource_path('views/components/process-dialog.blade.php')))
+        ->toContain("'class' => 'contents'");
+});

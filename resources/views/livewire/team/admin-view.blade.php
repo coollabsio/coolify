@@ -42,7 +42,9 @@
             </form>
 
             @if ($users->isNotEmpty())
-                <div class="data-table">
+                <div class="data-table transition-opacity"
+                    wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setPage,previousPage,nextPage">
                     <div class="data-table-header admin-users-table-grid">
                         <span>Name</span>
                         <span>Email</span>
@@ -83,57 +85,12 @@
                     @endforeach
                 </div>
 
-                <div
-                    class="flex min-h-14 items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
-                    <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                        Showing
-                        <span class="tabular-nums text-black dark:text-fg">
-                            {{ $users->firstItem() }}–{{ $users->lastItem() }}
-                        </span>
-                        of
-                        <span class="tabular-nums text-black dark:text-fg">{{ $users->total() }}</span>
-                    </p>
-                    <div
-                        class="inline-flex h-8 overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.10]">
-                        <button type="button" wire:click="setPage(1)" @disabled($users->onFirstPage())
-                            class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                            aria-label="First page" title="First page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M18 6L12 12L18 18M11 6L5 12L11 18" stroke="currentColor"
-                                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" wire:click="previousPage" @disabled($users->onFirstPage())
-                            class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                            aria-label="Previous page" title="Previous page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.8"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <span
-                            class="flex min-w-12 items-center justify-center border-r border-neutral-200 px-3 text-[13px] tabular-nums text-black dark:border-white/[0.10] dark:text-fg">
-                            {{ $users->currentPage() }}
-                        </span>
-                        <button type="button" wire:click="nextPage" @disabled(!$users->hasMorePages())
-                            class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                            aria-label="Next page" title="Next page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.8"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" wire:click="setPage({{ $users->lastPage() }})"
-                            @disabled(!$users->hasMorePages())
-                            class="flex w-10 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                            aria-label="Last page" title="Last page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="M6 6L12 12L6 18M13 6L19 12L13 18" stroke="currentColor"
-                                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
+                <x-table-pagination class="min-h-14 border-t border-neutral-200 dark:border-white/[0.08]"
+                    :from="$users->firstItem() ?? 0" :to="$users->lastItem() ?? 0" :total="$users->total()"
+                    :current-page="$users->currentPage()" :last-page="$users->lastPage()"
+                    wire-target="setPage,previousPage,nextPage" first-action="setPage(1)"
+                    previous-action="previousPage" next-action="nextPage"
+                    last-action="setPage({{ $users->lastPage() }})" />
             @else
                 <x-empty title="No users found" description="Try a different name or email address."
                     icon-name="teams" size="sm" />

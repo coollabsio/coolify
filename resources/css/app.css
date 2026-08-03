@@ -90,12 +90,12 @@
     .menu-subitem-active::before {
         content: "";
         position: absolute;
-        top: 4px;
-        bottom: 4px;
+        top: 0;
+        bottom: 0;
         left: calc(-0.25rem - 4px);
         z-index: 1;
         width: 3px;
-        border-radius: 999px;
+        border-radius: 0;
         background: var(--color-accent);
         pointer-events: none;
     }
@@ -815,6 +815,157 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     line-height: 1rem;
 }
 
+/* Public error surfaces (401/404/500/…). Match auth shell canvas + accent. */
+.error-shell {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 2rem 1rem;
+    background:
+        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-accent) 9%, transparent), transparent 34rem),
+        var(--coollabs-canvas);
+    color: #171717;
+}
+
+.dark .error-shell {
+    color: var(--color-fg);
+}
+
+.error-shell-content {
+    width: min(100%, 32rem);
+}
+
+.error-code {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: clamp(3.5rem, 12vw, 5.5rem);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--color-coollabs);
+}
+
+.dark .error-code {
+    color: var(--color-warning);
+}
+
+.error-code-danger {
+    color: var(--color-error);
+}
+
+.dark .error-code-danger {
+    color: var(--color-error);
+}
+
+.error-title {
+    margin: 1rem 0 0;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: #171717;
+}
+
+.dark .error-title {
+    color: var(--color-fg);
+}
+
+.error-description {
+    margin: 0.375rem 0 0;
+    max-width: 42ch;
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+    color: var(--coollabs-subtle);
+}
+
+.error-extra {
+    margin-top: 1.25rem;
+}
+
+.error-extra .error-message {
+    margin: 0;
+    padding: 0.75rem 0.875rem;
+    border-radius: 8px;
+    background: color-mix(in oklab, var(--color-error) 8%, transparent);
+    color: var(--color-error);
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    word-break: break-word;
+}
+
+.error-extra details {
+    margin: 0;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--coollabs-subtle);
+}
+
+.error-extra details summary {
+    cursor: pointer;
+    font-weight: 500;
+    color: #525252;
+    list-style: none;
+}
+
+.dark .error-extra details summary {
+    color: var(--color-fg-dim);
+}
+
+.error-extra details summary::-webkit-details-marker {
+    display: none;
+}
+
+.error-extra details summary:hover {
+    color: var(--color-accent);
+}
+
+.error-extra details ul {
+    margin: 0.5rem 0 0;
+    padding-left: 1.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.error-extra details code {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 0.05rem 0.3rem;
+    border-radius: 4px;
+    background: var(--coollabs-recessed);
+}
+
+.error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.75rem;
+}
+
+.error-contact-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #525252;
+    text-underline-offset: 3px;
+    transition: color 0.15s ease;
+}
+
+.dark .error-contact-link {
+    color: var(--color-fg-dim);
+}
+
+.error-contact-link:hover {
+    color: var(--color-accent);
+    text-decoration: underline;
+}
+
 /* Layer card root: elevated shell with a hairline ring. overflow stays
    visible so floating panels (listbox, tooltips) can escape the card. */
 .application-settings-section {
@@ -1215,6 +1366,26 @@ input[type="search"]::-webkit-search-results-decoration {
 /* Flush layer-card body (tables and other full-bleed content) */
 .application-settings-section-body.is-flush {
     padding: 0;
+}
+
+/* Centered process dialog (startup / activity logs) — full-height log body.
+   Override application-settings-form's `width: auto` so empty/waiting states
+   keep a usable panel instead of shrinking to the title. */
+.process-dialog {
+    width: 100% !important;
+    min-height: min(70dvh, 28rem);
+}
+
+.process-dialog-body {
+    border-radius: 0 0 8px 8px;
+    min-height: 0;
+    flex: 1 1 auto;
+}
+
+.process-dialog-body > * {
+    min-height: 0;
+    flex: 1 1 auto;
+    width: 100%;
 }
 
 /* Data table (layer-card body, full-bleed) */

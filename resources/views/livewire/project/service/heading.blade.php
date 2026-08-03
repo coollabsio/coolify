@@ -48,12 +48,12 @@
 
     <livewire:project.shared.configuration-checker :resource="$service" />
 
-    <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
+    <x-process-dialog @startservice.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Service Startup</x-slot:title>
         <x-slot:content>
             <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
-    </x-slide-over>
+    </x-process-dialog>
 
     @teleport('#server-topbar-context')
         <div class="flex min-w-0 items-center gap-1 text-[13px]">
