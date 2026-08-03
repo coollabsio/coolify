@@ -219,11 +219,8 @@
                 </div>
             @else
                 <x-empty size="sm" title="No scheduled backups"
-                    description="Add a persistent volume or directory backup schedule to protect application data.">
-                    <x-slot:icon>
-                        <x-reicon name="storages" class="size-8" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Add a persistent volume or directory backup schedule to protect application data."
+                    icon-name="storages" />
             @endif
         </div>
     </div>

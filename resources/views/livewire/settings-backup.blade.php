@@ -31,10 +31,8 @@
             @else
                 <x-application.settings-section title="Instance backup">
                     <x-empty title="Backup is not configured"
-                        description="Coolify needs an internal database resource to create automatic backups." size="sm">
-                        <x-slot:icon>
-                            <x-reicon name="database" class="size-6" />
-                        </x-slot:icon>
+                        description="Coolify needs an internal database resource to create automatic backups."
+                        icon-name="database" size="sm">
                         <x-slot:actions>
                             <x-forms.button wire:click="addCoolifyDatabase" isHighlighted>
                                 Configure backup

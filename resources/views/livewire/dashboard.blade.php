@@ -34,17 +34,9 @@
             </div>
 
             @if ($dashboardProjects->isEmpty())
-                <div
-                    class="flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 text-center dark:border-white/[0.1] dark:bg-white/[0.02]">
-                    <div
-                        class="mb-3 flex size-10 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-400 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">
-                        <x-reicon name="projects" class="size-5" />
-                    </div>
-                    <h3 class="text-[14px]! font-semibold!">No projects yet</h3>
-                    <p class="mt-1 max-w-sm text-[12px] text-neutral-500 dark:text-fg-dim">
-                        Use New to create your first deployment workspace.
-                    </p>
-                </div>
+                <x-empty title="No projects yet"
+                    description="Use New to create your first deployment workspace."
+                    icon-name="projects" size="sm" />
             @else
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($dashboardProjects as $project)
@@ -144,21 +136,12 @@
             </div>
 
             @if ($dashboardServers->isEmpty())
-                <div
-                    class="flex min-h-44 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 text-center dark:border-white/[0.1] dark:bg-white/[0.02]">
-                    <div
-                        class="mb-3 flex size-10 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-400 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">
-                        <x-reicon name="servers" class="size-5" />
-                    </div>
-                    <h3 class="text-[14px]! font-semibold!">
-                        {{ $privateKeys->isEmpty() ? 'A private key is required' : 'No servers yet' }}
-                    </h3>
-                    <p class="mt-1 max-w-sm text-[12px] text-neutral-500 dark:text-fg-dim">
-                        {{ $privateKeys->isEmpty()
-                            ? 'Use New to add a private key before connecting your first server.'
-                            : 'Use New to connect infrastructure for your deployments.' }}
-                    </p>
-                </div>
+                <x-empty
+                    :title="$privateKeys->isEmpty() ? 'A private key is required' : 'No servers yet'"
+                    :description="$privateKeys->isEmpty()
+                        ? 'Use New to add a private key before connecting your first server.'
+                        : 'Use New to connect infrastructure for your deployments.'"
+                    icon-name="servers" size="sm" />
             @else
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($dashboardServers as $server)

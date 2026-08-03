@@ -62,11 +62,8 @@
                     <x-application.settings-section title="Package updates"
                         helper="Available operating system updates for this server.">
                         <x-empty size="sm" title="Server is up to date"
-                            description="No package updates are currently available.">
-                            <x-slot:icon>
-                                <x-reicon name="check-circle" class="size-8" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="No package updates are currently available."
+                            icon-name="check-circle" />
                     </x-application.settings-section>
                 @elseif (isset($updates) && count($updates) > 0)
                     <x-application.settings-section id="server-package-updates-section" title="Package updates"

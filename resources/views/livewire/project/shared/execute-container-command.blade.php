@@ -184,20 +184,14 @@
                 @if ($type === 'server' && (! $servers->first()->isTerminalEnabled() || ! $servers->first()->isFunctional()))
                     <div class="flex h-full items-center justify-center bg-[#141414]">
                         <x-empty size="lg" title="Console unavailable"
-                            description="This server is not functional or terminal access is disabled.">
-                            <x-slot:icon>
-                                <x-reicon name="browser-terminal" class="size-9" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="This server is not functional or terminal access is disabled."
+                            icon-name="browser-terminal" />
                     </div>
                 @elseif ($type !== 'server' && $containers->isEmpty())
                     <div class="flex h-full items-center justify-center bg-[#141414]">
                         <x-empty size="lg" title="Console unavailable"
-                            description="No containers are running, or terminal access is disabled on the destination server.">
-                            <x-slot:icon>
-                                <x-reicon name="browser-terminal" class="size-9" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="No containers are running, or terminal access is disabled on the destination server."
+                            icon-name="browser-terminal" />
                     </div>
                 @else
                     <livewire:project.shared.terminal variant="application" />

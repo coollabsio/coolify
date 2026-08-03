@@ -180,11 +180,8 @@
                         </div>
                     @else
                         <x-empty size="sm" title="No servers available"
-                            description="Every usable server is already attached, or no additional server networks are configured.">
-                            <x-slot:icon>
-                                <x-reicon name="servers" class="size-8" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="Every usable server is already attached, or no additional server networks are configured."
+                            icon-name="servers" />
                     @endif
                 </x-application.settings-section>
             @endif

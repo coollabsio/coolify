@@ -59,11 +59,8 @@
                     </div>
                 @empty
                     <x-empty size="sm" title="No pull requests loaded"
-                        description="Load open pull requests from GitHub to configure a preview deployment.">
-                        <x-slot:icon>
-                            <x-reicon name="sources" class="size-8" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Load open pull requests from GitHub to configure a preview deployment."
+                        icon-name="sources" />
                 @endforelse
             </div>
         </x-application.settings-section>
@@ -227,11 +224,8 @@
             </section>
         @empty
             <x-empty title="No preview deployments"
-                description="Configure a pull request or manual preview to create an isolated deployment.">
-                <x-slot:icon>
-                    <x-reicon name="eye" class="size-8" />
-                </x-slot:icon>
-            </x-empty>
+                description="Configure a pull request or manual preview to create an isolated deployment."
+                icon-name="eye" />
         @endforelse
     </x-application.settings-section>
 

@@ -47,11 +47,8 @@
                         </a>
                     @empty
                         <x-empty size="sm" title="No destinations"
-                            description="Add a destination or scan the server for existing Docker networks.">
-                            <x-slot:icon>
-                                <x-reicon name="destinations" class="size-8" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="Add a destination or scan the server for existing Docker networks."
+                            icon-name="destinations" />
                     @endforelse
                 </x-application.settings-section>
 
@@ -80,11 +77,8 @@
                 <x-application.settings-section title="Destinations"
                     helper="Docker networks used to isolate and connect resources on this server.">
                     <x-empty size="sm" title="Server validation required"
-                        description="Validate this server before managing its destinations.">
-                        <x-slot:icon>
-                            <x-reicon name="destinations" class="size-8" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Validate this server before managing its destinations."
+                        icon-name="destinations" />
                 </x-application.settings-section>
             @endif
         </div>

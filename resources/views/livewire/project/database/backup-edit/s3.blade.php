@@ -7,10 +7,8 @@
             </div>
         </div>
         <x-empty title="No validated S3 storage"
-            description="Add and validate an S3 storage destination before enabling remote backups.">
-            <x-slot:icon>
-                <x-reicon name="storages" class="size-5" />
-            </x-slot:icon>
+            description="Add and validate an S3 storage destination before enabling remote backups."
+            icon-name="storages">
             <x-slot:contents>
                 <a class="button" {{ wireNavigate() }} href="{{ route('storage.index') }}">Open S3 storage</a>
             </x-slot:contents>

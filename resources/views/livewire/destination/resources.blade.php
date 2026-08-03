@@ -14,11 +14,8 @@
             description="Applications, databases, and services connected to this Docker network." flush>
             @if (count($resources) === 0)
                 <x-empty title="No resources use this destination"
-                    description="Resources will appear here after they are deployed to this network." size="sm">
-                    <x-slot:icon>
-                        <x-reicon name="destinations" class="size-6" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Resources will appear here after they are deployed to this network."
+                    icon-name="destinations" size="sm" />
             @else
                 <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
                     <div class="relative w-full max-w-sm">

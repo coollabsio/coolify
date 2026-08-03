@@ -8,10 +8,8 @@
                 </div>
             </div>
             <x-empty title="No GitHub Apps"
-                description="Create an app to grant Coolify access to selected repositories.">
-                <x-slot:icon>
-                    <x-reicon name="sources" class="size-5" />
-                </x-slot:icon>
+                description="Create an app to grant Coolify access to selected repositories."
+                icon-name="sources">
                 <x-slot:contents>
                     <x-modal-input buttonTitle="+ Add GitHub App" title="New GitHub App" closeOutside="false">
                         <livewire:source.github.create />

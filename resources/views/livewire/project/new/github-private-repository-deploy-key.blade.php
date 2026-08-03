@@ -29,10 +29,8 @@
                     </button>
                 @empty
                     <x-empty title="No private keys"
-                        description="Create an SSH key before connecting a private repository.">
-                        <x-slot:icon>
-                            <x-reicon name="keys" class="size-5" />
-                        </x-slot:icon>
+                        description="Create an SSH key before connecting a private repository."
+                        icon-name="keys">
                         <x-slot:contents>
                             <a class="button" href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}>
                                 Create private key

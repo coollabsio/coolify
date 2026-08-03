@@ -41,11 +41,8 @@
             </div>
         @empty
             <x-empty size="sm" title="No tags assigned"
-                description="Add a tag above or select one from your team's available tags.">
-                <x-slot:icon>
-                    <x-reicon name="tags" class="size-8" />
-                </x-slot:icon>
-            </x-empty>
+                description="Add a tag above or select one from your team's available tags."
+                icon-name="tags" />
         @endforelse
     </x-application.settings-section>
 

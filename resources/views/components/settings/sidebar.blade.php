@@ -10,7 +10,7 @@
             'label' => 'Advanced',
             'route' => 'settings.advanced',
             'active' => $activeMenu === 'advanced',
-            'icon' => 'admin',
+            'icon' => 'grid',
         ],
         [
             'label' => 'Updates',

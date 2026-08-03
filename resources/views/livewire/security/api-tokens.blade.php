@@ -10,10 +10,8 @@
             <x-application.settings-section title="API disabled"
                 description="Enable the Coolify API before creating access tokens.">
                 <x-empty title="API access is turned off"
-                    description="Enable API access in instance settings to issue tokens." size="sm">
-                    <x-slot:icon>
-                        <x-reicon name="keys" class="size-6" />
-                    </x-slot:icon>
+                    description="Enable API access in instance settings to issue tokens." icon-name="keys"
+                    size="sm">
                     <x-slot:actions>
                         <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
                             Open settings
@@ -177,11 +175,7 @@
 
                     @if ($tokens->isEmpty())
                         <x-empty title="No API tokens" description="Create a token when an external client needs access."
-                            size="sm">
-                            <x-slot:icon>
-                                <x-reicon name="keys" class="size-6" />
-                            </x-slot:icon>
-                        </x-empty>
+                            icon-name="keys" size="sm" />
                     @else
                         <div x-cloak x-show="filteredTokens.length > 0" class="data-table">
                             <div class="data-table-header api-tokens-table-grid">

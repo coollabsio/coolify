@@ -92,10 +92,7 @@
         </div>
     @empty
         <x-empty size="sm" title="No cleanup executions"
-            description="Run a manual cleanup or wait for the next scheduled execution.">
-            <x-slot:icon>
-                <x-reicon name="storages" class="size-8" />
-            </x-slot:icon>
-        </x-empty>
+            description="Run a manual cleanup or wait for the next scheduled execution."
+            icon-name="storages" />
     @endforelse
 </div>

@@ -57,7 +57,7 @@
                 @if ($search)
                     @if ($foundUsers->isEmpty())
                         <x-empty size="sm" title="No users found"
-                            description="No account matches {{ $search }}." />
+                            description="No account matches {{ $search }}." icon-name="profile" />
                     @else
                         <div class="data-table">
                             <div class="data-table-header admin-search-table-grid">
@@ -100,11 +100,7 @@
                     @endif
                 @else
                     <x-empty size="sm" title="Search for an account"
-                        description="Enter a name or email address to begin.">
-                        <x-slot:icon>
-                            <x-reicon name="profile" class="size-5" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Enter a name or email address to begin." icon-name="profile" />
                 @endif
             </div>
         </section>

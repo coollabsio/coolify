@@ -3,11 +3,8 @@
         description="Deployments currently running for resources with this tag." flush>
         @if (collect($deploymentsPerTagPerServer)->flatten(1)->isEmpty())
             <x-empty title="No active deployments"
-                description="Queued and running deployments will appear here automatically." size="sm">
-                <x-slot:icon>
-                    <x-reicon name="refresh" class="size-6" />
-                </x-slot:icon>
-            </x-empty>
+                description="Queued and running deployments will appear here automatically."
+                icon-name="refresh" size="sm" />
         @else
             <div class="data-table w-full">
                 <div

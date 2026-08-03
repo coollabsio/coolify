@@ -167,11 +167,8 @@
                     </div>
                 @else
                     <x-empty size="sm" title="Two-factor authentication is off"
-                        description="Configure an authenticator app to add another sign-in check.">
-                        <x-slot:icon>
-                            <x-reicon name="keys" class="size-5" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Configure an authenticator app to add another sign-in check."
+                        icon-name="keys" />
                 @endif
             </div>
         </section>

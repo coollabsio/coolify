@@ -88,11 +88,8 @@
                                 <div
                                     class="application-settings-section overflow-hidden sm:col-span-2">
                                     <x-empty title="No compose resources"
-                                        description="No applications or databases are defined in this Docker Compose file.">
-                                        <x-slot:icon>
-                                            <x-reicon name="grid" class="size-5" />
-                                        </x-slot:icon>
-                                    </x-empty>
+                                        description="No applications or databases are defined in this Docker Compose file."
+                                        icon-name="grid" />
                                 </div>
                             @endif
 

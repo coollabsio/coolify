@@ -53,11 +53,8 @@
 
         @if ($database->scheduledBackups->isEmpty())
             <x-empty size="sm" title="No scheduled backups"
-                description="Create a schedule to start protecting this database.">
-                <x-slot:icon>
-                    <x-reicon name="storages" class="size-5" />
-                </x-slot:icon>
-            </x-empty>
+                description="Create a schedule to start protecting this database."
+                icon-name="storages" />
         @else
             <div x-cloak x-show="search === '' || hasMatches()" class="data-table">
                 <div class="data-table-header scheduled-backups-table-grid">

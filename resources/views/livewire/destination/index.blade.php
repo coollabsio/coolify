@@ -29,17 +29,9 @@
     </header>
 
     @if ($destinations->isEmpty())
-        <div
-            class="flex min-h-80 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 text-center dark:border-white/[0.1] dark:bg-white/[0.02]">
-            <div
-                class="mb-4 flex size-11 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-400 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">
-                <x-reicon name="destinations" class="size-5" />
-            </div>
-            <h2 class="text-[15px] font-semibold">No destinations yet</h2>
-            <p class="mt-1 max-w-sm text-[13px] text-neutral-500 dark:text-fg-dim">
-                Add a Docker network endpoint to choose where your resources are deployed.
-            </p>
-        </div>
+        <x-empty title="No destinations yet"
+            description="Add a Docker network endpoint to choose where your resources are deployed."
+            icon-name="destinations" />
     @else
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             @foreach ($destinations as $destination)

@@ -21,7 +21,7 @@
                     <div class="flex items-start gap-3">
                         <div
                             class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
-                            <x-reicon name="terminal" class="size-4" />
+                            <x-reicon name="browser-terminal" class="size-4" />
                         </div>
                         <div>
                             <p class="text-sm font-medium text-neutral-950 dark:text-fg">

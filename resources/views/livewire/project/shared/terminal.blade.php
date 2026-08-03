@@ -15,11 +15,8 @@
         @if ($isApplicationConsole)
             <div class="flex h-full min-h-[32rem] items-center justify-center">
                 <x-empty size="lg" title="Shell unavailable"
-                    description="This container does not include Bash or sh. Install a supported shell to use the console.">
-                    <x-slot:icon>
-                        <x-reicon name="terminal" class="size-9" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="This container does not include Bash or sh. Install a supported shell to use the console."
+                    icon-name="browser-terminal" />
             </div>
         @else
             <div class="flex pt-4 items-center justify-center w-full py-4 mx-auto">

@@ -15,11 +15,8 @@
                 <x-application.settings-section title="Proxy"
                     helper="Configure the reverse proxy for this server.">
                     <x-empty size="sm" title="Server validation required"
-                        description="Validate this server before configuring its proxy.">
-                        <x-slot:icon>
-                            <x-reicon name="servers" class="size-8" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Validate this server before configuring its proxy."
+                        icon-name="servers" />
                 </x-application.settings-section>
             </div>
         @endif

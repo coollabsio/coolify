@@ -23,21 +23,16 @@
         </header>
 
         @if ($projects->isEmpty())
-            <div
-                class="flex min-h-80 flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 text-center dark:border-white/[0.1] dark:bg-white/[0.02]">
-                <div
-                    class="mb-4 flex size-11 items-center justify-center rounded-xl border border-neutral-200 bg-white text-neutral-400 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">
-                    <x-reicon name="projects" class="size-5" />
-                </div>
-                <h2 class="text-[15px] font-semibold">No projects yet</h2>
-                <p class="mt-1 max-w-sm text-[13px] text-neutral-500 dark:text-fg-dim">
-                    Create a project to organize your environments and resources.
-                </p>
-                <a class="mt-4 text-[12px] font-medium text-coollabs hover:underline dark:text-warning"
-                    href="{{ route('onboarding') }}" {{ wireNavigate() }}>
-                    Open onboarding
-                </a>
-            </div>
+            <x-empty title="No projects yet"
+                description="Create a project to organize your environments and resources."
+                icon-name="projects">
+                <x-slot:contents>
+                    <a class="text-[12px] font-medium text-coollabs hover:underline dark:text-warning"
+                        href="{{ route('onboarding') }}" {{ wireNavigate() }}>
+                        Open onboarding
+                    </a>
+                </x-slot:contents>
+            </x-empty>
         @else
             <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="relative w-full sm:max-w-sm">

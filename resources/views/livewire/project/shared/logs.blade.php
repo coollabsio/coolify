@@ -49,11 +49,8 @@
                         @endforeach
                     @else
                         <x-empty size="sm" title="No running containers"
-                            description="No containers are currently running on {{ $server->name }}.">
-                            <x-slot:icon>
-                                <x-reicon name="file-content" class="size-8" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="No containers are currently running on {{ $server->name }}."
+                            icon-name="file-content" />
                     @endif
                 @else
                     <x-callout type="warning" title="Server unavailable">
@@ -62,11 +59,8 @@
                 @endif
             @empty
                 <x-empty size="sm" title="No functional server"
-                    description="Connect and validate a server before viewing resource logs.">
-                    <x-slot:icon>
-                        <x-reicon name="servers" class="size-8" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Connect and validate a server before viewing resource logs."
+                    icon-name="servers" />
             @endforelse
         </div>
     </div>

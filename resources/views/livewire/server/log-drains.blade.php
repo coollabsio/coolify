@@ -86,11 +86,8 @@
                 <x-application.settings-section title="Log drains"
                     helper="Forward container logs from this server to an external destination.">
                     <x-empty size="sm" title="Server validation required"
-                        description="Validate this server before configuring log drains.">
-                        <x-slot:icon>
-                            <x-reicon name="notifications" class="size-8" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Validate this server before configuring log drains."
+                        icon-name="notifications" />
                 </x-application.settings-section>
             @endif
         </div>

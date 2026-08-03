@@ -36,7 +36,7 @@
                     @if ($executionStatus === 'running')
                         <x-loading class="size-4" />
                     @else
-                        <x-reicon name="terminal" class="size-4" />
+                        <x-reicon name="browser-terminal" class="size-4" />
                     @endif
                 </div>
                 <div class="min-w-0 flex-1">
@@ -87,10 +87,7 @@
         </div>
     @empty
         <x-empty size="sm" title="No executions yet"
-            description="Run this task now or wait for its next scheduled execution.">
-            <x-slot:icon>
-                <x-reicon name="terminal" class="size-8" />
-            </x-slot:icon>
-        </x-empty>
+            description="Run this task now or wait for its next scheduled execution."
+            icon-name="browser-terminal" />
     @endforelse
 </div>

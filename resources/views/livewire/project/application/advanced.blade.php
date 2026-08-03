@@ -141,10 +141,8 @@
                 </div>
             @else
                 <x-empty size="sm" title="Proxy behavior is managed through labels"
-                    description="Container labels are managed manually for this application. Switch label management back to Coolify to configure the proxy here.">
-                    <x-slot:icon>
-                        <x-reicon name="globe" class="size-8" />
-                    </x-slot:icon>
+                    description="Container labels are managed manually for this application. Switch label management back to Coolify to configure the proxy here."
+                    icon-name="globe">
                     <x-slot:contents>
                         <a class="button"
                             href="{{ route('project.application.configuration', $generalRouteParameters) }}#container-labels-section"

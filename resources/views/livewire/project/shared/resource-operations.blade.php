@@ -150,11 +150,8 @@
                 </div>
             @else
                 <x-empty size="sm" title="No destination environments"
-                    description="Create another project or environment before moving this resource.">
-                    <x-slot:icon>
-                        <x-reicon name="projects" class="size-8" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Create another project or environment before moving this resource."
+                    icon-name="projects" />
             @endif
         </x-application.settings-section>
     @else

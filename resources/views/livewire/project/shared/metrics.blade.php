@@ -10,11 +10,8 @@
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
             helper="Inspect CPU and memory usage for this application.">
             <x-empty size="sm" title="Metrics unavailable"
-                description="Container metrics are not currently available for Docker Compose applications.">
-                <x-slot:icon>
-                    <x-reicon name="dashboard" class="size-8" />
-                </x-slot:icon>
-            </x-empty>
+                description="Container metrics are not currently available for Docker Compose applications."
+                icon-name="dashboard" />
         </x-application.settings-section>
     @elseif (!$resource->destination->server->isMetricsEnabled())
         <x-application.settings-section id="metrics-overview-section" title="Metrics"
@@ -38,11 +35,8 @@
                 <x-status-badge status="Not running" type="neutral" />
             </x-slot:actions>
             <x-empty size="sm" title="Container is not running"
-                description="Start the application to begin collecting CPU and memory metrics.">
-                <x-slot:icon>
-                    <x-reicon name="dashboard" class="size-8" />
-                </x-slot:icon>
-            </x-empty>
+                description="Start the application to begin collecting CPU and memory metrics."
+                icon-name="dashboard" />
         </x-application.settings-section>
     @else
         <x-application.settings-section id="metrics-overview-section" title="Metrics"

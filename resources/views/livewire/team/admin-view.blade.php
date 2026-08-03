@@ -135,11 +135,8 @@
                     </div>
                 </div>
             @else
-                <x-empty title="No users found" description="Try a different name or email address." size="sm">
-                    <x-slot:icon>
-                        <x-reicon name="teams" class="size-6" />
-                    </x-slot:icon>
-                </x-empty>
+                <x-empty title="No users found" description="Try a different name or email address."
+                    icon-name="teams" size="sm" />
             @endif
         </x-application.settings-section>
     </div>

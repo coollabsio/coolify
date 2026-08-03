@@ -36,7 +36,7 @@
         ['key' => 'general', 'label' => 'General', 'icon' => 'settings'],
         ['key' => 's3', 'label' => 'S3 storage', 'icon' => 'storages'],
         ['key' => 'retention', 'label' => 'Retention', 'icon' => 'unordered-list'],
-        ['key' => 'executions', 'label' => 'Executions', 'icon' => 'terminal'],
+        ['key' => 'executions', 'label' => 'Executions', 'icon' => 'browser-terminal'],
         ['key' => 'danger', 'label' => 'Danger Zone', 'icon' => 'shield-alert'],
     ];
 @endphp

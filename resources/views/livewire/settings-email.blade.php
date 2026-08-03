@@ -3,32 +3,15 @@
         Transactional Email | Coolify
     </x-slot>
 
-    <x-settings.navbar>
-        <x-slot:actions>
-            @if (is_transactional_emails_enabled() && auth()->user()->isAdminFromSession())
-                <x-modal-input title="Send Test Email">
-                    <x-slot:content>
-                        <button type="button" class="button">
-                            <x-reicon name="notifications" class="size-3.5" />
-                            Send test
-                        </button>
-                    </x-slot:content>
-                    <form wire:submit.prevent="sendTestEmail" class="application-settings-form flex flex-col gap-4">
-                        <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com"
-                            id="testEmailAddress" label="Recipient" required />
-                        <div class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                            <button type="submit" class="button" @click="modalOpen=false">Send email</button>
-                        </div>
-                    </form>
-                </x-modal-input>
-            @endif
-        </x-slot:actions>
-    </x-settings.navbar>
+    <x-settings.navbar />
 
     <div class="application-settings-form flex w-full min-w-0 flex-col gap-6">
         <form wire:submit="submit">
             <x-unsaved-bar action="submit" />
             <x-application.settings-section title="Sender">
+                <x-slot:actions>
+                    @include('livewire.partials.settings-email-send-test')
+                </x-slot:actions>
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input required id="smtpFromName" helper="Name shown in outgoing email."
                         label="From name" />

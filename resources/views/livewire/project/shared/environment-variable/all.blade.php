@@ -243,11 +243,8 @@
                 </div>
             @else
                 <x-empty size="sm" title="No environment variables"
-                    description="Add your first variable with the + Add button above.">
-                    <x-slot:icon>
-                        <x-reicon name="variables" class="size-8" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Add your first variable with the + Add button above."
+                    icon-name="variables" />
             @endif
         </div>
     @endif

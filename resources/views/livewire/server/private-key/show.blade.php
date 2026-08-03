@@ -97,11 +97,8 @@
                     </div>
                 @empty
                     <x-empty size="sm" title="No private keys"
-                        description="Add or generate a private key to connect to this server.">
-                        <x-slot:icon>
-                            <x-reicon name="keys" class="size-8" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Add or generate a private key to connect to this server."
+                        icon-name="keys" />
                 @endforelse
             </x-application.settings-section>
         </div>

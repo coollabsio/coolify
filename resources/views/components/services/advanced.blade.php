@@ -8,6 +8,7 @@
     @keydown.escape.window="open = false">
     <button type="button" class="button" @click="open = !open" :aria-expanded="open"
         aria-haspopup="menu">
+        <x-reicon name="grid" class="size-3.5 opacity-70" />
         Advanced
         <x-reicon name="chevron-down" class="size-3 opacity-55" />
     </button>

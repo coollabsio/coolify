@@ -163,11 +163,7 @@
                     @if ($applications->isEmpty())
                         <x-empty title="No resources use this source"
                             description="Applications will appear here after this GitHub App is selected as their source."
-                            size="sm">
-                            <x-slot:icon>
-                                <x-reicon name="sources" class="size-6" />
-                            </x-slot:icon>
-                        </x-empty>
+                            icon-name="sources" size="sm" />
                     @else
                         <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
                             <div class="relative w-full max-w-sm">

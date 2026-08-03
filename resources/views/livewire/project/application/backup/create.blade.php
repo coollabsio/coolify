@@ -1,11 +1,8 @@
 <form class="application-settings-form flex w-full flex-col gap-4" wire:submit="submit">
     @if ($targets->isEmpty())
         <x-empty size="sm" title="No backup targets"
-            description="Add a persistent volume or directory mount before configuring a backup.">
-            <x-slot:icon>
-                <x-reicon name="storages" class="size-8" />
-            </x-slot:icon>
-        </x-empty>
+            description="Add a persistent volume or directory mount before configuring a backup."
+            icon-name="storages" />
     @else
         <div class="grid gap-4 sm:grid-cols-2">
             <x-forms.listbox id="targetKey" label="Backup target" required :options="$targets->map(fn ($target) => [

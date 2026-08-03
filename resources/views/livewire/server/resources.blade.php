@@ -73,11 +73,8 @@
                 @else
                     <div class="p-6">
                         <x-empty size="sm" title="No managed resources"
-                            description="Resources assigned to this server will appear here.">
-                            <x-slot:icon>
-                                <x-reicon name="projects" class="size-8" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="Resources assigned to this server will appear here."
+                            icon-name="projects" />
                     </div>
                 @endif
             @else
@@ -94,7 +91,7 @@
                             @php($containerState = (string) data_get($resource, 'State', 'unknown'))
                             <div
                                 class="data-table-row server-resources-unmanaged-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
-                                <div class="truncate font-mono text-[12px] text-neutral-950 dark:text-fg">
+                                <div class="min-w-0 truncate text-[12px] font-medium text-neutral-950 dark:text-fg">
                                     {{ data_get($resource, 'Names') }}
                                 </div>
                                 <div class="min-w-0 truncate font-mono text-[11px] text-neutral-600 dark:text-fg-dim">
@@ -143,11 +140,8 @@
                 @else
                     <div class="p-6">
                         <x-empty size="sm" title="No unmanaged containers"
-                            description="All detected Docker containers are managed by Coolify.">
-                            <x-slot:icon>
-                                <x-reicon name="servers" class="size-8" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="All detected Docker containers are managed by Coolify."
+                            icon-name="servers" />
                     </div>
                 @endif
             @endif

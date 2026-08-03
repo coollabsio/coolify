@@ -156,11 +156,8 @@
                 </div>
             @else
                 <x-empty size="sm" title="No executions"
-                    description="Run the backup schedule to create its first execution.">
-                    <x-slot:icon>
-                        <x-reicon name="storages" class="size-6" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Run the backup schedule to create its first execution."
+                    icon-name="storages" />
             @endif
         </x-application.settings-section>
     </div>

@@ -47,8 +47,9 @@
                             @keydown.escape.window="categoryOpen = false">
                             <button type="button" class="listbox-trigger"
                                 :disabled="loading || categories.length === 0"
-                                @click="categoryOpen = !categoryOpen; $nextTick(() => categoryOpen && $refs.categorySearchInput.focus())">
-                                <span class="truncate capitalize"
+                                @click="categoryOpen = !categoryOpen; $nextTick(() => categoryOpen && $refs.categorySearchInput.focus())"
+                                :title="selectedCategory === '' ? 'All categories' : selectedCategory">
+                                <span class="listbox-trigger-label capitalize"
                                     x-text="selectedCategory === '' ? 'All categories' : selectedCategory"></span>
                                 <svg class="size-3.5 shrink-0 opacity-60" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
@@ -305,9 +306,9 @@
                         </div>
                     </div>
                 </section>
-                <div x-show="visibleResourceCount === 0 && loading === false"
-                    class="rounded-xl border border-dashed border-neutral-300 px-6 py-12 text-center text-[13px] text-neutral-500 dark:border-white/[0.1] dark:text-fg-dim">
-                    No resources found.
+                <div x-show="visibleResourceCount === 0 && loading === false">
+                    <x-empty title="No resources found" description="Try a different search or resource type."
+                        icon-name="layers" size="sm" />
                 </div>
             </div>
             <script>
@@ -615,10 +616,8 @@
                 @empty
                     @if ($buildServers?->isEmpty() && ! $onlyBuildServerAvailable)
                         <x-empty title="No available servers"
-                            description="Validate a reachable server before creating this resource." size="sm">
-                            <x-slot:icon>
-                                <x-reicon name="servers" class="size-6" />
-                            </x-slot:icon>
+                            description="Validate a reachable server before creating this resource."
+                            icon-name="servers" size="sm">
                             <x-slot:actions>
                                 <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>Open
                                     servers</a>

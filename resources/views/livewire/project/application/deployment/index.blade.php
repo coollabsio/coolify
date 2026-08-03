@@ -289,11 +289,8 @@
                 <x-empty size="sm" title="No deployments found"
                     :description="$hasActiveQuery
                         ? 'No deployments match the current search and filters.'
-                        : 'Deploy the application to create its first deployment record.'">
-                    <x-slot:icon>
-                        <x-reicon name="layers" class="size-8" />
-                    </x-slot:icon>
-                </x-empty>
+                        : 'Deploy the application to create its first deployment record.'"
+                    icon-name="layers" />
             @endif
         </x-application.settings-section>
     </div>

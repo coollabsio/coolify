@@ -12,19 +12,26 @@
     'disabled' => false,
 ])
 
-<div class="w-full">
+<div class="w-full min-w-0">
     @if ($label)
-        <label for="{{ $id }}-trigger" class="mb-1.5 flex w-fit items-center gap-1.5">
-            {{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        {{--
+            Keep helper outside the label so taps do not open the listbox trigger.
+            Margin lives only on this wrapper (mb-0 on the label) so spacing matches
+            plain text labels and is not doubled by .application-settings-form label rules.
+        --}}
+        <div class="mb-1.5 flex w-fit items-center gap-1.5">
+            <label for="{{ $id }}-trigger" class="mb-0! flex items-center gap-1.5">
+                {{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @endif
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-        </label>
+        </div>
     @endif
-    <div class="relative" x-data="{
+    <div class="relative min-w-0" x-data="{
         open: false,
         options: @js(array_values($options)),
         value: @if (!$wire) @js($value) @elseif ($live) @entangle($id).live @else @entangle($id) @endif,
@@ -45,8 +52,8 @@
         <button id="{{ $id }}-trigger" type="button" class="listbox-trigger" @click="open = !open"
             @disabled($disabled)
             {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
-            :aria-expanded="open">
-            <span class="truncate" x-text="current"></span>
+            :aria-expanded="open" :title="current">
+            <span class="listbox-trigger-label" x-text="current"></span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
                 stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />

@@ -159,27 +159,32 @@
 
     <div>
         <div class="w-full md:hidden">
-            <div class="mb-3 flex min-w-0 flex-wrap items-center gap-2">
+            <div class="mb-3 flex min-w-0 flex-col gap-2">
                 <h1 data-testid="server-subtitle"
                     class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $server->name }}
                 </h1>
-                @if ($server->proxySet())
-                    @if ($proxyStatus === 'running')
-                        <x-status-badge label="Proxy" status="Running" type="success" />
-                    @elseif (in_array($proxyStatus, ['restarting', 'stopping', 'starting']))
-                        <x-status-badge label="Proxy" :status="str($proxyStatus)->headline()" type="warning" />
-                    @elseif (data_get($server, 'proxy.force_stop'))
-                        <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
-                            status="Force stopped" type="error" />
-                    @elseif ($proxyStatus === 'exited')
-                        <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
-                            status="Exited" type="error" />
-                    @endif
-                @endif
-                @if ($showSentinelStatus)
-                    <x-status-badge label="Sentinel" :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                        :type="$server->isSentinelLive() ? 'success' : 'error'" />
+                @if ($server->proxySet() || $showSentinelStatus)
+                    <div class="flex min-w-0 flex-wrap items-center gap-2">
+                        @if ($server->proxySet())
+                            @if ($proxyStatus === 'running')
+                                <x-status-badge label="Proxy" status="Running" type="success" />
+                            @elseif (in_array($proxyStatus, ['restarting', 'stopping', 'starting']))
+                                <x-status-badge label="Proxy" :status="str($proxyStatus)->headline()" type="warning" />
+                            @elseif (data_get($server, 'proxy.force_stop'))
+                                <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
+                                    status="Force stopped" type="error" />
+                            @elseif ($proxyStatus === 'exited')
+                                <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
+                                    status="Exited" type="error" />
+                            @endif
+                        @endif
+                        @if ($showSentinelStatus)
+                            <x-status-badge label="Sentinel"
+                                :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
+                                :type="$server->isSentinelLive() ? 'success' : 'error'" />
+                        @endif
+                    </div>
                 @endif
             </div>
 

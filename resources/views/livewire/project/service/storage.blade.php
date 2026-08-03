@@ -383,11 +383,8 @@
 
         @if (!$hasVolumes && !$hasFiles && !$hasDirectories)
             <x-empty title="No persistent storage"
-                description="Add a volume, file, or directory mount to preserve data between deployments.">
-                <x-slot:icon>
-                    <x-reicon name="storages" class="size-8" />
-                </x-slot:icon>
-            </x-empty>
+                description="Add a volume, file, or directory mount to preserve data between deployments."
+                icon-name="storages" />
         @else
             {{-- Volumes Tab --}}
             <div x-show="activeTab === 'volumes'" class="flex flex-col gap-6">

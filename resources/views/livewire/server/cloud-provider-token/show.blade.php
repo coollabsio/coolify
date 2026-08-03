@@ -59,22 +59,16 @@
                         </div>
                     @empty
                         <x-empty size="sm" title="No {{ $providerName }} tokens"
-                            description="Add a token to manage this server through {{ $providerName }}.">
-                            <x-slot:icon>
-                                <x-reicon name="keys" class="size-8" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="Add a token to manage this server through {{ $providerName }}."
+                            icon-name="keys" />
                     @endforelse
                 </x-application.settings-section>
             @else
                 <x-application.settings-section title="Cloud token"
                     helper="Cloud credentials are available for servers created through a supported provider.">
                     <x-empty size="sm" title="No cloud provider integration"
-                        description="This server was not created through Hetzner or Vultr, so it does not require a managed cloud token.">
-                        <x-slot:icon>
-                            <x-reicon name="keys" class="size-8" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="This server was not created through Hetzner or Vultr, so it does not require a managed cloud token."
+                        icon-name="keys" />
                 </x-application.settings-section>
             @endif
         </div>

@@ -12,14 +12,16 @@
     $selectedLabels = $selectedEvents->pluck('label')->implode(', ');
 @endphp
 
-<div class="w-full" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+<div class="w-full min-w-0" x-data="{ open: false }" @click.outside="open = false"
+    @keydown.escape.window="open = false">
     <label for="{{ $id }}-trigger" class="mb-1.5 block text-[12px] font-medium text-black dark:text-fg">
         {{ $label }}
     </label>
-    <div class="relative">
-        <button id="{{ $id }}-trigger" type="button" class="listbox-trigger" @click="open = !open"
-            @disabled($disabled) aria-haspopup="listbox" :aria-expanded="open">
-            <span class="min-w-0 flex-1 truncate text-left">
+    <div class="relative min-w-0">
+        <button id="{{ $id }}-trigger" type="button" class="listbox-trigger"
+            @click="open = !open" @disabled($disabled) aria-haspopup="listbox" :aria-expanded="open"
+            @if ($selectedCount > 0) title="{{ $selectedLabels }}" @endif>
+            <span class="listbox-trigger-label">
                 {{ $selectedCount === 0 ? 'No events selected' : $selectedLabels }}
             </span>
             <span

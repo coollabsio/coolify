@@ -84,11 +84,8 @@
                 </div>
             @empty
                 <x-empty title="No rollback images"
-                    description="No previous application images are currently stored on this server.">
-                    <x-slot:icon>
-                        <x-reicon name="layers" class="size-8" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="No previous application images are currently stored on this server."
+                    icon-name="layers" />
             @endforelse
         </div>
 

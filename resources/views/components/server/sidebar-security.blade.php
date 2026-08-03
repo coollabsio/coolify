@@ -4,13 +4,13 @@
             'label' => 'Server Patching',
             'route' => 'server.security.patches',
             'active' => request()->routeIs('server.security.patches'),
-            'icon' => 'admin',
+            'icon' => 'bandage',
         ],
         [
             'label' => 'Terminal Access',
             'route' => 'server.security.terminal-access',
             'active' => request()->routeIs('server.security.terminal-access'),
-            'icon' => 'terminal',
+            'icon' => 'browser-terminal',
             'navigate' => false,
         ],
     ];

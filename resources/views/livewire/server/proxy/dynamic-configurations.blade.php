@@ -70,11 +70,8 @@
                     @else
                         <x-application.settings-section wire:loading.remove title="Dynamic configurations">
                             <x-empty size="sm" title="No dynamic configurations"
-                                description="Add a configuration file to extend the proxy at runtime.">
-                                <x-slot:icon>
-                                    <x-reicon name="file-content" class="size-8" />
-                                </x-slot:icon>
-                            </x-empty>
+                                description="Add a configuration file to extend the proxy at runtime."
+                                icon-name="file-content" />
                         </x-application.settings-section>
                     @endif
                 </div>
@@ -82,11 +79,8 @@
                 <x-application.settings-section title="Dynamic configurations"
                     helper="Manage additional runtime proxy configuration.">
                     <x-empty size="sm" title="Server validation required"
-                        description="Validate this server before loading proxy configuration.">
-                        <x-slot:icon>
-                            <x-reicon name="file-content" class="size-8" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Validate this server before loading proxy configuration."
+                        icon-name="file-content" />
                 </x-application.settings-section>
             @endif
         </div>

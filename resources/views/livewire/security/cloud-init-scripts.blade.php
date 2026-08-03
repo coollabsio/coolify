@@ -25,11 +25,8 @@
             description="Reusable initialization scripts for cloud servers." flush>
             @if ($scripts->isEmpty())
                 <x-empty title="No cloud-init scripts"
-                    description="Create a script to reuse it during server provisioning." size="sm">
-                    <x-slot:icon>
-                        <x-reicon name="file-content" class="size-6" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Create a script to reuse it during server provisioning."
+                    icon-name="file-content" size="sm" />
             @else
                 <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($scripts as $script)

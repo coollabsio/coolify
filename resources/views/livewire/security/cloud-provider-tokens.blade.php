@@ -2,11 +2,7 @@
     <x-application.settings-section title="Cloud tokens" flush>
         @if ($tokens->isEmpty())
             <x-empty title="No cloud tokens"
-                description="Add a provider token to provision new cloud servers." size="sm">
-                <x-slot:icon>
-                    <x-reicon name="keys" class="size-6" />
-                </x-slot:icon>
-            </x-empty>
+                description="Add a provider token to provision new cloud servers." icon-name="keys" size="sm" />
         @else
             <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ($tokens as $savedToken)

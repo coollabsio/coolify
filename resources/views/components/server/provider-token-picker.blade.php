@@ -9,10 +9,7 @@
     description="Choose the cloud credential Coolify should use for this server." flush>
     @if ($tokens->isEmpty())
         <x-empty title="No {{ $providerLabel }} tokens"
-            description="Add an API token to continue provisioning." size="sm">
-            <x-slot:icon>
-                <x-reicon name="keys" class="size-6" />
-            </x-slot:icon>
+            description="Add an API token to continue provisioning." icon-name="keys" size="sm">
             <x-slot:actions>
                 <x-modal-input title="Add {{ $providerLabel }} Token">
                     <x-slot:content>

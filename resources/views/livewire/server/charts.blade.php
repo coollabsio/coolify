@@ -267,10 +267,8 @@
                     </x-slot:actions>
 
                     <x-empty size="sm" title="Metrics are disabled"
-                        description="Enable metrics to begin collecting CPU and memory history for this server.">
-                        <x-slot:icon>
-                            <x-reicon name="dashboard" class="size-8" />
-                        </x-slot:icon>
+                        description="Enable metrics to begin collecting CPU and memory history for this server."
+                        icon-name="dashboard">
                         <x-slot:contents>
                             <x-forms.button canGate="update" :canResource="$server" isHighlighted
                                 wire:click="toggleMetrics">
@@ -287,10 +285,8 @@
                     </x-slot:actions>
 
                     <x-empty size="sm" title="Sentinel is required"
-                        description="Enable Sentinel before collecting CPU and memory metrics for this server.">
-                        <x-slot:icon>
-                            <x-reicon name="dashboard" class="size-8" />
-                        </x-slot:icon>
+                        description="Enable Sentinel before collecting CPU and memory metrics for this server."
+                        icon-name="dashboard">
                         <x-slot:contents>
                             <a class="button"
                                 href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}"

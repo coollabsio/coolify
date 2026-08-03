@@ -1,0 +1,34 @@
+<?php
+
+it('renders the dashed empty-state card with title description and icon', function () {
+    $html = $this->blade(
+        '<x-empty title="No tags yet" description="Add a tag to group deployments." icon-name="tags" />'
+    );
+
+    $html->assertSee('No tags yet')
+        ->assertSee('Add a tag to group deployments.')
+        ->assertSee('border-dashed', false)
+        ->assertSee('min-h-80', false);
+});
+
+it('renders compact size without the full-page min height class', function () {
+    $html = $this->blade(
+        '<x-empty title="No cloud tokens" description="Add a provider token." icon-name="keys" size="sm" />'
+    );
+
+    $html->assertSee('No cloud tokens')
+        ->assertSee('min-h-44', false)
+        ->assertDontSee('min-h-80', false);
+});
+
+it('renders action content from both contents and actions slots', function () {
+    $contents = $this->blade(
+        '<x-empty title="Empty" icon-name="keys"><x-slot:contents><button type="button">From contents</button></x-slot:contents></x-empty>'
+    );
+    $contents->assertSee('From contents');
+
+    $actions = $this->blade(
+        '<x-empty title="Empty" icon-name="keys"><x-slot:actions><button type="button">From actions</button></x-slot:actions></x-empty>'
+    );
+    $actions->assertSee('From actions');
+});

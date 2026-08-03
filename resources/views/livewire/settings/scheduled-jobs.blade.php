@@ -3,14 +3,7 @@
         Scheduled Jobs | Coolify
     </x-slot>
 
-    <x-settings.navbar>
-        <x-slot:actions>
-            <x-forms.button type="button" wire:click="refresh">
-                <x-reicon name="refresh" class="size-3.5" />
-                Refresh
-            </x-forms.button>
-        </x-slot:actions>
-    </x-settings.navbar>
+    <x-settings.navbar />
 
     <div class="application-settings-form w-full min-w-0" x-data="{
         activeTab: ['executions', 'scheduler-runs', 'skipped-jobs'].includes(location.hash.slice(1))
@@ -46,6 +39,10 @@
                         Skipped <span class="ml-1 opacity-60">{{ $skipTotalCount }}</span>
                     </button>
                 </div>
+                <x-forms.button type="button" wire:click="refresh">
+                    <x-reicon name="refresh" class="size-3.5" />
+                    Refresh
+                </x-forms.button>
             </x-slot:actions>
             <div
                 class="flex flex-col gap-3 border-b border-neutral-200 p-3 dark:border-white/[0.08]">
@@ -126,11 +123,8 @@
             <div x-cloak x-show="activeTab === 'executions'">
                 @if ($executions->isEmpty())
                     <x-empty title="No failures"
-                        description="No failed scheduled executions match the current filters." size="sm">
-                        <x-slot:icon>
-                            <x-reicon name="check-circle" class="size-6" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="No failed scheduled executions match the current filters."
+                        icon-name="check-circle" size="sm" />
                 @else
                     <div x-data="{
                         page: 1,
@@ -225,11 +219,8 @@
             <div x-cloak x-show="activeTab === 'scheduler-runs'">
                 @if ($managerRuns->isEmpty())
                     <x-empty title="No manager runs"
-                        description="Scheduler manager activity appears here after its next run." size="sm">
-                        <x-slot:icon>
-                            <x-reicon name="refresh" class="size-6" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="Scheduler manager activity appears here after its next run."
+                        icon-name="refresh" size="sm" />
                 @else
                     <div x-data="{
                         page: 1,
@@ -297,11 +288,8 @@
             <div x-cloak x-show="activeTab === 'skipped-jobs'">
                 @if ($skipLogs->isEmpty())
                     <x-empty title="No skipped jobs"
-                        description="All scheduled jobs met their dispatch conditions." size="sm">
-                        <x-slot:icon>
-                            <x-reicon name="check-circle" class="size-6" />
-                        </x-slot:icon>
-                    </x-empty>
+                        description="All scheduled jobs met their dispatch conditions."
+                        icon-name="check-circle" size="sm" />
                 @else
                     <div class="data-table">
                         <div class="data-table-header skipped-jobs-table-grid">

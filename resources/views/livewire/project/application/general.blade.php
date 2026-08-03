@@ -66,10 +66,8 @@
             @if ($buildPack !== 'dockercompose')
                 @if ($application->settings->is_container_label_readonly_enabled == false)
                     <x-empty size="sm" title="Public access is managed through labels"
-                        description="Container labels are managed manually for this application. Switch label management back to Coolify to edit them here.">
-                        <x-slot:icon>
-                            <x-reicon name="globe" class="size-8" />
-                        </x-slot:icon>
+                        description="Container labels are managed manually for this application. Switch label management back to Coolify to edit them here."
+                        icon-name="globe">
                         <x-slot:contents>
                             <button type="button" class="button"
                                 @click="document.getElementById('container-labels-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
@@ -588,10 +586,8 @@
                 <x-application.settings-section id="security-section" title="Security" helper="Protect this application with authentication at the proxy level.">
                     @if ($application->settings->is_container_label_readonly_enabled == false)
                     <x-empty size="sm" title="Authentication is managed through labels"
-                        description="Authentication is managed via manual proxy labels. Switch label management back to Coolify to configure it here.">
-                        <x-slot:icon>
-                            <x-reicon name="admin" class="size-8" />
-                        </x-slot:icon>
+                        description="Authentication is managed via manual proxy labels. Switch label management back to Coolify to configure it here."
+                        icon-name="admin">
                         <x-slot:contents>
                             <button type="button" class="button"
                                 @click="document.getElementById('container-labels-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
@@ -633,13 +629,13 @@
                                     <div x-data="{ reveal: false }">
                                         <label class="flex items-center gap-1">Password</label>
                                         <div class="relative">
-                                            <input class="input pr-10" :type="reveal ? 'text' : 'password'"
+                                            <input class="input input-with-password-toggle" :type="reveal ? 'text' : 'password'"
                                                 x-model="credential.password" autocomplete="new-password">
                                             <button type="button"
-                                                class="flex absolute inset-y-0 right-0 items-center pr-2 cursor-pointer dark:hover:text-white"
+                                                class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
                                                 aria-label="Toggle password visibility" @click="reveal = !reveal">
                                                 <x-reicon name="eye" x-show="!reveal" class="size-[18px]" />
-                                                <x-reicon name="eye-off" x-cloak x-show="reveal" class="size-[18px]" />
+                                                <x-reicon name="eye-off2" x-cloak x-show="reveal" class="size-[18px]" />
                                             </button>
                                         </div>
                                     </div>

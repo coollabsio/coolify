@@ -101,11 +101,8 @@
 
             @if ($variables->isEmpty())
                 <x-empty title="No shared variables"
-                    description="Add a variable to make it available to resources in this scope." size="sm">
-                    <x-slot:icon>
-                        <x-reicon name="variables" class="size-6" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Add a variable to make it available to resources in this scope."
+                    icon-name="variables" size="sm" />
             @else
                 <div class="data-table flex w-full flex-col">
                     <div class="data-table-header env-table-grid order-[-1]">

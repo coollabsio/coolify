@@ -1,7 +1,12 @@
 <div class="application-settings-form flex w-full flex-col gap-6">
     <form wire:submit.prevent="submit" class="contents">
         @if ($isSentinelEnabled)
-            <x-unsaved-bar action="submit" />
+            {{-- Scope dirty tracking to savable form fields only. Without wire:target,
+                 Livewire compares the entire component snapshot — so dev-only x-init
+                 `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
+                 flashes this bar on every page open. --}}
+            <x-unsaved-bar action="submit"
+                targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
         @endif
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
@@ -53,11 +58,8 @@
                 </div>
             @else
                 <x-empty size="sm" title="Sentinel is disabled"
-                    description="Enable Sentinel to collect metrics and monitor server and container health.">
-                    <x-slot:icon>
-                        <x-reicon name="dashboard" class="size-8" />
-                    </x-slot:icon>
-                </x-empty>
+                    description="Enable Sentinel to collect metrics and monitor server and container health."
+                    icon-name="dashboard" />
             @endif
         </x-application.settings-section>
 
@@ -109,9 +111,13 @@
                             customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
                             saveCustomImage() {
                                 localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
-                                $wire.set('sentinelCustomDockerImage', this.customImage);
+                                $wire.set('sentinelCustomDockerImage', this.customImage || null);
                             }
-                        }" x-init="$wire.set('sentinelCustomDockerImage', customImage)">
+                        }"
+                            {{-- Only hydrate Livewire when a real override exists. Unconditional
+                                 $wire.set('', null→'') on every open marks the component dirty and
+                                 flashes the unsaved bar until the round-trip completes. --}}
+                            x-init="if (customImage) { $wire.set('sentinelCustomDockerImage', customImage) }">
                             <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
                                 @input.debounce.500ms="saveCustomImage()"
                                 placeholder="sentinel:latest" label="Custom Docker image"

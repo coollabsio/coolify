@@ -4,11 +4,7 @@
         @if ($groupedBackups->count() === 0)
             <x-empty title="No backup schedules use this storage"
                 description="Select this storage from a database or volume backup schedule to see it here."
-                size="sm">
-                <x-slot:icon>
-                    <x-reicon name="storages" class="size-6" />
-                </x-slot:icon>
-            </x-empty>
+                icon-name="storages" size="sm" />
         @else
             <div class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
                 <div class="relative w-full max-w-sm">

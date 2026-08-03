@@ -41,7 +41,7 @@
                 href="{{ route($taskRoute, [...$parameters, 'task_uuid' => $task->uuid]) }}">
                 <div
                     class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
-                    <x-reicon name="terminal" class="size-[18px]" />
+                    <x-reicon name="browser-terminal" class="size-[18px]" />
                 </div>
                 <div class="min-w-0 flex-1">
                     <div class="flex flex-wrap items-center gap-2">
@@ -61,11 +61,8 @@
             </a>
         @empty
             <x-empty title="No scheduled tasks"
-                description="Create a task to run maintenance commands, scripts, or recurring jobs automatically.">
-                <x-slot:icon>
-                    <x-reicon name="terminal" class="size-8" />
-                </x-slot:icon>
-            </x-empty>
+                description="Create a task to run maintenance commands, scripts, or recurring jobs automatically."
+                icon-name="browser-terminal" />
         @endforelse
     </x-application.settings-section>
 </div>

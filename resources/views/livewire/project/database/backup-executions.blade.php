@@ -136,11 +136,8 @@
                         </div>
                     @empty
                         <x-empty size="sm" title="No backup executions"
-                            description="Execution history appears here after the schedule runs.">
-                            <x-slot:icon>
-                                <x-reicon name="terminal" class="size-5" />
-                            </x-slot:icon>
-                        </x-empty>
+                            description="Execution history appears here after the schedule runs."
+                            icon-name="browser-terminal" />
                     @endforelse
                 </div>
 

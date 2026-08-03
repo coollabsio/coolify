@@ -59,7 +59,7 @@
                 'active' => request()->routeIs('settings.index', 'settings.advanced', 'settings.updates'),
             ],
             ['label' => 'Backup', 'route' => 'settings.backup', 'active' => request()->routeIs('settings.backup')],
-            ['label' => 'Transactional Email', 'route' => 'settings.email', 'active' => request()->routeIs('settings.email')],
+            ['label' => 'Email', 'route' => 'settings.email', 'active' => request()->routeIs('settings.email')],
             ['label' => 'OAuth', 'route' => 'settings.oauth', 'active' => request()->routeIs('settings.oauth')],
             ['label' => 'Scheduled Jobs', 'route' => 'settings.scheduled-jobs', 'active' => request()->routeIs('settings.scheduled-jobs')],
         ],

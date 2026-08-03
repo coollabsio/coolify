@@ -171,7 +171,7 @@ it('splits standalone database backup settings and executions across dedicated u
 
     $this->get($generalUrl.'/s3')
         ->assertOk()
-        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertSeeText('No validated S3 storage')
         ->assertDontSee('Disable Local Backup')
         ->assertDontSee('Enable S3')
         ->assertDontSee('Disable S3')
@@ -366,10 +366,10 @@ it('shows only an empty S3 state when no storages are available', function () {
     ]);
 
     Livewire::test(BackupEdit::class, ['backup' => $backup->fresh(), 'availableS3Storages' => $this->team->s3s, 'section' => 's3'])
-        ->assertSeeHtml('<h2>S3</h2>')
-        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertSeeHtml('<h2>S3 storage</h2>')
+        ->assertSeeText('No validated S3 storage')
         ->assertSeeHtml('href="'.route('storage.index').'"')
-        ->assertSeeHtml('>here</a>')
+        ->assertSeeText('Open S3 storage')
         ->assertDontSee('Save')
         ->assertDontSee('Enable S3')
         ->assertDontSee('Disable S3')
@@ -390,7 +390,7 @@ it('allows S3 backups to be disabled when no usable storage remains', function (
         'section' => 's3',
     ])
         ->assertSet('saveS3', true)
-        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertSeeText('No validated S3 storage')
         ->assertDontSee('Disable S3')
         ->call('toggleS3')
         ->assertDispatched('success')
