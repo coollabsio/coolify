@@ -1975,6 +1975,10 @@ test('list_databases paginates at the query layer', function () {
     $body2 = mcpReadJson($page2);
     expect($body2['data'])->toHaveCount(1)
         ->and($body2['data'][0]['name'])->toBe('gamma-db');
+
+    $page1Uuids = collect($body1['data'])->pluck('uuid')->all();
+    $page2Uuids = collect($body2['data'])->pluck('uuid')->all();
+    expect(array_intersect($page1Uuids, $page2Uuids))->toBe([]);
 });
 
 test('list_unhealthy_resources full mode paginates without dropping summary totals', function () {
@@ -2212,7 +2216,9 @@ test('list_scheduled_task_executions returns newest first across pages', functio
     $page1->assertOk();
     $page1Body = mcpReadJson($page1);
     expect($page1Body['data']['executions'])->toHaveCount(1)
-        ->and($page1Body['data']['executions'][0]['message'])->toBe('newer-run')
+        ->and($page1Body['data']['message_included'])->toBeFalse()
+        ->and($page1Body['data']['executions'][0])->not->toHaveKey('message')
+        ->and($page1Body['data']['executions'][0]['status'])->toBe('failed')
         ->and($page1Body['_pagination']['total'])->toBe(2);
 
     $page2 = mcpReadCall('list_scheduled_task_executions', [
@@ -2223,10 +2229,58 @@ test('list_scheduled_task_executions returns newest first across pages', functio
         'per_page' => 1,
     ]);
     $page2->assertOk();
-    expect(mcpReadJson($page2)['data']['executions'][0]['message'])->toBe('older-run');
+    $page2Body = mcpReadJson($page2);
+    expect($page2Body['data']['executions'][0]['status'])->toBe('success')
+        ->and($page2Body['data']['executions'][0])->not->toHaveKey('message');
+
+    $sensitive = mcpSensitiveReadCall('list_scheduled_task_executions', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+        'task_uuid' => $task->uuid,
+        'page' => 1,
+        'per_page' => 1,
+    ]);
+    $sensitive->assertOk();
+    $sensitiveBody = mcpReadJson($sensitive);
+    expect($sensitiveBody['data']['message_included'])->toBeTrue()
+        ->and($sensitiveBody['data']['executions'][0]['message'])->toBe('newer-run');
 
     // Silence unused variable analysis when timestamps are forced via create attributes.
     expect($older->id)->not->toBe($newer->id);
+});
+
+test('list_scheduled_task_executions redacts secret-like values in messages with sensitive read', function () {
+    $task = ScheduledTask::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'exec-redact',
+        'command' => 'echo ok',
+        'frequency' => '0 1 * * *',
+        'enabled' => true,
+        'timeout' => 60,
+        'team_id' => $this->team->id,
+        'application_id' => $this->application->id,
+    ]);
+    ScheduledTaskExecution::create([
+        'scheduled_task_id' => $task->id,
+        'status' => 'failed',
+        'message' => "backup failed password=redactme01\n",
+        'started_at' => now()->subMinute(),
+        'finished_at' => now(),
+    ]);
+
+    $response = mcpSensitiveReadCall('list_scheduled_task_executions', [
+        'resource' => 'application',
+        'uuid' => $this->application->uuid,
+        'task_uuid' => $task->uuid,
+    ]);
+    $response->assertOk();
+    $body = mcpReadJson($response);
+    $message = $body['data']['executions'][0]['message'] ?? '';
+
+    expect($body['data']['message_included'])->toBeTrue()
+        ->and($message)->not->toContain('redactme01')
+        ->and($message)->toContain('password=')
+        ->and($message)->toContain(REDACTED);
 });
 
 test('get_logs redacts secret-like values in container output', function () {

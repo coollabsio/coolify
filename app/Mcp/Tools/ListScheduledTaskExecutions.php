@@ -15,7 +15,7 @@ class ListScheduledTaskExecutions extends Tool
 {
     protected string $name = 'list_scheduled_task_executions';
 
-    protected string $description = 'List recent executions for a scheduled task on an application or service owned by the authenticated team.';
+    protected string $description = 'List recent executions for a scheduled task on an application or service owned by the authenticated team. Execution messages require read:sensitive and are best-effort redacted.';
 
     use BuildsResponse;
     use ResolvesResource;
@@ -63,6 +63,10 @@ class ListScheduledTaskExecutions extends Tool
             return $this->mcpError($request, "Scheduled task [{$taskUuid}] not found.", ['resource_uuid' => $taskUuid]);
         }
 
+        // Free-form execution output can embed secrets; gate like get_logs / task commands.
+        $token = $request->user()?->currentAccessToken();
+        $includeMessage = $token !== null && ($token->can('root') || $token->can('read:sensitive'));
+
         $args = $this->paginationArgs($request);
         $execQuery = $task->executions()->orderByDesc('created_at')->orderByDesc('id');
         $total = (clone $execQuery)->count();
@@ -70,13 +74,21 @@ class ListScheduledTaskExecutions extends Tool
             ->skip($args['offset'])
             ->take($args['per_page'])
             ->get()
-            ->map(fn ($ex) => $this->scrubSensitive([
-                'uuid' => $ex->uuid ?? null,
-                'status' => $ex->status ?? null,
-                'message' => $ex->message ?? null,
-                'created_at' => $ex->created_at,
-                'updated_at' => $ex->updated_at,
-            ]))
+            ->map(function ($ex) use ($includeMessage) {
+                $row = [
+                    'uuid' => $ex->uuid ?? null,
+                    'status' => $ex->status ?? null,
+                    'message_included' => $includeMessage,
+                    'created_at' => $ex->created_at,
+                    'updated_at' => $ex->updated_at,
+                ];
+                if ($includeMessage) {
+                    $message = $ex->message;
+                    $row['message'] = is_string($message) ? $this->redactLogText($message) : $message;
+                }
+
+                return $this->scrubSensitive($row);
+            })
             ->values()
             ->all();
 
@@ -85,6 +97,7 @@ class ListScheduledTaskExecutions extends Tool
                 'resource' => $resourceType,
                 'uuid' => $uuid,
                 'task_uuid' => $taskUuid,
+                'message_included' => $includeMessage,
                 'executions' => $executions,
             ],
             [],

@@ -145,6 +145,7 @@ class ListDatabases extends Tool
         $summaries = DB::query()
             ->fromSub($union, 'databases')
             ->orderBy('name')
+            ->orderBy('uuid')
             ->offset($args['offset'])
             ->limit($args['per_page'])
             ->get()
