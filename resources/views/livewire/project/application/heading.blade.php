@@ -283,25 +283,27 @@
                     </a>
                 @endforeach
             </div>
-            <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
-                submitAction="stop" :checkboxes="$checkboxes" :actions="[
-                    'This application will be stopped.',
-                    'All non-persistent data of this application will be deleted.',
-                ]" :confirmWithText="false" :confirmWithPassword="false"
-                step1ButtonText="Continue" step2ButtonText="Confirm">
-                <x-slot:trigger>
-                    <button id="application-mobile-stop-trigger" type="button" class="hidden">Stop</button>
-                </x-slot:trigger>
-            </x-modal-confirmation>
-            <x-modal-confirmation title="Confirm Application Restart?" buttonTitle="Restart"
-                submitAction="restart" :actions="[
-                    'This application will be restarted without rebuilding.',
-                ]" :confirmWithText="false" :confirmWithPassword="false"
-                step2ButtonText="Confirm">
-                <x-slot:trigger>
-                    <button id="application-mobile-restart-trigger" type="button" class="hidden">Restart</button>
-                </x-slot:trigger>
-            </x-modal-confirmation>
+            <div class="hidden" aria-hidden="true">
+                <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
+                    submitAction="stop" :checkboxes="$checkboxes" :actions="[
+                        'This application will be stopped.',
+                        'All non-persistent data of this application will be deleted.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false"
+                    step1ButtonText="Continue" step2ButtonText="Confirm">
+                    <x-slot:trigger>
+                        <button id="application-mobile-stop-trigger" type="button">Stop</button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
+                <x-modal-confirmation title="Confirm Application Restart?" buttonTitle="Restart"
+                    submitAction="restart" :actions="[
+                        'This application will be restarted without rebuilding.',
+                    ]" :confirmWithText="false" :confirmWithPassword="false"
+                    step2ButtonText="Confirm">
+                    <x-slot:trigger>
+                        <button id="application-mobile-restart-trigger" type="button">Restart</button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
+            </div>
         </div>
 
         {{-- Layer-2 top nav: fixed under the topbar on desktop, in-flow on smaller screens --}}

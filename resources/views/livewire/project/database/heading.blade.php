@@ -212,27 +212,29 @@
     </div>
 
     @if ($database->destination->server->isFunctional())
-        <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart"
-            submitAction="restartEvent" :actions="[
-                'This database will be unavailable during the restart.',
-                'If the database is currently in use, data could be lost.',
-            ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
-            :dispatchAction="true">
-            <x-slot:trigger>
-                <button id="database-restart-trigger" type="button" class="hidden">Restart</button>
-            </x-slot:trigger>
-        </x-modal-confirmation>
-        <x-modal-confirmation title="Confirm Database Stopping?" buttonTitle="Stop" submitAction="stop"
-            :checkboxes="$checkboxes" :actions="[
-                'This database will be stopped.',
-                'If the database is currently in use, data could be lost.',
-                'Non-persistent containers, networks, and unused images will be removed.',
-            ]" :confirmWithText="false" :confirmWithPassword="false"
-            step1ButtonText="Continue" step2ButtonText="Confirm">
-            <x-slot:trigger>
-                <button id="database-stop-trigger" type="button" class="hidden">Stop</button>
-            </x-slot:trigger>
-        </x-modal-confirmation>
+        <div class="hidden" aria-hidden="true">
+            <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart"
+                submitAction="restartEvent" :actions="[
+                    'This database will be unavailable during the restart.',
+                    'If the database is currently in use, data could be lost.',
+                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
+                :dispatchAction="true">
+                <x-slot:trigger>
+                    <button id="database-restart-trigger" type="button">Restart</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Database Stopping?" buttonTitle="Stop" submitAction="stop"
+                :checkboxes="$checkboxes" :actions="[
+                    'This database will be stopped.',
+                    'If the database is currently in use, data could be lost.',
+                    'Non-persistent containers, networks, and unused images will be removed.',
+                ]" :confirmWithText="false" :confirmWithPassword="false"
+                step1ButtonText="Continue" step2ButtonText="Confirm">
+                <x-slot:trigger>
+                    <button id="database-stop-trigger" type="button">Stop</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+        </div>
     @endif
 
     @script

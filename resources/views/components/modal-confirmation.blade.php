@@ -134,14 +134,14 @@
 }"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
     @class([
-        'relative h-auto',
+        // Default to inline-flex so shells with only a programmatic/hidden trigger
+        // do not paint a full-width empty block above navigation.
+        'relative inline-flex h-auto max-w-full',
         'w-full' => $buttonFullWidth,
-        // Compact toolbar triggers (e.g. layer-2 nav) should not stretch full width on mobile.
-        'w-auto' => ! $buttonFullWidth && isset($trigger),
-        'w-full sm:w-auto' => ! $buttonFullWidth && ! isset($trigger),
+        'w-auto' => ! $buttonFullWidth,
     ])>
     @if (isset($trigger))
-        <div class="inline-flex" @click="modalOpen=true">
+        <div class="inline-flex max-w-full" @click="modalOpen=true">
             {{ $trigger }}
         </div>
     @elseif ($customButton)

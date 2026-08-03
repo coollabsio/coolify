@@ -242,21 +242,23 @@
     </div>
 
     @if ($service->isDeployable)
-        <x-modal-confirmation title="Confirm Service Restart?" buttonTitle="Restart"
-            submitAction="restartEvent" :dispatchAction="true" :actions="['This service will be restarted.']"
-            :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Confirm">
-            <x-slot:trigger>
-                <button id="service-restart-trigger" type="button" class="hidden">Restart</button>
-            </x-slot:trigger>
-        </x-modal-confirmation>
-        <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop"
-            submitAction="stop" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
-            :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
-            step2ButtonText="Confirm">
-            <x-slot:trigger>
-                <button id="service-stop-trigger" type="button" class="hidden">Stop</button>
-            </x-slot:trigger>
-        </x-modal-confirmation>
+        <div class="hidden" aria-hidden="true">
+            <x-modal-confirmation title="Confirm Service Restart?" buttonTitle="Restart"
+                submitAction="restartEvent" :dispatchAction="true" :actions="['This service will be restarted.']"
+                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Confirm">
+                <x-slot:trigger>
+                    <button id="service-restart-trigger" type="button">Restart</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop"
+                submitAction="stop" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
+                step2ButtonText="Confirm">
+                <x-slot:trigger>
+                    <button id="service-stop-trigger" type="button">Stop</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+        </div>
     @endif
 
     @script
