@@ -109,6 +109,74 @@ it('lists existing domains as individual rows', function () {
         ->assertSee('https://www.example.com');
 });
 
+it('shows dns entries control next to Add', function () {
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSuccessful()
+        ->assertSee('DNS entries')
+        ->assertSee('Manual records');
+});
+
+it('lists dns entries for domains that still need dns and omits working configured hosts', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com,https://www.example.com,https://api.example.com',
+        'domain_dns_statuses' => [
+            'https://app.example.com' => [
+                'status' => 'ok',
+                'message' => 'OK',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+            'https://api.example.com' => [
+                'status' => 'failed',
+                'message' => 'Mismatch',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('openDnsRecordsModal')
+        ->assertSet('showDnsRecordsModal', true)
+        ->assertSee('Recheck');
+
+    $names = collect($component->instance()->dnsRecordHints())->pluck('name')->all();
+
+    expect($names)
+        ->toContain('api.example.com')
+        ->not->toContain('app.example.com');
+});
+
+it('shows cloudflare domain connect only on cloud with a key', function () {
+    config([
+        'constants.coolify.self_hosted' => false,
+        'services.domain_connect.private_key' => null,
+    ]);
+
+    $key = openssl_pkey_new([
+        'private_key_bits' => 2048,
+        'private_key_type' => OPENSSL_KEYTYPE_RSA,
+    ]);
+    openssl_pkey_export($key, $privateKey);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('Cloudflare');
+
+    config(['services.domain_connect.private_key' => $privateKey]);
+
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Cloudflare')
+        ->call('openCloudflareAutoconfigureModal')
+        ->assertSet('showCloudflareAutoconfigureModal', true)
+        ->assertSee('app.example.com')
+        ->assertDontSee('Domain or hostname')
+        ->call('applyCloudflareAutoconfigure')
+        ->assertHasNoErrors()
+        ->assertSet('showCloudflareAutoconfigureModal', false);
+});
+
 it('adds a domain to the application', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSee('+ Add')

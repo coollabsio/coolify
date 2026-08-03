@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -13,6 +14,7 @@ use Livewire\Component;
 class Domains extends Component
 {
     use AuthorizesRequests;
+    use InteractsWithCloudflareDomainConnect;
 
     public Service $service;
 
@@ -328,6 +330,11 @@ class Domains extends Component
         }
 
         return $this->serverIp;
+    }
+
+    protected function authorizeUpdateForDomainConnect(): void
+    {
+        $this->authorize('update', $this->service);
     }
 
     public function checkAllDns(): void

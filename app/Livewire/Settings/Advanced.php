@@ -48,6 +48,8 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $webhook_allow_localhost;
 
+    public ?string $domain_connect_private_key = null;
+
     public function rules()
     {
         return [
@@ -63,6 +65,7 @@ class Advanced extends Component
             'is_mcp_server_enabled' => 'boolean',
             'webhook_allowed_internal_hosts' => 'nullable|string',
             'webhook_allow_localhost' => 'boolean',
+            'domain_connect_private_key' => 'nullable|string',
         ];
     }
 
@@ -84,6 +87,8 @@ class Advanced extends Component
         $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
         $this->webhook_allowed_internal_hosts = collect($this->settings->webhook_allowed_internal_hosts ?? [])->implode(',');
         $this->webhook_allow_localhost = $this->settings->webhook_allow_localhost ?? false;
+        // Do not prefill the secret into the form; only update when the admin pastes a new value.
+        $this->domain_connect_private_key = null;
     }
 
     public function submit()
@@ -155,6 +160,11 @@ class Advanced extends Component
                 return;
             }
 
+            if (isCloud() && filled($this->domain_connect_private_key)) {
+                $this->settings->domain_connect_private_key = $this->normalizeDomainConnectPrivateKey($this->domain_connect_private_key);
+                $this->domain_connect_private_key = null;
+            }
+
             $this->instantSave($webhookAllowedInternalHosts);
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -185,6 +195,32 @@ class Advanced extends Component
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function clearDomainConnectPrivateKey(): void
+    {
+        try {
+            if (! isCloud()) {
+                return;
+            }
+            $this->authorize('update', $this->settings);
+            $this->settings->domain_connect_private_key = null;
+            $this->settings->save();
+            $this->domain_connect_private_key = null;
+            $this->dispatch('success', 'Domain Connect private key removed.');
+        } catch (\Exception $e) {
+            handleError($e, $this);
+        }
+    }
+
+    private function normalizeDomainConnectPrivateKey(string $key): string
+    {
+        $key = str_replace(["\r\n", "\r"], "\n", trim($key));
+        if (! str_contains($key, "\n") && str_contains($key, '\\n')) {
+            $key = str_replace('\\n', "\n", $key);
+        }
+
+        return $key;
     }
 
     /**

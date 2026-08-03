@@ -14,7 +14,7 @@
                  listboxes (API, MCP, telemetry, …) update the snapshot on the server
                  immediately; without wire:target they briefly flash this bar. --}}
             <x-unsaved-bar action="submit"
-                targets="custom_dns_servers,allowed_ips,webhook_allowed_internal_hosts,webhook_allow_localhost" />
+                targets="custom_dns_servers,allowed_ips,webhook_allowed_internal_hosts,webhook_allow_localhost,domain_connect_private_key" />
 
             <x-application.settings-section id="access-section" title="Access">
                 <div class="grid gap-4 lg:grid-cols-2">
@@ -45,6 +45,32 @@
                         placeholder="1.1.1.1, 8.8.8.8" />
                 </div>
             </x-application.settings-section>
+
+            @if (isCloud())
+                <x-application.settings-section id="domain-connect-section" title="Domain Connect"
+                    helper="Optional RSA private key used to sign Cloudflare Domain Connect apply URLs on Coolify Cloud. Leave blank to keep the existing key.">
+                    <div class="grid gap-4">
+                        <x-forms.input id="domain_connect_private_key" type="password" allowToPeak
+                            label="Domain Connect private key (PEM)"
+                            helper="Paste a PEM private key to set or rotate. Public key must be published at domainconnect.coolify.io. Env DOMAIN_CONNECT_PRIVATE_KEY is used as a fallback when this is empty."
+                            placeholder="-----BEGIN PRIVATE KEY-----" />
+                        @if (filled(data_get($settings, 'domain_connect_private_key')))
+                            <div class="flex flex-wrap items-center gap-2">
+                                <x-status-badge status="Key configured" type="success" />
+                                <x-forms.button type="button" wire:click="clearDomainConnectPrivateKey" isError>
+                                    Remove key
+                                </x-forms.button>
+                            </div>
+                        @elseif (filled(config('services.domain_connect.private_key')))
+                            <x-status-badge status="Using DOMAIN_CONNECT_PRIVATE_KEY from environment" type="neutral" />
+                        @else
+                            <x-callout type="info" title="Not configured">
+                                Automated Cloudflare DNS (Domain Connect) stays hidden until a private key is set.
+                            </x-callout>
+                        @endif
+                    </div>
+                </x-application.settings-section>
+            @endif
 
             <x-application.settings-section id="api-section" title="API and MCP">
                 <div class="grid gap-4 lg:grid-cols-2">

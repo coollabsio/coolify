@@ -69,6 +69,7 @@
         <div class="ml-auto flex flex-wrap items-center gap-2">
             @can('update', $service)
                 @if ($serviceAppCount > 0)
+                    @include('livewire.project.shared.cloudflare-autoconfigure')
                     <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                         canGate="update" :canResource="$service">
                         <x-slot:content>

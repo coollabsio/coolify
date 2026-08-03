@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
 use App\Models\Application;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
@@ -12,6 +13,7 @@ use Livewire\Component;
 class Domains extends Component
 {
     use AuthorizesRequests;
+    use InteractsWithCloudflareDomainConnect;
 
     public Application $application;
 
@@ -459,6 +461,11 @@ class Domains extends Component
             ->filter()
             ->values()
             ->all();
+    }
+
+    protected function authorizeUpdateForDomainConnect(): void
+    {
+        $this->authorize('update', $this->application);
     }
 
     public function checkAllDns(): void

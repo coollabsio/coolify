@@ -92,6 +92,7 @@
             @can('update', $application)
                 @unless ($labelsAreWritable)
                     @if (! $isCompose || count($composeServices) > 0)
+                        @include('livewire.project.shared.cloudflare-autoconfigure')
                         <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                             canGate="update" :canResource="$application">
                             <x-slot:content>

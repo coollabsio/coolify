@@ -98,6 +98,39 @@ it('lists domains grouped by service application on the stack domains page', fun
         ->assertSee('Web');
 });
 
+it('shows dns entries control next to Add', function () {
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSuccessful()
+        ->assertSee('DNS entries')
+        ->assertSee('Manual records');
+});
+
+it('lists dns entries for service hosts that still need dns', function () {
+    $this->webApp->update([
+        'fqdn' => 'https://web.example.com',
+        'domain_dns_statuses' => [
+            'https://web.example.com' => [
+                'status' => 'ok',
+                'message' => 'OK',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+    $this->apiApp->update(['fqdn' => 'https://api.example.com,https://www.api.example.com']);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('openDnsRecordsModal')
+        ->assertSee('Recheck');
+
+    $names = collect($component->instance()->dnsRecordHints())->pluck('name')->all();
+
+    expect($names)
+        ->toContain('api.example.com')
+        ->toContain('www.api.example.com')
+        ->not->toContain('web.example.com');
+});
+
 it('does not persist service redirect until Set Direction is called', function () {
     $this->webApp->update(['fqdn' => 'https://web.example.com', 'redirect' => 'both']);
 

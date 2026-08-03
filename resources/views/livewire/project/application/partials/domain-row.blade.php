@@ -67,9 +67,15 @@
 
         <div class="flex items-center justify-end gap-1">
             @can('update', $application)
-                <button type="button" wire:click="checkDomainDns({{ $index }})" class="icon-button shrink-0"
-                    title="Check DNS" aria-label="Check DNS">
-                    <x-reicon name="refresh" class="size-3.5" />
+                <button type="button" wire:click="checkDomainDns({{ $index }})"
+                    wire:loading.attr="disabled"
+                    wire:target="checkDomainDns({{ $index }}),checkAllDns"
+                    class="icon-button shrink-0" title="Check DNS" aria-label="Check DNS">
+                    <x-reicon name="refresh" class="size-3.5"
+                        wire:loading.remove.delay
+                        wire:target="checkDomainDns({{ $index }}),checkAllDns" />
+                    <x-loading-on-button wire:loading.delay
+                        wire:target="checkDomainDns({{ $index }}),checkAllDns" />
                 </button>
                 @unless ($labelsAreWritable)
                     @if ($isSuggested)
