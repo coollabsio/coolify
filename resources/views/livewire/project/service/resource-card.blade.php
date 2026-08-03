@@ -43,16 +43,11 @@
                         {{ $resource->fqdn }}
                     </span>
                     @can('update', $service)
-                        <x-modal-input title="Edit Domains" :closeOutside="false">
-                            <x-slot:content>
-                                <button type="button" class="icon-button shrink-0" title="Edit domains"
-                                    aria-label="Edit domains">
-                                    <x-reicon name="settings" class="size-3.5" />
-                                </button>
-                            </x-slot:content>
-                            <livewire:project.service.edit-domain applicationId="{{ $resource->id }}"
-                                wire:key="edit-domain-{{ $resource->id }}" />
-                        </x-modal-input>
+                        <a class="icon-button shrink-0" title="Edit domains" aria-label="Edit domains"
+                            {{ wireNavigate() }}
+                            href="{{ route('project.service.domains', $parameters) }}">
+                            <x-reicon name="settings" class="size-3.5" />
+                        </a>
                     @endcan
                 </div>
             @endif

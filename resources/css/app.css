@@ -1408,13 +1408,20 @@ input[type="search"]::-webkit-search-results-decoration {
     padding: 0;
 }
 
-/* Empty states still need the standard body inset when the card is flush for lists.
-   Override w-full: width 100% + horizontal margin overflows the parent card. */
-.application-settings-section-body.is-flush .empty-state {
-    margin: 1rem;
-    width: auto;
+/* Empty states sit edge-to-edge in settings cards — no outer inset/padding. */
+.application-settings-section-body:has(> .empty-state:only-child) {
+    padding: 0;
+}
+
+.application-settings-section-body.is-flush .empty-state,
+.application-settings-section-body:has(> .empty-state:only-child) .empty-state,
+.application-settings-section > .empty-state {
+    margin: 0;
+    width: 100%;
     max-width: none;
     box-sizing: border-box;
+    /* Match the layer-card body corners when the empty fills the body. */
+    border-radius: 8px;
 }
 
 /* Centered process dialog (startup / activity logs) — full-height log body.
@@ -1488,6 +1495,246 @@ input[type="search"]::-webkit-search-results-decoration {
 /* Shared variables only store value shape (multiline), not per-resource flags. */
 .env-table-grid-shared {
     grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4.5rem 3rem;
+}
+
+/* Env vars: collapse flag columns on tablet, card layout on phone */
+@media (max-width: 1100px) {
+    .env-table-grid {
+        grid-template-columns: minmax(0, 1.4fr) 6rem minmax(0, 1fr) 3rem;
+        gap: 0.75rem;
+    }
+
+    /* Hide Literal / Multiline / Buildtime / Runtime (4–7 of 8) */
+    .env-table-grid > :nth-child(4),
+    .env-table-grid > :nth-child(5),
+    .env-table-grid > :nth-child(6),
+    .env-table-grid > :nth-child(7) {
+        display: none;
+    }
+
+    .env-table-grid-shared {
+        grid-template-columns: minmax(0, 1.4fr) 6rem minmax(0, 1fr) 3rem;
+        gap: 0.75rem;
+    }
+
+    /* Hide Multiline (4 of 5) */
+    .env-table-grid-shared > :nth-child(4) {
+        display: none;
+    }
+}
+
+@media (max-width: 900px) {
+    .env-table-grid {
+        grid-template-columns: minmax(0, 1fr) 6rem 3rem;
+    }
+
+    /* Also hide Comment (3) */
+    .env-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .env-table-grid-shared {
+        grid-template-columns: minmax(0, 1fr) 6rem 3rem;
+    }
+
+    .env-table-grid-shared > :nth-child(3) {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .data-table-header.env-table-grid,
+    .data-table-header.env-table-grid-shared {
+        display: none;
+    }
+
+    .data-table-row.env-table-grid,
+    .data-table-row.env-table-grid-shared {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'name actions'
+            'meta actions';
+        gap: 0.35rem 0.75rem;
+        align-items: start;
+        padding: 0.875rem 1rem;
+        min-height: 0;
+    }
+
+    /* Name */
+    .data-table-row.env-table-grid > :nth-child(1),
+    .data-table-row.env-table-grid-shared > :nth-child(1) {
+        grid-area: name;
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+
+    .data-table-row.env-table-grid > :nth-child(1) .env-key-label,
+    .data-table-row.env-table-grid-shared > :nth-child(1) .env-key-label {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    /* Type desktop column → hide; type shows as mobile badge on name row */
+    .data-table-row.env-table-grid > :nth-child(2),
+    .data-table-row.env-table-grid-shared > :nth-child(2) {
+        display: none !important;
+    }
+
+    /* Comment / flags already hidden; keep meta area for optional second line */
+    .data-table-row.env-table-grid > :nth-child(3),
+    .data-table-row.env-table-grid > :nth-child(4),
+    .data-table-row.env-table-grid > :nth-child(5),
+    .data-table-row.env-table-grid > :nth-child(6),
+    .data-table-row.env-table-grid > :nth-child(7),
+    .data-table-row.env-table-grid-shared > :nth-child(3),
+    .data-table-row.env-table-grid-shared > :nth-child(4) {
+        display: none !important;
+    }
+
+    /* Actions */
+    .data-table-row.env-table-grid > :nth-child(8),
+    .data-table-row.env-table-grid-shared > :nth-child(5) {
+        grid-area: actions;
+        align-self: center;
+        justify-self: end;
+    }
+
+    .env-type-mobile {
+        display: inline-flex !important;
+    }
+}
+
+.env-type-mobile {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .env-type-desktop {
+        display: none !important;
+    }
+}
+
+.domains-table-grid {
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+}
+
+.domains-table-grid-compose {
+    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+}
+
+/* Domains table: collapse secondary columns on tablet/phone */
+@media (max-width: 900px) {
+    .domains-table-grid {
+        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        gap: 0.75rem;
+    }
+
+    /* Hide "Last checked" (3rd of 4) */
+    .domains-table-grid > :nth-child(3) {
+        display: none;
+    }
+
+    .domains-table-grid-compose {
+        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        gap: 0.75rem;
+    }
+
+    /* Hide "Service" (2) and "Last checked" (4) of 5 */
+    .domains-table-grid-compose > :nth-child(2),
+    .domains-table-grid-compose > :nth-child(4) {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .data-table-header.domains-table-grid,
+    .data-table-header.domains-table-grid-compose {
+        display: none;
+    }
+
+    .data-table-row.domains-table-grid,
+    .data-table-row.domains-table-grid-compose {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'domain actions'
+            'meta actions';
+        gap: 0.35rem 0.75rem;
+        align-items: start;
+        padding: 0.875rem 1rem;
+        min-height: 0;
+    }
+
+    /* Domain cell */
+    .data-table-row.domains-table-grid > :nth-child(1),
+    .data-table-row.domains-table-grid-compose > :nth-child(1) {
+        grid-area: domain;
+        min-width: 0;
+    }
+
+    .data-table-row.domains-table-grid > :nth-child(1) a,
+    .data-table-row.domains-table-grid-compose > :nth-child(1) a {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    /* Non-compose: 1 Domain, 2 DNS, 3 Last checked, 4 Actions */
+    .data-table-row.domains-table-grid > :nth-child(2) {
+        grid-area: meta;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .data-table-row.domains-table-grid > :nth-child(3) {
+        display: none !important;
+    }
+
+    .data-table-row.domains-table-grid > :nth-child(4) {
+        grid-area: actions;
+        align-self: center;
+    }
+
+    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Last checked, 5 Actions */
+    .data-table-row.domains-table-grid-compose > :nth-child(2) {
+        display: none !important;
+    }
+
+    .data-table-row.domains-table-grid-compose > :nth-child(3) {
+        grid-area: meta;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .data-table-row.domains-table-grid-compose > :nth-child(4) {
+        display: none !important;
+    }
+
+    .data-table-row.domains-table-grid-compose > :nth-child(5) {
+        grid-area: actions;
+        align-self: center;
+    }
+
+    /* Service name as badge under domain on mobile (compose only) */
+    .data-table-row.domains-table-grid-compose .domains-service-mobile {
+        display: inline-flex !important;
+    }
+}
+
+.domains-service-mobile {
+    display: none;
+}
+
+@media (max-width: 640px) {
+    .domains-service-desktop {
+        display: none !important;
+    }
 }
 
 .backup-table-grid {

@@ -58,9 +58,9 @@
 
     {{-- Toolbar: search left; filter and add right --}}
     @if ($view === 'normal')
-        <div class="mt-2 flex flex-wrap items-center gap-2"
+        <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
             @if (! $readyToLoad) aria-busy="true" @endif>
-            <div class="relative min-w-0 max-w-md flex-1">
+            <div class="relative min-w-0 w-full flex-1 sm:max-w-md">
                 <input type="search" placeholder="Search environment variables"
                     aria-label="Search environment variables" wire:model.live.debounce.300ms="search"
                     class="input w-full pl-8!" @disabled(! $readyToLoad) />
@@ -76,7 +76,7 @@
                     </svg>
                 </div>
             </div>
-            <div class="ml-auto flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
                 @if ($resource->type() === 'application' && $showPreview)
                     <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
                         <button type="button" class="button" @click="open = !open" @click.outside="open = false"

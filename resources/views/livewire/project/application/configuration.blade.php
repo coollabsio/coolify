@@ -19,6 +19,11 @@
                 'active' => $currentRoute === 'project.application.configuration',
             ],
             [
+                'label' => 'Domains',
+                'route' => 'project.application.domains',
+                'active' => $currentRoute === 'project.application.domains',
+            ],
+            [
                 'label' => 'Advanced',
                 'route' => 'project.application.advanced',
                 'active' => $currentRoute === 'project.application.advanced',
@@ -113,6 +118,7 @@
         // Icons follow the main sidebar's reicon set
         $menuIcons = [
             'General' => 'settings',
+            'Domains' => 'globe',
             'Advanced' => 'grid',
             'Swarm' => 'destinations',
             'Environment Variables' => 'variables',
@@ -133,7 +139,7 @@
 
         // Discord-style groups for the settings sidebar
         $menuGroups = [
-            'Settings' => ['General', 'Advanced', 'Swarm', 'Environment Variables', 'Persistent Storage'],
+            'Settings' => ['General', 'Domains', 'Advanced', 'Swarm', 'Environment Variables', 'Persistent Storage'],
             'Build & deploy' => ['Git Source', 'Servers', 'Preview Deployments', 'Rollback', 'Scheduled Tasks', 'Webhooks', 'Healthcheck'],
             'Operations' => ['Resource Limits', 'Resource Operations', 'Metrics', 'Tags', 'Danger Zone'],
         ];
@@ -250,6 +256,8 @@
             <div class="min-w-0 xl:mt-3">
             @if ($currentRoute === 'project.application.configuration')
                 <livewire:project.application.general :application="$application" />
+            @elseif ($currentRoute === 'project.application.domains')
+                <livewire:project.application.domains :application="$application" />
             @elseif ($currentRoute === 'project.application.swarm' && $application->destination->server->isSwarm())
                 <livewire:project.application.swarm :application="$application" />
             @elseif ($currentRoute === 'project.application.advanced')

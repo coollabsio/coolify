@@ -6,13 +6,15 @@
                 <p>Send backup archives to a validated object storage destination.</p>
             </div>
         </div>
-        <x-empty title="No validated S3 storage"
-            description="Add and validate an S3 storage destination before enabling remote backups."
-            icon-name="storages">
-            <x-slot:contents>
-                <a class="button" {{ wireNavigate() }} href="{{ route('storage.index') }}">Open S3 storage</a>
-            </x-slot:contents>
-        </x-empty>
+        <div class="application-settings-section-body is-flush">
+            <x-empty title="No validated S3 storage"
+                description="Add and validate an S3 storage destination before enabling remote backups."
+                icon-name="storages">
+                <x-slot:contents>
+                    <a class="button" {{ wireNavigate() }} href="{{ route('storage.index') }}">Open S3 storage</a>
+                </x-slot:contents>
+            </x-empty>
+        </div>
     </section>
 @else
     <form wire:submit="submit">

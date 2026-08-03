@@ -24,7 +24,7 @@
                     </g>
                 </svg>
             @endif
-            <span class="truncate font-mono text-[13px] text-black dark:text-fg"
+            <span class="env-key-label min-w-0 truncate font-mono text-[13px] text-black dark:text-fg"
                 title="{{ $env->key }}">{{ $env->key }}</span>
             @if ($is_really_required)
                 <span class="table-badge table-badge-danger shrink-0">Required</span>
@@ -32,8 +32,9 @@
             @if ($isMagicVariable)
                 <span class="table-badge shrink-0">Managed</span>
             @endif
+            <span class="env-type-mobile table-badge shrink-0">{{ $rowScopeLabel }}</span>
         </div>
-        <div class="text-[13px] text-neutral-500 dark:text-fg-dim">
+        <div class="env-type-desktop text-[13px] text-neutral-500 dark:text-fg-dim">
             {{ $rowScopeLabel }}
         </div>
         <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim"

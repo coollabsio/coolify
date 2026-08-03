@@ -27,83 +27,53 @@
             </x-application.settings-section>
 
             <x-application.settings-section id="public-access-section" title="Public access" helper="Connect public domains and control how incoming requests are redirected between www and non-www.">
-            @if ($buildPack === 'dockercompose')
-                @if (
-                    !is_null($parsedServices) &&
-                        count($parsedServices) > 0 &&
-                        !$application->settings->is_raw_compose_deployment_enabled)
-                    @php
-                        $hasNonDatabaseService = collect(data_get($parsedServices, 'services', []))
-                            ->contains(fn($service) => !isDatabaseImage(data_get($service, 'image')));
-                    @endphp
-                    @if ($hasNonDatabaseService)
-                        <div class="flex flex-col gap-4">
-                            @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
-                                @if (!isDatabaseImage(data_get($service, 'image')))
-                                    @php
-                                        $composeDomainKey = 'parsedServiceDomains.'.str($serviceName)->replace('-', '_')->replace('.', '_').'.domain';
-                                    @endphp
-                                    <div wire:key="compose-domain-{{ str($serviceName)->slug() }}"
-                                        class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                        <x-forms.domain-chips
-                                            :model="$composeDomainKey"
-                                            :label="$serviceName"
-                                            :can-update="auth()->user()->can('update', $application)"
-                                            :disabled="! auth()->user()->can('update', $application)"
-                                            x-bind:class="shouldDisable() ? 'pointer-events-none opacity-60' : ''" />
-                                        @can('update', $application)
-                                            <x-forms.button wire:click="generateDomain('{{ $serviceName }}')"
-                                                x-bind:disabled="shouldDisable()">
-                                                Generate domain
-                                            </x-forms.button>
-                                        @endcan
-                                    </div>
-                                @endif
-                            @endforeach
-                        </div>
+            @php
+                $domainCount = 0;
+                if ($buildPack === 'dockercompose') {
+                    $composeDomains = $application->docker_compose_domains
+                        ? json_decode($application->docker_compose_domains, true)
+                        : null;
+                    if (is_array($composeDomains)) {
+                        foreach ($composeDomains as $serviceDomain) {
+                            $domainString = data_get($serviceDomain, 'domain');
+                            if (filled($domainString)) {
+                                $domainCount += countDomains($domainString);
+                            }
+                        }
+                    }
+                } elseif (filled($fqdn)) {
+                    $domainCount = countDomains($fqdn);
+                }
+            @endphp
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                    @if ($domainCount === 0)
+                        No domains set.
+                    @elseif ($domainCount === 1)
+                        1 domain set.
                     @else
-                        <p class="text-sm text-neutral-500 dark:text-fg-dim">No public services were detected in this compose file.</p>
+                        {{ $domainCount }} domains set.
                     @endif
-                @else
-                    <p class="text-sm text-neutral-500 dark:text-fg-dim">Domains are managed directly in the raw compose file.</p>
-                @endif
-            @endif
-            @if ($buildPack !== 'dockercompose')
-                @if ($application->settings->is_container_label_readonly_enabled == false)
-                    <x-empty size="sm" title="Public access is managed through labels"
-                        description="Container labels are managed manually for this application. Switch label management back to Coolify to edit them here."
-                        icon-name="globe">
-                        <x-slot:contents>
-                            <button type="button" class="button"
-                                @click="document.getElementById('container-labels-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
-                                Go to Container labels
-                            </button>
-                        </x-slot:contents>
-                    </x-empty>
-                @else
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
-                        <x-forms.domain-chips model="fqdn" label="URLs"
-                            :can-update="auth()->user()->can('update', $application)"
-                            :disabled="! auth()->user()->can('update', $application)" />
-                        @can('update', $application)
-                            <x-forms.button wire:click="getWildcardDomain">Generate domain</x-forms.button>
-                        @endcan
-                    </div>
-                    <div class="application-settings-domain-direction application-direction-options mt-5">
-                        <div class="grid w-full gap-4 sm:grid-cols-2">
-                            <x-forms.listbox id="redirect" label="Domain redirection" :options="[
-                                ['value' => 'www', 'label' => 'Redirect non-www to www'],
-                                ['value' => 'non-www', 'label' => 'Redirect www to non-www'],
-                                ['value' => 'both', 'label' => 'Allow www & non-www'],
-                            ]" x-bind:disabled="!canUpdate" />
-                            <x-forms.listbox :wire="false" value="https" label="Protocol redirection" :options="[
-                                ['value' => 'https', 'label' => 'Redirect HTTP to HTTPS'],
-                                ['value' => 'none', 'label' => 'Allow HTTP & HTTPS'],
-                            ]" x-bind:disabled="!canUpdate" />
-                        </div>
-                    </div>
-                @endif
-            @endif
+                    Manage domains, DNS checks, and www redirects
+                    <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-warning dark:decoration-warning/30 dark:hover:decoration-warning"
+                        href="{{ route('project.application.domains', [
+                            'project_uuid' => $application->environment->project->uuid,
+                            'environment_uuid' => $application->environment->uuid,
+                            'application_uuid' => $application->uuid,
+                        ]) }}" {{ wireNavigate() }}>
+                        on the Domains page
+                    </a>.
+                </p>
+                <a class="button shrink-0"
+                    href="{{ route('project.application.domains', [
+                        'project_uuid' => $application->environment->project->uuid,
+                        'environment_uuid' => $application->environment->uuid,
+                        'application_uuid' => $application->uuid,
+                    ]) }}" {{ wireNavigate() }}>
+                    <x-reicon name="globe" class="size-4" />
+                    Manage domains
+                </a>
+            </div>
             </x-application.settings-section>
 
             <x-application.settings-section id="build-pipeline-section" title="Build pipeline" helper="Commands, directories and options used while building the application.">

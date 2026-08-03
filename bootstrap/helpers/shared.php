@@ -1815,11 +1815,188 @@ function getRealtime()
     }
 }
 
+/**
+ * Resolve a server IP or hostname to an IP address for DNS comparison/display.
+ *
+ * When a server uses a hostname (e.g. coolify-testing-host) instead of a literal
+ * IP, A-record validation and UI copy need the actual IP the user should point DNS to.
+ *
+ * Successful hostname resolutions are cached briefly so Livewire mounts/domain state
+ * loads do not re-query DNS on every request.
+ *
+ * @return array{ip: ?string, configured: ?string, resolved_from_hostname: bool}
+ */
+function resolveServerIpAddress(?string $ipOrHost): array
+{
+    $configured = filled($ipOrHost) ? trim((string) $ipOrHost) : null;
+
+    if ($configured === null || $configured === '') {
+        return [
+            'ip' => null,
+            'configured' => null,
+            'resolved_from_hostname' => false,
+        ];
+    }
+
+    // Strip IPv6 brackets if present: [2001:db8::1]
+    $candidate = str($configured)->trim('[]')->toString();
+
+    if (filter_var($candidate, FILTER_VALIDATE_IP) !== false) {
+        return [
+            'ip' => $candidate,
+            'configured' => $configured,
+            'resolved_from_hostname' => false,
+        ];
+    }
+
+    $cacheKey = 'server-ip-resolve:'.mb_strtolower($candidate);
+    $cachedIp = Cache::get($cacheKey);
+
+    if (is_string($cachedIp) && filter_var($cachedIp, FILTER_VALIDATE_IP) !== false) {
+        return [
+            'ip' => $cachedIp,
+            'configured' => $configured,
+            'resolved_from_hostname' => true,
+        ];
+    }
+
+    $resolvedIp = null;
+
+    try {
+        $aRecords = @dns_get_record($candidate, DNS_A);
+        if (is_array($aRecords)) {
+            foreach ($aRecords as $record) {
+                $ip = $record['ip'] ?? null;
+                if (is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                    $resolvedIp = $ip;
+                    break;
+                }
+            }
+        }
+    } catch (Throwable) {
+    }
+
+    if ($resolvedIp === null) {
+        try {
+            $aaaaRecords = @dns_get_record($candidate, DNS_AAAA);
+            if (is_array($aaaaRecords)) {
+                foreach ($aaaaRecords as $record) {
+                    $ip = $record['ipv6'] ?? null;
+                    if (is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+                        $resolvedIp = $ip;
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable) {
+        }
+    }
+
+    if ($resolvedIp === null) {
+        $resolved = @gethostbyname($candidate);
+        if (is_string($resolved) && $resolved !== $candidate && filter_var($resolved, FILTER_VALIDATE_IP) !== false) {
+            $resolvedIp = $resolved;
+        }
+    }
+
+    if ($resolvedIp !== null) {
+        Cache::put($cacheKey, $resolvedIp, now()->addSeconds(60));
+    }
+
+    return [
+        'ip' => $resolvedIp,
+        'configured' => $configured,
+        'resolved_from_hostname' => $resolvedIp !== null,
+    ];
+}
+
+/**
+ * Preferred server address for DNS validation: public instance IPs for localhost,
+ * otherwise the server IP/hostname resolved to a real IP when possible.
+ */
+function serverDnsTargetIp(Server $server): ?string
+{
+    $settings = instanceSettings();
+
+    if ($server->id === 0) {
+        $configured = data_get($settings, 'public_ipv4')
+            ?: data_get($settings, 'public_ipv6')
+            ?: $server->ip;
+    } else {
+        $configured = $server->ip;
+    }
+
+    $resolved = resolveServerIpAddress(is_string($configured) ? $configured : null);
+
+    // Prefer resolved IP; fall back to configured value so existing hostname-based
+    // comparisons still have something to show if DNS resolution fails.
+    return $resolved['ip'] ?? $resolved['configured'];
+}
+
+/**
+ * DNS record type users should create for a server address: A (IPv4) or AAAA (IPv6).
+ */
+function dnsRecordTypeForIp(?string $ipOrHost): string
+{
+    if (! is_string($ipOrHost) || trim($ipOrHost) === '') {
+        return 'A';
+    }
+
+    // Accept labels like "2001:db8::1 (hostname)" or bracketed IPv6.
+    $candidate = trim($ipOrHost);
+    if (preg_match('/^(\S+)/', $candidate, $matches) === 1) {
+        $candidate = $matches[1];
+    }
+    $candidate = str($candidate)->trim('[]')->toString();
+
+    if (filter_var($candidate, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+        return 'AAAA';
+    }
+
+    return 'A';
+}
+
+/**
+ * Bare address for DNS guidance (first token of a label, brackets stripped).
+ */
+function dnsGuidanceTargetAddress(?string $ipOrLabel): ?string
+{
+    if (! is_string($ipOrLabel) || trim($ipOrLabel) === '') {
+        return null;
+    }
+
+    $candidate = trim($ipOrLabel);
+    if (preg_match('/^(\S+)/', $candidate, $matches) === 1) {
+        $candidate = $matches[1];
+    }
+    $candidate = str($candidate)->trim('[]')->toString();
+
+    return $candidate !== '' ? $candidate : null;
+}
+
+/**
+ * User-facing guidance when a hostname does not resolve to the server.
+ * Format: "A record → 1.2.3.4" or "AAAA record → 2001:db8::1".
+ *
+ * @param  ?string  $targetLabel  Display target (IP, or "IP (hostname)") used as fallback.
+ * @param  ?string  $ipForRecordType  Preferred IP for type + display (defaults to $targetLabel).
+ */
+function dnsMismatchGuidanceMessage(?string $targetLabel, ?string $ipForRecordType = null): string
+{
+    $address = dnsGuidanceTargetAddress($ipForRecordType)
+        ?? dnsGuidanceTargetAddress($targetLabel);
+
+    if ($address === null) {
+        return 'DNS validation failed. Check your DNS records.';
+    }
+
+    $recordType = dnsRecordTypeForIp($address);
+
+    return "{$recordType} record → {$address}";
+}
+
 function validateDNSEntry(string $fqdn, Server $server)
 {
-    // https://www.cloudflare.com/ips-v4/#
-    $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
-
     $url = Url::fromString($fqdn);
     $host = $url->getHost();
     if (str($host)->contains('sslip.io')) {
@@ -1832,13 +2009,9 @@ function validateDNSEntry(string $fqdn, Server $server)
     }
     $dns_servers = data_get($settings, 'custom_dns_servers');
     $dns_servers = str($dns_servers)->explode(',');
-    if ($server->id === 0) {
-        $ip = data_get($settings, 'public_ipv4', data_get($settings, 'public_ipv6', $server->ip));
-    } else {
-        $ip = $server->ip;
-    }
+    $ip = serverDnsTargetIp($server);
     $found_matching_ip = false;
-    $type = DNSTypes::NAME_A;
+    $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
             $query = new DNSQuery($dns_server);
@@ -1847,11 +2020,11 @@ function validateDNSEntry(string $fqdn, Server $server)
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
-                        if (ipMatch($result->getData(), $cloudflare_ips->toArray(), $match)) {
+                        if (isCloudflareIp($result->getData())) {
                             $found_matching_ip = true;
                             break;
                         }
-                        if ($result->getData() === $ip) {
+                        if ($ip && $result->getData() === $ip) {
                             $found_matching_ip = true;
                             break;
                         }
@@ -1865,11 +2038,48 @@ function validateDNSEntry(string $fqdn, Server $server)
     return $found_matching_ip;
 }
 
+function isCloudflareIp(string $ip): bool
+{
+    // https://www.cloudflare.com/ips/
+    $cloudflareIps = [
+        '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+        '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13',
+        '172.64.0.0/13', '131.0.72.0/22', '2400:cb00::/32', '2606:4700::/32',
+        '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29',
+        '2c0f:f248::/32',
+    ];
+
+    return ipMatch($ip, $cloudflareIps);
+}
+
 function ipMatch($ip, $cidrs, &$match = null)
 {
     foreach ((array) $cidrs as $cidr) {
-        [$subnet, $mask] = explode('/', $cidr);
-        if (((ip2long($ip) & ($mask = ~((1 << (32 - $mask)) - 1))) == (ip2long($subnet) & $mask))) {
+        [$subnet, $prefixLength] = explode('/', $cidr);
+        $packedIp = inet_pton($ip);
+        $packedSubnet = inet_pton($subnet);
+
+        if ($packedIp === false || $packedSubnet === false || strlen($packedIp) !== strlen($packedSubnet)) {
+            continue;
+        }
+
+        $addressBits = strlen($packedIp) * 8;
+        $prefixLength = (int) $prefixLength;
+        if ($prefixLength < 0 || $prefixLength > $addressBits) {
+            continue;
+        }
+
+        $fullBytes = intdiv($prefixLength, 8);
+        $remainingBits = $prefixLength % 8;
+        $matches = substr($packedIp, 0, $fullBytes) === substr($packedSubnet, 0, $fullBytes);
+
+        if ($matches && $remainingBits > 0) {
+            $mask = (0xFF << (8 - $remainingBits)) & 0xFF;
+            $matches = (ord($packedIp[$fullBytes]) & $mask) === (ord($packedSubnet[$fullBytes]) & $mask);
+        }
+
+        if ($matches) {
             $match = $cidr;
 
             return true;
@@ -2774,6 +2984,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (! $isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
                         $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
+                        $redirectDirection = in_array(data_get($savedService, 'redirect'), ['www', 'non-www', 'both'], true)
+                            ? data_get($savedService, 'redirect')
+                            : 'both';
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -2785,7 +2998,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
-                                        image: data_get($service, 'image')
+                                        image: data_get($service, 'image'),
+                                        redirect_direction: $redirectDirection
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -2798,7 +3012,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
-                                        image: data_get($service, 'image')
+                                        image: data_get($service, 'image'),
+                                        redirect_direction: $redirectDirection
                                     ));
                                     break;
                             }
@@ -2811,7 +3026,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
-                                image: data_get($service, 'image')
+                                image: data_get($service, 'image'),
+                                redirect_direction: $redirectDirection
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -2822,7 +3038,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
-                                image: data_get($service, 'image')
+                                image: data_get($service, 'image'),
+                                redirect_direction: $redirectDirection
                             ));
                         }
                     }
@@ -3548,6 +3765,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                         }
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
+                        $composeRedirect = data_get($domains, "$serviceName.redirect");
+                        $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
+                            ? $composeRedirect
+                            : 'both';
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3561,6 +3782,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            redirect_direction: $redirectDirection,
                                         )
                                     );
                                     break;
@@ -3575,6 +3797,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            redirect_direction: $redirectDirection,
                                         )
                                     );
                                     break;
@@ -3590,6 +3813,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    redirect_direction: $redirectDirection,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
@@ -3602,6 +3826,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    redirect_direction: $redirectDirection,
                                 )
                             );
                         }

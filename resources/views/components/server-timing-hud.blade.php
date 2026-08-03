@@ -1,5 +1,5 @@
 {{-- Dev-only Server-Timing HUD. Injected by AddServerTimingHeaders on full HTML responses.
-     JS docks into #server-timing-hud-slot in the main top bar when present; otherwise floats bottom-left. --}}
+     JS docks into #server-timing-hud-slot in the desktop top bar (lg+); otherwise floats bottom-left. --}}
 <div id="server-timing-hud" data-server-timing-hud data-metrics='@json($metrics)' data-path="{{ $path }}"
     data-sth-mode="float"
     style="position:fixed;bottom:12px;left:12px;z-index:2147483000;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:#e5e5e5;pointer-events:auto">
@@ -52,16 +52,13 @@
 
     function pickSlot() {
         const desktop = document.getElementById('server-timing-hud-slot');
-        const mobile = document.getElementById('server-timing-hud-slot-mobile');
-        // Match Tailwind `lg` (1024px): desktop fixed header vs mobile sticky bar.
+        // Match Tailwind `lg` (1024px): only dock into the desktop top bar.
+        // On mobile the header is cramped — float bottom-left instead of docking.
         const isLg = window.matchMedia('(min-width: 1024px)').matches;
         if (isLg && desktop) {
             return desktop;
         }
-        if (!isLg && mobile) {
-            return mobile;
-        }
-        return desktop || mobile || null;
+        return null;
     }
 
     function applyDockedStyles(root) {

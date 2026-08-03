@@ -12,7 +12,7 @@ it('renders the dashed empty-state card with title description and icon', functi
         ->assertSee('min-h-80', false);
 });
 
-it('keeps inset margin for empty states rendered inside flush settings sections', function () {
+it('renders empty states flush with no outer inset inside settings sections', function () {
     $html = $this->blade(
         <<<'BLADE'
         <x-application.settings-section title="Scheduled tasks" flush>
@@ -31,9 +31,9 @@ it('keeps inset margin for empty states rendered inside flush settings sections'
 
     expect($css)
         ->toContain('.application-settings-section-body.is-flush .empty-state')
-        ->toContain('margin: 1rem')
-        // w-full + horizontal margin would overflow the parent card on the right
-        ->toContain('width: auto');
+        ->toContain('.application-settings-section-body:has(> .empty-state:only-child)')
+        ->toContain('.application-settings-section > .empty-state')
+        ->toMatch('/\.application-settings-section-body\.is-flush \.empty-state[\s\S]*?margin:\s*0/');
 });
 
 it('renders compact size without the full-page min height class', function () {

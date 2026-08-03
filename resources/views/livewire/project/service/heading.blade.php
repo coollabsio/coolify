@@ -5,6 +5,7 @@
                 'label' => 'Settings',
                 'route' => 'project.service.configuration',
                 'active' => request()->routeIs('project.service.configuration')
+                    || request()->routeIs('project.service.domains')
                     || request()->routeIs('project.service.environment-variables')
                     || request()->routeIs('project.service.storages')
                     || request()->routeIs('project.service.scheduled-tasks*')

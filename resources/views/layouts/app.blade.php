@@ -33,8 +33,9 @@
                     :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
                     <div class="flex shrink-0 items-baseline gap-1.5 min-w-0">
                         <a href="/" {{ wireNavigate() }} title="Coolify"
-                            class="hover:opacity-80 transition-opacity">
-                            <span x-show="collapsed" x-cloak class="text-[15px] font-semibold tracking-tight text-black dark:text-white">C</span>
+                            class="flex items-center hover:opacity-80 transition-opacity">
+                            <img x-show="collapsed" x-cloak src="/coolify-logo.svg" alt="Coolify"
+                                class="size-5" />
                             <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Coolify</span>
                         </a>
                         <x-version x-show="!collapsed"
@@ -101,8 +102,6 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-1">
-                    {{-- Prefer desktop slot; mobile uses this when desktop header is hidden --}}
-                    <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot class="hidden shrink-0 items-center lg:hidden"></div>
                     <x-top-user-menu />
                     <button type="button" class="-m-1 p-2 text-neutral-500 dark:text-fg-dim" x-on:click="open = !open">
                         <span class="sr-only">Open sidebar</span>

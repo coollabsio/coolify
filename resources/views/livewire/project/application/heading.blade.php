@@ -38,6 +38,11 @@
                 'active' => $routeIs('project.application.configuration'),
             ],
             [
+                'label' => 'Domains',
+                'route' => 'project.application.domains',
+                'active' => $routeIs('project.application.domains'),
+            ],
+            [
                 'label' => 'Advanced',
                 'route' => 'project.application.advanced',
                 'active' => $routeIs('project.application.advanced'),

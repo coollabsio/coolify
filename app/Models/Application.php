@@ -181,6 +181,7 @@ class Application extends BaseModel
         'docker_compose',
         'docker_compose_raw',
         'docker_compose_domains',
+        'domain_dns_statuses',
         'docker_compose_custom_start_command',
         'docker_compose_custom_build_command',
         'swarm_replicas',
@@ -233,6 +234,7 @@ class Application extends BaseModel
         'docker_compose',
         'docker_compose_raw',
         'custom_labels',
+        'domain_dns_statuses',
     ];
 
     protected function casts(): array
@@ -243,6 +245,7 @@ class Application extends BaseModel
             'manual_webhook_secret_gitlab' => 'encrypted',
             'manual_webhook_secret_bitbucket' => 'encrypted',
             'manual_webhook_secret_gitea' => 'encrypted',
+            'domain_dns_statuses' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'last_restart_at' => 'datetime',

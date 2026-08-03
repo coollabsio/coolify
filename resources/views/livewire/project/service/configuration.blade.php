@@ -14,6 +14,7 @@
 
         $configurationItems = collect([
             ['label' => 'General', 'route' => 'project.service.configuration', 'icon' => 'settings'],
+            ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
             ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables'],
             ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
@@ -29,7 +30,7 @@
         ]);
 
         $menuGroups = [
-            'Settings' => ['General', 'Environment Variables', 'Persistent Storage'],
+            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
             'Automation' => ['Scheduled Tasks', 'Webhooks'],
             'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
         ];
@@ -105,6 +106,8 @@
                             @endforeach
                         </div>
                     </div>
+                @elseif ($currentRoute === 'project.service.domains')
+                    <livewire:project.service.domains :service="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$service" />
                 @elseif ($currentRoute === 'project.service.storages')

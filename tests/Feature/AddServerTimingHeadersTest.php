@@ -91,13 +91,23 @@ test('injects on-screen HUD into full HTML documents when server_timing is enabl
         ->not->toContain('</SCRIPT>');
 });
 
-test('app shell exposes Server-Timing HUD dock slots in the main top bars', function () {
+test('app shell exposes Server-Timing HUD dock slot in the desktop top bar only', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
     expect($layout)
         ->toContain('id="server-timing-hud-slot"')
-        ->toContain('id="server-timing-hud-slot-mobile"')
-        ->toContain('data-server-timing-hud-slot');
+        ->toContain('data-server-timing-hud-slot')
+        ->not->toContain('id="server-timing-hud-slot-mobile"');
+});
+
+test('Server-Timing HUD docks on desktop only and floats on smaller viewports', function () {
+    $hud = file_get_contents(resource_path('views/components/server-timing-hud.blade.php'));
+
+    expect($hud)
+        ->toContain('server-timing-hud-slot')
+        ->toContain("matchMedia('(min-width: 1024px)')")
+        ->toContain('float bottom-left instead of docking')
+        ->not->toContain('server-timing-hud-slot-mobile');
 });
 
 test('does not inject HUD into non-HTML or fragment responses', function () {
