@@ -111,11 +111,20 @@ class SafeWebhookUrl implements ValidationRule
             return $options;
         }
 
+        // libcurl keeps only the last CURLOPT_RESOLVE entry for a given
+        // host:port pair, so every resolved address must be pinned in a single
+        // comma-separated entry. Emitting one entry per address silently drops
+        // all but the last, which is an IPv6 address whenever the host has AAAA
+        // records -- and that fails instantly on hosts without IPv6 egress.
+        $addresses = implode(',', array_map(
+            fn (string $ip): string => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.$ip.']' : $ip,
+            $target['ips'],
+        ));
+
         $options['curl'] = [
-            CURLOPT_RESOLVE => array_map(
-                fn (string $ip): string => sprintf('%s:%d:%s', $target['host'], $target['port'], filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.$ip.']' : $ip),
-                $target['ips'],
-            ),
+            CURLOPT_RESOLVE => [
+                sprintf('%s:%d:%s', $target['host'], $target['port'], $addresses),
+            ],
         ];
 
         return $options;
@@ -134,10 +143,17 @@ class SafeWebhookUrl implements ValidationRule
             return [];
         }
 
-        return array_map(
-            fn (string $ip): string => sprintf('%s:%d=%s', $target['host'], $target['port'], filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.$ip.']' : $ip),
+        // The MinIO client keeps one --resolve IP per host and parses it with Go's
+        // netip.ParseAddr, which rejects bracketed IPv6. Emit a single entry, preferring
+        // IPv4 for reachability, without brackets.
+        $preferredIps = array_values(array_filter(
             $target['ips'],
-        );
+            fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false,
+        ));
+
+        $ip = $preferredIps[0] ?? $target['ips'][0];
+
+        return [sprintf('%s:%d=%s', $target['host'], $target['port'], $ip)];
     }
 
     public static function redactedUrlForLog(string $url): string
