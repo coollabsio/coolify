@@ -58,18 +58,24 @@ it('places mobile status badges on a separate row below the server title', funct
     $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
 
     $mobileTitleBlock = str($navbar)
-        ->after('class="w-full md:hidden"')
+        ->after('data-testid="server-subtitle"')
         ->before('id="server-mobile-actions"')
         ->toString();
 
-    expect($mobileTitleBlock)
-        ->toContain('flex min-w-0 flex-col gap-2')
-        ->toContain('data-testid="server-subtitle"')
-        ->toContain('flex min-w-0 flex-wrap items-center gap-2')
-        ->not->toContain('flex min-w-0 flex-wrap items-center gap-2">'."\n".'                <h1');
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
 
-    $titlePos = strpos($mobileTitleBlock, 'data-testid="server-subtitle"');
-    $badgesRowPos = strpos($mobileTitleBlock, 'flex min-w-0 flex-wrap items-center gap-2');
+    expect($navbar)
+        ->toContain('mb-3 w-full lg:hidden')
+        ->toContain('data-testid="server-subtitle"')
+        ->toContain('flex min-w-0 flex-col gap-2');
+
+    $titleBlock = str($navbar)
+        ->after('mb-3 w-full lg:hidden')
+        ->before('Phone-only actions')
+        ->toString();
+
+    $titlePos = strpos($titleBlock, 'data-testid="server-subtitle"');
+    $badgesRowPos = strpos($titleBlock, 'flex min-w-0 flex-wrap items-center gap-2');
 
     expect($titlePos)->not->toBeFalse()
         ->and($badgesRowPos)->not->toBeFalse()

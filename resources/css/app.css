@@ -1247,6 +1247,11 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
 
+/* Shared variables only store value shape (multiline), not per-resource flags. */
+.env-table-grid-shared {
+    grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4.5rem 3rem;
+}
+
 .backup-table-grid {
     grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(8rem, 1fr) 5rem 1.5rem;
 }

@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-dashboard.navbar section="shared-variables" title="Shared variables"
-        subtitle="Project-wide variables for every environment in a project" />
+        subtitle="Project-wide variables for every environment in a project" :titleOnDesktop="false" />
 
     <div class="w-full">
     @if ($projects->isEmpty())

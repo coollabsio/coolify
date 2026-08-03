@@ -4,6 +4,7 @@ it('places the terminal helper beside the page title instead of under the subtit
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 
     expect($view)
+        ->toContain('terminal-page-header shrink-0')
         ->toContain('<div class="flex items-center gap-2">')
         ->toContain('<h1 class="text-[24px]! leading-7! font-semibold! tracking-tight!">Terminal</h1>')
         ->toContain('<x-helper')

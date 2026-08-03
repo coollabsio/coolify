@@ -10,7 +10,7 @@
     @endphp
 
     <x-dashboard.navbar section="destination" :parameters="['destination_uuid' => $destination->uuid]"
-        :title="$name" :subtitle="$destinationSubtitle" />
+        :title="$name" :subtitle="$destinationSubtitle" :titleOnDesktop="true" />
 
     <form wire:submit="submit" class="application-settings-form">
         <x-unsaved-bar action="submit" />

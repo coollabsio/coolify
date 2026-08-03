@@ -3,8 +3,7 @@
     'subtitle' => 'Instance configuration and maintenance',
 ])
 
-{{-- Same 1180px shell as the workspace. Title is mobile-only: desktop already
-     has Settings in the topbar, layer-2 tabs, and the grouped sidebar. --}}
+{{-- Same 1180px shell as the workspace. Title hidden only at xl+ (full desktop). --}}
 <div class="mx-auto w-full max-w-[1180px]">
     <x-dashboard.navbar section="settings" :title="$title" :subtitle="$subtitle" :titleOnDesktop="false">
         @isset($titleActions)

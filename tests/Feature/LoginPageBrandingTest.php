@@ -1,0 +1,22 @@
+<?php
+
+/**
+ * Auth shell headers should brand the product so users know they are on Coolify.
+ */
+test('login register and forgot password headers are Coolify', function () {
+    $login = file_get_contents(resource_path('views/auth/login.blade.php'));
+    $register = file_get_contents(resource_path('views/auth/register.blade.php'));
+    $forgot = file_get_contents(resource_path('views/auth/forgot-password.blade.php'));
+
+    expect($login)
+        ->toContain('title="Coolify"')
+        ->not->toContain('title="Welcome back"');
+
+    expect($register)
+        ->toContain('title="Coolify"')
+        ->not->toContain(":title=\"\$isFirstUser ? 'Create the root account' : 'Create your account'\"");
+
+    expect($forgot)
+        ->toContain('title="Coolify"')
+        ->not->toContain("title=\"{{ __('auth.forgot_password_heading') }}\"");
+});

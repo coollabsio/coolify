@@ -4,7 +4,7 @@
     </x-slot>
 
     <div class="application-settings-form w-full">
-        <header class="mb-5 flex items-start justify-between gap-4">
+        <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
                 <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Sources</h1>
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
@@ -12,7 +12,7 @@
                 </p>
             </div>
             @can('createAnyResource')
-                <div x-data="{ dropdownOpen: false }" class="relative shrink-0"
+                <div x-data="{ dropdownOpen: false }" class="relative w-fit shrink-0"
                     @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
                     <button type="button" @click="dropdownOpen = !dropdownOpen"
                         class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"

@@ -1,5 +1,5 @@
 <x-layout-simple>
-    <x-auth.shell title="Welcome back" description="Sign in to manage your applications and infrastructure.">
+    <x-auth.shell title="Coolify" description="Sign in to manage your applications and infrastructure.">
         <div class="flex flex-col gap-4">
             @if (session('status'))
                 <x-auth.alert type="success">{{ session('status') }}</x-auth.alert>

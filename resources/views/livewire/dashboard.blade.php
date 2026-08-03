@@ -136,12 +136,35 @@
             </div>
 
             @if ($dashboardServers->isEmpty())
-                <x-empty
-                    :title="$privateKeys->isEmpty() ? 'A private key is required' : 'No servers yet'"
-                    :description="$privateKeys->isEmpty()
-                        ? 'Use New to add a private key before connecting your first server.'
-                        : 'Use New to connect infrastructure for your deployments.'"
-                    icon-name="servers" size="sm" />
+                @if ($privateKeys->isEmpty())
+                    <x-empty title="A private key is required"
+                        description="Add an SSH private key before connecting your first server."
+                        icon-name="keys" size="sm">
+                        @can('create', App\Models\PrivateKey::class)
+                            <x-slot:contents>
+                                <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}
+                                    class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                    <x-reicon name="plus" class="size-3.5" />
+                                    Add private key
+                                </a>
+                            </x-slot:contents>
+                        @endcan
+                    </x-empty>
+                @else
+                    <x-empty title="No servers yet"
+                        description="Connect infrastructure for your deployments."
+                        icon-name="servers" size="sm">
+                        @can('createAnyResource')
+                            <x-slot:contents>
+                                <a href="{{ route('server.create') }}" {{ wireNavigate() }}
+                                    class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                    <x-reicon name="plus" class="size-3.5" />
+                                    New server
+                                </a>
+                            </x-slot:contents>
+                        @endcan
+                    </x-empty>
+                @endif
             @else
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($dashboardServers as $server)

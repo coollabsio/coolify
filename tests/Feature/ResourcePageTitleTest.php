@@ -43,7 +43,7 @@ it('renders the source name as a large page title before the navbar', function (
 
     $response->assertSuccessful();
     $response->assertSee('text-[24px]! leading-7! font-semibold! tracking-tight!', false);
-    $response->assertSee('order-1 mb-4 flex items-start justify-between gap-4 lg:order-2', false);
+    $response->assertSee('order-1 mb-4 flex min-w-0 items-start justify-between gap-4 lg:order-2', false);
     $response->assertSee('order-2 lg:order-1', false);
     $response->assertSee('coolify-laravel-dev-public');
     $response->assertSee('GitHub App for coollabsio');
@@ -61,7 +61,7 @@ it('renders family page titles before tabs for team notifications and keys', fun
     $team->assertSee('Team');
     $team->assertSee('Members, roles, and team settings');
     $team->assertSee('New team');
-    // Desktop hides the H1; mobile keeps it (lg:hidden on the header).
+    // Desktop shell (lg+) hides the family H1; mobile topbar layout keeps it.
     expect($team->getContent())->toContain('lg:hidden');
 
     $this->get(route('notifications.email'))
@@ -136,17 +136,16 @@ it('uses the same page title size on application database service and server hea
 });
 
 it('keeps new-action buttons on the same row as page titles or in layer-2 nav', function () {
-    $serversPattern = 'flex items-center justify-between gap-4';
-    $titleRowPattern = 'flex items-start justify-between gap-4';
+    $stackPattern = 'flex-col gap-3 sm:flex-row';
 
     expect(file_get_contents(resource_path('views/livewire/server/index.blade.php')))
-        ->toContain($serversPattern);
+        ->toContain($stackPattern);
     expect(file_get_contents(resource_path('views/source/all.blade.php')))
-        ->toContain($titleRowPattern);
+        ->toContain($stackPattern);
     expect(file_get_contents(resource_path('views/livewire/destination/index.blade.php')))
-        ->toContain($titleRowPattern);
+        ->toContain($stackPattern);
     expect(file_get_contents(resource_path('views/livewire/storage/index.blade.php')))
-        ->toContain($titleRowPattern);
+        ->toContain($stackPattern);
     expect(file_get_contents(resource_path('views/components/dashboard/navbar.blade.php')))
         ->toContain('titleActions');
     // Family pages put primary actions next to layer-2 tabs, not beside a desktop H1.

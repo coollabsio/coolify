@@ -30,12 +30,12 @@ test('settings navbar and workspace share the same max width shell', function ()
     }
 });
 
-test('settings page title is mobile-only on desktop the nav already provides context', function () {
+test('dashboard navbar hides family titles at lg by default', function () {
     $dashboardNavbar = file_get_contents(resource_path('views/components/dashboard/navbar.blade.php'));
     $settingsNavbar = file_get_contents(resource_path('views/components/settings/navbar.blade.php'));
 
     expect($dashboardNavbar)
-        ->toContain("'titleOnDesktop' => true")
+        ->toContain("'titleOnDesktop' => false")
         ->toContain("'lg:hidden' => ! \$titleOnDesktop");
 
     expect($settingsNavbar)

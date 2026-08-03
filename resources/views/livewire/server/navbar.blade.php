@@ -1,4 +1,4 @@
-<nav class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav class="w-full max-w-[1180px] pb-3 lg:pb-0">
     <x-slide-over @startproxy.window="slideOverOpen = true" fullScreen closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>
@@ -158,8 +158,10 @@
     @endteleport
 
     <div>
-        <div class="w-full md:hidden">
-            <div class="mb-3 flex min-w-0 flex-col gap-2">
+        {{-- Name lives in the desktop topbar (teleport) from lg up. Below that the
+             mobile topbar has no resource context, so show the H1 through lg. --}}
+        <div class="mb-3 w-full lg:hidden">
+            <div class="flex min-w-0 flex-col gap-2">
                 <h1 data-testid="server-subtitle"
                     class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $server->name }}
@@ -187,7 +189,10 @@
                     </div>
                 @endif
             </div>
+        </div>
 
+        {{-- Phone-only actions + primary tabs. From md the desktop tab row is used. --}}
+        <div class="w-full md:hidden">
             @if ($server->proxySet())
                 @can('manageProxy', $server)
                     <div id="server-mobile-actions" class="relative mb-3"
@@ -359,7 +364,7 @@
                 @endcan
             @endif
         </div>
-        <div class="hidden lg:block lg:h-10" aria-hidden="true"></div>
+        <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>
     </div>
 
     @script

@@ -52,6 +52,6 @@
         @endcan
     </div>
 
-    <div class="hidden lg:block lg:h-10" aria-hidden="true"></div>
+    <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>
 </nav>
 @endif

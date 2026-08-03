@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-dashboard.navbar section="shared-variables" title="Shared variables"
-        subtitle="Server-wide variables available to resources on a server" />
+        subtitle="Server-wide variables available to resources on a server" :titleOnDesktop="false" />
 
     <div class="w-full">
     @if ($servers->isEmpty())

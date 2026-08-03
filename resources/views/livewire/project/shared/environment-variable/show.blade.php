@@ -12,7 +12,7 @@
     @if ($isSharedVariable) :style="`order: ${sharedSort === 'alphabetical' ? {{ $tableAlphabeticalOrder }} : {{ $tableCreationOrder }}}`" @endif
     x-show="(typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $rowScope }}')
         && (typeof sharedSearch === 'undefined' || @js(mb_strtolower($env->key . ' ' . ($comment ?? '') . ' ' . $rowScopeLabel)).includes(sharedSearch.trim().toLowerCase()))">
-    <div class="data-table-row env-table-grid">
+    <div class="data-table-row {{ $isSharedVariable ? 'env-table-grid-shared' : 'env-table-grid' }}">
         <div class="flex min-w-0 items-center gap-2">
             @if ($isLocked)
                 <svg class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
@@ -40,8 +40,8 @@
             @if ($comment) title="{{ $comment }}" @endif>
             {{ $comment ?: '-' }}
         </div>
-        @foreach ([$is_literal, $is_multiline, $is_buildtime && !$isSharedVariable && !$is_redis_credential, $is_runtime && !$isSharedVariable && !$is_redis_credential] as $flag)
-            @if ($flag)
+        @if ($isSharedVariable)
+            @if ($is_multiline)
                 <span class="data-table-cell-check">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
                         stroke="currentColor" class="size-4">
@@ -51,7 +51,20 @@
             @else
                 <span class="data-table-cell-dash">-</span>
             @endif
-        @endforeach
+        @else
+            @foreach ([$is_literal, $is_multiline, $is_buildtime && !$is_redis_credential, $is_runtime && !$is_redis_credential] as $flag)
+                @if ($flag)
+                    <span class="data-table-cell-check">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                            stroke="currentColor" class="size-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                    </span>
+                @else
+                    <span class="data-table-cell-dash">-</span>
+                @endif
+            @endforeach
+        @endif
         <div class="justify-self-end">
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false">
                 <x-slot:content>

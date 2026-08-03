@@ -1,7 +1,7 @@
 @props([
     'title' => 'Notifications',
     'subtitle' => 'Delivery channels for team events',
-    // Topbar + channel tabs already identify the page on desktop.
+    // Topbar + channel tabs identify the page at xl+; keep the H1 on tablet.
     'titleOnDesktop' => false,
 ])
 

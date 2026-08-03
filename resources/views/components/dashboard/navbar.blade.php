@@ -3,9 +3,10 @@
     'parameters' => [],
     'title' => null,
     'subtitle' => null,
-    // When false, the in-flow H1/subtitle are mobile-only. Use for families
-    // whose identity already lives in the topbar + layer-2 tabs (e.g. Settings).
-    'titleOnDesktop' => true,
+    // When false (default), hide the in-flow H1 once the desktop shell is active
+    // (lg+: main sidebar + fixed layer-2 tabs). Below lg the mobile topbar is used
+    // and the page title stays visible. Pass true for resource-detail names.
+    'titleOnDesktop' => false,
 ])
 
 @php
@@ -93,11 +94,12 @@
 @if ($hasTitle)
     <div class="flex flex-col">
         <header @class([
-            'order-1 mb-4 flex items-start justify-between gap-4 lg:order-2',
+            'order-1 mb-4 flex min-w-0 items-start justify-between gap-4 lg:order-2',
             'lg:mb-8' => $titleOnDesktop,
+            // Hide with the desktop chrome (sidebar + fixed tabs), not xl.
             'lg:hidden' => ! $titleOnDesktop,
         ])>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
                 <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $title }}</h1>
                 @if (filled($subtitle))
                     <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">{{ $subtitle }}</p>
@@ -144,7 +146,7 @@
         </div>
     </div>
 
-    <div class="hidden lg:block lg:h-10" aria-hidden="true"></div>
+    <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>
 </nav>
 
 @if ($hasTitle)

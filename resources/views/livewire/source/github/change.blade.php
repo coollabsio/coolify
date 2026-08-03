@@ -6,7 +6,8 @@
     @if (data_get($github_app, 'app_id'))
         <x-dashboard.navbar section="source" :parameters="['github_app_uuid' => $github_app->uuid]"
             :title="$name ?: 'GitHub App'"
-            :subtitle="filled($organization) ? 'GitHub App for '.$organization : 'Private GitHub source'">
+            :subtitle="filled($organization) ? 'GitHub App for '.$organization : 'Private GitHub source'"
+            :titleOnDesktop="true">
             <x-slot:actions>
                 @if (data_get($github_app, 'installation_id'))
                     <x-status-badge label="Connected" type="success" />

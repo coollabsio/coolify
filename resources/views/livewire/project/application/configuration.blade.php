@@ -205,7 +205,7 @@
         ];
     @endphp
 
-    <section class="application-settings-workspace mt-0 w-full max-w-[1180px] md:mt-8 xl:mt-0">
+    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
             <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
                 <nav aria-label="Configuration sections"

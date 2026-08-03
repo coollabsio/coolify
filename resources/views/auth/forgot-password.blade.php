@@ -1,5 +1,5 @@
 <x-layout-simple>
-    <x-auth.shell title="{{ __('auth.forgot_password_heading') }}"
+    <x-auth.shell title="Coolify"
         description="Enter your account email and we’ll send you a secure reset link.">
         <div class="flex flex-col gap-4">
             @if (session('status'))

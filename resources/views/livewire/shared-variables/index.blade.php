@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-dashboard.navbar section="shared-variables" title="Shared variables"
-        subtitle="Reusable environment variables across resources" />
+        subtitle="Reusable environment variables across resources" :titleOnDesktop="false" />
 
     <div class="w-full">
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

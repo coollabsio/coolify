@@ -1,7 +1,7 @@
 @props([
     'title' => 'Keys & Tokens',
     'subtitle' => 'SSH keys, cloud tokens, and API access',
-    // Family index/list views hide the H1 on desktop (topbar + tabs cover context).
+    // Family index/list views hide the H1 only at xl+ (topbar + tabs cover context).
     // Detail views pass true so the resource name stays visible.
     'titleOnDesktop' => false,
 ])

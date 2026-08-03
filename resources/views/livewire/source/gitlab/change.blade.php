@@ -16,7 +16,7 @@
                     {{ filled($groupName) ? 'GitLab App for '.$groupName : 'Private GitLab source' }}
                 </p>
             </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2">
+            <div class="flex shrink-0 flex-wrap items-center gap-2 sm:ml-auto">
                 @can('view', $gitlab_app)
                     <x-forms.button type="button" wire:click.prevent="testConnection">
                         Test connection
@@ -173,7 +173,7 @@
                 </p>
             </div>
             @can('delete', $gitlab_app)
-                <div class="shrink-0">
+                <div class="shrink-0 sm:ml-auto">
                     <x-modal-confirmation title="Confirm GitLab App Deletion?" isErrorButton buttonTitle="Delete"
                         submitAction="delete" :actions="['The selected GitLab App will be permanently deleted.']"
                         confirmationText="{{ data_get($gitlab_app, 'name') }}"

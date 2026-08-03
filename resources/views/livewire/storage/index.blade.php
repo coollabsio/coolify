@@ -3,7 +3,7 @@
         Storages | Coolify
     </x-slot>
 
-    <header class="mb-5 flex items-start justify-between gap-4">
+    <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div class="min-w-0">
             <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">S3 Storage</h1>
             <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
@@ -11,7 +11,7 @@
             </p>
         </div>
         @can('create', App\Models\S3Storage::class)
-            <div class="shrink-0">
+            <div class="w-fit shrink-0">
                 <x-modal-input title="New S3 Storage" :closeOutside="false">
                     <x-slot:content>
                         <button type="button"

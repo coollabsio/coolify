@@ -1,7 +1,7 @@
 @props([
     'title' => 'Team',
     'subtitle' => 'Members, roles, and team settings',
-    // Topbar + tabs already identify the page; keep create in the layer-2 bar.
+    // Hide family H1 only at xl+; keep create in the layer-2 bar.
     'titleOnDesktop' => false,
 ])
 

@@ -30,16 +30,17 @@
     }
 }">
     <x-dashboard.navbar section="shared-variables" title="Shared variables"
-        subtitle="Reusable environment variables across resources" />
-
-    <x-application.settings-section :title="$title" flush>
+        subtitle="Reusable environment variables across resources" :titleOnDesktop="false">
         <x-slot:actions>
-            <x-forms.button type="button" wire:click="switch">
+            <x-forms.button type="button" wire:click="switch" class="whitespace-nowrap">
                 <x-reicon :name="$view === 'normal' ? 'browser-code' : 'unordered-list'" class="size-3.5" />
-                {{ $view === 'normal' ? 'Developer view' : 'Normal view' }}
+                <span class="max-sm:hidden">{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</span>
+                <span class="sm:hidden">{{ $view === 'normal' ? 'Developer' : 'Normal' }}</span>
             </x-forms.button>
         </x-slot:actions>
+    </x-dashboard.navbar>
 
+    <x-application.settings-section :title="$title" flush>
         @if ($view === 'normal')
             <div
                 class="flex flex-col gap-3 border-b border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.08]">
@@ -105,14 +106,11 @@
                     icon-name="variables" size="sm" />
             @else
                 <div class="data-table flex w-full flex-col">
-                    <div class="data-table-header env-table-grid order-[-1]">
+                    <div class="data-table-header env-table-grid-shared order-[-1]">
                         <span>Name</span>
                         <span>Scope</span>
                         <span>Comment</span>
-                        <span class="text-center">Literal</span>
                         <span class="text-center">Multiline</span>
-                        <span class="text-center">Buildtime</span>
-                        <span class="text-center">Runtime</span>
                         <span></span>
                     </div>
                     @foreach ($variables as $env)

@@ -4,10 +4,10 @@
     </x-slot>
 
     <div x-data="projectsIndex()" class="w-full">
-        <header class="mb-5 flex items-center justify-between gap-4">
+        <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Projects</h1>
             @can('createAnyResource')
-                <div class="shrink-0">
+                <div class="w-fit shrink-0">
                     <x-modal-input title="New Project">
                         <x-slot:content>
                             <button type="button"

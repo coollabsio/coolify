@@ -245,10 +245,16 @@ The shared workspace grid is:
 ```
 
 Instance Settings constrains both `x-settings.navbar` and the workspace to the
-same `max-w-[1180px]` shell. The in-flow H1/subtitle is **mobile-only**
-(`titleOnDesktop="false"`): on desktop the topbar already says Settings, the
-layer-2 tabs name the family, and the grouped sidebar covers the third level.
-Do not put the H1 beside the sidebar.
+same `max-w-[1180px]` shell.
+
+**Page titles (global):** family H1s (`x-dashboard.navbar` with
+`titleOnDesktop="false"`, the default) hide at **lg+**, the same breakpoint as
+the desktop shell (main sidebar + fixed layer-2 tabs). Below `lg` the mobile
+topbar is used and the page title stays visible. Collection indexes (Servers,
+Projects, …) always keep their H1; stack title above actions on narrow widths
+so they never overlap. Resource in-flow names only render below `md` (when the
+fixed resource tab bar is hidden). Fixed layer-2 spacers must be `lg:h-12` to
+match the bar height. Do not put the H1 beside the settings sidebar.
 
 Standard content stack:
 

@@ -3,7 +3,7 @@
         {{ data_get_str($environment, 'name')->limit(10) }} > Resources | Coolify
     </x-slot>
     <div x-data="resourceIndex()" class="w-full">
-        <header class="mb-5 flex items-start justify-between gap-4">
+        <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
                 <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $environment->name }}</h1>
                 <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
@@ -14,7 +14,7 @@
             @can('createAnyResource')
                 <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                     {{ wireNavigate() }}
-                    class="button shrink-0 bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                    class="button w-fit shrink-0 whitespace-nowrap bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
                     <x-reicon name="plus" class="size-3.5" />
                     New resource
                 </a>

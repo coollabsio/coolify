@@ -5,7 +5,8 @@
 
     <x-dashboard.navbar section="storage" :parameters="['storage_uuid' => $storage->uuid]"
         :title="$storage->name"
-        :subtitle="filled($storage->description) ? $storage->description : 'S3-compatible backup destination'">
+        :subtitle="filled($storage->description) ? $storage->description : 'S3-compatible backup destination'"
+        :titleOnDesktop="true">
         <x-slot:actions>
             <x-status-badge :status="$storage->is_usable ? 'Ready' : 'Not usable'"
                 :type="$storage->is_usable ? 'success' : 'error'" />
