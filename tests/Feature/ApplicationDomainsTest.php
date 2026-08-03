@@ -675,6 +675,43 @@ it('does not persist compose service redirect until Set Direction is called', fu
     expect(data_get($domains, 'web.redirect'))->toBe('both');
 });
 
+it('preserves per-service redirect when compose domains are updated through the api', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://old.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $plainTextToken = Str::random(40);
+    $token = $this->user->tokens()->create([
+        'name' => 'compose-domain-redirect-test',
+        'token' => hash('sha256', $plainTextToken),
+        'abilities' => ['*'],
+        'team_id' => $this->team->id,
+    ]);
+    auth()->logout();
+
+    $this->withToken($token->getKey().'|'.$plainTextToken)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_compose_domains' => [[
+                'name' => 'web',
+                'domain' => 'https://new.example.com',
+                'redirect' => 'www',
+            ]],
+        ])
+        ->assertOk();
+
+    $domains = json_decode($this->application->fresh()->docker_compose_domains, true);
+
+    expect($domains['web'])->toBe([
+        'domain' => 'https://new.example.com',
+        'redirect' => 'www',
+    ]);
+});
+
 it('sets redirect for compose services whose names contain dots', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',

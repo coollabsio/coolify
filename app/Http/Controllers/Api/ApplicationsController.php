@@ -3019,7 +3019,12 @@ class ApplicationsController extends Controller
             $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson) {
                 $name = data_get($domain, 'name');
                 if ($name && is_array($services) && isset($services[$name])) {
-                    $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = data_get($domain, 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put($name, $entry);
                 }
             });
             $request->offsetUnset('docker_compose_domains');
