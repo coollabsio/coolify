@@ -18,9 +18,10 @@
 <div x-data="{ modalOpen: false }"
     x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
-    class="relative w-auto h-auto" @close-modal.window="modalOpen=false" @if ($wireIgnore) wire:ignore @endif>
+    {{ $attributes->class(['relative', $isFullWidth ? 'h-full w-full' : 'h-auto w-auto']) }}
+    @close-modal.window="modalOpen=false" @if ($wireIgnore) wire:ignore @endif>
     @if ($content)
-        <div @click="modalOpen=true">
+        <div @click="modalOpen=true" @class(['h-full w-full' => $isFullWidth])>
             {{ $content }}
         </div>
     @else

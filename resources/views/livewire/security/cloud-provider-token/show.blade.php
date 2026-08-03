@@ -4,7 +4,8 @@
     </x-slot>
 
     <x-security.navbar :title="$cloudProviderToken->name"
-        :subtitle="filled($cloudProviderToken->description) ? $cloudProviderToken->description : 'Cloud provider API credential'">
+        :subtitle="filled($cloudProviderToken->description) ? $cloudProviderToken->description : 'Cloud provider API credential'"
+        :titleOnDesktop="true">
         <x-slot:actions>
             <x-forms.button type="button" wire:click="validateToken">
                 <x-reicon name="check-circle" class="size-3.5" />

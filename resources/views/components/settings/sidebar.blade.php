@@ -16,7 +16,7 @@
             'label' => 'Updates',
             'route' => 'settings.updates',
             'active' => $activeMenu === 'updates',
-            'icon' => 'dashboard',
+            'icon' => 'refresh3',
         ],
     ];
 @endphp

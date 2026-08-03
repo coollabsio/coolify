@@ -97,7 +97,7 @@
                             </div>
                             <div><x-status-badge status="Application" type="neutral" /></div>
                             <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
-                                {{ $application->description ?: '—' }}
+                                {{ $application->description ?: '-' }}
                             </div>
                         </div>
                     @endforeach
@@ -109,7 +109,7 @@
                             </div>
                             <div><x-status-badge status="Database" type="neutral" /></div>
                             <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
-                                {{ $database->description ?: '—' }}
+                                {{ $database->description ?: '-' }}
                             </div>
                         </div>
                     @endforeach
@@ -121,7 +121,7 @@
                             </div>
                             <div><x-status-badge status="Service" type="neutral" /></div>
                             <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
-                                {{ $service->description ?: '—' }}
+                                {{ $service->description ?: '-' }}
                             </div>
                         </div>
                     @endforeach

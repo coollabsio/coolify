@@ -12,12 +12,12 @@
             {{ $isPreview ? 'Preview' : 'Production' }}
         </div>
         <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim">
-            {{ $comment ?: ($value !== null && $value !== '' ? '—' : 'Inherited from host') }}
+            {{ $comment ?: ($value !== null && $value !== '' ? '-' : 'Inherited from host') }}
         </div>
-        <span class="data-table-cell-dash">—</span>
-        <span class="data-table-cell-dash">—</span>
-        <span class="data-table-cell-dash">—</span>
-        <span class="data-table-cell-dash">—</span>
+        <span class="data-table-cell-dash">-</span>
+        <span class="data-table-cell-dash">-</span>
+        <span class="data-table-cell-dash">-</span>
+        <span class="data-table-cell-dash">-</span>
         <div></div>
     </div>
 </div>

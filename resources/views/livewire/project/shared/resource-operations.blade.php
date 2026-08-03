@@ -66,7 +66,7 @@
                 $buildServers->map(
                     fn ($server) => [
                         'value' => "build-{$server->id}",
-                        'label' => "{$server->name} — build server",
+                        'label' => "{$server->name} (build server)",
                         'disabled' => true,
                     ],
                 )->values(),

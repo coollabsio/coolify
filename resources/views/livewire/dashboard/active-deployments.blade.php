@@ -62,16 +62,16 @@
                     </div>
 
                     <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
-                        {{ $environmentPath ?: '—' }}
+                        {{ $environmentPath ?: '-' }}
                     </p>
                     <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
-                        {{ $deployment->server_name ?: '—' }}
+                        {{ $deployment->server_name ?: '-' }}
                     </p>
                     <span class="hidden md:block">
                         <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
                     </span>
                     <p class="hidden truncate text-[12px] text-neutral-500 md:block dark:text-fg-dim">
-                        {{ $deployment->created_at?->diffForHumans() ?? '—' }}
+                        {{ $deployment->created_at?->diffForHumans() ?? '-' }}
                     </p>
                     <x-reicon name="arrow-right"
                         class="hidden size-3 text-neutral-400 transition-colors group-hover:text-black md:block dark:text-fg-faint dark:group-hover:text-fg" />
@@ -79,9 +79,9 @@
                     <div class="mt-3 flex min-w-0 items-center justify-between gap-3 md:hidden">
                         <x-status-badge :status="$deploymentStatus" :type="$deploymentStatusType" />
                         <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                            {{ $environmentPath ?: '—' }}
+                            {{ $environmentPath ?: '-' }}
                             <span class="px-1 text-neutral-300 dark:text-white/15">·</span>
-                            {{ $deployment->server_name ?: '—' }}
+                            {{ $deployment->server_name ?: '-' }}
                         </p>
                         <x-reicon name="arrow-right" class="size-3 shrink-0 text-neutral-400 dark:text-fg-faint" />
                     </div>

@@ -194,7 +194,7 @@
                                 'in_progress' => calculateDuration(data_get($deployment, 'created_at'), now()),
                                 default => data_get($deployment, 'finished_at')
                                     ? calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'finished_at'))
-                                    : '—',
+                                    : '-',
                             };
                             $commitMessage = $deployment->commitMessage()
                                 ? Str::before($deployment->commitMessage(), "\n")
@@ -218,7 +218,7 @@
                                         @endif
                                     </span>
                                 @else
-                                    <span class="text-neutral-400 dark:text-fg-faint">—</span>
+                                    <span class="text-neutral-400 dark:text-fg-faint">-</span>
                                 @endif
                             </span>
                             <span title="{{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}">
@@ -226,7 +226,7 @@
                             </span>
                             <span class="tabular-nums">{{ $duration }}</span>
                             <span class="truncate">
-                                {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '—') }}
+                                {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
                             </span>
                             <span class="flex justify-end text-neutral-400 dark:text-fg-faint">
                                 <x-reicon name="arrow-right" class="size-3.5" />

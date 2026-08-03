@@ -92,7 +92,7 @@
                                     ) }}
                                 </div>
                                 <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                                    {{ data_get($execution, 'size') ? formatBytes(data_get($execution, 'size')) : '—' }}
+                                    {{ data_get($execution, 'size') ? formatBytes(data_get($execution, 'size')) : '-' }}
                                 </div>
                                 <div class="flex flex-wrap items-center gap-1.5">
                                     <x-status-badge label="Local"

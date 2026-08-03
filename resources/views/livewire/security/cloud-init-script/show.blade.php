@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-security.navbar :title="$cloudInitScript->name"
-        subtitle="Reusable cloud-init script for server provisioning">
+        subtitle="Reusable cloud-init script for server provisioning" :titleOnDesktop="true">
         <x-slot:actions>
             @can('delete', $cloudInitScript)
                 <x-modal-confirmation title="Confirm Script Deletion?" isErrorButton buttonTitle="Delete"

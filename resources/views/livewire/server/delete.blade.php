@@ -10,7 +10,7 @@
         <x-server.sidebar :server="$server" activeMenu="danger" />
 
         <div class="application-settings-form w-full">
-            @if ($server->id !== 0)
+            @if (! $server->is_coolify_host)
                 <x-application.settings-section id="server-danger-section" title="Delete server"
                     helper="Permanently remove this server and its configuration from Coolify."
                     class="server-danger-section">

@@ -1,12 +1,19 @@
 @props([
     'title' => 'Team',
     'subtitle' => 'Members, roles, and team settings',
+    // Topbar + tabs already identify the page; keep create in the layer-2 bar.
+    'titleOnDesktop' => false,
 ])
 
-<x-dashboard.navbar section="team" :title="$title" :subtitle="$subtitle">
-    <x-slot:titleActions>
-        @isset($titleActions)
+<x-dashboard.navbar section="team" :title="$title" :subtitle="$subtitle" :titleOnDesktop="$titleOnDesktop">
+    @isset($titleActions)
+        <x-slot:titleActions>
             {{ $titleActions }}
+        </x-slot:titleActions>
+    @endisset
+    <x-slot:actions>
+        @isset($actions)
+            {{ $actions }}
         @else
             <x-modal-input title="New Team">
                 <x-slot:content>
@@ -19,10 +26,5 @@
                 <livewire:team.create />
             </x-modal-input>
         @endisset
-    </x-slot:titleActions>
-    @isset($actions)
-        <x-slot:actions>
-            {{ $actions }}
-        </x-slot:actions>
-    @endisset
+    </x-slot:actions>
 </x-dashboard.navbar>

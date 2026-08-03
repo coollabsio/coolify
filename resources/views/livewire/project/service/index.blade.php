@@ -116,15 +116,10 @@
                             </div>
                             <div class="grid gap-4 sm:grid-cols-2">
                                 @if (!$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
-                                    @if ($serviceApplication->required_fqdn)
-                                        <x-forms.input canGate="update" :canResource="$serviceApplication" required placeholder="https://app.coolify.io"
-                                            label="Domains" id="fqdn"
-                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- https://app.coolify.io,https://cloud.coolify.io/dashboard<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container.<br>- https://app.coolify.io:8080/api -> app.coolify.io/api will point to port 8080 inside the container."></x-forms.input>
-                                    @else
-                                        <x-forms.input canGate="update" :canResource="$serviceApplication" placeholder="https://app.coolify.io"
-                                            label="Domains" id="fqdn"
-                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- https://app.coolify.io,https://cloud.coolify.io/dashboard<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container.<br>- https://app.coolify.io:8080/api -> app.coolify.io/api will point to port 8080 inside the container."></x-forms.input>
-                                    @endif
+                                    <x-forms.domain-chips model="fqdn" label="Domains"
+                                        :required="(bool) $serviceApplication->required_fqdn"
+                                        :can-update="auth()->user()->can('update', $serviceApplication)"
+                                        :disabled="! auth()->user()->can('update', $serviceApplication)" />
                                 @endif
                                 <x-forms.input canGate="update" :canResource="$serviceApplication"
                                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
@@ -272,28 +267,52 @@
                             <div class="border-t border-neutral-200 pt-5 dark:border-white/[0.06]">
                                 <div class="mb-4 flex items-center justify-between gap-2">
                                     <h3 class="text-sm font-semibold text-black dark:text-fg">Public access</h3>
-                                    <x-loading wire:loading wire:target="instantSave" />
-                                    @if ($serviceDatabase->is_public)
-                                        <x-slide-over fullScreen>
-                                            <x-slot:title>Proxy Logs</x-slot:title>
-                                            <x-slot:content>
-                                                <livewire:project.shared.get-logs :server="$server" :resource="$service"
-                                                    :servicesubtype="$serviceDatabase" container="{{ $serviceDatabase->uuid }}-proxy" :collapsible="false" lazy />
-                                            </x-slot:content>
-                                            <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
-                                        </x-slide-over>
-                                    @endif
+                                    <div class="flex items-center gap-2">
+                                        <x-loading wire:loading wire:target="instantSave" />
+                                        @if ($serviceDatabase->is_public)
+                                            <x-slide-over fullScreen>
+                                                <x-slot:title>Proxy Logs</x-slot:title>
+                                                <x-slot:content>
+                                                    <livewire:project.shared.get-logs :server="$server" :resource="$service"
+                                                        :servicesubtype="$serviceDatabase" container="{{ $serviceDatabase->uuid }}-proxy" :collapsible="false" lazy />
+                                                </x-slot:content>
+                                                <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
+                                            </x-slide-over>
+                                        @endif
+                                    </div>
                                 </div>
-                                <div class="grid gap-4 sm:grid-cols-2">
-                                    <x-forms.checkbox canGate="update" :canResource="$serviceDatabase" instantSave id="isPublic"
-                                        label="Make it publicly available" />
-                                    <x-forms.input type="number" canGate="update" :canResource="$serviceDatabase" placeholder="5432"
-                                        disabled="{{ $serviceDatabase->is_public }}" id="publicPort" label="Public Port" />
-                                @if ($db_url_public)
-                                    <x-forms.input class="sm:col-span-2" label="Database IP:PORT (public)"
-                                        helper="Your credentials are available in your environment variables." type="password"
-                                        readonly wire:model="db_url_public" />
-                                @endif
+                                <div class="space-y-4">
+                                    <div class="flex flex-col gap-2 sm:flex-row sm:items-end"
+                                        x-data="{ port: @js(filled($publicPort) ? (string) $publicPort : '') }"
+                                        @input="if ($event.target.matches('input[type=number], input:not([type])')) port = $event.target.value">
+                                        <div class="w-full sm:max-w-xs">
+                                            <x-forms.input type="number" canGate="update" :canResource="$serviceDatabase"
+                                                placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
+                                                label="Public Port" />
+                                        </div>
+                                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                                            @if ($isPublic)
+                                                <x-status-badge status="Public" type="success" />
+                                                <x-forms.button canGate="update" :canResource="$serviceDatabase"
+                                                    wire:click="disablePublicAccess">
+                                                    Make private
+                                                </x-forms.button>
+                                            @else
+                                                {{-- Do not nest @if/@endif inside an <x-*> opening tag: Blade component
+                                                     compilation breaks and yields "unexpected token endif". --}}
+                                                <x-forms.button canGate="update" :canResource="$serviceDatabase"
+                                                    wire:click="enablePublicAccess"
+                                                    x-bind:disabled="!String(port ?? '').trim()">
+                                                    Make publicly available
+                                                </x-forms.button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    @if ($db_url_public)
+                                        <x-forms.input label="Database IP:PORT (public)"
+                                            helper="Your credentials are available in your environment variables." type="password"
+                                            readonly wire:model="db_url_public" />
+                                    @endif
                                 </div>
                             </div>
                             </div>

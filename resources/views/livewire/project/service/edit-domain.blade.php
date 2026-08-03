@@ -8,9 +8,9 @@
             </x-callout>
         @endif
 
-        <x-forms.input canGate="update" :canResource="$application" placeholder="https://app.coolify.io" label="Domains"
-            id="fqdn"
-            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- https://app.coolify.io,https://cloud.coolify.io/dashboard<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container.<br>- https://app.coolify.io:8080/api -> app.coolify.io/api will point to port 8080 inside the container."></x-forms.input>
+        <x-forms.domain-chips model="fqdn" label="Domains"
+            :can-update="auth()->user()->can('update', $application)"
+            :disabled="! auth()->user()->can('update', $application)" />
         <div class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
             <x-forms.button canGate="update" :canResource="$application" type="submit">Save domain</x-forms.button>
         </div>

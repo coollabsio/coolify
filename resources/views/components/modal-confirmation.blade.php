@@ -136,10 +136,12 @@
     @class([
         'relative h-auto',
         'w-full' => $buttonFullWidth,
-        'w-full sm:w-auto' => ! $buttonFullWidth,
+        // Compact toolbar triggers (e.g. layer-2 nav) should not stretch full width on mobile.
+        'w-auto' => ! $buttonFullWidth && isset($trigger),
+        'w-full sm:w-auto' => ! $buttonFullWidth && ! isset($trigger),
     ])>
     @if (isset($trigger))
-        <div class="w-full" @click="modalOpen=true">
+        <div class="inline-flex" @click="modalOpen=true">
             {{ $trigger }}
         </div>
     @elseif ($customButton)

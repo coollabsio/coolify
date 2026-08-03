@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-security.navbar>
-        <x-slot:titleActions>
+        <x-slot:actions>
             @can('create', App\Models\CloudInitScript::class)
                 <x-modal-input title="New Cloud-Init Script">
                     <x-slot:content>
@@ -17,7 +17,7 @@
                     <livewire:security.cloud-init-script-form />
                 </x-modal-input>
             @endcan
-        </x-slot:titleActions>
+        </x-slot:actions>
     </x-security.navbar>
 
     <div class="application-settings-form">

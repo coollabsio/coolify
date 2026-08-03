@@ -4,15 +4,29 @@
     </x-slot>
 
     <x-security.navbar>
-        <x-slot:titleActions>
+        <x-slot:actions>
             @can('create', App\Models\PrivateKey::class)
+                <x-modal-confirmation title="Confirm unused SSH Key Deletion?"
+                    isErrorButton submitAction="cleanupUnusedKeys"
+                    :actions="['All unused SSH keys (marked with unused) are permanently deleted.']"
+                    :confirmWithText="false" :confirmWithPassword="false">
+                    <x-slot:trigger>
+                        <button type="button"
+                            class="button whitespace-nowrap text-error! hover:text-error! dark:text-error!">
+                            <span class="max-sm:hidden">Delete unused keys</span>
+                            <span class="sm:hidden">Delete unused</span>
+                        </button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
+
                 <div x-data="{ dropdownOpen: false }" class="relative"
                     @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
                     <button type="button" @click="dropdownOpen = !dropdownOpen"
-                        class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                        class="button whitespace-nowrap bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
                         aria-haspopup="menu" :aria-expanded="dropdownOpen">
                         <x-reicon name="plus" class="size-3.5" />
-                        New private key
+                        <span class="max-sm:hidden">New private key</span>
+                        <span class="sm:hidden">New key</span>
                         <x-reicon name="chevron-down" class="size-3 opacity-55" />
                     </button>
 
@@ -43,17 +57,8 @@
                     </div>
                 </div>
             @endcan
-        </x-slot:titleActions>
+        </x-slot:actions>
     </x-security.navbar>
-
-    @can('create', App\Models\PrivateKey::class)
-        <div class="mb-4 flex justify-end">
-            <x-modal-confirmation title="Confirm unused SSH Key Deletion?"
-                buttonTitle="Delete unused keys" isErrorButton submitAction="cleanupUnusedKeys"
-                :actions="['All unused SSH keys (marked with unused) are permanently deleted.']"
-                :confirmWithText="false" :confirmWithPassword="false" />
-        </div>
-    @endcan
 
     @if ($privateKeys->isEmpty())
         <x-empty title="No private keys yet"

@@ -163,7 +163,7 @@
                                     class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                                 <input x-model.debounce.150ms="search" x-on:input="page = 1" type="search"
                                     placeholder="Search tokens" aria-label="Search tokens"
-                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-neutral-300! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
                                 <button x-cloak x-show="search" x-on:click="search = ''; page = 1" type="button"
                                     class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
                                     aria-label="Clear search">
@@ -231,8 +231,7 @@
                                                 :confirmWithPassword="false" step2ButtonText="Revoke token">
                                                 <x-slot:trigger>
                                                     <button type="button"
-                                                        class="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] font-medium text-error transition-colors hover:bg-error/10">
-                                                        <x-reicon name="trash" class="size-3" />
+                                                        class="inline-flex h-7 items-center rounded-md px-2 text-[11px] font-medium text-error transition-colors hover:bg-error/10">
                                                         Revoke
                                                     </button>
                                                 </x-slot:trigger>

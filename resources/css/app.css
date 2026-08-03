@@ -393,6 +393,21 @@ tr td:first-child {
 
 /* Wave-style application console: transparent viewport and an overlay
    scrollbar that stays out of the terminal content until it is used. */
+#terminal.terminal-host,
+#terminal.terminal-host .xterm {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+}
+
+#terminal.terminal-host .xterm {
+    padding: 0;
+}
+
+#terminal.terminal-host .xterm-viewport {
+    overflow-y: auto !important;
+}
+
 #terminal[data-terminal-style="application"] .xterm-viewport {
     background-color: transparent !important;
     scrollbar-width: thin;
@@ -412,17 +427,27 @@ tr td:first-child {
     background: transparent;
 }
 
-.application-console-shell {
+.application-console-shell,
+.terminal-fullscreen-shell {
     position: relative;
     isolation: isolate;
     color: #f2f2f2;
     background-color: #121214;
+}
+
+.application-console-shell {
     box-shadow:
         inset 0 0 0 1px rgb(255 255 255 / 0.08),
         0 18px 50px rgb(0 0 0 / 0.18);
 }
 
-.application-console-shell::before {
+/* Fullscreen is portaled to body — keep position:fixed from utilities. */
+.terminal-fullscreen-shell {
+    position: fixed;
+}
+
+.application-console-shell::before,
+.terminal-fullscreen-shell::before {
     position: absolute;
     z-index: 0;
     inset: 0;
@@ -430,59 +455,160 @@ tr td:first-child {
     background: var(--console-theme-background);
     opacity: var(--console-theme-opacity);
     content: "";
+    pointer-events: none;
     transition:
         background 220ms ease,
         opacity 220ms ease;
 }
 
-.application-console-shell[data-console-theme="shadows-midnight"] {
+.application-console-shell[data-console-theme="shadows-midnight"],
+.terminal-fullscreen-shell[data-console-theme="shadows-midnight"] {
     --console-theme-background: linear-gradient(135deg, #2a3b4c, rgb(42 59 76 / 0.4));
     --console-theme-opacity: 0.9;
 }
 
-.application-console-shell[data-console-theme="shadows-golden-hour"] {
+.application-console-shell[data-console-theme="shadows-golden-hour"],
+.terminal-fullscreen-shell[data-console-theme="shadows-golden-hour"] {
     --console-theme-background: linear-gradient(135deg, #d58a42, rgb(213 138 66 / 0.4));
     --console-theme-opacity: 0.4;
 }
 
-.application-console-shell[data-console-theme="shadows-cosmic-purple"] {
+.application-console-shell[data-console-theme="shadows-cosmic-purple"],
+.terminal-fullscreen-shell[data-console-theme="shadows-cosmic-purple"] {
     --console-theme-background: linear-gradient(135deg, #5d3e66, rgb(93 62 102 / 0.4));
     --console-theme-opacity: 0.8;
 }
 
-.application-console-shell[data-console-theme="shadows-neon-glow"] {
+.application-console-shell[data-console-theme="shadows-neon-glow"],
+.terminal-fullscreen-shell[data-console-theme="shadows-neon-glow"] {
     --console-theme-background: linear-gradient(135deg, #f300a6, rgb(243 0 166 / 0.3));
     --console-theme-opacity: 0.45;
 }
 
-.application-console-shell[data-console-theme="shadows-icy-mist"] {
+.application-console-shell[data-console-theme="shadows-icy-mist"],
+.terminal-fullscreen-shell[data-console-theme="shadows-icy-mist"] {
     --console-theme-background: linear-gradient(135deg, #d0d8e2, rgb(208 216 226 / 0.2));
     --console-theme-opacity: 0.5;
 }
 
-.application-console-shell[data-console-theme="shadows-tropical-storm"] {
+.application-console-shell[data-console-theme="shadows-tropical-storm"],
+.terminal-fullscreen-shell[data-console-theme="shadows-tropical-storm"] {
     --console-theme-background: linear-gradient(135deg, #00b894, #1fa771, #2ecc71, #27ae60);
     --console-theme-opacity: 0.3;
 }
 
-.application-console-shell[data-console-theme="shadows-golden-nebula"] {
+.application-console-shell[data-console-theme="shadows-golden-nebula"],
+.terminal-fullscreen-shell[data-console-theme="shadows-golden-nebula"] {
     --console-theme-background: linear-gradient(135deg, #ffd700, #ff6347, #d4a20e, #ffcc00, #1f3d6f);
     --console-theme-opacity: 0.44;
 }
 
-.application-console-shell[data-console-theme="shadows-cosmic-lagoon"] {
+.application-console-shell[data-console-theme="shadows-cosmic-lagoon"],
+.terminal-fullscreen-shell[data-console-theme="shadows-cosmic-lagoon"] {
     --console-theme-background: linear-gradient(135deg, #1d2b64, #2f4f96, #00b5b8, #9c27b0, #8e24aa);
     --console-theme-opacity: 0.59;
 }
 
-.application-console-shell[data-console-theme="shadows-neon-nebula"] {
+.application-console-shell[data-console-theme="shadows-neon-nebula"],
+.terminal-fullscreen-shell[data-console-theme="shadows-neon-nebula"] {
     --console-theme-background: linear-gradient(135deg, #00d9d9, #ff55aa, #1e1e2f, #2f3b57, #ff99ff);
     --console-theme-opacity: 0.6;
 }
 
-.application-console-shell[data-console-theme="shadows-transparent"] {
+.application-console-shell[data-console-theme="shadows-transparent"],
+.terminal-fullscreen-shell[data-console-theme="shadows-transparent"] {
     --console-theme-background: rgb(0 0 0 / 0.7);
     --console-theme-opacity: 0.7;
+}
+
+/*
+ * Terminal page: lock to the viewport so the shell fills remaining height
+ * without document scroll. Offsets match layouts/app.blade.php chrome:
+ *  mobile sticky top bar (~3.5rem) + main py-6 (3rem)
+ *  desktop fixed top bar accounted in main lg:pt-[calc(3rem+1.75rem)] + lg:pb-10
+ */
+.terminal-page {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    height: calc(100dvh - 6.75rem);
+    max-height: calc(100dvh - 6.75rem);
+}
+
+@media (min-width: 1024px) {
+    .terminal-page {
+        height: calc(100dvh - 7.25rem);
+        max-height: calc(100dvh - 7.25rem);
+    }
+}
+
+.terminal-page-header {
+    margin-bottom: 1rem;
+}
+
+.terminal-page-console {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 0%;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.terminal-page-console > .application-console-shell {
+    min-height: 0;
+    flex: 1 1 0%;
+}
+
+/* Fullscreen: freeze the page; only xterm scrollback may move. */
+html.terminal-is-fullscreen,
+html.terminal-is-fullscreen body {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    touch-action: none;
+    height: 100% !important;
+    max-height: 100% !important;
+}
+
+html.terminal-is-fullscreen body {
+    /* position:fixed is also applied inline for scroll-lock */
+    width: 100% !important;
+}
+
+html.terminal-is-fullscreen main {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+}
+
+/* Fullscreen terminal must win against layout chrome (header z-50, sidebar z-40). */
+html.terminal-is-fullscreen .terminal-fullscreen-shell,
+body.terminal-is-fullscreen .terminal-fullscreen-shell {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 100000 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    margin: 0 !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    touch-action: none;
+}
+
+/* Re-enable pan/scroll only inside the xterm buffer viewport. */
+html.terminal-is-fullscreen .terminal-fullscreen-shell .xterm-viewport,
+body.terminal-is-fullscreen .terminal-fullscreen-shell .xterm-viewport {
+    overscroll-behavior: contain !important;
+    touch-action: pan-y;
+}
+
+html.terminal-is-fullscreen .terminal-fullscreen-shell .terminal-fullscreen-btn,
+html.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-toolbar],
+body.terminal-is-fullscreen .terminal-fullscreen-shell .terminal-fullscreen-btn,
+body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-toolbar] {
+    touch-action: manipulation;
 }
 
 .application-console-header {
@@ -493,10 +619,44 @@ tr td:first-child {
 }
 
 .application-console-block {
+    /* Keep backdrop blur on a pseudo-element so position:fixed descendants
+       (terminal fullscreen) are not trapped by a backdrop-filter containing block. */
     position: relative;
     z-index: 1;
+    isolation: isolate;
+}
+
+.application-console-block::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+    border-radius: inherit;
     background: rgb(0 0 0 / 0.56);
     backdrop-filter: blur(10px);
+    content: "";
+    pointer-events: none;
+}
+
+.terminal-fullscreen-btn {
+    display: flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    border: 1px solid rgb(255 255 255 / 0.08);
+    background: rgb(0 0 0 / 0.55);
+    color: rgb(255 255 255 / 0.65);
+    backdrop-filter: blur(8px);
+    transition:
+        background-color 150ms ease,
+        color 150ms ease,
+        opacity 150ms ease;
+}
+
+.terminal-fullscreen-btn:hover {
+    background: rgb(255 255 255 / 0.08);
+    color: rgb(255 255 255 / 0.95);
 }
 
 /*
@@ -2106,4 +2266,488 @@ tr td:first-child {
     .environment-resource-grid > :nth-child(5) {
         display: none;
     }
+}
+
+/* Command palette (global search) */
+.command-palette {
+    display: flex;
+    width: 100%;
+    max-width: 36rem;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--coollabs-elevated);
+    box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal);
+}
+
+.command-palette-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    min-height: 2.75rem;
+    padding: 0 0.75rem 0 0.875rem;
+    background: var(--coollabs-elevated);
+}
+
+.command-palette-header-icon {
+    display: flex;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    color: var(--coollabs-subtle);
+}
+
+.command-palette-header-icon.is-loading {
+    color: var(--color-accent);
+}
+
+.command-palette-input {
+    min-width: 0;
+    flex: 1;
+    height: 2.75rem;
+    border: 0;
+    background: transparent;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: #171717;
+    outline: none;
+    box-shadow: none !important;
+}
+
+.dark .command-palette-input {
+    color: var(--color-fg);
+}
+
+.command-palette-input::placeholder {
+    color: var(--coollabs-subtle);
+}
+
+.command-palette-input:focus,
+.command-palette-input:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border: 0 !important;
+}
+
+.command-palette-shortcuts {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.command-palette-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.375rem;
+    padding: 0 0.375rem;
+    border-radius: 0.375rem;
+    border: 1px solid transparent;
+    background: var(--coollabs-recessed);
+    color: var(--coollabs-subtle);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+    font-family: inherit;
+}
+
+.dark .command-palette-kbd {
+    border-color: rgb(255 255 255 / 0.05);
+    background: rgb(255 255 255 / 0.06);
+}
+
+button.command-palette-kbd {
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+button.command-palette-kbd:hover {
+    color: #171717;
+    background: var(--coollabs-fill);
+}
+
+.dark button.command-palette-kbd:hover {
+    color: var(--color-fg);
+    background: rgb(255 255 255 / 0.1);
+}
+
+.command-palette-body {
+    max-height: min(60vh, 28rem);
+    overflow-y: auto;
+    border-radius: 8px;
+    background: var(--coollabs-base);
+    box-shadow: 0 0 0 1px var(--coollabs-fill);
+    scrollbar-width: thin;
+    scrollbar-color: var(--coollabs-fill) transparent;
+}
+
+.command-palette-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.command-palette-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.command-palette-body::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    background-color: var(--coollabs-fill);
+}
+
+.command-palette-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0.25rem;
+}
+
+.command-palette-section + .command-palette-section {
+    border-top: 1px solid var(--coollabs-fill);
+    margin-top: 0;
+    padding-top: 0.25rem;
+}
+
+.command-palette-group-label {
+    padding: 0.375rem 0.5rem 0.25rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: var(--coollabs-subtle);
+}
+
+/* Result rows: inset listbox-style pills. Kill the global button/a
+   focus-visible ring so keyboard selection is a soft fill, not yellow bars. */
+.command-palette-item {
+    display: flex;
+    position: relative;
+    width: 100%;
+    min-height: 2.5rem;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.4375rem 0.5rem;
+    border-radius: 6px;
+    text-align: left;
+    color: inherit;
+    transition: background 0.1s ease, box-shadow 0.1s ease;
+    outline: none !important;
+    border: 0;
+    box-shadow: none !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-offset-width: 0px !important;
+}
+
+a.command-palette-item,
+button.command-palette-item {
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.command-palette-item:hover {
+    background: var(--coollabs-fill);
+}
+
+/* Keyboard / programmatic focus = active selection */
+.command-palette-item:focus,
+.command-palette-item:focus-visible,
+button.command-palette-item:focus-visible,
+a.command-palette-item:focus-visible {
+    outline: none !important;
+    background: color-mix(in oklab, var(--color-accent) 12%, transparent);
+    box-shadow: none !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-ring-offset-width: 0px !important;
+}
+
+/* Soft left accent rail on focused row (matches sidebar language) */
+.command-palette-item:focus::before,
+.command-palette-item:focus-visible::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: 0;
+    width: 2px;
+    border-radius: 9999px;
+    background: var(--color-accent);
+    pointer-events: none;
+}
+
+.command-palette-item-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.command-palette-item-title {
+    display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem 0.5rem;
+}
+
+.command-palette-item-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: #171717;
+}
+
+.dark .command-palette-item-name {
+    color: var(--color-fg);
+}
+
+.command-palette-item:focus .command-palette-item-name,
+.command-palette-item:focus-visible .command-palette-item-name {
+    color: #171717;
+}
+
+.dark .command-palette-item:focus .command-palette-item-name,
+.dark .command-palette-item:focus-visible .command-palette-item-name {
+    color: var(--color-fg);
+}
+
+.command-palette-item-meta {
+    margin-top: 0.0625rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--coollabs-subtle);
+}
+
+.command-palette-type-badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    height: 1.25rem;
+    padding: 0 0.4375rem;
+    border-radius: 9999px;
+    background: var(--coollabs-recessed);
+    color: var(--coollabs-subtle);
+    font-size: 0.625rem;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.command-palette-item:focus .command-palette-type-badge,
+.command-palette-item:focus-visible .command-palette-type-badge {
+    background: color-mix(in oklab, var(--color-accent) 14%, transparent);
+    color: var(--color-accent);
+}
+
+/* Shortcut hint chip next to create action titles */
+.command-palette-quickcommand {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    border-radius: 0.25rem;
+    background: var(--coollabs-recessed);
+    color: var(--coollabs-subtle);
+    font-size: 0.625rem;
+    font-weight: 500;
+    line-height: 1;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.command-palette-item:focus .command-palette-quickcommand,
+.command-palette-item:focus-visible .command-palette-quickcommand {
+    background: color-mix(in oklab, var(--color-accent) 12%, transparent);
+    color: color-mix(in oklab, var(--color-accent) 85%, var(--coollabs-subtle));
+}
+
+/* Leading icon tile — neutral by default; accent only when the row is active */
+.command-palette-item-icon {
+    display: flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--coollabs-recessed);
+    box-shadow: inset 0 0 0 1px var(--coollabs-fill);
+    color: var(--coollabs-subtle);
+    transition: background 0.1s ease, color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.command-palette-item-icon img {
+    width: 1.125rem;
+    height: 1.125rem;
+    object-fit: contain;
+}
+
+.command-palette-item-icon.is-create {
+    background: var(--coollabs-recessed);
+    color: var(--coollabs-subtle);
+    box-shadow: inset 0 0 0 1px var(--coollabs-fill);
+}
+
+.command-palette-item-icon.is-create svg {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+.command-palette-item:hover .command-palette-item-icon.is-create {
+    color: #171717;
+}
+
+.dark .command-palette-item:hover .command-palette-item-icon.is-create {
+    color: var(--color-fg);
+}
+
+.command-palette-item:focus .command-palette-item-icon,
+.command-palette-item:focus-visible .command-palette-item-icon,
+.command-palette-item:focus .command-palette-item-icon.is-create,
+.command-palette-item:focus-visible .command-palette-item-icon.is-create {
+    background: color-mix(in oklab, var(--color-accent) 16%, transparent);
+    color: var(--color-accent);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 28%, transparent);
+}
+
+.command-palette-item-chevron {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex-shrink: 0;
+    color: var(--coollabs-subtle);
+    opacity: 0.4;
+    transition: opacity 0.1s ease, color 0.1s ease;
+}
+
+.command-palette-item:hover .command-palette-item-chevron {
+    opacity: 0.7;
+}
+
+.command-palette-item:focus .command-palette-item-chevron,
+.command-palette-item:focus-visible .command-palette-item-chevron {
+    opacity: 1;
+    color: var(--color-accent);
+}
+
+.command-palette-step-header {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin-bottom: 0.125rem;
+    padding: 0.25rem 0.375rem;
+}
+
+.command-palette-step-back {
+    display: inline-flex;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.375rem;
+    color: var(--coollabs-subtle);
+    transition: background 0.1s ease, color 0.1s ease;
+}
+
+.command-palette-step-back:hover {
+    background: var(--coollabs-recessed);
+    color: #171717;
+}
+
+.dark .command-palette-step-back:hover {
+    color: var(--color-fg);
+}
+
+.command-palette-step-title {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    color: #171717;
+}
+
+.dark .command-palette-step-title {
+    color: var(--color-fg);
+}
+
+.command-palette-step-subtitle {
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--coollabs-subtle);
+}
+
+.command-palette-status {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    margin: 0.125rem 0;
+    padding: 0.625rem 0.75rem;
+    border-radius: 6px;
+    background: var(--coollabs-recessed);
+    color: var(--coollabs-subtle);
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.command-palette-status.is-error {
+    background: color-mix(in oklab, #ef4444 10%, transparent);
+    color: #b91c1c;
+}
+
+.dark .command-palette-status.is-error {
+    color: #fca5a5;
+}
+
+.command-palette-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 2rem 1.25rem;
+    text-align: center;
+}
+
+.command-palette-empty-title {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #171717;
+}
+
+.dark .command-palette-empty-title {
+    color: var(--color-fg);
+}
+
+.command-palette-empty-desc {
+    max-width: 28ch;
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+    color: var(--coollabs-subtle);
+}
+
+.command-palette-arch-badge {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    height: 1.25rem;
+    padding: 0 0.4375rem;
+    border-radius: 9999px;
+    background: color-mix(in oklab, #f59e0b 16%, transparent);
+    color: #b45309;
+    font-size: 0.625rem;
+    font-weight: 500;
+    line-height: 1;
+}
+
+.dark .command-palette-arch-badge {
+    color: #fcd34d;
 }

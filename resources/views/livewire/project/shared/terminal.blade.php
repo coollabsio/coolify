@@ -37,12 +37,13 @@
         @endif
     @endif
 
-    <div x-ref="terminalWrapper"
+    <div x-ref="terminalWrapper" wire:ignore
+        :data-console-theme="fullscreen ? selectedTheme : null"
         :class="fullscreen
-            ? 'fixed inset-0 z-[9999] m-0 h-[100dvh] w-screen max-w-none overflow-hidden rounded-none bg-[#141414] p-0'
+            ? 'terminal-fullscreen-shell fixed inset-0 z-[100000] m-0 flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none p-0'
             : @js($isApplicationConsole
-                ? 'relative h-full min-h-0 w-full overflow-hidden bg-transparent'
-                : 'relative w-full h-full py-4 mx-auto max-h-[510px]')">
+                ? 'relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-transparent'
+                : 'relative flex w-full h-full max-h-[510px] flex-col py-4 mx-auto')">
         @if ($isApplicationConsole)
             <div x-show="!terminalActive" x-cloak
                 class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/35">
@@ -63,7 +64,7 @@
                 x-text="terminalSessionRemainingLabel()">
             </div>
         @else
-            <div x-show="terminalActive" x-cloak class="mb-2 flex justify-start">
+            <div x-show="terminalActive" x-cloak class="mb-2 flex shrink-0 justify-start">
                 <div class="inline-flex rounded-sm border px-2 py-1 text-xs font-medium"
                     :class="terminalSessionTimerClass()" x-text="terminalSessionRemainingLabel()">
                 </div>
@@ -73,16 +74,16 @@
         <div id="terminal" wire:ignore data-terminal-style="{{ $isApplicationConsole ? 'application' : 'default' }}"
             :class="fullscreen
                 ? (mobileToolbarCollapsed
-                    ? 'h-[calc(100dvh-3.5rem)] mb-14 px-1 py-[5px] bg-[#141414]'
-                    : 'h-[calc(100dvh-6rem)] mb-[6rem] px-1 py-[5px] bg-[#141414]')
+                    ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-14'
+                    : 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-24')
                 : @js($isApplicationConsole
-                    ? 'h-full min-h-0 overflow-hidden pt-[5px] pr-px pb-[5px] pl-1 bg-transparent'
-                    : 'h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')"
+                    ? 'terminal-host relative min-h-0 flex-1 overflow-hidden pt-[5px] pr-px pb-[5px] pl-1 bg-transparent'
+                    : 'terminal-host h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')"
             x-show="terminalActive">
         </div>
 
         <div x-show="terminalActive" x-cloak
-            :class="fullscreen ? 'absolute inset-x-0 bottom-0 z-[9999] px-2 pb-2' : 'relative mt-2'"
+            :class="fullscreen ? 'absolute inset-x-0 bottom-0 z-[2] px-2 pb-2' : 'relative mt-2 shrink-0'"
             class="sm:hidden" data-terminal-mobile-toolbar>
             <div
                 class="mx-auto max-w-3xl rounded-lg border border-white/10 bg-black/90 p-1.5 text-white shadow-lg backdrop-blur">
@@ -111,22 +112,23 @@
             </div>
         </div>
 
+        {{-- Enter/exit use identical chrome so toggle does not jump size or gain/lose a box. --}}
         <button type="button" title="Exit fullscreen" x-cloak x-show="fullscreen"
-            class="fixed top-3 right-3 z-[10000] flex size-7 items-center justify-center rounded-md border border-white/[0.08] bg-black/60 text-fg-dim backdrop-blur transition-colors hover:bg-white/[0.08] hover:text-fg"
+            class="terminal-fullscreen-btn fixed top-3 right-3 z-[100001]"
             x-on:click="makeFullscreen">
-            <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M9 4v5H4M15 20v-5h5M20 9h-5V4M4 15h5v5" stroke="currentColor" stroke-width="1.8"
                     stroke-linecap="round" stroke-linejoin="round" />
             </svg>
         </button>
         <button type="button" title="Fullscreen" x-cloak x-show="!fullscreen && terminalActive"
             @class([
-                'absolute z-20 flex size-7 items-center justify-center rounded-md transition-all',
-                'right-2 top-2 text-fg-faint opacity-0 hover:bg-white/[0.07] hover:text-fg group-hover/terminal:opacity-100 focus-visible:opacity-100' => $isApplicationConsole,
-                'right-5 top-6 text-white' => !$isApplicationConsole,
+                'terminal-fullscreen-btn absolute z-20',
+                'right-2 top-2 opacity-0 group-hover/terminal:opacity-100 focus-visible:opacity-100' => $isApplicationConsole,
+                'right-5 top-6' => !$isApplicationConsole,
             ])
             x-on:click="makeFullscreen">
-            <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M9 4H4v5M15 4h5v5M20 15v5h-5M4 15v5h5" stroke="currentColor" stroke-width="1.8"
                     stroke-linecap="round" stroke-linejoin="round" />
             </svg>

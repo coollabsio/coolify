@@ -30,7 +30,7 @@
                         class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                     <input x-model.debounce.150ms="search" x-on:input="page = 1" type="search"
                         placeholder="Search tags"
-                        class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-neutral-300! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                        class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
                     <button x-cloak x-show="search" x-on:click="search = ''; page = 1" type="button"
                         class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
                         aria-label="Clear search">
@@ -122,7 +122,7 @@
                     </template>
                 </div>
 
-                <footer x-show="filteredTags.length > 0"
+                <footer x-show="totalPages > 1"
                     class="mt-3 flex min-h-11 items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 text-[11px] text-neutral-500 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                     <span x-text="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`"></span>
                     <div class="flex items-center gap-1">
@@ -185,7 +185,7 @@
                     </div>
                 </template>
 
-                <footer x-show="filteredTags.length > 0"
+                <footer x-show="totalPages > 1"
                     class="flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
                     <span x-text="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`"></span>
                     <div class="flex items-center gap-1">

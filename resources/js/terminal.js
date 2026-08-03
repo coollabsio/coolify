@@ -149,6 +149,12 @@ export function initializeTerminalComponent() {
             isDocumentVisible: true,
             wasConnectedBeforeHidden: false,
             mobileToolbarCollapsed: false,
+            // Inline style snapshots for ancestors unlocked while fullscreen (no DOM reparenting).
+            fullscreenAncestorPatches: null,
+            pageScrollLocked: false,
+            scrollLockY: 0,
+            scrollLockStyles: null,
+            preventPageScrollHandler: null,
             terminalSessionStartedAt: null,
             terminalSessionRemainingSeconds: null,
             terminalSessionCountdownInterval: null,
@@ -157,6 +163,9 @@ export function initializeTerminalComponent() {
                 : 'shadows-cosmic-purple',
 
             init() {
+                // Recover if a previous portal build left the terminal on <body>.
+                this.$nextTick(() => this.salvageStrayFullscreenNodes());
+
                 this.setupTerminal();
 
                 // Add a small delay for initial connection to ensure everything is ready
@@ -241,6 +250,8 @@ export function initializeTerminalComponent() {
                 this.connectionState = 'disconnected';
                 this.pendingCommand = null;
                 this.resetTerminalSessionCountdown();
+                this.exitFullscreen();
+                this.unlockPageScroll();
                 if (this.socket) {
                     this.socket.close(1000, 'Client cleanup');
                 }
@@ -400,6 +411,7 @@ export function initializeTerminalComponent() {
                         rendererType: 'canvas',
                         convertEol: true,
                         disableStdin: false,
+                        scrollback: 5000,
                         theme: isApplicationConsole
                             ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes['shadows-cosmic-purple']
                             : undefined
@@ -657,7 +669,7 @@ export function initializeTerminalComponent() {
                     // Notify parent component that terminal connection failed
                     this.$wire.dispatch('terminalDisconnected');
                 } else if (event.data === 'pty-exited') {
-                    this.fullscreen = false;
+                    this.exitFullscreen();
                     this.mobileToolbarCollapsed = false;
                     this.terminalActive = false;
                     this.resetTerminalSessionCountdown();
@@ -865,73 +877,352 @@ export function initializeTerminalComponent() {
             },
 
             makeFullscreen() {
-                this.fullscreen = !this.fullscreen;
-                this.$nextTick(() => {
-                    // Force a layout reflow to ensure DOM changes are applied
-                    this.$refs.terminalWrapper.offsetHeight;
+                if (this.fullscreen) {
+                    this.exitFullscreen();
+                } else {
+                    this.enterFullscreen();
+                }
+            },
 
-                    // Add a small delay to ensure CSS transitions complete
-                    setTimeout(() => {
+            /**
+             * Keep the terminal in-place (no document.body reparent). Livewire morphs
+             * recreate missing children when nodes leave the component tree, which left
+             * an empty console shell and dumped the real xterm below the page.
+             *
+             * Instead, neutralize ancestor isolation/transform/filter/overflow so
+             * position:fixed + z-index can cover the viewport above sidebar/top bar.
+             */
+            enterFullscreen() {
+                const wrapper = this.$refs.terminalWrapper;
+                if (!wrapper || this.fullscreen) {
+                    return;
+                }
+
+                this.salvageStrayFullscreenNodes();
+                this.patchAncestorsForFullscreen(wrapper);
+                this.lockPageScroll();
+
+                wrapper.style.removeProperty('display');
+                wrapper.style.removeProperty('height');
+                wrapper.style.removeProperty('min-height');
+
+                this.fullscreen = true;
+                document.documentElement.classList.add('terminal-is-fullscreen');
+                document.body.classList.add('terminal-is-fullscreen');
+                this.scheduleTerminalResize();
+            },
+
+            exitFullscreen() {
+                const wrapper = this.$refs.terminalWrapper;
+
+                this.restoreAncestorsAfterFullscreen();
+                this.unlockPageScroll();
+                this.fullscreen = false;
+                document.documentElement.classList.remove('terminal-is-fullscreen');
+                document.body.classList.remove('terminal-is-fullscreen');
+
+                if (wrapper) {
+                    wrapper.style.removeProperty('display');
+                    wrapper.style.removeProperty('height');
+                    wrapper.style.removeProperty('min-height');
+                }
+
+                // Recover from older portal builds that left the terminal on <body>.
+                this.salvageStrayFullscreenNodes();
+                this.scheduleTerminalResize();
+            },
+
+            /**
+             * Freeze document scroll while fullscreen. Only xterm's own viewport may scroll.
+             * Uses position:fixed scroll-lock so nested overflow:visible ancestors cannot
+             * re-enable page scrolling under the overlay.
+             */
+            lockPageScroll() {
+                if (this.pageScrollLocked) {
+                    return;
+                }
+
+                this.pageScrollLocked = true;
+                this.scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+                this.scrollLockStyles = {
+                    htmlOverflow: document.documentElement.style.getPropertyValue('overflow'),
+                    htmlOverscroll: document.documentElement.style.getPropertyValue('overscroll-behavior'),
+                    bodyOverflow: document.body.style.getPropertyValue('overflow'),
+                    bodyPosition: document.body.style.getPropertyValue('position'),
+                    bodyTop: document.body.style.getPropertyValue('top'),
+                    bodyLeft: document.body.style.getPropertyValue('left'),
+                    bodyRight: document.body.style.getPropertyValue('right'),
+                    bodyWidth: document.body.style.getPropertyValue('width'),
+                    bodyPaddingRight: document.body.style.getPropertyValue('padding-right'),
+                    bodyOverscroll: document.body.style.getPropertyValue('overscroll-behavior'),
+                };
+
+                const scrollbarGap = Math.max(0, window.innerWidth - document.documentElement.clientWidth);
+
+                document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+                document.documentElement.style.setProperty('overscroll-behavior', 'none', 'important');
+                document.body.style.setProperty('overflow', 'hidden', 'important');
+                document.body.style.setProperty('overscroll-behavior', 'none', 'important');
+                document.body.style.setProperty('position', 'fixed', 'important');
+                document.body.style.setProperty('top', `-${this.scrollLockY}px`, 'important');
+                document.body.style.setProperty('left', '0', 'important');
+                document.body.style.setProperty('right', '0', 'important');
+                document.body.style.setProperty('width', '100%', 'important');
+                if (scrollbarGap > 0) {
+                    document.body.style.setProperty('padding-right', `${scrollbarGap}px`, 'important');
+                }
+
+                this.preventPageScrollHandler = (event) => {
+                    const target = event.target;
+                    if (!(target instanceof Element)) {
+                        event.preventDefault();
+                        return;
+                    }
+
+                    // Allow terminal scrollback and mobile toolbar touches only.
+                    if (
+                        target.closest('.xterm-viewport') ||
+                        target.closest('[data-terminal-mobile-toolbar]') ||
+                        target.closest('.terminal-fullscreen-btn')
+                    ) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                };
+
+                window.addEventListener('wheel', this.preventPageScrollHandler, { passive: false });
+                window.addEventListener('touchmove', this.preventPageScrollHandler, { passive: false });
+            },
+
+            unlockPageScroll() {
+                if (!this.pageScrollLocked) {
+                    return;
+                }
+
+                this.pageScrollLocked = false;
+
+                if (this.preventPageScrollHandler) {
+                    window.removeEventListener('wheel', this.preventPageScrollHandler);
+                    window.removeEventListener('touchmove', this.preventPageScrollHandler);
+                    this.preventPageScrollHandler = null;
+                }
+
+                const restore = (el, prop, value) => {
+                    if (value) {
+                        el.style.setProperty(prop, value);
+                    } else {
+                        el.style.removeProperty(prop);
+                    }
+                };
+
+                const styles = this.scrollLockStyles ?? {};
+                restore(document.documentElement, 'overflow', styles.htmlOverflow);
+                restore(document.documentElement, 'overscroll-behavior', styles.htmlOverscroll);
+                restore(document.body, 'overflow', styles.bodyOverflow);
+                restore(document.body, 'position', styles.bodyPosition);
+                restore(document.body, 'top', styles.bodyTop);
+                restore(document.body, 'left', styles.bodyLeft);
+                restore(document.body, 'right', styles.bodyRight);
+                restore(document.body, 'width', styles.bodyWidth);
+                restore(document.body, 'padding-right', styles.bodyPaddingRight);
+                restore(document.body, 'overscroll-behavior', styles.bodyOverscroll);
+
+                this.scrollLockStyles = null;
+                window.scrollTo(0, this.scrollLockY || 0);
+                this.scrollLockY = 0;
+            },
+
+            patchAncestorsForFullscreen(fromEl) {
+                this.restoreAncestorsAfterFullscreen();
+                this.fullscreenAncestorPatches = [];
+
+                let node = fromEl.parentElement;
+                while (node && node !== document.documentElement) {
+                    this.fullscreenAncestorPatches.push({
+                        el: node,
+                        isolation: node.style.getPropertyValue('isolation'),
+                        transform: node.style.getPropertyValue('transform'),
+                        filter: node.style.getPropertyValue('filter'),
+                        backdropFilter: node.style.getPropertyValue('backdrop-filter'),
+                        contain: node.style.getPropertyValue('contain'),
+                        overflow: node.style.getPropertyValue('overflow'),
+                        overflowX: node.style.getPropertyValue('overflow-x'),
+                        overflowY: node.style.getPropertyValue('overflow-y'),
+                        willChange: node.style.getPropertyValue('will-change'),
+                        perspective: node.style.getPropertyValue('perspective'),
+                        zIndex: node.style.getPropertyValue('z-index'),
+                        position: node.style.getPropertyValue('position'),
+                    });
+
+                    // Drop fixed-position containing blocks + nested stacking contexts.
+                    // Critical: CSS classes like .application-console-block { z-index: 1 }
+                    // trap position:fixed descendants under the sidebar (z-40) / top bar (z-50)
+                    // unless z-index is forced back to auto on the whole ancestor chain.
+                    node.style.setProperty('isolation', 'auto', 'important');
+                    node.style.setProperty('transform', 'none', 'important');
+                    node.style.setProperty('filter', 'none', 'important');
+                    node.style.setProperty('backdrop-filter', 'none', 'important');
+                    node.style.setProperty('contain', 'none', 'important');
+                    node.style.setProperty('perspective', 'none', 'important');
+                    node.style.setProperty('will-change', 'auto', 'important');
+                    node.style.setProperty('overflow', 'visible', 'important');
+                    node.style.setProperty('overflow-x', 'visible', 'important');
+                    node.style.setProperty('overflow-y', 'visible', 'important');
+                    node.style.setProperty('z-index', 'auto', 'important');
+
+                    node = node.parentElement;
+                }
+
+                // Sidebar/top bar are layout siblings of <main>, not ancestors. Elevate
+                // main so the fullscreen stacking context paints above z-50 chrome.
+                const main = fromEl.closest('main');
+                if (main) {
+                    const existing = this.fullscreenAncestorPatches.find((patch) => patch.el === main);
+                    if (!existing) {
+                        this.fullscreenAncestorPatches.push({
+                            el: main,
+                            isolation: main.style.getPropertyValue('isolation'),
+                            transform: main.style.getPropertyValue('transform'),
+                            filter: main.style.getPropertyValue('filter'),
+                            backdropFilter: main.style.getPropertyValue('backdrop-filter'),
+                            contain: main.style.getPropertyValue('contain'),
+                            overflow: main.style.getPropertyValue('overflow'),
+                            overflowX: main.style.getPropertyValue('overflow-x'),
+                            overflowY: main.style.getPropertyValue('overflow-y'),
+                            willChange: main.style.getPropertyValue('will-change'),
+                            perspective: main.style.getPropertyValue('perspective'),
+                            zIndex: main.style.getPropertyValue('z-index'),
+                            position: main.style.getPropertyValue('position'),
+                        });
+                    }
+
+                    if (getComputedStyle(main).position === 'static') {
+                        main.style.setProperty('position', 'relative', 'important');
+                    }
+                    main.style.setProperty('z-index', '100001', 'important');
+                }
+            },
+
+            restoreAncestorsAfterFullscreen() {
+                if (!this.fullscreenAncestorPatches?.length) {
+                    this.fullscreenAncestorPatches = null;
+                    return;
+                }
+
+                for (const patch of this.fullscreenAncestorPatches) {
+                    const el = patch.el;
+                    if (!el?.style) {
+                        continue;
+                    }
+
+                    const entries = [
+                        ['isolation', patch.isolation],
+                        ['transform', patch.transform],
+                        ['filter', patch.filter],
+                        ['backdrop-filter', patch.backdropFilter],
+                        ['contain', patch.contain],
+                        ['overflow', patch.overflow],
+                        ['overflow-x', patch.overflowX],
+                        ['overflow-y', patch.overflowY],
+                        ['will-change', patch.willChange],
+                        ['perspective', patch.perspective],
+                        ['z-index', patch.zIndex],
+                        ['position', patch.position],
+                    ];
+
+                    for (const [prop, value] of entries) {
+                        if (value) {
+                            el.style.setProperty(prop, value);
+                        } else {
+                            el.style.removeProperty(prop);
+                        }
+                    }
+                }
+
+                this.fullscreenAncestorPatches = null;
+            },
+
+            /**
+             * Older fullscreen code reparented the wrapper to document.body. Livewire then
+             * recreated an empty shell in-place. Pull any stray terminal hosts back home.
+             */
+            salvageStrayFullscreenNodes() {
+                const host = document.getElementById('terminal-container');
+                if (!host) {
+                    return;
+                }
+
+                const wrapper = this.$refs.terminalWrapper;
+                if (wrapper && wrapper.parentElement === document.body) {
+                    host.appendChild(wrapper);
+                }
+
+                document.querySelectorAll('body > .terminal-fullscreen-shell').forEach((node) => {
+                    if (node === wrapper) {
+                        host.appendChild(node);
+                        return;
+                    }
+                    if (node.querySelector('#terminal') || node.id === 'terminal') {
+                        host.appendChild(node);
+                    } else {
+                        node.remove();
+                    }
+                });
+            },
+
+            scheduleTerminalResize() {
+                this.$nextTick(() => {
+                    // Multi-pass fit: Alpine class swaps need a couple frames before the
+                    // host has a stable clientHeight for FitAddon.
+                    this.resizeTerminal();
+                    requestAnimationFrame(() => {
                         this.resizeTerminal();
-                    }, 100);
+                        setTimeout(() => this.resizeTerminal(), 50);
+                        setTimeout(() => this.resizeTerminal(), 150);
+                    });
                 });
             },
 
             resizeTerminal() {
-                if (!this.terminalActive || !this.term || !this.fitAddon) return;
+                if (!this.terminalActive || !this.term || !this.fitAddon) {
+                    return;
+                }
 
                 try {
-                    // Force a refresh of the fit addon dimensions
+                    const terminalElement = document.getElementById('terminal');
+                    if (!terminalElement || !this.term.element) {
+                        return;
+                    }
+
+                    // Host must already be laid out; otherwise FitAddon under-reads and
+                    // later the canvas keeps a wrong pixel height (page stretches on exit).
+                    if (terminalElement.clientHeight < 24 || terminalElement.clientWidth < 24) {
+                        setTimeout(() => this.resizeTerminal(), 50);
+                        return;
+                    }
+
+                    const previousCols = this.term.cols;
+                    const previousRows = this.term.rows;
+
                     this.fitAddon.fit();
 
-                    // Get fresh dimensions from the terminal element itself. The mobile
-                    // toolbar can live beside the terminal in normal flow, so wrapper dimensions
-                    // would include controls that should not be counted as terminal rows.
-                    const terminalElement = document.getElementById('terminal');
-                    const terminalHeight = terminalElement?.clientHeight || this.$refs.terminalWrapper.clientHeight;
-                    const terminalWidth = terminalElement?.clientWidth || this.$refs.terminalWrapper.clientWidth;
-
-                    // Account for terminal container padding. In fullscreen mobile mode,
-                    // the fixed toolbar sits over the terminal container, so reserve its height
-                    // when calculating rows to keep the prompt above the controls.
-                    const horizontalPadding = 16; // px-2 = 8px * 2 (left + right)
-                    const verticalPadding = 8; // py-1 = 4px * 2 (top + bottom)
-                    const height = terminalHeight - verticalPadding;
-                    const width = terminalWidth - horizontalPadding;
-
-                    // Check if dimensions are valid
-                    if (height <= 0 || width <= 0) {
-                        logTerminal('warn', '[Terminal] Invalid wrapper dimensions, retrying...', { height, width });
-                        setTimeout(() => this.resizeTerminal(), 100);
-                        return;
+                    // Keep the xterm chrome inside the host so overflow becomes scrollback,
+                    // not document growth after leaving fullscreen.
+                    if (this.term.element) {
+                        this.term.element.style.width = '100%';
+                        this.term.element.style.height = '100%';
+                        this.term.element.style.maxHeight = '100%';
                     }
 
-                    const charSize = this.term._core._renderService._charSizeService;
-
-                    if (!charSize.height || !charSize.width) {
-                        // Fallback values if char size not available yet
-                        logTerminal('warn', '[Terminal] Character size not available, retrying...');
-                        setTimeout(() => this.resizeTerminal(), 100);
-                        return;
-                    }
-
-                    // Calculate new dimensions with padding considerations
-                    const rows = Math.floor(height / charSize.height) - 1;
-                    const cols = Math.floor(width / charSize.width) - 1;
-
-                    if (rows > 0 && cols > 0) {
-                        // Check if dimensions actually changed to avoid unnecessary resizes
-                        const currentCols = this.term.cols;
-                        const currentRows = this.term.rows;
-
-                        if (cols !== currentCols || rows !== currentRows) {
-                            this.term.resize(cols, rows);
-                            this.sendMessage({
-                                resize: { cols: cols, rows: rows }
-                            });
-                        }
-                    } else {
-                        logTerminal('warn', '[Terminal] Invalid calculated dimensions:', { rows, cols, height, width, charSize });
+                    if (
+                        this.term.cols > 0 &&
+                        this.term.rows > 0 &&
+                        (this.term.cols !== previousCols || this.term.rows !== previousRows)
+                    ) {
+                        this.sendMessage({
+                            resize: { cols: this.term.cols, rows: this.term.rows },
+                        });
                     }
                 } catch (error) {
                     logTerminal('error', '[Terminal] Resize error:', error);

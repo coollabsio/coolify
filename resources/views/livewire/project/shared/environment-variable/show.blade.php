@@ -38,7 +38,7 @@
         </div>
         <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim"
             @if ($comment) title="{{ $comment }}" @endif>
-            {{ $comment ?: '—' }}
+            {{ $comment ?: '-' }}
         </div>
         @foreach ([$is_literal, $is_multiline, $is_buildtime && !$isSharedVariable && !$is_redis_credential, $is_runtime && !$isSharedVariable && !$is_redis_credential] as $flag)
             @if ($flag)
@@ -49,7 +49,7 @@
                     </svg>
                 </span>
             @else
-                <span class="data-table-cell-dash">—</span>
+                <span class="data-table-cell-dash">-</span>
             @endif
         @endforeach
         <div class="justify-self-end">

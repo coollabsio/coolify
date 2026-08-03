@@ -5,7 +5,7 @@
 
     <x-settings.navbar />
 
-    <div class="application-settings-form w-full min-w-0" x-data="{
+    <div class="application-settings-form mx-auto w-full max-w-[1180px] min-w-0" x-data="{
         activeTab: ['executions', 'scheduler-runs', 'skipped-jobs'].includes(location.hash.slice(1))
             ? location.hash.slice(1)
             : 'executions',
@@ -53,7 +53,7 @@
                             class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                         <input wire:model.live.debounce.250ms="search" type="search"
                             placeholder="Search scheduled jobs"
-                            class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-3! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-neutral-300! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                            class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-3! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
                     </div>
 
                     <div class="flex items-center gap-2">
@@ -182,7 +182,7 @@
                                         @elseif ($execution['status'] === 'running')
                                             <x-loading class="size-3.5" />
                                         @else
-                                            —
+                                            -
                                         @endif
                                     </div>
                                     <div class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
@@ -250,13 +250,13 @@
                                         {{ $run['message'] }}
                                     </div>
                                     <div class="text-[11px] text-neutral-500 dark:text-fg-dim">
-                                        {{ $run['duration_ms'] !== null ? $run['duration_ms'] . 'ms' : '—' }}
+                                        {{ $run['duration_ms'] !== null ? $run['duration_ms'] . 'ms' : '-' }}
                                     </div>
                                     <div class="text-[11px] text-neutral-500 dark:text-fg-dim">
-                                        {{ $run['dispatched'] ?? '—' }}
+                                        {{ $run['dispatched'] ?? '-' }}
                                     </div>
                                     <div class="text-[11px] text-neutral-500 dark:text-fg-dim">
-                                        {{ $run['skipped'] ?? '—' }}
+                                        {{ $run['skipped'] ?? '-' }}
                                     </div>
                                 </div>
                             @endforeach

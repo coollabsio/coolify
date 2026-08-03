@@ -8,6 +8,10 @@ tables, modals, toasts, terminals, and metrics.
 Use this file as the source of truth when updating another page. The older
 Graphite-only notes are no longer accurate.
 
+Onboarding validation and live server validation checkpoints share
+`<x-checkpoint-item>` (idle / pending / running / success / error) inside a
+compact divided list, not legacy green check SVGs or fixed-width status rows.
+
 > **Maintainer rules**
 >
 > - Keep the work frontend-focused unless existing data must be exposed to the
@@ -17,7 +21,7 @@ Graphite-only notes are no longer accurate.
 > - Do not write or run tests for this redesign branch.
 > - Validate Blade with `docker exec coolify php artisan view:cache`, then clear
 >   it with `docker exec coolify php artisan view:clear`.
-> - Build frontend assets in the Vite container with
+> - Build frontend assets in the Vitee container with
 >   `docker exec coolify-vite npm run build`.
 > - Use existing components before adding another styling abstraction.
 
@@ -37,7 +41,9 @@ The interface is compact and product-focused:
 - subtle active-item gradients that fade completely into the surrounding
   background at the far edge, with the active pill rounded only on the left
   (square on the right so it bleeds into the content edge);
-- sentence-case labels and headings.
+- sentence-case labels and headings;
+- never use the em dash (`—`) in UI copy. Prefer a period, colon, comma, or
+  ASCII hyphen (`-`) for empty cells and separators.
 
 Avoid oversized titles, generic dashboard cards, strong shadows, thick
 dividers, native browser selects, and isolated colored buttons that do not
@@ -238,6 +244,12 @@ The shared workspace grid is:
 </div>
 ```
 
+Instance Settings constrains both `x-settings.navbar` and the workspace to the
+same `max-w-[1180px]` shell. The in-flow H1/subtitle is **mobile-only**
+(`titleOnDesktop="false"`): on desktop the topbar already says Settings, the
+layer-2 tabs name the family, and the grouped sidebar covers the third level.
+Do not put the H1 beside the sidebar.
+
 Standard content stack:
 
 ```blade
@@ -435,6 +447,9 @@ The footer is always inside the table shell:
 - `Showing X–Y of Z` on the left;
 - first, previous, current page, next, and last controls on the right.
 
+Hide the entire pagination footer when there is only one page (`totalPages > 1`).
+A lone “1–2 of 2” bar with disabled controls adds noise and is unnecessary.
+
 Use `x-status-badge` for resource and execution state. It is a small neutral
 pill with a semantic dot, not a full colored rectangle.
 
@@ -467,6 +482,31 @@ that hide secondary columns before allowing horizontal overflow.
 
 Edit modals should use the same field layout and option set as their matching
 create modal.
+
+### Command palette
+
+The global search command palette (`livewire:global-search`) is a compact
+top-anchored overlay:
+
+- elevated shell with hairline ring and modal shadow (not a heavy floating card);
+- recessed-neutral header strip with outline search glyph and 14px input;
+- compact `⌘K` / `/` / `ESC` kbd chips matching the sidebar search trigger;
+- nested base-color results body with group labels in sentence case;
+- dense result rows as inset 6px-radius pills (listbox anatomy), not full-bleed
+  bars with global focus rings;
+- hover uses neutral fill; keyboard focus uses a soft accent wash plus a 2px
+  left rail — never the global `ring-2` / ring-offset treatment;
+- create rows use a neutral plus tile that only picks up the accent when the
+  row is focused;
+- type pills and quickcommand chips stay recessed; they tint with the accent
+  only on the focused row;
+- neutral thin scrollbar inside the results body (not brand-colored);
+- create-resource modals opened from the palette reuse the standard
+  `application-settings-section` layer-card shell.
+
+Preserve keyboard navigation (arrow keys, Enter via focused links, Escape to
+clear then close), `/` and `⌘K` open shortcuts, and the multi-step
+server → destination → project → environment create flow.
 
 ### Toasts
 
@@ -552,6 +592,7 @@ Use these as implementation references:
 | Status pill | `resources/views/components/status-badge.blade.php` |
 | Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
 | Global toast | `resources/views/components/toast.blade.php` |
+| Command palette / global search | `resources/views/livewire/global-search.blade.php` |
 | Outline icons | `resources/views/components/reicon.blade.php` |
 | Shared styling | `resources/css/app.css`, `resources/css/utilities.css` |
 

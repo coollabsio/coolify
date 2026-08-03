@@ -93,7 +93,7 @@
                             ['value' => false, 'label' => 'Disabled'],
                         ]" x-bind:disabled="@js(!$canUpdate)" />
                     <x-forms.listbox id="isGitShallowCloneEnabled" label="Clone depth" onChange="instantSave"
-                        helper="Shallow cloning (--depth=1) speeds up deployments by only fetching the latest commit — useful for large repositories."
+                        helper="Shallow cloning (--depth=1) speeds up deployments by only fetching the latest commit, useful for large repositories."
                         :options="[
                             ['value' => false, 'label' => 'Full history'],
                             ['value' => true, 'label' => 'Shallow clone (latest commit only)'],
@@ -107,7 +107,7 @@
                 helper="Advanced behavior for compose-based deployments.">
                 <div class="grid w-full gap-4 sm:grid-cols-2">
                     <x-forms.listbox id="isRawComposeDeploymentEnabled" label="Compose deployment" onChange="instantSave"
-                        helper="WARNING: Advanced use cases only. In raw mode your compose file is deployed as-is — nothing is modified by Coolify and you need to configure the proxy parts. More info in the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation</a>."
+                        helper="WARNING: Advanced use cases only. In raw mode your compose file is deployed as-is. Nothing is modified by Coolify and you need to configure the proxy parts. More info in the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/compose#raw-docker-compose-deployment'>documentation</a>."
                         :options="[
                             ['value' => false, 'label' => 'Managed by Coolify'],
                             ['value' => true, 'label' => 'Raw (deploy file as-is)'],
@@ -127,7 +127,7 @@
             @if ($labelsManagedByCoolify)
                 <div class="grid w-full gap-4 sm:grid-cols-2">
                     <x-forms.listbox id="isGzipEnabled" label="Gzip compression" onChange="instantSave"
-                        helper="Some services compress data by default — in that case you do not need this."
+                        helper="Some services compress data by default. In that case you do not need this."
                         :options="[
                             ['value' => true, 'label' => 'Enabled'],
                             ['value' => false, 'label' => 'Disabled'],

@@ -92,7 +92,9 @@
             'active' => $activeMenu === 'danger',
             'icon' => 'shield-alert',
             'group' => 'Danger zone',
-            'visible' => ! $server->isLocalhost(),
+            // Coolify host (id 0) cannot be deleted. Other servers may still use
+            // host.docker.internal (e.g. Lima VMs) and must keep the Danger menu.
+            'visible' => ! $server->is_coolify_host,
         ],
     ];
 

@@ -25,7 +25,7 @@
             ],
             ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
             ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
-            ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'subscription'],
+            ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
             ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
             ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
             ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],

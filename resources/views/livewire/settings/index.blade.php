@@ -45,7 +45,7 @@
                         <div class="relative">
                             <input id="instance_timezone" autocomplete="off" x-model="search"
                                 @focus="open = true" @input="open = true"
-                                class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-3! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-neutral-300! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint"
+                                class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-3! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint"
                                 placeholder="Search timezones" @disabled(!auth()->user()->can('update', $settings))>
                             <x-reicon name="search"
                                 class="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />

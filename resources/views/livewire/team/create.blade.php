@@ -3,6 +3,8 @@
     <x-forms.input id="description" label="Description" />
     <div class="flex justify-end">
         <x-forms.button type="submit"
-            class="bg-coollabs! text-white! hover:bg-coollabs-100!">Create team</x-forms.button>
+            defaultClass="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+            Create team
+        </x-forms.button>
     </div>
 </form>

@@ -196,7 +196,7 @@
                             ->map(fn ($storage) => [
                                 'value' => $storage['id'],
                                 'label' => $storage['name']
-                                    .($storage['description'] ? ' — '.$storage['description'] : ''),
+                                    .($storage['description'] ? ' - '.$storage['description'] : ''),
                             ])
                             ->values()
                             ->all();

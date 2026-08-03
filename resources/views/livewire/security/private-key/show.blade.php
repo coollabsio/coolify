@@ -4,7 +4,8 @@
     </x-slot>
 
     <x-security.navbar :title="$private_key->name"
-        :subtitle="filled($private_key->description) ? $private_key->description : 'SSH private key'">
+        :subtitle="filled($private_key->description) ? $private_key->description : 'SSH private key'"
+        :titleOnDesktop="true">
         <x-slot:actions>
             @if ($isGitRelated)
                 <x-status-badge label="Used by GitHub App" type="neutral" />

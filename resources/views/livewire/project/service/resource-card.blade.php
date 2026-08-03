@@ -45,7 +45,8 @@
                     @can('update', $service)
                         <x-modal-input title="Edit Domains" :closeOutside="false">
                             <x-slot:content>
-                                <button type="button" class="icon-button shrink-0" title="Edit domains">
+                                <button type="button" class="icon-button shrink-0" title="Edit domains"
+                                    aria-label="Edit domains">
                                     <x-reicon name="settings" class="size-3.5" />
                                 </button>
                             </x-slot:content>

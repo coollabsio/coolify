@@ -95,8 +95,8 @@ it('exits fullscreen when the terminal process exits', function () {
 
     expect($terminalClient)
         ->toContain("event.data === 'pty-exited'")
-        ->toContain('this.fullscreen = false;
-                    this.mobileToolbarCollapsed = false;
+        ->toContain('this.exitFullscreen();')
+        ->toContain('this.mobileToolbarCollapsed = false;
                     this.terminalActive = false;');
 });
 
@@ -146,7 +146,7 @@ it('renders a compact mobile terminal toolbar with shell control keys', function
         ->not->toContain('pasteFromClipboard()')
         ->not->toContain('copyTerminalSelection()')
         ->toContain('mobileToolbarCollapsed')
-        ->toContain("fullscreen ? 'absolute inset-x-0 bottom-0 z-[9999] px-2 pb-2' : 'relative mt-2'")
+        ->toContain("fullscreen ? 'absolute inset-x-0 bottom-0 z-[2] px-2 pb-2' : 'relative mt-2 shrink-0'")
         ->toContain('data-terminal-mobile-toolbar')
         ->and($appCss)
         ->toContain('.terminal-mobile-key');
@@ -169,13 +169,13 @@ it('sends terminal mobile toolbar controls through the websocket', function () {
         ->toContain('navigator.clipboard.writeText(selection)');
 });
 
-it('uses terminal dimensions when resizing so mobile controls do not cover terminal rows', function () {
+it('uses terminal host dimensions when resizing so mobile controls do not cover terminal rows', function () {
     $terminalClient = file_get_contents(resource_path('js/terminal.js'));
 
     expect($terminalClient)
         ->toContain("document.getElementById('terminal')")
-        ->toContain('terminalHeight')
-        ->toContain('terminalWidth')
+        ->toContain('this.fitAddon.fit()')
+        ->toContain('terminalElement.clientHeight')
         ->not->toContain('const wrapperHeight = this.$refs.terminalWrapper.clientHeight;');
 });
 
@@ -188,8 +188,8 @@ it('uses simple fullscreen bottom margin based on mobile toolbar visibility', fu
         ->not->toContain('terminalFullscreenHeight')
         ->not->toContain('window.visualViewport?.height')
         ->and($terminalView)
-        ->toContain("mobileToolbarCollapsed ? 'h-[calc(100dvh-3.5rem)] mb-14 px-2 py-1 bg-black' : 'h-[calc(100dvh-6rem)] mb-[6rem] px-2 py-1 bg-black'")
-        ->toContain("fullscreen ? 'absolute inset-x-0 bottom-0 z-[9999] px-2 pb-2'");
+        ->toContain("mobileToolbarCollapsed\n                    ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-14'\n                    : 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-24'")
+        ->toContain("fullscreen ? 'absolute inset-x-0 bottom-0 z-[2] px-2 pb-2'");
 });
 
 it('resizes after toggling the mobile terminal toolbar', function () {
@@ -203,11 +203,13 @@ it('uses fixed viewport positioning for fullscreen terminal instead of inherited
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
 
     expect($terminalView)
-        ->toContain('fixed inset-0')
+        ->toContain('terminal-fullscreen-shell fixed inset-0')
+        ->toContain('z-[100000]')
         ->toContain('h-[100dvh]')
         ->toContain('w-screen')
         ->toContain('max-w-none')
-        ->toContain('overflow-hidden');
+        ->toContain('overflow-hidden')
+        ->toContain(':data-console-theme="fullscreen ? selectedTheme : null"');
 });
 
 it('constrains normal terminal height after leaving fullscreen', function () {
@@ -215,4 +217,97 @@ it('constrains normal terminal height after leaving fullscreen', function () {
 
     expect($terminalView)
         ->toContain('h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden');
+});
+
+it('keeps enter and exit fullscreen controls the same size and chrome', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($terminalView)
+        ->toContain('class="terminal-fullscreen-btn fixed top-3 right-3 z-[100001]"')
+        ->toContain("'terminal-fullscreen-btn absolute z-20'")
+        ->and($appCss)
+        ->toContain('.terminal-fullscreen-btn')
+        ->toContain('width: 1.75rem')
+        ->toContain('height: 1.75rem');
+});
+
+it('does not apply backdrop-filter on the console block itself so fixed fullscreen can escape', function () {
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($appCss)
+        ->toContain('.application-console-block::before')
+        ->toContain('position:fixed descendants')
+        ->toMatch('/\.application-console-block::before\s*\{[^}]*backdrop-filter/s')
+        ->not->toMatch('/\.application-console-block\s*\{[^}]*\bbackdrop-filter\s*:/s');
+});
+
+it('keeps the terminal in the Livewire tree and unlocks ancestor stacking for fullscreen', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($terminalClient)
+        ->toContain('enterFullscreen()')
+        ->toContain('exitFullscreen()')
+        ->toContain('patchAncestorsForFullscreen(wrapper)')
+        ->toContain('restoreAncestorsAfterFullscreen()')
+        ->toContain('salvageStrayFullscreenNodes()')
+        ->toContain("node.style.setProperty('isolation', 'auto', 'important')")
+        ->toContain("node.style.setProperty('transform', 'none', 'important')")
+        ->toContain("node.style.setProperty('z-index', 'auto', 'important')")
+        ->toContain("main.style.setProperty('z-index', '100001', 'important')")
+        ->toContain("fromEl.closest('main')")
+        ->toContain('scheduleTerminalResize()')
+        ->not->toContain('document.body.appendChild(wrapper)')
+        ->not->toContain('enterFullscreenPortal')
+        ->and($terminalView)
+        ->toContain('wire:ignore')
+        ->toContain('terminal-fullscreen-shell fixed inset-0')
+        ->and($appCss)
+        ->toContain('body.terminal-is-fullscreen .terminal-fullscreen-shell')
+        ->toContain('z-index: 100000 !important');
+});
+
+it('locks page scroll while the terminal is fullscreen and unlocks on exit', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($terminalClient)
+        ->toContain('lockPageScroll()')
+        ->toContain('unlockPageScroll()')
+        ->toContain("document.body.style.setProperty('position', 'fixed', 'important')")
+        ->toContain("window.addEventListener('wheel', this.preventPageScrollHandler")
+        ->toContain("window.addEventListener('touchmove', this.preventPageScrollHandler")
+        ->toContain("target.closest('.xterm-viewport')")
+        ->toContain("document.documentElement.classList.add('terminal-is-fullscreen')")
+        ->toContain("document.documentElement.classList.remove('terminal-is-fullscreen')")
+        ->and($appCss)
+        ->toContain('html.terminal-is-fullscreen')
+        ->toContain('overscroll-behavior: none !important')
+        ->toContain('touch-action: none');
+});
+
+it('applies the selected console theme to the fullscreen shell', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($terminalView)
+        ->toContain('terminal-fullscreen-shell')
+        ->toContain(':data-console-theme="fullscreen ? selectedTheme : null"')
+        ->not->toContain('bg-[#141414]')
+        ->and($appCss)
+        ->toContain('.terminal-fullscreen-shell')
+        ->toContain('.terminal-fullscreen-shell[data-console-theme="shadows-cosmic-purple"]')
+        ->toContain('#terminal.terminal-host .xterm-viewport');
+});
+
+it('fits the terminal with FitAddon and keeps xterm within the host after resize', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($terminalClient)
+        ->toContain('this.fitAddon.fit()')
+        ->toContain("this.term.element.style.maxHeight = '100%'")
+        ->toContain('scrollback: 5000')
+        ->not->toContain('Math.floor(height / charSize.height) - 1');
 });

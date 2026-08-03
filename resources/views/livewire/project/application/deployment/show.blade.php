@@ -287,7 +287,7 @@
                                     class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-500" />
                                 <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
                                     aria-label="Find in logs"
-                                    class="h-8! w-full rounded-lg! border-white/[0.08]! bg-white/[0.05]! py-0! pr-8! pl-8! text-[12px]! text-white! shadow-none! placeholder:text-neutral-500 focus:border-white/[0.14]! focus:ring-0!" />
+                                    class="h-8! w-full rounded-lg! border-white/[0.08]! bg-white/[0.05]! py-0! pr-8! pl-8! text-[12px]! text-white! shadow-none! placeholder:text-neutral-500 focus:border-accent! focus:ring-0!" />
                                 <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
                                     class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-white/[0.07] hover:text-white"
                                     aria-label="Clear search">

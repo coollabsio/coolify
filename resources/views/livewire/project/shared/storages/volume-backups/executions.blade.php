@@ -85,7 +85,7 @@
                             </span>
 
                             <span class="tabular-nums text-neutral-500 dark:text-fg-dim">
-                                {{ $execution->size > 0 ? formatBytes($execution->size) : '—' }}
+                                {{ $execution->size > 0 ? formatBytes($execution->size) : '-' }}
                             </span>
 
                             <span class="flex flex-wrap gap-1">

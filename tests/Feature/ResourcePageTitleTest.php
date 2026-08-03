@@ -56,12 +56,13 @@ it('renders the source name as a large page title before the navbar', function (
 });
 
 it('renders family page titles before tabs for team notifications and keys', function () {
-    $this->get(route('team.index'))
-        ->assertSuccessful()
-        ->assertSee('Team')
-        ->assertSee('Members, roles, and team settings')
-        ->assertSee('order-1 mb-4 flex items-start justify-between gap-4 lg:order-2', false)
-        ->assertSee('New team');
+    $team = $this->get(route('team.index'));
+    $team->assertSuccessful();
+    $team->assertSee('Team');
+    $team->assertSee('Members, roles, and team settings');
+    $team->assertSee('New team');
+    // Desktop hides the H1; mobile keeps it (lg:hidden on the header).
+    expect($team->getContent())->toContain('lg:hidden');
 
     $this->get(route('notifications.email'))
         ->assertSuccessful()
@@ -134,7 +135,7 @@ it('uses the same page title size on application database service and server hea
     }
 });
 
-it('keeps new-action buttons on the same row as page titles', function () {
+it('keeps new-action buttons on the same row as page titles or in layer-2 nav', function () {
     $serversPattern = 'flex items-center justify-between gap-4';
     $titleRowPattern = 'flex items-start justify-between gap-4';
 
@@ -148,6 +149,11 @@ it('keeps new-action buttons on the same row as page titles', function () {
         ->toContain($titleRowPattern);
     expect(file_get_contents(resource_path('views/components/dashboard/navbar.blade.php')))
         ->toContain('titleActions');
+    // Family pages put primary actions next to layer-2 tabs, not beside a desktop H1.
     expect(file_get_contents(resource_path('views/livewire/security/private-key/index.blade.php')))
-        ->toContain('titleActions');
+        ->toContain('<x-slot:actions>');
+    expect(file_get_contents(resource_path('views/components/team/navbar.blade.php')))
+        ->toContain("'titleOnDesktop' => false")
+        ->toContain('<x-slot:actions>')
+        ->toContain('New team');
 });
