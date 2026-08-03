@@ -37,20 +37,27 @@ it('returns each service template last updated timestamp from the generated bund
 });
 
 it('prefers embedded service template git timestamps from the templates bundle', function () {
-    File::shouldReceive('get')
-        ->with(base_path('templates/'.config('constants.services.file_name')))
-        ->andReturn(json_encode([
-            'activepieces' => [
-                'documentation' => 'https://coolify.io/docs',
-                'slogan' => 'Open source no-code business automation.',
-                'compose' => '',
-                'tags' => null,
-                'category' => 'automation',
-                'logo' => 'images/default.webp',
-                'minversion' => '0.0.0',
-                'template_last_updated_at' => '2026-05-31T12:34:56+00:00',
-            ],
-        ]));
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $payload = json_encode([
+        'activepieces' => [
+            'documentation' => 'https://coolify.io/docs',
+            'slogan' => 'Open source no-code business automation.',
+            'compose' => '',
+            'tags' => null,
+            'category' => 'automation',
+            'logo' => 'images/default.webp',
+            'minversion' => '0.0.0',
+            'template_last_updated_at' => '2026-05-31T12:34:56+00:00',
+        ],
+    ]);
+
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn($payload);
 
     $resources = (new Select)->loadServices();
 

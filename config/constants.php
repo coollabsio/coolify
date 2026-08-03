@@ -27,6 +27,8 @@ return [
     'services' => [
         'official' => 'https://cdn.coollabs.io/coolify/service-templates-latest.json',
         'file_name' => 'service-templates-latest.json',
+        // Shared across HTTP/Horizon nodes when CACHE_DRIVER is redis (default).
+        'cache_key' => 'coolify:service-templates-bundle',
     ],
 
     'terminal' => [
