@@ -24,17 +24,25 @@ class EnvironmentEdit extends Component
 
     public ?string $description = null;
 
+    public ?string $color = null;
+
     protected function rules(): array
     {
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
+            'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ];
     }
 
     protected function messages(): array
     {
-        return ValidationPatterns::combinedMessages();
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            [
+                'color.regex' => 'The color must be a valid hex color code (e.g., #FF5733).',
+            ]
+        );
     }
 
     public function mount(string $project_uuid, string $environment_uuid)
@@ -55,10 +63,12 @@ class EnvironmentEdit extends Component
             $this->environment->update([
                 'name' => $this->name,
                 'description' => $this->description,
+                'color' => $this->color,
             ]);
         } else {
             $this->name = $this->environment->name;
             $this->description = $this->environment->description;
+            $this->color = $this->environment->color;
         }
     }
 

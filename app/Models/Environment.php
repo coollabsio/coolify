@@ -20,6 +20,7 @@ use OpenApi\Attributes as OA;
         'created_at' => ['type' => 'string'],
         'updated_at' => ['type' => 'string'],
         'description' => ['type' => 'string'],
+        'color' => ['type' => 'string'],
     ]
 )]
 class Environment extends BaseModel
