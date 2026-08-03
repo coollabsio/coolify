@@ -749,18 +749,71 @@ function base_ip(): string
 
     return 'localhost';
 }
-function getFqdnWithoutPort(string $fqdn)
+/**
+ * Parse a domain URL into scheme/host/path pieces used by COOLIFY_* and SERVICE_* env builders.
+ * Omits a bare "/" path so port re-append stays valid ("http://host:80" not "http://host/:80").
+ *
+ * @return array{scheme: string, host: string, path: string}|null
+ */
+function parseDomainUrlParts(string $fqdn): ?array
 {
     try {
         $url = Url::fromString($fqdn);
         $host = $url->getHost();
-        $scheme = $url->getScheme();
-        $path = $url->getPath();
+        if ($host === '') {
+            return null;
+        }
 
-        return "$scheme://$host$path";
+        $path = $url->getPath();
+        if ($path === '' || $path === '/') {
+            $path = '';
+        }
+
+        return [
+            'scheme' => $url->getScheme(),
+            'host' => $host,
+            'path' => $path,
+        ];
     } catch (Throwable) {
+        return null;
+    }
+}
+
+/**
+ * Absolute URL without port (and without a bare trailing slash).
+ * Used for COOLIFY_URL / SERVICE_URL base values.
+ */
+function getFqdnWithoutPort(string $fqdn): string
+{
+    $parts = parseDomainUrlParts($fqdn);
+    if ($parts === null || $parts['scheme'] === '') {
+        // Spatie accepts bare hostnames (empty scheme). Do not invent "://host".
         return $fqdn;
     }
+
+    return $parts['scheme'].'://'.$parts['host'].$parts['path'];
+}
+
+/**
+ * Host (+ optional path) without scheme or port.
+ * Used for COOLIFY_FQDN / SERVICE_FQDN base values.
+ */
+function getHostWithoutPort(string $fqdn): string
+{
+    $parts = parseDomainUrlParts($fqdn);
+    if ($parts === null) {
+        return $fqdn;
+    }
+
+    return $parts['host'].$parts['path'];
+}
+
+/**
+ * First entry from a comma-separated FQDN list (service apps may store multiple).
+ */
+function firstDomainFromList(?string $fqdns): string
+{
+    return trim((string) str($fqdns ?? '')->explode(',')->first());
 }
 /**
  * If fqdn is set, return it, otherwise return public ip.
@@ -2538,7 +2591,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($env) {
                                 $env_url = Url::fromString($savedService->fqdn);
                                 $env_port = $env_url->getPort();
-                                if ($env_port !== $predefinedPort) {
+                                if ((int) $env_port !== (int) $predefinedPort) {
                                     $env_url = $env_url->withPort($predefinedPort);
                                     $savedService->fqdn = $env_url->__toString();
                                     $savedService->save();
@@ -2623,7 +2676,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             if ($env) {
                                                 $env_url = Url::fromString($env->value);
                                                 $env_port = $env_url->getPort();
-                                                if ($env_port !== $predefinedPort) {
+                                                if ((int) $env_port !== (int) $predefinedPort) {
                                                     $env_url = $env_url->withPort($predefinedPort);
                                                     $savedService->fqdn = $env_url->__toString();
                                                     $savedService->save();
@@ -3444,16 +3497,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             if ($resource->serviceType()) {
                 $fqdns = generateServiceSpecificFqdns($resource);
             } else {
-                $domains = collect(json_decode($resource->docker_compose_domains)) ?? [];
+                $domains = json_decode($resource->docker_compose_domains ?: '[]', true) ?: [];
                 if ($domains) {
-                    $fqdns = data_get($domains, "$serviceName.domain");
+                    // Dual-read: original compose name or legacy underscore key.
+                    $fqdns = getComposeServiceDomainString($domains, (string) $serviceName);
                     if ($fqdns) {
                         $fqdns = str($fqdns)->explode(',');
                         if ($pull_request_id !== 0) {
                             $preview = $resource->previews()->find($preview_id);
-                            $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
-                            if ($docker_compose_domains->count() > 0) {
-                                $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                            $docker_compose_domains = json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: [];
+                            if (count($docker_compose_domains) > 0) {
+                                $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                                 if ($found_fqdn) {
                                     $fqdns = collect($found_fqdn);
                                 } else {
