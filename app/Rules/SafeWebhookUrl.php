@@ -143,10 +143,17 @@ class SafeWebhookUrl implements ValidationRule
             return [];
         }
 
-        return array_map(
-            fn (string $ip): string => sprintf('%s:%d=%s', $target['host'], $target['port'], filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.$ip.']' : $ip),
+        // The MinIO client keeps one --resolve IP per host and parses it with Go's
+        // netip.ParseAddr, which rejects bracketed IPv6. Emit a single entry, preferring
+        // IPv4 for reachability, without brackets.
+        $preferredIps = array_values(array_filter(
             $target['ips'],
-        );
+            fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false,
+        ));
+
+        $ip = $preferredIps[0] ?? $target['ips'][0];
+
+        return [sprintf('%s:%d=%s', $target['host'], $target['port'], $ip)];
     }
 
     public static function redactedUrlForLog(string $url): string
