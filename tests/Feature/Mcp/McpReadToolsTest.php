@@ -10,6 +10,7 @@ use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
@@ -205,6 +206,83 @@ test('database backup tools scope schedules by database type and id', function (
     ]);
     $response->assertOk();
     expect($response->json('result.isError'))->toBeTrue();
+});
+
+test('list_backup_executions omits messages without sensitive read and redacts when included', function () {
+    $postgres = StandalonePostgresql::create([
+        'name' => 'backup-msg-db',
+        'postgres_password' => 'password',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->team->id,
+        'frequency' => '0 0 * * *',
+        'database_id' => $postgres->id,
+        'database_type' => $postgres->getMorphClass(),
+    ]);
+
+    $older = ScheduledDatabaseBackupExecution::create([
+        'uuid' => (string) Str::uuid(),
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        'message' => 'older backup ok',
+        'size' => 100,
+        'filename' => 'old.sql.gz',
+        'created_at' => now()->subHours(2),
+        'updated_at' => now()->subHours(2),
+    ]);
+    $newer = ScheduledDatabaseBackupExecution::create([
+        'uuid' => (string) Str::uuid(),
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'failed',
+        'message' => "backup failed password=redactme01\n",
+        'size' => 0,
+        'filename' => 'new.sql.gz',
+        'created_at' => now()->subHour(),
+        'updated_at' => now()->subHour(),
+    ]);
+
+    $readOnly = mcpReadCall('list_backup_executions', [
+        'database_uuid' => $postgres->uuid,
+        'scheduled_backup_uuid' => $backup->uuid,
+        'page' => 1,
+        'per_page' => 1,
+    ]);
+    $readOnly->assertOk();
+    $readBody = mcpReadJson($readOnly);
+    expect($readBody['data']['message_included'])->toBeFalse()
+        ->and($readBody['data']['executions'])->toHaveCount(1)
+        ->and($readBody['data']['executions'][0]['status'])->toBe('failed')
+        ->and($readBody['data']['executions'][0]['filename'])->toBe('new.sql.gz')
+        ->and($readBody['data']['executions'][0])->not->toHaveKey('message')
+        ->and($readBody['_pagination']['total'])->toBe(2);
+
+    $page2 = mcpReadCall('list_backup_executions', [
+        'database_uuid' => $postgres->uuid,
+        'scheduled_backup_uuid' => $backup->uuid,
+        'page' => 2,
+        'per_page' => 1,
+    ]);
+    $page2->assertOk();
+    expect(mcpReadJson($page2)['data']['executions'][0]['status'])->toBe('success');
+
+    $sensitive = mcpSensitiveReadCall('list_backup_executions', [
+        'database_uuid' => $postgres->uuid,
+        'scheduled_backup_uuid' => $backup->uuid,
+        'page' => 1,
+        'per_page' => 1,
+    ]);
+    $sensitive->assertOk();
+    $sensitiveBody = mcpReadJson($sensitive);
+    $message = $sensitiveBody['data']['executions'][0]['message'] ?? '';
+    expect($sensitiveBody['data']['message_included'])->toBeTrue()
+        ->and($message)->not->toContain('redactme01')
+        ->and($message)->toContain('password=')
+        ->and($message)->toContain(REDACTED);
+
+    expect($older->id)->not->toBe($newer->id);
 });
 
 test('get_project returns environments and counts for team project only', function () {

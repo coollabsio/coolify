@@ -14,7 +14,7 @@ class ListBackupExecutions extends Tool
 {
     protected string $name = 'list_backup_executions';
 
-    protected string $description = 'List backup executions for a scheduled database backup owned by the authenticated team.';
+    protected string $description = 'List backup executions for a scheduled database backup owned by the authenticated team. Execution messages require read:sensitive and are best-effort redacted.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -55,23 +55,35 @@ class ListBackupExecutions extends Tool
             return $this->mcpError($request, "Backup schedule [{$backupUuid}] not found.", ['resource_uuid' => $backupUuid]);
         }
 
+        // Free-form execution output can embed secrets; gate like get_logs / task executions.
+        $token = $request->user()?->currentAccessToken();
+        $includeMessage = $token !== null && ($token->can('root') || $token->can('read:sensitive'));
+
         $args = $this->paginationArgs($request);
-        $query = $backup->executions()->orderByDesc('created_at');
+        $query = $backup->executions()->orderByDesc('created_at')->orderByDesc('id');
         $total = (clone $query)->count();
 
         $executions = $query
             ->skip($args['offset'])
             ->take($args['per_page'])
             ->get()
-            ->map(fn ($ex) => $this->scrubSensitive([
-                'uuid' => $ex->uuid ?? null,
-                'status' => $ex->status ?? null,
-                'message' => $ex->message ?? null,
-                'size' => $ex->size ?? null,
-                'filename' => $ex->filename ?? null,
-                'created_at' => $ex->created_at,
-                'updated_at' => $ex->updated_at,
-            ]))
+            ->map(function ($ex) use ($includeMessage) {
+                $row = [
+                    'uuid' => $ex->uuid ?? null,
+                    'status' => $ex->status ?? null,
+                    'message_included' => $includeMessage,
+                    'size' => $ex->size ?? null,
+                    'filename' => $ex->filename ?? null,
+                    'created_at' => $ex->created_at,
+                    'updated_at' => $ex->updated_at,
+                ];
+                if ($includeMessage) {
+                    $message = $ex->message;
+                    $row['message'] = is_string($message) ? $this->redactLogText($message) : $message;
+                }
+
+                return $this->scrubSensitive($row);
+            })
             ->values()
             ->all();
 
@@ -79,6 +91,7 @@ class ListBackupExecutions extends Tool
             [
                 'database_uuid' => $databaseUuid,
                 'scheduled_backup_uuid' => $backupUuid,
+                'message_included' => $includeMessage,
                 'executions' => $executions,
             ],
             [],
