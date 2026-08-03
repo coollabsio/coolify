@@ -79,9 +79,12 @@
     .menu-item-active::before {
         content: "";
         position: absolute;
-        inset: 0;
-        border-left: 3px solid var(--color-accent);
-        border-radius: inherit;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 3px;
+        background: var(--color-accent);
+        border-radius: 0;
         pointer-events: none;
     }
     .menu-subitem-active::before {
