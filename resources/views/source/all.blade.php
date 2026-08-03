@@ -12,26 +12,39 @@
                 </p>
             </div>
             @can('createAnyResource')
-                <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    <x-modal-input title="New GitHub App" :closeOutside="false">
-                        <x-slot:content>
-                            <button type="button"
-                                class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
-                                <x-reicon name="plus" class="size-3.5" />
-                                GitHub
-                            </button>
-                        </x-slot:content>
-                        <livewire:source.github.create />
-                    </x-modal-input>
-                    <x-modal-input title="New GitLab App" :closeOutside="false">
-                        <x-slot:content>
-                            <button type="button" class="button">
-                                <x-reicon name="plus" class="size-3.5" />
-                                GitLab
-                            </button>
-                        </x-slot:content>
-                        <livewire:source.gitlab.create />
-                    </x-modal-input>
+                <div x-data="{ dropdownOpen: false }" class="relative shrink-0"
+                    @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
+                    <button type="button" @click="dropdownOpen = !dropdownOpen"
+                        class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                        aria-haspopup="menu" :aria-expanded="dropdownOpen">
+                        <x-reicon name="plus" class="size-3.5" />
+                        New source
+                        <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                    </button>
+
+                    <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right role="menu"
+                        class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!">
+                        <x-modal-input title="New GitHub App" :closeOutside="false">
+                            <x-slot:content>
+                                <button type="button" @click="dropdownOpen = false"
+                                    class="listbox-option justify-start! gap-2.5!" role="menuitem">
+                                    <x-git-icon class="size-3.5 shrink-0 opacity-70" git="App\Models\GithubApp" />
+                                    GitHub App
+                                </button>
+                            </x-slot:content>
+                            <livewire:source.github.create />
+                        </x-modal-input>
+                        <x-modal-input title="New GitLab App" :closeOutside="false">
+                            <x-slot:content>
+                                <button type="button" @click="dropdownOpen = false"
+                                    class="listbox-option justify-start! gap-2.5!" role="menuitem">
+                                    <x-git-icon class="size-3.5 shrink-0 opacity-70" git="App\Models\GitlabApp" />
+                                    GitLab App
+                                </button>
+                            </x-slot:content>
+                            <livewire:source.gitlab.create />
+                        </x-modal-input>
+                    </div>
                 </div>
             @endcan
         </header>
