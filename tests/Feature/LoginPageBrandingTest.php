@@ -20,3 +20,15 @@ test('login register and forgot password headers are Coolify', function () {
         ->toContain('title="Coolify"')
         ->not->toContain("title=\"{{ __('auth.forgot_password_heading') }}\"");
 });
+
+test('confirm password page uses the shared auth shell', function () {
+    $confirm = file_get_contents(resource_path('views/auth/confirm-password.blade.php'));
+
+    expect($confirm)
+        ->toContain('x-auth.shell')
+        ->toContain('title="Coolify"')
+        ->toContain('x-auth.alert')
+        ->toContain('auth-guidance')
+        ->not->toContain('bg-gray-50 dark:bg-base')
+        ->not->toContain('!text-5xl font-extrabold');
+});

@@ -24,14 +24,13 @@
                     </div>
                 </x-application.settings-section>
             @else
-                @if (config('subscription.provider') === 'stripe')
-                    @if ($isCancelled)
-                        <x-callout type="warning" title="No active subscription" class="mb-6">
-                            Choose a plan to continue using Coolify Cloud.
-                        </x-callout>
-                    @endif
-                    <livewire:subscription.pricing-plans />
+                @if ($isCancelled || ! data_get(currentTeam(), 'subscription'))
+                    <x-callout type="warning" title="No active subscription" class="mb-6">
+                        Choose a plan to continue using Coolify Cloud.
+                    </x-callout>
                 @endif
+                {{-- Stripe is the only cloud provider; always render pricing so the page is never blank. --}}
+                <livewire:subscription.pricing-plans />
             @endif
         @endif
     @else

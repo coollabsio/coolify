@@ -31,12 +31,15 @@
                 {{-- Brand (width tracks sidebar) --}}
                 <div class="flex items-center gap-2 h-full shrink-0 border-r border-neutral-200 dark:border-white/[0.06] transition-[width] duration-200"
                     :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
-                    <a href="/" {{ wireNavigate() }} title="Coolify"
-                        class="flex shrink-0 items-baseline gap-1.5 min-w-0 hover:opacity-80 transition-opacity">
-                        <span x-show="collapsed" x-cloak class="text-[15px] font-semibold tracking-tight text-black dark:text-white">C</span>
-                        <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Coolify</span>
-                        <span x-show="!collapsed" class="text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint">v{{ config('constants.coolify.version') }}</span>
-                    </a>
+                    <div class="flex shrink-0 items-baseline gap-1.5 min-w-0">
+                        <a href="/" {{ wireNavigate() }} title="Coolify"
+                            class="hover:opacity-80 transition-opacity">
+                            <span x-show="collapsed" x-cloak class="text-[15px] font-semibold tracking-tight text-black dark:text-white">C</span>
+                            <span x-show="!collapsed" class="text-[15px] font-semibold tracking-tight text-black dark:text-white">Coolify</span>
+                        </a>
+                        <x-version x-show="!collapsed"
+                            class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 dark:hover:text-fg hover:text-black" />
+                    </div>
                     @if (isInstanceAdmin() && !isCloud())
                         <div x-show="!collapsed" class="ml-auto shrink-0">
                             @persist('upgrade')
@@ -58,18 +61,18 @@
             {{-- ============ MOBILE SLIDE-OVER SIDEBAR ============ --}}
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
-                <div class="fixed inset-y-0 right-0 h-full flex">
-                    <div class="relative flex flex-1 w-full max-w-56 min-w-0">
-                        <div class="absolute top-0 flex justify-center w-16 pt-5 right-full">
+                <div class="fixed inset-y-0 right-0 flex h-full">
+                    <div class="relative flex h-full w-full max-w-56 min-w-0 flex-col bg-white shadow-xl dark:bg-panel">
+                        <div class="absolute top-0 right-full flex w-16 justify-center pt-5">
                             <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
                                 <span class="sr-only">Close sidebar</span>
-                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                     stroke="currentColor" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
                         </div>
-                        <div class="flex flex-col pb-2 overflow-y-auto min-w-56 dark:bg-panel gap-y-5 scrollbar min-w-0">
+                        <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-2 scrollbar">
                             <x-navbar />
                         </div>
                     </div>

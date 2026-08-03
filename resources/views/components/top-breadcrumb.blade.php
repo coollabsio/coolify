@@ -31,25 +31,30 @@
         request()->routeIs('admin.*') => 'Admin',
         default => null,
     };
-    $pageDestinations = collect([
-        ['label' => 'Dashboard', 'href' => url('/')],
-        ['label' => 'Projects', 'href' => url('/projects')],
-        auth()->user()?->can('canAccessTerminal')
-            ? ['label' => 'Terminal', 'href' => route('terminal')]
-            : null,
-        ['label' => 'Servers', 'href' => url('/servers')],
-        ['label' => 'Sources', 'href' => route('source.all')],
-        ['label' => 'Destinations', 'href' => route('destination.index')],
-        ['label' => 'S3 Storage', 'href' => route('storage.index')],
-        ['label' => 'Shared Variables', 'href' => route('shared-variables.index')],
-        ['label' => 'Team', 'href' => route('team.index')],
-        ['label' => 'Notifications', 'href' => route('notifications.email')],
-        ['label' => 'Keys & Tokens', 'href' => route('security.private-key.index')],
-        ['label' => 'Tags', 'href' => route('tags.show')],
-        isInstanceAdmin()
-            ? ['label' => 'Settings', 'href' => route('settings.index')]
-            : null,
-    ])->filter();
+    // Workspace destinations require an active plan on cloud; unsubscribed users
+    // only keep profile/appearance and must not see this switcher.
+    $canUseWorkspaceNav = isSubscribed() || ! isCloud();
+    $pageDestinations = $canUseWorkspaceNav
+        ? collect([
+            ['label' => 'Dashboard', 'href' => url('/')],
+            ['label' => 'Projects', 'href' => url('/projects')],
+            auth()->user()?->can('canAccessTerminal')
+                ? ['label' => 'Terminal', 'href' => route('terminal')]
+                : null,
+            ['label' => 'Servers', 'href' => url('/servers')],
+            ['label' => 'Sources', 'href' => route('source.all')],
+            ['label' => 'Destinations', 'href' => route('destination.index')],
+            ['label' => 'S3 Storage', 'href' => route('storage.index')],
+            ['label' => 'Shared Variables', 'href' => route('shared-variables.index')],
+            ['label' => 'Team', 'href' => route('team.index')],
+            ['label' => 'Notifications', 'href' => route('notifications.email')],
+            ['label' => 'Keys & Tokens', 'href' => route('security.private-key.index')],
+            ['label' => 'Tags', 'href' => route('tags.show')],
+            isInstanceAdmin()
+                ? ['label' => 'Settings', 'href' => route('settings.index')]
+                : null,
+        ])->filter()
+        : collect();
 @endphp
 <div class="flex items-center gap-0.5 min-w-0 text-[13px]">
     {{-- Team --}}
@@ -57,7 +62,7 @@
         <livewire:switch-team />
     </div>
 
-    @if (!$currentProject && $dashboardContext)
+    @if (!$currentProject && $dashboardContext && $canUseWorkspaceNav)
         <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
             <button type="button" @click="open = !open" @click.outside="open = false" title="Switch page"
@@ -86,6 +91,11 @@
                 @endforeach
             </div>
         </div>
+    @elseif (!$currentProject && $dashboardContext)
+        {{-- Static context label only — no links to paid workspace pages. --}}
+        <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
+        <span
+            class="flex h-8 min-w-0 items-center truncate px-2 font-semibold text-black opacity-70 dark:text-fg">{{ $dashboardContext }}</span>
     @endif
 
     @if ($currentProject)

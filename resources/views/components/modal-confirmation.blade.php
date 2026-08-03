@@ -136,12 +136,17 @@
     @class([
         // Default to inline-flex so shells with only a programmatic/hidden trigger
         // do not paint a full-width empty block above navigation.
-        'relative inline-flex h-auto max-w-full',
-        'w-full' => $buttonFullWidth,
-        'w-auto' => ! $buttonFullWidth,
+        'relative h-auto max-w-full',
+        'flex w-full' => $buttonFullWidth,
+        'inline-flex w-auto' => ! $buttonFullWidth,
     ])>
     @if (isset($trigger))
-        <div class="inline-flex max-w-full" @click="modalOpen=true">
+        <div @class([
+                'max-w-full',
+                'flex w-full min-w-0' => $buttonFullWidth,
+                'inline-flex' => ! $buttonFullWidth,
+            ])
+            @click="modalOpen=true">
             {{ $trigger }}
         </div>
     @elseif ($customButton)

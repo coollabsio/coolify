@@ -42,19 +42,21 @@
                 document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#0d0d0d' : '#ffffff');
             }
     }">
-    {{-- Search --}}
-    <div class="px-1 pb-3" :class="collapsed && 'lg:px-0 lg:flex lg:justify-center'">
-        <button @click="$dispatch('open-global-search')" type="button" title="Search (Press / or ⌘K)"
-            class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint"
-            :class="collapsed && 'lg:w-8 lg:justify-center lg:px-0'">
-            <span class="flex items-center gap-2.5 min-w-0">
-                <x-reicon name="search" class="menu-item-icon" />
-                <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Search</span>
-            </span>
-            <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
-                :class="collapsed && 'lg:hidden'">⌘K</kbd>
-        </button>
-    </div>
+    {{-- Search is only useful when workspace resources are available --}}
+    @if (isSubscribed() || ! isCloud())
+        <div class="px-1 pb-3" :class="collapsed && 'lg:px-0 lg:flex lg:justify-center'">
+            <button @click="$dispatch('open-global-search')" type="button" title="Search (Press / or ⌘K)"
+                class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint"
+                :class="collapsed && 'lg:w-8 lg:justify-center lg:px-0'">
+                <span class="flex items-center gap-2.5 min-w-0">
+                    <x-reicon name="search" class="menu-item-icon" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Search</span>
+                </span>
+                <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
+                    :class="collapsed && 'lg:hidden'">⌘K</kbd>
+            </button>
+        </div>
+    @endif
 
     <ul role="list" class="flex min-h-0 flex-1 flex-col gap-y-0.5 overflow-y-auto pb-2 scrollbar">
         @if (isSubscribed() || !isCloud())
@@ -177,8 +179,23 @@
 
             <li class="flex-1" aria-hidden="true"></li>
         @endif
-        @if (!isSubscribed() && isCloud() && auth()->user()->teams()->get()->count() > 1)
-            <livewire:navbar-delete-team />
+        @if (isCloud() && ! isSubscribed())
+            {{-- Unsubscribed cloud has no workspace items — keep these at the top of the list. --}}
+            <li class="nav-section" :class="collapsed && 'lg:hidden'">Account</li>
+            <li>
+                <a title="Subscription" {{ wireNavigate() }}
+                    class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                    :class="collapsed && 'lg:justify-center lg:px-0'"
+                    href="{{ isSubscriptionOnGracePeriod() ? route('subscription.show') : route('subscription.index') }}">
+                    <x-reicon name="subscription" class="menu-item-icon" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Subscription</span>
+                </a>
+            </li>
+            @if (auth()->user()->teams()->get()->count() > 1)
+                <li class="mt-2">
+                    <livewire:navbar-delete-team />
+                </li>
+            @endif
         @endif
     </ul>
     {{-- Sticky sidebar collapser (desktop only; mobile uses a temporary slide-over) --}}

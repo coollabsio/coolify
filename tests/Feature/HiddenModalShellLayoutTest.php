@@ -7,7 +7,9 @@ test('modal confirmation roots are inline so hidden triggers do not stretch full
     $modal = file_get_contents(resource_path('views/components/modal-confirmation.blade.php'));
 
     expect($modal)
-        ->toContain('relative inline-flex h-auto max-w-full')
+        ->toContain("'relative h-auto max-w-full'")
+        ->toContain("'inline-flex w-auto' => ! \$buttonFullWidth")
+        ->toContain("'flex w-full' => \$buttonFullWidth")
         ->not->toContain("'relative h-auto'");
 });
 

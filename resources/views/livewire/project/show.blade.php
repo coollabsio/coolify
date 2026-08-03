@@ -16,7 +16,16 @@
             </div>
 
             @can('update', $project)
-                <div class="w-fit shrink-0">
+                <div class="flex w-fit shrink-0 items-center gap-2">
+                    <a href="{{ route('project.edit', ['project_uuid' => $project->uuid]) }}"
+                        {{ wireNavigate() }}
+                        class="button"
+                        title="Project settings"
+                        aria-label="Open settings for {{ $project->name }}">
+                        <x-reicon name="settings" class="size-3.5" />
+                        Settings
+                    </a>
+
                     <x-modal-input title="New Environment">
                         <x-slot:content>
                             <button type="button"

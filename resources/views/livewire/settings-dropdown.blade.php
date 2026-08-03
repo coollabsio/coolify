@@ -175,16 +175,13 @@
                             x-text="`${filteredEntries.length} ${filteredEntries.length === 1 ? 'update' : 'updates'}`"></span>
                     </div>
 
-                    <div class="min-h-0 flex-1 overflow-y-auto p-3 scrollbar sm:p-4">
-                        <div x-show="filteredEntries.length > 0" class="flex flex-col gap-3">
+                    <div class="min-h-0 flex-1 overflow-y-auto p-4 scrollbar sm:p-5">
+                        <div x-show="filteredEntries.length > 0">
                             <template x-for="entry in paginatedEntries" :key="entry.tag_name">
-                                <article
-                                    class="relative overflow-hidden rounded-lg border border-neutral-200 bg-white p-4 dark:border-white/[0.07] dark:bg-raised">
-                                    <div x-show="!entry.is_read"
-                                        class="absolute inset-y-0 left-0 w-0.5 bg-accent"></div>
-                                    <div class="flex items-start gap-4">
+                                <article>
+                                    <div class="mb-4 flex items-start gap-4">
                                         <div class="min-w-0 flex-1">
-                                            <div class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                                 <a :href="`https://github.com/coollabsio/coolify/releases/tag/${entry.tag_name}`"
                                                     target="_blank" rel="noopener noreferrer"
                                                     class="inline-flex min-w-0 items-center gap-1.5 text-sm font-semibold text-black hover:text-accent dark:text-fg"
@@ -200,9 +197,6 @@
                                                     x-text="new Date(entry.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })">
                                                 </span>
                                             </div>
-                                            <div
-                                                class="max-w-none text-sm leading-6 text-neutral-600 dark:text-fg-dim [&_a]:font-medium [&_a]:text-accent [&_code]:rounded [&_code]:bg-neutral-100 [&_code]:px-1 [&_code]:py-0.5 dark:[&_code]:bg-white/[0.06] [&_li]:my-1 [&_ul]:ml-5 [&_ul]:list-disc"
-                                                x-html="entry.content_html"></div>
                                         </div>
                                         <button x-show="!entry.is_read" @click="markEntryAsRead(entry.tag_name)"
                                             class="shrink-0 cursor-pointer rounded-md px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
@@ -210,6 +204,9 @@
                                             Mark read
                                         </button>
                                     </div>
+                                    <div
+                                        class="max-w-none text-sm leading-6 text-neutral-600 dark:text-fg-dim [&_a]:font-medium [&_a]:text-accent [&_code]:rounded [&_code]:bg-neutral-100 [&_code]:px-1 [&_code]:py-0.5 dark:[&_code]:bg-white/[0.06] [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-base [&_h2]:font-semibold [&_h2]:text-black dark:[&_h2]:text-fg [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-black dark:[&_h3]:text-fg [&_li]:my-1 [&_ul]:ml-5 [&_ul]:list-disc"
+                                        x-html="entry.content_html"></div>
                                 </article>
                             </template>
                         </div>
