@@ -23,6 +23,7 @@ beforeEach(function () {
     $this->publicKey = $pair['public'];
 
     config([
+        'constants.coolify.self_hosted' => false, // isCloud()
         'services.domain_connect.provider_id' => 'coolify.io',
         'services.domain_connect.service_id' => 'hosting',
         'services.domain_connect.key_id' => '_dcpubkeyv1',
@@ -109,7 +110,11 @@ it('splits hostnames into domain and host', function () {
         ->and(CloudflareDomainConnect::splitHostname('app.example.com'))
         ->toBe(['domain' => 'example.com', 'host' => 'app'])
         ->and(CloudflareDomainConnect::splitHostname('https://api.staging.example.com/path'))
-        ->toBe(['domain' => 'example.com', 'host' => 'api.staging']);
+        ->toBe(['domain' => 'example.com', 'host' => 'api.staging'])
+        ->and(CloudflareDomainConnect::splitHostname('app.example.co.uk'))
+        ->toBe(['domain' => 'example.co.uk', 'host' => 'app'])
+        ->and(CloudflareDomainConnect::splitHostname('api.staging.example.com.au'))
+        ->toBe(['domain' => 'example.com.au', 'host' => 'api.staging']);
 });
 
 it('rejects invalid domains and ips', function () {

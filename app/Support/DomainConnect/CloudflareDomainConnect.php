@@ -126,8 +126,12 @@ class CloudflareDomainConnect
     }
 
     /**
-     * Split a hostname like app.example.com into domain=example.com and host=app.
-     * For apex (example.com) host is empty.
+     * Split a hostname into its registrable domain and relative host.
+     *
+     * Uses a small multi-part public-suffix set for common cases (e.g. co.uk)
+     * instead of shipping the full Mozilla Public Suffix List (~300KB).
+     * Unknown multi-part TLDs fall back to last-two-labels; Cloudflare will
+     * still match the user's zone when the guess is close enough.
      *
      * @return array{domain: string, host: string}
      */
@@ -145,17 +149,129 @@ class CloudflareDomainConnect
             throw new InvalidArgumentException('Hostname must include a domain (e.g. example.com or app.example.com).');
         }
 
-        if (count($labels) === 2) {
-            return ['domain' => implode('.', $labels), 'host' => ''];
+        $suffixLabelCount = self::publicSuffixLabelCount($labels);
+        $registrableLabelCount = $suffixLabelCount + 1;
+
+        if (count($labels) < $registrableLabelCount) {
+            throw new InvalidArgumentException('Hostname must include a registrable domain.');
         }
 
-        // Multi-label: treat last two labels as the zone (example.com / co.uk-style multi-part TLDs
-        // are imperfect without a public-suffix list; Cloudflare will match the user's zone).
-        $domain = implode('.', array_slice($labels, -2));
-        $host = implode('.', array_slice($labels, 0, -2));
+        $domain = implode('.', array_slice($labels, -$registrableLabelCount));
+        $hostLabels = array_slice($labels, 0, -$registrableLabelCount);
+        $host = implode('.', $hostLabels);
 
         return ['domain' => $domain, 'host' => $host];
     }
+
+    /**
+     * How many trailing labels form the public suffix (effective TLD).
+     *
+     * @param  list<string>  $labels
+     */
+    protected static function publicSuffixLabelCount(array $labels): int
+    {
+        $count = count($labels);
+
+        // Longest multi-part match first (up to 3 labels: e.g. com.au, co.uk).
+        for ($length = min(3, $count - 1); $length >= 2; $length--) {
+            $candidate = implode('.', array_slice($labels, -$length));
+            if (isset(self::MULTI_PART_PUBLIC_SUFFIXES[$candidate])) {
+                return $length;
+            }
+        }
+
+        return 1;
+    }
+
+    /**
+     * Common multi-label public suffixes. Keys only; values unused.
+     * Not exhaustive — covers frequent Domain Connect / Cloudflare zones.
+     *
+     * @var array<string, true>
+     */
+    private const MULTI_PART_PUBLIC_SUFFIXES = [
+        // United Kingdom / related
+        'ac.uk' => true,
+        'co.uk' => true,
+        'gov.uk' => true,
+        'ltd.uk' => true,
+        'me.uk' => true,
+        'net.uk' => true,
+        'org.uk' => true,
+        'plc.uk' => true,
+        'sch.uk' => true,
+        // Australia
+        'com.au' => true,
+        'net.au' => true,
+        'org.au' => true,
+        'edu.au' => true,
+        'gov.au' => true,
+        'asn.au' => true,
+        'id.au' => true,
+        // New Zealand
+        'co.nz' => true,
+        'net.nz' => true,
+        'org.nz' => true,
+        'govt.nz' => true,
+        'ac.nz' => true,
+        // Japan
+        'co.jp' => true,
+        'or.jp' => true,
+        'ne.jp' => true,
+        'ac.jp' => true,
+        'go.jp' => true,
+        // Brazil
+        'com.br' => true,
+        'net.br' => true,
+        'org.br' => true,
+        'gov.br' => true,
+        // India
+        'co.in' => true,
+        'net.in' => true,
+        'org.in' => true,
+        'gen.in' => true,
+        'firm.in' => true,
+        'ind.in' => true,
+        // South Africa
+        'co.za' => true,
+        'org.za' => true,
+        'web.za' => true,
+        'net.za' => true,
+        // Mexico / LatAm
+        'com.mx' => true,
+        'org.mx' => true,
+        'gob.mx' => true,
+        'com.ar' => true,
+        'com.co' => true,
+        'com.pe' => true,
+        'com.cl' => true,
+        // Asia / others
+        'com.cn' => true,
+        'net.cn' => true,
+        'org.cn' => true,
+        'com.hk' => true,
+        'com.sg' => true,
+        'com.tw' => true,
+        'com.my' => true,
+        'com.ph' => true,
+        'com.tr' => true,
+        'com.ua' => true,
+        'com.pl' => true,
+        'com.ru' => true,
+        'co.kr' => true,
+        'co.il' => true,
+        'com.sa' => true,
+        'com.eg' => true,
+        'com.ng' => true,
+        // EU-style
+        'co.at' => true,
+        'or.at' => true,
+        'co.nl' => true,
+        'com.de' => true,
+        // Platforms sometimes used as zones
+        'github.io' => true,
+        'pages.dev' => true,
+    ];
 
     /**
      * @param  array<string, string>  $params
