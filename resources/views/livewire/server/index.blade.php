@@ -112,14 +112,12 @@
                                     x-text="server.address"></p>
                             </div>
                         </div>
-                        <div class="mt-auto flex items-center justify-between gap-2 pt-4">
+                        <div class="mt-auto flex items-center pt-4">
                             <x-status-badge dynamic>
                                 <span class="size-1.5 rounded-full"
                                     :class="server.ready ? 'bg-emerald-500' : 'bg-red-500'"></span>
                                 <span x-text="server.status"></span>
                             </x-status-badge>
-                            <x-reicon name="arrow-right"
-                                class="size-3.5 text-neutral-400 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                         </div>
                     </a>
                 </template>
@@ -128,15 +126,14 @@
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
                 <div
-                    class="grid min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem_2rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="grid min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                     <div>Server</div>
                     <div>Address</div>
                     <div>Status</div>
-                    <div></div>
                 </div>
                 <template x-for="server in filteredServers" :key="server.uuid">
                     <a :href="server.href" {{ wireNavigate() }}
-                        class="grid min-h-14 min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem_2rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        class="grid min-h-14 min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -157,8 +154,6 @@
                                 <span x-text="server.status"></span>
                             </x-status-badge>
                         </div>
-                        <x-reicon name="arrow-right"
-                            class="size-3.5 justify-self-end text-neutral-400 dark:text-fg-faint" />
                     </a>
                 </template>
             </div>

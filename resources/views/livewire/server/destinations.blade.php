@@ -43,7 +43,6 @@
                                     {{ $server->swarmDockers->contains('id', data_get($destination, 'id')) ? 'Docker Swarm' : 'Standalone Docker' }}
                                 </p>
                             </div>
-                            <x-reicon name="arrow-right" class="size-4 text-neutral-400" />
                         </a>
                     @empty
                         <x-empty size="sm" title="No destinations"

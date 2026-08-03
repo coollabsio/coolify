@@ -51,8 +51,6 @@
                                             </p>
                                         </div>
                                     </div>
-                                    <x-reicon name="arrow-right"
-                                        class="mt-auto size-3.5 self-end pt-3 text-neutral-400 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                                 </a>
                             @endforeach
                         </div>

@@ -19,8 +19,4 @@
             </div>
         @endif
     </div>
-    @unless ($upgrade)
-        <x-reicon name="arrow-right"
-            class="size-4 shrink-0 text-neutral-300 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
-    @endunless
 </div>

@@ -50,11 +50,10 @@
                                         </p>
                                     </div>
                                 </div>
-                                <div class="mt-auto flex items-center justify-between pt-4">
+                                <div class="mt-auto flex items-center pt-4">
                                     <span class="text-[10px] text-neutral-400 dark:text-fg-faint">
                                         Updated {{ $script->updated_at->diffForHumans() }}
                                     </span>
-                                    <x-reicon name="arrow-right" class="size-3 text-neutral-400" />
                                 </div>
                             </a>
                         @endcan

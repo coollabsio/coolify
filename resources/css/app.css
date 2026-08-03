@@ -1182,10 +1182,14 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     box-shadow: 0 0 0 1px var(--color-accent);
 }
 
-/* Hide native search clear decoration where it fights layout */
-.searchable-listbox-search-input::-webkit-search-decoration,
-.searchable-listbox-search-input::-webkit-search-cancel-button {
+/* Hide native WebKit search clear so custom clear buttons are not doubled */
+input[type="search"]::-webkit-search-decoration,
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-results-button,
+input[type="search"]::-webkit-search-results-decoration {
     -webkit-appearance: none;
+    appearance: none;
+    display: none;
 }
 
 .searchable-listbox-options {
@@ -1264,15 +1268,15 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 }
 
 .backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(8rem, 1fr) 5rem 1.5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(8rem, 1fr) 5rem;
 }
 
 .deployment-table-grid {
-    grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr) 1.5rem;
+    grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr);
 }
 
 .dashboard-deployment-table-grid {
-    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem 1rem;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem;
 }
 
 .team-members-table-grid {
@@ -1333,7 +1337,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 
 @media (max-width: 900px) {
     .backup-table-grid {
-        grid-template-columns: minmax(10rem, 1.5fr) 6rem 7.5rem minmax(8rem, 1fr) 1.5rem;
+        grid-template-columns: minmax(10rem, 1.5fr) 6rem 7.5rem minmax(8rem, 1fr);
     }
 
     .backup-table-grid > :nth-child(3),
@@ -1342,7 +1346,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     }
 
     .deployment-table-grid {
-        grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(10rem, 1.4fr) minmax(8rem, 0.9fr) 1.5rem;
+        grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(10rem, 1.4fr) minmax(8rem, 0.9fr);
     }
 
     .deployment-table-grid > :nth-child(5),
@@ -1402,7 +1406,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     }
 
     .backup-table-grid {
-        grid-template-columns: minmax(0, 1fr) 7.5rem 1.5rem;
+        grid-template-columns: minmax(0, 1fr) 7.5rem;
     }
 
     .backup-table-grid > :nth-child(2),
@@ -1411,7 +1415,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     }
 
     .deployment-table-grid {
-        grid-template-columns: 7.5rem minmax(0, 1fr) 1.5rem;
+        grid-template-columns: 7.5rem minmax(0, 1fr);
     }
 
     .deployment-table-grid > :nth-child(2),
@@ -2158,8 +2162,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
         minmax(110px, 0.8fr)
         minmax(180px, 1.2fr)
         minmax(120px, 0.8fr)
-        minmax(140px, 1fr)
-        1.75rem;
+        minmax(140px, 1fr);
     column-gap: 1rem;
 }
 
@@ -2180,8 +2183,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
         minmax(220px, 1.7fr)
         minmax(100px, 0.65fr)
         minmax(110px, 0.7fr)
-        minmax(90px, 0.55fr)
-        3rem;
+        minmax(90px, 0.55fr);
     column-gap: 1rem;
 }
 
@@ -2262,8 +2264,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
             minmax(220px, 2fr)
             minmax(100px, 0.8fr)
             minmax(110px, 0.8fr)
-            minmax(120px, 1fr)
-            1.75rem;
+            minmax(120px, 1fr);
     }
 
     .environment-resource-grid .resource-domain,
@@ -2274,7 +2275,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 
 @media (max-width: 768px) {
     .environment-resource-grid {
-        grid-template-columns: minmax(0, 1fr) 6.5rem 1.75rem;
+        grid-template-columns: minmax(0, 1fr) 6.5rem;
         column-gap: 0.75rem;
     }
 

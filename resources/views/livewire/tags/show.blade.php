@@ -112,11 +112,9 @@
                                 </div>
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-2 pt-4">
+                            <div class="mt-auto flex items-center pt-4">
                                 <span class="text-[11px] text-neutral-500 dark:text-fg-dim"
                                     x-text="`${tag.resourceCount} ${tag.resourceCount === 1 ? 'resource' : 'resources'}`"></span>
-                                <x-reicon name="arrow-right"
-                                    class="size-3.5 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100 dark:text-fg-faint" />
                             </div>
                         </article>
                     </template>
@@ -154,35 +152,26 @@
                     <div>Resources</div>
                     <div>Applications</div>
                     <div class="tag-services">Services</div>
-                    <div></div>
                 </div>
 
                 <template x-for="tag in paginatedTags" :key="tag.id">
-                    <div
-                        class="tags-table-grid group min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                    <a :href="tag.href" {{ wireNavigate() }}
+                        class="tags-table-grid group min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]"
+                        :aria-label="`Open ${tag.name}`">
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
                                 <x-reicon name="tags" class="size-4" />
                             </div>
-                            <a :href="tag.href" {{ wireNavigate() }}
-                                class="truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
-                                x-text="tag.name"></a>
+                            <span class="truncate text-[13px] font-semibold text-black dark:text-fg"
+                                x-text="tag.name"></span>
                         </div>
 
                         <div class="text-[12px] text-neutral-600 dark:text-fg-dim" x-text="tag.resourceCount"></div>
                         <div class="text-[12px] text-neutral-600 dark:text-fg-dim" x-text="tag.applicationsCount"></div>
                         <div class="tag-services text-[12px] text-neutral-600 dark:text-fg-dim"
                             x-text="tag.servicesCount"></div>
-
-                        <div class="flex items-center justify-end">
-                            <a :href="tag.href" {{ wireNavigate() }}
-                                class="flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                :aria-label="`Open ${tag.name}`">
-                                <x-reicon name="arrow-right" class="size-3.5" />
-                            </a>
-                        </div>
-                    </div>
+                    </a>
                 </template>
 
                 <footer x-show="totalPages > 1"
@@ -452,17 +441,16 @@
                             icon-name="play-circle" size="sm" />
                     @else
                         <div
-                            class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem_2rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                            class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                             <div>Resource</div>
                             <div>Server</div>
                             <div>Status</div>
-                            <div></div>
                         </div>
 
                         @foreach ($deploymentsPerTagPerServer as $serverName => $deployments)
                             @foreach ($deployments as $deployment)
                                 <a {{ wireNavigate() }} href="{{ data_get($deployment, 'deployment_url') }}"
-                                    class="grid min-h-13 min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem_2rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                                    class="grid min-h-13 min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                                     <div class="truncate font-medium text-black dark:text-fg">
                                         {{ data_get($deployment, 'application_name') }}
                                     </div>
@@ -471,8 +459,6 @@
                                         <x-status-badge :status="str(data_get($deployment, 'status'))->headline()"
                                             :type="data_get($deployment, 'status') === 'in_progress' ? 'warning' : 'neutral'" />
                                     </div>
-                                    <x-reicon name="arrow-right"
-                                        class="size-3.5 justify-self-end text-neutral-400 dark:text-fg-faint" />
                                 </a>
                             @endforeach
                         @endforeach

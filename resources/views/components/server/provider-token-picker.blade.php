@@ -45,9 +45,6 @@
                             </p>
                         </div>
                     </div>
-                    <div class="mt-auto flex justify-end pt-4">
-                        <x-reicon name="arrow-right" class="size-3 text-neutral-400" />
-                    </div>
                 </a>
             @endforeach
         </div>

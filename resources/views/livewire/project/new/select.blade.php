@@ -610,8 +610,6 @@
                             </span>
                         </span>
                         <x-status-badge status="running" text="Ready" />
-                        <x-reicon name="arrow-right"
-                            class="size-3.5 text-neutral-300 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                     </button>
                 @empty
                     @if ($buildServers?->isEmpty() && ! $onlyBuildServerAvailable)
@@ -666,8 +664,6 @@
                                     destination</span>
                             </span>
                             <x-deprecated-badge />
-                            <x-reicon name="arrow-right"
-                                class="size-3.5 text-neutral-300 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                         </button>
                     @endforeach
                 @else
@@ -685,8 +681,6 @@
                                     {{ $standaloneDocker->network }}</span>
                             </span>
                             <x-status-badge status="running" text="Standalone Docker" />
-                            <x-reicon name="arrow-right"
-                                class="size-3.5 text-neutral-300 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                         </button>
                     @endforeach
                 @endif

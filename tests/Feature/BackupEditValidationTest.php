@@ -264,6 +264,68 @@ it('redirects to executions after queuing a database backup with unusable S3 sto
     Queue::assertPushed(DatabaseBackupJob::class);
 });
 
+it('queues instance database backup without redirecting when project context is missing', function () {
+    Queue::fake();
+
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    $this->user->teams()->syncWithoutDetaching([$rootTeam->id => ['role' => 'owner']]);
+    session(['currentTeam' => $rootTeam]);
+
+    $server = Server::factory()->create([
+        'id' => 0,
+        'team_id' => $rootTeam->id,
+        'ip' => '127.0.0.1',
+    ]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first()
+        ?? StandaloneDocker::create([
+            'id' => 0,
+            'name' => 'coolify',
+            'uuid' => (string) str()->uuid(),
+            'network' => 'coolify',
+            'server_id' => $server->id,
+        ]);
+
+    $database = new StandalonePostgresql;
+    $database->forceFill([
+        'id' => 0,
+        'name' => 'coolify-db',
+        'description' => 'Coolify database',
+        'postgres_user' => 'coolify',
+        'postgres_password' => 'password',
+        'postgres_db' => 'coolify',
+        'status' => 'running',
+        'destination_type' => StandaloneDocker::class,
+        'destination_id' => $destination->id,
+        'environment_id' => null,
+    ]);
+    $database->save();
+
+    expect($database->project())->toBeNull()
+        ->and($database->environment)->toBeNull();
+
+    $backup = ScheduledDatabaseBackup::create([
+        'id' => 0,
+        'enabled' => true,
+        'save_s3' => false,
+        'frequency' => '0 0 * * *',
+        'database_type' => StandalonePostgresql::class,
+        'database_id' => $database->id,
+        'team_id' => $rootTeam->id,
+        'timeout' => 3600,
+    ]);
+
+    Livewire::test(BackupEdit::class, [
+        'backup' => $backup->fresh(),
+        'availableS3Storages' => collect(),
+    ])
+        ->call('backupNow')
+        ->assertDispatched('success', 'Backup queued. It will be available in a few minutes.')
+        ->assertNoRedirect()
+        ->assertHasNoErrors();
+
+    Queue::assertPushed(DatabaseBackupJob::class);
+});
+
 it('disables S3 backup when saved without a selected S3 storage', function () {
     $backup = createBackupForEditValidationTest($this->team);
 

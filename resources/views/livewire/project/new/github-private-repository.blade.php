@@ -47,8 +47,6 @@
                                 {{ data_get($ghapp, 'html_url') }}
                             </p>
                         </div>
-                        <x-reicon name="arrow-right"
-                            class="size-4 text-neutral-300 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                     </button>
                 @endforeach
             </div>

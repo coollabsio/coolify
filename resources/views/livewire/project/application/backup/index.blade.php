@@ -172,7 +172,6 @@
                         <span>Status</span>
                         <span>Last run</span>
                         <span class="text-right">Executions</span>
-                        <span></span>
                     </div>
 
                     @foreach ($backups as $backup)
@@ -210,9 +209,6 @@
                             </span>
                             <span class="text-right tabular-nums text-neutral-950 dark:text-fg">
                                 {{ $backup->executions_count }}
-                            </span>
-                            <span class="flex justify-end text-neutral-400 dark:text-fg-faint">
-                                <x-reicon name="arrow-right" class="size-3.5" />
                             </span>
                         </a>
                     @endforeach

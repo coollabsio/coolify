@@ -11,7 +11,9 @@
 
         <div class="application-settings-form flex w-full flex-col gap-6">
             <form wire:submit="submit" class="contents">
-                <x-unsaved-bar action="submit" />
+                {{-- Scope to cron/threshold fields; listboxes use instantSave and would flash the bar. --}}
+                <x-unsaved-bar action="submit"
+                    targets="dockerCleanupFrequency,dockerCleanupThreshold" />
 
                 <x-application.settings-section id="docker-cleanup-overview-section" title="Docker cleanup"
                     helper="Remove unused Docker data and keep disk usage under control.">

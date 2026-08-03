@@ -31,13 +31,11 @@
                             </p>
                         </div>
                     </div>
-                    <div class="mt-auto flex items-center justify-between pt-4">
+                    <div class="mt-auto flex items-center pt-4">
                         <span class="text-[11px] text-neutral-500 dark:text-fg-dim">
                             {{ $project->environment_variables()->count() }}
                             {{ Str::plural('variable', $project->environment_variables()->count()) }}
                         </span>
-                        <x-reicon name="arrow-right"
-                            class="size-3.5 text-neutral-400 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                     </div>
                 </a>
             @endforeach

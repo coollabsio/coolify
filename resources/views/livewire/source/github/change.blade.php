@@ -177,12 +177,11 @@
                         </div>
                         <div class="overflow-x-auto">
                             <div
-                                class="grid min-w-[680px] grid-cols-[minmax(10rem,.8fr)_minmax(10rem,.8fr)_minmax(12rem,1fr)_8rem_2rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                                class="grid min-w-[680px] grid-cols-[minmax(10rem,.8fr)_minmax(10rem,.8fr)_minmax(12rem,1fr)_8rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                                 <div>Project</div>
                                 <div>Environment</div>
                                 <div>Resource</div>
                                 <div>Type</div>
-                                <div></div>
                             </div>
                             @foreach ($applications->sortBy('name', SORT_NATURAL) as $resource)
                                 @php
@@ -196,13 +195,11 @@
                                 @endphp
                                 <a {{ wireNavigate() }} href="{{ $resource->link() }}"
                                     x-show="search === '' || '{{ addslashes($searchValue) }}'.includes(search.toLowerCase())"
-                                    class="grid min-h-13 min-w-[680px] grid-cols-[minmax(10rem,.8fr)_minmax(10rem,.8fr)_minmax(12rem,1fr)_8rem_2rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                                    class="grid min-h-13 min-w-[680px] grid-cols-[minmax(10rem,.8fr)_minmax(10rem,.8fr)_minmax(12rem,1fr)_8rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                                     <span class="truncate text-neutral-500 dark:text-fg-dim">{{ $projectName }}</span>
                                     <span class="truncate text-neutral-500 dark:text-fg-dim">{{ $environmentName }}</span>
                                     <span class="truncate font-medium text-black dark:text-fg">{{ $resourceName }}</span>
                                     <span class="text-neutral-500 dark:text-fg-dim">{{ $resourceType }}</span>
-                                    <x-reicon name="arrow-right"
-                                        class="size-3.5 justify-self-end text-neutral-400 dark:text-fg-faint" />
                                 </a>
                             @endforeach
                         </div>

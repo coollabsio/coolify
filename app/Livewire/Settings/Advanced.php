@@ -230,33 +230,6 @@ class Advanced extends Component
         return filter_var($entry, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) !== false;
     }
 
-    public function toggleRegistration($password): bool
-    {
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return false;
-        }
-
-        $this->settings->is_registration_enabled = $this->is_registration_enabled = true;
-        $this->settings->save();
-        $this->dispatch('success', 'Registration has been enabled.');
-
-        return true;
-    }
-
-    public function toggleTwoStepConfirmation($password): bool
-    {
-        $this->authorize('update', $this->settings);
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return false;
-        }
-
-        $this->settings->disable_two_step_confirmation = $this->disable_two_step_confirmation = true;
-        $this->settings->save();
-        $this->dispatch('success', 'Two step confirmation has been disabled.');
-
-        return true;
-    }
-
     public function render()
     {
         return view('livewire.settings.advanced');

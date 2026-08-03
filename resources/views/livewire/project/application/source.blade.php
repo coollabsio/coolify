@@ -56,9 +56,8 @@
                 <div class="grid gap-2 sm:grid-cols-2">
                     @forelse ($privateKeys as $key)
                         <button type="button" wire:click="setPrivateKey('{{ $key->id }}')"
-                            class="flex min-h-11 items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 text-left text-[12px] font-medium transition-colors hover:bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:bg-white/[0.05]">
+                            class="flex min-h-11 items-center rounded-lg border border-neutral-200 bg-white px-3 text-left text-[12px] font-medium transition-colors hover:bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:bg-white/[0.05]">
                             {{ $key->name }}
-                            <x-reicon name="arrow-right" class="size-3.5 text-neutral-400" />
                         </button>
                     @empty
                         <x-empty title="No alternative private keys"

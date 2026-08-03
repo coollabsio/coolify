@@ -2,9 +2,7 @@
 
 namespace App\Livewire\Project;
 
-use App\Models\PrivateKey;
 use App\Models\Project;
-use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -12,13 +10,10 @@ class Index extends Component
 {
     public $projects;
 
-    public $servers;
-
-    public $private_keys;
-
     public function mount(): void
     {
-        $this->private_keys = PrivateKey::ownedByCurrentTeamCached();
+        // Only load what the page renders. Servers/private keys were previously
+        // hydrated into public Livewire state but never used by the view.
         $this->projects = Project::ownedByCurrentTeam()
             ->with(['environments:id,uuid,name,project_id'])
             ->withCount([
@@ -34,7 +29,6 @@ class Index extends Component
                 'mariadbs',
             ])
             ->get();
-        $this->servers = Server::ownedByCurrentTeamCached();
     }
 
     public function render(): View

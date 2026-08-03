@@ -10,7 +10,8 @@
         <x-settings.sidebar activeMenu="updates" />
 
         <form wire:submit="submit" class="application-settings-form flex min-w-0 flex-col gap-6">
-            <x-unsaved-bar action="submit" />
+            {{-- Exclude is_auto_update_enabled (instantSave) so the bar does not flash. --}}
+            <x-unsaved-bar action="submit" targets="update_check_frequency,auto_update_frequency" />
 
             <x-application.settings-section title="Update checks">
                 <x-slot:actions>

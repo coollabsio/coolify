@@ -140,7 +140,6 @@
                     <div class="resource-domain">Domain</div>
                     <div>Server</div>
                     <div class="resource-tags">Tags</div>
-                    <div></div>
                 </div>
 
                 <template x-for="item in paginatedResources" :key="item.uuid">
@@ -209,17 +208,6 @@
                             <span x-show="item.tags.length === 0"
                                 class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
                         </div>
-
-                        <a :href="item.hrefLink"
-                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
-                            {{ wireNavigate() }}
-                            class="flex size-7 items-center justify-center rounded-md text-neutral-400 opacity-0 transition-all hover:bg-neutral-100 hover:text-black group-hover:opacity-100 focus-visible:opacity-100 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            :aria-label="`Open ${item.name}`">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </a>
                     </div>
                 </template>
 
@@ -261,7 +249,12 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <template x-for="item in paginatedResources" :key="item.uuid">
                         <article
-                            class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <a :href="item.hrefLink"
+                                @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                                {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
+                                :aria-label="`Open ${item.name}`"></a>
+
                             <div class="flex items-start gap-3">
                                 <div
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
@@ -277,11 +270,9 @@
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex min-w-0 items-center gap-1.5">
-                                        <a :href="item.hrefLink"
-                                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
-                                            {{ wireNavigate() }}
-                                            class="block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
-                                            x-text="item.name"></a>
+                                        <h2
+                                            class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
+                                            x-text="item.name"></h2>
                                         <span x-show="item.version === 'v5'"
                                             class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
                                     </div>
@@ -295,21 +286,10 @@
                                 </x-status-badge>
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-3 pt-4">
+                            <div class="mt-auto flex items-center pt-4">
                                 <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
                                     x-text="displayDomain(item.fqdn) || item.description || item.destination?.server?.name || 'No endpoint'">
                                 </p>
-                                <a :href="item.hrefLink"
-                                    @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
-                                    {{ wireNavigate() }}
-                                    class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    :aria-label="`Open ${item.name}`">
-                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                        aria-hidden="true">
-                                        <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                            stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                </a>
                             </div>
                         </article>
                     </template>

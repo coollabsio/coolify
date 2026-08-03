@@ -227,15 +227,6 @@
                                 :aria-label="`Open settings for ${environment.name}`">
                                 <x-reicon name="settings" class="size-3.5" />
                             </a>
-                            <a :href="environment.href" {{ wireNavigate() }}
-                                class="flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                :aria-label="`Open ${environment.name}`">
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                    aria-hidden="true">
-                                    <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </a>
                         </div>
                     </div>
                 </template>

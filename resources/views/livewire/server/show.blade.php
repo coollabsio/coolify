@@ -59,7 +59,9 @@
                 @endphp
 
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col gap-6">
-                    <x-unsaved-bar action="submit" />
+                    {{-- isBuildServer uses instantSave; keep dirty tracking on explicit-save fields. --}}
+                    <x-unsaved-bar action="submit"
+                        targets="name,description,ip,user,port,connectionTimeout,serverTimezone,wildcardDomain" />
 
                     <x-application.settings-section id="server-overview-section" title="Server overview"
                         helper="Connection health, provider state, operating system, and hardware details.">

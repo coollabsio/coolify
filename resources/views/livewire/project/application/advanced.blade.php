@@ -194,7 +194,9 @@
                 @if ($isGpuEnabled)
                     <form id="gpu-settings-form" wire:submit="submit"
                         class="mt-5 flex w-full flex-col gap-4 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
-                        <x-unsaved-bar action="submit" />
+                        {{-- Scope to GPU form fields; sibling instantSave listboxes share this component. --}}
+                        <x-unsaved-bar action="submit"
+                            targets="gpuDriver,gpuCount,gpuDeviceIds,gpuOptions" />
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-forms.input label="GPU driver" id="gpuDriver" canGate="update" :canResource="$application" />
                             <x-forms.input label="GPU count" placeholder="Empty means use all GPUs" id="gpuCount"

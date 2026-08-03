@@ -161,7 +161,6 @@
                         <span>Started</span>
                         <span>Duration</span>
                         <span>Server</span>
-                        <span></span>
                     </div>
 
                     @foreach ($deployments as $deployment)
@@ -227,9 +226,6 @@
                             <span class="tabular-nums">{{ $duration }}</span>
                             <span class="truncate">
                                 {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
-                            </span>
-                            <span class="flex justify-end text-neutral-400 dark:text-fg-faint">
-                                <x-reicon name="arrow-right" class="size-3.5" />
                             </span>
                         </a>
                     @endforeach

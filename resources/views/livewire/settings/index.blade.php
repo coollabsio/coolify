@@ -10,7 +10,10 @@
         <x-settings.sidebar activeMenu="general" />
 
         <form wire:submit="submit" class="application-settings-form flex w-full min-w-0 flex-col gap-6">
-            <x-unsaved-bar action="submit" />
+            {{-- instance_timezone auto-saves via $wire.set + submit; exclude it so
+                 the bar does not flash while the snapshot catches up. --}}
+            <x-unsaved-bar action="submit"
+                targets="fqdn,instance_name,public_ipv4,public_ipv6,dev_helper_version" />
             <x-application.settings-section title="General">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div class="lg:col-span-2">
@@ -22,50 +25,15 @@
                     <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name"
                         placeholder="Coolify" helper="Custom name for this Coolify instance." />
 
-                    <div x-data="{
-                        open: false,
-                        search: @js($settings->instance_timezone ?: ''),
-                        timezones: @js($this->timezones),
-                        get filteredTimezones() {
-                            const query = this.search.toLowerCase();
-                            return this.timezones.filter(timezone => timezone.toLowerCase().includes(query)).slice(0, 100);
-                        },
-                        selectTimezone(timezone) {
-                            this.search = timezone;
-                            this.open = false;
-                            this.$wire.set('instance_timezone', timezone);
-                            this.$wire.submit();
-                        }
-                    }" @click.outside="open = false" class="w-full">
-                        <label for="instance_timezone" class="mb-1.5 flex w-fit items-center gap-1.5">
-                            Instance timezone
-                            <x-helper
-                                helper="Timezone used for update checks and the automatic update schedule." />
-                        </label>
-                        <div class="relative">
-                            <input id="instance_timezone" autocomplete="off" x-model="search"
-                                @focus="open = true" @input="open = true"
-                                class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-3! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint"
-                                placeholder="Search timezones" @disabled(!auth()->user()->can('update', $settings))>
-                            <x-reicon name="search"
-                                class="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
-
-                            <div x-cloak x-show="open" x-transition.origin.top
-                                class="absolute top-9 right-0 left-0 z-50 max-h-60 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
-                                <template x-for="timezone in filteredTimezones" :key="timezone">
-                                    <button type="button"
-                                        class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                        @click="selectTimezone(timezone)">
-                                        <span class="truncate" x-text="timezone"></span>
-                                    </button>
-                                </template>
-                                <p x-show="filteredTimezones.length === 0"
-                                    class="px-2 py-3 text-center text-[12px] text-neutral-500 dark:text-fg-dim">
-                                    No matching timezone
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    {{-- Use searchable-listbox so the label row (h-4) and control height match
+                         sibling x-forms.input fields (Name). onChange auto-saves like before. --}}
+                    <x-forms.searchable-listbox id="instance_timezone" label="Instance timezone"
+                        helper="Timezone used for update checks and the automatic update schedule."
+                        searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                        onChange="submit" :options="collect($this->timezones)->map(fn ($timezone) => [
+                            'value' => $timezone,
+                            'label' => $timezone,
+                        ])->all()" :disabled="! auth()->user()->can('update', $settings)" />
                 </div>
             </x-application.settings-section>
 

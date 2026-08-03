@@ -257,21 +257,21 @@
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
                                 <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                    <x-reicon name="x" class="mt-1 size-3 shrink-0" />
+                                    <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
                                     <span>{{ $action }}</span>
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
                                     <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                        <x-reicon name="x" class="mt-1 size-3 shrink-0" />
+                                        <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
                                         <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                            <x-reicon name="x" class="mt-1 size-3 shrink-0" />
+                                            <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
                                             <span>{{ $checkbox['default_warning'] }}</span>
                                         </li>
                                     </template>

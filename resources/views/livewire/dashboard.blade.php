@@ -200,12 +200,8 @@
                                 </div>
                             </div>
 
-                            <div class="mt-auto flex items-center justify-between gap-3 pt-4">
+                            <div class="mt-auto flex items-center pt-4">
                                 <x-status-badge :status="$serverStatus" :type="$serverStatusType" />
-                                <span
-                                    class="relative z-10 flex size-6.5 items-center justify-center rounded-md text-neutral-400 transition-colors group-hover:bg-neutral-100 group-hover:text-black dark:text-fg-faint dark:group-hover:bg-white/[0.06] dark:group-hover:text-fg">
-                                    <x-reicon name="arrow-right" class="size-3" />
-                                </span>
                             </div>
                         </article>
                     @endforeach

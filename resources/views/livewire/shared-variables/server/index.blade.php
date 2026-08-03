@@ -31,11 +31,9 @@
                             </p>
                         </div>
                     </div>
-                    <div class="mt-auto flex items-center justify-between pt-4">
+                    <div class="mt-auto flex items-center pt-4">
                         <x-status-badge :status="$server->isFunctional() ? 'Ready' : 'Validation required'"
                             :type="$server->isFunctional() ? 'success' : 'warning'" />
-                        <x-reicon name="arrow-right"
-                            class="size-3.5 text-neutral-400 transition-transform group-hover:translate-x-0.5 dark:text-fg-faint" />
                     </div>
                 </a>
             @endforeach

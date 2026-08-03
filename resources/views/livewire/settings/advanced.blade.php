@@ -10,61 +10,26 @@
         <x-settings.sidebar activeMenu="advanced" />
 
         <form wire:submit="submit" class="application-settings-form flex min-w-0 flex-col gap-6">
-            <x-unsaved-bar action="submit" />
+            {{-- Scope dirty tracking to fields that need an explicit Save. Instant-save
+                 listboxes (API, MCP, telemetry, …) update the snapshot on the server
+                 immediately; without wire:target they briefly flash this bar. --}}
+            <x-unsaved-bar action="submit"
+                targets="custom_dns_servers,allowed_ips,webhook_allowed_internal_hosts,webhook_allow_localhost" />
 
             <x-application.settings-section id="access-section" title="Access">
                 <div class="grid gap-4 lg:grid-cols-2">
-                    @if ($is_registration_enabled)
-                        <x-forms.listbox id="is_registration_enabled" label="Registration"
-                            helper="Allow users to create their own account." onChange="instantSave" :options="[
-                                ['value' => true, 'label' => 'Anyone can register'],
-                                ['value' => false, 'label' => 'Registration disabled'],
-                            ]" />
-                    @else
-                        <div
-                            class="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
-                            <div>
-                                <p class="text-[12px] font-medium text-black dark:text-fg">Registration disabled</p>
-                                <p class="mt-0.5 text-[10px] text-neutral-500 dark:text-fg-faint">
-                                    Only administrators can create accounts.
-                                </p>
-                            </div>
-                            <x-modal-confirmation title="Enable Registration?" buttonTitle="Enable"
-                                isErrorButton submitAction="toggleRegistration"
-                                :actions="['Anyone will be able to create an account.']"
-                                warningMessage="Only enable public registration when this instance is intended for it."
-                                confirmationText="ENABLE REGISTRATION"
-                                confirmationLabel="Enter the confirmation text to enable registration."
-                                shortConfirmationLabel="Confirmation text" />
-                        </div>
-                    @endif
-
-                    @if ($disable_two_step_confirmation)
-                        <x-forms.listbox id="disable_two_step_confirmation" label="Destructive action confirmation"
-                            helper="Choose whether destructive actions require password and text confirmation."
-                            onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Require two-step confirmation'],
-                                ['value' => true, 'label' => 'Skip two-step confirmation'],
-                            ]" />
-                    @else
-                        <div
-                            class="flex min-h-12 items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-neutral-50 px-3 dark:border-white/[0.08] dark:bg-white/[0.025]">
-                            <div>
-                                <p class="text-[12px] font-medium text-black dark:text-fg">Two-step confirmations enabled</p>
-                                <p class="mt-0.5 text-[10px] text-neutral-500 dark:text-fg-faint">
-                                    Destructive actions require explicit confirmation.
-                                </p>
-                            </div>
-                            <x-modal-confirmation title="Disable Two Step Confirmation?" buttonTitle="Disable"
-                                isErrorButton submitAction="toggleTwoStepConfirmation" :actions="[
-                                    'Two-step confirmation will be disabled globally.',
-                                    'Accidental destructive actions become easier.',
-                                ]"
-                                confirmationText="DISABLE TWO STEP CONFIRMATION"
-                                confirmationLabel="Enter the confirmation text to disable this safeguard."
-                                shortConfirmationLabel="Confirmation text" />
-                        </div>
-                    @endif
+                    <x-forms.listbox id="is_registration_enabled" label="Registration"
+                        helper="Allow users to create their own account. When disabled, only administrators can create accounts."
+                        onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Anyone can register'],
+                            ['value' => false, 'label' => 'Registration disabled'],
+                        ]" />
+                    <x-forms.listbox id="disable_two_step_confirmation" label="Destructive action confirmation"
+                        helper="Choose whether destructive actions require password and text confirmation."
+                        onChange="instantSave" :options="[
+                            ['value' => false, 'label' => 'Require two-step confirmation'],
+                            ['value' => true, 'label' => 'Skip two-step confirmation'],
+                        ]" />
                 </div>
             </x-application.settings-section>
 
@@ -101,7 +66,7 @@
                             placeholder="192.168.1.100, 10.0.0.0/8" />
                     </div>
                 </div>
-                @if (empty($allowed_ips) || in_array('0.0.0.0', array_map('trim', explode(',', $allowed_ips ?? ''))))
+                @if ($is_api_enabled && (empty($allowed_ips) || in_array('0.0.0.0', array_map('trim', explode(',', $allowed_ips ?? '')))))
                     <x-callout type="warning" title="API access is open to every source" class="mt-4">
                         Restrict the allowlist before using API access on a public production instance.
                     </x-callout>
