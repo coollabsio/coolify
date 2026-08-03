@@ -2082,34 +2082,7 @@ class Application extends BaseModel
             $this->save();
             $parsedServices = $this->parse();
             if ($this->docker_compose_domains) {
-                $decoded = json_decode($this->docker_compose_domains, true);
-                $json = collect(is_array($decoded) ? $decoded : []);
-                $normalized = collect();
-                foreach ($json as $key => $value) {
-                    $normalizedKey = (string) str($key)->replace('-', '_')->replace('.', '_');
-                    $normalized->put($normalizedKey, $value);
-                }
-                $json = $normalized;
-                $services = collect(data_get($parsedServices, 'services', []));
-                foreach ($services as $name => $service) {
-                    if (str($name)->contains('-') || str($name)->contains('.')) {
-                        $replacedName = str($name)->replace('-', '_')->replace('.', '_');
-                        $services->put((string) $replacedName, $service);
-                        $services->forget((string) $name);
-                    }
-                }
-                $names = collect($services)->keys()->toArray();
-                $jsonNames = $json->keys()->toArray();
-                $diff = array_diff($jsonNames, $names);
-                $json = $json->filter(function ($value, $key) use ($diff) {
-                    return ! in_array($key, $diff);
-                });
-                if ($json) {
-                    $this->docker_compose_domains = json_encode($json);
-                } else {
-                    $this->docker_compose_domains = null;
-                }
-                $this->save();
+                $this->reconcileDockerComposeDomains($parsedServices);
             }
 
             return [
@@ -2124,6 +2097,31 @@ class Application extends BaseModel
 
             throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
+    }
+
+    private function reconcileDockerComposeDomains(mixed $parsedServices): void
+    {
+        $services = collect(data_get($parsedServices, 'services', []));
+        $serviceNames = $services->keys()->map(fn ($name) => (string) $name)->all();
+
+        if ($serviceNames === []) {
+            return;
+        }
+
+        $decoded = json_decode($this->docker_compose_domains, true);
+        $rekeyed = rekeyComposeDomainsToServiceNames(
+            is_array($decoded) ? $decoded : [],
+            $serviceNames,
+        );
+
+        $domains = collect($rekeyed)->filter(
+            fn ($value, $key) => findComposeServiceName((string) $key, $serviceNames) !== null
+        );
+
+        $this->docker_compose_domains = $domains->isNotEmpty()
+            ? json_encode($domains->all())
+            : null;
+        $this->save();
     }
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)

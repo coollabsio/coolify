@@ -124,34 +124,55 @@ class ApplicationPreview extends BaseModel
 
     public function generate_preview_fqdn_compose()
     {
-        $services = collect(json_decode($this->application->docker_compose_domains)) ?? collect();
-        $docker_compose_domains = data_get($this, 'docker_compose_domains');
-        $docker_compose_domains = json_decode($docker_compose_domains, true) ?? [];
+        $applicationDomains = json_decode($this->application->docker_compose_domains ?: '[]', true) ?: [];
+        $previewDomains = json_decode(data_get($this, 'docker_compose_domains') ?: '[]', true) ?: [];
 
-        // Get all services from the parsed compose file to ensure all services have entries
-        $parsedServices = $this->application->parse(pull_request_id: $this->pull_request_id);
-        if (isset($parsedServices['services'])) {
-            foreach ($parsedServices['services'] as $serviceName => $service) {
-                if (! isDatabaseImage(data_get($service, 'image'))) {
-                    // Remove PR suffix from service name to get original service name
-                    $originalServiceName = str($serviceName)->replaceLast('-pr-'.$this->pull_request_id, '')->toString();
+        $composeServiceNames = $this->composeServiceNamesForPreview();
+        // Canonical compose names first; collapse leftover domain-map twins when parse is empty/missing.
+        $domainKeys = collect(array_keys($applicationDomains))
+            ->merge(array_keys($previewDomains))
+            ->map(fn ($name) => (string) $name);
+        $unmappedDomainKeys = $domainKeys
+            ->reject(fn (string $key) => findComposeServiceName($key, $composeServiceNames) !== null)
+            ->all();
+        $knownServiceNames = collect($composeServiceNames)
+            ->merge(preferredComposeServiceNamesFromDomainKeys(
+                $composeServiceNames === [] ? $domainKeys->all() : $unmappedDomainKeys
+            ))
+            ->unique()
+            ->values()
+            ->all();
 
-                    // Ensure all services have an entry, even if empty
-                    if (! $services->has($originalServiceName)) {
-                        $services->put($originalServiceName, ['domain' => '']);
-                    }
-                }
+        $applicationDomains = rekeyComposeDomainsToServiceNames($applicationDomains, $knownServiceNames);
+        $previewDomains = rekeyComposeDomainsToServiceNames($previewDomains, $knownServiceNames);
+
+        // Ensure every non-database compose service has a domain slot (empty if unset).
+        foreach ($composeServiceNames as $serviceName) {
+            if (! array_key_exists($serviceName, $applicationDomains)) {
+                $applicationDomains[$serviceName] = ['domain' => ''];
             }
         }
 
-        foreach ($services as $service_name => $service_config) {
-            $domain_string = data_get($service_config, 'domain');
+        $serviceNames = collect(array_keys($applicationDomains))
+            ->merge($composeServiceNames)
+            ->map(fn ($name) => (string) $name)
+            ->unique()
+            ->values()
+            ->all();
+
+        $docker_compose_domains = [];
+        foreach ($serviceNames as $service_name) {
+            $domain_string = getComposeServiceDomainString($applicationDomains, $service_name);
 
             // If domain string is empty or null, don't auto-generate domain
             // Only generate domains when main app already has domains set
             if (empty($domain_string)) {
-                // Ensure service has an empty domain entry for form binding
-                $docker_compose_domains[$service_name]['domain'] = '';
+                $docker_compose_domains = putComposeServiceDomain(
+                    $docker_compose_domains,
+                    $service_name,
+                    '',
+                    $serviceNames,
+                );
 
                 continue;
             }
@@ -180,19 +201,22 @@ class ApplicationPreview extends BaseModel
                 $preview_domains[] = $preview_fqdn;
             }
 
-            if (! empty($preview_domains)) {
-                $docker_compose_domains[$service_name]['domain'] = implode(',', $preview_domains);
-            } else {
-                // Ensure service has an empty domain entry for form binding
-                $docker_compose_domains[$service_name]['domain'] = '';
-            }
+            $docker_compose_domains = putComposeServiceDomain(
+                $docker_compose_domains,
+                $service_name,
+                ! empty($preview_domains) ? implode(',', $preview_domains) : '',
+                $serviceNames,
+            );
         }
+
+        // Drop any leftover twin keys that were not rewritten above.
+        $docker_compose_domains = rekeyComposeDomainsToServiceNames($docker_compose_domains, $serviceNames);
 
         $this->docker_compose_domains = json_encode($docker_compose_domains);
 
         // Populate fqdn from generated domains so webhook notifications can read it
         $allDomains = collect($docker_compose_domains)
-            ->pluck('domain')
+            ->map(fn ($entry) => composeDomainEntryString($entry))
             ->filter(fn ($d) => ! empty($d))
             ->flatMap(fn ($d) => explode(',', $d))
             ->implode(',');
@@ -200,5 +224,32 @@ class ApplicationPreview extends BaseModel
         $this->fqdn = ! empty($allDomains) ? $allDomains : null;
 
         $this->save();
+    }
+
+    /**
+     * Original compose service names for this preview (PR suffix stripped), excluding database images.
+     *
+     * @return list<string>
+     */
+    private function composeServiceNamesForPreview(): array
+    {
+        $parsedServices = $this->application->parse(pull_request_id: $this->pull_request_id);
+        $services = data_get($parsedServices, 'services', []);
+        if (! is_iterable($services)) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($services as $serviceName => $service) {
+            if (isDatabaseImage(data_get($service, 'image'))) {
+                continue;
+            }
+
+            $names[] = str((string) $serviceName)
+                ->replaceLast('-pr-'.$this->pull_request_id, '')
+                ->toString();
+        }
+
+        return array_values(array_unique($names));
     }
 }
