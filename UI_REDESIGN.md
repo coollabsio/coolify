@@ -38,9 +38,8 @@ The interface is compact and product-focused:
 - outline Reicon glyphs through `<x-reicon>`;
 - the Coolify purple brand accent in light mode;
 - the readable Coolify yellow accent in dark mode;
-- subtle active-item gradients that fade completely into the surrounding
-  background at the far edge, with the active pill rounded only on the left
-  (square on the right so it bleeds into the content edge);
+- solid active-item fills (neutral black/white opacity), not accent gradients;
+  active state is the left accent rail plus a flat selected surface;
 - sentence-case labels and headings;
 - never use the em dash (`—`) in UI copy. Prefer a period, colon, comma, or
   ASCII hyphen (`-`) for empty cells and separators.
@@ -124,9 +123,10 @@ opacity rather than a fully saturated fill.
 
 - Main sidebar groups are compact, use outline Reicons, and keep a 32px row
   height.
-- Active sidebar rows have a curved accent rail and a subtle horizontal
-  gradient. The gradient must fade to the exact sidebar background at the
-  right edge in both themes.
+- Active sidebar rows are rounded pills (`rounded-md`) with an accent rail on
+  the left plus a solid neutral selected fill (`bg-black/5` light,
+  `bg-white/6` dark). Hover rows use the same radius. Do not use accent-tinted
+  gradients on nav rows; yellow washes look muddy on dark UI.
 - Nested items use a thin guide line with a visible active segment, not a thick
   box border.
 - The update badge sits on the version row and uses a tiny fully rounded

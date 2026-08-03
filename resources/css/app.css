@@ -75,7 +75,7 @@
         @apply min-h-10 rounded-md border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white shadow-inner active:bg-white/25;
     }
 
-    /* Accent bar on the active sidebar item (Linear/Wave-style) */
+    /* Accent rail on the active rounded pill (sits flush on the left edge) */
     .menu-item-active::before {
         content: "";
         position: absolute;
@@ -84,7 +84,7 @@
         left: 0;
         width: 3px;
         background: var(--color-accent);
-        border-radius: 0;
+        border-radius: 0.375rem 0 0 0.375rem;
         pointer-events: none;
     }
     .menu-subitem-active::before {
@@ -92,15 +92,12 @@
         position: absolute;
         top: 0;
         bottom: 0;
-        left: calc(-0.25rem - 4px);
+        left: 0;
         z-index: 1;
         width: 3px;
-        border-radius: 0;
+        border-radius: 0.375rem 0 0 0.375rem;
         background: var(--color-accent);
         pointer-events: none;
-    }
-    .menu-subitem-active {
-        overflow: visible !important;
     }
     .sidebar-collapsed .menu-item-active::before {
         display: none;
@@ -111,26 +108,12 @@
         opacity: 1;
     }
 
+    /* Kill any legacy accent wash; fill is solid via menu-item-active utility. */
     .menu-item-active,
-    .menu-subitem-active {
-        background-image: linear-gradient(
-            90deg,
-            rgba(107, 22, 237, 0.2) 0%,
-            rgba(107, 22, 237, 0.1) 42%,
-            rgba(107, 22, 237, 0.035) 76%,
-            transparent 100%
-        );
-    }
-
+    .menu-subitem-active,
     .dark .menu-item-active,
     .dark .menu-subitem-active {
-        background-image: linear-gradient(
-            90deg,
-            rgba(252, 212, 82, 0.2) 0%,
-            rgba(252, 212, 82, 0.1) 42%,
-            rgba(252, 212, 82, 0.035) 76%,
-            transparent 100%
-        );
+        background-image: none;
     }
 
     /* vertical connector line for a nested nav group */
