@@ -41,3 +41,10 @@ CHANGELOG.md
 tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
 ref
+
+# Local generated Lima configs
+.dev/bin/
+.dev/coold-assets/
+.dev/lima/ssh.config
+.dev/lima/ssh_key
+.dev/lima/hosts

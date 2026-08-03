@@ -74,6 +74,7 @@ use Symfony\Component\Yaml\Yaml;
         'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
         'status' => ['type' => 'string', 'description' => 'Application status.'],
         'preview_url_template' => ['type' => 'string',  'description' => 'Preview URL template.'],
+        'max_restart_count' => ['type' => 'integer', 'description' => 'Maximum container restart count before stopping.'],
         'destination_type' => ['type' => 'string', 'description' => 'Destination type.'],
         'destination_id' => ['type' => 'integer', 'description' => 'Destination identifier.'],
         'source_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Source identifier.'],
@@ -1463,11 +1464,11 @@ class Application extends BaseModel
 
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
-            $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
-            $source_html_url_host = $url['host'];
-            $source_html_url_scheme = $url['scheme'];
 
             if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+                $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL)) ?: [];
+                $source_html_url_host = $url['host'] ?? '';
+                $source_html_url_scheme = $url['scheme'] ?? '';
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 if ($this->source->is_public) {
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
@@ -1505,6 +1506,32 @@ class Application extends BaseModel
 
             if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
+
+                if ($gitlabSource->isConnected()) {
+                    $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL)) ?: [];
+                    $source_html_url_host = $this->urlHostWithPort($url);
+                    $source_html_url_scheme = $url['scheme'] ?? '';
+                    $token = generateGitlabCloneToken($gitlabSource);
+                    $encodedToken = rawurlencode($token);
+                    $pathPrefix = rtrim($url['path'] ?? '', '/');
+                    $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
+                    $escapedRepoUrl = escapeshellarg($repoUrl);
+                    $fullRepoUrl = $repoUrl;
+                    $base_command = "{$base_command} {$escapedRepoUrl}";
+
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, $base_command));
+                    } else {
+                        $commands->push($base_command);
+                    }
+
+                    return [
+                        'commands' => $commands->implode(' && '),
+                        'branch' => $branch,
+                        'fullRepoUrl' => $fullRepoUrl,
+                    ];
+                }
+
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
                 if ($private_key) {
@@ -1529,7 +1556,6 @@ class Application extends BaseModel
                     ];
                 }
 
-                // GitLab source without private key — use URL as-is (supports user-embedded basic auth)
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $base_command = "{$base_command} {$escapedCustomRepository}";
@@ -1762,6 +1788,52 @@ class Application extends BaseModel
 
             if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
+
+                if ($gitlabSource->isConnected()) {
+                    $token = generateGitlabCloneToken($gitlabSource);
+                    $encodedToken = rawurlencode($token);
+                    $pathPrefix = rtrim($url['path'] ?? '', '/');
+                    $source_html_url_host = $this->urlHostWithPort($url ?: []);
+
+                    // Rewrite same-host HTTPS submodule URLs to auth with the OAuth token (mirrors the GitHub path) without persisting credentials.
+                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/");
+                    $gitConfigOptions = $this->withGitHttpTransportConfig($gitConfigOption);
+
+                    $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
+                    $escapedRepoUrl = escapeshellarg($repoUrl);
+                    $fullRepoUrl = $repoUrl;
+                    $git_clone_command_base = $this->applyGitConfigOptionsToCloneCommand("{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}", $gitConfigOptions);
+                    if ($only_checkout) {
+                        $git_clone_command = $git_clone_command_base;
+                    } else {
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOptions);
+                    }
+
+                    if ($pull_request_id !== 0) {
+                        $branch = "merge-requests/{$pull_request_id}/head:{$pr_branch_name}";
+                        if ($exec_in_docker) {
+                            $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out {$branch}'"));
+                        } else {
+                            $commands->push("echo 'Checking out {$branch}'");
+                        }
+                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitConfigOptions: $gitConfigOptions);
+                        $escapedPrBranch = escapeshellarg($branch);
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git {$gitConfigOptions} fetch origin {$escapedPrBranch} && {$git_checkout_command}";
+                    }
+
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
+                    } else {
+                        $commands->push($git_clone_command);
+                    }
+
+                    return [
+                        'commands' => $commands->implode(' && '),
+                        'branch' => $branch,
+                        'fullRepoUrl' => $fullRepoUrl,
+                    ];
+                }
+
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
                 if ($private_key) {
@@ -1802,7 +1874,6 @@ class Application extends BaseModel
                     ];
                 }
 
-                // GitLab source without private key — use URL as-is (supports user-embedded basic auth)
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
@@ -2465,6 +2536,14 @@ class Application extends BaseModel
             'limits_cpuset' => $this->limits_cpuset,
             'limits_cpu_shares' => $this->limits_cpu_shares,
         ];
+    }
+
+    private function urlHostWithPort(array $url): string
+    {
+        $host = $url['host'] ?? '';
+        $port = isset($url['port']) ? ":{$url['port']}" : '';
+
+        return "{$host}{$port}";
     }
 
     public function generateConfig($is_json = false)

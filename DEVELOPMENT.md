@@ -173,9 +173,9 @@ If you encounter issues or break your database or something else, follow these s
 
 1. Stop all running containers `ctrl + c`.
 
-2. Remove all Coolify containers:
+2. Force-remove all Coolify dev containers:
    ```bash
-   docker rm coolify coolify-db coolify-redis coolify-realtime coolify-testing-host coolify-minio coolify-vite-1 coolify-mail
+   npm run clean
    ```
 
 3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on your machine, in that case remove the prefix from the command):

@@ -83,6 +83,7 @@ use App\Livewire\SharedVariables\Server\Index as ServerSharedVariablesIndex;
 use App\Livewire\SharedVariables\Server\Show as ServerSharedVariablesShow;
 use App\Livewire\SharedVariables\Team\Index as TeamSharedVariablesIndex;
 use App\Livewire\Source\Github\Change as GitHubChange;
+use App\Livewire\Source\Gitlab\Change as GitLabChange;
 use App\Livewire\Storage\Index as StorageIndex;
 use App\Livewire\Storage\Show as StorageShow;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
@@ -353,6 +354,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/github/{github_app_uuid}/permissions', GitHubChange::class)->name('source.github.permissions');
     Route::get('/source/github/{github_app_uuid}/resources', GitHubChange::class)->name('source.github.resources');
+    Route::get('/source/gitlab/{gitlab_app_uuid}', GitLabChange::class)->name('source.gitlab.show');
 });
 
 Route::middleware(['auth'])->group(function () {

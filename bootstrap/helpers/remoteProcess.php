@@ -301,6 +301,7 @@ function remove_iip($text)
 
     // Git access tokens
     $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
+    $text = preg_replace('/oauth2:.*?(?=@)/', 'oauth2:'.REDACTED, $text);
 
     // ANSI color codes
     $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);

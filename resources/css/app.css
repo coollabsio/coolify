@@ -268,6 +268,14 @@ body {
     @apply w-full min-h-full bg-gray-50 dark:bg-app dark:text-fg-dim;
 }
 
+@media (max-width: 767px) {
+    input,
+    textarea,
+    select {
+        font-size: 16px;
+    }
+}
+
 body {
     @apply min-h-screen text-sm font-sans antialiased scrollbar overflow-x-hidden;
 }

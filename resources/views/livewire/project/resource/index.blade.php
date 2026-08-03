@@ -160,9 +160,15 @@
                                 </template>
                             </div>
                             <div class="min-w-0">
-                                <a :href="item.hrefLink" {{ wireNavigate() }}
-                                    class="block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
-                                    x-text="item.name"></a>
+                                <div class="flex min-w-0 items-center gap-1.5">
+                                    <a :href="item.hrefLink"
+                                        @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                                        {{ wireNavigate() }}
+                                        class="block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
+                                        x-text="item.name"></a>
+                                    <span x-show="item.version === 'v5'"
+                                        class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
+                                </div>
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                     x-text="item.description || item.fqdn || item.uuid"></p>
                             </div>
@@ -204,7 +210,9 @@
                                 class="text-[12px] text-neutral-400 dark:text-fg-faint">—</span>
                         </div>
 
-                        <a :href="item.hrefLink" {{ wireNavigate() }}
+                        <a :href="item.hrefLink"
+                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                            {{ wireNavigate() }}
                             class="flex size-7 items-center justify-center rounded-md text-neutral-400 opacity-0 transition-all hover:bg-neutral-100 hover:text-black group-hover:opacity-100 focus-visible:opacity-100 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
                             :aria-label="`Open ${item.name}`">
                             <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -268,9 +276,15 @@
                                     </template>
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <a :href="item.hrefLink" {{ wireNavigate() }}
-                                        class="block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
-                                        x-text="item.name"></a>
+                                    <div class="flex min-w-0 items-center gap-1.5">
+                                        <a :href="item.hrefLink"
+                                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                                            {{ wireNavigate() }}
+                                            class="block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
+                                            x-text="item.name"></a>
+                                        <span x-show="item.version === 'v5'"
+                                            class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
+                                    </div>
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="item.typeLabel"></p>
                                 </div>
@@ -285,7 +299,9 @@
                                 <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
                                     x-text="displayDomain(item.fqdn) || item.description || item.destination?.server?.name || 'No endpoint'">
                                 </p>
-                                <a :href="item.hrefLink" {{ wireNavigate() }}
+                                <a :href="item.hrefLink"
+                                    @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                                    {{ wireNavigate() }}
                                     class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     :aria-label="`Open ${item.name}`">
                                     <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
