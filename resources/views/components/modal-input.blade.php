@@ -9,13 +9,15 @@
     'closeOutside' => true,
     'isFullWidth' => false,
     'wireIgnore' => true,
+    // Optional Livewire bool property to entangle open state (survives Livewire re-renders).
+    'wireOpen' => null,
 ])
 
 @php
     $modalId = 'modal-' . uniqid();
 @endphp
 
-<div x-data="{ modalOpen: false }"
+<div x-data="{ modalOpen: @if ($wireOpen) $wire.entangle(@js($wireOpen)) @else false @endif }"
     x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
     {{ $attributes->class(['relative', $isFullWidth ? 'h-full w-full' : 'h-auto w-auto']) }}

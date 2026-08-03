@@ -19,8 +19,9 @@
             Margin lives only on this wrapper (mb-0 on the label) so spacing matches
             plain text labels and is not doubled by .application-settings-form label rules.
         --}}
-        <div class="mb-1.5 flex w-fit items-center gap-1.5">
-            <label for="{{ $id }}-trigger" class="mb-0! flex items-center gap-1.5">
+        {{-- Fixed h-4 matches the helper icon so side-by-side fields align with or without a helper. --}}
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label for="{{ $id }}-trigger" class="mb-0! flex items-center gap-1.5 leading-4">
                 {{ $label }}
                 @if ($required)
                     <x-highlighted text="*" />
@@ -50,8 +51,7 @@
         {{ $attributes->whereStartsWith('x-effect') }}
         @click.outside="open = false" @keydown.escape="open = false">
         <button id="{{ $id }}-trigger" type="button" class="listbox-trigger" @click="open = !open"
-            @disabled($disabled)
-            {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
+            @disabled($disabled) aria-haspopup="listbox"
             :aria-expanded="open" :title="current">
             <span class="listbox-trigger-label" x-text="current"></span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"

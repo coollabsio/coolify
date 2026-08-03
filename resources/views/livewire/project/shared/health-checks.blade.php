@@ -38,7 +38,7 @@
             <x-forms.listbox id="healthCheckType" label="Check type" required live :options="[
                 ['value' => 'http', 'label' => 'HTTP request'],
                 ['value' => 'cmd', 'label' => 'Container command'],
-            ]" x-bind:disabled="@js(!$canUpdate)" />
+            ]" :disabled="! $canUpdate" />
         </div>
     </x-application.settings-section>
 
@@ -51,11 +51,11 @@
                     ['value' => 'HEAD', 'label' => 'HEAD'],
                     ['value' => 'POST', 'label' => 'POST'],
                     ['value' => 'OPTIONS', 'label' => 'OPTIONS'],
-                ]" x-bind:disabled="@js(!$canUpdate)" />
+                ]" :disabled="! $canUpdate" />
                 <x-forms.listbox id="healthCheckScheme" label="Scheme" required :options="[
                     ['value' => 'http', 'label' => 'HTTP'],
                     ['value' => 'https', 'label' => 'HTTPS'],
-                ]" x-bind:disabled="@js(!$canUpdate)" />
+                ]" :disabled="! $canUpdate" />
                 <x-forms.input canGate="update" :canResource="$resource" id="healthCheckHost"
                     placeholder="localhost" label="Host" required />
                 <x-forms.input canGate="update" :canResource="$resource" type="number"

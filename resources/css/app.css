@@ -893,6 +893,17 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     color: var(--coollabs-subtle);
 }
 
+/*
+ * Labels that sit in a fixed-height control row (with optional helper icon) must not
+ * add their own bottom margin — the row wrapper owns spacing so side-by-side inputs align.
+ */
+.application-settings-workspace .mb-0\!,
+.application-settings-form .mb-0\!,
+.application-settings-workspace label.mb-0\!,
+.application-settings-form label.mb-0\! {
+    margin-bottom: 0 !important;
+}
+
 /* Inputs & selects: recessed fill + line border (surface hierarchy) */
 .application-settings-workspace .input,
 .application-settings-workspace .select,

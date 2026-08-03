@@ -18,19 +18,19 @@
                     :options="[
                         ['value' => false, 'label' => 'Use Docker build cache'],
                         ['value' => true, 'label' => 'Rebuild from scratch every time'],
-                    ]" x-bind:disabled="@js(!$canUpdate)" />
+                    ]" :disabled="! $canUpdate" />
                 <x-forms.listbox id="injectBuildArgsToDockerfile" label="Build arguments" onChange="instantSave"
                     helper="When injected automatically, Coolify adds ARG statements to your Dockerfile for build-time variables. Manage them manually to preserve Docker build cache."
                     :options="[
                         ['value' => true, 'label' => 'Inject build args automatically'],
                         ['value' => false, 'label' => 'Managed manually in Dockerfile'],
-                    ]" x-bind:disabled="@js(!$canUpdate)" />
+                    ]" :disabled="! $canUpdate" />
                 <x-forms.listbox id="includeSourceCommitInBuild" label="Source commit availability" onChange="instantSave"
                     helper="SOURCE_COMMIT (git commit hash) is always available at runtime. Making it available during build invalidates the cache on every commit."
                     :options="[
                         ['value' => false, 'label' => 'Runtime only (preserves cache)'],
                         ['value' => true, 'label' => 'Available during build'],
-                    ]" x-bind:disabled="@js(!$canUpdate)" />
+                    ]" :disabled="! $canUpdate" />
             </div>
         </x-application.settings-section>
 
@@ -42,7 +42,7 @@
                     :options="[
                         ['value' => false, 'label' => 'Generated name (rolling updates)'],
                         ['value' => true, 'label' => 'Consistent name (no rolling updates)'],
-                    ]" x-bind:disabled="@js(!$canUpdate)" />
+                    ]" :disabled="! $canUpdate" />
                 @if ($isConsistentContainerNameEnabled === false)
                     <x-forms.input
                         helper="You can add a custom name for your container.<br><br>The name is saved automatically and converted to slug format. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
@@ -61,19 +61,19 @@
                         :options="[
                             ['value' => true, 'label' => 'Deploy on push (webhooks)'],
                             ['value' => false, 'label' => 'Manual deployments only'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                     <x-forms.listbox id="isPreviewDeploymentsEnabled" label="Preview deployments" onChange="instantSave"
                         helper="Automatically deploy Preview Deployments for all opened PRs.<br><br>Closing a PR deletes its Preview Deployment."
                         :options="[
                             ['value' => false, 'label' => 'Disabled'],
                             ['value' => true, 'label' => 'Deploy opened pull requests'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                     <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="instantSave"
                         helper="When public, anyone can trigger PR deployments. Otherwise fork PRs are blocked and only repository owners, members, and collaborators can trigger them."
                         :options="[
                             ['value' => false, 'label' => 'Repository members only'],
                             ['value' => true, 'label' => 'Public (fork PRs allowed)'],
-                        ]" x-bind:disabled="@js(!$canUpdate || !$isPreviewDeploymentsEnabled)" />
+                        ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
                 </div>
             </x-application.settings-section>
 
@@ -85,19 +85,19 @@
                         :options="[
                             ['value' => true, 'label' => 'Clone submodules'],
                             ['value' => false, 'label' => 'Skip submodules'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                     <x-forms.listbox id="isGitLfsEnabled" label="Git LFS" onChange="instantSave"
                         helper="Allow Git LFS during the build process."
                         :options="[
                             ['value' => true, 'label' => 'Enabled'],
                             ['value' => false, 'label' => 'Disabled'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                     <x-forms.listbox id="isGitShallowCloneEnabled" label="Clone depth" onChange="instantSave"
                         helper="Shallow cloning (--depth=1) speeds up deployments by only fetching the latest commit, useful for large repositories."
                         :options="[
                             ['value' => false, 'label' => 'Full history'],
                             ['value' => true, 'label' => 'Shallow clone (latest commit only)'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                 </div>
             </x-application.settings-section>
         @endif
@@ -111,13 +111,13 @@
                         :options="[
                             ['value' => false, 'label' => 'Managed by Coolify'],
                             ['value' => true, 'label' => 'Raw (deploy file as-is)'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                     <x-forms.listbox id="isConnectToDockerNetworkEnabled" label="Predefined network" onChange="instantSave"
                         helper="By default a compose resource only gets its own internal network. Connecting to a Coolify predefined network may require different internal DNS names. More info <a class='underline dark:text-white' target='_blank' href='https://coolify.io/docs/knowledge-base/docker/compose#connect-to-predefined-networks'>here</a>."
                         :options="[
                             ['value' => false, 'label' => 'Isolated network only'],
                             ['value' => true, 'label' => 'Connect to predefined network'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                 </div>
             </x-application.settings-section>
         @endif
@@ -131,13 +131,13 @@
                         :options="[
                             ['value' => true, 'label' => 'Enabled'],
                             ['value' => false, 'label' => 'Disabled'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                     <x-forms.listbox id="isStripprefixEnabled" label="Path prefixes" onChange="instantSave"
                         helper="Strip Prefix removes prefixes from paths, like /api/ to /."
                         :options="[
                             ['value' => true, 'label' => 'Strip prefixes'],
                             ['value' => false, 'label' => 'Keep paths as-is'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                 </div>
             @else
                 <x-empty size="sm" title="Proxy behavior is managed through labels"
@@ -177,7 +177,7 @@
                     :options="[
                         ['value' => false, 'label' => 'Disabled'],
                         ['value' => true, 'label' => 'Send logs to the log drain endpoint'],
-                    ]" x-bind:disabled="@js(!$canUpdate)" />
+                    ]" :disabled="! $canUpdate" />
             </div>
         </x-application.settings-section>
 
@@ -189,7 +189,7 @@
                         :options="[
                             ['value' => false, 'label' => 'Disabled'],
                             ['value' => true, 'label' => 'Enabled'],
-                        ]" x-bind:disabled="@js(!$canUpdate)" />
+                        ]" :disabled="! $canUpdate" />
                 </div>
                 @if ($isGpuEnabled)
                     <form id="gpu-settings-form" wire:submit="submit"

@@ -66,17 +66,19 @@
             @endforeach
         @endif
         <div class="justify-self-end">
-            <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false">
+            {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
+            <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
+                wireOpen="editorOpen">
                 <x-slot:content>
-                    <button type="button"
-                        class="cursor-pointer text-[13px] font-medium text-black transition-opacity hover:opacity-70 dark:text-fg">
-                        Edit
+                    <button type="button" wire:click="loadValues" class="icon-button shrink-0"
+                        title="Edit environment variable" aria-label="Edit environment variable">
+                        <x-reicon name="settings" class="size-3.5" />
                     </button>
                 </x-slot:content>
 
                 <form wire:submit="submit" class="flex w-full flex-col gap-4"
                     x-data="{ isMultiline: $wire.entangle('is_multiline') }">
-                    <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid items-end gap-4 sm:grid-cols-2">
                         <x-forms.input id="key" label="Name" :required="$is_redis_credential"
                             :disabled="!$canEditValue || $is_redis_credential" />
                         <x-forms.input id="comment" label="Comment" placeholder="Optional note"
@@ -86,38 +88,72 @@
 
                     <div>
                         @if ($isValueHidden)
-                            <label>Value</label>
-                            <input disabled type="text" value="Hidden (only admins can view)"
-                                class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
+                            <div class="w-full">
+                                <label class="mb-1 flex items-center gap-1 text-sm font-medium">Value</label>
+                                <input disabled type="text" value="Hidden (only admins can view)"
+                                    class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
+                            </div>
                         @elseif ($isLocked)
-                            <label>Value</label>
-                            <input disabled type="text" value="Hidden after locking"
-                                class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
+                            <div class="w-full">
+                                <label class="mb-1 flex items-center gap-1 text-sm font-medium">Value</label>
+                                <input disabled type="text" value="Hidden after locking"
+                                    class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
+                            </div>
                         @else
-                            <template x-if="isMultiline">
-                                <div wire:key="env-show-value-textarea-{{ $env->id }}">
-                                    <x-forms.textarea id="value" label="Value" class="font-sans"
-                                        :required="$is_redis_credential" :disabled="!$canEditValue" spellcheck />
+                            {{-- Multiline: same shell while loading/loaded to avoid layout jump. --}}
+                            <div x-show="isMultiline" x-cloak wire:key="env-show-value-multiline-{{ $env->id }}"
+                                class="w-full">
+                                <label class="mb-1 flex items-center gap-1 text-sm font-medium">
+                                    Value
+                                    @if ($is_redis_credential)
+                                        <x-highlighted text="*" />
+                                    @endif
+                                </label>
+                                @if (!$valuesLoaded)
+                                    <div class="input flex min-h-24 w-full items-start py-2 text-neutral-500 dark:text-fg-dim"
+                                        aria-busy="true">
+                                        <x-loading text="Loading value..." />
+                                    </div>
+                                @else
+                                    <x-forms.textarea id="value" class="font-sans" :required="$is_redis_credential"
+                                        :disabled="!$canEditValue" spellcheck />
+                                @endif
+                            </div>
+
+                            {{-- Single-line: keep one label + control shell so label/input gap never changes. --}}
+                            <div x-show="!isMultiline" class="w-full"
+                                wire:key="env-show-value-single-{{ $env->id }}">
+                                <label class="mb-1 flex items-center gap-1 text-sm font-medium">
+                                    Value
+                                    @if ($is_redis_credential)
+                                        <x-highlighted text="*" />
+                                    @endif
+                                </label>
+                                <div class="relative">
+                                    @if (!$valuesLoaded)
+                                        <div class="input input-with-password-toggle flex w-full items-center text-neutral-500 dark:text-fg-dim"
+                                            aria-busy="true">
+                                            <x-loading text="Loading value..." />
+                                        </div>
+                                    @else
+                                        <x-forms.env-var-input id="value" type="password"
+                                            :required="$is_redis_credential" :disabled="!$canEditValue"
+                                            :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
+                                            :projectUuid="data_get($parameters, 'project_uuid')"
+                                            :environmentUuid="data_get($parameters, 'environment_uuid')"
+                                            :serverUuid="data_get($parameters, 'server_uuid')" />
+                                    @endif
                                 </div>
-                            </template>
-                            <template x-if="!isMultiline">
-                                <div wire:key="env-show-value-input-{{ $env->id }}">
-                                    <x-forms.env-var-input id="value" label="Value" type="password"
-                                        :required="$is_redis_credential" :disabled="!$canEditValue"
-                                        :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
-                                        :projectUuid="data_get($parameters, 'project_uuid')"
-                                        :environmentUuid="data_get($parameters, 'environment_uuid')"
-                                        :serverUuid="data_get($parameters, 'server_uuid')" />
-                                </div>
-                            </template>
-                            @if (!$isSharedVariable)
-                                <div x-cloak x-show="!isMultiline" wire:key="env-show-value-tip-{{ $env->id }}"
-                                    class="mt-1.5 text-xs text-neutral-500 dark:text-fg-faint">
-                                    Tip: Type <span
-                                        class="font-mono text-coollabs dark:text-warning">{{ '{{' }}</span> to reference
-                                    a shared environment variable
-                                </div>
-                            @endif
+                            </div>
+                        @endif
+                        {{-- Keep tip mounted during value load so layout does not jump when decrypt finishes. --}}
+                        @if (!$isSharedVariable && !$isValueHidden && !$isLocked)
+                            <div x-cloak x-show="!isMultiline" wire:key="env-show-value-tip-{{ $env->id }}"
+                                class="mt-1.5 text-xs text-neutral-500 dark:text-fg-faint">
+                                Tip: Type <span
+                                    class="font-mono text-coollabs dark:text-warning">{{ '{{' }}</span> to reference
+                                a shared environment variable
+                            </div>
                         @endif
                     </div>
 
@@ -133,7 +169,7 @@
                                     ['value' => false, 'label' => 'Single line'],
                                     ['value' => true, 'label' => 'Multiline'],
                                 ]"
-                                    x-bind:disabled="@js(!$canUpdate)" />
+                                    :disabled="! $canUpdate" />
                             @endif
                             @if ($showInterpolation)
                                 <x-forms.listbox id="is_literal" label="Interpolation" :options="[
@@ -141,7 +177,7 @@
                                     ['value' => true, 'label' => 'Literal (keep $ characters as-is)'],
                                 ]"
                                     helper="Literal means $VARIABLES in the value is kept as the actual characters '$VARIABLES' instead of being resolved from another variable. Useful when your value contains a $ sign."
-                                    x-bind:disabled="@js(!$canUpdate)" />
+                                    :disabled="! $canUpdate" />
                             @endif
                             @if ($showBuildtime)
                                 <x-forms.listbox id="is_buildtime" label="Build time" :options="[
@@ -149,14 +185,14 @@
                                     ['value' => false, 'label' => 'Not available during build'],
                                 ]"
                                     helper="Make this variable available during the Docker build process. Useful for build secrets and dependencies."
-                                    x-bind:disabled="@js(!$canUpdate)" />
+                                    :disabled="! $canUpdate" />
                             @endif
                             @if ($showRuntime)
                                 <x-forms.listbox id="is_runtime" label="Runtime" :options="[
                                     ['value' => true, 'label' => 'Available in the container'],
                                     ['value' => false, 'label' => 'Not available in the container'],
                                 ]" helper="Make this variable available in the running container at runtime."
-                                    x-bind:disabled="@js(!$canUpdate)" />
+                                    :disabled="! $canUpdate" />
                             @endif
                         </div>
                     @endif

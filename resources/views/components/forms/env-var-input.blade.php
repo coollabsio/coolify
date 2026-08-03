@@ -1,13 +1,15 @@
 <div class="w-full">
     @if ($label)
-        <label class="flex gap-1 items-center mb-1 text-sm font-medium">{{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @endif
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-        </label>
+        </div>
     @endif
 
     <div class="relative" @success.window="type = '{{ $type }}'" x-data="{

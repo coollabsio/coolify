@@ -21,8 +21,9 @@
             Margin lives only on this wrapper (mb-0 on the label) so spacing matches
             plain text labels and is not doubled by .application-settings-form label rules.
         --}}
-        <div class="mb-1.5 flex w-fit items-center gap-1.5">
-            <label for="{{ $id }}-trigger" class="mb-0! flex items-center gap-1.5">
+        {{-- Fixed h-4 matches the helper icon so side-by-side fields align with or without a helper. --}}
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label for="{{ $id }}-trigger" class="mb-0! flex items-center gap-1.5 leading-4">
                 {{ $label }}
                 @if ($required)
                     <x-highlighted text="*" />

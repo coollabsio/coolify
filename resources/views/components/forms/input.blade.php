@@ -3,17 +3,24 @@
     'w-full' => !$isMultiline,
 ])>
     @if ($label)
-        <label class="flex gap-1 items-center mb-1 text-sm font-medium">{{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        {{--
+            Fixed-height label row (h-4 = helper icon). Helper lives outside <label> so
+            side-by-side fields align whether a field has a helper, required mark, both, or neither.
+            Margin is only on this wrapper — mb-0! beats .application-settings-form label rules.
+        --}}
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @endif
+                @isset($labelSuffix)
+                    {{ $labelSuffix }}
+                @endisset
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-            @isset($labelSuffix)
-                {{ $labelSuffix }}
-            @endisset
-        </label>
+        </div>
     @endif
     @if ($type === 'password')
         <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
