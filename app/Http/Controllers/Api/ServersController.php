@@ -858,7 +858,7 @@ class ServersController extends Controller
         if ($server->definedResources()->count() > 0 && ! $force) {
             return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
-        if ($server->isLocalhost()) {
+        if ($server->is_coolify_host) {
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
 

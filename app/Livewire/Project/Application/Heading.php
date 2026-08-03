@@ -20,6 +20,8 @@ class Heading extends Component
 
     public array $parameters;
 
+    public string $activeRouteName = '';
+
     protected string $deploymentUuid;
 
     public bool $docker_cleanup = true;
@@ -38,6 +40,7 @@ class Heading extends Component
 
     public function mount()
     {
+        $this->activeRouteName = request()->route()?->getName() ?? '';
         $this->parameters = [
             'project_uuid' => $this->application->project()->uuid,
             'environment_uuid' => $this->application->environment->uuid,

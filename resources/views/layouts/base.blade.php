@@ -204,9 +204,30 @@
         let checkHealthInterval = null;
         let checkIfIamDeadInterval = null;
 
-        function copyToClipboard(text) {
-            navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');
+        async function copyToClipboard(text) {
+            try {
+                if (navigator.clipboard?.writeText && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.setAttribute('readonly', '');
+                    textarea.style.position = 'fixed';
+                    textarea.style.left = '-9999px';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    const copied = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (!copied) {
+                        throw new Error('Copy command was rejected.');
+                    }
+                }
+                window.Livewire.dispatch('success', 'Copied to clipboard.');
+            } catch (error) {
+                window.Livewire.dispatch('error', 'Failed to copy to clipboard.');
+            }
         }
+        window.copyToClipboard = copyToClipboard;
         document.addEventListener('livewire:init', () => {
             window.Livewire.on('reloadWindow', (timeout) => {
                 if (timeout) {

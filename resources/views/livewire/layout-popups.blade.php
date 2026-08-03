@@ -91,41 +91,49 @@
             <x-popup>
                 <x-slot:customActions>
                     <div
-                        class="flex md:flex-row flex-col max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 border-neutral-200 dark:bg-coolgray-100 lg:p-8 lg:pb-4 sm:rounded-sm gap-2">
-                        <div class="md:block hidden">
-                            <img src="{{ asset('heart.png') }}" class="w-20 h-20">
+                        class="relative mx-auto flex w-full max-w-2xl flex-col gap-5 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-5 shadow-modal sm:p-6 dark:border-white/[0.1] dark:bg-surface">
+                        <button type="button" aria-label="Dismiss sponsorship reminder"
+                            class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                            @click="bannerVisible=false;disableSponsorship()">
+                            <x-reicon name="x" class="size-3.5" />
+                        </button>
+
+                        <div class="flex items-start gap-4 pr-8">
+                            <div
+                                class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 sm:flex dark:border-white/[0.08] dark:bg-white/[0.04]">
+                                <img src="{{ asset('heart.png') }}" alt="" class="size-9">
+                            </div>
+                            <div class="min-w-0">
+                                <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
+                                    Love Coolify? Support our work.
+                                </h2>
+                                <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                    Coolify is profitable thanks to <span
+                                        class="font-semibold text-coollabs dark:text-warning">you</span>. Your support
+                                    helps us build more features and keep improving the project.
+                                </p>
+                            </div>
                         </div>
-                        <div class="flex flex-col gap-2 lg:px-10 px-1">
-                            <div class="lg:text-xl text-md dark:text-white font-bold">Love Coolify? Support our work.
-                            </div>
-                            <div class="lg:text-sm text-xs dark:text-white">
-                                We are already profitable thanks to <span class="font-bold text-pink-500">YOU</span>
-                                but...<br />We
-                                would
-                                like to
-                                make
-                                more cool features.
-                            </div>
-                            <div class="lg:text-sm text-xs dark:text-white pt-2 ">
-                                For this we need your help to support our work financially.
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-2 text-center md:mx-auto lg:py-0 pt-2">
-                            <x-forms.button isHighlighted class="md:w-36 w-full"><a target="_blank"
-                                    href="https://github.com/sponsors/coollabsio"
-                                    class="font-bold dark:text-white">GitHub
-                                    Sponsors</a></x-forms.button>
-                            <x-forms.button isHighlighted class="md:w-36 w-full"><a target="_blank"
-                                    href="https://opencollective.com/coollabsio/donate?interval=month&amount=10&name=&legalName=&email="
-                                    class="font-bold dark:text-white">Open
-                                    Collective</a></x-forms.button>
-                            <x-forms.button isHighlighted class="md:w-36 w-full"><a
-                                    href="https://donate.stripe.com/8x2bJ104ifmB9kB45u38402" target="_blank"
-                                    class="font-bold dark:text-white">Stripe</a></x-forms.button>
-                            <div class="pt-4 dark:text-white hover:underline cursor-pointer lg:text-base text-xs"
+
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <a target="_blank" href="https://github.com/sponsors/coollabsio"
+                                class="button h-9 justify-center bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! sm:flex-1 dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                GitHub Sponsors
+                            </a>
+                            <a target="_blank"
+                                href="https://opencollective.com/coollabsio/donate?interval=month&amount=10&name=&legalName=&email="
+                                class="button h-9 justify-center sm:flex-1">
+                                Open Collective
+                            </a>
+                            <a href="https://donate.stripe.com/8x2bJ104ifmB9kB45u38402" target="_blank"
+                                class="button h-9 justify-center sm:flex-1">
+                                Stripe
+                            </a>
+                            <button type="button"
+                                class="h-9 cursor-pointer px-2 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black sm:shrink-0 dark:text-fg-dim dark:hover:text-fg"
                                 @click="bannerVisible=false;disableSponsorship()">
                                 Maybe next time
-                            </div>
+                            </button>
                         </div>
                     </div>
                 </x-slot:customActions>

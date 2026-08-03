@@ -1,140 +1,192 @@
-<div class="flex flex-col gap-4">
-    <div>
-        <div class="flex items-center gap-2">
-            <h2>Environment Variables</h2>
-            @can('manageEnvironment', $resource)
-                <div class="flex flex-col items-center">
-                    <x-modal-input buttonTitle="+ Add" title="New Environment Variable" :closeOutside="false">
+<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables">
+    <x-application.settings-section id="environment-variables-section" title="Environment variables"
+        helper="Environment variables (secrets) for this resource.">
+        @can('manageEnvironment', $resource)
+            <x-slot:actions>
+                <x-forms.button wire:click='switch' wire:loading.attr="disabled"
+                    wire:target="loadEnvironmentVariables,switch">
+                    {{ $view === 'normal' ? 'Developer view' : 'Normal view' }}
+                </x-forms.button>
+            </x-slot:actions>
+        @endcan
+        @if ($view === 'normal')
+            @if ($resourceClass === 'App\Models\Application')
+                <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                    @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                        <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
+                            onChange="instantSave"
+                            helper="Controls how environment variables are ordered in the list and written to the generated .env file on deploy."
+                            :options="[
+                                ['value' => false, 'label' => 'Creation order'],
+                                ['value' => true, 'label' => 'Alphabetical'],
+                            ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                    @endif
+                    <x-forms.listbox id="use_build_secrets" label="Build secrets" onChange="instantSave"
+                        helper="Docker BuildKit secrets keep values out of the final image for enhanced security during builds. Requires Docker 18.09+ with BuildKit support."
+                        :options="[
+                            ['value' => false, 'label' => 'Standard build arguments'],
+                            ['value' => true, 'label' => 'Docker BuildKit secrets'],
+                        ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                </div>
+            @else
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">Manage this resource's environment variables below.</p>
+            @endif
+        @else
+            <form wire:submit.prevent='submit' class="flex w-full flex-col gap-4">
+                @can('manageEnvironment', $resource)
+                    <x-callout type="info" title="Note">
+                        Inline comments with space before # (e.g., <code class="font-mono">KEY=value #comment</code>) are stripped.
+                    </x-callout>
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
+                        wire:model="variables" label="Production"></x-forms.textarea>
+                    @if ($showPreview)
+                        <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" label="Preview deployments"
+                            id="variablesPreview" wire:model="variablesPreview"></x-forms.textarea>
+                    @endif
+                    <x-unsaved-bar action="submit" />
+                @else
+                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
+                        wire:model="variables" label="Production" disabled></x-forms.textarea>
+                    @if ($showPreview)
+                        <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" label="Preview deployments"
+                            id="variablesPreview" wire:model="variablesPreview" disabled></x-forms.textarea>
+                    @endif
+                @endcan
+            </form>
+        @endif
+    </x-application.settings-section>
+
+    {{-- Toolbar: search left; filter and add right --}}
+    @if ($view === 'normal')
+        <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
+            @if (! $readyToLoad) aria-busy="true" @endif>
+            <div class="relative min-w-0 w-full flex-1 sm:max-w-md">
+                <input type="search" placeholder="Search environment variables"
+                    aria-label="Search environment variables" wire:model.live.debounce.300ms="search"
+                    class="input w-full pl-8!" @disabled(! $readyToLoad) />
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+                    <x-reicon name="search" wire:loading.remove wire:target="search,loadEnvironmentVariables"
+                        class="size-3.5 text-neutral-400 dark:text-fg-faint" />
+                    <svg wire:loading wire:target="search,loadEnvironmentVariables" aria-hidden="true"
+                        class="size-3.5 animate-spin text-neutral-400 dark:text-fg-dim" fill="none"
+                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+                @if ($resource->type() === 'application' && $showPreview)
+                    <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
+                        <button type="button" class="button" @click="open = !open" @click.outside="open = false"
+                            aria-haspopup="listbox" :aria-expanded="open" @disabled(! $readyToLoad)>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
+                                stroke="currentColor" class="size-3.5">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
+                            </svg>
+                            Filter
+                        </button>
+                        <div class="listbox-panel left-auto! right-0! z-[90]! min-w-48!" x-show="open" x-cloak
+                            role="listbox">
+                            @foreach ([
+                                'all' => 'All environments',
+                                'production' => 'Production',
+                                'preview' => 'Preview',
+                            ] as $filterValue => $filterLabel)
+                                <button type="button" class="listbox-option" role="option"
+                                    aria-selected="{{ $environmentFilter === $filterValue ? 'true' : 'false' }}"
+                                    wire:click="setEnvironmentFilter('{{ $filterValue }}')" @click="open = false">
+                                    <span class="truncate">{{ $filterLabel }}</span>
+                                    @if ($environmentFilter === $filterValue)
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="2.5" stroke="currentColor" class="size-3.5 shrink-0">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                d="m4.5 12.75 6 6 9-13.5" />
+                                        </svg>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+                @can('manageEnvironment', $resource)
+                    {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
+                         disabled attribute painted on first load would never re-enable. --}}
+                    <x-modal-input title="New Environment Variable" :closeOutside="false">
+                        <x-slot:content>
+                            <button type="button"
+                                class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                <x-reicon name="plus" class="size-3.5" />
+                                Add
+                            </button>
+                        </x-slot:content>
                         <livewire:project.shared.environment-variable.add />
                     </x-modal-input>
-                </div>
-                <x-forms.button
-                    wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
-            @endcan
-        </div>
-        <div>Environment variables (secrets) for this resource. </div>
-        @if ($resourceClass === 'App\Models\Application')
-            <div class="flex flex-col gap-2 pt-2">
-                @if (data_get($resource, 'build_pack') !== 'dockercompose')
-                    <div class="w-64">
-                        @can('manageEnvironment', $resource)
-                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
-                                instantSave></x-forms.checkbox>
-                        @else
-                            <x-forms.checkbox id="is_env_sorting_enabled" label="Sort alphabetically"
-                                helper="Turn this off if one environment is dependent on another. It will be sorted by creation order (like you pasted them or in the order you created them)."
-                                disabled></x-forms.checkbox>
-                        @endcan
-                    </div>
-                @endif
-                <div class="w-64">
-                    @can('manageEnvironment', $resource)
-                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
-                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
-                            instantSave></x-forms.checkbox>
-                    @else
-                        <x-forms.checkbox id="use_build_secrets" label="Use Docker Build Secrets"
-                            helper="Enable Docker BuildKit secrets for enhanced security during builds. Secrets won't be exposed in the final image. Requires Docker 18.09+ with BuildKit support."
-                            disabled></x-forms.checkbox>
-                    @endcan
-                </div>
+                @endcan
             </div>
-        @endif
-    </div>
+        </div>
+    @endif
+
     @if ($view === 'normal')
-        <div class="w-full md:w-96">
-            <div class="relative">
-                <input type="search" placeholder="Search" aria-label="Search environment variables"
-                    wire:model.live.debounce.300ms="search" class="w-full input pl-10" />
-                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                    <div class="relative w-4 h-4">
-                        <svg wire:loading.remove wire:target="search" aria-hidden="true"
-                            class="absolute inset-0 w-4 h-4 dark:text-neutral-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <svg wire:loading wire:target="search" aria-hidden="true"
-                            class="absolute inset-0 w-4 h-4 text-coollabs dark:text-warning animate-spin" fill="none"
-                            viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                    </div>
-                </div>
+        @if (! $readyToLoad)
+            <div id="environment-table-section"
+                class="application-settings-section-body mt-1 flex min-h-40 w-full scroll-mt-28 items-center justify-center"
+                wire:loading.class="opacity-100" wire:target="loadEnvironmentVariables">
+                <x-loading text="Loading environment variables..." />
             </div>
-        </div>
-        @if ($this->isSearchActive && ! $this->hasEnvironmentVariables)
-            <div>No environment variables found.</div>
         @else
-            @if ($this->environmentVariables->isNotEmpty() || $this->hardcodedEnvironmentVariables->isNotEmpty())
-                <div>
-                    <h3>Production Environment Variables</h3>
-                    <div>Environment (secrets) variables for Production.</div>
-                </div>
-                @foreach ($this->environmentVariables as $env)
-                    <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}" :env="$env"
-                        :type="$resource->type()" />
-                @endforeach
-                @if (($resource->type() === 'service' || $resource?->build_pack === 'dockercompose') && $this->hardcodedEnvironmentVariables->isNotEmpty())
-                    @foreach ($this->hardcodedEnvironmentVariables as $index => $env)
-                        <livewire:project.shared.environment-variable.show-hardcoded
-                            wire:key="hardcoded-prod-{{ $env['key'] }}-{{ $env['service_name'] ?? 'default' }}-{{ $index }}" :env="$env" />
-                    @endforeach
+            @php
+                $totalRows = $this->environmentVariableRowCount;
+                $currentPage = $this->currentEnvironmentVariablePage;
+                $lastPage = $this->environmentVariableLastPage;
+                $firstVisibleRow = $totalRows === 0 ? 0 : ($currentPage - 1) * $perPage + 1;
+                $lastVisibleRow = min($currentPage * $perPage, $totalRows);
+            @endphp
+            <div id="environment-table-section"
+                class="application-settings-section-body mt-1 scroll-mt-28 {{ $totalRows > 0 ? 'is-flush' : '' }} w-full">
+                @if ($this->isSearchActive && $totalRows === 0)
+                    <x-empty size="sm" title="No environment variables found"
+                        description="No variables match your search." />
+                @elseif ($totalRows > 0)
+                    <div class="data-table w-full transition-opacity"
+                        wire:loading.class="opacity-50 pointer-events-none"
+                        wire:target="setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
+                        <div class="data-table-header env-table-grid">
+                            <span>Name</span>
+                            <span>Type</span>
+                            <span>Comment</span>
+                            <span class="text-center">Literal</span>
+                            <span class="text-center">Multiline</span>
+                            <span class="text-center">Buildtime</span>
+                            <span class="text-center">Runtime</span>
+                            <span></span>
+                        </div>
+                        @foreach ($this->environmentVariablePageRows as $row)
+                            @if ($row['kind'] === 'managed')
+                                <livewire:project.shared.environment-variable.show wire:key="{{ $row['id'] }}"
+                                    :env="$row['environmentVariable']" :type="$resource->type()" />
+                            @else
+                                <livewire:project.shared.environment-variable.show-hardcoded
+                                    wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"
+                                    :isPreview="$row['scope'] === 'preview'" />
+                            @endif
+                        @endforeach
+                        <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$totalRows"
+                            :current-page="$currentPage" :last-page="$lastPage"
+                            wire-target="setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
+                            first-action="setEnvironmentVariablePage(1)"
+                            previous-action="previousEnvironmentVariablePage"
+                            next-action="nextEnvironmentVariablePage"
+                            last-action="setEnvironmentVariablePage({{ $lastPage }})" />
+                    </div>
+                @else
+                    <x-empty size="sm" title="No environment variables"
+                        description="Add your first variable with the + Add button above."
+                        icon-name="variables" />
                 @endif
-            @endif
-            @if (
-                $resource->type() === 'application' &&
-                    $showPreview &&
-                    ($this->environmentVariablesPreview->isNotEmpty() || $this->hardcodedEnvironmentVariablesPreview->isNotEmpty())
-            )
-                <div>
-                    <h3>Preview Deployments Environment Variables</h3>
-                    <div>Environment (secrets) variables for Preview Deployments.</div>
-                </div>
-                @foreach ($this->environmentVariablesPreview as $env)
-                    <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}" :env="$env"
-                        :type="$resource->type()" />
-                @endforeach
-                @if (($resource->type() === 'service' || $resource?->build_pack === 'dockercompose') && $this->hardcodedEnvironmentVariablesPreview->isNotEmpty())
-                    @foreach ($this->hardcodedEnvironmentVariablesPreview as $index => $env)
-                        <livewire:project.shared.environment-variable.show-hardcoded
-                            wire:key="hardcoded-preview-{{ $env['key'] }}-{{ $env['service_name'] ?? 'default' }}-{{ $index }}"
-                            :env="$env" />
-                    @endforeach
-                @endif
-            @endif
+            </div>
         @endif
-    @else
-        <form wire:submit.prevent='submit' class="flex flex-col gap-2">
-            @can('manageEnvironment', $resource)
-                <x-callout type="info" title="Note" class="mb-2">
-                    Inline comments with space before # (e.g., <code class="font-mono">KEY=value #comment</code>) are stripped.
-                </x-callout>
-
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables" wire:model="variables"
-                    label="Production Environment Variables"></x-forms.textarea>
-
-                @if ($showPreview)
-                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans"
-                        label="Preview Deployments Environment Variables" id="variablesPreview"
-                        wire:model="variablesPreview"></x-forms.textarea>
-                @endif
-
-                <x-forms.button type="submit" class="btn btn-primary">Save All Environment Variables</x-forms.button>
-            @else
-                <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables" wire:model="variables"
-                    label="Production Environment Variables" disabled></x-forms.textarea>
-
-                @if ($showPreview)
-                    <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans"
-                        label="Preview Deployments Environment Variables" id="variablesPreview" wire:model="variablesPreview"
-                        disabled></x-forms.textarea>
-                @endif
-            @endcan
-        </form>
     @endif
 </div>

@@ -27,7 +27,7 @@ class Checkbox extends Component
         public string|bool $instantSave = false,
         public bool $live = false,
         public bool $disabled = false,
-        public string $defaultClass = 'dark:border-neutral-700 text-coolgray-400 dark:bg-coolgray-100 rounded-sm cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base',
+        public string $defaultClass = 'peer absolute inset-0 z-10 m-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed',
         public ?string $canGate = null,
         public mixed $canResource = null,
         public bool $autoDisable = true,
@@ -40,10 +40,6 @@ class Checkbox extends Component
                 $this->disabled = true;
                 $this->instantSave = false; // Disable instant save for unauthorized users
             }
-        }
-
-        if ($this->disabled) {
-            $this->defaultClass .= ' opacity-40';
         }
     }
 

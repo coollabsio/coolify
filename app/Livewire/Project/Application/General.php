@@ -94,6 +94,9 @@ class General extends Component
 
     public bool $isSpa = false;
 
+    /** UI-only aggregate of isStatic/isSpa: dynamic | static | spa */
+    public string $siteType = 'dynamic';
+
     public bool $isBuildServerEnabled = false;
 
     public bool $isPreserveRepositoryEnabled = false;
@@ -437,11 +440,19 @@ class General extends Component
             // Application settings properties
             $this->isStatic = $this->application->settings->is_static;
             $this->isSpa = $this->application->settings->is_spa;
+            $this->siteType = $this->isStatic ? ($this->isSpa ? 'spa' : 'static') : 'dynamic';
             $this->isBuildServerEnabled = $this->application->settings->is_build_server_enabled;
             $this->isPreserveRepositoryEnabled = $this->application->settings->is_preserve_repository_enabled;
             $this->isContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $this->isContainerLabelReadonlyEnabled = $this->application->settings->is_container_label_readonly_enabled;
         }
+    }
+
+    public function setSiteType(): void
+    {
+        $this->isStatic = $this->siteType !== 'dynamic';
+        $this->isSpa = $this->siteType === 'spa';
+        $this->instantSave();
     }
 
     public function instantSave()
@@ -680,7 +691,10 @@ class General extends Component
             if ($this->application->additional_servers->count() === 0) {
                 foreach ($domains as $domain) {
                     if (! validateDNSEntry($domain, $this->application->destination->server)) {
-                        $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                        $server = $this->application->destination->server;
+                        $target = serverDnsTargetIp($server) ?? $server->ip;
+                        $guidance = dnsMismatchGuidanceMessage($target, $target);
+                        $showToaster && $this->dispatch('error', 'Validating DNS failed.', "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     }
                 }
             }
@@ -722,7 +736,10 @@ class General extends Component
             $this->application->redirect = $this->redirect;
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
-                $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
+                $server = $this->application->destination?->server;
+                $target = $server ? (serverDnsTargetIp($server) ?? $server->ip) : null;
+                $dnsHint = dnsMismatchGuidanceMessage($target, $target);
+                $this->dispatch('error', "You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list ({$dnsHint}).");
 
                 return;
             }
@@ -847,7 +864,10 @@ class General extends Component
                         $domain = data_get($service, 'domain');
                         if ($domain) {
                             if (! validateDNSEntry($domain, $this->application->destination->server)) {
-                                $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                                $server = $this->application->destination->server;
+                                $target = serverDnsTargetIp($server) ?? $server->ip;
+                                $guidance = dnsMismatchGuidanceMessage($target, $target);
+                                $showToaster && $this->dispatch('error', 'Validating DNS failed.', "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                             }
                         }
                     }

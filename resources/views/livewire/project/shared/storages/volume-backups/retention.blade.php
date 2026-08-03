@@ -1,52 +1,35 @@
-<form wire:submit="save" class="flex flex-col gap-4">
-    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <h2>Retention</h2>
-        <x-forms.button type="submit" class="w-full sm:w-auto" canGate="update"
-            :canResource="$backup">Save</x-forms.button>
-    </div>
+<form wire:submit="save" class="application-settings-form">
+    <x-unsaved-bar action="save" />
 
-    <div>
-        <ul class="pl-6 space-y-2 list-disc">
-            <li>Setting a value to 0 means unlimited retention.</li>
-            <li>The retention rules work independently - whichever limit is reached first will trigger cleanup.</li>
-        </ul>
-    </div>
-
-    <div class="flex flex-col gap-6">
+    <x-application.settings-section title="Retention"
+        description="The first reached limit removes the oldest archive. Use 0 for unlimited retention.">
         <div>
-            <h3 class="mb-3">Local Backup Retention</h3>
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-                <x-forms.input label="Number of backups to keep" id="retentionAmountLocally" type="number"
+            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Local backups</h3>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <x-forms.input label="Backups to keep" id="retentionAmountLocally" type="number"
                     min="0" canGate="update" :canResource="$backup"
-                    helper="Keeps only the specified number of most recent backups on the server. Set to 0 for unlimited backups."
-                    required />
-                <x-forms.input label="Days to keep backups" id="retentionDaysLocally" type="number"
+                    helper="Maximum number of recent local backups." required />
+                <x-forms.input label="Days to keep" id="retentionDaysLocally" type="number"
                     min="0" canGate="update" :canResource="$backup"
-                    helper="Automatically removes backups older than the specified number of days. Set to 0 for no time limit."
-                    required />
+                    helper="Remove local backups older than this many days." required />
                 <x-forms.input label="Maximum storage (GB)" id="retentionMaxStorageLocally" type="number"
                     min="0" step="any" canGate="update" :canResource="$backup"
-                    helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.001 for 1MB). Set to 0 for unlimited storage."
-                    required />
+                    helper="Remove the oldest local backups after this total size is reached." required />
             </div>
         </div>
 
-        <div>
-            <h3 class="mb-3">S3 Storage Retention</h3>
-            <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
-                <x-forms.input label="Number of backups to keep" id="retentionAmountS3" type="number" min="0"
+        <div class="mt-6 border-t border-neutral-200 pt-6 dark:border-white/[0.06]">
+            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">S3 backups</h3>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <x-forms.input label="Backups to keep" id="retentionAmountS3" type="number" min="0"
+                    canGate="update" :canResource="$backup" helper="Maximum number of recent S3 backups." required />
+                <x-forms.input label="Days to keep" id="retentionDaysS3" type="number" min="0"
                     canGate="update" :canResource="$backup"
-                    helper="Keeps only the specified number of most recent backups on S3 storage. Set to 0 for unlimited backups."
-                    required />
-                <x-forms.input label="Days to keep backups" id="retentionDaysS3" type="number" min="0"
-                    canGate="update" :canResource="$backup"
-                    helper="Automatically removes S3 backups older than the specified number of days. Set to 0 for no time limit."
-                    required />
-                <x-forms.input label="Maximum storage (GB)" id="retentionMaxStorageS3" type="number" min="0"
-                    step="any" canGate="update" :canResource="$backup"
-                    helper="When total size of all backups in the current backup job exceeds this limit in GB, the oldest backups will be removed. Decimal values are supported (e.g. 0.5 for 500MB). Set to 0 for unlimited storage."
-                    required />
+                    helper="Remove S3 backups older than this many days." required />
+                <x-forms.input label="Maximum storage (GB)" id="retentionMaxStorageS3" type="number"
+                    min="0" step="any" canGate="update" :canResource="$backup"
+                    helper="Remove the oldest S3 backups after this total size is reached." required />
             </div>
         </div>
-    </div>
+    </x-application.settings-section>
 </form>

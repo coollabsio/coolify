@@ -2468,22 +2468,22 @@ export default function Clusters({
                                                     firewallRules.map((rule, index) => (
                                                         <tr key={rule.id ?? `firewall-rule-${index}`}>
                                                             <td className="max-w-80 truncate px-3 py-2 font-mono text-muted-foreground" title={rule.id}>
-                                                                {rule.id ?? '—'}
+                                                                {rule.id ?? '-'}
                                                             </td>
                                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                                                {rule.namespace ?? '—'}
+                                                                {rule.namespace ?? '-'}
                                                             </td>
                                                             <td className="whitespace-nowrap px-3 py-2 font-mono text-muted-foreground">
-                                                                {rule.src ?? '—'}
+                                                                {rule.src ?? '-'}
                                                             </td>
                                                             <td className="whitespace-nowrap px-3 py-2 font-mono text-muted-foreground">
-                                                                {rule.dst ?? '—'}
+                                                                {rule.dst ?? '-'}
                                                             </td>
                                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                                                {rule.proto ?? '—'}
+                                                                {rule.proto ?? '-'}
                                                             </td>
                                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
-                                                                {rule.port ?? '—'}
+                                                                {rule.port ?? '-'}
                                                             </td>
                                                         </tr>
                                                     ))

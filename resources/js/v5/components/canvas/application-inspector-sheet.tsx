@@ -99,7 +99,7 @@ function ApplicationLogsTab({ application }: { application: V5Application }) {
                               : logs
                                 ? logs
                                 : hasLoaded
-                                  ? 'No container logs yet — the container has not been created. See the status message above for the deploy result.'
+                                  ? 'No container logs yet. The container has not been created. See the status message above for the deploy result.'
                                   : ''
                     }
                     readOnly

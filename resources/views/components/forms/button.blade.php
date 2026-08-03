@@ -1,3 +1,29 @@
+@php
+    $wireClickValue = $attributes->whereStartsWith('wire:click')->first();
+    $wireTargetValue = $attributes->get('wire:target');
+    $hasExplicitWireTarget = $attributes->has('wire:target')
+        && filled($wireTargetValue)
+        && $wireTargetValue !== true
+        && $wireTargetValue !== '1';
+
+    $loadingTarget = null;
+    if ($showLoadingIndicator) {
+        if (filled($wireClickValue)) {
+            $loadingTarget = trim(explode('(', (string) $wireClickValue, 2)[0]);
+        } elseif ($hasExplicitWireTarget) {
+            $loadingTarget = trim(explode('(', (string) $wireTargetValue, 2)[0]);
+        }
+    }
+
+    $loadingAttributes = [];
+    if (filled($loadingTarget)) {
+        $loadingAttributes['wire:loading.attr'] = 'disabled';
+        $loadingAttributes['wire:loading.class'] = 'is-loading';
+        if (! $hasExplicitWireTarget) {
+            $loadingAttributes['wire:target'] = $loadingTarget;
+        }
+    }
+@endphp
 @if ($authDisabled || filled($tooltip))
 <span class="relative inline-flex"
     x-data="{ visible: false, _t: null }"
@@ -19,8 +45,7 @@
     }, 300)"
     @mouseleave="clearTimeout(_t); visible = false">
 @endif
-<button @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass]) }}
-    {{ $attributes->merge(['type' => 'button']) }}
+<button @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass, 'type' => 'button'])->merge($loadingAttributes) }}
     @isset($confirm)
             x-on:click="toggleConfirmModal('{{ $confirm }}', '{{ explode('(', $confirmAction)[0] }}')"
         @endisset
@@ -28,16 +53,10 @@
             x-on:{{ explode('(', $confirmAction)[0] }}.window="$wire.{{ explode('(', $confirmAction)[0] }}"
         @endisset>
 
-    {{ $slot }}
-    @if ($showLoadingIndicator)
-        @if ($attributes->whereStartsWith('wire:click')->first())
-            <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}"
-                wire:loading.delay />
-        @elseif($attributes->whereStartsWith('wire:target')->first())
-            <x-loading-on-button wire:target="{{ $attributes->whereStartsWith('wire:target')->first() }}"
-                wire:loading.delay />
-        @endif
+    @if (filled($loadingTarget))
+        <x-loading-on-button wire:target="{{ $loadingTarget }}" wire:loading />
     @endif
+    {{ $slot }}
 </button>
 @if ($authDisabled || filled($tooltip))
     <div x-ref="tip" x-show="visible" x-cloak class="auth-tooltip">
