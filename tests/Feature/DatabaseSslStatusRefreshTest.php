@@ -230,6 +230,34 @@ it('reloads the mysql status-info model when refresh is called so ssl controls f
         ->assertSee('Database should be stopped to change this settings.');
 });
 
+it('shows ssl mode even when ssl is disabled, as a disabled control', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+    $database = StandaloneMysql::create([
+        'name' => 'ssl-disabled-mysql',
+        'image' => 'mysql:8',
+        'mysql_root_password' => 'password',
+        'mysql_user' => 'coolify',
+        'mysql_password' => 'password',
+        'mysql_database' => 'coolify',
+        'status' => 'exited:unhealthy',
+        'enable_ssl' => false,
+        'ssl_mode' => 'REQUIRED',
+        'is_log_drain_enabled' => false,
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    Livewire::test(MysqlStatusInfo::class, ['database' => $database])
+        ->assertSet('enableSsl', false)
+        ->assertSee('SSL mode')
+        ->assertSeeHtml('id="sslMode-trigger"');
+});
+
 it('does not clobber server form text inputs when sentinel restarts', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,

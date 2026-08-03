@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col items-center gap-4 p-4 bg-white border lg:items-start dark:bg-base dark:border-coolgray-300 border-neutral-200">
+    <form wire:submit='submit' class="flex flex-col gap-4">
         @if ($isReadOnly)
             @if (!$storage->isServiceResource() && !$storage->isDockerComposeResource())
                 <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
@@ -7,7 +7,7 @@
                 </div>
             @endif
             @if ($isFirst)
-                <div class="flex gap-2 items-end w-full  md:flex-row flex-col">
+                <div class="grid w-full gap-4 md:grid-cols-3">
                     @if (
                         $storage->resource_type === 'App\Models\ServiceApplication' ||
                             $storage->resource_type === 'App\Models\ServiceDatabase')
@@ -48,7 +48,7 @@
                     @endif
                 </div>
             @else
-                <div class="flex gap-2 items-end w-full">
+                <div class="grid w-full gap-4 md:grid-cols-3">
                     <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required readonly>
                         <x-slot:labelSuffix>
                             @if ($hasEnabledBackup)
@@ -65,9 +65,12 @@
             @if (!$isService)
                 @can('update', $resource)
                     <div class="w-full sm:w-96">
-                        <x-forms.checkbox instantSave canGate="update" :canResource="$resource" label="Add suffix for PR deployments"
-                            id="isPreviewSuffixEnabled"
-                            helper="When enabled, a -pr-N suffix is added to this volume's name for preview deployments (e.g. myvolume becomes myvolume-pr-1). Disable this for volumes that should be shared between the main and preview deployments."></x-forms.checkbox>
+                        <x-forms.listbox id="isPreviewSuffixEnabled" label="PR deployment suffix"
+                            helper="Choose whether preview deployments receive an isolated -pr-N volume suffix."
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Add suffix'],
+                                ['value' => false, 'label' => 'Share volume'],
+                            ]" />
                     </div>
                 @endcan
             @endif
@@ -83,7 +86,7 @@
         @else
             @can('update', $resource)
                 @if ($isFirst)
-                    <div class="flex gap-2 items-end w-full">
+                    <div class="grid w-full gap-4 md:grid-cols-3">
                         <x-forms.input id="name" label="Volume Name" required>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
@@ -98,7 +101,7 @@
                             helper="Directory inside the container." required />
                     </div>
                 @else
-                    <div class="flex gap-2 items-end w-full">
+                    <div class="grid w-full gap-4 md:grid-cols-3">
                         <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
@@ -114,9 +117,12 @@
                 @endif
                 @if (!$isService)
                     <div class="w-full sm:w-96">
-                        <x-forms.checkbox instantSave canGate="update" :canResource="$resource" label="Add suffix for PR deployments"
-                            id="isPreviewSuffixEnabled"
-                            helper="When enabled, a -pr-N suffix is added to this volume's name for preview deployments (e.g. myvolume becomes myvolume-pr-1). Disable this for volumes that should be shared between the main and preview deployments."></x-forms.checkbox>
+                        <x-forms.listbox id="isPreviewSuffixEnabled" label="PR deployment suffix"
+                            helper="Choose whether preview deployments receive an isolated -pr-N volume suffix."
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Add suffix'],
+                                ['value' => false, 'label' => 'Share volume'],
+                            ]" />
                     </div>
                 @endif
                 <div class="flex gap-2">
@@ -140,7 +146,7 @@
                 </div>
             @else
                 @if ($isFirst)
-                    <div class="flex gap-2 items-end w-full">
+                    <div class="grid w-full gap-4 md:grid-cols-3">
                         <x-forms.input id="name" label="Volume Name" required disabled>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)
@@ -156,7 +162,7 @@
                             helper="Directory inside the container." required disabled />
                     </div>
                 @else
-                    <div class="flex gap-2 items-end w-full">
+                    <div class="grid w-full gap-4 md:grid-cols-3">
                         <x-forms.input id="name" :label="$hasEnabledBackup ? 'Volume Name' : null" required disabled>
                             <x-slot:labelSuffix>
                                 @if ($hasEnabledBackup)

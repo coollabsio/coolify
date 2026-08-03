@@ -1,47 +1,47 @@
-<form wire:submit="save" class="flex flex-col gap-4">
-    <div>
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <h2>General</h2>
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <x-forms.button type="submit" class="w-full sm:w-auto">Save</x-forms.button>
+<form wire:submit="save" class="application-settings-form">
+    <x-unsaved-bar action="save" />
+
+    <x-application.settings-section title="Backup schedule"
+        description="Choose when this storage is archived and how long each backup may run.">
+        <x-slot:actions>
+            <div class="flex items-center gap-2">
                 @if (!$enabled)
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
-                        wire:target="toggleEnabled" isHighlighted>Enable Backup</x-forms.button>
+                        wire:target="toggleEnabled" isHighlighted>Enable backup</x-forms.button>
                 @else
                     <x-forms.button type="button" wire:click="toggleEnabled" wire:loading.attr="disabled"
-                        wire:target="toggleEnabled">Disable Backup</x-forms.button>
+                        wire:target="toggleEnabled">Disable backup</x-forms.button>
                 @endif
-
-                <x-forms.button type="button" wire:click="backupNow" class="w-full sm:w-auto">Backup Now</x-forms.button>
+                <x-forms.button type="button" wire:click="backupNow">Back up now</x-forms.button>
             </div>
-        </div>
-        <p class="pt-1 text-sm text-neutral-600 dark:text-neutral-400">
-            {{ $backup?->targetType() ?? ($storage instanceof \App\Models\LocalFileVolume ? 'Directory' : 'Volume') }}:
-            <span class="font-medium text-neutral-800 dark:text-neutral-200">
-                {{ $backup?->targetName() ?? ($storage instanceof \App\Models\LocalFileVolume ? $storage->fs_path : $storage->name) }}
+        </x-slot:actions>
+
+        <div class="mb-4 flex items-center justify-between gap-3 rounded-lg bg-neutral-50 px-3 py-2.5 ring-1 ring-neutral-200 dark:bg-white/[0.025] dark:ring-white/[0.07]">
+            <span class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                {{ $backup?->targetType() ?? ($storage instanceof \App\Models\LocalFileVolume ? 'Directory' : 'Volume') }}
             </span>
-        </p>
-    </div>
+            <code class="truncate text-[12px] font-medium text-neutral-900 dark:text-fg">
+                {{ $backup?->targetName() ?? ($storage instanceof \App\Models\LocalFileVolume ? $storage->fs_path : $storage->name) }}
+            </code>
+        </div>
 
-    <div class="p-3 text-sm rounded bg-warning/10 text-warning">
-        Backups made while the application is writing to this storage may be inconsistent or corrupted. You can
-        gracefully stop containers during the archive step for a safer file-level backup, but this briefly
-        interrupts the application.
-    </div>
+        <x-callout type="warning" title="File-level consistency">
+            Archives created while the application writes to this storage can be inconsistent. Stopping containers
+            during the archive is safer, but briefly interrupts the application.
+        </x-callout>
 
-    <div class="w-full max-w-md">
-        <x-forms.checkbox instantSave id="stopDuringBackup" label="Stop containers while creating the archive"
-            helper="Off by default. Containers using this storage are gracefully stopped and restarted immediately after the archive is created." />
-    </div>
-
-    <div class="flex flex-col gap-4">
-        <div class="grid grid-cols-1 gap-2 md:grid-cols-3">
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <x-forms.listbox id="stopDuringBackup" label="Archive behavior" live onChange="instantSave"
+                :options="[
+                    ['value' => false, 'label' => 'Keep containers running'],
+                    ['value' => true, 'label' => 'Stop containers during archive'],
+                ]" />
             <x-forms.input id="frequency" label="Frequency" required
                 helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression." />
             <x-forms.input id="timezone" label="Timezone" disabled
-                helper="The timezone of the server where the backup is scheduled to run (if not set, the instance timezone will be used)" required />
+                helper="Uses the backup server timezone, or the instance timezone when none is configured." required />
             <x-forms.input id="timeout" type="number" min="60" max="36000" label="Timeout"
-                helper="The timeout of the backup job in seconds." required />
+                helper="Maximum backup runtime in seconds." required />
         </div>
-    </div>
+    </x-application.settings-section>
 </form>

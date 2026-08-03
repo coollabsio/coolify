@@ -2,24 +2,44 @@
     <x-slot:title>
         Project Variables | Coolify
     </x-slot>
-    <div class="flex gap-2">
-        <h1>Projects</h1>
-    </div>
-    <div class="subtitle">List of your projects.</div>
-    <div class="flex flex-col gap-2">
-        @forelse ($projects as $project)
-            <a class="coolbox group"
-                href="{{ route('shared-variables.project.show', ['project_uuid' => data_get($project, 'uuid')]) }}" {{ wireNavigate() }}>
-                <div class="flex flex-col justify-center mx-6 ">
-                    <div class="box-title">{{ $project->name }}</div>
-                    <div class="box-description ">
-                        {{ $project->description }}</div>
-                </div>
-            </a>
-        @empty
-            <div>
-                <div>No project found.</div>
-            </div>
-        @endforelse
+
+    <x-dashboard.navbar section="shared-variables" title="Shared variables"
+        subtitle="Project-wide variables for every environment in a project" :titleOnDesktop="false" />
+
+    <div class="w-full">
+    @if ($projects->isEmpty())
+        <x-empty title="No projects yet"
+            description="Create a project before adding project-wide variables."
+            icon-name="projects" />
+    @else
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            @foreach ($projects as $project)
+                <a class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                    href="{{ route('shared-variables.project.show', ['project_uuid' => $project->uuid]) }}"
+                    {{ wireNavigate() }}>
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                            <x-reicon name="projects" class="size-4" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                {{ $project->name }}
+                            </h2>
+                            <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                {{ $project->description ?: 'No description' }}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="mt-auto flex items-center pt-4">
+                        <span class="text-[11px] text-neutral-500 dark:text-fg-dim">
+                            {{ $project->environment_variables()->count() }}
+                            {{ Str::plural('variable', $project->environment_variables()->count()) }}
+                        </span>
+                    </div>
+                </a>
+            @endforeach
+        </div>
+    @endif
     </div>
 </div>

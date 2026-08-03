@@ -353,6 +353,8 @@ class Change extends Component
                 $this->activeTab = 'permissions';
             } elseif ($routeName === 'source.github.resources') {
                 $this->activeTab = 'resources';
+            } elseif ($routeName === 'source.github.danger') {
+                $this->activeTab = 'danger';
             } else {
                 $this->activeTab = 'general';
             }

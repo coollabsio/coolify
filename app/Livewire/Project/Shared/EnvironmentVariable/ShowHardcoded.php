@@ -16,6 +16,8 @@ class ShowHardcoded extends Component
 
     public ?string $serviceName = null;
 
+    public bool $isPreview = false;
+
     public function mount()
     {
         $this->key = $this->env['key'];

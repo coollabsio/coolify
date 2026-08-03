@@ -1,15 +1,20 @@
-<div>
-    <h1>Create a new Application</h1>
-    <div class="pb-4">You can deploy a simple Dockerfile, without Git.</div>
+<div class="mt-8 w-full max-w-[1180px] lg:mt-3">
     <form wire:submit="submit">
-        <div class="flex gap-2 pb-1">
-            <h2>Dockerfile</h2>
-            <x-forms.button type="submit">Save</x-forms.button>
-        </div>
-        <x-forms.textarea useMonacoEditor monacoEditorLanguage="dockerfile" rows="20" id="dockerfile" autofocus
-            placeholder='FROM nginx
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Dockerfile</h2>
+                    <p>Create an application directly from a Dockerfile without connecting a Git repository.</p>
+                </div>
+                <x-forms.button type="submit" isHighlighted>Create application</x-forms.button>
+            </div>
+            <div class="application-settings-section-body p-0!">
+                <x-forms.textarea useMonacoEditor monacoEditorLanguage="dockerfile" rows="20"
+                    id="dockerfile" autofocus placeholder='FROM nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 '></x-forms.textarea>
+            </div>
+        </section>
     </form>
 </div>

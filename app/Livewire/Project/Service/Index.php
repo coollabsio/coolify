@@ -282,6 +282,18 @@ class Index extends Component
         }
     }
 
+    public function enablePublicAccess(): void
+    {
+        $this->isPublic = true;
+        $this->instantSave();
+    }
+
+    public function disablePublicAccess(): void
+    {
+        $this->isPublic = false;
+        $this->instantSave();
+    }
+
     public function instantSave()
     {
         try {

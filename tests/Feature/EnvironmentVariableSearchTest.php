@@ -50,10 +50,59 @@ it('filters production environment variables by key case-insensitively', functio
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
         ->toBe(['API_KEY']);
+});
+
+it('orders environment variables by creation order or alphabetically based on the setting', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'ZEBRA',
+        'value' => 'last-key',
+        'order' => 1,
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'ALPHA',
+        'value' => 'first-key',
+        'order' => 2,
+        'resourceable_type' => Application::class,
+        'resourceable_id' => $application->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
+        ->assertSet('is_env_sorting_enabled', false);
+
+    $userManagedKeys = $component->instance()->environmentVariables
+        ->pluck('key')
+        ->filter(fn (string $key) => in_array($key, ['ZEBRA', 'ALPHA'], true))
+        ->values()
+        ->all();
+
+    expect($userManagedKeys)->toBe(['ZEBRA', 'ALPHA']);
+
+    $component
+        ->set('is_env_sorting_enabled', true)
+        ->call('instantSave');
+
+    $alphabeticallyOrderedKeys = $component->instance()->environmentVariables
+        ->pluck('key')
+        ->filter(fn (string $key) => in_array($key, ['ZEBRA', 'ALPHA'], true))
+        ->values()
+        ->all();
+
+    expect($alphabeticallyOrderedKeys)
+        ->toBe(['ALPHA', 'ZEBRA'])
+        ->and($application->settings->fresh()->is_env_sorting_enabled)->toBeTrue();
 });
 
 it('treats production environment variable search underscore wildcards literally', function () {
@@ -76,6 +125,7 @@ it('treats production environment variable search underscore wildcards literally
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api_key');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
@@ -104,6 +154,7 @@ it('filters preview environment variables by key case-insensitively', function (
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'token');
 
     expect($component->instance()->environmentVariablesPreview->pluck('key')->all())
@@ -124,6 +175,7 @@ YAML,
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api');
 
     expect($component->instance()->hardcodedEnvironmentVariables->pluck('key')->all())
@@ -150,12 +202,13 @@ it('searches service environment variables without requiring preview variables',
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
-        ->assertSee('Production Environment Variables')
         ->assertDontSee('Preview Deployments Environment Variables');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
-        ->toBe(['API_KEY']);
+        ->toBe(['API_KEY'])
+        ->and($component->instance()->showPreview)->toBeFalse();
 });
 
 it('does not show the empty production message when search only matches hardcoded variables', function () {
@@ -172,9 +225,9 @@ YAML,
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
-        ->assertSee('Production Environment Variables')
-        ->assertDontSee('No environment variables found.');
+        ->assertDontSee('No environment variables found');
 
     expect($component->instance()->hardcodedEnvironmentVariables->pluck('key')->all())
         ->toBe(['API_TOKEN']);
@@ -200,6 +253,7 @@ it('keeps developer view unfiltered after searching', function () {
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
         ->call('switch')
         ->assertSet('view', 'dev');
@@ -229,6 +283,7 @@ it('does not delete non-matching variables when saving developer view after sear
     ]);
 
     Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
         ->call('switch')
         ->call('submit');
@@ -261,11 +316,11 @@ it('hides the preview section when search filters out all preview variables', fu
     ]);
 
     $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('loadEnvironmentVariables')
         ->set('search', 'api')
-        ->assertSee('Production Environment Variables')
-        ->assertDontSee('Preview Deployments Environment Variables')
         ->assertDontSee('PREVIEW_TOKEN');
 
     expect($component->instance()->environmentVariables->pluck('key')->all())
-        ->toBe(['API_KEY']);
+        ->toBe(['API_KEY'])
+        ->and($component->instance()->environmentVariablesPreview)->toHaveCount(0);
 });

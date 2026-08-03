@@ -362,6 +362,7 @@ class ApplicationsController extends Controller
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
                                         'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
@@ -554,6 +555,7 @@ class ApplicationsController extends Controller
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
                                         'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
@@ -746,6 +748,7 @@ class ApplicationsController extends Controller
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
                                         'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
@@ -1332,9 +1335,10 @@ class ApplicationsController extends Controller
                 'build_pack' => ['required', Rule::enum(BuildPackTypes::class)],
                 'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/|nullable',
                 'docker_compose_domains' => 'array|nullable',
-                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
                 'docker_compose_domains.*.name' => 'string|required',
                 'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             ];
             // ports_exposes is not required for dockercompose
             if ($request->build_pack === 'dockercompose') {
@@ -1343,7 +1347,7 @@ class ApplicationsController extends Controller
             }
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validationMessages = [
-                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
             ];
             $validator = Validator::make($request->all(), $validationRules, $validationMessages);
             if ($validator->fails()) {
@@ -1435,7 +1439,12 @@ class ApplicationsController extends Controller
                 }
 
                 $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
-                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = data_get($domain, 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), $entry);
                 });
                 $request->offsetUnset('docker_compose_domains');
             }
@@ -1552,13 +1561,14 @@ class ApplicationsController extends Controller
                 'github_app_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
-                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
                 'docker_compose_domains.*.name' => 'string|required',
                 'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             ];
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validationMessages = [
-                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
             ];
             $validator = Validator::make($request->all(), $validationRules, $validationMessages);
             if ($validator->fails()) {
@@ -1688,7 +1698,12 @@ class ApplicationsController extends Controller
                 }
 
                 $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
-                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = data_get($domain, 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), $entry);
                 });
                 $request->offsetUnset('docker_compose_domains');
             }
@@ -1804,14 +1819,15 @@ class ApplicationsController extends Controller
                 'private_key_uuid' => 'string|required',
                 'watch_paths' => 'string|nullable',
                 'docker_compose_domains' => 'array|nullable',
-                'docker_compose_domains.*' => 'array:name,domain',
+                'docker_compose_domains.*' => 'array:name,domain,redirect',
                 'docker_compose_domains.*.name' => 'string|required',
                 'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+                'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             ];
 
             $validationRules = array_merge(sharedDataApplications(), $validationRules);
             $validationMessages = [
-                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+                'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
             ];
             $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
@@ -1913,7 +1929,12 @@ class ApplicationsController extends Controller
                 }
 
                 $dockerComposeDomains->each(function ($domain) use ($dockerComposeDomainsJson) {
-                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = data_get($domain, 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put(data_get($domain, 'name'), $entry);
                 });
                 $request->offsetUnset('docker_compose_domains');
             }
@@ -2675,6 +2696,7 @@ class ApplicationsController extends Controller
                                     properties: [
                                         'name' => ['type' => 'string', 'description' => 'The service name as defined in docker-compose.'],
                                         'domain' => ['type' => 'string', 'description' => 'Comma-separated list of URLs (e.g. "https://app.coolify.io,https://app2.coolify.io")'],
+                                        'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'Per-service www/non-www redirect for this compose service.', 'enum' => ['www', 'non-www', 'both']],
                                     ],
                                 ),
                             ],
@@ -2801,9 +2823,10 @@ class ApplicationsController extends Controller
             'static_image' => 'string',
             'watch_paths' => 'string|nullable',
             'docker_compose_domains' => 'array|nullable',
-            'docker_compose_domains.*' => 'array:name,domain',
+            'docker_compose_domains.*' => 'array:name,domain,redirect',
             'docker_compose_domains.*.name' => 'string|required',
             'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+            'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
             'custom_nginx_configuration' => 'string|nullable',
             'is_http_basic_auth_enabled' => 'boolean|nullable',
             'is_preview_deployments_enabled' => 'boolean|nullable',
@@ -2813,7 +2836,7 @@ class ApplicationsController extends Controller
         ];
         $validationRules = array_merge(sharedDataApplications(), $validationRules);
         $validationMessages = [
-            'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only a name and domain field are supported.',
+            'docker_compose_domains.*.array' => 'An item in the docker_compose_domains array has invalid fields. Only name, domain, and redirect fields are supported.',
         ];
         $validator = Validator::make($request->all(), $validationRules, $validationMessages);
 
@@ -3021,10 +3044,18 @@ class ApplicationsController extends Controller
 
             $yaml = Yaml::parse($application->docker_compose_raw);
             $services = data_get($yaml, 'services', []);
-            $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson) {
+            $existingDockerComposeDomains = json_decode($application->docker_compose_domains ?? '[]', true) ?? [];
+            $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson, $existingDockerComposeDomains) {
                 $name = data_get($domain, 'name');
                 if ($name && is_array($services) && isset($services[$name])) {
-                    $dockerComposeDomainsJson->put($name, ['domain' => data_get($domain, 'domain')]);
+                    $entry = ['domain' => data_get($domain, 'domain')];
+                    $redirect = array_key_exists('redirect', $domain)
+                        ? data_get($domain, 'redirect')
+                        : data_get($existingDockerComposeDomains[$name] ?? [], 'redirect');
+                    if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
+                        $entry['redirect'] = $redirect;
+                    }
+                    $dockerComposeDomainsJson->put($name, $entry);
                 }
             });
             $request->offsetUnset('docker_compose_domains');

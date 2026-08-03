@@ -1340,6 +1340,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             if ($isPullRequest) {
                 $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
+            $composeRedirect = data_get($domains, "$changedServiceName.redirect");
+            $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
+                ? $composeRedirect
+                : 'both';
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
@@ -1351,7 +1355,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            redirect_direction: $redirectDirection
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1365,7 +1370,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            predefinedPort: $predefinedPort
+                            predefinedPort: $predefinedPort,
+                            redirect_direction: $redirectDirection
                         ));
                         break;
                 }
@@ -1378,7 +1384,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    redirect_direction: $redirectDirection
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
@@ -1390,7 +1397,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    predefinedPort: $predefinedPort
+                    predefinedPort: $predefinedPort,
+                    redirect_direction: $redirectDirection
                 ));
             }
         }
@@ -2599,6 +2607,9 @@ function serviceParser(Service $resource): Collection
             $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
             $uuid = $resource->uuid;
             $network = data_get($resource, 'destination.network');
+            $redirectDirection = in_array(data_get($originalResource, 'redirect'), ['www', 'non-www', 'both'], true)
+                ? data_get($originalResource, 'redirect')
+                : 'both';
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
@@ -2610,7 +2621,8 @@ function serviceParser(Service $resource): Collection
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            redirect_direction: $redirectDirection
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -2624,7 +2636,8 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            predefinedPort: $predefinedPort
+                            predefinedPort: $predefinedPort,
+                            redirect_direction: $redirectDirection
                         ));
                         break;
                 }
@@ -2637,7 +2650,8 @@ function serviceParser(Service $resource): Collection
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
-                    image: $image
+                    image: $image,
+                    redirect_direction: $redirectDirection
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $network,
@@ -2649,7 +2663,8 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    predefinedPort: $predefinedPort
+                    predefinedPort: $predefinedPort,
+                    redirect_direction: $redirectDirection
                 ));
             }
         }
