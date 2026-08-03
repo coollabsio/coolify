@@ -14,7 +14,7 @@
             </svg>
         </button>
         <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-            class="absolute left-0 z-[90] mt-2 min-w-60 max-w-96 max-h-80 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1.5 shadow-modal scrollbar dark:border-white/10 dark:bg-raised">
+            class="absolute right-0 z-[90] mt-2 min-w-60 max-w-96 max-h-80 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1.5 shadow-modal scrollbar dark:border-white/10 dark:bg-raised md:left-0 md:right-auto">
             @foreach ($links as $link)
                 <a class="{{ $linkItemClasses }}" target="_blank" href="{{ $link }}">
                     <x-external-link class="size-3.5 shrink-0" />

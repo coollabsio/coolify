@@ -174,17 +174,23 @@
             @endif
 
             <div
-                class="flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                @foreach ($servicePageItems as $menuItem)
-                    <a @class([
-                        'app-tab shrink-0',
-                        'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $menuItem['active'],
-                    ])
-                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                        href="{{ route($menuItem['route'], $parameters) }}">
-                        {{ $menuItem['label'] }}
-                    </a>
-                @endforeach
+                class="flex min-w-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                {{-- Tabs may scroll; keep Links outside overflow so the dropdown never creates a scrollbar. --}}
+                <x-resource-heading-tabs class="min-w-0 flex-1">
+                    @foreach ($servicePageItems as $menuItem)
+                        <a @class([
+                            'app-tab shrink-0',
+                            'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $menuItem['active'],
+                        ])
+                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                            href="{{ route($menuItem['route'], $parameters) }}">
+                            {{ $menuItem['label'] }}
+                        </a>
+                    @endforeach
+                </x-resource-heading-tabs>
+                <div class="resource-heading-menus shrink-0">
+                    <x-services.links :service="$service" />
+                </div>
             </div>
         </div>
 
@@ -193,7 +199,7 @@
             <div
                 class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
                 <div class="flex min-w-0 items-center gap-0.5">
-                    <div class="resource-heading-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto">
+                    <x-resource-heading-tabs class="min-w-0">
                         @foreach ($servicePageItems as $menuItem)
                             <a wire:key="service-primary-nav-{{ str($menuItem['label'])->slug() }}"
                                 @class([
@@ -205,7 +211,7 @@
                                 {{ $menuItem['label'] }}
                             </a>
                         @endforeach
-                    </div>
+                    </x-resource-heading-tabs>
                     <div class="resource-heading-menus shrink-0">
                         <x-services.links :service="$service" />
                     </div>

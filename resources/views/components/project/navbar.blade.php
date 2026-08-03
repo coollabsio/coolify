@@ -24,7 +24,7 @@
         :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
         <div
             class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-            <div class="resource-heading-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto">
+            <x-resource-heading-tabs class="min-w-0">
                 @foreach ($items as $item)
                     <a @class([
                         'app-tab shrink-0',
@@ -35,7 +35,7 @@
                         {{ $item['label'] }}
                     </a>
                 @endforeach
-            </div>
+            </x-resource-heading-tabs>
 
             <div class="resource-heading-actions flex shrink-0 items-center gap-0.5 border-l border-neutral-200 pl-1 dark:border-white/[0.08]">
                 @isset($actions)

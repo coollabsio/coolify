@@ -109,8 +109,8 @@
                                     'label' => data_get($branch, 'name'),
                                 ])->values()->all()" />
                             <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
+                                ['value' => 'railpack', 'label' => 'Railpack'],
                                 ['value' => 'nixpacks', 'label' => 'Nixpacks'],
-                                ['value' => 'railpack', 'label' => 'Railpack (Beta)'],
                                 ['value' => 'static', 'label' => 'Static'],
                                 ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                                 ['value' => 'dockercompose', 'label' => 'Docker Compose'],

@@ -283,17 +283,19 @@
             @endif
 
             <div
-                class="flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                @foreach ($serverMenuItems as $menuItem)
-                    <a @class([
-                        'app-tab shrink-0',
-                        'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $menuItem['active'],
-                    ])
-                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                        href="{{ route($menuItem['route'], $serverRouteParameters) }}">
-                        {{ $menuItem['label'] }}
-                    </a>
-                @endforeach
+                class="flex min-w-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                <x-resource-heading-tabs class="min-w-0 flex-1">
+                    @foreach ($serverMenuItems as $menuItem)
+                        <a @class([
+                            'app-tab shrink-0',
+                            'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $menuItem['active'],
+                        ])
+                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                            href="{{ route($menuItem['route'], $serverRouteParameters) }}">
+                            {{ $menuItem['label'] }}
+                        </a>
+                    @endforeach
+                </x-resource-heading-tabs>
             </div>
         </div>
 
@@ -301,8 +303,7 @@
             :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
             <div
                 class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                <div
-                    class="application-primary-tabs resource-heading-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto">
+                <x-resource-heading-tabs class="application-primary-tabs min-w-0">
                     @foreach ($serverMenuItems as $menuItem)
                         <a wire:key="server-primary-nav-{{ str($menuItem['label'])->slug() }}"
                             @class([
@@ -318,7 +319,7 @@
                             @endif
                         </a>
                     @endforeach
-                </div>
+                </x-resource-heading-tabs>
 
                 @if ($server->proxySet())
                     @can('manageProxy', $server)

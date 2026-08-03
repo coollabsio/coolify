@@ -81,8 +81,8 @@
                 <div class="application-build-pack-options mb-5 border-b border-neutral-200 pb-5 dark:border-white/[0.07]">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="buildPack" label="Build strategy" live :options="[
+                            ['value' => 'railpack', 'label' => 'Railpack'],
                             ['value' => 'nixpacks', 'label' => 'Nixpacks'],
-                            ['value' => 'railpack', 'label' => 'Railpack (beta)'],
                             ['value' => 'static', 'label' => 'Static'],
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Compose'],

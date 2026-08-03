@@ -47,7 +47,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ?? StandaloneDocker::factory()->create(['server_id' => $this->server->id, 'network' => 'coolify-test']);
 });
 
-test('existing application buildpack selector lists nixpacks before railpack', function () {
+test('existing application buildpack selector lists railpack before nixpacks', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
@@ -62,12 +62,12 @@ test('existing application buildpack selector lists nixpacks before railpack', f
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()
         ->assertSeeInOrder([
+            '<option value="railpack">Railpack</option>',
             '<option value="nixpacks">Nixpacks</option>',
-            '<option value="railpack">Railpack (Beta)</option>',
         ], false);
 });
 
-test('existing application shows railpack beta label in build pack selector', function () {
+test('existing application shows railpack without beta label in build pack selector', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
@@ -81,5 +81,7 @@ test('existing application shows railpack beta label in build pack selector', fu
 
     Livewire::test(General::class, ['application' => $application])
         ->assertSuccessful()
-        ->assertSee('Railpack (Beta)');
+        ->assertSee('Railpack')
+        ->assertDontSee('Railpack (Beta)')
+        ->assertDontSee('Railpack (beta)');
 });

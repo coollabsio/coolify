@@ -56,8 +56,8 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-forms.input id="branch" required label="Branch" />
                         <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
+                            ['value' => 'railpack', 'label' => 'Railpack'],
                             ['value' => 'nixpacks', 'label' => 'Nixpacks'],
-                            ['value' => 'railpack', 'label' => 'Railpack (Beta)'],
                             ['value' => 'static', 'label' => 'Static'],
                             ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                             ['value' => 'dockercompose', 'label' => 'Docker Compose'],
