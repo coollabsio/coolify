@@ -91,6 +91,24 @@ test('injects on-screen HUD into full HTML documents when server_timing is enabl
         ->not->toContain('</SCRIPT>');
 });
 
+test('removes stale Content-Length after injecting the HUD', function () {
+    Config::set('app.server_timing', true);
+
+    $middleware = new AddServerTimingHeaders;
+    $request = Request::create('/projects', 'GET');
+    $html = '<!DOCTYPE html><html><body><main>projects</main></body></html>';
+
+    $response = $middleware->handle($request, function () use ($html) {
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            'Content-Length' => (string) strlen($html),
+        ]);
+    });
+
+    expect($response->getContent())->toContain('id="server-timing-hud"');
+    expect($response->headers->has('Content-Length'))->toBeFalse();
+});
+
 test('app shell exposes Server-Timing HUD dock slot in the desktop top bar only', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 

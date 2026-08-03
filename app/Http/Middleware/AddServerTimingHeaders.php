@@ -131,9 +131,9 @@ class AddServerTimingHeaders
         }
 
         $response->setContent($replaced);
+        $response->headers->remove('Content-Length');
 
         // Keep html metric as pre-HUD page size (more useful for profiling the app).
-        // Content-Length is not recalculated here; PHP-FPM/nginx typically recompute.
 
         return $response;
     }

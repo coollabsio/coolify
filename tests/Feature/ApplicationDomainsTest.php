@@ -712,6 +712,58 @@ it('preserves per-service redirect when compose domains are updated through the 
     ]);
 });
 
+it('preserves omitted compose redirects while allowing explicit null', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://old.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $plainTextToken = Str::random(40);
+    $token = $this->user->tokens()->create([
+        'name' => 'legacy-compose-domain-test',
+        'token' => hash('sha256', $plainTextToken),
+        'abilities' => ['*'],
+        'team_id' => $this->team->id,
+    ]);
+    auth()->logout();
+
+    $this->withToken($token->getKey().'|'.$plainTextToken)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_compose_domains' => [[
+                'name' => 'web',
+                'domain' => 'https://new.example.com',
+            ]],
+        ])
+        ->assertOk();
+
+    $domains = json_decode($this->application->fresh()->docker_compose_domains, true);
+
+    expect($domains['web'])->toBe([
+        'domain' => 'https://new.example.com',
+        'redirect' => 'both',
+    ]);
+
+    $this->withToken($token->getKey().'|'.$plainTextToken)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_compose_domains' => [[
+                'name' => 'web',
+                'domain' => 'https://new.example.com',
+                'redirect' => null,
+            ]],
+        ])
+        ->assertOk();
+
+    $domains = json_decode($this->application->fresh()->docker_compose_domains, true);
+
+    expect($domains['web'])->toBe([
+        'domain' => 'https://new.example.com',
+    ]);
+});
+
 it('sets redirect for compose services whose names contain dots', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',

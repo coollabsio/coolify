@@ -9,6 +9,7 @@ use App\Models\ServiceApplication;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Domains extends Component
@@ -583,32 +584,30 @@ class Domains extends Component
             $this->serviceRedirects[$serviceApplicationId] = $redirect;
             $this->pendingRedirectServiceApplicationId = $serviceApplicationId;
 
-            // Promote the optional www/non-www suggestion to a real domain for redirects.
-            if (in_array($redirect, ['www', 'non-www'], true)) {
-                if (! $this->ensureWwwNonWwwPairsConfigured($app)) {
-                    return;
+            $saved = DB::transaction(function () use ($app, $redirect): bool {
+                // Promote the optional www/non-www suggestion to a real domain for redirects.
+                if (in_array($redirect, ['www', 'non-www'], true)) {
+                    if (! $this->ensureWwwNonWwwPairsConfigured($app)) {
+                        return false;
+                    }
+                    $app->refresh();
                 }
-                $app->refresh();
-            }
 
-            $app->redirect = $redirect;
-            $app->save();
+                $domains = collect($this->splitDomains($app->fqdn));
+                if (! $this->assertRedirectDomainsPresent($redirect, $domains)) {
+                    return false;
+                }
 
-            $domains = collect($this->splitDomains($app->fqdn));
-            if (! $this->assertRedirectDomainsPresent($redirect, $domains)) {
-                return;
-            }
-
-            try {
+                $app->redirect = $redirect;
+                $app->save();
                 updateCompose($app);
-            } catch (\Throwable) {
-                // Compose generation may fail in incomplete test environments.
-            }
-
-            try {
                 $this->service->parse();
-            } catch (\Throwable) {
-                // Parse may fail without a full compose template.
+
+                return true;
+            });
+
+            if (! $saved) {
+                return;
             }
 
             $this->pendingAction = null;
@@ -1103,22 +1102,14 @@ class Domains extends Component
             $this->dispatch('warning', __('warning.sslipdomain'));
         }
 
-        $app->save();
-
-        try {
+        DB::transaction(function () use ($app): void {
+            $app->save();
             updateCompose($app);
-        } catch (\Throwable) {
-            // Compose generation may fail in incomplete test environments.
-        }
+            $this->service->parse();
+        });
 
         if (str($app->fqdn)->contains(',')) {
             $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
-        }
-
-        try {
-            $this->service->parse();
-        } catch (\Throwable) {
-            // Parse may fail without a full compose template.
         }
 
         $this->dispatch('refresh');

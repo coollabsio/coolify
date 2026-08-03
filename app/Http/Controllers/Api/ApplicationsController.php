@@ -3016,11 +3016,14 @@ class ApplicationsController extends Controller
 
             $yaml = Yaml::parse($application->docker_compose_raw);
             $services = data_get($yaml, 'services', []);
-            $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson) {
+            $existingDockerComposeDomains = json_decode($application->docker_compose_domains ?? '[]', true) ?? [];
+            $dockerComposeDomains->each(function ($domain) use ($services, $dockerComposeDomainsJson, $existingDockerComposeDomains) {
                 $name = data_get($domain, 'name');
                 if ($name && is_array($services) && isset($services[$name])) {
                     $entry = ['domain' => data_get($domain, 'domain')];
-                    $redirect = data_get($domain, 'redirect');
+                    $redirect = array_key_exists('redirect', $domain)
+                        ? data_get($domain, 'redirect')
+                        : data_get($existingDockerComposeDomains[$name] ?? [], 'redirect');
                     if (in_array($redirect, ['www', 'non-www', 'both'], true)) {
                         $entry['redirect'] = $redirect;
                     }

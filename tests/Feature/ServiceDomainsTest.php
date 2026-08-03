@@ -189,6 +189,33 @@ it('adds a domain to a selected service application', function () {
     expect($this->webApp->fqdn)->toBe('https://web.example.com');
 });
 
+it('rolls back a domain change when compose regeneration fails', function () {
+    $this->service->update(['docker_compose_raw' => '']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->webApp->id)
+        ->set('newDomain', 'https://web.example.com')
+        ->call('addDomain')
+        ->assertDispatched('error')
+        ->assertNotDispatched('success');
+
+    expect($this->webApp->fresh()->fqdn)->toBeNull();
+});
+
+it('rolls back a redirect change when compose regeneration fails', function () {
+    $this->webApp->update(['fqdn' => 'https://web.example.com', 'redirect' => 'both']);
+    $this->service->update(['docker_compose_raw' => '']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set("serviceRedirects.{$this->webApp->id}", 'www')
+        ->call('setServiceRedirect', $this->webApp->id)
+        ->assertDispatched('error')
+        ->assertNotDispatched('success');
+
+    expect($this->webApp->fresh()->redirect)->toBe('both')
+        ->and($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
+});
+
 it('prunes dns status when a service domain is removed', function () {
     $this->apiApp->update([
         'domain_dns_statuses' => [
