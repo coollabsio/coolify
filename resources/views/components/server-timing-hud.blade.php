@@ -1,15 +1,16 @@
-{{-- Dev-only Server-Timing HUD. Injected by AddServerTimingHeaders on full HTML responses. --}}
+{{-- Dev-only Server-Timing HUD. Injected by AddServerTimingHeaders on full HTML responses.
+     JS docks into #server-timing-hud-slot in the main top bar when present; otherwise floats bottom-left. --}}
 <div id="server-timing-hud" data-server-timing-hud data-metrics='@json($metrics)' data-path="{{ $path }}"
-    style="position:fixed;bottom:12px;right:12px;z-index:2147483000;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:#e5e5e5;pointer-events:auto">
-    {{-- column-reverse: panel opens above the pill --}}
-    <div style="display:flex;flex-direction:column-reverse;align-items:flex-end;gap:6px">
+    data-sth-mode="float"
+    style="position:fixed;bottom:12px;left:12px;z-index:2147483000;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:#e5e5e5;pointer-events:auto">
+    <div data-sth-shell style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;position:relative">
         <button type="button" data-sth-toggle aria-expanded="false" aria-controls="server-timing-hud-panel"
-            style="border:1px solid rgba(255,255,255,.12);background:rgba(16,16,16,.92);color:#fafafa;border-radius:999px;padding:6px 10px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(8px);user-select:none"
+            style="border:1px solid rgba(255,255,255,.12);background:rgba(16,16,16,.92);color:#fafafa;border-radius:999px;padding:5px 9px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28);backdrop-filter:blur(8px);user-select:none;white-space:nowrap;line-height:1.2"
             title="Show/hide Server-Timing history">
             <span data-sth-summary>ST …</span>
         </button>
         <div id="server-timing-hud-panel" data-sth-panel hidden
-            style="width:min(420px,calc(100vw - 24px));border:1px solid rgba(255,255,255,.12);background:rgba(16,16,16,.96);border-radius:12px;padding:10px 12px;box-shadow:0 12px 32px rgba(0,0,0,.4);backdrop-filter:blur(10px)">
+            style="width:min(420px,calc(100vw - 24px));border:1px solid rgba(255,255,255,.12);background:rgba(16,16,16,.96);border-radius:12px;padding:10px 12px;box-shadow:0 12px 32px rgba(0,0,0,.4);backdrop-filter:blur(10px);position:absolute;right:0;bottom:calc(100% + 6px);z-index:2147483001">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
                 <strong style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#a3a3a3">Server Timing</strong>
                 <div style="display:flex;align-items:center;gap:8px">
@@ -47,6 +48,172 @@
 
     function rootEl() {
         return document.getElementById('server-timing-hud');
+    }
+
+    function pickSlot() {
+        const desktop = document.getElementById('server-timing-hud-slot');
+        const mobile = document.getElementById('server-timing-hud-slot-mobile');
+        // Match Tailwind `lg` (1024px): desktop fixed header vs mobile sticky bar.
+        const isLg = window.matchMedia('(min-width: 1024px)').matches;
+        if (isLg && desktop) {
+            return desktop;
+        }
+        if (!isLg && mobile) {
+            return mobile;
+        }
+        return desktop || mobile || null;
+    }
+
+    function applyDockedStyles(root) {
+        root.setAttribute('data-sth-mode', 'docked');
+        root.style.cssText = [
+            'position:relative',
+            'bottom:auto',
+            'left:auto',
+            'top:auto',
+            'right:auto',
+            'z-index:60',
+            'display:block',
+            'flex-shrink:0',
+            'visibility:visible',
+            'opacity:1',
+            'margin-right:8px',
+            'font:11px/1.3 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace',
+            'color:#e5e5e5',
+            'pointer-events:auto',
+        ].join(';');
+
+        const panel = qs(root, '[data-sth-panel]');
+        if (panel) {
+            // Dropdown below the pill inside the top bar.
+            panel.style.position = 'absolute';
+            panel.style.right = '0';
+            panel.style.left = 'auto';
+            panel.style.top = 'calc(100% + 8px)';
+            panel.style.bottom = 'auto';
+            panel.style.zIndex = '2147483001';
+        }
+    }
+
+    function applyFloatStyles(root) {
+        root.setAttribute('data-sth-mode', 'float');
+        // Bottom-left: toasts are bottom-right.
+        root.style.cssText = [
+            'position:fixed',
+            'bottom:12px',
+            'left:12px',
+            'top:auto',
+            'right:auto',
+            'z-index:2147483000',
+            'display:block',
+            'visibility:visible',
+            'opacity:1',
+            'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace',
+            'color:#e5e5e5',
+            'pointer-events:auto',
+        ].join(';');
+
+        const panel = qs(root, '[data-sth-panel]');
+        if (panel) {
+            // Panel opens upward from bottom-left float.
+            panel.style.position = 'absolute';
+            panel.style.right = 'auto';
+            panel.style.left = '0';
+            panel.style.top = 'auto';
+            panel.style.bottom = 'calc(100% + 6px)';
+            panel.style.zIndex = '2147483001';
+        }
+    }
+
+    function revealSlot(slot) {
+        if (!slot) {
+            return;
+        }
+        // Inline display beats Tailwind `hidden` (and any !important-less utility order issues).
+        slot.classList.remove('hidden');
+        slot.classList.add('flex');
+        slot.style.display = 'flex';
+        slot.style.alignItems = 'center';
+        slot.style.flexShrink = '0';
+        slot.style.visibility = 'visible';
+    }
+
+    function hideEmptySlots(except) {
+        document.querySelectorAll('[data-server-timing-hud-slot]').forEach((el) => {
+            if (el === except) {
+                return;
+            }
+            if (!el.querySelector('[data-server-timing-hud]')) {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+                el.style.display = '';
+            }
+        });
+    }
+
+    function isEffectivelyHidden(el) {
+        if (!el || !el.isConnected) {
+            return true;
+        }
+        let node = el;
+        while (node && node.nodeType === 1) {
+            const style = window.getComputedStyle(node);
+            if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) {
+                return true;
+            }
+            node = node.parentElement;
+        }
+        const rect = el.getBoundingClientRect();
+        return rect.width === 0 && rect.height === 0;
+    }
+
+    /**
+     * Move the HUD into the main top bar slot when the app shell is present.
+     * Dedupes reinjected nodes after full page / Livewire navigations.
+     * Falls back to floating if the slot (or its ancestors, e.g. x-cloak) still hide it.
+     */
+    function dockHud() {
+        const nodes = Array.from(document.querySelectorAll('[data-server-timing-hud]'));
+        if (!nodes.length) {
+            return null;
+        }
+        // Prefer a node that already has metrics / is the canonical id.
+        let keep = document.getElementById('server-timing-hud') || nodes[0];
+        nodes.forEach((node) => {
+            if (node !== keep) {
+                node.remove();
+            }
+        });
+        if (!keep.id) {
+            keep.id = 'server-timing-hud';
+        }
+
+        const slot = pickSlot();
+        if (slot) {
+            if (keep.parentElement !== slot) {
+                slot.appendChild(keep);
+            }
+            revealSlot(slot);
+            hideEmptySlots(slot);
+            applyDockedStyles(keep);
+
+            // If still hidden (x-cloak shell not ready, etc.), float until visible.
+            if (isEffectivelyHidden(keep) || isEffectivelyHidden(slot)) {
+                if (keep.parentElement === slot) {
+                    document.body.appendChild(keep);
+                }
+                hideEmptySlots(null);
+                applyFloatStyles(keep);
+            }
+        } else {
+            if (keep.parentElement !== document.body) {
+                document.body.appendChild(keep);
+            }
+            hideEmptySlots(null);
+            applyFloatStyles(keep);
+        }
+        applyOpenState();
+        return keep;
     }
 
     function setOpen(next) {
@@ -559,6 +726,8 @@
     }
 
     function boot() {
+        dockHud();
+
         // Document-level delegation survives Livewire morphs / HUD reinjection.
         if (!window.__coolifyServerTimingClickBound) {
             window.__coolifyServerTimingClickBound = true;
@@ -670,22 +839,35 @@
             };
         }
 
-        document.addEventListener('livewire:navigated', () => {
-            if (!rootEl()) {
-                return;
-            }
-            const seededNav = metricsFromDom();
-            if (seededNav) {
-                pushEntry({
-                    metrics: seededNav.metrics,
-                    path: seededNav.path || window.location.pathname,
-                    method: 'GET',
-                    kind: 'document',
-                });
-            } else {
+        if (!window.__coolifyServerTimingNavBound) {
+            window.__coolifyServerTimingNavBound = true;
+            const redock = () => {
+                dockHud();
                 paint();
-            }
-        });
+            };
+            document.addEventListener('livewire:navigated', () => {
+                // Full navigations may reinject a floating HUD at end of document; re-dock into top bar.
+                dockHud();
+                const seededNav = metricsFromDom();
+                if (seededNav) {
+                    pushEntry({
+                        metrics: seededNav.metrics,
+                        path: seededNav.path || window.location.pathname,
+                        method: 'GET',
+                        kind: 'document',
+                    });
+                } else {
+                    paint();
+                }
+            });
+            window.addEventListener('resize', redock);
+            // App shell uses x-cloak; re-dock once Alpine reveals the top bar.
+            document.addEventListener('alpine:initialized', redock);
+            // Safety: retry a few times after load in case cloak clears late.
+            [50, 150, 400, 1000].forEach((ms) => {
+                window.setTimeout(redock, ms);
+            });
+        }
     }
 
     if (document.readyState === 'loading') {

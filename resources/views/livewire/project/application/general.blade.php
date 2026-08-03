@@ -537,64 +537,18 @@
                         </x-slot:contents>
                     </x-empty>
                     @else
-                    <div class="grid w-full items-end gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                        <x-forms.listbox id="isHttpBasicAuthEnabled" label="Authentication" onChange="instantSave"
-                            helper="HTTP Basic Authentication adds the required authentication labels to the proxy."
-                            :options="[
-                                ['value' => false, 'label' => 'None'],
-                                ['value' => true, 'label' => 'HTTP Basic Authentication'],
-                            ]" x-bind:disabled="!canUpdate" />
-                        <div class="hidden sm:block"></div>
-                        <button type="button" class="button invisible hidden sm:inline-flex" tabindex="-1"
-                            aria-hidden="true">Remove user</button>
-                    </div>
-                    @if ($application->is_http_basic_auth_enabled)
-                        <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]"
-                            x-data="{ extraCredentials: [] }">
-                            <div class="grid w-full items-end gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                                <x-forms.input id="httpBasicAuthUsername" label="Username" required
-                                    x-bind:disabled="!canUpdate" />
-                                <x-forms.input id="httpBasicAuthPassword" type="password" label="Password" required
-                                    x-bind:disabled="!canUpdate" />
-                                <button type="button" class="button" disabled
-                                    title="The default user cannot be removed">
-                                    Remove user
-                                </button>
-                            </div>
-                            <template x-for="(credential, index) in extraCredentials" :key="index">
-                                <div class="mt-4 grid w-full items-end gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                                    <div>
-                                        <label class="flex items-center gap-1">Username</label>
-                                        <input class="input" x-model="credential.username" autocomplete="off">
-                                    </div>
-                                    <div x-data="{ reveal: false }">
-                                        <label class="flex items-center gap-1">Password</label>
-                                        <div class="relative">
-                                            <input class="input input-with-password-toggle" :type="reveal ? 'text' : 'password'"
-                                                x-model="credential.password" autocomplete="new-password">
-                                            <button type="button"
-                                                class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
-                                                aria-label="Toggle password visibility" @click="reveal = !reveal">
-                                                <x-reicon name="eye" x-show="!reveal" class="size-[18px]" />
-                                                <x-reicon name="eye-off2" x-cloak x-show="reveal" class="size-[18px]" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <button type="button" class="button" @click="extraCredentials.splice(index, 1)">
-                                        Remove user
-                                    </button>
-                                </div>
-                            </template>
-                            @can('update', $application)
-                                <button type="button" class="button mt-4"
-                                    @click="extraCredentials.push({ username: '', password: '' })">
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke-width="2" stroke="currentColor" class="size-4">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                    </svg>
-                                    Add user
-                                </button>
-                            @endcan
+                    <x-forms.listbox id="isHttpBasicAuthEnabled" label="Authentication" onChange="instantSave"
+                        helper="HTTP Basic Authentication adds the required authentication labels to the proxy. Coolify currently supports a single username and password."
+                        :options="[
+                            ['value' => false, 'label' => 'None'],
+                            ['value' => true, 'label' => 'HTTP Basic Authentication'],
+                        ]" x-bind:disabled="!canUpdate" />
+                    @if ($isHttpBasicAuthEnabled)
+                        <div class="mt-5 grid w-full gap-4 border-t border-neutral-200 pt-5 sm:grid-cols-2 dark:border-white/[0.07]">
+                            <x-forms.input id="httpBasicAuthUsername" label="Username" required
+                                x-bind:disabled="!canUpdate" />
+                            <x-forms.input id="httpBasicAuthPassword" type="password" label="Password" required
+                                x-bind:disabled="!canUpdate" />
                         </div>
                     @endif
                     @endif

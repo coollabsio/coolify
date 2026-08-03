@@ -174,6 +174,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('storages')->group(function () {
         Route::get('/', StorageIndex::class)->name('storage.index');
         Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
+        Route::get('/{storage_uuid}/danger', StorageShow::class)->name('storage.danger');
         Route::get('/{storage_uuid}/resources', StorageShow::class)->name('storage.resources');
     });
     Route::prefix('shared-variables')->group(function () {
@@ -374,6 +375,7 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
+    Route::get('/source/github/{github_app_uuid}/danger', GitHubChange::class)->name('source.github.danger');
     Route::get('/source/github/{github_app_uuid}/permissions', GitHubChange::class)->name('source.github.permissions');
     Route::get('/source/github/{github_app_uuid}/resources', GitHubChange::class)->name('source.github.resources');
     Route::get('/source/gitlab/{gitlab_app_uuid}', GitLabChange::class)->name('source.gitlab.show');

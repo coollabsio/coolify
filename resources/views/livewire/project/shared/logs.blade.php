@@ -15,25 +15,48 @@
     @endif
 
     @php
-        $resourceStatus = data_get($resource, 'status', $status);
-        $isRunning = str($resourceStatus)->contains('running');
+        $totalContainers = collect($serverContainers)->flatten(1)->count();
+        $functionalServers = $servers->filter(fn ($server) => $server->isFunctional());
+        $logsUnavailable = $containersLoaded && (
+            $servers->isEmpty()
+            || $functionalServers->isEmpty()
+            || $totalContainers === 0
+        );
     @endphp
 
-    <div class="application-settings-form flex flex-col gap-6">
-        <div wire:loading wire:target="loadAllContainers"
-            class="application-settings-section-body flex min-h-32 items-center justify-center">
-            <x-loading text="Loading containers" />
-        </div>
+    <div wire:loading.flex wire:target="loadAllContainers"
+        class="mt-4 hidden min-h-32 w-full items-center justify-center lg:mt-3">
+        <x-loading text="Loading containers" />
+    </div>
 
-        <div class="flex flex-col gap-4" x-init="$wire.loadAllContainers()" wire:loading.remove
-            wire:target="loadAllContainers">
-            @php
-                $totalContainers = collect($serverContainers)->flatten(1)->count();
-            @endphp
-
-            @forelse ($servers as $server)
-                @if ($server->isFunctional())
-                    @if (isset($serverContainers[$server->id]) && count($serverContainers[$server->id]) > 0)
+    <div class="mt-4 w-full lg:mt-3" x-init="if (! $wire.containersLoaded) { $wire.loadAllContainers() }"
+        wire:loading.remove wire:target="loadAllContainers">
+        @if (! $containersLoaded)
+            <div class="flex min-h-32 items-center justify-center">
+                <x-loading text="Loading containers" />
+            </div>
+        @elseif ($logsUnavailable)
+            @if ($servers->isEmpty())
+                <x-empty size="lg" title="Runtime logs unavailable"
+                    description="Connect and validate a server before viewing resource logs."
+                    icon-name="file-content" />
+            @elseif ($functionalServers->isEmpty())
+                <x-empty size="lg" title="Runtime logs unavailable"
+                    description="No functional servers are available, so container logs cannot be loaded."
+                    icon-name="file-content" />
+            @else
+                <x-empty size="lg" title="Runtime logs unavailable"
+                    description="No containers are running, so there are no runtime logs to show."
+                    icon-name="file-content" />
+            @endif
+        @else
+            <div class="flex flex-col gap-4">
+                @foreach ($servers as $server)
+                    @if (! $server->isFunctional())
+                        <x-callout type="warning" title="Server unavailable">
+                            {{ $server->name }} is not functional, so its container logs cannot be loaded.
+                        </x-callout>
+                    @elseif (isset($serverContainers[$server->id]) && count($serverContainers[$server->id]) > 0)
                         @if ($servers->count() > 1)
                             <div class="flex items-center gap-2 px-1">
                                 <x-reicon name="servers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
@@ -47,21 +70,9 @@
                                 :resource="$resource" :container="data_get($container, 'Names')"
                                 :expandByDefault="$totalContainers === 1" />
                         @endforeach
-                    @else
-                        <x-empty size="sm" title="No running containers"
-                            description="No containers are currently running on {{ $server->name }}."
-                            icon-name="file-content" />
                     @endif
-                @else
-                    <x-callout type="warning" title="Server unavailable">
-                        {{ $server->name }} is not functional, so its container logs cannot be loaded.
-                    </x-callout>
-                @endif
-            @empty
-                <x-empty size="sm" title="No functional server"
-                    description="Connect and validate a server before viewing resource logs."
-                    icon-name="servers" />
-            @endforelse
-        </div>
+                @endforeach
+            </div>
+        @endif
     </div>
 </div>

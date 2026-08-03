@@ -10,11 +10,11 @@
                             Send email
                         </x-forms.button>
                     @endif
-                    <button type="submit"
-                        class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                    <x-forms.button type="submit" wire:target="viaLink"
+                        defaultClass="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
                         <x-reicon name="plus" class="size-3.5" />
                         Generate link
-                    </button>
+                    </x-forms.button>
                 </x-slot:actions>
 
                 @if (!is_transactional_emails_enabled() && isInstanceAdmin())

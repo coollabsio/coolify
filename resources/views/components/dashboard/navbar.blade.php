@@ -68,7 +68,11 @@
             ['label' => 'Scheduled Jobs', 'route' => 'settings.scheduled-jobs', 'active' => request()->routeIs('settings.scheduled-jobs')],
         ],
         'source' => [
-            ['label' => 'General', 'route' => 'source.github.show', 'active' => request()->routeIs('source.github.show')],
+            [
+                'label' => 'General',
+                'route' => 'source.github.show',
+                'active' => request()->routeIs('source.github.show', 'source.github.danger'),
+            ],
             ['label' => 'Permissions', 'route' => 'source.github.permissions', 'active' => request()->routeIs('source.github.permissions')],
             ['label' => 'Resources', 'route' => 'source.github.resources', 'active' => request()->routeIs('source.github.resources')],
         ],
@@ -77,7 +81,11 @@
             ['label' => 'Resources', 'route' => 'destination.resources', 'active' => request()->routeIs('destination.resources')],
         ],
         'storage' => [
-            ['label' => 'General', 'route' => 'storage.show', 'active' => request()->routeIs('storage.show')],
+            [
+                'label' => 'General',
+                'route' => 'storage.show',
+                'active' => request()->routeIs('storage.show', 'storage.danger'),
+            ],
             ['label' => 'Resources', 'route' => 'storage.resources', 'active' => request()->routeIs('storage.resources')],
         ],
         'subscription' => [
@@ -119,7 +127,14 @@
             'lg:hidden' => ! $titleOnDesktop && $showNav,
         ])>
             <div class="min-w-0 flex-1">
-                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $title }}</h1>
+                <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $title }}</h1>
+                    @isset($titleMeta)
+                        <div class="flex shrink-0 flex-wrap items-center gap-2">
+                            {{ $titleMeta }}
+                        </div>
+                    @endisset
+                </div>
                 @if (filled($subtitle))
                     <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">{{ $subtitle }}</p>
                 @endif

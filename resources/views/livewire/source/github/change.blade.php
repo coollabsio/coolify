@@ -4,131 +4,219 @@
     </x-slot>
 
     @if (data_get($github_app, 'app_id'))
-        <x-dashboard.navbar section="source" :parameters="['github_app_uuid' => $github_app->uuid]"
+        @php
+            $githubAppRouteParameters = ['github_app_uuid' => $github_app->uuid];
+            $showSettingsSidebar = in_array($activeTab, ['general', 'danger'], true);
+            $settingsMenuItems = [
+                [
+                    'label' => 'General',
+                    'route' => 'source.github.show',
+                    'active' => $activeTab === 'general',
+                    'icon' => 'settings',
+                ],
+                [
+                    'label' => 'Danger Zone',
+                    'route' => 'source.github.danger',
+                    'active' => $activeTab === 'danger',
+                    'icon' => 'shield-alert',
+                ],
+            ];
+        @endphp
+
+        <x-dashboard.navbar section="source" :parameters="$githubAppRouteParameters"
             :title="$name ?: 'GitHub App'"
             :subtitle="filled($organization) ? 'GitHub App for '.$organization : 'Private GitHub source'"
             :titleOnDesktop="true">
-            <x-slot:actions>
+            <x-slot:titleMeta>
                 @if (data_get($github_app, 'installation_id'))
                     <x-status-badge label="Connected" type="success" />
                 @else
                     <x-status-badge label="Setup incomplete" type="warning" />
                 @endif
-                @can('delete', $github_app)
-                    <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton
-                        buttonTitle="Delete" submitAction="delete"
-                        :actions="['The selected GitHub App will be permanently deleted.']"
-                        confirmationText="{{ data_get($github_app, 'name') }}"
-                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
-                        shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
-                        step2ButtonText="Permanently Delete" />
-                @endcan
-            </x-slot:actions>
+            </x-slot:titleMeta>
         </x-dashboard.navbar>
 
-        @if (!data_get($github_app, 'installation_id'))
-            <div class="application-settings-form">
-                <x-application.settings-section title="Complete GitHub installation"
-                    description="Choose which repositories this GitHub App can access before using it as a source.">
-                    <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div class="flex items-start gap-3">
-                            <div
-                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning">
-                                <x-reicon name="alert-triangle" class="size-4" />
+        @if ($showSettingsSidebar)
+            <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+                <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+                    <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
+                        <nav aria-label="GitHub App settings"
+                            class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+                            <div class="nav-section hidden xl:block">Settings</div>
+                            @foreach ($settingsMenuItems as $menuItem)
+                                <a wire:key="github-app-settings-{{ str($menuItem['label'])->slug() }}"
+                                    @class([
+                                        'menu-item',
+                                        'menu-item-active' => $menuItem['active'],
+                                    ])
+                                    {{ wireNavigate() }}
+                                    href="{{ route($menuItem['route'], $githubAppRouteParameters) }}">
+                                    <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
+                                    <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </nav>
+                    </aside>
+
+                    <div class="min-w-0 xl:mt-3">
+                        @if (!data_get($github_app, 'installation_id') && $activeTab === 'general')
+                            <div class="application-settings-form">
+                                <x-application.settings-section title="Complete GitHub installation"
+                                    description="Choose which repositories this GitHub App can access before using it as a source.">
+                                    <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="flex items-start gap-3">
+                                            <div
+                                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/10 text-warning">
+                                                <x-reicon name="alert-triangle" class="size-4" />
+                                            </div>
+                                            <p class="max-w-xl text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                                Repository access has not been installed yet. Complete this step before attaching the
+                                                source to an application.
+                                            </p>
+                                        </div>
+                                        <a class="button shrink-0 bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                            href="{{ getInstallationPath($github_app) }}">
+                                            Install repositories
+                                            <x-external-link />
+                                        </a>
+                                    </div>
+                                </x-application.settings-section>
                             </div>
-                            <p class="max-w-xl text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
-                                Repository access has not been installed yet. Complete this step before attaching the
-                                source to an application.
-                            </p>
-                        </div>
-                        <a class="button shrink-0 bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
-                            href="{{ getInstallationPath($github_app) }}">
-                            Install repositories
-                            <x-external-link />
-                        </a>
-                    </div>
-                </x-application.settings-section>
-            </div>
-        @elseif ($activeTab === 'general')
-            @php
-                $privateKeyOptions = collect([
-                    blank($github_app->private_key_id)
-                        ? ['value' => 0, 'label' => 'Select a private key']
-                        : null,
-                    ...$privateKeys->map(fn ($privateKey) => [
-                        'value' => $privateKey->id,
-                        'label' => $privateKey->name,
-                    ])->all(),
-                ])->filter()->values()->all();
-            @endphp
+                        @elseif ($activeTab === 'general')
+                            @php
+                                $privateKeyOptions = collect([
+                                    blank($github_app->private_key_id)
+                                        ? ['value' => 0, 'label' => 'Select a private key']
+                                        : null,
+                                    ...$privateKeys->map(fn ($privateKey) => [
+                                        'value' => $privateKey->id,
+                                        'label' => $privateKey->name,
+                                    ])->all(),
+                                ])->filter()->values()->all();
+                            @endphp
 
-            <form wire:submit="submit" class="application-settings-form">
-                <x-unsaved-bar action="submit" />
-                <x-application.settings-section title="General"
-                    description="Connection and authentication settings for this private GitHub source.">
-                    <x-slot:actions>
-                        <x-forms.button type="button" wire:click.prevent="updateGithubAppName">
-                            <x-reicon name="refresh" class="size-3.5" />
-                            Sync name
-                        </x-forms.button>
-                        @can('update', $github_app)
-                            <a href="{{ $this->getGithubAppNameUpdatePath() }}" class="button">
-                                Rename
-                                <x-external-link />
-                            </a>
-                            <a href="{{ getInstallationPath($github_app) }}" class="button">
-                                Repositories
-                                <x-external-link />
-                            </a>
-                        @endcan
-                    </x-slot:actions>
+                            <form wire:submit="submit" class="application-settings-form">
+                                <x-unsaved-bar action="submit" />
+                                <x-application.settings-section title="General"
+                                    description="Connection and authentication settings for this private GitHub source.">
+                                    <x-slot:actions>
+                                        <x-forms.button type="button" wire:click.prevent="updateGithubAppName">
+                                            <x-reicon name="refresh" class="size-3.5" />
+                                            Sync name
+                                        </x-forms.button>
+                                        @can('update', $github_app)
+                                            <a href="{{ $this->getGithubAppNameUpdatePath() }}" class="button">
+                                                Rename
+                                                <x-external-link />
+                                            </a>
+                                            <a href="{{ getInstallationPath($github_app) }}" class="button">
+                                                Repositories
+                                                <x-external-link />
+                                            </a>
+                                        @endcan
+                                    </x-slot:actions>
 
-                    <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.input canGate="update" :canResource="$github_app" id="name" label="App name" />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="organization"
-                            label="Organization" placeholder="Personal account when empty" />
+                                    <div class="grid gap-4 lg:grid-cols-2">
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="name" label="App name" />
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="organization"
+                                            label="Organization" placeholder="Personal account when empty" />
 
-                        @if (!isCloud())
-                            <div class="lg:col-span-2">
-                                <x-forms.listbox id="isSystemWide" label="Availability" :options="[
-                                    ['value' => false, 'label' => 'Only this team'],
-                                    ['value' => true, 'label' => 'Every team on this instance'],
-                                ]"
-                                    helper="System-wide GitHub Apps can be used by every team on this Coolify instance."
-                                    :disabled="!auth()->user()->can('update', $github_app)" />
+                                        @if (!isCloud())
+                                            <div class="lg:col-span-2">
+                                                <x-forms.listbox id="isSystemWide" label="Availability" :options="[
+                                                    ['value' => false, 'label' => 'Only this team'],
+                                                    ['value' => true, 'label' => 'Every team on this instance'],
+                                                ]"
+                                                    helper="System-wide GitHub Apps can be used by every team on this Coolify instance."
+                                                    :disabled="!auth()->user()->can('update', $github_app)" />
+                                            </div>
+                                            @if ($isSystemWide)
+                                                <div class="lg:col-span-2">
+                                                    <x-callout type="warning" title="Shared with every team">
+                                                        Use team-specific GitHub Apps when you need repository isolation between teams.
+                                                    </x-callout>
+                                                </div>
+                                            @endif
+                                        @endif
+
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="htmlUrl"
+                                            label="HTML URL" />
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="apiUrl"
+                                            label="API URL" />
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="customUser"
+                                            label="User" required />
+                                        <x-forms.input canGate="update" :canResource="$github_app" type="number"
+                                            id="customPort" label="Port" required />
+                                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
+                                            label="App ID" required />
+                                        <x-forms.input canGate="update" :canResource="$github_app" type="number"
+                                            id="installationId" label="Installation ID" required />
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="clientId"
+                                            label="Client ID" type="password" required />
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
+                                            label="Client secret" type="password" required />
+                                        <x-forms.input canGate="update" :canResource="$github_app" id="webhookSecret"
+                                            label="Webhook secret" type="password" required />
+                                        <x-forms.listbox id="privateKeyId" label="Private key" required
+                                            :options="$privateKeyOptions" :disabled="!auth()->user()->can('update', $github_app)" />
+                                    </div>
+                                </x-application.settings-section>
+                            </form>
+                        @elseif ($activeTab === 'danger')
+                            <div class="application-settings-form">
+                                <x-application.settings-section id="github-app-danger-section" title="Danger zone"
+                                    helper="Destructive actions for this GitHub App source cannot be undone.">
+                                    <div
+                                        class="rounded-lg border border-red-300 bg-red-50 p-4 ring-1 ring-inset ring-red-200/60 dark:border-error/30 dark:bg-error/[0.08] dark:ring-error/10">
+                                        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                            <div class="min-w-0">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <h4 class="text-sm font-semibold text-red-700 dark:text-error">Delete GitHub App</h4>
+                                                    <x-status-badge status="Permanent" type="error" />
+                                                </div>
+                                                <p class="mt-2 max-w-2xl text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
+                                                    Permanently delete
+                                                    <strong class="font-semibold text-black dark:text-fg">{{ $name ?: 'this GitHub App' }}</strong>
+                                                    from Coolify. Applications using this source will need another Git provider configured.
+                                                </p>
+                                                <ul class="mt-3 space-y-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                                    <li>• The App registration on GitHub is not removed automatically.</li>
+                                                    <li>• Linked applications keep their Git settings until you change them.</li>
+                                                    <li>• This source cannot be restored from Coolify after deletion.</li>
+                                                </ul>
+                                            </div>
+
+                                            <div class="shrink-0">
+                                                @can('delete', $github_app)
+                                                    <x-modal-confirmation title="Confirm GitHub App Deletion?" isErrorButton
+                                                        buttonTitle="Delete" submitAction="delete"
+                                                        :actions="['The selected GitHub App will be permanently deleted.']"
+                                                        confirmationText="{{ data_get($github_app, 'name') }}"
+                                                        confirmationLabel="Please confirm the execution of the actions by entering the GitHub App Name below"
+                                                        shortConfirmationLabel="GitHub App Name" :confirmWithPassword="false"
+                                                        step2ButtonText="Permanently Delete" />
+                                                @else
+                                                    <x-forms.button disabled tooltip="You do not have permission to delete this GitHub App.">
+                                                        Delete
+                                                    </x-forms.button>
+                                                @endcan
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @cannot('delete', $github_app)
+                                        <div class="mt-4">
+                                            <x-callout type="danger" title="Insufficient permissions">
+                                                Contact a team administrator if this GitHub App must be deleted.
+                                            </x-callout>
+                                        </div>
+                                    @endcannot
+                                </x-application.settings-section>
                             </div>
-                            @if ($isSystemWide)
-                                <div class="lg:col-span-2">
-                                    <x-callout type="warning" title="Shared with every team">
-                                        Use team-specific GitHub Apps when you need repository isolation between teams.
-                                    </x-callout>
-                                </div>
-                            @endif
                         @endif
-
-                        <x-forms.input canGate="update" :canResource="$github_app" id="htmlUrl"
-                            label="HTML URL" />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="apiUrl"
-                            label="API URL" />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="customUser"
-                            label="User" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number"
-                            id="customPort" label="Port" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
-                            label="App ID" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" type="number"
-                            id="installationId" label="Installation ID" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="clientId"
-                            label="Client ID" type="password" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
-                            label="Client secret" type="password" required />
-                        <x-forms.input canGate="update" :canResource="$github_app" id="webhookSecret"
-                            label="Webhook secret" type="password" required />
-                        <x-forms.listbox id="privateKeyId" label="Private key" required
-                            :options="$privateKeyOptions" :disabled="!auth()->user()->can('update', $github_app)" />
                     </div>
-                </x-application.settings-section>
-            </form>
+                </div>
+            </section>
         @elseif ($activeTab === 'permissions')
             <div class="application-settings-form">
                 <x-application.settings-section title="Permissions"

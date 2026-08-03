@@ -297,80 +297,83 @@
             </div>
         </div>
 
-        <div class="hidden w-full items-center justify-between gap-4 md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pr-4 lg:pl-2 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
+        <div class="hidden w-full items-center md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pr-4 lg:pl-2 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
             :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
             <div
-                class="application-primary-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                @foreach ($serverMenuItems as $menuItem)
-                    <a wire:key="server-primary-nav-{{ str($menuItem['label'])->slug() }}"
-                        @class([
-                            'app-tab shrink-0 gap-1',
-                            'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $menuItem['active'],
-                        ])
-                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                        href="{{ route($menuItem['route'], $serverRouteParameters) }}">
-                        {{ $menuItem['label'] }}
-                        @if ($menuItem['warning'] ?? false)
-                            <x-reicon name="alert-triangle"
-                                class="size-3.5 text-orange-500 dark:text-warning" />
-                        @endif
-                    </a>
-                @endforeach
-            </div>
-
-            @if ($server->proxySet())
-                @can('manageProxy', $server)
-                    <div
-                        class="application-heading-actions flex shrink-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                        @if ($proxyStatus === 'running')
-                            <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
-                                <x-loading text="Checking Traefik dashboard" />
-                            </div>
-                            @if ($traefikDashboardAvailable)
-                                <a class="button" target="_blank" href="http://{{ $serverIp }}:8080">
-                                    Traefik Dashboard
-                                    <x-external-link />
-                                </a>
+                class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                <div
+                    class="application-primary-tabs resource-heading-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto">
+                    @foreach ($serverMenuItems as $menuItem)
+                        <a wire:key="server-primary-nav-{{ str($menuItem['label'])->slug() }}"
+                            @class([
+                                'app-tab shrink-0 gap-1',
+                                'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $menuItem['active'],
+                            ])
+                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                            href="{{ route($menuItem['route'], $serverRouteParameters) }}">
+                            {{ $menuItem['label'] }}
+                            @if ($menuItem['warning'] ?? false)
+                                <x-reicon name="alert-triangle"
+                                    class="size-3.5 text-orange-500 dark:text-warning" />
                             @endif
-                            <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
-                                submitAction="restart" :actions="[
-                                    'This proxy will be stopped and started again.',
-                                    'All resources hosted on Coolify will be unavailable during the restart.',
-                                ]" :confirmWithText="false" :confirmWithPassword="false"
-                                step2ButtonText="Restart Proxy" :dispatchEvent="true"
-                                dispatchEventType="restartEvent">
-                                <x-slot:content>
-                                    <x-forms.button title="Restart proxy">
-                                        <x-reicon name="restart"
-                                            class="size-4 text-orange-500 dark:text-warning" />
-                                        Restart Proxy
-                                    </x-forms.button>
-                                </x-slot:content>
-                            </x-modal-confirmation>
-                            <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
-                                submitAction="stop(true)" :actions="[
-                                    'The Coolify proxy will be stopped.',
-                                    'All resources hosted on Coolify will be unavailable.',
-                                ]" :confirmWithText="false" :confirmWithPassword="false"
-                                step2ButtonText="Stop Proxy" :dispatchEvent="true"
-                                dispatchEventType="stopEvent">
-                                <x-slot:content>
-                                    <x-forms.button isError title="Stop proxy">
-                                        <x-reicon name="stop" class="size-4 text-error" />
-                                        Stop Proxy
-                                    </x-forms.button>
-                                </x-slot:content>
-                            </x-modal-confirmation>
-                        @else
-                            <x-forms.button @click="$wire.dispatch('checkProxyEvent')">
-                                <x-reicon name="play-circle"
-                                    class="size-4 text-coollabs dark:text-warning" />
-                                Start Proxy
-                            </x-forms.button>
-                        @endif
-                    </div>
-                @endcan
-            @endif
+                        </a>
+                    @endforeach
+                </div>
+
+                @if ($server->proxySet())
+                    @can('manageProxy', $server)
+                        <div
+                            class="resource-heading-actions flex shrink-0 items-center gap-0.5 border-l border-neutral-200 pl-1 dark:border-white/[0.08]">
+                            @if ($proxyStatus === 'running')
+                                <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
+                                    <x-loading text="Checking Traefik dashboard" />
+                                </div>
+                                @if ($traefikDashboardAvailable)
+                                    <a class="button" target="_blank" href="http://{{ $serverIp }}:8080">
+                                        Traefik Dashboard
+                                        <x-external-link />
+                                    </a>
+                                @endif
+                                <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
+                                    submitAction="restart" :actions="[
+                                        'This proxy will be stopped and started again.',
+                                        'All resources hosted on Coolify will be unavailable during the restart.',
+                                    ]" :confirmWithText="false" :confirmWithPassword="false"
+                                    step2ButtonText="Restart Proxy" :dispatchEvent="true"
+                                    dispatchEventType="restartEvent">
+                                    <x-slot:content>
+                                        <x-forms.button title="Restart proxy">
+                                            <x-reicon name="restart"
+                                                class="size-4 text-orange-500 dark:text-warning" />
+                                            Restart Proxy
+                                        </x-forms.button>
+                                    </x-slot:content>
+                                </x-modal-confirmation>
+                                <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
+                                    submitAction="stop(true)" :actions="[
+                                        'The Coolify proxy will be stopped.',
+                                        'All resources hosted on Coolify will be unavailable.',
+                                    ]" :confirmWithText="false" :confirmWithPassword="false"
+                                    step2ButtonText="Stop Proxy" :dispatchEvent="true"
+                                    dispatchEventType="stopEvent">
+                                    <x-slot:content>
+                                        <x-forms.button isError title="Stop proxy">
+                                            <x-reicon name="stop" class="size-4 text-error" />
+                                            Stop Proxy
+                                        </x-forms.button>
+                                    </x-slot:content>
+                                </x-modal-confirmation>
+                            @else
+                                <x-forms.button @click="$wire.dispatch('checkProxyEvent')">
+                                    <x-reicon name="play-circle"
+                                        class="size-4 text-coollabs dark:text-warning" />
+                                    Start Proxy
+                                </x-forms.button>
+                            @endif
+                        </div>
+                    @endcan
+                @endif
+            </div>
         </div>
         <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>
     </div>

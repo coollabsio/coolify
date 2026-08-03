@@ -10,7 +10,27 @@ test('helper trigger is a button that stops label activation', function () {
         ->toContain('type="button"')
         ->toContain('@click.prevent.stop')
         ->toContain('aria-label="More information"')
+        ->toContain('info-helper-popup')
+        ->toContain('name="info-circle"')
         ->not->toContain('<div x-ref="trigger" class="info-helper"');
+});
+
+test('helper popup uses the redesigned raised surface styles', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+    $utilities = file_get_contents(resource_path('css/utilities.css'));
+
+    expect($helper)
+        ->toContain('info-helper-popup')
+        ->toContain('x-transition:enter')
+        ->toContain('text-[13px] leading-5');
+
+    expect($utilities)
+        ->toContain('@utility info-helper-popup')
+        ->toContain('dark:bg-raised')
+        ->toContain('dark:border-white/10')
+        ->toContain('shadow-modal')
+        ->toContain('@utility auth-tooltip')
+        ->toContain('rounded-lg');
 });
 
 test('listbox keeps the helper outside the label association', function () {
@@ -19,8 +39,8 @@ test('listbox keeps the helper outside the label association', function () {
 
     expect($contents)
         ->toContain('Keep helper outside the label')
-        ->toContain('<div class="mb-1.5 flex w-fit items-center gap-1.5">')
-        ->toContain('class="mb-0! flex items-center gap-1.5"')
+        ->toContain('<div class="mb-1.5 flex h-4 w-full items-center gap-1.5">')
+        ->toContain('class="mb-0! flex items-center gap-1.5 leading-4"')
         ->toMatch('/<label for="\{\{ \$id \}\}-trigger"[^>]*>[\s\S]*?<\/label>\s*@if \(\$helper\)/');
 });
 

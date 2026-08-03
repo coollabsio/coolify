@@ -53,6 +53,8 @@
                     <x-top-breadcrumb />
                     <div id="server-topbar-context" class="min-w-0"></div>
                     <div class="flex-1"></div>
+                    {{-- Dev Server-Timing HUD docks here (local only; empty in production) --}}
+                    <div id="server-timing-hud-slot" data-server-timing-hud-slot class="hidden shrink-0 items-center"></div>
                     {{-- Right cluster --}}
                     <x-top-user-menu />
                 </div>
@@ -99,6 +101,8 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-1">
+                    {{-- Prefer desktop slot; mobile uses this when desktop header is hidden --}}
+                    <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot class="hidden shrink-0 items-center lg:hidden"></div>
                     <x-top-user-menu />
                     <button type="button" class="-m-1 p-2 text-neutral-500 dark:text-fg-dim" x-on:click="open = !open">
                         <span class="sr-only">Open sidebar</span>

@@ -262,9 +262,7 @@
             }
         }
     }" class="flex flex-1 min-h-0 flex-col overflow-hidden">
-            <livewire:project.application.deployment-navbar
-                :application_deployment_queue="$application_deployment_queue" />
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-3 flex flex-1 min-h-0 flex-col overflow-hidden sm:mt-4'">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-3'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-[#0d0d0d] text-neutral-100"
                     :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-800 shadow-sm'">
@@ -295,8 +293,6 @@
                                 </button>
                             </div>
                             <div class="logs-viewer-meta">
-                                <x-status-badge :status="$deploymentStatusLabel" :type="$deploymentStatusType"
-                                    class="logs-viewer-status-badge" />
                                 <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
                                     class="text-xs text-neutral-500 whitespace-nowrap"></span>
                             </div>
@@ -415,6 +411,12 @@
                                             d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                                     </svg>
                                 </button>
+                            </div>
+                            <div class="logs-viewer-end">
+                                <x-status-badge :status="$deploymentStatusLabel" :type="$deploymentStatusType"
+                                    class="logs-viewer-status-badge" />
+                                <livewire:project.application.deployment-navbar
+                                    :application_deployment_queue="$application_deployment_queue" />
                             </div>
                         </div>
                     </div>

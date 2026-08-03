@@ -7,8 +7,33 @@ it('renders the dashed empty-state card with title description and icon', functi
 
     $html->assertSee('No tags yet')
         ->assertSee('Add a tag to group deployments.')
+        ->assertSee('empty-state', false)
         ->assertSee('border-dashed', false)
         ->assertSee('min-h-80', false);
+});
+
+it('keeps inset margin for empty states rendered inside flush settings sections', function () {
+    $html = $this->blade(
+        <<<'BLADE'
+        <x-application.settings-section title="Scheduled tasks" flush>
+            <x-empty title="No scheduled tasks"
+                description="Create a task to run maintenance commands."
+                icon-name="browser-terminal" />
+        </x-application.settings-section>
+        BLADE
+    );
+
+    $html->assertSee('is-flush', false)
+        ->assertSee('empty-state', false)
+        ->assertSee('No scheduled tasks');
+
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toContain('.application-settings-section-body.is-flush .empty-state')
+        ->toContain('margin: 1rem')
+        // w-full + horizontal margin would overflow the parent card on the right
+        ->toContain('width: auto');
 });
 
 it('renders compact size without the full-page min height class', function () {

@@ -17,7 +17,7 @@
      real pending edits. Hide has no delay so Save still feels snappy.
 
      Mobile: stacked layout (full label, buttons on the next line) inset from
-     the viewport edges so body overflow-x-hidden cannot clip it.
+     the viewport edges so body overflow-x-clip cannot clip it.
      Desktop: compact single-row centered pill. --}}
 <div wire:dirty.class="is-dirty"
     wire:loading.class="!opacity-0 !translate-y-6 !pointer-events-none"

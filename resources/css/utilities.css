@@ -145,7 +145,7 @@
 }
 
 @utility auth-tooltip {
-    @apply fixed z-[99] px-2.5 py-1.5 text-xs rounded-sm pointer-events-none whitespace-nowrap text-neutral-700 bg-neutral-200 dark:text-neutral-300 dark:bg-coolgray-400;
+    @apply fixed z-[99] px-2.5 py-1.5 text-xs font-medium rounded-lg pointer-events-none whitespace-nowrap text-white bg-neutral-900 border border-neutral-700 shadow-lg dark:text-fg dark:bg-raised dark:border-white/10;
 }
 
 @utility alert-success {
@@ -317,15 +317,15 @@
 }
 
 @utility text-helper {
-    @apply inline-block font-bold text-coollabs dark:text-warning;
+    @apply inline-block font-semibold text-coollabs dark:text-warning;
 }
 
 @utility info-helper {
-    @apply cursor-pointer text-coollabs dark:text-warning;
+    @apply cursor-pointer text-neutral-400 transition-colors hover:text-neutral-600 dark:text-fg-faint dark:hover:text-fg-dim;
 }
 
 @utility info-helper-popup {
-    @apply hidden absolute right-0 z-40 w-max max-w-[min(20rem,calc(100vw-2rem))] text-xs rounded-sm text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300 whitespace-normal break-words;
+    @apply rounded-lg border border-neutral-200 bg-white text-neutral-600 shadow-modal whitespace-normal break-words dark:border-white/10 dark:bg-raised dark:text-fg-dim;
 }
 
 @utility buyme {

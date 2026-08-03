@@ -90,10 +90,12 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('logs-viewer-toolbar')
         ->toContain('logs-viewer-toolbar-controls')
         ->toContain('logs-viewer-meta')
+        ->toContain('logs-viewer-end')
         ->toContain('logs-viewer-status-badge')
         ->toContain('logs-viewer-line')
         ->toContain('logs-viewer-timestamp')
         ->toContain('logs-viewer-line-text')
+        ->toContain('livewire:project.application.deployment-navbar')
         ->and($sharedLogsView)
         ->toContain('logs-viewer-toolbar')
         ->toContain('logs-viewer-toolbar-controls')
@@ -108,12 +110,85 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('z-10 size-3.5')
         ->and($appCss)
         ->toContain('.logs-viewer-toolbar')
+        ->toContain('.logs-viewer-end')
         ->toContain('.logs-viewer-status-badge')
         ->toContain('.logs-viewer-lines')
         ->toContain('.logs-viewer-actions')
+        ->toContain('.logs-viewer-deployment-actions')
         ->toContain('.logs-settings-section')
         ->toContain('flex-direction: column')
         ->toContain('@media (min-width: 640px)');
+
+    // Status badge lives in the right-side end group, immediately before cancel controls.
+    $endGroup = str($deploymentView)
+        ->after('class="logs-viewer-end"')
+        ->before('logs-viewer-viewport')
+        ->toString();
+
+    expect($endGroup)
+        ->toContain('logs-viewer-status-badge')
+        ->toContain('livewire:project.application.deployment-navbar');
+
+    $badgePos = strpos($endGroup, 'logs-viewer-status-badge');
+    $navbarPos = strpos($endGroup, 'livewire:project.application.deployment-navbar');
+
+    expect($badgePos)->not->toBeFalse()
+        ->and($navbarPos)->not->toBeFalse()
+        ->and($badgePos)->toBeLessThan($navbarPos);
+});
+
+it('places cancel deployment controls inside the deployment logs toolbar', function () {
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'deploy-cancel-toolbar-test',
+        'server_id' => $this->server->id,
+        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        'logs' => json_encode([
+            [
+                'command' => null,
+                'output' => 'building image',
+                'type' => 'stdout',
+                'timestamp' => now()->toISOString(),
+                'hidden' => false,
+                'batch' => 1,
+                'order' => 1,
+            ],
+        ], JSON_THROW_ON_ERROR),
+    ]);
+
+    $response = $this->get(route('project.application.deployment.show', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+        'deployment_uuid' => $deployment->deployment_uuid,
+    ]));
+
+    $response->assertSuccessful();
+    $response->assertSee('Cancel deployment');
+    $response->assertSee('logs-viewer-end', false);
+    $response->assertSee('logs-viewer-deployment-actions', false);
+    $response->assertSee('logs-viewer-cancel-btn', false);
+
+    $content = $response->getContent();
+    $toolbarPos = strpos($content, 'logs-viewer-toolbar');
+    $endPos = strpos($content, 'logs-viewer-end');
+    $viewportPos = strpos($content, 'logs-viewer-viewport');
+
+    expect($toolbarPos)->not->toBeFalse()
+        ->and($endPos)->not->toBeFalse()
+        ->and($viewportPos)->not->toBeFalse()
+        ->and($endPos)->toBeGreaterThan($toolbarPos)
+        ->and($endPos)->toBeLessThan($viewportPos);
+
+    // Within the right-side end group: status badge, then cancel controls.
+    $endGroup = substr($content, $endPos, $viewportPos - $endPos);
+    $badgePos = strpos($endGroup, 'logs-viewer-status-badge');
+    $cancelPos = strpos($endGroup, 'Cancel deployment');
+
+    expect($badgePos)->not->toBeFalse()
+        ->and($cancelPos)->not->toBeFalse()
+        ->and($badgePos)->toBeLessThan($cancelPos)
+        ->and($endGroup)->toContain('In progress');
 });
 
 it('uses the shared mobile logs layout for proxy and sentinel log pages', function () {

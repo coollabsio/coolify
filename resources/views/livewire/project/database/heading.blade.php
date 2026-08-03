@@ -164,48 +164,49 @@
             </div>
         </div>
 
-        <div class="hidden w-full items-center justify-between gap-4 md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pr-4 lg:pl-2 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
+        <div class="hidden w-full items-center md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pr-4 lg:pl-2 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
             :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
             <div
-                class="flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                @foreach ($databasePageItems as $menuItem)
-                    <a wire:key="database-primary-nav-{{ str($menuItem['label'])->slug() }}"
-                        @class([
-                            'app-tab shrink-0',
-                            'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $menuItem['active'],
-                        ])
-                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                        href="{{ route($menuItem['route'], $parameters) }}">
-                        {{ $menuItem['label'] }}
-                    </a>
-                @endforeach
-            </div>
+                class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                <div class="resource-heading-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto">
+                    @foreach ($databasePageItems as $menuItem)
+                        <a wire:key="database-primary-nav-{{ str($menuItem['label'])->slug() }}"
+                            @class([
+                                'app-tab shrink-0',
+                                'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $menuItem['active'],
+                            ])
+                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                            href="{{ route($menuItem['route'], $parameters) }}">
+                            {{ $menuItem['label'] }}
+                        </a>
+                    @endforeach
+                </div>
 
-            @if ($database->destination->server->isFunctional())
-                <div
-                    class="flex shrink-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                    @if (! $databaseStatus->startsWith('exited'))
-                        <x-forms.button canGate="manage" :canResource="$database"
-                            @click="document.getElementById('database-restart-trigger')?.click()">
-                            <x-reicon name="restart" class="size-4 text-orange-500 dark:text-warning" />
-                            Restart
-                        </x-forms.button>
-                        <x-forms.button canGate="manage" :canResource="$database" isError
-                            @click="document.getElementById('database-stop-trigger')?.click()">
-                            <x-reicon name="stop" class="size-4 text-error" />
-                            Stop
-                        </x-forms.button>
+                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5 border-l border-neutral-200 pl-1 dark:border-white/[0.08]">
+                    @if ($database->destination->server->isFunctional())
+                        @if (! $databaseStatus->startsWith('exited'))
+                            <x-forms.button canGate="manage" :canResource="$database"
+                                @click="document.getElementById('database-restart-trigger')?.click()">
+                                <x-reicon name="restart" class="size-4 text-orange-500 dark:text-warning" />
+                                Restart
+                            </x-forms.button>
+                            <x-forms.button canGate="manage" :canResource="$database" isError
+                                @click="document.getElementById('database-stop-trigger')?.click()">
+                                <x-reicon name="stop" class="size-4 text-error" />
+                                Stop
+                            </x-forms.button>
+                        @else
+                            <x-forms.button canGate="manage" :canResource="$database"
+                                @click="$wire.dispatch('startEvent')">
+                                <x-reicon name="play-circle" class="size-4 text-warning" />
+                                Start
+                            </x-forms.button>
+                        @endif
                     @else
-                        <x-forms.button canGate="manage" :canResource="$database"
-                            @click="$wire.dispatch('startEvent')">
-                            <x-reicon name="play-circle" class="size-4 text-warning" />
-                            Start
-                        </x-forms.button>
+                        <x-status-badge status="Server unavailable" type="error" />
                     @endif
                 </div>
-            @else
-                <x-status-badge status="Server unavailable" type="error" />
-            @endif
+            </div>
         </div>
 
         <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>

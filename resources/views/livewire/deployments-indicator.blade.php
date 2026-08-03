@@ -1,9 +1,11 @@
-<div wire:poll.3000ms x-data="{
+<div wire:poll.3000ms x-on:livewire:navigated.window="
+        $wire.updateShouldShowFromPath(window.location.pathname || '/')
+    " x-data="{
     expanded: @entangle('expanded'),
     reduceOpacity: @js($this->shouldReduceOpacity)
 }" class="fixed bottom-0 left-0 z-60 mb-4 ml-4 transition-[left] duration-200"
     :class="collapsed ? 'lg:left-16' : 'lg:left-56'">
-    @if ($this->deploymentCount > 0)
+    @if ($this->shouldShow && $this->deploymentCount > 0)
         <div class="relative transition-opacity duration-200"
             :class="{ 'opacity-100': expanded || !reduceOpacity, 'opacity-60 hover:opacity-100': reduceOpacity && !expanded }">
             {{-- Expanded deployment list (above the pill) --}}

@@ -27,6 +27,7 @@ test('fixed layer-2 spacers match the fixed bar height', function () {
         $blade = file_get_contents($path);
         expect($blade)->toContain('lg:h-12');
         expect($blade)->not->toContain('lg:h-10');
+        expect($blade)->not->toContain('lg:block lg:h-5');
     }
 });
 

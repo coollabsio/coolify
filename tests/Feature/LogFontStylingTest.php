@@ -13,7 +13,7 @@ it('registers geist mono from a local asset for log surfaces', function () {
         ->toContain("url('../fonts/geist-sans-variable.woff2')")
         ->and($appCss)
         ->toContain("--font-sans: 'Geist Sans', Inter, sans-serif")
-        ->toContain('@apply min-h-screen text-sm font-sans antialiased scrollbar overflow-x-hidden;')
+        ->toContain('@apply min-h-screen text-sm font-sans antialiased scrollbar overflow-x-clip;')
         ->toContain("--font-logs: 'Geist Mono'")
         ->toContain("--font-geist-sans: 'Geist Sans'")
         ->and($fontPath)

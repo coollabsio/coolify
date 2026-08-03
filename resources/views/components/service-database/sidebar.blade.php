@@ -28,7 +28,7 @@
         [
             'label' => 'Import Backup',
             'route' => 'project.service.database.import',
-            'icon' => 'storages',
+            'icon' => 'upload',
             'active' => request()->routeIs('project.service.database.import'),
             'visible' => $isImportSupported,
             'navigate' => false,

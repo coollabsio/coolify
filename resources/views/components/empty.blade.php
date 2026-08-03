@@ -51,7 +51,7 @@
 {{-- Empty state: dashed card, icon badge, title, description, optional actions. --}}
 <div
     {{ $attributes->merge([
-        'class' => "flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-10 text-center dark:border-white/[0.1] dark:bg-white/[0.02] {$minHeight}",
+        'class' => "empty-state flex w-full flex-col items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-6 py-10 text-center dark:border-white/[0.1] dark:bg-white/[0.02] {$minHeight}",
     ]) }}>
     @if ($hasIcon)
         <div

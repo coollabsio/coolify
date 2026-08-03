@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use Illuminate\Support\Collection;
@@ -9,7 +10,9 @@ use Livewire\Component;
 
 class ActiveDeployments extends Component
 {
-    public Collection $deployments;
+    public Collection $activeDeployments;
+
+    public Collection $recentDeployments;
 
     public function mount(): void
     {
@@ -20,25 +23,42 @@ class ActiveDeployments extends Component
     {
         $serverIds = Server::ownedByCurrentTeamCached()->pluck('id');
 
-        $this->deployments = ApplicationDeploymentQueue::query()
+        $columns = [
+            'id',
+            'application_id',
+            'application_name',
+            'deployment_url',
+            'deployment_uuid',
+            'pull_request_id',
+            'server_name',
+            'server_id',
+            'status',
+            'created_at',
+            'finished_at',
+        ];
+
+        $baseQuery = ApplicationDeploymentQueue::query()
             ->with(['application.environment.project'])
-            ->whereIn('status', ['in_progress', 'queued'])
-            ->whereIn('server_id', $serverIds)
+            ->whereIn('server_id', $serverIds);
+
+        $this->activeDeployments = (clone $baseQuery)
+            ->whereIn('status', [
+                ApplicationDeploymentStatus::IN_PROGRESS->value,
+                ApplicationDeploymentStatus::QUEUED->value,
+            ])
             ->orderBy('status')
             ->orderBy('id')
-            ->limit(8)
-            ->get([
-                'id',
-                'application_id',
-                'application_name',
-                'deployment_url',
-                'deployment_uuid',
-                'pull_request_id',
-                'server_name',
-                'server_id',
-                'status',
-                'created_at',
-            ]);
+            ->limit(5)
+            ->get($columns);
+
+        $this->recentDeployments = (clone $baseQuery)
+            ->whereNotIn('status', [
+                ApplicationDeploymentStatus::IN_PROGRESS->value,
+                ApplicationDeploymentStatus::QUEUED->value,
+            ])
+            ->orderByDesc('id')
+            ->limit(5)
+            ->get($columns);
     }
 
     public function render()

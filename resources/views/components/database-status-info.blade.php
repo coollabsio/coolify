@@ -72,10 +72,10 @@
                         ['value' => true, 'label' => 'Enabled'],
                         ['value' => false, 'label' => 'Disabled'],
                     ]" />
-                @if ($sslModeOptions && $enableSsl)
+                @if ($sslModeOptions)
                     <x-forms.listbox id="sslMode" label="SSL mode" :helper="$sslModeHelper"
                         onChange="instantSaveSSL"
-                        :disabled="! $isExited || ! auth()->user()?->can('update', $database)"
+                        :disabled="! $enableSsl || ! $isExited || ! auth()->user()?->can('update', $database)"
                         :options="collect($sslModeOptions)->map(fn ($option, $value) => [
                             'value' => $value,
                             'label' => $option['label'],

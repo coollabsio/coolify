@@ -41,6 +41,55 @@ it('labels console themes without a Shadow\'s prefix', function () {
     }
 });
 
+it('shows console unavailable without the terminal shell wrapper', function () {
+    $consoleView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    $unavailableBranch = str($consoleView)
+        ->after('@if ($consoleUnavailable)')
+        ->before('@else')
+        ->toString();
+
+    expect($consoleView)
+        ->toContain('$consoleUnavailable')
+        ->toContain('@if ($consoleUnavailable)')
+        ->toContain('title="Console unavailable"')
+        ->toContain('icon-name="browser-terminal"')
+        // Empty state must not nest inside the themed terminal chrome.
+        ->not->toContain('No running containers');
+
+    expect($unavailableBranch)
+        ->toContain('<x-empty')
+        ->toContain('title="Console unavailable"')
+        ->not->toContain('application-console-shell')
+        ->not->toContain('application-console-header')
+        ->not->toContain('Choose terminal theme');
+});
+
+it('shows runtime logs unavailable without log viewer chrome', function () {
+    $logsView = file_get_contents(resource_path('views/livewire/project/shared/logs.blade.php'));
+
+    $unavailableBranch = str($logsView)
+        ->after('@elseif ($logsUnavailable)')
+        ->before('@else')
+        ->toString();
+
+    expect($logsView)
+        ->toContain('$logsUnavailable')
+        ->toContain('title="Runtime logs unavailable"')
+        ->toContain('icon-name="file-content"')
+        ->toContain('class="mt-4 w-full lg:mt-3"')
+        ->not->toContain('max-w-[1180px]')
+        ->not->toContain('title="No running containers"')
+        ->not->toContain('application-settings-form');
+
+    expect($unavailableBranch)
+        ->toContain('<x-empty')
+        ->toContain('title="Runtime logs unavailable"')
+        ->not->toContain('runtime-log-shell')
+        ->not->toContain('livewire:project.shared.get-logs')
+        ->not->toContain('logs-viewer-toolbar');
+});
+
 it('uses server and container icons in the target list but not on the closed dropdown trigger', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 

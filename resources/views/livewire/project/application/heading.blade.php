@@ -306,39 +306,41 @@
             </div>
         </div>
 
-        {{-- Layer-2 top nav: fixed under the topbar on desktop, in-flow on smaller screens --}}
-        <div class="hidden w-full items-center justify-between gap-4 md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pl-2 lg:pr-4 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
+        {{-- Layer-2 top nav: one unified bar — menus left, actions right --}}
+        <div class="hidden w-full items-center md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pl-2 lg:pr-4 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
             :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
-            <div class="flex min-w-0 items-center gap-2">
-                <div class="application-primary-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                @foreach ($applicationMenuItems as $menuItem)
-                    @php
-                        $isApplicationMenuItemActive = $menuItem['active']
-                            || ($menuItem['label'] === 'Settings' && $activeConfigurationMenuItem);
-                    @endphp
-                    <a wire:key="application-primary-nav-{{ str($menuItem['label'])->slug() }}"
-                        @class([
-                            'app-tab shrink-0',
-                            'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $isApplicationMenuItemActive,
-                        ])
-                        @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                        href="{{ route($menuItem['route'], $parameters) }}">
-                        {{ $menuItem['label'] }}
-                        @if ($menuItem['label'] === 'Runtime Logs' && $application->restart_count > 0 && (!str($application->status)->startsWith('exited') || $application->stoppedAfterRestartLimit()))
-                            <span class="size-1.5 rounded-full bg-warning"
-                                title="Container has restarted {{ $application->restart_count }} time{{ $application->restart_count > 1 ? 's' : '' }}"></span>
-                        @endif
-                    </a>
-                @endforeach
+            <div
+                class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                <div class="application-primary-tabs flex min-w-0 items-center gap-0.5">
+                    {{-- Tabs alone may scroll; keep Links outside overflow so the dropdown never creates a scrollbar. --}}
+                    <div class="resource-heading-tabs flex min-w-0 items-center gap-0.5 overflow-x-auto">
+                        @foreach ($applicationMenuItems as $menuItem)
+                            @php
+                                $isApplicationMenuItemActive = $menuItem['active']
+                                    || ($menuItem['label'] === 'Settings' && $activeConfigurationMenuItem);
+                            @endphp
+                            <a wire:key="application-primary-nav-{{ str($menuItem['label'])->slug() }}"
+                                @class([
+                                    'app-tab shrink-0',
+                                    'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $isApplicationMenuItemActive,
+                                ])
+                                @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                href="{{ route($menuItem['route'], $parameters) }}">
+                                {{ $menuItem['label'] }}
+                                @if ($menuItem['label'] === 'Runtime Logs' && $application->restart_count > 0 && (!str($application->status)->startsWith('exited') || $application->stoppedAfterRestartLimit()))
+                                    <span class="size-1.5 rounded-full bg-warning"
+                                        title="Container has restarted {{ $application->restart_count }} time{{ $application->restart_count > 1 ? 's' : '' }}"></span>
+                                @endif
+                            </a>
+                        @endforeach
+                    </div>
+                    <div class="resource-heading-menus shrink-0">
+                        <x-applications.links :application="$application" />
+                    </div>
                 </div>
-                <div class="application-heading-actions flex shrink-0 items-center rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                    <x-applications.links :application="$application" />
-                </div>
-            </div>
-            <div class="flex shrink-0 items-center gap-3">
-                {{-- Status badge temporarily hidden — will be redesigned later:
-                     <x-status.index :resource="$application" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" /> --}}
-                <div class="application-heading-actions flex items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5 border-l border-neutral-200 pl-1 dark:border-white/[0.08]">
+                    {{-- Status badge temporarily hidden — will be redesigned later:
+                         <x-status.index :resource="$application" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" /> --}}
                     @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                         <span class="px-2 text-[13px] text-neutral-500 dark:text-fg-dim">Load a Compose file to deploy.</span>
                     @else
@@ -394,7 +396,7 @@
                 </div>
             </div>
         </div>
-        {{-- Spacer: keeps in-flow content clear of the fixed layer-2 nav on desktop --}}
+        {{-- Spacer: in-flow stand-in for the fixed layer-2 nav (h-12). Not visible content — keeps page body clear of the bar. --}}
         <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>
     </div>
 </nav>

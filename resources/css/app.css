@@ -280,7 +280,9 @@ body {
 }
 
 body {
-    @apply min-h-screen text-sm font-sans antialiased scrollbar overflow-x-hidden;
+    /* overflow-x: clip (not hidden) — hidden creates a scroll containment that
+       breaks position:sticky on settings sidebars and other in-page pins. */
+    @apply min-h-screen text-sm font-sans antialiased scrollbar overflow-x-clip;
 }
 
 .coolify-monaco-editor {
@@ -1036,6 +1038,23 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     .server-settings-workspace > :not(.application-settings-navigation) {
         margin-top: 0.75rem;
     }
+
+    /*
+     * Settings / resource side nav stays pinned while the form column scrolls.
+     * top = primary header (3rem) + layer-2 bar (3rem) + hairline gap (0.5rem).
+     * max-height lets long menus scroll inside the pin instead of forcing the
+     * whole page to move the nav out of view.
+     */
+    .application-settings-navigation {
+        position: sticky;
+        top: 6.5rem;
+        align-self: start;
+        max-height: calc(100dvh - 7.25rem);
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+    }
 }
 
 /* Field labels */
@@ -1115,6 +1134,27 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 .dark .application-settings-workspace .form-control:hover,
 .dark .application-settings-form .form-control:hover {
     background: transparent;
+}
+
+/* Unified resource heading bar: hide tab-strip scrollbars; menus/actions stay overflow-visible for dropdowns */
+.resource-heading-navbar {
+    overflow: visible;
+}
+
+.resource-heading-tabs {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/legacy Edge */
+}
+
+.resource-heading-tabs::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+    width: 0;
+    height: 0;
+}
+
+.resource-heading-menus,
+.resource-heading-actions {
+    overflow: visible;
 }
 
 /* Heading action group: buttons + dropdown triggers styled like the tabs */
@@ -1366,6 +1406,15 @@ input[type="search"]::-webkit-search-results-decoration {
 /* Flush layer-card body (tables and other full-bleed content) */
 .application-settings-section-body.is-flush {
     padding: 0;
+}
+
+/* Empty states still need the standard body inset when the card is flush for lists.
+   Override w-full: width 100% + horizontal margin overflows the parent card. */
+.application-settings-section-body.is-flush .empty-state {
+    margin: 1rem;
+    width: auto;
+    max-width: none;
+    box-sizing: border-box;
 }
 
 /* Centered process dialog (startup / activity logs) — full-height log body.
@@ -1877,6 +1926,49 @@ input[type="search"]::-webkit-search-results-decoration {
     flex-shrink: 0;
 }
 
+/* Status badge + cancel/force-start — right-aligned as a group */
+.logs-viewer-end {
+    display: flex;
+    min-width: 0;
+    width: 100%;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.logs-viewer-deployment-actions {
+    display: flex;
+    min-width: 0;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.logs-viewer-deployment-actions:empty {
+    display: none;
+}
+
+.logs-viewer-deployment-btn {
+    height: 2rem !important;
+    min-height: 2rem !important;
+    padding-inline: 0.75rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1rem !important;
+    border-radius: 0.5rem !important;
+}
+
+.logs-viewer-cancel-btn {
+    border-color: color-mix(in oklab, var(--color-error, #ef4444) 55%, transparent) !important;
+    background: color-mix(in oklab, var(--color-error, #ef4444) 10%, transparent) !important;
+    color: color-mix(in oklab, var(--color-error, #f87171) 90%, white) !important;
+}
+
+.logs-viewer-cancel-btn:hover {
+    border-color: color-mix(in oklab, var(--color-error, #ef4444) 75%, transparent) !important;
+    background: color-mix(in oklab, var(--color-error, #ef4444) 18%, transparent) !important;
+}
+
 .logs-viewer-btn,
 .runtime-log-icon-button {
     position: relative;
@@ -1962,6 +2054,18 @@ input[type="search"]::-webkit-search-results-decoration {
         max-width: 100%;
         justify-content: flex-end;
         overflow: visible;
+    }
+
+    .logs-viewer-end {
+        order: 3;
+        width: auto;
+        flex: 0 0 auto;
+        margin-left: auto;
+    }
+
+    .logs-viewer-deployment-actions {
+        width: auto;
+        flex: 0 0 auto;
     }
 
     .logs-viewer-btn {

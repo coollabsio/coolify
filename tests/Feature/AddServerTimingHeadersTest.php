@@ -71,6 +71,33 @@ test('injects on-screen HUD into full HTML documents when server_timing is enabl
         ->toContain('__coolifyServerTimingHistory')
         ->toContain('</body>');
     expect(substr_count($body, 'id="server-timing-hud"'))->toBe(1);
+    // Docks into main top bar via #server-timing-hud-slot; float fallback is bottom-left.
+    expect($body)
+        ->toContain('dockHud')
+        ->toContain('data-sth-mode="float"')
+        ->toContain('position:fixed;bottom:12px;left:12px')
+        ->not->toContain('position:fixed;bottom:12px;right:12px')
+        ->not->toContain('position:fixed;top:56px;right:12px');
+    // Inline <script> must not embed literal HTML closers (browser ends the script early).
+    $hudScript = null;
+    if (preg_match('/id="server-timing-hud".*?<script data-navigate-once>(.*?)<\/script>/s', $body, $m)) {
+        $hudScript = $m[1];
+    }
+    expect($hudScript)->not->toBeNull();
+    expect($hudScript)
+        ->not->toContain('</body>')
+        ->not->toContain('</BODY>')
+        ->not->toContain('</script>')
+        ->not->toContain('</SCRIPT>');
+});
+
+test('app shell exposes Server-Timing HUD dock slots in the main top bars', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+
+    expect($layout)
+        ->toContain('id="server-timing-hud-slot"')
+        ->toContain('id="server-timing-hud-slot-mobile"')
+        ->toContain('data-server-timing-hud-slot');
 });
 
 test('does not inject HUD into non-HTML or fragment responses', function () {
