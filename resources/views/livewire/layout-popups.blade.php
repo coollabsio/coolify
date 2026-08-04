@@ -67,21 +67,51 @@
         <span x-show="popups.realtime === true">
             @if (!isCloud())
                 <x-popup>
-                    <x-slot:title>
-                        <span class="font-bold text-left text-red-500">WARNING: </span> Cannot connect to real-time service
-                    </x-slot:title>
-                    <x-slot:description>
-                        <div>This will cause unusual problems on the
-                            UI! <br><br>
-                            Please ensure that you have opened the
-                            <a class="underline" href='https://coolify.io/docs/knowledge-base/server/firewall'
-                                target='_blank'>required ports</a> or get
-                            help on <a class="underline" href='https://coollabs.io/discord' target='_blank'>Discord</a>.
+                    <x-slot:customActions>
+                        <div
+                            class="relative mx-auto flex w-full max-w-2xl flex-col gap-5 overflow-hidden rounded-2xl border border-red-200 bg-white p-5 shadow-modal sm:p-6 dark:border-red-500/20 dark:bg-surface">
+                            <button type="button" aria-label="Dismiss real-time connection warning"
+                                class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                                @click="bannerVisible=false;disableRealtime()">
+                                <x-reicon name="x" class="size-3.5" />
+                            </button>
+
+                            <div class="flex items-start gap-4 pr-8">
+                                <div
+                                    class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 sm:flex dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+                                    <x-reicon name="alert-triangle" class="size-6" />
+                                </div>
+                                <div class="min-w-0">
+                                    <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
+                                        Cannot connect to real-time service
+                                    </h2>
+                                    <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                        This will cause unusual problems on the UI. Open the
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                            href="https://coolify.io/docs/knowledge-base/server/firewall"
+                                            target="_blank" rel="noopener noreferrer">required ports</a>
+                                        or get help on
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                            href="https://coollabs.io/discord" target="_blank"
+                                            rel="noopener noreferrer">Discord</a>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                                <a target="_blank" rel="noopener noreferrer"
+                                    href="https://coolify.io/docs/knowledge-base/server/firewall"
+                                    class="button h-9 justify-center sm:min-w-28">
+                                    View docs
+                                </a>
+                                <button type="button"
+                                    class="button h-9 justify-center bg-red-600! text-white! ring-1 ring-red-600/25 hover:bg-red-700! sm:min-w-40 dark:bg-red-500! dark:ring-red-500/30 dark:hover:bg-red-400!"
+                                    @click="bannerVisible=false;disableRealtime()">
+                                    Acknowledge &amp; disable
+                                </button>
+                            </div>
                         </div>
-                    </x-slot:description>
-                    <x-slot:button-text @click="disableRealtime()">
-                        Acknowledge & Disable This Popup
-                    </x-slot:button-text>
+                    </x-slot:customActions>
                 </x-popup>
             @endif
         </span>
@@ -192,28 +222,47 @@
     @if (!currentTeam()->isAnyNotificationEnabled())
         <span x-show="popups.notification">
             <x-popup>
-                <x-slot:title>
-                    No notifications enabled.
-                </x-slot:title>
-                <x-slot:icon>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="text-red-500 stroke-current w-14 h-14 shrink-0"
-                        fill="none" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                </x-slot:icon>
-                <x-slot:description>
-                    It is
-                    highly recommended to enable at least
-                    one
-                    notification channel to receive important alerts.<br>Visit <a
-                        href="{{ route('notifications.email') }}" {{ wireNavigate() }} class="underline dark:text-white">/notification</a> to
-                    enable notifications.</span>
-        </x-slot:description>
-        <x-slot:button-text @click="disableNotification()">
-            Accept and Close
-        </x-slot:button-text>
-        </x-popup>
+                <x-slot:customActions>
+                    <div
+                        class="relative mx-auto flex w-full max-w-2xl flex-col gap-5 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-5 shadow-modal sm:p-6 dark:border-white/[0.1] dark:bg-surface">
+                        <button type="button" aria-label="Dismiss notifications reminder"
+                            class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                            @click="bannerVisible=false;disableNotification()">
+                            <x-reicon name="x" class="size-3.5" />
+                        </button>
+
+                        <div class="flex items-start gap-4 pr-8">
+                            <div
+                                class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 sm:flex dark:border-warning/20 dark:bg-warning/10 dark:text-warning">
+                                <x-reicon name="alert-triangle" class="size-6" />
+                            </div>
+                            <div class="min-w-0">
+                                <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
+                                    No notifications enabled
+                                </h2>
+                                <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                    Enable at least one notification channel so you receive important alerts.
+                                    Visit
+                                    <a href="{{ route('notifications.email') }}" {{ wireNavigate() }}
+                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90">notifications</a>
+                                    to get started.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                            <a href="{{ route('notifications.email') }}" {{ wireNavigate() }}
+                                class="button h-9 justify-center sm:min-w-28">
+                                Open notifications
+                            </a>
+                            <button type="button" class="button h-9 justify-center sm:min-w-32"
+                                @click="bannerVisible=false;disableNotification()">
+                                Accept and close
+                            </button>
+                        </div>
+                    </div>
+                </x-slot:customActions>
+            </x-popup>
         </span>
     @endif
     <script>

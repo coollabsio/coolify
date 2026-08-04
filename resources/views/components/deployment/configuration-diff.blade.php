@@ -90,7 +90,7 @@
                                                 <x-reicon name="eye"
                                                     x-show="! expandedRows['{{ $changeKey }}']"
                                                     class="size-3.5" />
-                                                <x-reicon name="eye-off"
+                                                <x-reicon name="eye-off2"
                                                     x-show="expandedRows['{{ $changeKey }}']"
                                                     x-cloak class="size-3.5" />
                                             </button>

@@ -107,6 +107,30 @@ it('registers the eye-off2 reicon used when password value is visible', function
         ->toContain('M2.53033 1.46967');
 });
 
+it('uses the same eye-off2 icon in configuration changes expand toggle', function () {
+    $html = view('components.deployment.configuration-diff', [
+        'diff' => [
+            'changes' => [
+                [
+                    'key' => 'env.SECRET',
+                    'section_label' => 'Environment',
+                    'label' => 'SECRET',
+                    'expandable' => true,
+                    'old_display_value' => 'old-***',
+                    'new_display_value' => 'new-***',
+                    'old_full_value' => 'old-secret-value',
+                    'new_full_value' => 'new-secret-value',
+                ],
+            ],
+        ],
+    ])->render();
+
+    // eye-off2 path (password inputs); not the older eye-off glyph.
+    expect($html)
+        ->toContain('M2.53033 1.46967')
+        ->not->toContain('M22.2954 6.31083');
+});
+
 it('renders env var password input before visibility toggle in tab order', function () {
     $html = Blade::render('<x-forms.env-var-input type="password" id="secret" />');
 
