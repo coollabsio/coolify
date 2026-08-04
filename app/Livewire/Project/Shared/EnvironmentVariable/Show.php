@@ -453,7 +453,9 @@ class Show extends Component
             if ($this->type === 'service' || $this->type === 'application' && $this->env->resourceable?->docker_compose) {
                 [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($this->env->key, $this->env->resourceable?->docker_compose);
 
-                if ($isUsed) {
+                // Legacy duplicate rows (created before the unique constraint) must stay deletable:
+                // only block when this is the last remaining row for the key
+                if ($isUsed && ! $this->keyHasOtherRows()) {
                     $this->dispatch('error', "Cannot delete environment variable '{$this->env->key}' <br><br>Please remove it from the Docker Compose file first.");
 
                     return;
@@ -466,5 +468,20 @@ class Show extends Component
         } catch (\Exception $e) {
             return handleError($e);
         }
+    }
+
+    private function keyHasOtherRows(): bool
+    {
+        if (! $this->env instanceof ModelsEnvironmentVariable) {
+            return false;
+        }
+
+        return ModelsEnvironmentVariable::query()
+            ->where('resourceable_type', $this->env->resourceable_type)
+            ->where('resourceable_id', $this->env->resourceable_id)
+            ->where('key', $this->env->key)
+            ->where('is_preview', $this->env->is_preview)
+            ->where('id', '!=', $this->env->id)
+            ->exists();
     }
 }

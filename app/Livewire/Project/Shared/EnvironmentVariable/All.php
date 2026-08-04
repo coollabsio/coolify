@@ -7,8 +7,10 @@ use App\Models\EnvironmentVariable;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
@@ -750,17 +752,30 @@ class All extends Component
     private function handleSingleSubmit($data)
     {
         $data['key'] = ValidationPatterns::validatedEnvironmentVariableKey($data['key']);
-        $found = $this->resource->environment_variables()->where('key', $data['key'])->first();
-        if ($found) {
+
+        try {
+            $created = DB::transaction(function () use ($data) {
+                $found = $this->resource->environment_variables()->where('key', $data['key'])->lockForUpdate()->first();
+                if ($found) {
+                    return false;
+                }
+
+                $maxOrder = $this->resource->environment_variables()->max('order') ?? 0;
+                $environment = $this->createEnvironmentVariable($data);
+                $environment->order = $maxOrder + 1;
+                $environment->save();
+
+                return true;
+            });
+        } catch (UniqueConstraintViolationException) {
+            $created = false;
+        }
+
+        if (! $created) {
             $this->dispatch('error', 'Environment variable already exists.');
 
             return;
         }
-
-        $maxOrder = $this->resource->environment_variables()->max('order') ?? 0;
-        $environment = $this->createEnvironmentVariable($data);
-        $environment->order = $maxOrder + 1;
-        $environment->save();
 
         $this->clearEnvironmentVariableCaches();
 
@@ -788,17 +803,28 @@ class All extends Component
     {
         $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
 
-        // Get all environment variables that will be deleted
-        $variablesToDelete = $this->resource->$method()->whereNotIn('key', array_keys($variables))->get();
+        $existingVariables = $this->resource->$method()->get();
+
+        // Rows whose key was removed from the textarea entirely
+        $removedVariables = $existingVariables->filter(fn ($env) => ! array_key_exists($env->key, $variables));
+
+        // Legacy duplicate rows (created before the unique constraint) of keys that are kept:
+        // keep the most recently updated row per key, delete the rest
+        $surplusDuplicates = $existingVariables
+            ->filter(fn ($env) => array_key_exists($env->key, $variables))
+            ->groupBy('key')
+            ->filter(fn ($rows) => $rows->count() > 1)
+            ->flatMap(fn ($rows) => $rows->sortBy([['updated_at', 'desc'], ['id', 'desc']])->slice(1));
 
         // If there are no variables to delete, return 0
-        if ($variablesToDelete->isEmpty()) {
+        if ($removedVariables->isEmpty() && $surplusDuplicates->isEmpty()) {
             return 0;
         }
 
-        // Check if any of these variables are used in Docker Compose
+        // Check if any of these variables are used in Docker Compose. Only removing a key
+        // entirely can break Docker Compose; surplus duplicate rows keep the key alive.
         if ($this->resource->type() === 'service' || $this->resource->build_pack === 'dockercompose') {
-            foreach ($variablesToDelete as $envVar) {
+            foreach ($removedVariables as $envVar) {
                 [$isUsed, $reason] = $this->isEnvironmentVariableUsedInDockerCompose($envVar->key, $this->resource->docker_compose);
 
                 if ($isUsed) {
@@ -810,9 +836,10 @@ class All extends Component
         }
 
         // If we get here, no variables are used in Docker Compose, so we can delete them
-        $this->resource->$method()->whereNotIn('key', array_keys($variables))->delete();
+        $idsToDelete = $removedVariables->merge($surplusDuplicates)->pluck('id');
+        $this->resource->$method()->whereIn('id', $idsToDelete)->delete();
 
-        return $variablesToDelete->count();
+        return $idsToDelete->count();
     }
 
     private function normalizeEnvironmentVariables(array $variables): array
@@ -845,47 +872,70 @@ class All extends Component
             $value = is_array($data) ? ($data['value'] ?? '') : $data;
             $comment = is_array($data) ? ($data['comment'] ?? null) : null;
 
-            $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
-            $found = $this->resource->$method()->where('key', $key)->first();
-
-            if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
-                    $changed = false;
-
-                    // Update value if it changed
-                    if ($found->value !== $value) {
-                        $found->value = $value;
-                        $changed = true;
-                    }
-
-                    // Only update comment from inline comment if one is provided (overwrites existing)
-                    // If $comment is null, don't touch existing comment field to preserve it
-                    if ($comment !== null && $found->comment !== $comment) {
-                        $found->comment = $comment;
-                        $changed = true;
-                    }
-
-                    if ($changed) {
-                        $found->save();
-                        $count++;
-                    }
+            try {
+                $count += $this->persistVariable($isPreview, $key, $value, $comment);
+            } catch (UniqueConstraintViolationException) {
+                // A concurrent request created the same key first; retry so this attempt takes the update path.
+                try {
+                    $count += $this->persistVariable($isPreview, $key, $value, $comment);
+                } catch (UniqueConstraintViolationException) {
+                    $this->dispatch('error', "Environment variable '{$key}' was modified by another request. Please try again.");
                 }
-            } else {
-                $environment = new EnvironmentVariable;
-                $environment->key = $key;
-                $environment->value = $value;
-                $environment->comment = $comment; // Set comment from inline comment
-                $environment->is_multiline = false;
-                $environment->is_preview = $isPreview;
-                $environment->resourceable_id = $this->resource->id;
-                $environment->resourceable_type = $this->resource->getMorphClass();
-
-                $environment->save();
-                $count++;
             }
         }
 
         return $count;
+    }
+
+    private function persistVariable(bool $isPreview, string $key, $value, ?string $comment): int
+    {
+        $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
+
+        return DB::transaction(function () use ($method, $isPreview, $key, $value, $comment) {
+            $found = $this->resource->$method()->where('key', $key)->lockForUpdate()->first();
+
+            if ($found) {
+                if ($found->is_shown_once || $found->is_multiline) {
+                    return 0;
+                }
+
+                $changed = false;
+
+                // Update value if it changed
+                if ($found->value !== $value) {
+                    $found->value = $value;
+                    $changed = true;
+                }
+
+                // Only update comment from inline comment if one is provided (overwrites existing)
+                // If $comment is null, don't touch existing comment field to preserve it
+                if ($comment !== null && $found->comment !== $comment) {
+                    $found->comment = $comment;
+                    $changed = true;
+                }
+
+                if ($changed) {
+                    $found->save();
+
+                    return 1;
+                }
+
+                return 0;
+            }
+
+            $environment = new EnvironmentVariable;
+            $environment->key = $key;
+            $environment->value = $value;
+            $environment->comment = $comment; // Set comment from inline comment
+            $environment->is_multiline = false;
+            $environment->is_preview = $isPreview;
+            $environment->resourceable_id = $this->resource->id;
+            $environment->resourceable_type = $this->resource->getMorphClass();
+
+            $environment->save();
+
+            return 1;
+        });
     }
 
     public function refreshEnvs()
