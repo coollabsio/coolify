@@ -181,7 +181,7 @@
                                             helper="This shows the actual command that will be executed with auto-injected flags." />
                                     </div>
                                 @endif
-                                @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                                @if ($this->application->git_based() && !$this->application->is_public_repository())
                                     <div class="pt-4">
                                         <x-forms.textarea
                                             helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
@@ -237,7 +237,7 @@
                                 @endif
 
                             </div>
-                            @if ($this->application->is_github_based() && !$this->application->is_public_repository())
+                            @if ($this->application->git_based() && !$this->application->is_public_repository())
                                 <div class="pb-4">
                                     <x-forms.textarea
                                         helper="Order-based pattern matching to filter Git webhook deployments. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
