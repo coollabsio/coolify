@@ -1,0 +1,34 @@
+# documentation: https://github.com/fxerkan/my_network_scanner#readme
+# slogan: See every device on your home network - including the Zigbee, Z-Wave, Matter and Bluetooth LE ones an IP scan cannot find.
+# category: monitoring
+# tags: network, scanner, monitoring, homelab, home-assistant, iot, mdns, matter, zigbee, zwave, discovery
+# logo: svgs/mynes.svg
+# port: 5883
+
+# MyNeS runs on the host network. Raw ARP frames and mDNS/SSDP multicast do not cross a bridge
+# network, so from a bridge the scanner would see the Docker bridge instead of the LAN. That also
+# means the proxy cannot route to it by container name: the UI is served directly on host port
+# 5883. Put it behind a domain by pointing a reverse proxy at <host>:5883 if you need one.
+services:
+  mynes:
+    image: fxerkan/my_network_scanner:1.3.0
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      - MYNES_PORT=5883
+      # All optional - MyNeS scans with zero configuration and these can also be set in its UI.
+      - MYNES_PASSWORD=${SERVICE_PASSWORD_MYNES}
+      - MYNES_MQTT_HOST=${MYNES_MQTT_HOST:-}
+      - MYNES_HA_URL=${MYNES_HA_URL:-}
+      - MYNES_HA_TOKEN=${MYNES_HA_TOKEN:-}
+    volumes:
+      - mynes-data:/app/data
+      - mynes-config:/app/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5883/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
