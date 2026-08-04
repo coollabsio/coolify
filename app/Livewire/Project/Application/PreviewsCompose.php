@@ -39,13 +39,7 @@ class PreviewsCompose extends Component
             ]);
 
             $this->domain = ValidationPatterns::normalizeApplicationDomains($this->domain);
-
-            $docker_compose_domains = data_get($this->preview, 'docker_compose_domains');
-            $docker_compose_domains = json_decode($docker_compose_domains, true) ?: [];
-            $docker_compose_domains[$this->serviceName] = $docker_compose_domains[$this->serviceName] ?? [];
-            $docker_compose_domains[$this->serviceName]['domain'] = $this->domain;
-            $this->preview->docker_compose_domains = json_encode($docker_compose_domains);
-            $this->preview->save();
+            $this->persistPreviewDomain($this->domain);
             $this->dispatch('update_links');
             $this->dispatch('success', 'Domain saved.');
         } catch (\Throwable $e) {
@@ -58,12 +52,8 @@ class PreviewsCompose extends Component
         try {
             $this->authorize('update', $this->preview->application);
 
-            $domains = collect(json_decode($this->preview->application->docker_compose_domains, true) ?: []);
-            $domain = $domains->first(function ($_, $key) {
-                return $key === $this->serviceName;
-            });
-
-            $domain_string = data_get($domain, 'domain');
+            $applicationDomains = json_decode($this->preview->application->docker_compose_domains ?: '[]', true) ?: [];
+            $domain_string = getComposeServiceDomainString($applicationDomains, (string) $this->serviceName);
 
             // If no domain is set in the main application, generate a default domain
             if (empty($domain_string)) {
@@ -111,19 +101,65 @@ class PreviewsCompose extends Component
                 $preview_fqdn = implode(',', $preview_fqdns);
             }
 
-            // Save the generated domain
             $this->domain = $preview_fqdn;
-            $docker_compose_domains = data_get($this->preview, 'docker_compose_domains');
-            $docker_compose_domains = json_decode($docker_compose_domains, true) ?: [];
-            $docker_compose_domains[$this->serviceName] = $docker_compose_domains[$this->serviceName] ?? [];
-            $docker_compose_domains[$this->serviceName]['domain'] = $this->domain;
-            $this->preview->docker_compose_domains = json_encode($docker_compose_domains);
-            $this->preview->save();
+            $this->persistPreviewDomain($this->domain);
 
             $this->dispatch('update_links');
             $this->dispatch('success', 'Domain generated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function persistPreviewDomain(?string $domain): void
+    {
+        $docker_compose_domains = json_decode(data_get($this->preview, 'docker_compose_domains') ?: '[]', true) ?: [];
+        $serviceNames = $this->previewServiceNames($docker_compose_domains);
+        $storageKey = findComposeServiceName((string) $this->serviceName, $serviceNames)
+            ?? (string) $this->serviceName;
+
+        $docker_compose_domains = putComposeServiceDomain(
+            $docker_compose_domains,
+            $storageKey,
+            $domain,
+            $serviceNames,
+        );
+        $docker_compose_domains = rekeyComposeDomainsToServiceNames($docker_compose_domains, $serviceNames);
+
+        $this->serviceName = $storageKey;
+        $this->preview->docker_compose_domains = json_encode($docker_compose_domains);
+        $this->preview->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $previewDomains
+     * @return list<string>
+     */
+    private function previewServiceNames(array $previewDomains): array
+    {
+        $parsedServices = $this->preview->application->parse(pull_request_id: $this->preview->pull_request_id);
+        $fromCompose = collect(data_get($parsedServices, 'services', []))
+            ->keys()
+            ->map(function ($serviceName) {
+                return str((string) $serviceName)
+                    ->replaceLast('-pr-'.$this->preview->pull_request_id, '')
+                    ->toString();
+            })
+            ->all();
+
+        $domainKeys = collect(array_keys($previewDomains))
+            ->merge(array_keys(json_decode($this->preview->application->docker_compose_domains ?: '[]', true) ?: []))
+            ->map(fn ($name) => (string) $name);
+        $unmapped = $domainKeys
+            ->reject(fn (string $key) => findComposeServiceName($key, $fromCompose) !== null)
+            ->all();
+
+        return collect($fromCompose)
+            ->merge(preferredComposeServiceNamesFromDomainKeys(
+                $fromCompose === [] ? $domainKeys->all() : $unmapped
+            ))
+            ->unique()
+            ->values()
+            ->all();
     }
 }

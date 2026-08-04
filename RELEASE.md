@@ -20,7 +20,7 @@ Coolify uses two long-lived branches so production fixes can ship without waitin
 
 | Branch | Role | Docker image tags | How it ships |
 | --- | --- | --- | --- |
-| **`v4.x`** | Production / releasable line | `sha-<commit>` via **Build Coolify (SHA)** | GitHub release promotes the SHA image to a semantic version (and `latest` for stable releases) |
+| **`v4.x`** | Production / releasable line | `sha-<commit>` and moving `edge` via **Build Coolify (SHA)** | GitHub release promotes the SHA image to a semantic version (and `latest` for stable releases) |
 | **`next`** | Development line for features and larger changes | Branch tag (for example `next`) via **Staging Build** | Becomes production only after merge into `v4.x` |
 
 ### Where to merge
@@ -59,6 +59,7 @@ Only commits on **`v4.x`** produce production SHA images and can be tagged for a
    - Merge the release commit into `v4.x` through a pull request.
    - The `Build Coolify (SHA)` workflow builds AMD64 and ARM64 images and publishes them to Docker Hub and GHCR using immutable architecture tags.
    - After both builds complete, the workflow creates the multi-architecture `sha-<commit-sha>` manifest in both registries.
+   - For pushes to **`v4.x`**, the same multi-architecture manifest is also tagged as `edge`, so `coollabsio/coolify:edge` always points at the latest production-line SHA image. Builds from `main` publish only the immutable `sha-<commit-sha>` tags.
    - This workflow does not update a semantic version tag or `latest`.
 
 3. **Wait for the SHA Image**

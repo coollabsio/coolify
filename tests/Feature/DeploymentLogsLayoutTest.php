@@ -69,11 +69,138 @@ it('renders deployment logs in a full-height layout', function () {
 
     $response->assertSuccessful();
     $response->assertSee('rolling update started');
-    $response->assertSee('flex h-[calc(100vh-10rem)] min-h-40 flex-col overflow-hidden', false);
+    $response->assertSee('logs-viewer', false);
+    $response->assertSee('logs-viewer-toolbar', false);
+    $response->assertSee('logs-viewer-search', false);
+    $response->assertSee('logs-viewer-actions', false);
+    $response->assertSee('logs-viewer-viewport', false);
+    $response->assertSee('logs-viewer-line', false);
+    $response->assertSee('h-[calc(100dvh-7.5rem)]', false);
     $response->assertSee('flex flex-1 min-h-0 flex-col overflow-hidden', false);
-    $response->assertSee('mt-4 flex flex-1 min-h-0 flex-col overflow-hidden', false);
-    $response->assertSee('flex min-h-0 flex-col w-full overflow-hidden bg-white', false);
-    $response->assertSee('flex min-h-40 flex-1 flex-col overflow-y-auto p-2 px-4 scrollbar', false);
 
     expect($response->getContent())->not->toContain('max-h-[30rem]');
+});
+
+it('uses a mobile-friendly stacked logs toolbar markup', function () {
+    $deploymentView = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
+    $sharedLogsView = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($deploymentView)
+        ->toContain('logs-viewer-toolbar')
+        ->toContain('logs-viewer-toolbar-controls')
+        ->toContain('logs-viewer-meta')
+        ->toContain('logs-viewer-end')
+        ->toContain('logs-viewer-status-badge')
+        ->toContain('logs-viewer-line')
+        ->toContain('logs-viewer-timestamp')
+        ->toContain('logs-viewer-line-text')
+        ->toContain('livewire:project.application.deployment-navbar')
+        ->and($sharedLogsView)
+        ->toContain('logs-viewer-toolbar')
+        ->toContain('logs-viewer-toolbar-controls')
+        ->toContain('logs-viewer-meta')
+        ->toContain('logs-viewer-lines')
+        ->toContain('logs-viewer-actions')
+        ->toContain('logs-viewer-line')
+        ->toContain('pl-8!')
+        ->toContain('z-10 size-3.5')
+        ->and($deploymentView)
+        ->toContain('pl-8!')
+        ->toContain('z-10 size-3.5')
+        ->and($appCss)
+        ->toContain('.logs-viewer-toolbar')
+        ->toContain('.logs-viewer-end')
+        ->toContain('.logs-viewer-status-badge')
+        ->toContain('.logs-viewer-lines')
+        ->toContain('.logs-viewer-actions')
+        ->toContain('.logs-viewer-deployment-actions')
+        ->toContain('.logs-settings-section')
+        ->toContain('flex-direction: column')
+        ->toContain('@media (min-width: 640px)');
+
+    // Status badge lives in the right-side end group, immediately before cancel controls.
+    $endGroup = str($deploymentView)
+        ->after('class="logs-viewer-end"')
+        ->before('logs-viewer-viewport')
+        ->toString();
+
+    expect($endGroup)
+        ->toContain('logs-viewer-status-badge')
+        ->toContain('livewire:project.application.deployment-navbar');
+
+    $badgePos = strpos($endGroup, 'logs-viewer-status-badge');
+    $navbarPos = strpos($endGroup, 'livewire:project.application.deployment-navbar');
+
+    expect($badgePos)->not->toBeFalse()
+        ->and($navbarPos)->not->toBeFalse()
+        ->and($badgePos)->toBeLessThan($navbarPos);
+});
+
+it('places cancel deployment controls inside the deployment logs toolbar', function () {
+    $deployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'deploy-cancel-toolbar-test',
+        'server_id' => $this->server->id,
+        'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        'logs' => json_encode([
+            [
+                'command' => null,
+                'output' => 'building image',
+                'type' => 'stdout',
+                'timestamp' => now()->toISOString(),
+                'hidden' => false,
+                'batch' => 1,
+                'order' => 1,
+            ],
+        ], JSON_THROW_ON_ERROR),
+    ]);
+
+    $response = $this->get(route('project.application.deployment.show', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+        'deployment_uuid' => $deployment->deployment_uuid,
+    ]));
+
+    $response->assertSuccessful();
+    $response->assertSee('Cancel deployment');
+    $response->assertSee('logs-viewer-end', false);
+    $response->assertSee('logs-viewer-deployment-actions', false);
+    $response->assertSee('logs-viewer-cancel-btn', false);
+
+    $content = $response->getContent();
+    $toolbarPos = strpos($content, 'logs-viewer-toolbar');
+    $endPos = strpos($content, 'logs-viewer-end');
+    $viewportPos = strpos($content, 'logs-viewer-viewport');
+
+    expect($toolbarPos)->not->toBeFalse()
+        ->and($endPos)->not->toBeFalse()
+        ->and($viewportPos)->not->toBeFalse()
+        ->and($endPos)->toBeGreaterThan($toolbarPos)
+        ->and($endPos)->toBeLessThan($viewportPos);
+
+    // Within the right-side end group: status badge, then cancel controls.
+    $endGroup = substr($content, $endPos, $viewportPos - $endPos);
+    $badgePos = strpos($endGroup, 'logs-viewer-status-badge');
+    $cancelPos = strpos($endGroup, 'Cancel deployment');
+
+    expect($badgePos)->not->toBeFalse()
+        ->and($cancelPos)->not->toBeFalse()
+        ->and($badgePos)->toBeLessThan($cancelPos)
+        ->and($endGroup)->toContain('In progress');
+});
+
+it('uses the shared mobile logs layout for proxy and sentinel log pages', function () {
+    $proxyLogsView = file_get_contents(resource_path('views/livewire/server/proxy/logs.blade.php'));
+    $sentinelLogsView = file_get_contents(resource_path('views/livewire/server/sentinel/logs.blade.php'));
+
+    expect($proxyLogsView)
+        ->toContain('logs-settings-section')
+        ->toContain('logs-section-status-badge')
+        ->toContain('livewire:project.shared.get-logs')
+        ->and($sentinelLogsView)
+        ->toContain('logs-settings-section')
+        ->toContain('logs-section-status-badge')
+        ->toContain('livewire:project.shared.get-logs');
 });

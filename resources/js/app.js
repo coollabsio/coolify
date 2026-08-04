@@ -8,11 +8,7 @@ document.addEventListener('livewire:navigated', () => {
     document.querySelectorAll('[x-cloak]').forEach((el) => el.removeAttribute('x-cloak'));
 });
 
-['livewire:navigated', 'alpine:init'].forEach((event) => {
-    document.addEventListener(event, () => {
-        // tree-shaking
-        if (document.getElementById('terminal-container')) {
-            initializeTerminalComponent()
-        }
-    });
-});
+// Register the terminal data provider before Alpine initializes the page.
+// Keeping this registration independent from the current route also makes it
+// available before Alpine processes terminal markup after wire:navigate.
+document.addEventListener('alpine:init', initializeTerminalComponent);

@@ -8,8 +8,8 @@ use App\Jobs\V5TeardownTeamJob;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
-use App\Support\V5\V5Feature;
 use App\Notifications\Channels\SendsSlack;
+use App\Support\V5\V5Feature;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -50,6 +50,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'show_boarding',
         'custom_server_limit',
         'is_mcp_server_enabled',
+    ];
+
+    protected $attributes = [
+        'is_mcp_server_enabled' => true,
     ];
 
     protected $casts = [

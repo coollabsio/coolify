@@ -66,7 +66,9 @@ class Index extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->team->name;
             $this->description = $this->team->description;
-            $this->is_mcp_server_enabled = $this->team->is_mcp_server_enabled;
+            // Null can appear after Team::create() when the DB default is not
+            // hydrated onto the in-memory model stored in session.
+            $this->is_mcp_server_enabled = (bool) ($this->team->is_mcp_server_enabled ?? true);
         }
     }
 
