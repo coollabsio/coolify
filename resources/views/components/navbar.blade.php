@@ -15,6 +15,12 @@
     @mouseleave="tooltip.show = false"
     x-data="{
         tooltip: { text: '', x: 0, y: 0, show: false },
+        // macOS/iOS use ⌘; Windows/Linux use Ctrl+
+        modKeyLabel: (() => {
+            const platform = navigator.userAgentData?.platform || navigator.platform || '';
+            const ua = navigator.userAgent || '';
+            return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
+        })(),
         init() {
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                     const userSettings = localStorage.getItem('theme');
@@ -45,7 +51,8 @@
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
         <div class="px-1 pb-3" :class="collapsed && 'lg:px-0 lg:flex lg:justify-center'">
-            <button @click="$dispatch('open-global-search')" type="button" title="Search (Press / or ⌘K)"
+            <button @click="$dispatch('open-global-search')" type="button"
+                :title="'Search (Press / or ' + modKeyLabel + 'K)'"
                 class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint"
                 :class="collapsed && 'lg:w-8 lg:justify-center lg:px-0'">
                 <span class="flex items-center gap-2.5 min-w-0">
@@ -53,7 +60,7 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Search</span>
                 </span>
                 <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
-                    :class="collapsed && 'lg:hidden'">⌘K</kbd>
+                    :class="collapsed && 'lg:hidden'" x-text="modKeyLabel + 'K'"></kbd>
             </button>
         </div>
     @endif

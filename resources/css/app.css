@@ -1079,6 +1079,33 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     padding: 1rem;
 }
 
+.settings-mobile-header {
+    margin-bottom: 1.25rem;
+}
+
+.settings-mobile-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.75rem;
+    letter-spacing: -0.025em;
+    color: #000000;
+}
+
+.dark .settings-mobile-title {
+    color: #ffffff;
+}
+
+.settings-mobile-description {
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: #737373;
+}
+
+.dark .settings-mobile-description {
+    color: var(--coollabs-subtle);
+}
+
 /* All settings sidebars share one alignment rule. Keep the sticky offset equal
    to the desktop main-content top padding so the menu does not jump upward
    when it changes from its natural position to sticky positioning. */

@@ -27,7 +27,11 @@
     ])->filter();
 @endphp
 
-<section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+<section class="application-settings-workspace w-full max-w-[1180px]">
+    <header class="settings-mobile-header xl:hidden">
+        <h1 class="settings-mobile-title">Keys & Tokens</h1>
+        <p class="settings-mobile-description">Manage SSH keys, cloud credentials, and API access tokens.</p>
+    </header>
     <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
         <aside class="application-settings-navigation min-w-0 xl:self-start">
             <nav aria-label="Keys and tokens"

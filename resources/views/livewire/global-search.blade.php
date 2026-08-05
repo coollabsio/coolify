@@ -8,6 +8,12 @@
     searchQuery: '',
     creatableItems: [],
     isCreateMode: false,
+    // macOS/iOS use ⌘; Windows/Linux use Ctrl+
+    modKeyLabel: (() => {
+        const platform = navigator.userAgentData?.platform || navigator.platform || '';
+        const ua = navigator.userAgent || '';
+        return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
+    })(),
 
     // Client-side search function
     get searchResults() {
@@ -313,7 +319,7 @@
                         class="command-palette-input" autocomplete="off" spellcheck="false" />
                     <div class="command-palette-shortcuts">
                         <span class="command-palette-kbd">/</span>
-                        <span class="command-palette-kbd">⌘K</span>
+                        <span class="command-palette-kbd" x-text="modKeyLabel + 'K'"></span>
                         <button type="button" @click="closeModal()" class="command-palette-kbd" title="Close">
                             ESC
                         </button>
