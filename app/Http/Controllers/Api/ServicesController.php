@@ -263,7 +263,7 @@ class ServicesController extends Controller
                 mediaType: 'application/json',
                 schema: new OA\Schema(
                     type: 'object',
-                    required: ['server_uuid', 'project_uuid', 'environment_name', 'environment_uuid'],
+                    required: ['server_uuid', 'project_uuid'],
                     properties: [
                         'type' => ['description' => 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)', 'type' => 'string'],
                         'name' => ['type' => 'string', 'maxLength' => 255, 'description' => 'Name of the service.'],
@@ -355,7 +355,7 @@ class ServicesController extends Controller
     )]
     public function create_service(Request $request)
     {
-        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
+        $allowedFields = ['type', 'name', 'description', 'project_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -582,7 +582,7 @@ class ServicesController extends Controller
 
             return response()->json(['message' => 'Service not found.', 'valid_service_types' => $serviceKeys], 404);
         } elseif (filled($request->docker_compose_raw)) {
-            $allowedFields = ['name', 'description', 'project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
+            $allowedFields = ['name', 'description', 'project_uuid', 'server_uuid', 'destination_uuid', 'instant_deploy', 'docker_compose_raw', 'connect_to_docker_network', 'urls', 'force_domain_override', 'is_container_label_escape_enabled', 'tags'];
 
             $validationRules = [
                 'project_uuid' => 'string|required',

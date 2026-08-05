@@ -54,8 +54,6 @@ paths:
               required:
                 - project_uuid
                 - server_uuid
-                - environment_name
-                - environment_uuid
                 - git_repository
                 - git_branch
                 - build_pack
@@ -392,8 +390,6 @@ paths:
               required:
                 - project_uuid
                 - server_uuid
-                - environment_name
-                - environment_uuid
                 - github_app_uuid
                 - git_repository
                 - git_branch
@@ -734,8 +730,6 @@ paths:
               required:
                 - project_uuid
                 - server_uuid
-                - environment_name
-                - environment_uuid
                 - private_key_uuid
                 - git_repository
                 - git_branch
@@ -1076,8 +1070,6 @@ paths:
               required:
                 - project_uuid
                 - server_uuid
-                - environment_name
-                - environment_uuid
                 - dockerfile
               properties:
                 project_uuid:
@@ -1355,8 +1347,6 @@ paths:
               required:
                 - project_uuid
                 - server_uuid
-                - environment_name
-                - environment_uuid
                 - docker_registry_image_name
               properties:
                 project_uuid:
@@ -3636,8 +3626,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -3747,8 +3735,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -3846,8 +3832,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -3942,8 +3926,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -4041,8 +4023,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -4140,8 +4120,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -4248,8 +4226,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -4356,8 +4332,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 server_uuid:
                   type: string
@@ -8716,8 +8690,6 @@ paths:
               required:
                 - server_uuid
                 - project_uuid
-                - environment_name
-                - environment_uuid
               properties:
                 type:
                   description: 'The one-click service type (e.g. "actualbudget", "calibre-web", "gitea-with-mysql" ...)'
