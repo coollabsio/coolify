@@ -25,3 +25,11 @@ it('does not animate navbar padding when restoring collapsed state', function ()
         ->not->toContain('items-start gap-3 motion-safe:transition-all')
         ->not->toContain('overflow-hidden motion-safe:transition-all');
 });
+
+it('draws a single border between the desktop sidebar and main content', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
+
+    expect($navbar)->toContain('border-r border-neutral-200')
+        ->and($layout)->not->toContain('lg:border-l border-neutral-200');
+});

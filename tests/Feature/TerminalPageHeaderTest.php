@@ -34,6 +34,7 @@ it('labels console themes without a Shadow\'s prefix', function () {
 
     foreach ([$terminalView, $consoleView] as $view) {
         expect($view)
+            ->toContain("['key' => 'system', 'name' => 'System'")
             ->toContain("'name' => 'Tropical Storm'")
             ->toContain("'name' => 'Blur Black'")
             ->toContain("'name' => 'Cosmic Purple'")
@@ -41,7 +42,50 @@ it('labels console themes without a Shadow\'s prefix', function () {
     }
 });
 
-it('shows console unavailable without the terminal shell wrapper', function () {
+it('defaults to a system console theme that follows the page color mode', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $consoleView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    foreach ([$terminalView, $consoleView] as $view) {
+        expect($view)
+            ->toContain("consoleTheme: 'system'")
+            ->toContain("? savedTheme : 'system'");
+    }
+
+    expect($terminalClient)
+        ->toContain("'system': createSystemTerminalTheme()")
+        ->toContain('new MutationObserver')
+        ->toContain("attributeFilter: ['class', 'data-theme']")
+        ->and($appCss)
+        ->toContain('[data-console-theme="system"]')
+        ->toContain('html.dark .application-console-shell[data-console-theme="system"]');
+});
+
+it('uses the page color mode for the console theme selector', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $consoleView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    foreach ([$terminalView, $consoleView] as $view) {
+        expect($view)
+            ->toContain('console-theme-selector')
+            ->toContain('border-neutral-200 bg-white')
+            ->toContain('dark:bg-[#111113]')
+            ->toContain('text-neutral-600 transition-colors')
+            ->toContain('dark:text-white/65');
+    }
+
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($appCss)
+        ->toContain('.console-theme-selector')
+        ->toContain('scrollbar-color: rgb(161 161 170) transparent')
+        ->toContain('html.dark .console-theme-selector')
+        ->toContain('scrollbar-color: rgb(255 255 255 / 0.28) transparent');
+});
+
+it('shows terminal unavailable without the terminal shell wrapper', function () {
     $consoleView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
 
     $unavailableBranch = str($consoleView)
@@ -52,14 +96,14 @@ it('shows console unavailable without the terminal shell wrapper', function () {
     expect($consoleView)
         ->toContain('$consoleUnavailable')
         ->toContain('@if ($consoleUnavailable)')
-        ->toContain('title="Console unavailable"')
+        ->toContain('title="Terminal unavailable"')
         ->toContain('icon-name="browser-terminal"')
         // Empty state must not nest inside the themed terminal chrome.
         ->not->toContain('No running containers');
 
     expect($unavailableBranch)
         ->toContain('<x-empty')
-        ->toContain('title="Console unavailable"')
+        ->toContain('title="Terminal unavailable"')
         ->not->toContain('application-console-shell')
         ->not->toContain('application-console-header')
         ->not->toContain('Choose terminal theme');
@@ -78,7 +122,7 @@ it('shows runtime logs unavailable without log viewer chrome', function () {
         ->toContain('title="Runtime logs unavailable"')
         ->toContain('icon-name="file-content"')
         ->toContain('class="mt-4 w-full lg:mt-3"')
-        ->not->toContain('max-w-[1180px]')
+        ->toContain('application-settings-workspace')
         ->not->toContain('title="No running containers"')
         ->not->toContain('application-settings-form');
 

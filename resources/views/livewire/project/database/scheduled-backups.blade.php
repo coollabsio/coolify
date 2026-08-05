@@ -1,4 +1,4 @@
-<div x-data="{
+<div class="flex min-w-0 flex-col gap-3" x-data="{
     search: '',
     backups: @js($database->scheduledBackups->map(fn ($backup) => [
         'name' => strtolower($database->name),
@@ -41,12 +41,12 @@
         </form>
     @else
         @if ($database->scheduledBackups->isNotEmpty())
-            <div class="border-b border-neutral-200 p-3 dark:border-white/[0.06]">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div class="relative max-w-sm">
                     <x-reicon name="search"
                         class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
-                    <input type="search" x-model="search"
-                        class="input h-8! pl-8! text-[13px]!" placeholder="Search backup schedules…" />
+                    <input type="search" x-model="search" aria-label="Search backups"
+                        class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search backups" />
                 </div>
             </div>
         @endif
@@ -56,7 +56,7 @@
                 description="Create a schedule to start protecting this database."
                 icon-name="storages" />
         @else
-            <div x-cloak x-show="search === '' || hasMatches()" class="data-table">
+            <div x-cloak x-show="search === '' || hasMatches()" class="data-table overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
                 <div class="data-table-header scheduled-backups-table-grid">
                     <span>Schedule</span>
                     <span>Latest run</span>
@@ -83,10 +83,9 @@
                         || @js(strtolower($backup->s3?->name ?? '')).includes(search.toLowerCase())"
                         class="data-table-row scheduled-backups-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
                         <div class="min-w-0">
-                            <a class="block truncate text-[12px] font-semibold text-black dark:text-fg"
-                                {{ wireNavigate() }} href="{{ $backupRoute }}">
+                            <span class="block truncate text-[12px] font-semibold text-black dark:text-fg">
                                 {{ $backup->frequency }}
-                            </a>
+                            </span>
                         </div>
                         <div class="flex items-center gap-2">
                             <x-status-badge :status="$statusLabel" :type="$statusType" />
@@ -98,7 +97,7 @@
                             {{ $backup->save_s3 ? ($backup->s3?->name ?? 'Unavailable') : 'Local only' }}
                         </div>
                         <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                            {{ $backup->executions()->count() }}
+                            {{ $backup->executions_count ?? $backup->executions()->count() }}
                         </div>
                         <div class="flex justify-end">
                             <a class="button" {{ wireNavigate() }} href="{{ $backupRoute }}">Manage</a>

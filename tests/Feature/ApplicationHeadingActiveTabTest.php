@@ -129,16 +129,16 @@ it('does not mark settings tab active on deployment logs', function () {
         ->assertSuccessful()
         ->getContent();
 
-    expect($html)->toContain('Deployment Logs');
+    expect($html)->toContain('Deployment');
 
     expect(preg_match(
         '/<a[^>]*(?:aria-current="page"[^>]*app-tab-active|app-tab-active[^>]*aria-current="page")[^>]*>\s*Settings\s*<\/a>/s',
         $html
     ))->toBe(0);
 
-    // Deployment Logs should be the active primary tab instead.
+    // Deployment now lives in the Logs section of the settings sidebar.
     expect(preg_match(
-        '/<a[^>]*(?:aria-current="page"[^>]*app-tab-active|app-tab-active[^>]*aria-current="page")[^>]*>\s*Deployment Logs\s*<\/a>/s',
+        '/<a[^>]*menu-item-active[^>]*>.*?Deployment.*?<\/a>/s',
         $html
     ))->toBe(1);
 });

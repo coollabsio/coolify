@@ -76,20 +76,10 @@ class ConfigurationChecker extends Component
 
     public function configurationChanged(): void
     {
-        // Banner only needs a lightweight summary in the Livewire snapshot.
-        $this->loadConfigurationState(includeChanges: false);
+        $this->loadConfigurationState();
     }
 
-    public function refreshConfigurationChanges(): void
-    {
-        // Full change list is only needed when the user opens "View changes".
-        $this->loadConfigurationState(includeChanges: true);
-    }
-
-    /**
-     * @param  bool  $includeChanges  When false, only summary keys are stored (smaller HTML/snapshots).
-     */
-    private function loadConfigurationState(bool $includeChanges = false): void
+    private function loadConfigurationState(): void
     {
         $this->resource->refresh();
 
@@ -98,15 +88,6 @@ class ConfigurationChecker extends Component
             $this->isConfigurationChanged = $diff->isChanged();
 
             $array = $diff->toArray();
-
-            if (! $includeChanges) {
-                $this->configurationDiff = [
-                    'count' => data_get($array, 'count', 0),
-                    'requires_build' => (bool) data_get($array, 'requires_build', false),
-                ];
-
-                return;
-            }
 
             // Fail closed: only owners/admins may see unlocked env values.
             $redactEnvironment = ! (bool) auth()->user()?->isAdmin();

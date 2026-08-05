@@ -45,7 +45,8 @@
     }, 300)"
     @mouseleave="clearTimeout(_t); visible = false">
 @endif
-<button @disabled($disabled) {{ $attributes->merge(['class' => $defaultClass, 'type' => 'button'])->merge($loadingAttributes) }}
+<button @disabled($disabled) @if ($isHighlighted) isHighlighted @endif
+    {{ $attributes->merge(['class' => $defaultClass, 'type' => 'button'])->merge($loadingAttributes) }}
     @isset($confirm)
             x-on:click="toggleConfirmModal('{{ $confirm }}', '{{ explode('(', $confirmAction)[0] }}')"
         @endisset

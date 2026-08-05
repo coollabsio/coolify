@@ -17,12 +17,15 @@
             ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
             ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables'],
             ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
+            ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
+            ['label' => 'Runtime', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
+            ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
             ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
             ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'shield-alert'],
-        ])->map(fn (array $item): array => [
+        ])->filter(fn (array $item): bool => $item['visible'] ?? true)->map(fn (array $item): array => [
             ...$item,
             'active' => $currentRoute === $item['route']
                 || ($item['route'] === 'project.service.scheduled-tasks.show'
@@ -30,9 +33,10 @@
         ]);
 
         $menuGroups = [
-            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
+            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Backups'],
             'Automation' => ['Scheduled Tasks', 'Webhooks'],
-            'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
+            'Logs' => ['Runtime'],
+            'Operations' => ['Terminal', 'Resource Operations', 'Tags', 'Danger Zone'],
         ];
 
         $groupedItems = collect($menuGroups)
@@ -63,7 +67,7 @@
                                 'menu-item',
                                 'menu-item-active' => $menuItem['active'],
                             ])
-                                {{ wireNavigate() }}
+                                @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                                 href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
                                 <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label">{{ $menuItem['label'] }}</span>

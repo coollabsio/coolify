@@ -62,7 +62,21 @@ test('listbox forwards dynamic disabled state to its trigger', function () {
     expect($listbox)->toContain("\$attributes->whereStartsWith('x-bind:disabled')");
 
     expect($operations)
-        ->toContain('x-bind:disabled="!selectedCloneServer"')
+        ->toContain('selectedCloneServer: null')
+        ->toContain('selectedCloneProject: null')
+        ->toContain('selectedCloneEnvironment: null')
+        ->toContain('currentServerId: @js($resource->destination->server->id)')
+        ->toContain('currentDestinationUuid: @js($resource->destination->uuid)')
+        ->toContain("server.id == this.currentServerId ? ' (current)' : ''")
+        ->toContain("destination.uuid == this.currentDestinationUuid ? ' (current)' : ''")
+        ->toContain('selectedCloneServer = null;')
+        ->toContain('placeholder="Choose a server…"')
+        ->toContain("this.selectedCloneServer === null || this.selectedCloneServer === ''")
+        ->toContain("x-bind:disabled=\"selectedCloneServer === null || selectedCloneServer === ''\"")
+        ->toContain('x-model="selectedCloneProject"')
+        ->toContain('x-model="selectedCloneEnvironment"')
+        ->toContain('$wire.cloneTo(selectedCloneDestination)')
+        ->toContain('$wire.cloneTo(@js($resource->destination->uuid), selectedCloneEnvironment)')
         ->toContain('x-bind:disabled="!selectedMoveProject || availableEnvironments.length === 0"');
 });
 

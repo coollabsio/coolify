@@ -8,8 +8,6 @@
     <x-application.settings-section id="healthcheck-configuration-section" title="Healthcheck"
         helper="Define how Coolify determines whether this application is ready to receive traffic.">
         <x-slot:actions>
-            <x-status-badge :status="$healthCheckEnabled ? 'Enabled' : 'Disabled'"
-                :type="$healthCheckEnabled ? 'success' : 'neutral'" />
             @if (!$healthCheckEnabled)
                 <x-modal-confirmation :disabled="!auth()->user()->can('update', $resource)"
                     :authDisabled="!auth()->user()->can('update', $resource)"

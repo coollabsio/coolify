@@ -31,7 +31,7 @@
             'danger' => 'project.service.volume-backups.danger',
         ],
         default => [
-            'back' => 'project.database.backup.index',
+            'back' => 'project.database.configuration',
             'general' => 'project.database.backup.execution',
             's3' => 'project.database.backup.s3',
             'retention' => 'project.database.backup.retention',
@@ -47,15 +47,19 @@
         ['key' => 'executions', 'label' => 'Executions', 'icon' => 'browser-terminal'],
         ['key' => 'danger', 'label' => 'Danger Zone', 'icon' => 'shield-alert'],
     ];
+    $backLabel = $context === 'database' ? 'Back to database' : 'Back to backups';
+    $backParameters = $context === 'database'
+        ? collect($parameters)->except('backup_uuid')->all()
+        : $parameters;
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start">
     <nav aria-label="Backup settings"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         <div class="nav-section hidden xl:block">Backup</div>
-        <a class="menu-item" {{ wireNavigate() }} href="{{ route($routes['back'], $parameters) }}">
+        <a class="menu-item" {{ wireNavigate() }} href="{{ route($routes['back'], $backParameters) }}">
             <x-reicon name="logout" class="menu-item-icon rotate-180" />
-            <span class="menu-item-label">Back to backups</span>
+            <span class="menu-item-label">{{ $backLabel }}</span>
         </a>
 
         @foreach ($items as $item)

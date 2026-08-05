@@ -13,7 +13,7 @@
         toggleMethod: @js($toggleMethod),
         testMethod: @js($testMethod),
     }">
-    <x-forms.button type="button" :disabled="!$canUpdate"
+    <x-forms.button type="button" :disabled="!$canUpdate" :isHighlighted="!$enabled"
         x-on:click="
             if (!enabled && !$el.closest('form').reportValidity()) return;
             $wire.$set(enabledProperty, !enabled).then(() => $wire.$call(toggleMethod));

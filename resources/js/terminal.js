@@ -42,7 +42,28 @@ function createApplicationTerminalTheme(accent, colors = {}) {
     };
 }
 
+function createSystemTerminalTheme() {
+    if (document.documentElement.classList.contains('dark')) {
+        return createApplicationTerminalTheme('#8C8E9C');
+    }
+
+    return createApplicationTerminalTheme('#52525b', {
+        black: '#18181b',
+        red: '#dc2626',
+        green: '#15803d',
+        yellow: '#a16207',
+        blue: '#2563eb',
+        magenta: '#9333ea',
+        cyan: '#0e7490',
+        white: '#52525b',
+        brightBlack: '#71717a',
+        brightWhite: '#18181b',
+        foreground: '#18181b',
+    });
+}
+
 const applicationTerminalThemes = {
+    'system': createSystemTerminalTheme(),
     'shadows-midnight': createApplicationTerminalTheme('#6d7a7c', {
         blue: '#7392ad',
         cyan: '#7fa3a6',
@@ -155,14 +176,26 @@ export function initializeTerminalComponent() {
             scrollLockY: 0,
             scrollLockStyles: null,
             preventPageScrollHandler: null,
+            themeObserver: null,
             terminalSessionStartedAt: null,
             terminalSessionRemainingSeconds: null,
             terminalSessionCountdownInterval: null,
             selectedTheme: applicationTerminalThemes[localStorage.getItem('coolify-console-theme')]
                 ? localStorage.getItem('coolify-console-theme')
-                : 'shadows-cosmic-purple',
+                : 'system',
 
             init() {
+                this.themeObserver = new MutationObserver(() => {
+                    if (this.selectedTheme === 'system') {
+                        applicationTerminalThemes.system = createSystemTerminalTheme();
+                        this.setTerminalTheme('system');
+                    }
+                });
+                this.themeObserver.observe(document.documentElement, {
+                    attributes: true,
+                    attributeFilter: ['class', 'data-theme'],
+                });
+
                 // Recover if a previous portal build left the terminal on <body>.
                 this.$nextTick(() => this.salvageStrayFullscreenNodes());
 
@@ -343,6 +376,10 @@ export function initializeTerminalComponent() {
                     return;
                 }
 
+                if (themeName === 'system') {
+                    applicationTerminalThemes.system = createSystemTerminalTheme();
+                }
+
                 this.selectedTheme = themeName;
                 localStorage.setItem('coolify-console-theme', themeName);
 
@@ -413,7 +450,7 @@ export function initializeTerminalComponent() {
                         disableStdin: false,
                         scrollback: 5000,
                         theme: isApplicationConsole
-                            ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes['shadows-cosmic-purple']
+                            ? applicationTerminalThemes[this.selectedTheme] ?? applicationTerminalThemes.system
                             : undefined
                     });
                     this.fitAddon = new FitAddon();
@@ -745,6 +782,10 @@ export function initializeTerminalComponent() {
                     }
                     return true;
                 });
+            },
+
+            destroy() {
+                this.themeObserver?.disconnect();
             },
 
 

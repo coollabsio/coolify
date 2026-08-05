@@ -50,174 +50,184 @@
     <livewire:project.shared.configuration-checker :resource="$application" />
     <livewire:project.application.heading :application="$application" wire:key="application-heading-backup-index" />
 
-    <div class="application-settings-form flex flex-col gap-6">
-        <x-application.settings-section title="Storage backups"
-            helper="Schedule backups for persistent volumes and directory mounts attached to this application.">
-            @can('update', $application)
-                <x-slot:actions>
-                    <x-modal-input title="New scheduled backup" :wireIgnore="false">
-                        <x-slot:content>
-                            <button type="button"
-                                class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
-                                <x-reicon name="plus" class="size-3.5" />
-                                Add
-                            </button>
-                        </x-slot:content>
-                        <livewire:project.application.backup.create :application="$application"
-                            wire:key="create-volume-backup-{{ $application->id }}" />
-                    </x-modal-input>
-                </x-slot:actions>
-            @endcan
+    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+            <x-application.configuration-sidebar :application="$application"
+                current-route="project.application.backup.index" />
 
-            <div class="grid gap-4 sm:grid-cols-3">
-                <div>
-                    <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Schedules</p>
-                    <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                        {{ $backups->count() }}
-                    </p>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Enabled</p>
-                    <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                        {{ $backups->where('enabled', true)->count() }}
-                    </p>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Total executions</p>
-                    <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                        {{ $backups->sum('executions_count') }}
-                    </p>
-                </div>
-            </div>
-        </x-application.settings-section>
+            <div class="application-settings-form flex min-w-0 flex-col gap-6">
+            <x-application.settings-section title="Storage backups"
+                helper="Schedule backups for persistent volumes and directory mounts attached to this application.">
+                @can('update', $application)
+                    <x-slot:actions>
+                        <x-modal-input title="New scheduled backup" :wireIgnore="false">
+                            <x-slot:content>
+                                <button type="button"
+                                    class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                    <x-reicon name="plus" class="size-3.5" />
+                                    Add
+                                </button>
+                            </x-slot:content>
+                            <livewire:project.application.backup.create :application="$application"
+                                wire:key="create-volume-backup-{{ $application->id }}" />
+                        </x-modal-input>
+                    </x-slot:actions>
+                @endcan
 
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="relative w-full sm:max-w-sm">
-                <x-reicon name="search"
-                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
-                <input type="search" x-model="search" placeholder="Search backups" aria-label="Search backups"
-                    class="input h-8! w-full py-0! pr-8! pl-8!" />
-                <button x-cloak x-show="search" x-on:click="search = ''" type="button"
-                    class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
-                    aria-label="Clear search">
-                    <span class="text-sm leading-none">×</span>
-                </button>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <div class="relative" x-on:click.outside="filterOpen = false">
-                    <button type="button" class="button" x-on:click="filterOpen = !filterOpen; sortOpen = false">
-                        <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
-                                stroke-linecap="round" />
-                        </svg>
-                        Filter
-                    </button>
-                    <div x-cloak x-show="filterOpen" x-transition.origin.top.right
-                        class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
-                        <template x-for="option in filterOptions" :key="option.value">
-                            <button type="button"
-                                class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                x-on:click="typeFilter = option.value; filterOpen = false">
-                                <span class="flex-1" x-text="option.label"></span>
-                                <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
-                                    viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                    <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                        </template>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div>
+                        <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Schedules</p>
+                        <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
+                            {{ $backups->count() }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Enabled</p>
+                        <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
+                            {{ $backups->where('enabled', true)->count() }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Total executions</p>
+                        <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
+                            {{ $backups->sum('executions_count') }}
+                        </p>
                     </div>
                 </div>
+            </x-application.settings-section>
 
-                <div class="relative" x-on:click.outside="sortOpen = false">
-                    <button type="button" class="button" x-on:click="sortOpen = !sortOpen; filterOpen = false">
-                        <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3" stroke="currentColor"
-                                stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        Sort
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="relative w-full sm:max-w-sm">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input type="search" x-model="search" placeholder="Search backups" aria-label="Search backups"
+                        class="input h-8! w-full py-0! pr-8! pl-8!" />
+                    <button x-cloak x-show="search" x-on:click="search = ''" type="button"
+                        class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                        aria-label="Clear search">
+                        <span class="text-sm leading-none">×</span>
                     </button>
-                    <div x-cloak x-show="sortOpen" x-transition.origin.top.right
-                        class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
-                        <template x-for="option in sortOptions" :key="option.value">
-                            <button type="button"
-                                class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                x-on:click="sortBy = option.value; sortOpen = false">
-                                <span class="flex-1" x-text="option.label"></span>
-                                <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
-                                    viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                    <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                        </template>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <div class="relative" x-on:click.outside="filterOpen = false">
+                        <button type="button" class="button" x-on:click="filterOpen = !filterOpen; sortOpen = false">
+                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
+                                    stroke-linecap="round" />
+                            </svg>
+                            Filter
+                        </button>
+                        <div x-cloak x-show="filterOpen" x-transition.origin.top.right
+                            class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                            <template x-for="option in filterOptions" :key="option.value">
+                                <button type="button"
+                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                    x-on:click="typeFilter = option.value; filterOpen = false">
+                                    <span class="flex-1" x-text="option.label"></span>
+                                    <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
+                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="relative" x-on:click.outside="sortOpen = false">
+                        <button type="button" class="button" x-on:click="sortOpen = !sortOpen; filterOpen = false">
+                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3" stroke="currentColor"
+                                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            Sort
+                        </button>
+                        <div x-cloak x-show="sortOpen" x-transition.origin.top.right
+                            class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                            <template x-for="option in sortOptions" :key="option.value">
+                                <button type="button"
+                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                    x-on:click="sortBy = option.value; sortOpen = false">
+                                    <span class="flex-1" x-text="option.label"></span>
+                                    <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </button>
+                            </template>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            <div @class([
+                'application-settings-section-body w-full',
+                'is-flush' => $backups->isNotEmpty(),
+            ])>
+                <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
+                    <x-empty size="sm" title="No backups found"
+                        description="No scheduled backups match your search." />
+                </div>
+
+                @if ($backups->isNotEmpty())
+                    <div class="data-table flex w-full flex-col" x-show="filteredBackups.length > 0">
+                        <div class="data-table-header backup-table-grid">
+                            <span>Target</span>
+                            <span>Type</span>
+                            <span>Schedule</span>
+                            <span>Status</span>
+                            <span>Last run</span>
+                            <span class="text-right">Executions</span>
+                        </div>
+
+                        @foreach ($backups as $backup)
+                            @php
+                                $latestExecution = $backup->latestExecution;
+                                $status = $latestExecution?->status;
+                                $statusLabel = match ($status) {
+                                    'running' => 'In progress',
+                                    'success' => 'Success',
+                                    'failed' => 'Failed',
+                                    default => $backup->enabled ? 'Waiting' : 'Disabled',
+                                };
+                                $statusType = match ($status) {
+                                    'running' => 'warning',
+                                    'success' => 'success',
+                                    'failed' => 'error',
+                                    default => 'neutral',
+                                };
+                            @endphp
+                            <a wire:key="volume-backup-{{ $backup->uuid }}"
+                                x-show="isVisible(@js((string) $backup->id))"
+                                x-bind:style="{ order: backupOrder(@js((string) $backup->id)) }"
+                                href="{{ route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]) }}"
+                                {{ wireNavigate() }}
+                                class="data-table-row backup-table-grid text-[13px] text-neutral-700 dark:text-fg-dim">
+                                <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg"
+                                    title="{{ $backup->targetName() }}">
+                                    {{ $backup->targetName() }}
+                                </span>
+                                <span>{{ $backup->targetType() }}</span>
+                                <span>{{ $backup->frequency }}</span>
+                                <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
+                                <span>
+                                    {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
+                                </span>
+                                <span class="text-right tabular-nums text-neutral-950 dark:text-fg">
+                                    {{ $backup->executions_count }}
+                                </span>
+                            </a>
+                        @endforeach
+                    </div>
+                @else
+                    <x-empty size="sm" title="No scheduled backups"
+                        description="Add a persistent volume or directory backup schedule to protect application data."
+                        icon-name="storages" />
+                @endif
             </div>
         </div>
-
-        <div class="application-settings-section-body is-flush w-full">
-            <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
-                <x-empty size="sm" title="No backups found"
-                    description="No scheduled backups match your search." />
-            </div>
-
-            @if ($backups->isNotEmpty())
-                <div class="data-table flex w-full flex-col" x-show="filteredBackups.length > 0">
-                    <div class="data-table-header backup-table-grid">
-                        <span>Target</span>
-                        <span>Type</span>
-                        <span>Schedule</span>
-                        <span>Status</span>
-                        <span>Last run</span>
-                        <span class="text-right">Executions</span>
-                    </div>
-
-                    @foreach ($backups as $backup)
-                        @php
-                            $latestExecution = $backup->latestExecution;
-                            $status = $latestExecution?->status;
-                            $statusLabel = match ($status) {
-                                'running' => 'In progress',
-                                'success' => 'Success',
-                                'failed' => 'Failed',
-                                default => $backup->enabled ? 'Waiting' : 'Disabled',
-                            };
-                            $statusType = match ($status) {
-                                'running' => 'warning',
-                                'success' => 'success',
-                                'failed' => 'error',
-                                default => 'neutral',
-                            };
-                        @endphp
-                        <a wire:key="volume-backup-{{ $backup->uuid }}"
-                            x-show="isVisible(@js((string) $backup->id))"
-                            x-bind:style="{ order: backupOrder(@js((string) $backup->id)) }"
-                            href="{{ route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]) }}"
-                            {{ wireNavigate() }}
-                            class="data-table-row backup-table-grid text-[13px] text-neutral-700 dark:text-fg-dim">
-                            <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg"
-                                title="{{ $backup->targetName() }}">
-                                {{ $backup->targetName() }}
-                            </span>
-                            <span>{{ $backup->targetType() }}</span>
-                            <span>{{ $backup->frequency }}</span>
-                            <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span>
-                                {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
-                            </span>
-                            <span class="text-right tabular-nums text-neutral-950 dark:text-fg">
-                                {{ $backup->executions_count }}
-                            </span>
-                        </a>
-                    @endforeach
-                </div>
-            @else
-                <x-empty size="sm" title="No scheduled backups"
-                    description="Add a persistent volume or directory backup schedule to protect application data."
-                    icon-name="storages" />
-            @endif
         </div>
-    </div>
+    </section>
 </div>

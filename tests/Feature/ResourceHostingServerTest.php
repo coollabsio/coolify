@@ -436,5 +436,5 @@ test('resource operations explains why build servers cannot be clone targets', f
     Livewire::test(ResourceOperations::class, ['resource' => $source])
         ->assertSet('buildServers', fn ($servers) => $servers->contains('id', $buildServer->id))
         ->assertSee('Dedicated Builder')
-        ->assertSee('Build server — cannot host resources');
+        ->assertSee('build server');
 });

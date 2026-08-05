@@ -15,7 +15,7 @@
         @if ($isApplicationConsole)
             <div class="flex h-full min-h-[32rem] items-center justify-center">
                 <x-empty size="lg" title="Shell unavailable"
-                    description="This container does not include Bash or sh. Install a supported shell to use the console."
+                    description="This container does not include Bash or sh. Install a supported shell to use the terminal."
                     icon-name="browser-terminal" />
             </div>
         @else

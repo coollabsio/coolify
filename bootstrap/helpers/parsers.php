@@ -1340,7 +1340,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             if ($isPullRequest) {
                 $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
-            $composeRedirect = data_get($domains, "$changedServiceName.redirect");
+            $domainServiceName = findComposeServiceName((string) $serviceName, $domains->keys());
+            $composeRedirect = data_get($domains->get($domainServiceName), 'redirect');
             $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                 ? $composeRedirect
                 : 'both';

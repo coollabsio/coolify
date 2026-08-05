@@ -36,6 +36,8 @@ class All extends Component
 
     public bool $showActionsColumn = false;
 
+    public bool $showBackupAction = false;
+
     public bool $isComposeOrService = false;
 
     public bool $canUpdate = false;
@@ -47,7 +49,8 @@ class All extends Component
         $this->canUpdate = (bool) auth()->user()?->can('update', $this->resource);
         $this->supportsPreviewSuffix = $this->resource instanceof Application
             && $this->resource->git_based();
-        $this->showActionsColumn = $this->resource instanceof Application
+        $this->showActionsColumn = $this->canUpdate;
+        $this->showBackupAction = $this->resource instanceof Application
             || $this->resource instanceof ServiceApplication
             || $this->resource instanceof ServiceDatabase;
         $this->isComposeOrService = $this->resource->type() === 'service'
@@ -175,7 +178,7 @@ class All extends Component
     {
         $this->volumeBackupMeta = [];
 
-        if (! $this->showActionsColumn) {
+        if (! $this->showBackupAction) {
             return;
         }
 

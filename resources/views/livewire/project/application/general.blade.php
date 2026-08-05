@@ -9,16 +9,16 @@
         <x-unsaved-bar action="submit" />
         {{-- Temporarily hidden: the "Compose parser" dev hint and the "View details"
              resource-details modal trigger. --}}
-        @if ($buildPack === 'dockercompose')
-            <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
-                <x-forms.button canGate="update" :canResource="$application" wire:target='initLoadingCompose'
-                    x-on:click="$wire.dispatch('loadCompose', false)">
-                    {{ $application->docker_compose_raw ? 'Reload compose' : 'Load compose' }}
-                </x-forms.button>
-            </div>
-        @endif
         <div class="application-settings-grid flex flex-col gap-6">
             <x-application.settings-section id="application-details-section" title="Application details" helper="Name the application and choose the build strategy Coolify should use to deploy it." class="application-details-card">
+            @if ($buildPack === 'dockercompose')
+                <x-slot:actions>
+                    <x-forms.button canGate="update" :canResource="$application" wire:target='initLoadingCompose'
+                        x-on:click="$wire.dispatch('loadCompose', false)">
+                        {{ $application->docker_compose_raw ? 'Reload compose' : 'Load compose' }}
+                    </x-forms.button>
+                </x-slot:actions>
+            @endif
             <div class="grid gap-4">
                 <x-forms.input x-bind:disabled="shouldDisable()" id="name" label="Name" required />
                 <x-forms.input x-bind:disabled="shouldDisable()" id="description" label="Description" />
@@ -302,7 +302,7 @@
             @endif
             @if ($buildPack === 'dockercompose')
                 <div x-data="{ showRaw: true }">
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-4">
                         <h3>Docker Compose</h3>
                         <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
                             @click.prevent="showRaw = !showRaw"

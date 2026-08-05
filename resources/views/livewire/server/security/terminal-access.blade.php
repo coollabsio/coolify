@@ -47,7 +47,7 @@
                                 ]" confirmationText="{{ $server->name }}"
                                 shortConfirmationLabel="Server Name"
                                 step3ButtonText="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
-                                isHighlightedButton />
+                                :isHighlightedButton="!$isTerminalEnabled" />
                         </div>
                     @endif
                 </div>

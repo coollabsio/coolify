@@ -42,6 +42,10 @@ class Index extends Component
 
     public array $sourceFilterOptions = [];
 
+    public bool $embedded = false;
+
+    public ?string $selectedDeploymentUuid = null;
+
     protected $queryString = ['pull_request_id'];
 
     public function getListeners()
@@ -79,6 +83,9 @@ class Index extends Component
         }
 
         $this->application = $application;
+        if ($this->embedded) {
+            $this->defaultTake = 3;
+        }
         $this->loadPullRequestOptions();
         $this->loadDeploymentFilterOptions();
         ['deployments' => $deployments, 'count' => $count] = $application->deployments(
@@ -90,7 +97,11 @@ class Index extends Component
         );
         $this->deployments = $deployments;
         $this->deployments_count = $count;
-        $this->current_url = url()->current();
+        $this->current_url = route('project.application.deployment.index', [
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'application_uuid' => $application->uuid,
+        ]);
         $this->updateCurrentPage();
         $this->showMore();
     }

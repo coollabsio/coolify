@@ -115,7 +115,7 @@
 
             {{-- ============ MAIN ============ --}}
             <main
-                class="min-h-screen bg-white dark:bg-panel lg:border-l border-neutral-200 dark:border-white/[0.06] px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
+                class="min-h-screen bg-white dark:bg-panel px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
                 :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
                 <div class="mx-auto w-full max-w-[1400px]">
                     {{ $slot }}

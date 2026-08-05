@@ -1,10 +1,20 @@
-<div class="flex h-[calc(100dvh-7.5rem)] min-h-[22rem] flex-col overflow-hidden sm:h-[calc(100vh-8rem)] sm:min-h-[32rem] lg:min-h-[42rem]">
+<div
+    class="flex min-h-[calc(100dvh-7.5rem)] flex-col xl:h-[calc(100dvh-7.5rem)] xl:min-h-0 xl:overflow-hidden">
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
         <livewire:project.shared.configuration-checker :resource="$application" />
         <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-show" />
-        <div x-data="{
+        <section class="application-settings-workspace flex min-h-0 w-full max-w-[1180px] flex-1">
+            <div class="grid min-h-0 min-w-0 flex-1 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+                <x-application.configuration-sidebar :application="$application" :flush="true"
+                    current-route="project.application.deployment.show" />
+                <div class="flex min-h-0 min-w-0 flex-col gap-4 xl:h-full xl:pt-px">
+                    <livewire:project.application.deployment.index :embedded="true"
+                        :selected-deployment-uuid="$deployment_uuid"
+                        wire:key="embedded-deployment-history-{{ $deployment_uuid }}" />
+
+                    <div x-data="{
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
         rafId: null,
@@ -261,8 +271,8 @@
                 this.deploymentFinishedCleanup = null;
             }
         }
-    }" class="flex flex-1 min-h-0 flex-col overflow-hidden">
-            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-3'">
+    }" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full flex-col overflow-hidden xl:h-auto xl:min-h-0 xl:flex-1">
+            <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-0'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-[#0d0d0d] text-neutral-100"
                     :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-800 shadow-sm'">
@@ -456,4 +466,7 @@
                 </div>
             </div>
         </div>
+                </div>
+            </div>
+        </section>
 </div>

@@ -24,15 +24,28 @@
         );
     @endphp
 
+    @if (in_array($type, ['application', 'database', 'service'], true))
+        <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+            <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+                @if ($type === 'application')
+                    <x-application.configuration-sidebar :application="$resource" current-route="project.application.logs" />
+                @elseif ($type === 'database')
+                    <x-database.configuration-sidebar :database="$resource" current-route="project.database.logs" />
+                @else
+                    <x-service.configuration-sidebar :service="$resource" current-route="project.service.logs" />
+                @endif
+                <div class="min-w-0">
+    @endif
+
     <div wire:loading.flex wire:target="loadAllContainers"
-        class="mt-4 hidden min-h-32 w-full items-center justify-center lg:mt-3">
+        class="loading-state-card mt-4 hidden min-h-40 w-full items-center justify-center lg:mt-3">
         <x-loading text="Loading containers" />
     </div>
 
     <div class="mt-4 w-full lg:mt-3" x-init="if (! $wire.containersLoaded) { $wire.loadAllContainers() }"
         wire:loading.remove wire:target="loadAllContainers">
         @if (! $containersLoaded)
-            <div class="flex min-h-32 items-center justify-center">
+            <div class="loading-state-card flex min-h-40 w-full items-center justify-center">
                 <x-loading text="Loading containers" />
             </div>
         @elseif ($logsUnavailable)
@@ -75,4 +88,9 @@
             </div>
         @endif
     </div>
+    @if (in_array($type, ['application', 'database', 'service'], true))
+                </div>
+            </div>
+        </section>
+    @endif
 </div>
