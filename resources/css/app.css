@@ -364,6 +364,11 @@ tr td:first-child {
     padding-right: 2.5rem;
 }
 
+/* Same durable clearance for copy-affordance inputs (utility pr-* loses to settings CSS). */
+.input.input-with-copy-button {
+    padding-right: 2.5rem;
+}
+
 .lds-heart {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
@@ -1075,11 +1080,13 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     box-shadow: none !important;
 }
 
-/* Keep password toggle clear of the value inside denser settings inputs */
+/* Keep password toggle / copy button clear of the value inside denser settings inputs */
 .application-settings-workspace .input.input-with-password-toggle,
 .application-settings-workspace .input[type="password"],
+.application-settings-workspace .input.input-with-copy-button,
 .application-settings-form .input.input-with-password-toggle,
-.application-settings-form .input[type="password"] {
+.application-settings-form .input[type="password"],
+.application-settings-form .input.input-with-copy-button {
     padding-right: 2.5rem;
 }
 

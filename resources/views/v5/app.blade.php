@@ -12,10 +12,18 @@
         <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/svg+xml" />
     @endenv
     @auth
+        @php
+            $pusherForceWs = (bool) config('constants.pusher.force_ws');
+        @endphp
         <script type="text/javascript" src="{{ URL::asset('js/echo.js') }}"></script>
         <script type="text/javascript" src="{{ URL::asset('js/pusher.js') }}"></script>
         <script>
             window.Pusher = Pusher;
+            @if ($pusherForceWs)
+            if (window.Pusher && window.Pusher.Runtime) {
+                window.Pusher.Runtime.getProtocol = function () { return 'http:'; };
+            }
+            @endif
             const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;
             window.Echo = new EchoConstructor({
                 broadcaster: 'pusher',
@@ -25,10 +33,10 @@
                 wsPort: "{{ getRealtime() }}",
                 wssPort: "{{ getRealtime() }}",
                 forceTLS: false,
-                encrypted: true,
+                encrypted: @json($pusherForceWs ? false : true),
                 enableStats: false,
                 enableLogging: @json(app()->environment('local')),
-                enabledTransports: ['ws', 'wss'],
+                enabledTransports: @json($pusherForceWs ? ['ws'] : ['ws', 'wss']),
                 disabledTransports: ['sockjs', 'xhr_streaming', 'xhr_polling'],
             });
         </script>

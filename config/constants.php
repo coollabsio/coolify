@@ -42,6 +42,8 @@ return [
         'host' => env('PUSHER_HOST'),
         'port' => env('PUSHER_PORT'),
         'app_key' => env('PUSHER_APP_KEY'),
+        'scheme' => env('PUSHER_SCHEME', 'http'),
+        'force_ws' => filter_var(env('PUSHER_FORCE_WS', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
     'migration' => [
