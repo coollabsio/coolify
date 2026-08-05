@@ -20,20 +20,24 @@
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">
-                        <div class="relative" @click.outside="filterOpen = false"
-                            @keydown.escape.window="filterOpen = false">
-                            <button type="button" class="button" @click="filterOpen = !filterOpen">
+                        <div class="relative" @click.outside="filterOpen = false">
+                            <button type="button" class="button" @click="filterOpen = !filterOpen"
+                                aria-haspopup="listbox" aria-controls="resource-type-filter-options"
+                                :aria-expanded="filterOpen">
                                 <x-reicon name="filter" class="size-3.5" />
                                 Filter
                             </button>
-                            <div x-show="filterOpen" x-cloak x-transition.opacity.duration.120ms
+                            <div id="resource-type-filter-options" x-show="filterOpen" x-cloak
+                                x-transition.opacity.duration.120ms role="listbox" aria-label="Resource type"
+                                @keydown.escape.stop="filterOpen = false; $el.previousElementSibling.focus()"
                                 class="listbox-panel left-auto! right-0! z-[90]! min-w-48!">
                                 <div
                                     class="px-2 py-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
                                     Resource type
                                 </div>
                                 <template x-for="option in resourceTypeOptions" :key="option.value">
-                                    <button type="button" class="listbox-option"
+                                    <button type="button" class="listbox-option" role="option"
+                                        :aria-selected="resourceType === option.value"
                                         @click="resourceType = option.value; filterOpen = false">
                                         <span x-text="option.label"></span>
                                         <x-reicon name="check-circle" class="size-3.5 text-accent"
@@ -43,11 +47,12 @@
                             </div>
                         </div>
 
-                        <div class="relative w-48" @click.outside="categoryOpen = false"
-                            @keydown.escape.window="categoryOpen = false">
+                        <div class="relative w-48" @click.outside="closeCategoryFilter()">
                             <button type="button" class="listbox-trigger"
                                 :disabled="loading || categories.length === 0"
                                 @click="categoryOpen = !categoryOpen; $nextTick(() => categoryOpen && $refs.categorySearchInput.focus())"
+                                aria-haspopup="listbox" aria-controls="resource-category-options"
+                                :aria-expanded="categoryOpen"
                                 :title="selectedCategory === '' ? 'All categories' : selectedCategory">
                                 <span class="listbox-trigger-label capitalize"
                                     x-text="selectedCategory === '' ? 'All categories' : selectedCategory"></span>
@@ -57,7 +62,9 @@
                                         d="m8 9 4-4 4 4m0 6-4 4-4-4" />
                                 </svg>
                             </button>
-                            <div x-show="categoryOpen" x-cloak x-transition.opacity.duration.120ms
+                            <div id="resource-category-options" x-show="categoryOpen" x-cloak
+                                x-transition.opacity.duration.120ms role="listbox" aria-label="Service category"
+                                @keydown.escape.stop="closeCategoryFilter(true)"
                                 class="listbox-panel left-auto! right-0! z-[90]! min-w-56!">
                                 <div class="border-b border-neutral-200 p-2 dark:border-white/[0.08]">
                                     <input type="search" x-ref="categorySearchInput" x-model="categorySearch"
@@ -66,7 +73,8 @@
                                         @click.stop>
                                 </div>
                                 <div class="max-h-60 overflow-auto p-1">
-                                    <button type="button" class="listbox-option"
+                                    <button type="button" class="listbox-option" role="option"
+                                        :aria-selected="selectedCategory === ''"
                                         @click="selectedCategory = ''; categorySearch = ''; categoryOpen = false">
                                         <span>All categories</span>
                                         <x-reicon name="check-circle" class="size-3.5 text-accent"
@@ -75,7 +83,8 @@
                                     <template
                                         x-for="category in categories.filter(category => categorySearch === '' || category.toLowerCase().includes(categorySearch.toLowerCase()))"
                                         :key="category">
-                                        <button type="button" class="listbox-option capitalize"
+                                        <button type="button" class="listbox-option capitalize" role="option"
+                                            :aria-selected="selectedCategory === category"
                                             @click="selectedCategory = category; categorySearch = ''; categoryOpen = false">
                                             <span class="truncate" x-text="category"></span>
                                             <x-reicon name="check-circle" class="size-3.5 text-accent"
@@ -350,6 +359,17 @@
                         gitBasedApplications: [],
                         dockerBasedApplications: [],
                         databases: [],
+                        closeCategoryFilter(restoreFocus = false) {
+                            if (!this.categoryOpen) return;
+
+                            this.categoryOpen = false;
+                            this.categorySearch = '';
+                            this.$refs.categorySearchInput?.blur();
+                            if (restoreFocus) {
+                                this.$nextTick(() => document.getElementById('resource-category-options')
+                                    ?.previousElementSibling?.focus());
+                            }
+                        },
                         databaseLinks: {
                             postgresql: {
                                 docs: 'https://www.postgresql.org/docs/',
