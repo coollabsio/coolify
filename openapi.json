@@ -15290,6 +15290,252 @@
                 ]
             }
         },
+        "\/servers\/{uuid}\/proxy\/dynamic-configurations": {
+            "get": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "List proxy dynamic configurations",
+                "description": "List safe dynamic configuration files for a team-owned server. File contents are only included when the token has `read:sensitive` (or `root`) and the user is a team admin or owner.",
+                "operationId": "list-server-proxy-dynamic-configurations",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Dynamic configuration files.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "required": [
+                                            "filename"
+                                        ],
+                                        "properties": {
+                                            "filename": {
+                                                "type": "string",
+                                                "example": "pos.yaml"
+                                            },
+                                            "content": {
+                                                "description": "Only present with read:sensitive.",
+                                                "type": "string",
+                                                "example": "http:\n  routers: {}\n"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Create proxy dynamic configuration",
+                "description": "Create a dynamic configuration file. Traefik content must be valid YAML. Proxy-specific extensions are appended when omitted, and Caddy is reloaded after a successful write.",
+                "operationId": "create-server-proxy-dynamic-configuration",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "filename",
+                                    "content"
+                                ],
+                                "properties": {
+                                    "filename": {
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "pos.yaml"
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "maxLength": 1048576,
+                                        "example": "http:\n  routers: {}\n"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Dynamic configuration created."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "Dynamic configuration already exists."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/proxy\/dynamic-configurations\/{filename}": {
+            "delete": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Delete proxy dynamic configuration",
+                "description": "Delete a dynamic configuration file. Coolify-managed filenames are rejected, and Caddy is reloaded after a successful deletion.",
+                "operationId": "delete-server-proxy-dynamic-configuration",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filename",
+                        "in": "path",
+                        "description": "Configuration filename",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Dynamic configuration deleted."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Update proxy dynamic configuration",
+                "description": "Replace an existing dynamic configuration atomically. Traefik content must be valid YAML, and Caddy is reloaded after a successful write.",
+                "operationId": "update-server-proxy-dynamic-configuration",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "filename",
+                        "in": "path",
+                        "description": "Configuration filename",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "content"
+                                ],
+                                "properties": {
+                                    "content": {
+                                        "type": "string",
+                                        "maxLength": 1048576,
+                                        "example": "http:\n  routers: {}\n"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Dynamic configuration updated."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/servers\/{uuid}\/sentinel": {
             "get": {
                 "tags": [

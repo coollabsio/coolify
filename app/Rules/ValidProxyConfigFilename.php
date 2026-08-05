@@ -13,6 +13,7 @@ class ValidProxyConfigFilename implements ValidationRule
     private const RESERVED_FILENAMES = [
         'coolify.yaml',
         'coolify.yml',
+        'coolify.caddy',
         'Caddyfile',
     ];
 
@@ -63,7 +64,7 @@ class ValidProxyConfigFilename implements ValidationRule
             return;
         }
 
-        // Check for reserved filenames (case-sensitive for coolify.yaml/yml, case-insensitive check not needed as Caddyfile is exact)
+        // Check for reserved filenames (managed proxy files use exact casing on disk).
         if (in_array($filename, self::RESERVED_FILENAMES, true)) {
             $fail('The :attribute uses a reserved filename.');
 

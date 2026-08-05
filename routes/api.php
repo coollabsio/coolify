@@ -187,6 +187,10 @@ Route::group([
     Route::patch('/servers/{uuid}/proxy', [ServerProxyController::class, 'update'])->middleware(['api.ability:write']);
     Route::put('/servers/{uuid}/proxy/configuration', [ServerProxyController::class, 'saveConfiguration'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:write']);
+    Route::get('/servers/{uuid}/proxy/dynamic-configurations', [ServerProxyController::class, 'dynamicConfigurations'])->middleware(['api.ability:read']);
+    Route::post('/servers/{uuid}/proxy/dynamic-configurations', [ServerProxyController::class, 'createDynamicConfiguration'])->middleware(['api.ability:write']);
+    Route::patch('/servers/{uuid}/proxy/dynamic-configurations/{filename}', [ServerProxyController::class, 'updateDynamicConfiguration'])->middleware(['api.ability:write']);
+    Route::delete('/servers/{uuid}/proxy/dynamic-configurations/{filename}', [ServerProxyController::class, 'deleteDynamicConfiguration'])->middleware(['api.ability:write']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
