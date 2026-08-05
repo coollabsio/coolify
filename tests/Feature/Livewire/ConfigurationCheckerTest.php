@@ -67,7 +67,7 @@ it('renders the changed configuration labels without a second backend request', 
 
     Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
         ->assertSee('The latest configuration has not been applied')
-        ->assertSee('A rebuild is required.')
+        ->assertSee('Rebuild required.')
         ->assertSee('Build command');
 
     $view = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
@@ -114,7 +114,7 @@ it('shows an unapplied configuration warning after a directory mount is added', 
         ->dispatch('configurationChanged')
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('The latest configuration has not been applied')
-        ->assertSee('Please redeploy to apply the new configuration.')
+        ->assertSee('Redeploy to apply.')
         ->assertSee('Directory mount');
 });
 

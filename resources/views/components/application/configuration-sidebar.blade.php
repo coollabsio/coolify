@@ -176,6 +176,7 @@
             'project.application.configuration' => array_values(array_filter([
                 ['id' => 'application-details-section', 'label' => 'Application details'],
                 ['id' => 'public-access-section', 'label' => 'Public access'],
+                $isComposeApp ? null : ['id' => 'internal-access-section', 'label' => 'Internal access'],
                 ['id' => 'build-pipeline-section', 'label' => 'Build pipeline'],
                 $isComposeApp ? null : ['id' => 'container-image-section', 'label' => 'Container image'],
                 $isComposeApp ? null : ['id' => 'networking-section', 'label' => 'Networking'],

@@ -21,7 +21,8 @@ it('collapses server subsystem badges into one status summary', function () {
         ->toContain('wire:loading.flex wire:target="checkProxyStatus"')
         ->toContain('Refreshing status')
         ->toContain('<x-loading compact />')
-        ->toContain('name="refresh" class="size-3 opacity-70"')
+        ->toContain('name="refresh" class="size-2.5 opacity-70"')
+        ->toContain('min-h-0! h-7! gap-1.5! px-2! py-1! text-[11px]')
         ->not->toContain('@click="open = false" role="menuitem"');
 
     expect($badgeView)

@@ -65,7 +65,8 @@
             <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
                 <div class="fixed inset-y-0 right-0 flex h-full">
-                    <div class="relative flex h-full w-full max-w-56 min-w-0 flex-col bg-white shadow-xl dark:bg-panel">
+                    <div
+                        class="relative flex h-full w-full max-w-56 min-w-0 flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-white/[0.12] dark:bg-panel">
                         <div class="absolute top-0 right-full flex w-16 justify-center pt-5">
                             <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
                                 <span class="sr-only">Close sidebar</span>
@@ -101,7 +102,10 @@
                         <livewire:switch-team />
                     </div>
                 </div>
-                <div class="flex items-center gap-1">
+                <div class="flex min-w-0 items-center gap-1">
+                    {{-- Dev Server-Timing HUD docks here on <lg (desktop uses #server-timing-hud-slot) --}}
+                    <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot
+                        class="hidden shrink-0 items-center"></div>
                     <x-top-user-menu />
                     <button type="button" class="-m-1 p-2 text-neutral-500 dark:text-fg-dim" x-on:click="open = !open">
                         <span class="sr-only">Open sidebar</span>

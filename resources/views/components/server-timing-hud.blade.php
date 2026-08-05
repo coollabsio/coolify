@@ -1,5 +1,6 @@
 {{-- Dev-only Server-Timing HUD. Injected by AddServerTimingHeaders on full HTML responses.
-     JS docks into #server-timing-hud-slot in the desktop top bar (lg+); otherwise floats bottom-left. --}}
+     JS docks into the top bar: #server-timing-hud-slot (lg+) or #server-timing-hud-slot-mobile (<lg);
+     floats bottom-left only if no navbar slot is available. --}}
 <div id="server-timing-hud" data-server-timing-hud data-metrics='@json($metrics)' data-path="{{ $path }}"
     data-sth-mode="float"
     style="position:fixed;bottom:12px;left:12px;z-index:2147483000;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:#e5e5e5;pointer-events:auto">
@@ -52,16 +53,21 @@
 
     function pickSlot() {
         const desktop = document.getElementById('server-timing-hud-slot');
-        // Match Tailwind `lg` (1024px): only dock into the desktop top bar.
-        // On mobile the header is cramped — float bottom-left instead of docking.
+        const mobile = document.getElementById('server-timing-hud-slot-mobile');
+        // Match Tailwind `lg` (1024px): desktop top bar vs mobile top bar.
         const isLg = window.matchMedia('(min-width: 1024px)').matches;
         if (isLg && desktop) {
             return desktop;
         }
-        return null;
+        if (!isLg && mobile) {
+            return mobile;
+        }
+        // Fallback if one breakpoint's slot is missing from the shell.
+        return desktop || mobile || null;
     }
 
     function applyDockedStyles(root) {
+        const isMobileSlot = root.parentElement && root.parentElement.id === 'server-timing-hud-slot-mobile';
         root.setAttribute('data-sth-mode', 'docked');
         root.style.cssText = [
             'position:relative',
@@ -71,14 +77,34 @@
             'right:auto',
             'z-index:60',
             'display:block',
-            'flex-shrink:0',
+            'flex-shrink:1',
+            'min-width:0',
+            'max-width:100%',
             'visibility:visible',
             'opacity:1',
-            'margin-right:8px',
+            isMobileSlot ? 'margin-right:4px' : 'margin-right:8px',
             'font:11px/1.3 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace',
             'color:#e5e5e5',
             'pointer-events:auto',
         ].join(';');
+
+        const toggle = qs(root, '[data-sth-toggle]');
+        if (toggle) {
+            if (isMobileSlot) {
+                // Compact pill: just "83ms" — no full metric breakdown in the bar.
+                toggle.style.padding = '4px 8px';
+                toggle.style.fontSize = '11px';
+                toggle.style.maxWidth = 'none';
+                toggle.style.overflow = 'visible';
+                toggle.style.whiteSpace = 'nowrap';
+            } else {
+                toggle.style.padding = '';
+                toggle.style.fontSize = '';
+                toggle.style.maxWidth = '100%';
+                toggle.style.overflow = 'hidden';
+                toggle.style.textOverflow = 'ellipsis';
+            }
+        }
 
         const panel = qs(root, '[data-sth-panel]');
         if (panel) {
@@ -89,6 +115,10 @@
             panel.style.top = 'calc(100% + 8px)';
             panel.style.bottom = 'auto';
             panel.style.zIndex = '2147483001';
+            if (isMobileSlot) {
+                // Keep panel on-screen: open near the right edge of the viewport.
+                panel.style.width = 'min(420px, calc(100vw - 16px))';
+            }
         }
     }
 
@@ -563,7 +593,13 @@
         const q = latest.metrics.queries !== undefined ? Math.round(Number(latest.metrics.queries)) + 'q' : '—';
         const db = latest.metrics.db !== undefined ? Number(latest.metrics.db).toFixed(0) + 'ms db' : '—';
         const n = history.length;
-        summary.textContent = 'ST ' + app + ' · ' + db + ' · ' + q + (n > 1 ? ' · ×' + n : '');
+        // Mobile navbar is tight — show only total app time; full breakdown lives in the panel.
+        const compactSummary = root.getAttribute('data-sth-mode') === 'docked'
+            && root.parentElement
+            && root.parentElement.id === 'server-timing-hud-slot-mobile';
+        summary.textContent = compactSummary
+            ? app
+            : ('ST ' + app + ' · ' + db + ' · ' + q + (n > 1 ? ' · ×' + n : ''));
         if (countEl) {
             countEl.textContent = n + (n === 1 ? ' request' : ' requests');
         }

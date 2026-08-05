@@ -31,6 +31,8 @@ it('shows application configuration sections and navigation', function () {
         ->assertSee('Environment Variables')
         ->assertSee('Danger Zone')
         ->assertSee('Application details')
+        ->assertSee('Internal access')
+        ->assertSee('Docker network')
         ->assertSee('Build pipeline')
         ->screenshot(filename: 'application-configuration-overview');
 });

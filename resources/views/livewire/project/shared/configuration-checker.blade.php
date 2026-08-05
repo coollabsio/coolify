@@ -6,26 +6,27 @@
                     The latest configuration has not been applied
                 </x-slot:title>
                 <x-slot:icon>
-                    <x-reicon name="alert-triangle" class="size-5" />
+                    <x-reicon name="alert-triangle" class="size-4" />
                 </x-slot:icon>
                 <x-slot:description>
                     <span>
                         @if (data_get($configurationDiff, 'count'))
-                            {{ data_get($configurationDiff, 'count') }} unapplied configuration
-                            {{ data_get($configurationDiff, 'count') === 1 ? 'change' : 'changes' }} detected.
+                            {{ data_get($configurationDiff, 'count') }}
+                            {{ data_get($configurationDiff, 'count') === 1 ? 'change' : 'changes' }}
+                            unapplied.
                             @if (data_get($configurationDiff, 'requires_build'))
-                                A rebuild is required.
+                                Rebuild required.
                             @else
-                                Please redeploy to apply the new configuration.
+                                Redeploy to apply.
                             @endif
                             <button type="button"
-                                class="ml-1 inline-flex items-center gap-1 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80"
+                                class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80"
                                 x-on:click="configurationDiffModalOpen = true">
                                 View changes
-                                <x-reicon name="arrow-right" class="size-3" />
+                                <x-reicon name="arrow-right" class="size-2.5" />
                             </button>
                         @else
-                            Please redeploy to apply the new configuration.
+                            Redeploy to apply.
                         @endif
                     </span>
                 </x-slot:description>
@@ -49,32 +50,26 @@
                             class="application-settings-form application-settings-section relative max-h-[calc(100dvh-2rem)] w-full max-w-6xl overflow-hidden"
                             style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
                             <header>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-1.5">
                                     <x-reicon name="alert-triangle"
-                                        class="size-4 text-amber-600 dark:text-warning" />
+                                        class="size-3.5 text-amber-600 dark:text-warning" />
                                     <h3>Configuration changes</h3>
                                 </div>
                                 <button type="button" @click="configurationDiffModalOpen = false"
-                                    class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-black/5 hover:text-neutral-800 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                    class="flex size-6 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-black/5 hover:text-neutral-800 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
                                     <x-reicon name="x" class="size-3.5" />
                                 </button>
                             </header>
                             <div
-                                class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
+                                class="application-settings-section-body min-h-0 flex-1 overflow-y-auto !p-3">
                                 <div
-                                    class="mb-4 flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200 dark:bg-warning/[0.07] dark:ring-warning/15">
-                                    <div class="flex min-w-0 items-center gap-2.5">
-                                        <div
-                                            class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning">
-                                            <x-reicon name="alert-triangle" class="size-4" />
-                                        </div>
+                                    class="mb-3 flex items-center justify-between gap-2 rounded-md bg-amber-50 px-2.5 py-1.5 ring-1 ring-amber-200 dark:bg-warning/[0.07] dark:ring-warning/15">
+                                    <div class="flex min-w-0 items-center gap-2">
                                         <div class="min-w-0">
-                                            <p class="text-sm font-semibold text-neutral-900 dark:text-fg">
-                                                {{ data_get($configurationDiff, 'count') }} configuration
+                                            <p class="text-xs font-semibold text-neutral-900 dark:text-fg">
+                                                {{ data_get($configurationDiff, 'count') }}
                                                 {{ data_get($configurationDiff, 'count') === 1 ? 'change' : 'changes' }}
-                                            </p>
-                                            <p class="text-xs text-neutral-600 dark:text-fg-dim">
-                                                Deploy again to apply the latest values.
+                                                · Deploy again to apply
                                             </p>
                                         </div>
                                     </div>
@@ -82,7 +77,7 @@
                                         :status="data_get($configurationDiff, 'requires_build') ? 'Rebuild required' : 'Redeploy required'"
                                         type="warning" />
                                 </div>
-                                <x-deployment.configuration-diff :diff="$configurationDiff" />
+                                <x-deployment.configuration-diff :diff="$configurationDiff" compact />
                             </div>
                         </div>
                     </div>

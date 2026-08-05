@@ -223,6 +223,14 @@
         position: relative;
         z-index: 2;
     }
+
+    @media (max-width: 767px) {
+        :root input,
+        :root textarea,
+        :root select {
+            font-size: 16px !important;
+        }
+    }
 }
 
 /*
@@ -231,14 +239,6 @@
 html,
 body {
     @apply w-full min-h-full bg-gray-50 dark:bg-app dark:text-fg-dim;
-}
-
-@media (max-width: 767px) {
-    input,
-    textarea,
-    select {
-        font-size: 16px;
-    }
 }
 
 body {

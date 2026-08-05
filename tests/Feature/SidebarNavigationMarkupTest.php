@@ -34,6 +34,12 @@ it('draws a single border between the desktop sidebar and main content', functio
         ->and($layout)->not->toContain('lg:border-l border-neutral-200');
 });
 
+it('separates the mobile sidebar from the page with a visible border', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+
+    expect($layout)->toContain('max-w-56 min-w-0 flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-white/[0.12] dark:bg-panel');
+});
+
 it('shows section titles and descriptions above settings navigation on smaller screens', function (string $view, string $title, string $description) {
     $layout = file_get_contents(resource_path("views/components/{$view}"));
     $css = file_get_contents(resource_path('css/app.css'));

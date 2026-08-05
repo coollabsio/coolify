@@ -127,7 +127,7 @@
             'active' => $storage->uuid === $currentStorage->uuid,
         ])">
             <x-slot:meta>
-                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 text-xs font-medium text-black dark:bg-white/[0.08] dark:text-fg"
+                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg"
                     x-data="{ usable: @js((bool) $currentStorage->is_usable) }"
                     @storage-status-changed.window="usable = $event.detail.isUsable">
                     <span class="size-1.5 rounded-full" :class="usable ? 'bg-[#3fb950]' : 'bg-red-500'"></span>
@@ -151,7 +151,7 @@
             'active' => $source->getMorphClass() === $currentSource->getMorphClass() && $source->uuid === $currentSource->uuid,
         ])">
             <x-slot:meta>
-                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 text-xs font-medium text-black dark:bg-white/[0.08] dark:text-fg">
+                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg">
                 <span @class([
                     'size-1.5 rounded-full',
                     'bg-[#3fb950]' => $sourceConnected,
@@ -170,7 +170,7 @@
             'active' => $destination->getMorphClass() === $currentDestination->getMorphClass() && $destination->uuid === $currentDestination->uuid,
         ])">
             <x-slot:meta>
-                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 text-xs font-medium text-black dark:bg-white/[0.08] dark:text-fg">
+                <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg">
                 <span @class([
                     'size-1.5 rounded-full',
                     'bg-[#3fb950]' => $currentDestination->getMorphClass() === 'App\\Models\\StandaloneDocker',
@@ -266,7 +266,7 @@
         <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
         <span class="flex min-w-0 shrink items-center gap-2 h-8 px-2">
             <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentApplication->name }}</span>
-            <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2.5 text-xs font-medium text-black dark:bg-white/[0.08] dark:text-fg"
+            <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg"
                 title="{{ $currentApplication->status }}">
                 <span class="size-1.5 rounded-full {{ $statusDotClass }}"></span>
                 {{ $statusLabel }}

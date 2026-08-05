@@ -64,13 +64,15 @@
             </div>
         @endif
         @if ($server->proxySet())
-            <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="checkProxyStatus"
-                wire:loading.attr="disabled" wire:target="checkProxyStatus" role="menuitem">
+            <button type="button"
+                class="listbox-option justify-start! min-h-0! h-7! gap-1.5! px-2! py-1! text-[11px] text-neutral-500 dark:text-fg-muted"
+                wire:click="checkProxyStatus" wire:loading.attr="disabled" wire:target="checkProxyStatus"
+                role="menuitem">
                 <span class="contents" wire:loading.remove wire:target="checkProxyStatus">
-                    <x-reicon name="refresh" class="size-3 opacity-70" />
+                    <x-reicon name="refresh" class="size-2.5 opacity-70" />
                     Refresh status
                 </span>
-                <span class="hidden items-center gap-2.5" wire:loading.flex wire:target="checkProxyStatus">
+                <span class="hidden items-center gap-1.5" wire:loading.flex wire:target="checkProxyStatus">
                     <x-loading compact />
                     Refreshing status
                 </span>

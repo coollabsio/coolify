@@ -1,6 +1,6 @@
 @props([
     'diff' => null,
-    'compact' => false,
+    'compact' => true,
 ])
 
 @php
@@ -8,18 +8,26 @@
 @endphp
 
 @if ($changes->isNotEmpty())
-    <div class="space-y-5">
+    <div @class(['space-y-3' => $compact, 'space-y-5' => ! $compact])>
         @foreach ($changes->groupBy('section_label') as $sectionLabel => $sectionChanges)
             <div>
                 <h4
-                    class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-fg-faint">
+                    @class([
+                        'font-semibold uppercase tracking-wide text-neutral-500 dark:text-fg-faint',
+                        'mb-1 text-[10px]' => $compact,
+                        'mb-2 text-[11px]' => ! $compact,
+                    ])>
                     {{ $sectionLabel }}
                 </h4>
 
-                <div class="overflow-x-auto rounded-lg ring-1 ring-neutral-200 dark:ring-white/[0.08]">
-                    <div class="min-w-[640px]">
+                <div class="overflow-x-auto rounded-md ring-1 ring-neutral-200 dark:ring-white/[0.08]">
+                    <div class="min-w-[560px]">
                         <div
-                            class="grid grid-cols-[minmax(10rem,0.8fr)_minmax(14rem,1fr)_1.5rem_minmax(14rem,1fr)_1.75rem] items-center gap-3 bg-neutral-100 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:bg-white/[0.04] dark:text-fg-faint">
+                            @class([
+                                'grid grid-cols-[minmax(8rem,0.75fr)_minmax(12rem,1fr)_1.25rem_minmax(12rem,1fr)_1.5rem] items-center text-[10px] font-medium text-neutral-500 dark:bg-white/[0.04] dark:text-fg-faint bg-neutral-100',
+                                'gap-2 px-2 py-1' => $compact,
+                                'gap-3 px-3 py-2' => ! $compact,
+                            ])>
                             <div>Field</div>
                             <div>Current</div>
                             <div></div>
@@ -42,7 +50,11 @@
                                 @endphp
 
                                 <div
-                                    class="grid grid-cols-[minmax(10rem,0.8fr)_minmax(14rem,1fr)_1.5rem_minmax(14rem,1fr)_1.75rem] items-start gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
+                                    @class([
+                                        'grid grid-cols-[minmax(8rem,0.75fr)_minmax(12rem,1fr)_1.25rem_minmax(12rem,1fr)_1.5rem] items-start transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]',
+                                        'gap-2 px-2 py-1.5 text-xs' => $compact,
+                                        'gap-3 px-3 py-2.5 text-sm' => ! $compact,
+                                    ])>
                                     <div class="min-w-0 font-medium text-neutral-900 dark:text-fg">
                                         @if ($rowExpandable)
                                             <div class="break-words"
@@ -66,7 +78,7 @@
                                     </div>
 
                                     <div class="flex justify-center pt-0.5 text-neutral-400 dark:text-fg-faint">
-                                        <x-reicon name="arrow-right" class="size-3.5" />
+                                        <x-reicon name="arrow-right" class="size-3" />
                                     </div>
 
                                     <div class="min-w-0 text-emerald-600 dark:text-emerald-400">
@@ -86,13 +98,13 @@
                                                 x-on:click="expandedRows['{{ $changeKey }}'] = ! expandedRows['{{ $changeKey }}']"
                                                 :aria-expanded="!! expandedRows['{{ $changeKey }}']"
                                                 title="Toggle full value"
-                                                class="flex size-6 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                                class="flex size-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
                                                 <x-reicon name="eye"
                                                     x-show="! expandedRows['{{ $changeKey }}']"
-                                                    class="size-3.5" />
+                                                    class="size-3" />
                                                 <x-reicon name="eye-off2"
                                                     x-show="expandedRows['{{ $changeKey }}']"
-                                                    x-cloak class="size-3.5" />
+                                                    x-cloak class="size-3" />
                                             </button>
                                         @endif
                                     </div>

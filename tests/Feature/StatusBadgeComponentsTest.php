@@ -36,6 +36,14 @@ it('renders service container statuses as shared status badges', function () {
         ->not->toContain('badge-success');
 });
 
+it('uses bordered status badges in the top breadcrumb', function () {
+    $breadcrumb = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
+    $borderedBadgeClasses = 'rounded-full border border-neutral-200 bg-neutral-100';
+
+    expect(substr_count($breadcrumb, $borderedBadgeClasses))->toBe(4)
+        ->and(substr_count($breadcrumb, 'rounded-full bg-neutral-100'))->toBe(0);
+});
+
 it('uses a shared refresh badge for resource status refresh actions', function () {
     $statusIndex = file_get_contents(resource_path('views/components/status/index.blade.php'));
     $serviceStatus = file_get_contents(resource_path('views/components/status/services.blade.php'));

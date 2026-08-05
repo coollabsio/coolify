@@ -109,23 +109,26 @@ test('removes stale Content-Length after injecting the HUD', function () {
     expect($response->headers->has('Content-Length'))->toBeFalse();
 });
 
-test('app shell exposes Server-Timing HUD dock slot in the desktop top bar only', function () {
+test('app shell exposes Server-Timing HUD dock slots in desktop and mobile top bars', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
     expect($layout)
         ->toContain('id="server-timing-hud-slot"')
-        ->toContain('data-server-timing-hud-slot')
-        ->not->toContain('id="server-timing-hud-slot-mobile"');
+        ->toContain('id="server-timing-hud-slot-mobile"')
+        ->toContain('data-server-timing-hud-slot');
 });
 
-test('Server-Timing HUD docks on desktop only and floats on smaller viewports', function () {
+test('Server-Timing HUD docks into navbar slots and floats only as fallback', function () {
     $hud = file_get_contents(resource_path('views/components/server-timing-hud.blade.php'));
 
     expect($hud)
         ->toContain('server-timing-hud-slot')
+        ->toContain('server-timing-hud-slot-mobile')
         ->toContain("matchMedia('(min-width: 1024px)')")
-        ->toContain('float bottom-left instead of docking')
-        ->not->toContain('server-timing-hud-slot-mobile');
+        ->toContain('floats bottom-left only if no navbar slot is available')
+        // Mobile pill is compact (app ms only); full "ST · db · q" breakdown stays desktop/float.
+        ->toContain("parentElement.id === 'server-timing-hud-slot-mobile'")
+        ->toContain('compactSummary');
 });
 
 test('does not inject HUD into non-HTML or fragment responses', function () {
