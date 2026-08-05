@@ -65,6 +65,7 @@ function recommendedApplicationSettingsPayload(): array
         'gpu_options' => null,
         'is_consistent_container_name_enabled' => true,
         'custom_internal_name' => 'my-app-internal',
+        'is_container_label_readonly_enabled' => true,
     ];
 }
 

@@ -59,6 +59,7 @@ class ApplicationsController extends Controller
         'gpu_options',
         'is_consistent_container_name_enabled',
         'custom_internal_name',
+        'is_container_label_readonly_enabled',
     ];
 
     private const BOOLEAN_APPLICATION_SETTING_FIELDS = [
@@ -76,6 +77,7 @@ class ApplicationsController extends Controller
         'is_log_drain_enabled',
         'is_gpu_enabled',
         'is_consistent_container_name_enabled',
+        'is_container_label_readonly_enabled',
     ];
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed

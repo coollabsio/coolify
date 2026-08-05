@@ -139,6 +139,7 @@ function sharedDataApplications()
         'custom_internal_name' => 'string|nullable',
         'preview_url_template' => 'string',
         'max_restart_count' => 'integer|min:0',
+        'is_container_label_readonly_enabled' => 'boolean',
         'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
         'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
