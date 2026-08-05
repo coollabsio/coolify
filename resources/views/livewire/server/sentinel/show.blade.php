@@ -5,7 +5,7 @@
     <livewire:server.navbar :server="$server" />
     <div
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-        <x-server.sidebar-sentinel :server="$server" :parameters="$parameters" />
+        <x-server.sidebar :server="$server" activeMenu="sentinel" />
         @if ($server->isFunctional())
             <div class="w-full">
                 <livewire:server.sentinel :server="$server" />

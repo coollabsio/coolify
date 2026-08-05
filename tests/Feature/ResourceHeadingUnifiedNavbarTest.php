@@ -255,10 +255,13 @@ it('keeps Links dropdowns outside the scrollable tabs strip', function () {
 it('shows an icon in application and service Links controls', function () {
     $applicationLinks = file_get_contents(resource_path('views/components/applications/links.blade.php'));
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
+    $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
 
     expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false])")
         ->toContain('<x-reicon name="external-link"')
-        ->and($serviceLinks)->toContain('<x-reicon name="external-link"')
+        ->and($serviceLinksComponent)->toContain('public bool $fullWidth = false')
+        ->and($serviceLinks)
+        ->toContain('<x-reicon name="external-link"')
         ->and($applicationLinks)->not->toContain('<x-external-link')
         ->and($serviceLinks)->not->toContain('<x-external-link');
 });
@@ -284,8 +287,15 @@ it('shows application and service Links on mobile headings', function () {
 
     expect($mobileServiceSection)
         ->toContain('<x-services.links')
+        ->toContain('full-width')
         ->toContain('resource-heading-menus')
         ->not->toContain('<x-resource-heading-tabs');
+
+    $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
+    expect($serviceLinks)
+        ->toContain("'button w-full justify-between' => \$fullWidth")
+        ->toContain('<x-reicon name="chevron-down"')
+        ->toContain('No links available');
 
     // One mobile + one desktop instance.
     expect(substr_count($application, '<x-applications.links'))->toBe(2);

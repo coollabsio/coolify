@@ -110,7 +110,7 @@
                             <x-reicon name="search"
                                 class="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                             <input type="search" x-model.debounce.100ms="search" placeholder="Filter servers…"
-                                class="h-7! w-full rounded-md! py-0! pr-2! pl-7! text-[11px]!">
+                                class="h-7! w-full rounded-md! border-neutral-200! bg-white! py-0! pr-2! pl-7! text-[11px]! text-black! placeholder:text-neutral-400! dark:border-white/[0.1]! dark:bg-coolgray-100! dark:text-white! dark:placeholder:text-fg-faint!">
                         </div>
                     </div>
                     <template x-for="option in servers.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))"
@@ -126,38 +126,9 @@
                         </a>
                     </template>
                 </div>
-                <x-status-badge :status="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                    :type="$server->isFunctional() ? 'success' : 'warning'" />
             </span>
-
-            <div class="hidden shrink-0 items-center gap-1 xl:flex">
-                @if ($server->proxySet())
-                    @if ($proxyStatus === 'running')
-                        <x-status-badge label="Proxy" status="Running" type="success" />
-                    @elseif (in_array($proxyStatus, ['restarting', 'stopping', 'starting']))
-                        <x-status-badge label="Proxy" :status="str($proxyStatus)->headline()" type="warning" />
-                    @elseif (data_get($server, 'proxy.force_stop'))
-                        <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
-                            status="Force stopped" type="error" />
-                    @elseif ($proxyStatus === 'exited')
-                        <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
-                            status="Exited" type="error" />
-                    @endif
-                    <x-status-badge wire:loading wire:target="checkProxyStatus" label="Proxy"
-                        status="Checking…" type="warning" />
-                @endif
-                @if ($showSentinelStatus)
-                    <x-status-badge label="Sentinel"
-                        :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                        :type="$server->isSentinelLive() ? 'success' : 'error'" />
-                @endif
-                @if ($server->proxySet())
-                    <x-status-badge as="button" wire:target="checkProxyStatus"
-                        wire:loading.attr="disabled" wire:click="checkProxyStatus" status="Refresh"
-                        type="neutral" title="Refresh status" aria-label="Refresh proxy status"
-                        class="min-w-[4.5rem] cursor-pointer justify-center border-transparent hover:bg-neutral-200 disabled:cursor-wait disabled:opacity-70 dark:hover:bg-coolgray-300" />
-                @endif
-            </div>
+            <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
+                :show-sentinel-status="$showSentinelStatus" />
         </div>
     @endteleport
 
@@ -170,33 +141,13 @@
                     class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $server->name }}
                 </h1>
-                @if ($server->proxySet() || $showSentinelStatus)
-                    <div class="flex min-w-0 flex-wrap items-center gap-2">
-                        @if ($server->proxySet())
-                            @if ($proxyStatus === 'running')
-                                <x-status-badge label="Proxy" status="Running" type="success" />
-                            @elseif (in_array($proxyStatus, ['restarting', 'stopping', 'starting']))
-                                <x-status-badge label="Proxy" :status="str($proxyStatus)->headline()" type="warning" />
-                            @elseif (data_get($server, 'proxy.force_stop'))
-                                <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
-                                    status="Force stopped" type="error" />
-                            @elseif ($proxyStatus === 'exited')
-                                <x-status-badge wire:loading.remove wire:target="checkProxyStatus" label="Proxy"
-                                    status="Exited" type="error" />
-                            @endif
-                        @endif
-                        @if ($showSentinelStatus)
-                            <x-status-badge label="Sentinel"
-                                :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
-                                :type="$server->isSentinelLive() ? 'success' : 'error'" />
-                        @endif
-                    </div>
-                @endif
+                <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
+                    :show-sentinel-status="$showSentinelStatus" />
             </div>
         </div>
 
-        {{-- Phone-only actions + primary tabs. From md the desktop tab row is used. --}}
-        <div class="w-full md:hidden">
+        {{-- Resource actions stay available below the desktop action HUD. Navigation lives in the sidebar. --}}
+        <div class="w-full xl:hidden">
             @if ($server->proxySet())
                 @can('manageProxy', $server)
                     <div id="server-mobile-actions" class="relative mb-3"
@@ -282,8 +233,7 @@
                 @endcan
             @endif
 
-            <div
-                class="flex min-w-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+            <div class="hidden" aria-hidden="true">
                 <x-resource-heading-tabs class="min-w-0 flex-1">
                     @foreach ($serverMenuItems as $menuItem)
                         <a @class([
@@ -300,11 +250,10 @@
             </div>
         </div>
 
-        <div class="hidden w-full items-center md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pr-4 lg:pl-2 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
-            :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
+        <div class="hidden xl:fixed xl:top-14 xl:right-4 xl:z-30 xl:flex xl:h-12 xl:w-auto xl:items-center">
             <div
-                class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                <x-resource-heading-tabs class="application-primary-tabs min-w-0">
+                class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                <x-resource-heading-tabs class="hidden" aria-hidden="true">
                     @foreach ($serverMenuItems as $menuItem)
                         <a wire:key="server-primary-nav-{{ str($menuItem['label'])->slug() }}"
                             @class([
@@ -326,7 +275,7 @@
                 @if ($server->proxySet())
                     @can('manageProxy', $server)
                         <div
-                            class="resource-heading-actions flex shrink-0 items-center gap-0.5 border-l border-neutral-200 pl-1 dark:border-white/[0.08]">
+                            class="resource-heading-actions flex shrink-0 items-center gap-0.5">
                             @if ($proxyStatus === 'running')
                                 <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
                                     <x-loading text="Checking Traefik dashboard" />
@@ -378,7 +327,6 @@
                 @endif
             </div>
         </div>
-        <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>
     </div>
 
     @script

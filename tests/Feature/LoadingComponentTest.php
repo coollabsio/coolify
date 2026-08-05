@@ -5,7 +5,8 @@ it('uses the current neutral loading indicator styles', function () {
 
     expect($loading)
         ->toContain('gap-2 text-[13px] text-neutral-500 dark:text-fg-dim')
-        ->toContain('size-4 shrink-0 animate-spin')
+        ->toContain("'size-3' => \$compact")
+        ->toContain("'size-4' => ! \$compact")
         ->toContain('stroke="currentColor" stroke-width="2"')
         ->not->toContain('text-coollabs')
         ->not->toContain('dark:text-warning');

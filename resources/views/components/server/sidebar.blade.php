@@ -47,6 +47,47 @@
             'visible' => ! $server->isLocalhost(),
         ],
         [
+            'label' => 'Proxy',
+            'route' => 'server.proxy',
+            'active' => request()->routeIs('server.proxy', 'server.proxy.*'),
+            'icon' => 'network',
+            'group' => 'Platform',
+            'visible' => ! $server->isSwarmWorker() && ! $server->settings->is_build_server,
+            'children' => [
+                ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => request()->routeIs('server.proxy'), 'icon' => 'settings'],
+                ['label' => 'Dynamic Configurations', 'route' => 'server.proxy.dynamic-confs', 'active' => request()->routeIs('server.proxy.dynamic-confs'), 'icon' => 'sliders', 'visible' => $server->proxySet()],
+                ['label' => 'Logs', 'route' => 'server.proxy.logs', 'active' => request()->routeIs('server.proxy.logs'), 'icon' => 'file-content', 'visible' => $server->proxySet(), 'navigate' => false],
+            ],
+        ],
+        [
+            'label' => 'Sentinel',
+            'route' => 'server.sentinel',
+            'active' => request()->routeIs('server.sentinel', 'server.sentinel.*'),
+            'icon' => 'shield-star',
+            'group' => 'Platform',
+            'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server),
+            'children' => [
+                ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => request()->routeIs('server.sentinel'), 'icon' => 'settings'],
+                ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => request()->routeIs('server.sentinel.logs'), 'icon' => 'file-content'],
+            ],
+        ],
+        [
+            'label' => 'Resources',
+            'route' => 'server.resources',
+            'active' => request()->routeIs('server.resources'),
+            'icon' => 'projects',
+            'group' => 'Platform',
+        ],
+        [
+            'label' => 'Terminal',
+            'route' => 'server.command',
+            'active' => request()->routeIs('server.command'),
+            'icon' => 'browser-terminal',
+            'group' => 'Operations',
+            'navigate' => false,
+            'visible' => auth()->user()?->can('canAccessTerminal'),
+        ],
+        [
             'label' => 'Destinations',
             'route' => 'server.destinations',
             'active' => $activeMenu === 'destinations',
@@ -66,7 +107,7 @@
             'label' => 'Docker Cleanup',
             'route' => 'server.docker-cleanup',
             'active' => $activeMenu === 'docker-cleanup',
-            'icon' => 'storages',
+            'icon' => 'broom',
             'group' => 'Operations',
             'visible' => $server->isFunctional(),
         ],
@@ -85,6 +126,18 @@
             'icon' => 'graph',
             'group' => 'Operations',
             'visible' => $server->isFunctional(),
+        ],
+        [
+            'label' => 'Security',
+            'route' => 'server.security.patches',
+            'active' => request()->routeIs('server.security.*'),
+            'icon' => 'shield-alert',
+            'group' => 'Security',
+            'visible' => auth()->user()?->can('update', $server),
+            'children' => [
+                ['label' => 'Server Patching', 'route' => 'server.security.patches', 'active' => request()->routeIs('server.security.patches'), 'icon' => 'bandage'],
+                ['label' => 'Terminal Access', 'route' => 'server.security.terminal-access', 'active' => request()->routeIs('server.security.terminal-access'), 'icon' => 'browser-terminal', 'navigate' => false],
+            ],
         ],
         [
             'label' => 'Danger',
@@ -119,11 +172,24 @@
                         'menu-item',
                         'menu-item-active' => $menuItem['active'],
                     ])
-                    {{ wireNavigate() }}
+                    @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                     href="{{ route($menuItem['route'], $serverRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                 </a>
+                @if ($menuItem['active'] && isset($menuItem['children']))
+                    <div class="col-span-full grid grid-cols-2 gap-0.5 border-l border-neutral-200 pl-2 sm:grid-cols-3 xl:grid-cols-1 dark:border-white/[0.08]">
+                        @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
+                            <a wire:key="server-settings-child-{{ str($menuItem['label'].'-'.$child['label'])->slug() }}"
+                                @class(['menu-item', 'menu-item-active' => $child['active']])
+                                @if ($child['navigate'] ?? true) {{ wireNavigate() }} @endif
+                                href="{{ route($child['route'], $serverRouteParameters) }}">
+                                <x-reicon :name="$child['icon']" class="menu-item-icon" />
+                                <span class="menu-item-label">{{ $child['label'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
             @endforeach
         @endforeach
     </nav>

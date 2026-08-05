@@ -55,3 +55,23 @@ it('shows section titles and descriptions above settings navigation on smaller s
     ['settings/layout.blade.php', 'Instance Settings', 'Configure global settings for this Coolify instance.'],
     ['team/settings-layout.blade.php', 'Team', 'Manage your team, members, and access settings.'],
 ]);
+
+it('uses the structured sidebar and action HUD for server navigation', function () {
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+    $sidebar = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+    $resources = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
+    $terminal = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($navbar)
+        ->toContain('class="hidden xl:fixed xl:top-14 xl:right-4 xl:z-30 xl:flex')
+        ->toContain('<x-resource-heading-tabs class="hidden" aria-hidden="true">')
+        ->toContain('dark:bg-coolgray-100! dark:text-white!')
+        ->and($sidebar)
+        ->toContain("'label' => 'Proxy'")
+        ->toContain("'label' => 'Sentinel'")
+        ->toContain("'label' => 'Resources'")
+        ->toContain("'label' => 'Terminal'")
+        ->toContain("'label' => 'Security'")
+        ->and($resources)->toContain('<x-server.sidebar :server="$server" activeMenu="resources" />')
+        ->and($terminal)->toContain('<x-server.sidebar :server="$resource" activeMenu="terminal" />');
+});

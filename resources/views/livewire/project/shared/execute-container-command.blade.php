@@ -41,10 +41,12 @@
         ])->values();
     @endphp
 
-    @if (in_array($type, ['application', 'database', 'service'], true))
+    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
         <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
             <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-                @if ($type === 'application')
+                @if ($type === 'server')
+                    <x-server.sidebar :server="$resource" activeMenu="terminal" />
+                @elseif ($type === 'application')
                     <x-application.configuration-sidebar :application="$resource" current-route="project.application.command" />
                 @elseif ($type === 'database')
                     <x-database.configuration-sidebar :database="$resource" current-route="project.database.command" />
@@ -210,7 +212,7 @@
             </div>
         </section>
     @endif
-    @if (in_array($type, ['application', 'database', 'service'], true))
+    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
                 </div>
             </div>
         </section>

@@ -101,14 +101,14 @@
                             localStorage.setItem('service-compose-resources-view', mode);
                         }
                     }">
-                        <div class="mb-3 flex items-center justify-between gap-3">
+                        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 class="text-base font-semibold text-black dark:text-fg">Compose resources</h2>
                                 <p class="mt-1 text-sm text-neutral-500 dark:text-fg-dim">
                                     Applications and databases defined in this service.
                                 </p>
                             </div>
-                            <div class="flex shrink-0 items-center gap-2">
+                            <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                                 <div
                                     class="flex h-8 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
                                     <button type="button" x-on:click="setViewMode('table')"

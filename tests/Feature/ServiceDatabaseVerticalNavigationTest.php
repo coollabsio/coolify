@@ -92,7 +92,7 @@ it('shows the database sidebar in the terminal', function () {
     $terminal = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
 
     expect($terminal)
-        ->toContain("in_array(\$type, ['application', 'database', 'service'], true)")
+        ->toContain("in_array(\$type, ['application', 'database', 'service', 'server'], true)")
         ->toContain('<x-database.configuration-sidebar :database="$resource" current-route="project.database.command"');
 });
 
@@ -105,7 +105,7 @@ it('shows the service sidebar on runtime logs and terminal pages', function () {
         ->toContain("in_array(\$type, ['application', 'database', 'service'], true)")
         ->toContain('<x-service.configuration-sidebar :service="$resource" current-route="project.service.logs"')
         ->and($terminal)
-        ->toContain("in_array(\$type, ['application', 'database', 'service'], true)")
+        ->toContain("in_array(\$type, ['application', 'database', 'service', 'server'], true)")
         ->toContain('<x-service.configuration-sidebar :service="$resource" current-route="project.service.command"')
         ->and($sidebar)
         ->toContain("'Logs' => ['Runtime']")

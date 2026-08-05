@@ -179,7 +179,7 @@
             @endif
 
             <div class="resource-heading-menus w-full">
-                <x-services.links :service="$service" />
+                <x-services.links :service="$service" full-width />
             </div>
         </div>
 
