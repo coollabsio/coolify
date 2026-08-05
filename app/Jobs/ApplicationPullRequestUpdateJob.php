@@ -101,8 +101,7 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($dockerComposeDomains as $serviceName => $config) {
                 $domain = data_get($config, 'domain');
                 if (! empty($domain)) {
-                    $firstDomain = str($domain)->explode(',')->first();
-                    $firstDomain = trim($firstDomain);
+                    $firstDomain = getFqdnWithoutPort(firstDomainFromList($domain));
                     if (! empty($firstDomain)) {
                         $links[] = "[Open {$serviceName}]({$firstDomain})";
                     }
@@ -112,6 +111,10 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
             return ! empty($links) ? implode(' | ', $links).' | ' : '';
         }
 
-        return $this->preview->fqdn ? "[Open Preview]({$this->preview->fqdn}) | " : '';
+        if (! $this->preview->fqdn) {
+            return '';
+        }
+
+        return '[Open Preview]('.getFqdnWithoutPort($this->preview->fqdn).') | ';
     }
 }
