@@ -20,53 +20,20 @@
             ['label' => 'Servers', 'route' => 'shared-variables.server.index', 'active' => request()->routeIs('shared-variables.server.*')],
         ],
         'team' => [
-            ['label' => 'General', 'route' => 'team.index', 'active' => request()->routeIs('team.index')],
-            ['label' => 'Members', 'route' => 'team.member.index', 'active' => request()->routeIs('team.member.index')],
-            [
-                'label' => 'Admin View',
-                'route' => 'team.admin-view',
-                'active' => request()->routeIs('team.admin-view'),
-                'visible' => isInstanceAdmin(),
-            ],
+            ['label' => 'General', 'route' => 'team.index', 'active' => request()->routeIs('team.index', 'team.member.index', 'team.admin-view', 'team.danger-zone')],
         ],
         'profile' => [
             ['label' => 'General', 'route' => 'profile', 'active' => request()->routeIs('profile')],
             ['label' => 'Appearance', 'route' => 'profile.appearance', 'active' => request()->routeIs('profile.appearance')],
         ],
         'notifications' => [
-            ['label' => 'Email', 'route' => 'notifications.email', 'active' => request()->routeIs('notifications.email')],
-            ['label' => 'Discord', 'route' => 'notifications.discord', 'active' => request()->routeIs('notifications.discord')],
-            ['label' => 'Telegram', 'route' => 'notifications.telegram', 'active' => request()->routeIs('notifications.telegram')],
-            ['label' => 'Slack', 'route' => 'notifications.slack', 'active' => request()->routeIs('notifications.slack')],
-            ['label' => 'Pushover', 'route' => 'notifications.pushover', 'active' => request()->routeIs('notifications.pushover')],
-            ['label' => 'Webhook', 'route' => 'notifications.webhook', 'active' => request()->routeIs('notifications.webhook')],
+            ['label' => 'Email', 'route' => 'notifications.email', 'active' => request()->routeIs('notifications.*')],
         ],
         'security' => [
-            ['label' => 'Private Keys', 'route' => 'security.private-key.index', 'active' => request()->routeIs('security.private-key.*')],
-            [
-                'label' => 'Cloud Tokens',
-                'route' => 'security.cloud-tokens',
-                'active' => request()->routeIs('security.cloud-tokens*'),
-                'visible' => auth()->user()?->can('viewAny', App\Models\CloudProviderToken::class),
-            ],
-            [
-                'label' => 'Cloud-Init Scripts',
-                'route' => 'security.cloud-init-scripts',
-                'active' => request()->routeIs('security.cloud-init-scripts*'),
-                'visible' => auth()->user()?->can('viewAny', App\Models\CloudInitScript::class),
-            ],
-            ['label' => 'API Tokens', 'route' => 'security.api-tokens', 'active' => request()->routeIs('security.api-tokens')],
+            ['label' => 'Private Keys', 'route' => 'security.private-key.index', 'active' => request()->routeIs('security.*')],
         ],
         'settings' => [
-            [
-                'label' => 'Configuration',
-                'route' => 'settings.index',
-                'active' => request()->routeIs('settings.index', 'settings.advanced', 'settings.updates'),
-            ],
-            ['label' => 'Backup', 'route' => 'settings.backup', 'active' => request()->routeIs('settings.backup')],
-            ['label' => 'Email', 'route' => 'settings.email', 'active' => request()->routeIs('settings.email')],
-            ['label' => 'OAuth', 'route' => 'settings.oauth', 'active' => request()->routeIs('settings.oauth')],
-            ['label' => 'Scheduled Jobs', 'route' => 'settings.scheduled-jobs', 'active' => request()->routeIs('settings.scheduled-jobs')],
+            ['label' => 'General', 'route' => 'settings.index', 'active' => request()->routeIs('settings.*')],
         ],
         'source' => [
             [

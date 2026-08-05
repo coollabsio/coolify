@@ -3,12 +3,7 @@
         Advanced Settings | Coolify
     </x-slot>
 
-    <x-settings.navbar />
-
-    <div
-        class="application-settings-workspace mx-auto grid w-full max-w-[1180px] min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-        <x-settings.sidebar activeMenu="advanced" />
-
+    <x-settings.layout>
         <form wire:submit="submit" class="application-settings-form flex min-w-0 flex-col gap-6">
             {{-- Scope dirty tracking to fields that need an explicit Save. Instant-save
                  listboxes (API, MCP, telemetry, …) update the snapshot on the server
@@ -140,5 +135,5 @@
                 </div>
             </x-application.settings-section>
         </form>
-    </div>
+    </x-settings.layout>
 </div>

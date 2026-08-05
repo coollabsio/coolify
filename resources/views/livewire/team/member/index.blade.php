@@ -56,8 +56,7 @@
         Team Members | Coolify
     </x-slot>
 
-    <x-team.navbar />
-
+    <x-team.settings-layout>
     <div class="application-settings-form flex flex-col gap-6">
         <x-application.settings-section title="Members" flush>
             <div
@@ -172,4 +171,5 @@
             <livewire:team.invitations :invitations="$invitations" />
         @endcan
     </div>
+    </x-team.settings-layout>
 </div>

@@ -34,6 +34,16 @@ test('helper popup uses the redesigned raised surface styles', function () {
         ->toContain('rounded-lg');
 });
 
+test('helper popup remains open while moving from the trigger into interactive content', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('hideTimer: null')
+        ->toContain('setTimeout(() =>')
+        ->toContain('@mouseenter="cancelHide()"')
+        ->toContain('@mouseleave="hide()"');
+});
+
 test('listbox keeps the helper outside the label association', function () {
     $path = resource_path('views/components/forms/listbox.blade.php');
     $contents = file_get_contents($path);

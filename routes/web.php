@@ -92,6 +92,7 @@ use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
+use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
@@ -194,6 +195,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
+        Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
     });
 
     Route::get('/terminal', TerminalIndex::class)->name('terminal')->middleware('can.access.terminal');

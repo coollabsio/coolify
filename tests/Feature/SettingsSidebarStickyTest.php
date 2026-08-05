@@ -10,8 +10,8 @@ it('uses one aligned sticky rule for all settings sidebars', function () {
     expect($navigationCss)
         ->toContain('align-self: start')
         ->toContain('position: sticky')
-        ->toContain('top: 3.5rem')
-        ->toContain('max-height: calc(100dvh - 4.25rem)')
+        ->toContain('top: calc(3rem + 1.75rem)')
+        ->toContain('max-height: calc(100dvh - 5.5rem)')
         ->toContain('overflow-y: auto');
 });
 

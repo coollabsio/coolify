@@ -3,7 +3,9 @@
         Keys & Tokens | Coolify
     </x-slot>
 
-    <x-security.navbar>
+    <x-security.settings-layout>
+        <x-application.settings-section title="Private keys"
+            description="SSH keys used to connect servers and private repositories." flush>
         <x-slot:actions>
             @can('create', App\Models\PrivateKey::class)
                 <x-modal-confirmation title="Confirm unused SSH Key Deletion?"
@@ -52,26 +54,35 @@
                                     Add manually
                                 </button>
                             </x-slot:content>
-                            <livewire:security.private-key.create />
+                            <livewire:security.private-key.create :modal_mode="true" />
                         </x-modal-input>
                     </div>
                 </div>
             @endcan
         </x-slot:actions>
-    </x-security.navbar>
+
 
     @if ($privateKeys->isEmpty())
         <x-empty title="No private keys yet"
             description="Generate or add an SSH key to connect Coolify to servers and private repositories."
             icon-name="keys" />
     @else
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+            <div class="grid grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[13px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                <div class="pl-11">Private key</div>
+                <div class="hidden sm:block">Description</div>
+                <div class="text-center">Status</div>
+                <div class="w-7"></div>
+            </div>
             @foreach ($privateKeys as $key)
                 @can('view', $key)
-                    <a class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
-                        href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}"
-                        {{ wireNavigate() }}>
-                        <div class="flex items-start gap-3">
+                    <x-modal-input title="Edit Private Key" isFullWidth :wireIgnore="false" :contentClicks="false"
+                        class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
+                        <x-slot:content>
+                    <div
+                        class="grid min-h-14 w-full grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:hover:bg-white/[0.025]"
+                    >
+                        <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                                 <x-reicon name="keys" class="size-4" />
@@ -80,21 +91,29 @@
                                 <h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                     {{ data_get($key, 'name') }}
                                 </h3>
-                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    {{ $key->description ?: 'SSH private key' }}
-                                </p>
                             </div>
                         </div>
-                        <div class="mt-auto pt-4">
+                        <p class="hidden truncate text-[12px] text-neutral-500 sm:block dark:text-fg-dim">
+                            {{ $key->description ?: '-' }}
+                        </p>
+                        <div class="flex justify-center">
                             @if ($key->isInUse())
                                 <x-status-badge label="In use" type="success" />
                             @else
                                 <x-status-badge label="Unused" type="warning" />
                             @endif
                         </div>
-                    </a>
+                        <button type="button" class="icon-button" title="Edit private key"
+                            aria-label="Edit {{ $key->name }}" @click="modalOpen=true">
+                            <x-reicon name="settings" class="size-3.5" />
+                        </button>
+                    </div>
+                        </x-slot:content>
+                        <livewire:security.private-key.show :private_key_uuid="$key->uuid" :modalMode="true"
+                            :key="'private-key-editor-'.$key->uuid" />
+                    </x-modal-input>
                 @else
-                    <div class="flex min-h-28 cursor-not-allowed flex-col rounded-xl border border-neutral-200 bg-neutral-50 p-3 opacity-65 dark:border-white/[0.08] dark:bg-white/[0.015]"
+                    <div class="grid min-h-14 cursor-not-allowed grid-cols-[minmax(0,1fr)_7rem_1.75rem] items-center gap-3 border-b border-neutral-200 px-4 py-2.5 opacity-65 last:border-b-0 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_7rem_1.75rem] dark:border-white/[0.07]"
                         title="You do not have permission to view this private key">
                         <div class="flex items-start gap-3">
                             <div
@@ -105,20 +124,22 @@
                                 <h3 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
                                     {{ data_get($key, 'name') }}
                                 </h3>
-                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    {{ $key->description ?: 'SSH private key' }}
-                                </p>
                             </div>
                         </div>
-                        <div class="mt-auto flex flex-wrap gap-2 pt-4">
+                        <p class="hidden truncate text-[12px] text-neutral-500 sm:block dark:text-fg-dim">{{ $key->description ?: '-' }}</p>
+                        <div class="flex flex-wrap justify-center gap-2">
                             <x-status-badge label="View only" type="neutral" />
                             @if (!$key->isInUse())
                                 <x-status-badge label="Unused" type="warning" />
                             @endif
                         </div>
+                        <span class="size-7"></span>
                     </div>
                 @endcan
             @endforeach
         </div>
     @endif
+        </x-application.settings-section>
+
+    </x-security.settings-layout>
 </div>

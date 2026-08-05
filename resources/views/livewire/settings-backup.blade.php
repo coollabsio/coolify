@@ -3,8 +3,7 @@
         Instance Backup | Coolify
     </x-slot>
 
-    <x-settings.navbar />
-
+    <x-settings.layout>
     <div class="application-settings-form mx-auto flex w-full max-w-[1180px] min-w-0 flex-col gap-6">
         @if ($server->isFunctional())
             @if (isset($database) && isset($backup))
@@ -51,4 +50,5 @@
             </x-application.settings-section>
         @endif
     </div>
+    </x-settings.layout>
 </div>

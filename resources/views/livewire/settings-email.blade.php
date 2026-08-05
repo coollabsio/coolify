@@ -3,8 +3,7 @@
         Transactional Email | Coolify
     </x-slot>
 
-    <x-settings.navbar />
-
+    <x-settings.layout>
     <div class="application-settings-form mx-auto flex w-full max-w-[1180px] min-w-0 flex-col gap-6">
         <form wire:submit="submit">
             <x-unsaved-bar action="submit" />
@@ -65,4 +64,5 @@
             </x-application.settings-section>
         </form>
     </div>
+    </x-settings.layout>
 </div>

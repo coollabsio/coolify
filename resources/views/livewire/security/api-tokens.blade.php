@@ -3,7 +3,7 @@
         API Tokens | Coolify
     </x-slot>
 
-    <x-security.navbar />
+    <x-security.settings-layout>
 
     @if (!$isApiEnabled)
         <div class="application-settings-form">
@@ -53,49 +53,53 @@
                                 <h4 class="text-[12px] font-semibold text-black dark:text-fg">Permissions</h4>
                                 <x-helper helper="Only grant the abilities this token needs." />
                             </div>
-                            <div class="grid gap-3 lg:grid-cols-2">
-                                @if ($canUseRootPermissions)
-                                    <x-forms.checkbox label="Root" wire:model.live="permissions" domValue="root"
-                                        helper="Full access to every API operation." :checked="in_array('root', $permissions)" />
-                                @else
-                                    <x-forms.checkbox label="Root" disabled domValue="root"
-                                        helper="Requires an admin or owner role." :checked="false" />
-                                @endif
+                            <div class="relative" x-data="{ permissionsOpen: false }"
+                                @click.outside="permissionsOpen = false" @keydown.escape.window="permissionsOpen = false">
+                                <button type="button" class="listbox-trigger" @click="permissionsOpen = !permissionsOpen"
+                                    aria-haspopup="listbox" :aria-expanded="permissionsOpen">
+                                    <span class="truncate">
+                                        Selected permissions: {{ collect($permissions)->map(fn ($permission) => str($permission)->replace(':', ' ')->headline())->join(', ') }}
+                                    </span>
+                                    <x-reicon name="chevron-down" class="size-3.5 shrink-0 opacity-60" />
+                                </button>
 
-                                @if (!in_array('root', $permissions))
-                                    @if ($canUseWritePermissions)
-                                        <x-forms.checkbox label="Write" wire:model.live="permissions"
-                                            domValue="write" helper="Create and update resources."
-                                            :checked="in_array('write', $permissions)" />
-                                    @else
-                                        <x-forms.checkbox label="Write" disabled domValue="write"
-                                            helper="Requires an admin or owner role." :checked="false" />
-                                    @endif
-
-                                    @if ($canUseDeployPermissions)
-                                        <x-forms.checkbox label="Deploy" wire:model.live="permissions"
-                                            domValue="deploy" helper="Trigger deployments through webhooks."
-                                            :checked="in_array('deploy', $permissions)" />
-                                    @else
-                                        <x-forms.checkbox label="Deploy" disabled domValue="deploy"
-                                            helper="Requires an admin or owner role." :checked="false" />
-                                    @endif
-
-                                    <x-forms.checkbox label="Read" wire:model.live="permissions" domValue="read"
-                                        helper="Read non-sensitive resource data."
-                                        :checked="in_array('read', $permissions)" />
-
-                                    @if ($canUseSensitivePermissions)
-                                        <x-forms.checkbox label="Read sensitive data" wire:model.live="permissions"
-                                            domValue="read:sensitive"
+                                <div x-cloak x-show="permissionsOpen" x-transition.origin.top
+                                    class="listbox-panel top-full! mt-1! w-full!" role="listbox">
+                                    <div class="listbox-option p-0!">
+                                        <x-forms.checkbox id="permission-root" label="Root" fullWidth
+                                            wire:model.live="permissions" domValue="root"
+                                            helper="Full access to every API operation."
+                                            :checked="in_array('root', $permissions)" :disabled="!$canUseRootPermissions" />
+                                    </div>
+                                    <div class="listbox-option p-0!">
+                                        <x-forms.checkbox id="permission-write" label="Write" fullWidth
+                                            wire:model.live="permissions" domValue="write"
+                                            helper="Create and update resources."
+                                            :checked="in_array('write', $permissions)"
+                                            :disabled="in_array('root', $permissions) || !$canUseWritePermissions" />
+                                    </div>
+                                    <div class="listbox-option p-0!">
+                                        <x-forms.checkbox id="permission-deploy" label="Deploy" fullWidth
+                                            wire:model.live="permissions" domValue="deploy"
+                                            helper="Trigger deployments through webhooks."
+                                            :checked="in_array('deploy', $permissions)"
+                                            :disabled="in_array('root', $permissions) || !$canUseDeployPermissions" />
+                                    </div>
+                                    <div class="listbox-option p-0!">
+                                        <x-forms.checkbox id="permission-read" label="Read" fullWidth
+                                            wire:model.live="permissions" domValue="read"
+                                            helper="Read non-sensitive resource data."
+                                            :checked="in_array('read', $permissions)"
+                                            :disabled="in_array('root', $permissions)" />
+                                    </div>
+                                    <div class="listbox-option p-0!">
+                                        <x-forms.checkbox id="permission-read-sensitive" label="Read sensitive data"
+                                            fullWidth wire:model.live="permissions" domValue="read:sensitive"
                                             helper="Include secrets, logs, passwords, and Compose content."
-                                            :checked="in_array('read:sensitive', $permissions)" />
-                                    @else
-                                        <x-forms.checkbox label="Read sensitive data" disabled
-                                            domValue="read:sensitive" helper="Requires an admin or owner role."
-                                            :checked="false" />
-                                    @endif
-                                @endif
+                                            :checked="in_array('read:sensitive', $permissions)"
+                                            :disabled="in_array('root', $permissions) || !$canUseSensitivePermissions" />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </x-application.settings-section>
@@ -299,4 +303,5 @@
             </x-application.settings-section>
         </div>
     @endif
+    </x-security.settings-layout>
 </div>

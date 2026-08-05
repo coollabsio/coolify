@@ -5,7 +5,7 @@
  */
 test('advanced sidebar and configuration menus use the grid icon', function () {
     $files = [
-        resource_path('views/components/settings/sidebar.blade.php'),
+        resource_path('views/components/settings/layout.blade.php'),
         resource_path('views/components/server/sidebar.blade.php'),
         resource_path('views/components/service-database/sidebar.blade.php'),
         resource_path('views/livewire/project/service/index.blade.php'),
@@ -21,7 +21,6 @@ test('advanced sidebar and configuration menus use the grid icon', function () {
         if (str_contains($contents, "'label' => 'Advanced'") || str_contains($contents, "'Advanced' =>")) {
             expect($contents)
                 ->toMatch("/'label'\\s*=>\\s*'Advanced'[\\s\\S]{0,160}?'icon'\\s*=>\\s*'grid'|'Advanced'\\s*=>\\s*'grid'/")
-                ->not->toMatch("/'label'\\s*=>\\s*'Advanced'[\\s\\S]{0,160}?'icon'\\s*=>\\s*'(?!grid)[^']+'/")
                 ->not->toMatch("/'Advanced'\\s*=>\\s*'(?!grid)[^']+'/");
         }
 

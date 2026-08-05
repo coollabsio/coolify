@@ -4,7 +4,7 @@
  * Instance settings Updates nav must use the reicon "refresh3" glyph.
  */
 test('settings updates sidebar uses the refresh3 icon', function () {
-    $sidebar = file_get_contents(resource_path('views/components/settings/sidebar.blade.php'));
+    $sidebar = file_get_contents(resource_path('views/components/settings/layout.blade.php'));
     $reicon = file_get_contents(resource_path('views/components/reicon.blade.php'));
 
     expect($sidebar)

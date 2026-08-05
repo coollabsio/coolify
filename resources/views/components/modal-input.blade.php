@@ -11,6 +11,7 @@
     'wireIgnore' => true,
     // Optional Livewire bool property to entangle open state (survives Livewire re-renders).
     'wireOpen' => null,
+    'contentClicks' => true,
 ])
 
 @php
@@ -23,7 +24,7 @@
     {{ $attributes->class(['relative', $isFullWidth ? 'h-full w-full' : 'h-auto w-auto']) }}
     @close-modal.window="modalOpen=false" @if ($wireIgnore) wire:ignore @endif>
     @if ($content)
-        <div @click="modalOpen=true" @class(['h-full w-full' => $isFullWidth])>
+        <div @if ($contentClicks) @click="modalOpen=true" @endif @class(['h-full w-full' => $isFullWidth])>
             {{ $content }}
         </div>
     @else

@@ -1030,8 +1030,9 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     padding: 1rem;
 }
 
-/* All settings sidebars share one alignment rule. Their natural position is
-   level with the content column; once scrolled they stay below the top bar. */
+/* All settings sidebars share one alignment rule. Keep the sticky offset equal
+   to the desktop main-content top padding so the menu does not jump upward
+   when it changes from its natural position to sticky positioning. */
 .server-settings-workspace > :not(.application-settings-navigation) {
     min-width: 0;
 }
@@ -1039,9 +1040,9 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 @media (min-width: 1280px) {
     .application-settings-navigation {
         position: sticky;
-        top: 3.5rem;
+        top: calc(3rem + 1.75rem);
         align-self: start;
-        max-height: calc(100dvh - 4.25rem);
+        max-height: calc(100dvh - 5.5rem);
         padding-right: 0.375rem;
         overflow-x: hidden;
         overflow-y: auto;

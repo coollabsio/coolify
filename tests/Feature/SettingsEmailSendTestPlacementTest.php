@@ -44,11 +44,10 @@ test('send test is available in the sender section and not in the settings navba
     $view = file_get_contents(resource_path('views/livewire/settings-email.blade.php'));
 
     expect($view)
-        ->toContain('<x-settings.navbar />')
+        ->toContain('<x-settings.layout>')
         ->toContain('settings-section title="Sender"')
         ->toContain('settings-email-send-test')
-        // Self-closing navbar means no actions slot is passed into the tab bar.
-        ->not->toContain('<x-settings.navbar>');
+        ->not->toContain('<x-settings.navbar');
 });
 
 test('send test is not rendered when transactional email is disabled', function () {

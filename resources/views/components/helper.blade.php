@@ -1,18 +1,30 @@
 <div x-data="{
     open: false,
     pinned: false,
+    hideTimer: null,
     style: '',
     show(pinned = false) {
+        this.cancelHide();
         this.pinned = pinned;
         this.open = true;
         this.$nextTick(() => this.position());
     },
     hide() {
-        if (!this.pinned) {
-            this.open = false;
+        this.cancelHide();
+        this.hideTimer = setTimeout(() => {
+            if (!this.pinned) {
+                this.open = false;
+            }
+        }, 150);
+    },
+    cancelHide() {
+        if (this.hideTimer) {
+            clearTimeout(this.hideTimer);
+            this.hideTimer = null;
         }
     },
     close() {
+        this.cancelHide();
         this.pinned = false;
         this.open = false;
     },
@@ -64,7 +76,7 @@
             x-transition:leave-end="opacity-0"
             :style="style"
             class="info-helper-popup fixed z-[9999] w-max max-w-[min(20rem,calc(100vw-2rem))]"
-            @click.stop>
+            @mouseenter="cancelHide()" @mouseleave="hide()" @click.stop>
             <div class="px-3 py-2.5 text-[13px] leading-5">
                 {!! $helper !!}
             </div>

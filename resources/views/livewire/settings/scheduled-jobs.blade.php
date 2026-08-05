@@ -3,8 +3,7 @@
         Scheduled Jobs | Coolify
     </x-slot>
 
-    <x-settings.navbar />
-
+    <x-settings.layout>
     <div class="application-settings-form mx-auto w-full max-w-[1180px] min-w-0" x-data="{
         activeTab: ['executions', 'scheduler-runs', 'skipped-jobs'].includes(location.hash.slice(1))
             ? location.hash.slice(1)
@@ -363,4 +362,5 @@
             </div>
         </x-application.settings-section>
     </div>
+    </x-settings.layout>
 </div>

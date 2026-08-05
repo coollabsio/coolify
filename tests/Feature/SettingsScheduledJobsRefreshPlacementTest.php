@@ -4,11 +4,10 @@ test('scheduled jobs refresh control lives on the activity section not the navba
     $view = file_get_contents(resource_path('views/livewire/settings/scheduled-jobs.blade.php'));
 
     expect($view)
-        ->toContain('<x-settings.navbar />')
+        ->toContain('<x-settings.layout>')
         ->toContain('settings-section title="Scheduler activity"')
         ->toContain('wire:click="refresh"')
-        // Self-closing navbar means Refresh is not passed as a tab-bar action.
-        ->not->toContain('<x-settings.navbar>');
+        ->not->toContain('<x-settings.navbar');
 
     // Refresh should appear after the activity section opens, not before.
     $activityPos = strpos($view, 'settings-section title="Scheduler activity"');

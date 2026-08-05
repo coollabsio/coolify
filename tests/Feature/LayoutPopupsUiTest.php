@@ -25,3 +25,14 @@ test('notification reminder uses the redesigned popup shell', function () {
         ->toContain('Open notifications')
         ->not->toContain('Accept and Close');
 });
+
+test('non-critical reminders collapse after ten seconds', function () {
+    $view = file_get_contents(resource_path('views/livewire/layout-popups.blade.php'));
+
+    expect($view)
+        ->toContain('reminderCollapseAfter: 10000')
+        ->toContain("scheduleReminderCollapse('sponsorship')")
+        ->toContain("scheduleReminderCollapse('notification')")
+        ->toContain('reminders.sponsorship.compact = true')
+        ->toContain('reminders.notification.compact = true');
+});

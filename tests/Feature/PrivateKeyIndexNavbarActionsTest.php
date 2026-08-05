@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Security / notifications family: mobile-only H1 on list views; actions in layer-2 nav.
+ * Security / notifications family: mobile-only H1 on list views; list actions live in card headers.
  * Detail views keep the resource title on desktop.
  */
 test('security navbar defaults to hiding the title on desktop', function () {
@@ -17,7 +17,7 @@ test('security navbar defaults to hiding the title on desktop', function () {
         ->toContain(':titleOnDesktop="$titleOnDesktop"');
 });
 
-test('security list views place create actions next to the tabs not in titleActions', function () {
+test('security list views place create actions in collection card headers', function () {
     $pages = [
         resource_path('views/livewire/security/private-key/index.blade.php') => [
             'New private key',
@@ -25,7 +25,7 @@ test('security list views place create actions next to the tabs not in titleActi
             'Delete unused keys',
             'Delete unused',
         ],
-        resource_path('views/livewire/security/cloud-tokens.blade.php') => [
+        resource_path('views/livewire/security/cloud-provider-tokens.blade.php') => [
             'New token',
         ],
         resource_path('views/livewire/security/cloud-init-scripts.blade.php') => [
@@ -37,6 +37,7 @@ test('security list views place create actions next to the tabs not in titleActi
         $blade = file_get_contents($path);
 
         expect($blade)
+            ->toContain('<x-application.settings-section')
             ->toContain('<x-slot:actions>')
             ->not->toContain('<x-slot:titleActions>');
 

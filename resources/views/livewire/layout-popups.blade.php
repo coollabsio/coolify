@@ -4,11 +4,24 @@
         notification: true,
         realtime: false,
     },
+    reminders: {
+        sponsorship: { compact: false },
+        notification: { compact: false },
+    },
+    reminderCollapseAfter: 10000,
     isDevelopment: {{ isDev() ? 'true' : 'false' }},
     init() {
         this.popups.sponsorship = this.shouldShowMonthlyPopup('popupSponsorship');
         this.popups.notification = this.shouldShowMonthlyPopup('popupNotification');
         this.popups.realtime = localStorage.getItem('popupRealtime');
+
+        if (this.popups.sponsorship) {
+            this.scheduleReminderCollapse('sponsorship');
+        }
+
+        if (this.popups.notification) {
+            this.scheduleReminderCollapse('notification');
+        }
 
         let checkNumber = 1;
         let checkPusherInterval = null;
@@ -32,6 +45,17 @@
                 }
             }, 2000);
         }
+    },
+    scheduleReminderCollapse(reminder) {
+        setTimeout(() => {
+            if (reminder === 'sponsorship') {
+                this.reminders.sponsorship.compact = true;
+            }
+
+            if (reminder === 'notification') {
+                this.reminders.notification.compact = true;
+            }
+        }, this.reminderCollapseAfter);
     },
     shouldShowMonthlyPopup(storageKey) {
         const disabledTimestamp = localStorage.getItem(storageKey);
@@ -120,8 +144,8 @@
         <span x-show="popups.sponsorship">
             <x-popup>
                 <x-slot:customActions>
-                    <div
-                        class="relative mx-auto flex w-full max-w-2xl flex-col gap-5 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-5 shadow-modal sm:p-6 dark:border-white/[0.1] dark:bg-surface">
+                    <div class="relative mx-auto flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-modal transition-all duration-300 dark:border-white/[0.1] dark:bg-surface"
+                        :class="reminders.sponsorship.compact ? 'max-w-sm gap-3 p-4' : 'max-w-2xl gap-5 p-5 sm:p-6'">
                         <button type="button" aria-label="Dismiss sponsorship reminder"
                             class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
                             @click="bannerVisible=false;disableSponsorship()">
@@ -129,7 +153,7 @@
                         </button>
 
                         <div class="flex items-start gap-4 pr-8">
-                            <div
+                            <div x-show="!reminders.sponsorship.compact" x-transition.opacity
                                 class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 sm:flex dark:border-white/[0.08] dark:bg-white/[0.04]">
                                 <img src="{{ asset('heart.png') }}" alt="" class="size-9">
                             </div>
@@ -137,7 +161,8 @@
                                 <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
                                     Love Coolify? Support our work.
                                 </h2>
-                                <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                <p x-show="!reminders.sponsorship.compact" x-transition.opacity
+                                    class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
                                     Coolify is profitable thanks to <span
                                         class="font-semibold text-coollabs dark:text-warning">you</span>. Your support
                                     helps us build more features and keep improving the project.
@@ -150,16 +175,17 @@
                                 class="button h-9 justify-center bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! sm:flex-1 dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
                                 GitHub Sponsors
                             </a>
-                            <a target="_blank"
+                            <a x-show="!reminders.sponsorship.compact" x-transition.opacity target="_blank"
                                 href="https://opencollective.com/coollabsio/donate?interval=month&amount=10&name=&legalName=&email="
                                 class="button h-9 justify-center sm:flex-1">
                                 Open Collective
                             </a>
-                            <a href="https://donate.stripe.com/8x2bJ104ifmB9kB45u38402" target="_blank"
+                            <a x-show="!reminders.sponsorship.compact" x-transition.opacity
+                                href="https://donate.stripe.com/8x2bJ104ifmB9kB45u38402" target="_blank"
                                 class="button h-9 justify-center sm:flex-1">
                                 Stripe
                             </a>
-                            <button type="button"
+                            <button x-show="!reminders.sponsorship.compact" x-transition.opacity type="button"
                                 class="h-9 cursor-pointer px-2 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black sm:shrink-0 dark:text-fg-dim dark:hover:text-fg"
                                 @click="bannerVisible=false;disableSponsorship()">
                                 Maybe next time
@@ -223,8 +249,8 @@
         <span x-show="popups.notification">
             <x-popup>
                 <x-slot:customActions>
-                    <div
-                        class="relative mx-auto flex w-full max-w-2xl flex-col gap-5 overflow-hidden rounded-2xl border border-neutral-200 bg-white p-5 shadow-modal sm:p-6 dark:border-white/[0.1] dark:bg-surface">
+                    <div class="relative mx-auto flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-modal transition-all duration-300 dark:border-white/[0.1] dark:bg-surface"
+                        :class="reminders.notification.compact ? 'max-w-sm gap-3 p-4' : 'max-w-2xl gap-5 p-5 sm:p-6'">
                         <button type="button" aria-label="Dismiss notifications reminder"
                             class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
                             @click="bannerVisible=false;disableNotification()">
@@ -232,7 +258,7 @@
                         </button>
 
                         <div class="flex items-start gap-4 pr-8">
-                            <div
+                            <div x-show="!reminders.notification.compact" x-transition.opacity
                                 class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 sm:flex dark:border-warning/20 dark:bg-warning/10 dark:text-warning">
                                 <x-reicon name="alert-triangle" class="size-6" />
                             </div>
@@ -240,7 +266,8 @@
                                 <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
                                     No notifications enabled
                                 </h2>
-                                <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                <p x-show="!reminders.notification.compact" x-transition.opacity
+                                    class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
                                     Enable at least one notification channel so you receive important alerts.
                                     Visit
                                     <a href="{{ route('notifications.email') }}" {{ wireNavigate() }}
@@ -255,7 +282,8 @@
                                 class="button h-9 justify-center sm:min-w-28">
                                 Open notifications
                             </a>
-                            <button type="button" class="button h-9 justify-center sm:min-w-32"
+                            <button x-show="!reminders.notification.compact" x-transition.opacity type="button"
+                                class="button h-9 justify-center sm:min-w-32"
                                 @click="bannerVisible=false;disableNotification()">
                                 Accept and close
                             </button>

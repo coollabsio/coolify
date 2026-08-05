@@ -90,7 +90,13 @@
                 @if ($currentRoute === 'project.service.configuration')
                     <livewire:project.service.stack-form :service="$service" />
 
-                    <div class="mt-8">
+                    <div class="mt-8" x-data="{
+                        viewMode: localStorage.getItem('service-compose-resources-view') || 'table',
+                        setViewMode(mode) {
+                            this.viewMode = mode;
+                            localStorage.setItem('service-compose-resources-view', mode);
+                        }
+                    }">
                         <div class="mb-3 flex items-center justify-between gap-3">
                             <div>
                                 <h2 class="text-base font-semibold text-black dark:text-fg">Compose resources</h2>
@@ -98,13 +104,46 @@
                                     Applications and databases defined in this service.
                                 </p>
                             </div>
-                            <a class="button" target="_blank" href="{{ $service->documentation() }}">
-                                Documentation
-                                <x-reicon name="external-link" class="size-4" />
-                            </a>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <div
+                                    class="flex h-8 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                                    <button type="button" x-on:click="setViewMode('table')"
+                                        class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                                        :class="viewMode === 'table'
+                                            ? 'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning'
+                                            : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                                        aria-label="Table view" title="Table view">
+                                        <x-reicon name="unordered-list" class="size-3.5" />
+                                    </button>
+                                    <button type="button" x-on:click="setViewMode('grid')"
+                                        class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                                        :class="viewMode === 'grid'
+                                            ? 'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning'
+                                            : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                                        aria-label="Grid view" title="Grid view">
+                                        <x-reicon name="grid" class="size-3.5" />
+                                    </button>
+                                </div>
+                                <a class="button" target="_blank" href="{{ $service->documentation() }}">
+                                    Documentation
+                                    <x-reicon name="external-link" class="size-4" />
+                                </a>
+                            </div>
                         </div>
 
-                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div :class="viewMode === 'grid'
+                            ? 'grid grid-cols-1 gap-3 sm:grid-cols-2'
+                            : 'overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]'">
+                            @if ($applications->isNotEmpty() || $databases->isNotEmpty())
+                                <div x-cloak x-show="viewMode === 'table'"
+                                    class="grid grid-cols-[minmax(0,1fr)_auto] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                                    <div>Resource</div>
+                                    <div class="hidden sm:block">Image</div>
+                                    <div>Status</div>
+                                    <div class="w-20"></div>
+                                </div>
+                            @endif
+
                             @if ($applications->isEmpty() && $databases->isEmpty())
                                 <div
                                     class="application-settings-section overflow-hidden sm:col-span-2">

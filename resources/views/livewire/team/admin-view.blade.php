@@ -3,8 +3,7 @@
         Team Admin | Coolify
     </x-slot>
 
-    <x-team.navbar />
-
+    <x-team.settings-layout>
     <div class="application-settings-form">
         <x-application.settings-section title="Instance users" flush>
             <form wire:submit.prevent="submitSearch"
@@ -97,4 +96,5 @@
             @endif
         </x-application.settings-section>
     </div>
+    </x-team.settings-layout>
 </div>

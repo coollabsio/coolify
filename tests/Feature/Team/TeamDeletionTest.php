@@ -1,6 +1,6 @@
 <?php
 
-use App\Livewire\Team\Index;
+use App\Livewire\Team\DangerZone;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
@@ -10,7 +10,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->owner = User::factory()->create();
 
@@ -27,7 +27,7 @@ test('deleting a team switches session to another team without error', function 
     $this->actingAs($this->owner);
     session(['currentTeam' => $this->teamToDelete]);
 
-    Livewire::test(Index::class)
+    Livewire::test(DangerZone::class)
         ->call('delete')
         ->assertRedirect(route('team.index'));
 
