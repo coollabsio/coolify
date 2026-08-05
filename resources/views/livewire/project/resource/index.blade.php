@@ -68,27 +68,51 @@
 
                 <div class="flex items-center gap-2">
                     <div class="relative" x-on:click.outside="filterOpen = false">
-                        <button type="button" class="button" x-on:click="filterOpen = !filterOpen">
+                        <button type="button" class="button max-w-64"
+                            :class="activeFilterCount > 0 && 'bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 dark:bg-warning/15! dark:text-warning! dark:ring-warning/25'"
+                            x-on:click="filterOpen = !filterOpen" :title="activeFilterCount > 0 ? filterButtonText : 'Filter'">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
                                     stroke-linecap="round" />
                             </svg>
-                            Filter
+                            <span class="truncate" x-text="activeFilterCount > 0 ? filterButtonText : 'Filter'"></span>
+                            <span x-show="activeFilterCount > 0"
+                                class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"
+                                x-text="activeFilterCount"></span>
                         </button>
                         <div x-cloak x-show="filterOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
-                            <template x-for="option in filterOptions" :key="option.value">
-                                <button type="button"
-                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="typeFilter = option.value; filterOpen = false; page = 1">
-                                    <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
-                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
-                                            stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
+                            class="absolute top-9 right-0 z-50 flex w-64 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                            <div class="max-h-80 overflow-y-auto p-1">
+                                <template x-for="group in filterGroups" :key="group.key">
+                                    <div x-show="group.options.length > 0">
+                                        <div class="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-fg-faint"
+                                            x-text="group.label"></div>
+                                        <template x-for="option in group.options" :key="`${group.key}-${option.value}`">
+                                            <button type="button" class="listbox-option"
+                                                x-on:click="toggleFilter(group.key, option.value)">
+                                                <span class="min-w-0 flex-1 truncate" x-text="option.label"></span>
+                                                <span
+                                                    class="flex size-4 shrink-0 items-center justify-center rounded-[5px] border"
+                                                    :class="isFilterSelected(group.key, option.value)
+                                                        ? 'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black'
+                                                        : 'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]'">
+                                                    <svg x-show="isFilterSelected(group.key, option.value)" class="size-3"
+                                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                        <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="border-t border-neutral-200 bg-white p-1 dark:border-white/10 dark:bg-raised">
+                                <button type="button" class="listbox-option justify-center! text-center!"
+                                    x-on:click="clearFilters()">
+                                    Clear filters
                                 </button>
-                            </template>
+                            </div>
                         </div>
                     </div>
 
@@ -180,8 +204,9 @@
                                     <span x-show="item.version === 'v5'"
                                         class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
                                 </div>
-                                <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                    x-text="item.description || item.fqdn || item.uuid"></p>
+                                <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    <span x-show="item.description" x-text="item.description"></span>
+                                </p>
                             </div>
                         </div>
 
@@ -350,7 +375,10 @@
     function resourceIndex() {
         return {
             search: '',
-            typeFilter: 'all',
+            typeFilters: [],
+            tagFilters: [],
+            serverFilters: [],
+            statusFilters: [],
             sortBy: 'name-asc',
             viewMode: localStorage.getItem('environment-resource-view') || 'table',
             filterOpen: false,
@@ -369,23 +397,53 @@
                 ...@js($clickhousesJs),
                 ...@js($servicesJs),
             ],
-            filterOptions: [{
-                    value: 'all',
-                    label: 'All resources'
-                },
-                {
-                    value: 'application',
-                    label: 'Applications'
-                },
-                {
-                    value: 'database',
-                    label: 'Databases'
-                },
-                {
-                    value: 'service',
-                    label: 'Services'
-                },
-            ],
+            get filterGroups() {
+                return [{
+                        key: 'typeFilters',
+                        label: 'Resource types',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: item.type,
+                            label: item.typeLabel,
+                        }))),
+                    },
+                    {
+                        key: 'tagFilters',
+                        label: 'Tags',
+                        options: this.uniqueOptions(this.resources.flatMap((item) =>
+                            (item.tags || []).map((tag) => ({ value: tag.name, label: tag.name }))
+                        )),
+                    },
+                    {
+                        key: 'serverFilters',
+                        label: 'Servers',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: item.destination?.server?.name || 'Unknown',
+                            label: item.destination?.server?.name || 'Unknown',
+                        }))),
+                    },
+                    {
+                        key: 'statusFilters',
+                        label: 'Statuses',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: this.statusState(item),
+                            label: this.statusLabel(item),
+                        }))),
+                    },
+                ];
+            },
+            get activeFilterCount() {
+                return this.typeFilters.length + this.tagFilters.length + this.serverFilters.length +
+                    this.statusFilters.length;
+            },
+            get filterButtonText() {
+                const selectedLabels = this.filterGroups.flatMap((group) => group.options
+                    .filter((option) => this[group.key].includes(option.value))
+                    .map((option) => option.label));
+
+                if (selectedLabels.length === 0) return 'Filter';
+                if (selectedLabels.length === 1) return selectedLabels[0];
+                return `${selectedLabels[0]} +${selectedLabels.length - 1}`;
+            },
             sortOptions: [{
                     value: 'name-asc',
                     label: 'Name A–Z'
@@ -406,7 +464,12 @@
             get filteredResources() {
                 const query = this.search.trim().toLowerCase();
                 const items = this.resources.filter((item) => {
-                    const matchesType = this.typeFilter === 'all' || item.type === this.typeFilter;
+                    const matchesType = this.typeFilters.length === 0 || this.typeFilters.includes(item.type);
+                    const matchesTags = this.tagFilters.length === 0 || (item.tags || [])
+                        .some((tag) => this.tagFilters.includes(tag.name));
+                    const serverName = item.destination?.server?.name || 'Unknown';
+                    const matchesServer = this.serverFilters.length === 0 || this.serverFilters.includes(serverName);
+                    const matchesStatus = this.statusFilters.length === 0 || this.statusFilters.includes(this.statusState(item));
                     const searchable = [
                         item.name,
                         item.fqdn,
@@ -417,7 +480,8 @@
                         ...(item.tags || []).map((tag) => tag.name),
                     ].filter(Boolean).join(' ').toLowerCase();
 
-                    return matchesType && (!query || searchable.includes(query));
+                    return matchesType && matchesTags && matchesServer && matchesStatus &&
+                        (!query || searchable.includes(query));
                 });
 
                 return items.sort((first, second) => {
@@ -435,6 +499,28 @@
 
                     return first.name.localeCompare(second.name);
                 });
+            },
+            uniqueOptions(options) {
+                return [...new Map(options
+                    .filter((option) => option.value)
+                    .map((option) => [option.value, option])).values()]
+                    .sort((first, second) => first.label.localeCompare(second.label));
+            },
+            isFilterSelected(group, value) {
+                return this[group].includes(value);
+            },
+            toggleFilter(group, value) {
+                this[group] = this[group].includes(value)
+                    ? this[group].filter((selected) => selected !== value)
+                    : [...this[group], value];
+                this.page = 1;
+            },
+            clearFilters() {
+                this.typeFilters = [];
+                this.tagFilters = [];
+                this.serverFilters = [];
+                this.statusFilters = [];
+                this.page = 1;
             },
             get totalPages() {
                 return Math.max(1, Math.ceil(this.filteredResources.length / this.pageSize));

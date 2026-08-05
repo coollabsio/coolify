@@ -7,8 +7,6 @@
 }"
     @close-email-change-modal.window="emailModalOpen = false">
     <x-slot:title>Profile | Coolify</x-slot>
-    <x-profile.navbar />
-
     <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
         <form wire:submit="submit">
             <x-unsaved-bar action="submit" />

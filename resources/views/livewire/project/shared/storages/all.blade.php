@@ -53,21 +53,21 @@
                                 <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
                                     <span
-                                        class="min-w-0 truncate font-mono text-[13px] font-medium text-neutral-950 dark:text-fg"
+                                        class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
                                 </div>
                             </div>
 
                             <div class="volumes-col-source min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <span class="block min-w-0 truncate font-mono text-[13px]"
+                                <span class="block min-w-0 truncate text-[13px]"
                                     title="{{ $form['hostPath'] }}">{{ $displayHostPath }}</span>
                             </div>
 
                             <div class="volumes-cell-dest min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
                                 <span
-                                    class="block min-w-0 truncate font-mono text-[13px] text-neutral-950 dark:text-fg"
+                                    class="block min-w-0 truncate text-[13px] text-neutral-950 dark:text-fg"
                                     title="{{ $form['mountPath'] }}">{{ $form['mountPath'] }}</span>
                             </div>
 
@@ -96,10 +96,20 @@
                                 <div
                                     class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
                                     @if ($canUpdate)
-                                        <x-forms.button type="button" wire:click="openBackupModal({{ $id }})"
-                                            class="!px-2.5 !text-xs">
-                                            Backup
-                                        </x-forms.button>
+                                        <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
+                                            <x-slot:content>
+                                                <x-forms.button type="button" class="!px-2.5 !text-xs">Backup</x-forms.button>
+                                            </x-slot:content>
+                                            @if ($resource instanceof \App\Models\Application)
+                                                <livewire:project.application.backup.create :application="$resource"
+                                                    :selected-target-key="'volume:' . $id"
+                                                    wire:key="configure-volume-backup-{{ $id }}" />
+                                            @else
+                                                <livewire:project.service.volume-backup.create :service="$resource->service"
+                                                    :selected-target-key="'volume:' . $id"
+                                                    wire:key="configure-service-volume-backup-{{ $id }}" />
+                                            @endif
+                                        </x-modal-input>
                                     @else
                                         <span class="text-neutral-400 dark:text-fg-faint">—</span>
                                     @endif
@@ -160,11 +170,21 @@
                                     Update
                                 </x-forms.button>
 
-                                @if ($resource instanceof \App\Models\Application)
-                                    <x-forms.button type="button" wire:click="openBackupModal({{ $id }})"
-                                        class="!px-2.5 !text-xs">
-                                        Backup
-                                    </x-forms.button>
+                                @if ($showActionsColumn)
+                                    <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
+                                        <x-slot:content>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs">Backup</x-forms.button>
+                                        </x-slot:content>
+                                        @if ($resource instanceof \App\Models\Application)
+                                            <livewire:project.application.backup.create :application="$resource"
+                                                :selected-target-key="'volume:' . $id"
+                                                wire:key="configure-volume-backup-{{ $id }}" />
+                                        @else
+                                            <livewire:project.service.volume-backup.create :service="$resource->service"
+                                                :selected-target-key="'volume:' . $id"
+                                                wire:key="configure-service-volume-backup-{{ $id }}" />
+                                        @endif
+                                    </x-modal-input>
                                 @endif
 
                                 <x-modal-confirmation title="Confirm persistent storage deletion?" isErrorButton
@@ -182,47 +202,4 @@
         </div>
     @endif
 
-    {{-- Single shared backup configurator (mounted only when opened) --}}
-    @if ($backupModalStorageId && $resource instanceof \App\Models\Application)
-        <div wire:key="shared-volume-backup-modal-{{ $backupModalStorageId }}" x-data="{ modalOpen: true }"
-            x-init="$watch('modalOpen', value => { if (!value) { $wire.closeBackupModal() } })"
-            @keydown.window.escape="modalOpen = false">
-            <template x-teleport="body">
-                <div x-show="modalOpen" class="fixed inset-0 z-99 overflow-y-auto">
-                    <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
-                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
-                        x-transition:leave-end="opacity-0"
-                        class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"
-                        @click="modalOpen = false"></div>
-                    <div class="relative flex min-h-full items-start justify-center p-4 sm:items-center"
-                        @click.self="modalOpen = false">
-                        <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
-                            x-transition:enter="ease-out duration-100"
-                            x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave="ease-in duration-100"
-                            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                            class="application-settings-form application-settings-section relative max-h-[calc(100dvh-2rem)] w-full lg:w-auto lg:min-w-2xl lg:max-w-4xl"
-                            style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                            <header class="flex-nowrap!">
-                                <h3 class="min-w-0 flex-1 truncate">Configure Volume Backup</h3>
-                                <button type="button" @click="modalOpen = false"
-                                    class="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                                    <x-reicon name="x" class="size-4" />
-                                </button>
-                            </header>
-                            <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                                style="-webkit-overflow-scrolling: touch;">
-                                <livewire:project.application.backup.create :application="$resource"
-                                    :selected-target-key="'volume:' . $backupModalStorageId"
-                                    wire:key="shared-configure-volume-backup-{{ $backupModalStorageId }}" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </template>
-        </div>
-    @endif
 </div>

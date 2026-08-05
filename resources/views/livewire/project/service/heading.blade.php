@@ -17,6 +17,11 @@
                     || request()->routeIs('project.service.database.*'),
             ],
             [
+                'label' => 'Backups',
+                'route' => 'project.service.volume-backups.index',
+                'active' => request()->routeIs('project.service.volume-backups.*'),
+            ],
+            [
                 'label' => 'Runtime Logs',
                 'route' => 'project.service.logs',
                 'active' => request()->routeIs('project.service.logs'),

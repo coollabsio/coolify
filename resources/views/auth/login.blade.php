@@ -34,9 +34,43 @@
                 @endenv
 
                 <div class="flex justify-end">
-                    <a href="/forgot-password" class="auth-text-link">
-                        {{ __('auth.forgot_password_link') }}
-                    </a>
+                    @if (is_transactional_emails_enabled())
+                        <a href="/forgot-password" class="auth-text-link">
+                            {{ __('auth.forgot_password_link') }}
+                        </a>
+                    @else
+                        <span class="relative inline-flex"
+                            x-data="{ visible: false, _t: null }"
+                            @mouseenter="_t = setTimeout(() => {
+                                visible = true;
+                                $nextTick(() => requestAnimationFrame(() => {
+                                    const tip = $refs.tip;
+                                    if (!tip) return;
+                                    const r = $el.getBoundingClientRect();
+                                    const t = tip.getBoundingClientRect();
+                                    let top = r.top - t.height - 6;
+                                    let left = r.left;
+                                    if (top < 4) top = r.bottom + 6;
+                                    if (left + t.width > innerWidth - 8) left = innerWidth - 8 - t.width;
+                                    if (left < 4) left = 4;
+                                    tip.style.top = top + 'px';
+                                    tip.style.left = left + 'px';
+                                }));
+                            }, 300)"
+                            @mouseleave="clearTimeout(_t); visible = false"
+                            @focusin="visible = true"
+                            @focusout="visible = false">
+                            <span tabindex="0" role="link" aria-disabled="true"
+                                class="auth-text-link cursor-not-allowed opacity-50"
+                                aria-describedby="forgot-password-disabled-tooltip">
+                                {{ __('auth.forgot_password_link') }}
+                            </span>
+                            <div id="forgot-password-disabled-tooltip" x-ref="tip" x-show="visible" x-cloak
+                                class="auth-tooltip max-w-xs whitespace-normal">
+                                {{ __('auth.forgot_password_disabled_tooltip') }}
+                            </div>
+                        </span>
+                    @endif
                 </div>
 
                 <x-forms.button class="w-full justify-center" type="submit" isHighlighted>

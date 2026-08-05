@@ -994,6 +994,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 /* Layer card header: compact strip on the shell, subtle title color */
 .application-settings-section > :is(header, .application-settings-section-header) {
     display: flex;
+    min-height: 3rem;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
@@ -1029,30 +1030,18 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     padding: 1rem;
 }
 
-/* Server pages share the application settings grid. The small desktop offset
-   aligns the first card edge with the visible sidebar section label. */
+/* All settings sidebars share one alignment rule. Their natural position is
+   level with the content column; once scrolled they stay below the top bar. */
 .server-settings-workspace > :not(.application-settings-navigation) {
     min-width: 0;
 }
 
 @media (min-width: 1280px) {
-    .server-settings-workspace > :not(.application-settings-navigation) {
-        margin-top: 0.75rem;
-    }
-
-    /*
-     * Settings / resource side nav stays pinned while the form column scrolls.
-     * top = primary header (3rem) + layer-2 bar (3rem) + hairline gap (0.5rem).
-     * max-height lets long menus scroll inside the pin instead of forcing the
-     * whole page to move the nav out of view.
-     */
     .application-settings-navigation {
         position: sticky;
-        top: 6.5rem;
+        top: 3.5rem;
         align-self: start;
-        max-height: calc(100dvh - 7.25rem);
-        /* Inset content so the default ring-2 + ring-offset-2 focus ring is not
-           clipped by overflow-x on the right edge of this narrow column. */
+        max-height: calc(100dvh - 4.25rem);
         padding-right: 0.375rem;
         overflow-x: hidden;
         overflow-y: auto;

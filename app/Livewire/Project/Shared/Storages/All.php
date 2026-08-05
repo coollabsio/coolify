@@ -6,6 +6,8 @@ use App\Models\Application;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -38,9 +40,6 @@ class All extends Component
 
     public bool $canUpdate = false;
 
-    /** Storage id for the single shared backup modal (null = closed / unmounted). */
-    public ?int $backupModalStorageId = null;
-
     protected $listeners = ['refreshStorages' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
 
     public function mount(): void
@@ -48,7 +47,9 @@ class All extends Component
         $this->canUpdate = (bool) auth()->user()?->can('update', $this->resource);
         $this->supportsPreviewSuffix = $this->resource instanceof Application
             && $this->resource->git_based();
-        $this->showActionsColumn = $this->resource instanceof Application;
+        $this->showActionsColumn = $this->resource instanceof Application
+            || $this->resource instanceof ServiceApplication
+            || $this->resource instanceof ServiceDatabase;
         $this->isComposeOrService = $this->resource->type() === 'service'
             || data_get($this->resource, 'build_pack') === 'dockercompose';
 
@@ -132,23 +133,11 @@ class All extends Component
         }
 
         $storage->delete();
-        $this->backupModalStorageId = null;
         $this->refreshList();
         $this->dispatch('refreshStorages');
         $this->dispatch('configurationChanged');
 
         return true;
-    }
-
-    public function openBackupModal(int $storageId): void
-    {
-        $this->authorize('update', $this->resource);
-        $this->backupModalStorageId = $storageId;
-    }
-
-    public function closeBackupModal(): void
-    {
-        $this->backupModalStorageId = null;
     }
 
     public function render()
@@ -186,7 +175,7 @@ class All extends Component
     {
         $this->volumeBackupMeta = [];
 
-        if (! $this->resource instanceof Application) {
+        if (! $this->showActionsColumn) {
             return;
         }
 
@@ -212,7 +201,7 @@ class All extends Component
             ->where('is_host_file', false)
             ->pluck('id');
 
-        $totalApplicationBackups = ScheduledVolumeBackup::query()
+        $totalResourceBackups = ScheduledVolumeBackup::query()
             ->where(function ($query) use ($volumeMorph, $volumeIds, $directoryMorph, $directoryIds): void {
                 $query->where(function ($query) use ($volumeMorph, $volumeIds): void {
                     $query->where('backupable_type', $volumeMorph)
@@ -224,7 +213,12 @@ class All extends Component
             })
             ->count();
 
-        $parameters = [
+        $service = $this->resource instanceof Application ? null : $this->resource->service;
+        $parameters = $service ? [
+            'project_uuid' => $service->project()->uuid,
+            'environment_uuid' => $service->environment->uuid,
+            'service_uuid' => $service->uuid,
+        ] : [
             'project_uuid' => $this->resource->project()->uuid,
             'environment_uuid' => $this->resource->environment->uuid,
             'application_uuid' => $this->resource->uuid,
@@ -236,9 +230,10 @@ class All extends Component
             $url = null;
 
             if ($enabled && $backup) {
-                $url = $totalApplicationBackups > 1
-                    ? route('project.application.backup.index', [...$parameters, 'search' => $storage->name])
-                    : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
+                $routePrefix = $service ? 'project.service.volume-backups' : 'project.application.backup';
+                $url = $totalResourceBackups > 1
+                    ? route($routePrefix.'.index', [...$parameters, 'search' => $storage->name])
+                    : route($routePrefix.'.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
             }
 
             $this->volumeBackupMeta[(int) $storage->id] = [

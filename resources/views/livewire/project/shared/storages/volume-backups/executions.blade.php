@@ -25,9 +25,10 @@
             @if ($executionCount > 0)
                 <div class="data-table w-full">
                     <div
-                        class="grid grid-cols-[7.5rem_minmax(0,1fr)_7rem_9rem_minmax(9rem,.7fr)] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                        class="grid grid-cols-[7.5rem_minmax(0,1fr)_8.5rem_7rem_9rem_minmax(9rem,.7fr)] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                         <span>Status</span>
                         <span>Archive</span>
+                        <span>Time</span>
                         <span>Size</span>
                         <span>Availability</span>
                         <span class="text-right">Actions</span>
@@ -64,24 +65,22 @@
                         @endphp
 
                         <div wire:key="volume-backup-execution-{{ $execution->id }}"
-                            class="grid min-h-16 grid-cols-[7.5rem_minmax(0,1fr)_7rem_9rem_minmax(9rem,.7fr)] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]">
+                            class="grid min-h-16 grid-cols-[7.5rem_minmax(0,1fr)_8.5rem_7rem_9rem_minmax(9rem,.7fr)] items-center gap-x-3 border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]">
                             <span>
                                 <x-status-badge :status="$statusLabel" :type="$statusType" />
                             </span>
 
                             <span class="min-w-0">
-                                <span class="block truncate font-medium text-black dark:text-fg"
-                                    title="{{ $execution->filename ?? 'No archive name' }}">
-                                    {{ $execution->filename ?? 'No archive name' }}
-                                </span>
-                                <span class="mt-0.5 block truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    @if ($execution->status === 'running')
-                                        Running for {{ calculateDuration($execution->created_at, now()) }}
-                                    @else
-                                        {{ $finishedAt->diffForHumans() }} ·
-                                        {{ calculateDuration($execution->created_at, $finishedAt) }}
-                                    @endif
-                                </span>
+                                <x-forms.copy-button :text="$execution->filename ?? 'No archive name'" />
+                            </span>
+
+                            <span class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                                @if ($execution->status === 'running')
+                                    Running for {{ calculateDuration($execution->created_at, now()) }}
+                                @else
+                                    {{ $finishedAt->diffForHumans() }}<br>
+                                    {{ calculateDuration($execution->created_at, $finishedAt) }}
+                                @endif
                             </span>
 
                             <span class="tabular-nums text-neutral-500 dark:text-fg-dim">
@@ -125,7 +124,7 @@
 
                             @if ($execution->message)
                                 <pre
-                                    class="col-span-5 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">{{ $execution->message }}</pre>
+                                    class="col-span-6 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">{{ $execution->message }}</pre>
                             @endif
                         </div>
                     @endforeach

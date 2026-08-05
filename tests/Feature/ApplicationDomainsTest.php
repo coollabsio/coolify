@@ -116,6 +116,17 @@ it('shows dns entries control next to Add', function () {
         ->assertSee('Manual records');
 });
 
+it('shows dns entries when domains are managed through labels', function () {
+    $this->application->settings->update([
+        'is_container_label_readonly_enabled' => false,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh(['settings'])])
+        ->assertSuccessful()
+        ->assertSee('DNS entries')
+        ->assertSee('Manual records');
+});
+
 it('lists dns entries for domains that still need dns and omits working configured hosts', function () {
     $this->application->update([
         'fqdn' => 'https://app.example.com,https://www.example.com,https://api.example.com',

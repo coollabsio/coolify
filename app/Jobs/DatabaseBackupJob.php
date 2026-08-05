@@ -778,7 +778,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $escapedSecret = escapeshellarg($secret);
             $escapedBackupLocation = escapeshellarg($this->backup_location);
             $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
-            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint))
+            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint, $this->s3->trustedInternalHosts()))
                 ->map(fn (string $resolveOption): string => '--resolve '.escapeshellarg($resolveOption))
                 ->implode(' ');
             $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;

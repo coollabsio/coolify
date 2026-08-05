@@ -24,28 +24,42 @@ beforeEach(function () {
     ]);
 });
 
-it('places connection status next to the title and delete in the danger zone', function () {
+it('places the storage name and connection status in breadcrumbs and delete in the danger zone', function () {
     $view = file_get_contents(resource_path('views/livewire/storage/show.blade.php'));
     $navbar = file_get_contents(resource_path('views/components/dashboard/navbar.blade.php'));
 
     expect($view)
-        ->toContain('<x-slot:titleMeta>')
-        ->toContain("'Connected'")
+        ->toContain(':mobileTitleOnly="true"')
+        ->not->toContain('<x-slot:titleMeta>')
         ->toContain('storage.danger')
         ->toContain('Danger Zone')
         ->toContain('storage-danger-section')
+        ->toContain("'label' => 'Resources'")
+        ->toContain("'active' => \$currentRoute === 'storage.resources'")
         ->toContain('submitAction="delete"');
 
-    $navbarStart = strpos($view, '<x-dashboard.navbar');
-    $navbarEnd = strpos($view, '</x-dashboard.navbar>');
-    $navbarBlock = substr($view, $navbarStart, $navbarEnd - $navbarStart);
+    expect(file_get_contents(app_path('Livewire/Storage/Form.php')))
+        ->toContain("dispatch('storage-status-changed'");
+    expect(file_get_contents(app_path('Livewire/Storage/Show.php')))
+        ->toContain("#[On('storage-status-changed')]")
+        ->toContain('$this->storage->refresh();');
 
-    expect($navbarBlock)
-        ->toContain('<x-slot:titleMeta>')
-        ->not->toContain('<x-slot:actions>');
+    expect(file_get_contents(resource_path('views/components/top-breadcrumb.blade.php')))
+        ->toContain('x-breadcrumb-switcher')
+        ->toContain('$currentStorage->name')
+        ->toContain("route('storage.show'")
+        ->toContain("usable ? 'Connected' : 'Not usable'")
+        ->toContain('@storage-status-changed.window');
+    expect(file_get_contents(resource_path('views/components/breadcrumb-switcher.blade.php')))
+        ->toContain('{{ $title }}')
+        ->toContain('name="check-circle"');
+    expect(file_get_contents(resource_path('views/livewire/storage/index.blade.php')))
+        ->toContain('label="Connected"')
+        ->not->toContain('label="Ready"');
 
     expect($navbar)
-        ->toContain("request()->routeIs('storage.show', 'storage.danger')");
+        ->toContain("request()->routeIs('storage.show', 'storage.danger', 'storage.resources')")
+        ->not->toContain("['label' => 'Resources', 'route' => 'storage.resources'");
 
     expect(file_get_contents(base_path('routes/web.php')))
         ->toContain("->name('storage.danger')");

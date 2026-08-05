@@ -7,7 +7,7 @@
 
     <div
         class="application-settings-workspace mx-auto grid w-full max-w-[1180px] min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-        <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start"
+        <aside class="application-settings-navigation min-w-0 xl:self-start"
             x-data="{ activeProvider: location.hash.slice(1).replace('-oauth-section', '') || '{{ $oauth_settings_map[0]['provider'] ?? '' }}' }"
             @hashchange.window="activeProvider = location.hash.slice(1).replace('-oauth-section', '')">
             <nav aria-label="OAuth providers"

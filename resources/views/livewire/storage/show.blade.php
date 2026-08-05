@@ -5,13 +5,19 @@
 
     @php
         $storageRouteParameters = ['storage_uuid' => $storage->uuid];
-        $showSettingsSidebar = in_array($currentRoute, ['storage.show', 'storage.danger'], true);
+        $showSettingsSidebar = in_array($currentRoute, ['storage.show', 'storage.resources', 'storage.danger'], true);
         $settingsMenuItems = [
             [
                 'label' => 'General',
                 'route' => 'storage.show',
                 'active' => $currentRoute === 'storage.show',
                 'icon' => 'settings',
+            ],
+            [
+                'label' => 'Resources',
+                'route' => 'storage.resources',
+                'active' => $currentRoute === 'storage.resources',
+                'icon' => 'grid',
             ],
             [
                 'label' => 'Danger Zone',
@@ -25,17 +31,12 @@
     <x-dashboard.navbar section="storage" :parameters="$storageRouteParameters"
         :title="$storage->name"
         :subtitle="filled($storage->description) ? $storage->description : 'S3-compatible backup destination'"
-        :titleOnDesktop="true">
-        <x-slot:titleMeta>
-            <x-status-badge :status="$storage->is_usable ? 'Connected' : 'Not usable'"
-                :type="$storage->is_usable ? 'success' : 'error'" />
-        </x-slot:titleMeta>
-    </x-dashboard.navbar>
+        :mobileTitleOnly="true" />
 
     @if ($showSettingsSidebar)
         <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
             <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-                <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
+                <aside class="application-settings-navigation min-w-0 xl:self-start">
                     <nav aria-label="S3 storage settings"
                         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
                         <div class="nav-section hidden xl:block">Settings</div>
@@ -54,9 +55,11 @@
                     </nav>
                 </aside>
 
-                <div class="min-w-0 xl:mt-3">
+                <div class="min-w-0">
                     @if ($currentRoute === 'storage.show')
                         <livewire:storage.form :storage="$storage" />
+                    @elseif ($currentRoute === 'storage.resources')
+                        <livewire:storage.resources :storage="$storage" :key="'resources-'.$storage->uuid" />
                     @elseif ($currentRoute === 'storage.danger')
                         <div class="application-settings-form">
                             <x-application.settings-section id="storage-danger-section" title="Danger zone"
@@ -120,7 +123,5 @@
                 </div>
             </div>
         </section>
-    @elseif ($currentRoute === 'storage.resources')
-        <livewire:storage.resources :storage="$storage" :key="'resources-'.$storage->uuid" />
     @endif
 </div>

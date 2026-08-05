@@ -17,7 +17,7 @@
             <div class="volumes-cell-name min-w-0">
                 <span class="volumes-mobile-label volumes-field-label">Volume Name</span>
                 <div class="flex min-w-0 items-center gap-2">
-                    <span class="min-w-0 truncate font-mono text-[13px] font-medium text-neutral-950 dark:text-fg"
+                    <span class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
                         title="{{ $name }}">{{ $name }}</span>
                     @if ($hasEnabledBackup)
                         @if ($backupUrl)
@@ -37,14 +37,14 @@
 
             <div class="volumes-col-source min-w-0">
                 <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                <span class="block min-w-0 truncate font-mono text-[13px]" title="{{ $hostPath }}">
+                <span class="block min-w-0 truncate text-[13px]" title="{{ $hostPath }}">
                     {{ $displayHostPath }}
                 </span>
             </div>
 
             <div class="volumes-cell-dest min-w-0">
                 <span class="volumes-mobile-label volumes-field-label">Destination Path</span>
-                <span class="block min-w-0 truncate font-mono text-[13px] text-neutral-950 dark:text-fg"
+                <span class="block min-w-0 truncate text-[13px] text-neutral-950 dark:text-fg"
                     title="{{ $mountPath }}">{{ $mountPath }}</span>
             </div>
 

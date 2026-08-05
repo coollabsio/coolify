@@ -1,36 +1,35 @@
 <?php
 
-/**
- * Settings / resource side navs must stay pinned while the main form column scrolls.
- */
-it('pins application-settings-navigation with sticky CSS that survives body overflow-x', function () {
-    $appCss = file_get_contents(resource_path('css/app.css'));
+use Illuminate\Support\Facades\File;
 
-    expect($appCss)
-        ->toContain('overflow-x-clip')
-        ->not->toContain('scrollbar overflow-x-hidden;')
-        ->toContain('.application-settings-navigation')
+it('uses one aligned sticky rule for all settings sidebars', function () {
+    $appCss = file_get_contents(resource_path('css/app.css'));
+    preg_match('/\.application-settings-navigation\s*\{([^}]+)\}/', $appCss, $matches);
+    $navigationCss = $matches[1] ?? '';
+
+    expect($navigationCss)
+        ->toContain('align-self: start')
         ->toContain('position: sticky')
-        ->toContain('top: 6.5rem')
-        ->toContain('max-height: calc(100dvh - 7.25rem)')
+        ->toContain('top: 3.5rem')
+        ->toContain('max-height: calc(100dvh - 4.25rem)')
         ->toContain('overflow-y: auto');
 });
 
-it('marks shared settings sidebars sticky at the xl breakpoint', function () {
-    $paths = [
-        resource_path('views/livewire/project/application/configuration.blade.php'),
-        resource_path('views/livewire/project/database/configuration.blade.php'),
-        resource_path('views/livewire/project/service/configuration.blade.php'),
-        resource_path('views/components/settings/sidebar.blade.php'),
-        resource_path('views/components/server/sidebar.blade.php'),
-        resource_path('views/components/service-database/sidebar.blade.php'),
-    ];
+it('aligns every settings sidebar with its content without per-view top offsets', function () {
+    $navigationViews = collect(File::allFiles(resource_path('views')))
+        ->filter(fn (SplFileInfo $file): bool => str_contains($file->getContents(), 'application-settings-navigation'));
 
-    foreach ($paths as $path) {
-        expect(file_get_contents($path))
-            ->toContain('application-settings-navigation')
-            ->toContain('xl:sticky')
-            ->toContain('xl:top-26')
-            ->toContain('xl:self-start');
+    expect($navigationViews)->not->toBeEmpty();
+
+    foreach ($navigationViews as $file) {
+        expect($file->getContents())
+            ->not->toContain('xl:sticky')
+            ->not->toContain('xl:top-26');
     }
+});
+
+it('keeps settings card headers the same height with or without actions', function () {
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($appCss)->toMatch('/\.application-settings-section > :is\(header, \.application-settings-section-header\)\s*\{[^}]*min-height:\s*3rem/s');
 });

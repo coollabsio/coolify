@@ -15,7 +15,7 @@
                     :isImportSupported="$isImportSupported" />
             @endif
 
-            <div class="min-w-0 xl:mt-3">
+            <div class="min-w-0">
                 @if ($backup)
                     @if ($section === 'executions')
                         <livewire:project.database.backup-executions :backup="$backup"

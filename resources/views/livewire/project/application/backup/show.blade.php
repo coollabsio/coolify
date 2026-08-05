@@ -9,7 +9,7 @@
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
             <x-backup-sidebar context="application" :parameters="$parameters" :section="$section" />
 
-            <div class="min-w-0 xl:mt-3">
+            <div class="min-w-0">
                 <livewire:project.shared.storages.volume-backups :storage="$backup->backupable"
                     :resource="$application" :section="$section"
                     wire:key="volume-backup-{{ $backup->uuid }}-{{ $section }}" />

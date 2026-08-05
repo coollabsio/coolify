@@ -121,9 +121,9 @@
         </div>
         <div class="ml-auto flex flex-wrap items-center gap-2">
             @can('update', $application)
+                @include('livewire.project.shared.cloudflare-autoconfigure')
                 @unless ($labelsAreWritable)
                     @if (! $isCompose || count($composeServices) > 0)
-                        @include('livewire.project.shared.cloudflare-autoconfigure')
                         <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                             canGate="update" :canResource="$application">
                             <x-slot:content>

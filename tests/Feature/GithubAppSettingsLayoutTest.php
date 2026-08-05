@@ -26,31 +26,33 @@ beforeEach(function () {
     ]);
 });
 
-it('places connection status next to the title and delete in the danger zone view', function () {
+it('places source navigation in the sidebar and source status in breadcrumbs', function () {
     $view = file_get_contents(resource_path('views/livewire/source/github/change.blade.php'));
     $navbar = file_get_contents(resource_path('views/components/dashboard/navbar.blade.php'));
 
     expect($view)
-        ->toContain('<x-slot:titleMeta>')
-        ->toContain('label="Connected"')
+        ->toContain(':mobileTitleOnly="true"')
+        ->not->toContain('<x-slot:titleMeta>')
+        ->toContain("'label' => 'Permissions'")
+        ->toContain("'icon' => 'keys'")
+        ->toContain("'label' => 'Resources'")
+        ->toContain('application-settings-navigation min-w-0 xl:self-start')
+        ->not->toContain('application-settings-navigation min-w-0 xl:sticky')
         ->toContain('source.github.danger')
         ->toContain('Danger Zone')
         ->toContain('github-app-danger-section')
         ->toContain('submitAction="delete"');
 
-    // Connection status lives in titleMeta; the dashboard navbar has no actions slot.
-    $navbarStart = strpos($view, '<x-dashboard.navbar');
-    $navbarEnd = strpos($view, '</x-dashboard.navbar>');
-    expect($navbarStart)->not->toBeFalse();
-    expect($navbarEnd)->not->toBeFalse();
-    $navbarBlock = substr($view, $navbarStart, $navbarEnd - $navbarStart);
-    expect($navbarBlock)
-        ->toContain('<x-slot:titleMeta>')
-        ->not->toContain('<x-slot:actions>');
-
     expect($navbar)
-        ->toContain('@isset($titleMeta)')
-        ->toContain("request()->routeIs('source.github.show', 'source.github.danger')");
+        ->toContain("request()->routeIs('source.github.show', 'source.github.permissions', 'source.github.resources', 'source.github.danger')")
+        ->not->toContain("['label' => 'Permissions', 'route' => 'source.github.permissions'")
+        ->not->toContain("['label' => 'Resources', 'route' => 'source.github.resources'");
+
+    expect(file_get_contents(resource_path('views/components/top-breadcrumb.blade.php')))
+        ->toContain('x-breadcrumb-switcher')
+        ->toContain('$currentSource->name')
+        ->toContain("route('source.github.show'")
+        ->toContain("route('source.gitlab.show'");
 
     expect(file_get_contents(base_path('routes/web.php')))
         ->toContain("->name('source.github.danger')");

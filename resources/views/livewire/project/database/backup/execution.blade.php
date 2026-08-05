@@ -9,7 +9,7 @@
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
             <x-backup-sidebar context="database" :parameters="$parameters" :section="$section" />
 
-            <div class="min-w-0 xl:mt-3">
+            <div class="min-w-0">
                 @if ($section === 'executions')
                     <livewire:project.database.backup-executions :backup="$backup" />
                 @else

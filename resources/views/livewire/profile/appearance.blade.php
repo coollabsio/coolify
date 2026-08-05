@@ -1,7 +1,5 @@
 <div>
     <x-slot:title>Appearance | Coolify</x-slot>
-    <x-profile.navbar />
-
     <div x-data="{
         theme: localStorage.getItem('theme') || 'dark',
         init() {
@@ -30,7 +28,7 @@
             <div class="application-settings-section-body grid gap-3 sm:grid-cols-3">
                 @foreach ([
                     ['value' => 'light', 'label' => 'Light', 'description' => 'Bright surfaces and dark text.', 'preview' => 'bg-white'],
-                    ['value' => 'system', 'label' => 'System', 'description' => 'Follow your operating system.', 'preview' => 'bg-gradient-to-r from-white to-[#181818]'],
+                    ['value' => 'system', 'label' => 'System', 'description' => 'Follow your operating system.', 'preview' => 'bg-gradient-to-r from-white via-neutral-400 to-[#050505]'],
                     ['value' => 'dark', 'label' => 'Dark', 'description' => 'Dark surfaces and soft contrast.', 'preview' => 'bg-[#181818]'],
                 ] as $option)
                     <button type="button" @click="setTheme('{{ $option['value'] }}')"

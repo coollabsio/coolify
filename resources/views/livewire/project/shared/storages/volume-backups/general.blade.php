@@ -20,22 +20,24 @@
             <span class="text-[12px] text-neutral-500 dark:text-fg-dim">
                 {{ $backup?->targetType() ?? ($storage instanceof \App\Models\LocalFileVolume ? 'Directory' : 'Volume') }}
             </span>
-            <code class="truncate text-[12px] font-medium text-neutral-900 dark:text-fg">
+            <span class="truncate text-[12px] font-medium text-neutral-900 dark:text-fg">
                 {{ $backup?->targetName() ?? ($storage instanceof \App\Models\LocalFileVolume ? $storage->fs_path : $storage->name) }}
-            </code>
+            </span>
         </div>
 
         <x-callout type="warning" title="File-level consistency">
             Archives created while the application writes to this storage can be inconsistent. Stopping containers
             during the archive is safer, but briefly interrupts the application.
+            <div class="mt-4">
+                <x-forms.listbox id="stopDuringBackup" label="Archive behavior" live onChange="instantSave"
+                    :options="[
+                        ['value' => false, 'label' => 'Keep containers running'],
+                        ['value' => true, 'label' => 'Stop containers during archive'],
+                    ]" />
+            </div>
         </x-callout>
 
         <div class="mt-4 grid gap-4 lg:grid-cols-2">
-            <x-forms.listbox id="stopDuringBackup" label="Archive behavior" live onChange="instantSave"
-                :options="[
-                    ['value' => false, 'label' => 'Keep containers running'],
-                    ['value' => true, 'label' => 'Stop containers during archive'],
-                ]" />
             <x-forms.input id="frequency" label="Frequency" required
                 helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression." />
             <x-forms.input id="timezone" label="Timezone" disabled

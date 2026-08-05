@@ -1,12 +1,16 @@
 <?php
 
+use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
+use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -103,18 +107,21 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('Destination Path')
         ->toContain('volumes-col-backup')
         ->toContain('supportsPreviewSuffix')
-        ->toContain('openBackupModal')
+        ->toContain('x-modal-input')
+        ->not->toContain('wire:click="openBackupModal')
         ->toContain('data-table-row')
         ->toContain('volumes-mobile-label')
         ->not->toContain('table-badge table-badge-success')
         ->not->toContain('livewire:project.shared.storages.show')
         ->not->toContain('x-status-badge')
+        ->not->toContain('font-mono')
         ->not->toContain('Service volume mounts are read-only here.');
 
     // Show remains available for isolated embeds/tests but is no longer nested from All.
     expect($showView)
         ->toContain('data-table-row')
-        ->toContain('volumes-table-grid');
+        ->toContain('volumes-table-grid')
+        ->not->toContain('font-mono');
 
     // Service stack page: one settings-section card per compose service/resource.
     expect($storageView)
@@ -130,6 +137,20 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('scrollToSettingsSection')
         ->toContain('Service volume mounts are read-only here.')
         ->toContain("'storage-service-'.\$resource->uuid");
+
+    expect($serviceConfigurationView)->not->toContain('Storage Backups');
+    expect(file_get_contents(resource_path('views/livewire/project/service/heading.blade.php')))
+        ->toContain("'label' => 'Backups'")
+        ->toContain('project.service.volume-backups.*');
+    expect(file_get_contents(resource_path('views/livewire/project/service/volume-backup/show.blade.php')))
+        ->toContain('context="service-volume"');
+    expect(file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/general.blade.php')))
+        ->not->toContain('<code')
+        ->toMatch('/<x-callout[^>]*title="File-level consistency"[\s\S]*id="stopDuringBackup"[\s\S]*<\/x-callout>/');
+    expect(file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php')))
+        ->toContain('<span>Time</span>')
+        ->toContain('x-forms.copy-button')
+        ->toContain('col-span-6');
 
     $css = file_get_contents(resource_path('css/app.css'));
 
@@ -147,6 +168,43 @@ it('renders volumes as a data table with shared column headers', function () {
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)
         ->toMatch('/\.application-settings-form label\s*\{[^}]*font-size:\s*13px/s');
+});
+
+it('creates and exposes volume backups for service storage', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $serviceApplication = ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'buzz',
+    ]);
+    $volume = LocalPersistentVolume::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'buzz-data',
+        'mount_path' => '/data',
+        'resource_id' => $serviceApplication->id,
+        'resource_type' => $serviceApplication->getMorphClass(),
+    ]);
+
+    Livewire::test(CreateServiceVolumeBackup::class, [
+        'service' => $service,
+        'selectedTargetKey' => 'volume:'.$volume->id,
+    ])->set('frequency', 'daily')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect($volume->scheduledBackups()->first())
+        ->not->toBeNull()
+        ->enabled->toBeTrue();
+    expect(ScheduledVolumeBackup::query()->forService($service)->count())->toBe(1);
+
+    Livewire::test(All::class, ['resource' => $serviceApplication])
+        ->assertSet('showActionsColumn', true)
+        ->assertSee('Backup')
+        ->assertSeeHtml('title="Volume backup is enabled"');
 });
 
 it('shows PR deployment suffix only for git-based applications', function () {

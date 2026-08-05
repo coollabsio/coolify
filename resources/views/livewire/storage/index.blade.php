@@ -52,7 +52,7 @@
 
                     <div class="mt-auto pt-4">
                         @if ($storage->is_usable)
-                            <x-status-badge label="Ready" type="success" />
+                            <x-status-badge label="Connected" type="success" />
                         @else
                             <x-status-badge label="Not usable" type="error" />
                         @endif

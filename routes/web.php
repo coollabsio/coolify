@@ -35,6 +35,8 @@ use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
+use App\Livewire\Project\Service\VolumeBackup\Index;
+use App\Livewire\Project\Service\VolumeBackup\Show;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Show as ProjectShow;
@@ -305,6 +307,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
+        Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
+        Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
+        Route::get('/storage-backups/{backup_uuid}/s3', Show::class)->name('project.service.volume-backups.s3');
+        Route::get('/storage-backups/{backup_uuid}/retention', Show::class)->name('project.service.volume-backups.retention');
+        Route::get('/storage-backups/{backup_uuid}/executions', Show::class)->name('project.service.volume-backups.executions');
+        Route::get('/storage-backups/{backup_uuid}/danger', Show::class)->name('project.service.volume-backups.danger');
         Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
         Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
@@ -354,6 +362,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
+    Route::get('/destination/{destination_uuid}/danger', DestinationShow::class)->name('destination.danger');
     Route::get('/destination/{destination_uuid}/resources', DestinationResources::class)->name('destination.resources');
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');

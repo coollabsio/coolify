@@ -15,7 +15,10 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @param  (Closure(string): array<int, string>)|null  $resolver
      */
-    public function __construct(private ?Closure $resolver = null) {}
+    /**
+     * @param  array<int, string>  $trustedInternalHosts
+     */
+    public function __construct(private ?Closure $resolver = null, private array $trustedInternalHosts = []) {}
 
     /**
      * Run the validation rule.
@@ -97,7 +100,7 @@ class SafeWebhookUrl implements ValidationRule
      *
      * @return array<string, mixed>
      */
-    public static function httpClientOptions(string $url): array
+    public static function httpClientOptions(string $url, array $trustedInternalHosts = []): array
     {
         $options = ['allow_redirects' => false];
 
@@ -105,7 +108,7 @@ class SafeWebhookUrl implements ValidationRule
             throw new \RuntimeException('Webhook URL DNS pinning is unavailable.');
         }
 
-        $target = self::resolveUrlForRequest($url);
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts);
 
         if ($target['ips'] === [] || filter_var($target['host'], FILTER_VALIDATE_IP)) {
             return $options;
@@ -135,9 +138,9 @@ class SafeWebhookUrl implements ValidationRule
      *
      * @return array<int, string>
      */
-    public static function minioClientResolveOptions(string $url): array
+    public static function minioClientResolveOptions(string $url, array $trustedInternalHosts = []): array
     {
-        $target = self::resolveUrlForRequest($url);
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts);
 
         if ($target['ips'] === [] || filter_var($target['host'], FILTER_VALIDATE_IP)) {
             return [];
@@ -172,9 +175,9 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @return array{host: string, port: int, ips: array<int, string>}
      */
-    private static function resolveUrlForRequest(string $url): array
+    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = []): array
     {
-        $rule = new self;
+        $rule = new self(trustedInternalHosts: $trustedInternalHosts);
         $host = parse_url($url, PHP_URL_HOST);
         if (! is_string($host) || $host === '') {
             throw new \RuntimeException('Webhook URL host could not be resolved.');
@@ -458,6 +461,10 @@ class SafeWebhookUrl implements ValidationRule
 
     private function isAllowedHostname(string $host): bool
     {
+        if (in_array($host, array_map('strtolower', $this->trustedInternalHosts), true)) {
+            return true;
+        }
+
         foreach ($this->allowlistEntries() as $entry) {
             if (! str_contains($entry, '/') && strtolower($entry) === $host) {
                 return true;

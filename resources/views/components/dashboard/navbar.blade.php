@@ -7,6 +7,7 @@
     // (lg+: main sidebar + fixed layer-2 tabs). Below lg the mobile topbar is used
     // and the page title stays visible. Pass true for resource-detail names.
     'titleOnDesktop' => false,
+    'mobileTitleOnly' => false,
 ])
 
 @php
@@ -71,22 +72,18 @@
             [
                 'label' => 'General',
                 'route' => 'source.github.show',
-                'active' => request()->routeIs('source.github.show', 'source.github.danger'),
+                'active' => request()->routeIs('source.github.show', 'source.github.permissions', 'source.github.resources', 'source.github.danger'),
             ],
-            ['label' => 'Permissions', 'route' => 'source.github.permissions', 'active' => request()->routeIs('source.github.permissions')],
-            ['label' => 'Resources', 'route' => 'source.github.resources', 'active' => request()->routeIs('source.github.resources')],
         ],
         'destination' => [
-            ['label' => 'General', 'route' => 'destination.show', 'active' => request()->routeIs('destination.show')],
-            ['label' => 'Resources', 'route' => 'destination.resources', 'active' => request()->routeIs('destination.resources')],
+            ['label' => 'General', 'route' => 'destination.show', 'active' => request()->routeIs('destination.show', 'destination.resources', 'destination.danger')],
         ],
         'storage' => [
             [
                 'label' => 'General',
                 'route' => 'storage.show',
-                'active' => request()->routeIs('storage.show', 'storage.danger'),
+                'active' => request()->routeIs('storage.show', 'storage.danger', 'storage.resources'),
             ],
-            ['label' => 'Resources', 'route' => 'storage.resources', 'active' => request()->routeIs('storage.resources')],
         ],
         'subscription' => [
             [
@@ -124,7 +121,7 @@
             'lg:mb-8' => $titleOnDesktop || ! $showNav,
             // Hide with the desktop chrome (sidebar + fixed tabs), not xl.
             // Keep title on desktop when there is no fixed layer-2 tab strip.
-            'lg:hidden' => ! $titleOnDesktop && $showNav,
+            'lg:hidden' => $mobileTitleOnly || (! $titleOnDesktop && $showNav),
         ])>
             <div class="min-w-0 flex-1">
                 <div class="flex min-w-0 flex-wrap items-center gap-2">

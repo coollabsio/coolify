@@ -16,7 +16,7 @@
     ];
 @endphp
 
-<aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
+<aside class="application-settings-navigation min-w-0 xl:self-start">
     <nav aria-label="Server security sections"
         class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
         <div class="nav-section hidden xl:block">Security</div>
