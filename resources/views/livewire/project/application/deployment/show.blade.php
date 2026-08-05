@@ -5,7 +5,7 @@
         </x-slot>
         <livewire:project.shared.configuration-checker :resource="$application" />
         <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-show" />
-        <section class="application-settings-workspace flex min-h-0 w-full max-w-[1180px] flex-1">
+        <section class="application-settings-workspace mt-4 flex min-h-0 w-full max-w-[1180px] flex-1 lg:mt-0">
             <div class="grid min-h-0 min-w-0 flex-1 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
                 <x-application.configuration-sidebar :application="$application" :flush="true"
                     current-route="project.application.deployment.show" />

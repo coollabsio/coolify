@@ -250,9 +250,10 @@
             </div>
         </div>
 
-        <div class="hidden xl:fixed xl:top-14 xl:right-4 xl:z-30 xl:flex xl:h-12 xl:w-auto xl:items-center">
+        @teleport('#resource-action-hud-slot')
+        <div class="hidden xl:flex xl:w-auto xl:items-center">
             <div
-                class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
+                class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <x-resource-heading-tabs class="hidden" aria-hidden="true">
                     @foreach ($serverMenuItems as $menuItem)
                         <a wire:key="server-primary-nav-{{ str($menuItem['label'])->slug() }}"
@@ -327,6 +328,7 @@
                 @endif
             </div>
         </div>
+        @endteleport
     </div>
 
     @script

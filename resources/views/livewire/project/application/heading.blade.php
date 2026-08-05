@@ -183,11 +183,11 @@
             </div>
         </div>
 
-        {{-- Layer-2 top nav: one unified bar — menus left, actions right --}}
-        <div
-            class="hidden w-full items-center xl:fixed xl:top-14 xl:right-4 xl:z-30 xl:flex xl:h-12 xl:w-auto xl:border-0 xl:bg-transparent xl:p-0 xl:backdrop-blur-none xl:dark:bg-transparent">
+        {{-- Desktop actions live in the fixed top bar so they cannot overlap page content. --}}
+        @teleport('#resource-action-hud-slot')
+        <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
-                class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-start gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 xl:w-auto xl:justify-end dark:border-white/[0.07] dark:bg-white/[0.035]">
+                class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-start gap-1 overflow-visible xl:w-auto xl:justify-end">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
                     {{-- Status badge temporarily hidden — will be redesigned later:
                          <x-status.index :resource="$application" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" /> --}}
@@ -282,5 +282,6 @@
                 </div>
             </div>
         </div>
+        @endteleport
     </div>
 </nav>

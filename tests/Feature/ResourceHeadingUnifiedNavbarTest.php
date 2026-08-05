@@ -22,15 +22,64 @@ it('uses a single unified navbar for application, service, database, and server 
         ->toContain('justify-start')
         ->toContain('xl:justify-end')
         ->toContain('xl:w-auto')
-        ->toContain('xl:bg-transparent')
-        ->toContain('xl:fixed')
-        ->toContain('xl:top-14')
+        ->toContain("@teleport('#resource-action-hud-slot')")
+        ->not->toContain('xl:fixed')
+        ->not->toContain('xl:top-14')
         ->toContain('xl:hidden')
         ->not->toContain('application-primary-tabs')
         ->not->toContain("typeof collapsed !== 'undefined'")
         ->not->toContain('Spacer: in-flow stand-in')
         ->not->toContain('hidden lg:block lg:h-12')
         ->not->toContain('border-l border-neutral-200 pl-1');
+});
+
+it('docks desktop resource actions in the top bar instead of floating over content', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $files = [
+        resource_path('views/livewire/project/application/heading.blade.php'),
+        resource_path('views/livewire/project/service/heading.blade.php'),
+        resource_path('views/livewire/project/database/heading.blade.php'),
+        resource_path('views/livewire/server/navbar.blade.php'),
+    ];
+
+    expect($layout)->toContain('id="resource-action-hud-slot"');
+
+    foreach ($files as $path) {
+        $contents = file_get_contents($path);
+
+        expect($contents)
+            ->toContain("@teleport('#resource-action-hud-slot')")
+            ->not->toContain('xl:fixed xl:top-14 xl:right-4');
+
+        $desktopHud = str($contents)->after("@teleport('#resource-action-hud-slot')")->before('@endteleport')->toString();
+
+        expect($desktopHud)
+            ->not->toContain('rounded-[10px]')
+            ->not->toContain('border-neutral-200')
+            ->not->toContain('bg-neutral-100')
+            ->not->toContain('dark:bg-white/[0.035]');
+    }
+});
+
+it('places the account menu beside the desktop sidebar toggle while retaining it on mobile', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
+    $accountMenu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
+
+    expect($layout)
+        ->not->toContain("{{-- Right cluster --}}\n                    <x-top-user-menu />")
+        ->toContain('<x-top-user-menu />')
+        ->toContain('flex grow min-w-0 flex-col overflow-visible');
+
+    expect(substr_count($layout, '<x-top-user-menu />'))->toBe(1);
+
+    expect($navbar)
+        ->toContain('<x-top-user-menu sidebar />')
+        ->toContain('Toggle sidebar');
+
+    expect($accountMenu)
+        ->toContain("'sidebar' => false")
+        ->toContain("'bottom-full! left-0! right-auto! top-auto! mb-1!' => \$sidebar");
 });
 
 it('keeps application links next to advanced actions on the right', function () {
@@ -166,6 +215,17 @@ it('keeps the deployment log sidebar fixed in the layout without a top gap', fun
         ->and($css)->toContain('.application-settings-navigation.is-flush')
         ->and($css)->toContain('position: static;')
         ->and($css)->toContain('overflow: visible;');
+});
+
+it('uses the same mobile heading gap on deployment pages as application settings', function () {
+    $configuration = file_get_contents(resource_path('views/livewire/project/application/configuration.blade.php'));
+    $deploymentIndex = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
+    $deploymentShow = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
+
+    expect($configuration)->toContain('application-settings-workspace mt-4')
+        ->and($deploymentIndex)->toContain("'mt-4 max-w-[1180px] lg:mt-0' => ! \$embedded")
+        ->and($deploymentShow)->toContain('application-settings-workspace mt-4')
+        ->toContain('lg:mt-0');
 });
 
 it('removes desktop top spacing from the deployment log viewer', function () {

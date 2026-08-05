@@ -1,10 +1,14 @@
+@props([
+    'sidebar' => false,
+])
+
 @php
     $user = auth()->user();
     $userName = $user?->name ?? 'Account';
     $userEmail = $user?->email ?? '';
     $userInitial = strtoupper(mb_substr($user?->name ?: ($user?->email ?: 'A'), 0, 1));
 @endphp
-<div class="relative" x-data="{
+<div @class(['relative', 'min-w-0' => $sidebar]) x-data="{
     open: false,
     appearanceOpen: false,
     theme: localStorage.getItem('theme') || 'dark',
@@ -22,19 +26,31 @@
     @click.outside="open = false; appearanceOpen = false">
     <button type="button" @click="open = !open"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
-        class="flex h-8 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 shadow-sm transition-colors hover:bg-neutral-200 dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]">
+        @if ($sidebar) :class="collapsed && 'w-8 justify-center px-0'" @endif
+        @class([
+            'flex h-8 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 shadow-sm transition-colors hover:bg-neutral-200 dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]',
+            'max-w-36' => $sidebar,
+        ])>
         <span
             class="flex size-5 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-700 dark:bg-white/[0.1] dark:text-fg">
             {{ $userInitial }}
         </span>
-        <svg class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint transition-transform" :class="open && 'rotate-180'"
+        @if ($sidebar)
+            <span class="min-w-0 truncate text-xs font-medium" :class="collapsed && 'hidden'">{{ $userName }}</span>
+        @endif
+        <svg class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint transition-transform"
+            :class="[open && 'rotate-180', {{ $sidebar ? "collapsed && 'hidden'" : 'false' }}]"
             viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
     </button>
 
     <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-        class="listbox-panel right-0! left-auto! z-[90]! max-h-none! w-52! min-w-0! overflow-visible!">
+        @class([
+            'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
+            'right-0! left-auto!' => ! $sidebar,
+            'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
+        ])>
         <div class="min-w-0 px-2 py-1.5">
             <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
             <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $userEmail }}</div>
