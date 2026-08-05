@@ -40,6 +40,19 @@ it('separates the mobile sidebar from the page with a visible border', function 
     expect($layout)->toContain('max-w-56 min-w-0 flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-white/[0.12] dark:bg-panel');
 });
 
+it('truncates long team names within the mobile header', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $switcher = file_get_contents(resource_path('views/livewire/switch-team.blade.php'));
+
+    expect($layout)
+        ->toContain('flex min-w-0 flex-1 items-center gap-2.5')
+        ->toContain('size-8 shrink-0 items-center justify-center rounded-lg')
+        ->toContain('flex shrink-0 items-center gap-1')
+        ->and($switcher)
+        ->toContain('group/team flex h-8 min-w-0 max-w-full items-center')
+        ->toContain('min-w-0 truncate text-[13px]');
+});
+
 it('shows section titles and descriptions above settings navigation on smaller screens', function (string $view, string $title, string $description) {
     $layout = file_get_contents(resource_path("views/components/{$view}"));
     $css = file_get_contents(resource_path('css/app.css'));

@@ -45,3 +45,28 @@ test('two factor challenge page uses the shared auth shell', function () {
         ->not->toContain('bg-gray-50 dark:bg-base')
         ->not->toContain('!text-5xl font-extrabold');
 });
+
+test('email verification page uses the shared auth shell', function () {
+    $verification = file_get_contents(resource_path('views/auth/verify-email.blade.php'));
+
+    expect($verification)
+        ->toContain('x-layout-simple')
+        ->toContain('x-auth.shell')
+        ->toContain('title="Coolify"')
+        ->toContain('auth-guidance')
+        ->toContain('block sm:inline')
+        ->not->toContain('<x-layout>')
+        ->not->toContain('md:h-screen');
+});
+
+test('team invitation page uses the shared auth shell', function () {
+    $invitation = file_get_contents(resource_path('views/invitation/accept.blade.php'));
+
+    expect($invitation)
+        ->toContain('x-auth.shell')
+        ->toContain('title="Coolify"')
+        ->toContain('x-auth.alert')
+        ->toContain('Accept invitation')
+        ->not->toContain('bg-gray-50 dark:bg-base')
+        ->not->toContain('!text-5xl font-extrabold');
+});

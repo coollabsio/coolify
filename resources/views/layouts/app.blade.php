@@ -94,15 +94,16 @@
             {{-- ============ MOBILE TOP BAR ============ --}}
             <div
                 class="sticky top-0 z-40 flex items-center justify-between px-4 py-3 gap-x-4 sm:px-6 lg:hidden bg-white/95 dark:bg-panel/95 backdrop-blur-sm border-b border-neutral-200/60 dark:border-white/[0.06]">
-                <div class="flex items-center gap-2.5 flex-shrink-0 min-w-0">
-                    <a href="/" class="flex items-center justify-center size-8 rounded-lg bg-neutral-100 dark:bg-white/[0.06] hover:opacity-80 transition-opacity">
+                <div class="flex min-w-0 flex-1 items-center gap-2.5">
+                    <a href="/"
+                        class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 transition-opacity hover:opacity-80 dark:bg-white/[0.06]">
                         <img src="/coolify-logo.svg" alt="Coolify" class="w-[18px] h-[18px]" />
                     </a>
                     <div class="min-w-0" x-data="{ collapsed: false }">
                         <livewire:switch-team />
                     </div>
                 </div>
-                <div class="flex min-w-0 items-center gap-1">
+                <div class="flex shrink-0 items-center gap-1">
                     {{-- Dev Server-Timing HUD docks here on <lg (desktop uses #server-timing-hud-slot) --}}
                     <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot
                         class="hidden shrink-0 items-center"></div>
