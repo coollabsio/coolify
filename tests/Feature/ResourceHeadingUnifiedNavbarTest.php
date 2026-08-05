@@ -75,7 +75,8 @@ it('places the account menu beside the desktop sidebar toggle while retaining it
 
     expect($navbar)
         ->toContain('<x-top-user-menu sidebar />')
-        ->toContain('Toggle sidebar');
+        ->toContain('Toggle sidebar')
+        ->toContain("collapsed ? 'flex-col-reverse justify-center'");
 
     expect($accountMenu)
         ->toContain("'sidebar' => false")

@@ -30,3 +30,13 @@ it('collapses server subsystem badges into one status summary', function () {
         ->toContain('<button')
         ->toContain("merge(['type' => 'button'])");
 });
+
+it('uses the branded input focus state for the server filter', function () {
+    $navbarView = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+
+    expect($navbarView)
+        ->toContain('placeholder="Filter servers…"')
+        ->toContain('class="input h-7!')
+        ->toContain('<x-reicon name="check-circle"')
+        ->not->toContain('<x-reicon name="check"');
+});

@@ -207,7 +207,7 @@
     </ul>
     {{-- Sticky sidebar collapser (desktop only; mobile uses a temporary slide-over) --}}
     <div class="sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 border-t border-neutral-200 bg-white px-2 py-2 dark:border-white/[0.06] dark:bg-panel lg:-mx-3 lg:flex lg:px-3"
-        :class="collapsed ? 'flex-col justify-center' : 'justify-between'">
+        :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
         <x-top-user-menu sidebar />
         <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
             class="menu-item w-8 shrink-0 justify-center px-0">

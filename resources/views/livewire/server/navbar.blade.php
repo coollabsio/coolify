@@ -110,7 +110,7 @@
                             <x-reicon name="search"
                                 class="pointer-events-none absolute top-1/2 left-2 size-3 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
                             <input type="search" x-model.debounce.100ms="search" placeholder="Filter servers…"
-                                class="h-7! w-full rounded-md! border-neutral-200! bg-white! py-0! pr-2! pl-7! text-[11px]! text-black! placeholder:text-neutral-400! dark:border-white/[0.1]! dark:bg-coolgray-100! dark:text-white! dark:placeholder:text-fg-faint!">
+                                class="input h-7! w-full rounded-md! border-neutral-200! bg-white! py-0! pr-2! pl-7! text-[11px]! text-black! placeholder:text-neutral-400! dark:border-white/[0.1]! dark:bg-coolgray-100! dark:text-white! dark:placeholder:text-fg-faint!">
                         </div>
                     </div>
                     <template x-for="option in servers.filter((item) => item.name.toLowerCase().includes(search.toLowerCase()))"
@@ -120,7 +120,7 @@
                             <span class="size-1.5 shrink-0 rounded-full"
                                 :class="option.functional ? 'bg-success' : 'bg-error'"></span>
                             <span class="min-w-0 flex-1 truncate" x-text="option.name"></span>
-                            <x-reicon name="check"
+                            <x-reicon name="check-circle"
                                 class="size-3.5 shrink-0 text-coollabs dark:text-warning"
                                 x-show="option.uuid === '{{ $server->uuid }}'" />
                         </a>
