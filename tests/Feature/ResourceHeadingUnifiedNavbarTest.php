@@ -94,7 +94,7 @@ it('keeps application links next to advanced actions on the right', function () 
     expect($advancedPosition)->not->toBeFalse()
         ->and($linksPosition)->not->toBeFalse()
         ->and($linksPosition)->toBeGreaterThan($advancedPosition)
-        ->and($links)->toContain('listbox-panel top-full! right-0! left-auto!')
+        ->and($links)->toContain("'right-0! left-auto! min-w-60! max-w-96!' => !\$fullWidth")
         ->and($links)->toContain('listbox-option justify-start! gap-2.5!')
         ->and($links)->not->toContain('md:left-0 md:right-auto');
 
@@ -344,6 +344,7 @@ it('shows application and service Links on mobile headings', function () {
     $applicationLinks = file_get_contents(resource_path('views/components/applications/links.blade.php'));
     expect($applicationLinks)
         ->toContain("'button w-full justify-between' => \$fullWidth")
+        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
         ->toContain('<x-reicon name="chevron-down"');
 
     expect($mobileServiceSection)
@@ -355,6 +356,7 @@ it('shows application and service Links on mobile headings', function () {
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
     expect($serviceLinks)
         ->toContain("'button w-full justify-between' => \$fullWidth")
+        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
         ->toContain('<x-reicon name="chevron-down"')
         ->toContain('No links available');
 

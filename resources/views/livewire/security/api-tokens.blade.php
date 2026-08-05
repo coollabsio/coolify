@@ -35,7 +35,7 @@
                     <x-application.settings-section title="New API token">
                         <x-slot:actions>
                             <button type="submit"
-                                class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                class="button button-highlighted">
                                 <x-reicon name="plus" class="size-3.5" />
                                 Create token
                             </button>

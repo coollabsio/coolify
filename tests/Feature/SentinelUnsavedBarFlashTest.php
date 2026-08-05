@@ -36,6 +36,15 @@ test('unsaved bar delays show and hides while loading to avoid instant-save flas
         ->toContain('delay-0');
 });
 
+test('unsaved bar stays above floating notifications so save actions remain accessible', function () {
+    $unsavedBar = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+    $popup = file_get_contents(resource_path('views/components/popup-small.blade.php'));
+
+    expect($unsavedBar)
+        ->toContain('z-[1000]')
+        ->and($popup)->toContain('z-999');
+});
+
 test('settings general unsaved bar excludes auto-saving instance timezone', function () {
     $path = resource_path('views/livewire/settings/index.blade.php');
     $contents = file_get_contents($path);

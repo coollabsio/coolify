@@ -71,7 +71,7 @@
                                     <div
                                         class="flex items-center gap-2.5 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2.5 dark:border-white/[0.08] dark:bg-white/[0.03]">
                                         <template x-if="!upgradeComplete && !upgradeError">
-                                            <svg class="size-4 shrink-0 animate-spin text-coollabs dark:text-warning"
+                                            <svg class="loading-indicator size-4 shrink-0 animate-spin"
                                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                                 aria-hidden="true">
                                                 <circle class="opacity-25" cx="12" cy="12" r="10"

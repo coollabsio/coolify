@@ -75,7 +75,7 @@
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
                                 ?
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' :
+                                'control-selected' :
                                 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Table view" title="Table view">
                             <x-reicon name="unordered-list" class="size-3.5" />
@@ -84,7 +84,7 @@
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'grid'
                                 ?
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' :
+                                'control-selected' :
                                 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Grid view" title="Grid view">
                             <x-reicon name="grid" class="size-3.5" />
@@ -408,9 +408,11 @@
 
                 <div wire:poll="getDeployments" class="overflow-x-auto">
                     @if (count($deploymentsPerTagPerServer ?? []) === 0)
-                        <x-empty title="No active deployments"
-                            description="Deployments will appear here while they are queued or running."
-                            icon-name="play-circle" size="sm" />
+                        <div class="p-3">
+                            <x-empty title="No active deployments"
+                                description="Deployments will appear here while they are queued or running."
+                                icon-name="play-circle" size="sm" />
+                        </div>
                     @else
                         <div
                             class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">

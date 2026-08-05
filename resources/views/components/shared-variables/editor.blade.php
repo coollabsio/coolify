@@ -30,7 +30,9 @@
     }
 }">
     <x-dashboard.navbar section="shared-variables" title="Shared variables"
-        subtitle="Reusable environment variables across resources" :titleOnDesktop="false">
+        subtitle="Reusable environment variables across resources" :titleOnDesktop="false" />
+
+    <x-application.settings-section :title="$title" flush>
         <x-slot:actions>
             <x-forms.button type="button" wire:click="switch" class="whitespace-nowrap">
                 <x-reicon :name="$view === 'normal' ? 'browser-code' : 'unordered-list'" class="size-3.5" />
@@ -38,9 +40,6 @@
                 <span class="sm:hidden">{{ $view === 'normal' ? 'Developer' : 'Normal' }}</span>
             </x-forms.button>
         </x-slot:actions>
-    </x-dashboard.navbar>
-
-    <x-application.settings-section :title="$title" flush>
         @if ($view === 'normal')
             <div
                 class="flex flex-col gap-3 border-b border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.08]">
@@ -89,7 +88,7 @@
                         <x-modal-input title="New Shared Variable">
                             <x-slot:content>
                                 <button type="button"
-                                    class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                    class="button button-highlighted">
                                     <x-reicon name="plus" class="size-3.5" />
                                     Add variable
                                 </button>
@@ -101,9 +100,11 @@
             </div>
 
             @if ($variables->isEmpty())
-                <x-empty title="No shared variables"
-                    description="Add a variable to make it available to resources in this scope."
-                    icon-name="variables" size="sm" />
+                <div class="p-3">
+                    <x-empty title="No shared variables"
+                        description="Add a variable to make it available to resources in this scope."
+                        icon-name="variables" size="sm" />
+                </div>
             @else
                 <div class="data-table flex w-full flex-col">
                     <div class="data-table-header env-table-grid-shared order-[-1]">

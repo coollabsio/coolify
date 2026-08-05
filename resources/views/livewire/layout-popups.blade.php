@@ -172,7 +172,7 @@
 
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <a target="_blank" href="https://github.com/sponsors/coollabsio"
-                                class="button h-9 justify-center bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! sm:flex-1 dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                class="button button-highlighted h-9 justify-center sm:flex-1">
                                 GitHub Sponsors
                             </a>
                             <a x-show="!reminders.sponsorship.compact" x-transition.opacity target="_blank"

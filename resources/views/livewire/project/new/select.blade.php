@@ -131,7 +131,7 @@
                                         Docs
                                     </a>
                                     <button type="button"
-                                        class="button ml-auto bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                        class="button ml-auto button-highlighted"
                                         :disabled="selecting" @click="setType(application.id)">
                                         Deploy
                                     </button>
@@ -166,7 +166,7 @@
                                         Docs
                                     </a>
                                     <button type="button"
-                                        class="button ml-auto bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                        class="button ml-auto button-highlighted"
                                         :disabled="selecting" @click="setType(application.id)">
                                         Deploy
                                     </button>
@@ -219,7 +219,7 @@
                                         Website
                                     </a>
                                     <button type="button"
-                                        class="button ml-auto bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                        class="button ml-auto button-highlighted"
                                         :disabled="selecting" @click="setType(database.id)">
                                         Deploy
                                     </button>
@@ -295,7 +295,7 @@
                                             Website
                                         </a>
                                         <button type="button"
-                                            class="button ml-auto bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                            class="button ml-auto button-highlighted"
                                             :disabled="selecting"
                                             @click="setType('one-click-service-' + service.id)">
                                             Deploy

@@ -7,7 +7,7 @@
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
         @can('createAnyResource')
             <a href="{{ route('server.create') }}" {{ wireNavigate() }}
-                class="button w-fit shrink-0 whitespace-nowrap bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
                 <x-reicon name="plus" class="size-3.5" />
                 New server
             </a>
@@ -78,7 +78,7 @@
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
-                                ? 'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning'
+                                ? 'control-selected'
                                 : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Table view">
                             <x-reicon name="unordered-list" class="size-3.5" />
@@ -86,7 +86,7 @@
                         <button type="button" x-on:click="setViewMode('grid')"
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'grid'
-                                ? 'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning'
+                                ? 'control-selected'
                                 : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Grid view">
                             <x-reicon name="grid" class="size-3.5" />

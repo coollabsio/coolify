@@ -143,7 +143,7 @@
                         @can('create', App\Models\PrivateKey::class)
                             <x-slot:contents>
                                 <a href="{{ route('security.private-key.index') }}" {{ wireNavigate() }}
-                                    class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                    class="button button-highlighted">
                                     <x-reicon name="plus" class="size-3.5" />
                                     Add private key
                                 </a>
@@ -157,7 +157,7 @@
                         @can('createAnyResource')
                             <x-slot:contents>
                                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
-                                    class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                    class="button button-highlighted">
                                     <x-reicon name="plus" class="size-3.5" />
                                     New server
                                 </a>

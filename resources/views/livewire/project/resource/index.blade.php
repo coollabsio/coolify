@@ -25,7 +25,7 @@
                 @can('createAnyResource')
                     <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                         {{ wireNavigate() }}
-                        class="button whitespace-nowrap bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                        class="button whitespace-nowrap button-highlighted">
                         <x-reicon name="plus" class="size-3.5" />
                         New resource
                     </a>
@@ -69,7 +69,7 @@
                 <div class="flex items-center gap-2">
                     <div class="relative" x-on:click.outside="filterOpen = false">
                         <button type="button" class="button max-w-64"
-                            :class="activeFilterCount > 0 && 'bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 dark:bg-warning/15! dark:text-warning! dark:ring-warning/25'"
+                            :class="activeFilterCount > 0 && 'button-highlighted'"
                             x-on:click="filterOpen = !filterOpen" :title="activeFilterCount > 0 ? filterButtonText : 'Filter'">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
@@ -148,7 +148,7 @@
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
                                 ?
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' :
+                                'control-selected' :
                                 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Table view" title="Table view">
                             <x-reicon name="unordered-list" class="size-3.5" />
@@ -157,7 +157,7 @@
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'grid'
                                 ?
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' :
+                                'control-selected' :
                                 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Grid view" title="Grid view">
                             <x-reicon name="grid" class="size-3.5" />

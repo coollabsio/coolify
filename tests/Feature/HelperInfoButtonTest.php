@@ -9,7 +9,7 @@ test('helper trigger is a button that stops label activation', function () {
     expect($contents)
         ->toContain('type="button"')
         ->toContain('@click.prevent.stop')
-        ->toContain('aria-label="More information"')
+        ->toContain('aria-label="{{ $label }}"')
         ->toContain('info-helper-popup')
         ->toContain('name="info-circle"')
         ->toContain('class="size-3.5 text-neutral-400')

@@ -96,7 +96,7 @@
                         @if ($activeFilterCount > 0) title="{{ $activeFilterText }}" @endif
                         @class([
                             'button max-w-80 min-w-0',
-                            'bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 dark:bg-warning/15! dark:text-warning! dark:ring-warning/25' => $activeFilterCount > 0,
+                            'button-highlighted' => $activeFilterCount > 0,
                         ])>
                         <x-reicon name="filter" class="size-3.5 shrink-0" />
                         <span class="truncate">{{ $activeFilterCount > 0 ? $activeFilterText : 'Filter' }}</span>
@@ -205,7 +205,7 @@
                     <x-modal-input title="New Environment Variable" :closeOutside="false">
                         <x-slot:content>
                             <button type="button"
-                                class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                class="button button-highlighted">
                                 <x-reicon name="plus" class="size-3.5" />
                                 Add
                             </button>

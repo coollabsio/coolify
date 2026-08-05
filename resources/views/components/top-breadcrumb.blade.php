@@ -106,9 +106,6 @@
                     <a href="{{ $destination['href'] }}" {{ wireNavigate() }} @click="open = false"
                         class="listbox-option {{ $destination['label'] === $dashboardContext ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
                         <span class="min-w-0 flex-1 truncate">{{ $destination['label'] }}</span>
-                        @if ($destination['label'] === $dashboardContext)
-                            <x-reicon name="check-circle" class="size-3.5 shrink-0 text-warning" />
-                        @endif
                     </a>
                 @endforeach
             </div>
@@ -214,9 +211,6 @@
                     <a href="{{ route($projectDestinationRoute, ['project_uuid' => $p->uuid]) }}" {{ wireNavigate() }} @click="open = false"
                         class="listbox-option {{ $p->uuid === $currentProject->uuid ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
                         <span class="min-w-0 flex-1 truncate">{{ $p->name }}</span>
-                        @if ($p->uuid === $currentProject->uuid)
-                            <x-reicon name="check-circle" class="size-3.5 shrink-0 text-warning" />
-                        @endif
                     </a>
                 @endforeach
             </div>
@@ -243,9 +237,6 @@
                     <a href="{{ route('project.resource.index', ['project_uuid' => $currentProject->uuid, 'environment_uuid' => $env->uuid]) }}" {{ wireNavigate() }} @click="open = false"
                         class="listbox-option {{ $env->uuid === $currentEnvironment->uuid ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
                         <span class="min-w-0 flex-1 truncate">{{ $env->name }}</span>
-                        @if ($env->uuid === $currentEnvironment->uuid)
-                            <x-reicon name="check-circle" class="size-3.5 shrink-0 text-warning" />
-                        @endif
                     </a>
                 @endforeach
             </div>

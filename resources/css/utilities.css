@@ -130,6 +130,18 @@
     @apply inline-flex shrink-0 gap-1.5 justify-center items-center whitespace-nowrap px-2.5 h-9 min-h-9 text-[13px] text-black normal-case rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
 }
 
+@utility button-highlighted {
+    @apply border-2 text-coollabs-200 dark:text-white bg-coollabs-50 dark:bg-coollabs/20 border-coollabs dark:border-coollabs-100 hover:bg-coollabs hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white;
+}
+
+@utility control-selected {
+    @apply bg-coollabs text-white dark:bg-coollabs dark:text-white;
+}
+
+@utility loading-indicator {
+    @apply text-coollabs dark:text-coollabs-100;
+}
+
 /* Compact icon-only control (gear, chevrons, etc.) */
 @utility icon-button {
     @apply inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-neutral-400 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-35 dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg;

@@ -268,7 +268,7 @@ button[isError]:not(:disabled) {
 }
 
 button[isHighlighted]:not(:disabled) {
-    @apply text-coollabs-200 bg-coollabs-50 border-coollabs hover:bg-coollabs hover:text-white dark:bg-warning/15 dark:text-warning dark:border-warning/25 dark:hover:bg-warning/20 dark:hover:text-warning;
+    @apply button-highlighted;
 }
 
 h1 {
@@ -2427,9 +2427,14 @@ input[type="search"]::-webkit-search-results-decoration {
    Mobile stacks: search → meta → full-width actions (no side-by-side overlap). */
 .logs-viewer-toolbar {
     flex-shrink: 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.035);
+    border-bottom: 1px solid var(--color-neutral-200);
+    background: var(--color-neutral-50);
     padding: 0.5rem 0.75rem;
+}
+
+.dark .logs-viewer-toolbar {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.035);
 }
 
 .logs-viewer-toolbar-controls {
@@ -2503,11 +2508,17 @@ input[type="search"]::-webkit-search-results-decoration {
 .logs-viewer-status-badge {
     height: 1.5rem !important;
     flex-shrink: 0;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: var(--color-neutral-200) !important;
+    background: white !important;
     padding-inline: 0.5rem !important;
     font-size: 0.6875rem !important;
     font-weight: 500 !important;
+    color: var(--color-neutral-700) !important;
+}
+
+.dark .logs-viewer-status-badge {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.05) !important;
     color: #d4d4d4 !important;
 }
 
@@ -2615,18 +2626,27 @@ input[type="search"]::-webkit-search-results-decoration {
     align-items: center;
     justify-content: center;
     border-radius: 0.5rem;
-    color: #a3a3a3;
+    color: var(--color-neutral-500);
     transition: color 0.15s, background-color 0.15s;
 }
 
 .logs-viewer-btn:hover {
+    background: var(--color-neutral-100);
+    color: var(--color-neutral-900);
+}
+
+.dark .logs-viewer-btn {
+    color: #a3a3a3;
+}
+
+.dark .logs-viewer-btn:hover {
     background: rgba(255, 255, 255, 0.06);
     color: #f5f5f5;
 }
 
 .logs-viewer-btn-active {
-    background: color-mix(in oklab, var(--color-warning) 14%, transparent);
-    color: var(--color-warning);
+    background: var(--color-coollabs);
+    color: #fff;
 }
 
 .logs-viewer-viewport {

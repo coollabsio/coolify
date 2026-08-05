@@ -1,7 +1,15 @@
 <div>
     @if ($isConfigurationChanged && !is_null($resource->config_hash) && !$resource->isExited())
+        @php
+            $compactStoragePrefix = "configuration-warning:{$resource->uuid}:";
+            $currentConfigurationHash = $resource instanceof \App\Models\Application
+                ? $resource->deploymentConfigurationHash()
+                : md5((string) $resource->config_hash);
+            $compactStorageKey = $compactStoragePrefix.$currentConfigurationHash;
+        @endphp
         <div x-data="{ configurationDiffModalOpen: false, expandedRows: {} }">
-            <x-popup-small>
+            <x-popup-small :compact-after="5000" :compact-storage-key="$compactStorageKey"
+                :compact-storage-prefix="$compactStoragePrefix">
                 <x-slot:title>
                     The latest configuration has not been applied
                 </x-slot:title>

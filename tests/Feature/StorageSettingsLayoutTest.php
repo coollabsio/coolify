@@ -52,7 +52,7 @@ it('places the storage name and connection status in breadcrumbs and delete in t
         ->toContain('@storage-status-changed.window');
     expect(file_get_contents(resource_path('views/components/breadcrumb-switcher.blade.php')))
         ->toContain('{{ $title }}')
-        ->toContain('name="check-circle"');
+        ->not->toContain('name="check-circle"');
     expect(file_get_contents(resource_path('views/livewire/storage/index.blade.php')))
         ->toContain('label="Connected"')
         ->not->toContain('label="Ready"');

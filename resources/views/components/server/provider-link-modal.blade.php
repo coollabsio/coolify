@@ -86,7 +86,7 @@
                     <x-status-badge label="Match found" type="success" />
                 </div>
                 <button type="button"
-                    class="button mt-3 bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                    class="button mt-3 button-highlighted"
                     wire:click="{{ $linkMethod }}">
                     Link resource
                 </button>

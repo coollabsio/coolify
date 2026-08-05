@@ -114,6 +114,13 @@ it('shows empty resource and deployment states for an unused tag', function () {
         ->assertSee('Queued or running');
 });
 
+it('adds spacing around the active deployments empty state', function () {
+    $view = file_get_contents(resource_path('views/livewire/tags/show.blade.php'));
+
+    expect($view)
+        ->toMatch('/<div class="p-3">\s*<x-empty title="No active deployments"/');
+});
+
 it('redirects to the overview when the requested tag does not exist', function () {
     Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
 

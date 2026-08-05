@@ -40,7 +40,7 @@
                         <x-reicon name="check-circle" class="size-3" />
                     </template>
                     <template x-if="currentStep === {{ $stepNumber }}">
-                        <svg class="size-3 animate-spin text-coollabs dark:text-warning" xmlns="http://www.w3.org/2000/svg"
+                        <svg class="loading-indicator size-3 animate-spin" xmlns="http://www.w3.org/2000/svg"
                             fill="none" viewBox="0 0 24 24" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                 stroke-width="4"></circle>

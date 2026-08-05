@@ -25,9 +25,6 @@
                 <button type="button" wire:click="switch_to({{ $team->id }})" @click="open = false"
                     class="listbox-option {{ $team->id === $currentTeam->id ? 'bg-neutral-100 font-medium dark:bg-white/[0.06]' : '' }}">
                     <span class="min-w-0 flex-1 truncate">{{ $team->name }}</span>
-                    @if ($team->id === $currentTeam->id)
-                        <x-reicon name="check-circle" class="size-3.5 shrink-0 text-warning" />
-                    @endif
                 </button>
             @endforeach
             <div class="mt-1 border-t border-neutral-200 pt-1 dark:border-white/[0.08]">
@@ -72,9 +69,6 @@
                 <button type="button" wire:click="switch_to({{ $team->id }})" @click="teamOpen = false"
                     class="listbox-option {{ $team->id === $currentTeam->id ? 'bg-neutral-100 font-medium dark:bg-white/[0.06]' : '' }}">
                     <span class="min-w-0 flex-1 truncate">{{ $team->name }}</span>
-                    @if ($team->id === $currentTeam->id)
-                        <x-reicon name="check-circle" class="size-3.5 shrink-0 text-warning" />
-                    @endif
                 </button>
             @endforeach
             <div class="mt-1 border-t border-neutral-200 pt-1 dark:border-white/[0.08]">

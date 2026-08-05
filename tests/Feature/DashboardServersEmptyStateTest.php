@@ -30,6 +30,7 @@ it('shows an add private key button when no private keys exist', function () {
         ->assertSee('A private key is required')
         ->assertSee('Add an SSH private key before connecting your first server.')
         ->assertSee('Add private key')
+        ->assertSeeHtml('button button-highlighted')
         ->assertSee(route('security.private-key.index'), false);
 });
 

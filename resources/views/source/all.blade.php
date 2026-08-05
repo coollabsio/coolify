@@ -15,7 +15,7 @@
                 <div x-data="{ dropdownOpen: false }" class="relative w-fit shrink-0"
                     @click.outside="dropdownOpen = false" @keydown.escape.window="dropdownOpen = false">
                     <button type="button" @click="dropdownOpen = !dropdownOpen"
-                        class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                        class="button button-highlighted"
                         aria-haspopup="menu" :aria-expanded="dropdownOpen">
                         <x-reicon name="plus" class="size-3.5" />
                         New source

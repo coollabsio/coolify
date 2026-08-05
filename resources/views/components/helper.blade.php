@@ -1,3 +1,8 @@
+@props([
+    'helper',
+    'label' => 'More information',
+])
+
 <div x-data="{
     open: false,
     pinned: false,
@@ -55,10 +60,15 @@
     {{ $attributes->merge(['class' => 'relative z-10 inline-block align-middle']) }}>
     {{-- button (not div) so label-for associations do not steal the click on mobile --}}
     <button type="button" x-ref="trigger"
-        class="info-helper relative z-10 inline-flex size-3.5 shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none"
-        aria-label="More information" @mouseenter="show(false)" @mouseleave="hide"
+        @class([
+            'info-helper relative z-10 inline-flex shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none',
+            'size-3.5' => ! isset($trigger),
+        ])
+        aria-label="{{ $label }}" @mouseenter="show(false)" @mouseleave="hide"
         @click.prevent.stop="open && pinned ? close() : show(true)">
-        @isset($icon)
+        @isset($trigger)
+            {{ $trigger }}
+        @elseif (isset($icon))
             {{ $icon }}
         @else
             <x-reicon name="info-circle"

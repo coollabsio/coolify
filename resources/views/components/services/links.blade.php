@@ -16,9 +16,12 @@
             <x-reicon name="chevron-down" class="size-3 opacity-55" />
         </span>
     </button>
-    <div x-show="open" x-cloak x-transition.origin.top.right
-        class="listbox-panel top-full! right-0! left-auto! mt-1! min-w-60! max-w-96! max-h-80! overflow-y-auto!"
-        role="menu">
+    <div x-show="open" x-cloak x-transition.origin.top.right role="menu"
+        @class([
+            'listbox-panel top-full! mt-1! max-h-80! overflow-y-auto!',
+            'left-0! right-0! w-full! min-w-0! max-w-none!' => $fullWidth,
+            'right-0! left-auto! min-w-60! max-w-96!' => !$fullWidth,
+        ])>
         @forelse ($links as $link)
             <a class="{{ $linkItemClasses }}" target="_blank" href="{{ $link }}">
                 <span class="min-w-0 truncate">{{ $link }}</span>

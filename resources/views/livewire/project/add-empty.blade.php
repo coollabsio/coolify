@@ -11,7 +11,7 @@
 
     <footer class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
         <x-forms.button type="submit"
-            defaultClass="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+            defaultClass="button button-highlighted">
             Create project
         </x-forms.button>
     </footer>

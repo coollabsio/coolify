@@ -19,19 +19,29 @@ test('shared variables pages hide the family title on desktop', function () {
     }
 });
 
-test('shared variables editor places the view toggle next to the tabs', function () {
+test('shared variables editor places the view toggle in the variables section title', function () {
     $editor = file_get_contents(resource_path('views/components/shared-variables/editor.blade.php'));
 
     expect($editor)
+        ->toContain('<x-application.settings-section :title="$title" flush>')
         ->toContain('<x-slot:actions>')
         ->toContain('wire:click="switch"')
         ->toContain('Developer view')
-        ->toContain('Normal view');
+        ->toContain('Normal view')
+        ->toMatch('/settings-section[\s\S]{0,300}<x-slot:actions>[\s\S]{0,300}wire:click="switch"/')
+        ->not->toContain('actionsInTitle');
+});
 
-    // No longer nested as a section header action above the variable list.
-    expect($editor)->not->toMatch(
-        '/settings-section[\s\S]{0,200}<x-slot:actions>[\s\S]{0,200}wire:click="switch"/'
-    );
+test('shared variables navigation uses the standard mobile settings menu', function () {
+    $navbar = file_get_contents(resource_path('views/components/dashboard/navbar.blade.php'));
+
+    expect($navbar)
+        ->toContain("\$stackTabsOnMobile = \$section === 'shared-variables'")
+        ->toContain('grid grid-cols-2 gap-0.5 border-y')
+        ->toContain("'menu-item'")
+        ->toContain("'menu-item-active' => \$item['active']")
+        ->toContain("\$sharedVariableIcons[\$item['label']]")
+        ->toContain('hidden lg:flex');
 });
 
 test('shared variables table omits resource-only flag columns', function () {

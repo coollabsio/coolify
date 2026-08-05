@@ -73,8 +73,27 @@ it('renders the changed configuration labels without a second backend request', 
     $view = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
 
     expect($view)
+        ->toContain(':compact-after="5000"')
+        ->toContain(':compact-storage-key="$compactStorageKey"')
         ->toContain('x-on:click="configurationDiffModalOpen = true"')
         ->not->toContain('$wire.refreshConfigurationChanges()');
+});
+
+it('supports timed compact popup notifications', function () {
+    $view = file_get_contents(resource_path('views/components/popup-small.blade.php'));
+
+    expect($view)
+        ->toContain('compactAfter')
+        ->toContain('compactStorageKey')
+        ->toContain("localStorage.setItem(this.storageKey, 'compact')")
+        ->toContain("localStorage.setItem(this.storageKey, 'icon')")
+        ->toContain('localStorage.removeItem(key)')
+        ->toContain('<template x-teleport="body">')
+        ->toContain('compact = true')
+        ->toContain('@click="restore()"')
+        ->toContain('@click.stop="minimizeToIcon()"')
+        ->toContain('x-show="!iconOnly"')
+        ->toContain('x-show="!compact"');
 });
 
 it('refreshes configuration changes when the event is received', function () {

@@ -14,7 +14,7 @@
                 description="Add an existing Linux server using its SSH connection details.">
                 <x-slot:actions>
                     <button type="submit"
-                        class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                        class="button button-highlighted">
                         Continue
                         <x-reicon name="arrow-right" class="size-3.5" />
                     </button>

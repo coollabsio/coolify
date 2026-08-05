@@ -78,7 +78,7 @@
                                                 source to an application.
                                             </p>
                                         </div>
-                                        <a class="button shrink-0 bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                        <a class="button shrink-0 button-highlighted"
                                             href="{{ getInstallationPath($github_app) }}">
                                             Install repositories
                                             <x-external-link />
@@ -313,7 +313,7 @@
                                 helper="Write access lets Coolify post deployment status and links on pull requests." />
 
                             <button type="button"
-                                class="button mt-auto w-full justify-center bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                class="button mt-auto w-full justify-center button-highlighted"
                                 x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, {{ Illuminate\Support\Js::from($preview_deployment_permissions) }}, {{ Illuminate\Support\Js::from($administration) }})">
                                 Register with GitHub
                             </button>

@@ -25,9 +25,6 @@
             <a href="{{ $item['href'] }}" {{ wireNavigate() }} @click="open = false"
                 class="listbox-option {{ $item['active'] ? 'bg-neutral-100 font-medium text-black dark:bg-white/[0.07] dark:text-fg' : '' }}">
                 <span class="min-w-0 flex-1 truncate">{{ $item['label'] }}</span>
-                @if ($item['active'])
-                    <x-reicon name="check-circle" class="size-3.5 shrink-0 text-warning" />
-                @endif
             </a>
         @endforeach
     </div>

@@ -274,8 +274,8 @@
     }" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full flex-col overflow-hidden xl:h-auto xl:min-h-0 xl:flex-1">
             <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-0'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                    class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-[#0d0d0d] text-neutral-100"
-                    :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-800 shadow-sm'">
+                    class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-[#0d0d0d] dark:text-neutral-100"
+                    :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-200 shadow-sm dark:border-neutral-800'">
                     <div class="logs-viewer-toolbar">
                         @php
                             $deploymentStatus = data_get($application_deployment_queue, 'status');
@@ -292,12 +292,12 @@
                         <div class="logs-viewer-toolbar-controls">
                             <div class="logs-viewer-search relative">
                                 <x-reicon name="search"
-                                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-500" />
+                                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" />
                                 <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
                                     aria-label="Find in logs"
-                                    class="h-8! w-full rounded-lg! border-white/[0.08]! bg-white/[0.05]! py-0! pr-8! pl-8! text-[12px]! text-white! shadow-none! placeholder:text-neutral-500 focus:border-accent! focus:ring-0!" />
+                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! text-neutral-800! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.05]! dark:text-white! dark:placeholder:text-neutral-500" />
                                 <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
-                                    class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                    class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-500 dark:hover:bg-white/[0.07] dark:hover:text-white"
                                     aria-label="Clear search">
                                     <x-reicon name="x" class="size-3" />
                                 </button>
@@ -333,10 +333,10 @@
                                         x-transition:leave="transition ease-in duration-75"
                                         x-transition:leave-start="transform opacity-100 scale-100"
                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                        class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-white/[0.1] bg-[#181818] p-1 shadow-modal focus:outline-none">
+                                        class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-neutral-200 bg-white p-1 shadow-modal focus:outline-none dark:border-white/[0.1] dark:bg-[#181818]">
                                         <div>
                                             <button x-on:click="downloadLogs(); downloadMenuOpen = false"
-                                                class="listbox-option text-neutral-200! hover:bg-white/[0.07]!">
+                                                class="listbox-option text-neutral-700! hover:bg-neutral-100! dark:text-neutral-200! dark:hover:bg-white/[0.07]!">
                                                 Download displayed logs
                                             </button>
                                             @can('update', $application)
@@ -360,7 +360,7 @@
                                             "
                                                 :disabled="downloadingAllLogs"
                                                 :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
-                                                class="listbox-option text-neutral-200! hover:bg-white/[0.07]!">
+                                                class="listbox-option text-neutral-700! hover:bg-neutral-100! dark:text-neutral-200! dark:hover:bg-white/[0.07]!">
                                                 <span x-show="!downloadingAllLogs">Download all logs</span>
                                                 <span x-show="downloadingAllLogs" class="flex items-center gap-2">
                                                     <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

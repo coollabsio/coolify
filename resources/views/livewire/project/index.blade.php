@@ -11,7 +11,7 @@
                     <x-modal-input title="New Project">
                         <x-slot:content>
                             <button type="button"
-                                class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                                class="button button-highlighted">
                                 <x-reicon name="plus" class="size-3.5" />
                                 New project
                             </button>
@@ -82,7 +82,7 @@
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
                                 ?
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' :
+                                'control-selected' :
                                 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Table view" title="Table view">
                             <x-reicon name="unordered-list" class="size-3.5" />
@@ -91,7 +91,7 @@
                             class="flex size-6.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'grid'
                                 ?
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' :
+                                'control-selected' :
                                 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
                             aria-label="Grid view" title="Grid view">
                             <x-reicon name="grid" class="size-3.5" />

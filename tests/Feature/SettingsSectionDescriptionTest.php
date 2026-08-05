@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\Blade;
 
-it('renders section helper copy as a visible description instead of an info icon', function () {
+it('renders section helper copy as a tooltip on the underlined title', function () {
     $html = Blade::render(<<<'BLADE'
         <x-application.settings-section title="Primary server" helper="The server and network used by this resource.">
             Content
@@ -12,5 +12,8 @@ it('renders section helper copy as a visible description instead of an info icon
     expect($html)
         ->toContain('Primary server')
         ->toContain('The server and network used by this resource.')
-        ->not->toContain('aria-label="More information"');
+        ->toContain('aria-label="More information about Primary server"')
+        ->toContain('class="underline underline-offset-4"')
+        ->toContain('underline-offset-4')
+        ->not->toMatch('/<p[^>]*>\s*The server and network used by this resource\.\s*<\/p>/');
 });

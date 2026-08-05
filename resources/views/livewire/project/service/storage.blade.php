@@ -40,7 +40,7 @@
                         ">
                             <div class="relative" @click.outside="dropdownOpen = false">
                                 <x-forms.button
-                                    class="bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!"
+                                    class="button-highlighted"
                                     @click="dropdownOpen = !dropdownOpen" aria-haspopup="menu"
                                     x-bind:aria-expanded="dropdownOpen">
                                     <x-reicon name="plus" class="size-3.5" />

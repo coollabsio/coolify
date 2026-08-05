@@ -90,6 +90,13 @@ test('shared environment variables table still omits Managed column', function (
     expect($show)->toContain('! $isSharedVariable');
 });
 
+test('shared environment variables empty state has spacing around the card', function () {
+    $editor = file_get_contents(resource_path('views/components/shared-variables/editor.blade.php'));
+
+    expect($editor)
+        ->toMatch('/<div class="p-3">\s*<x-empty title="No shared variables"/');
+});
+
 test('managed environment variables are ordered first', function () {
     $component = file_get_contents(app_path('Livewire/Project/Shared/EnvironmentVariable/All.php'));
 

@@ -307,7 +307,7 @@
                 <x-application.settings-section title="Step 3 · Authorize with GitLab"
                     description="Authorize Coolify with your GitLab instance. The redirect URI must match the Callback URL configured in GitLab.">
                     <a href="{{ $this->getOAuthUrl() }}" wire:key="oauth-url-{{ md5((string) $redirectUri) }}"
-                        class="button bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 hover:bg-coollabs/15! dark:bg-warning/15! dark:text-warning! dark:ring-warning/25 dark:hover:bg-warning/20!">
+                        class="button button-highlighted">
                         Connect to GitLab
                         <x-external-link />
                     </a>
