@@ -3,6 +3,13 @@
 
     <x-application.settings-section id="cpu-limits-section" title="CPU"
         helper="Limit CPU capacity, affinity, and scheduling priority for this container.">
+        <x-slot:actions>
+            <a class="button" target="_blank" rel="noopener noreferrer"
+                href="https://docs.docker.com/engine/containers/resource_constraints/#cpu">
+                Docker CPU constraints
+                <x-reicon name="external-link" class="size-3.5" />
+            </a>
+        </x-slot:actions>
         <div class="grid gap-4 md:grid-cols-3">
             <x-forms.input canGate="update" :canResource="$resource" placeholder="1.5"
                 helper="Set to 0 to use all available CPUs. Decimal values such as 0.5 are supported."
@@ -14,12 +21,6 @@
                 helper="Relative CPU scheduling weight. Docker uses 1024 by default."
                 label="CPU weight" id="limitsCpuShares" />
         </div>
-        <a class="mt-4 inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-coollabs dark:text-fg-dim dark:hover:text-warning"
-            target="_blank" rel="noopener noreferrer"
-            href="https://docs.docker.com/engine/containers/resource_constraints/#cpu">
-            Docker CPU constraints
-            <x-external-link />
-        </a>
     </x-application.settings-section>
 
     <x-application.settings-section id="memory-limits-section" title="Memory"

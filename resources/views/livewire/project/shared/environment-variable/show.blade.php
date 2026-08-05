@@ -12,7 +12,7 @@
     @if ($isSharedVariable) :style="`order: ${sharedSort === 'alphabetical' ? {{ $tableAlphabeticalOrder }} : {{ $tableCreationOrder }}}`" @endif
     x-show="(typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $rowScope }}')
         && (typeof sharedSearch === 'undefined' || @js(mb_strtolower($env->key . ' ' . ($comment ?? '') . ' ' . $rowScopeLabel)).includes(sharedSearch.trim().toLowerCase()))">
-    <div class="data-table-row {{ $isSharedVariable ? 'env-table-grid-shared' : 'env-table-grid' }}">
+    <div class="data-table-row {{ $isSharedVariable ? 'env-table-grid-shared' : 'env-table-grid' }} {{ ! $isSharedVariable && ! $showEnvironmentType ? 'env-table-grid-no-type' : '' }}">
         <div class="flex min-w-0 items-center gap-2">
             @if ($isLocked)
                 <svg class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24"
@@ -26,21 +26,34 @@
             @endif
             <span class="env-key-label min-w-0 truncate font-mono text-[13px] text-black dark:text-fg"
                 title="{{ $env->key }}">{{ $env->key }}</span>
+            @if (! $isSharedVariable && filled($comment))
+                <x-helper :helper="e($comment)" />
+            @endif
             @if ($is_really_required)
                 <span class="table-badge table-badge-danger shrink-0">Required</span>
             @endif
+        </div>
+        @if (! $isSharedVariable)
             @if ($isMagicVariable)
-                <span class="table-badge shrink-0">Managed</span>
+                <span class="env-managed-desktop data-table-cell-check">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor" class="size-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                </span>
+            @else
+                <span class="env-managed-desktop data-table-cell-dash">-</span>
             @endif
-            <span class="env-type-mobile table-badge shrink-0">{{ $rowScopeLabel }}</span>
-        </div>
-        <div class="env-type-desktop text-[13px] text-neutral-500 dark:text-fg-dim">
-            {{ $rowScopeLabel }}
-        </div>
-        <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim"
-            @if ($comment) title="{{ $comment }}" @endif>
-            {{ $comment ?: '-' }}
-        </div>
+        @endif
+        @if ($showEnvironmentType)
+            <div class="env-type-desktop text-[13px] text-neutral-500 dark:text-fg-dim">{{ $rowScopeLabel }}</div>
+        @endif
+        @if ($isSharedVariable)
+            <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim"
+                @if ($comment) title="{{ $comment }}" @endif>
+                {{ $comment ?: '-' }}
+            </div>
+        @endif
         @if ($isSharedVariable)
             @if ($is_multiline)
                 <span class="data-table-cell-check">

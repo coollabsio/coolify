@@ -44,6 +44,28 @@ test('searchable listbox component uses shared trigger label truncation', functi
         ->toContain(':title="current"');
 });
 
+test('listbox shows an empty state when it has no options', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+    $operations = file_get_contents(resource_path('views/livewire/project/shared/resource-operations.blade.php'));
+
+    expect($listbox)
+        ->toContain("'emptyText' => 'No options available.'")
+        ->toContain('x-show="options.length === 0"');
+
+    expect($operations)->toContain('No network destinations are available on this server.');
+});
+
+test('listbox forwards dynamic disabled state to its trigger', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+    $operations = file_get_contents(resource_path('views/livewire/project/shared/resource-operations.blade.php'));
+
+    expect($listbox)->toContain("\$attributes->whereStartsWith('x-bind:disabled')");
+
+    expect($operations)
+        ->toContain('x-bind:disabled="!selectedCloneServer"')
+        ->toContain('x-bind:disabled="!selectedMoveProject || availableEnvironments.length === 0"');
+});
+
 test('notification event multiselect truncates long selected summaries', function () {
     $html = Blade::render(<<<'BLADE'
         <x-notification.event-multiselect id="server-slack-events" label="Servers" :events="[

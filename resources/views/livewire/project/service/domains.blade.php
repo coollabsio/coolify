@@ -8,7 +8,36 @@
     $singleAppId = $singleApp['id'] ?? null;
 @endphp
 
-<div class="flex flex-col gap-4">
+<div class="flex flex-col gap-4"
+    x-data="{
+        modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
+        editingServiceLabel: '',
+        localEditingIndex: @js($editingIndex),
+        localEditingDomain: @js($editingDomain),
+        localEditingServiceApplicationId: @js($editingServiceApplicationId),
+        openEditDomain(index, url, serviceApplicationId, serviceLabel) {
+            this.localEditingIndex = index;
+            this.localEditingDomain = url;
+            this.localEditingServiceApplicationId = serviceApplicationId;
+            this.editingServiceLabel = serviceLabel || '';
+            this.modalOpen = true;
+            this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
+        },
+        closeEditDomain() {
+            this.modalOpen = false;
+            this.editingServiceLabel = '';
+            this.localEditingIndex = null;
+            this.localEditingDomain = '';
+            this.localEditingServiceApplicationId = null;
+        },
+        prepareEditSubmit() {
+            $wire.editingIndex = this.localEditingIndex;
+            $wire.editingDomain = this.localEditingDomain;
+            $wire.editingServiceApplicationId = this.localEditingServiceApplicationId;
+            $wire.showEditDomainModal = true;
+        },
+    }"
+    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel)">
     <x-application.settings-section id="service-domains-section" title="Domains"
         helper="Manage domains and www/non-www redirects for applications in this stack.">
         @can('update', $service)
@@ -63,7 +92,7 @@
         <p class="min-w-0 flex-1 text-[13px] text-neutral-500 dark:text-fg-dim">
             {{ $configuredCount }} domain{{ $configuredCount === 1 ? '' : 's' }}
             @if ($suggestedCount > 0)
-                · {{ $suggestedCount }} suggested
+                · {{ $suggestedCount }} not added
             @endif
         </p>
         <div class="ml-auto flex flex-wrap items-center gap-2">
@@ -97,13 +126,12 @@
                                 required />
 
                             @if ($addDomainDnsFailed)
-                                <x-callout type="danger" title="DNS validation failed">
-                                    {{ $addDomainDnsMessage }}
-                                    @if ($serverIp)
-                                        <div class="pt-2 text-sm">
-                                            Expected target:
-                                            <span class="font-mono">{{ $this->dnsTargetLabel() ?? $serverIp }}</span>
-                                        </div>
+                                <x-callout type="danger" title="DNS is not pointing to the right IP">
+                                    This domain does not currently resolve to this server.
+                                    Traffic may not reach Coolify until you update DNS.
+                                    Are you sure you want to add it anyway?
+                                    @if (filled($addDomainDnsMessage))
+                                        <div class="pt-2">{{ $addDomainDnsMessage }}</div>
                                     @endif
                                 </x-callout>
                             @endif
@@ -202,90 +230,94 @@
         @endif
     @endif
 
-    {{-- Edit domain modal --}}
-    @if ($showEditDomainModal)
-        <div x-data="{ modalOpen: @entangle('showEditDomainModal') }"
-            @keydown.escape.window="modalOpen = false; $wire.cancelEdit()"
-            class="relative h-auto w-auto" :class="{ 'z-40': modalOpen }">
-            <template x-teleport="body">
-                <div x-show="modalOpen" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
-                    <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
-                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
-                        x-transition:leave-end="opacity-0"
-                        class="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-[2px]"
-                        @click="modalOpen = false; $wire.cancelEdit()"></div>
-                    <div class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
-                        <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
-                            x-transition:enter="ease-out duration-100"
-                            x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                            x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave="ease-in duration-100"
-                            x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                            x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                            class="application-settings-form application-settings-section relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden lg:w-auto lg:min-w-2xl lg:max-w-4xl"
-                            style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                            <header class="flex-nowrap!">
-                                <h3 class="min-w-0 flex-1 truncate">Edit domain</h3>
-                                <button type="button" wire:click="cancelEdit" class="icon-button shrink-0"
-                                    aria-label="Close">
-                                    <x-reicon name="x" class="size-4" />
-                                </button>
-                            </header>
-                            <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
-                                style="-webkit-overflow-scrolling: touch;">
-                                <form wire:submit="updateDomain" class="flex flex-col gap-4">
-                                    @php
-                                        $editingServiceLabel = collect($serviceApps)
-                                            ->firstWhere('id', (int) $editingServiceApplicationId)['name']
-                                            ?? data_get($domainRows, ($editingIndex ?? -1).'.service_name');
-                                    @endphp
-                                    @if (filled($editingServiceLabel))
-                                        <x-forms.input label="Service application" value="{{ $editingServiceLabel }}"
-                                            readonly
-                                            helper="Domains stay on the service they were added to. Remove and re-add to move." />
-                                    @endif
-
-                                    <x-forms.input id="editingDomain" label="Domain URL"
-                                        placeholder="https://app.example.com"
-                                        helper="Full URL including scheme. Optional path and container port are supported."
-                                        required />
-
-                                    @if ($editDomainDnsFailed)
-                                        <x-callout type="danger" title="DNS validation failed">
-                                            {{ $editDomainDnsMessage }}
-                                            @if ($serverIp)
-                                                <div class="pt-2 text-sm">
-                                                    Expected target:
-                                                    <span class="font-mono">{{ $this->dnsTargetLabel() ?? $serverIp }}</span>
-                                                </div>
-                                            @endif
-                                        </x-callout>
-                                    @endif
-
-                                    <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
-                                        <x-forms.button type="button" wire:click="cancelEdit">
-                                            Cancel
-                                        </x-forms.button>
-                                        @if ($editDomainDnsFailed)
-                                            <x-forms.button type="button" wire:click="confirmUpdateDomainDespiteDns"
-                                                isError>
-                                                Continue
-                                            </x-forms.button>
-                                        @else
-                                            <x-forms.button type="submit" isHighlighted>
-                                                Save
-                                            </x-forms.button>
-                                        @endif
+    {{-- Edit domain modal: open/close is Alpine-only; server runs only on Save / Continue. --}}
+    <div class="relative h-auto w-auto" :class="{ 'z-40': modalOpen }"
+        @keydown.window.escape="if (modalOpen) { closeEditDomain() }">
+        <template x-teleport="body">
+            <div x-show="modalOpen" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0"
+                    class="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-[2px]"
+                    @click="closeEditDomain()"></div>
+                <div class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="application-settings-form application-settings-section relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden lg:w-auto lg:min-w-2xl lg:max-w-4xl"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header class="flex-nowrap!">
+                            <h3 class="min-w-0 flex-1 truncate">Edit domain</h3>
+                            <button type="button" @click="closeEditDomain()" class="icon-button shrink-0"
+                                aria-label="Close">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
+                            style="-webkit-overflow-scrolling: touch;">
+                            <form @submit.prevent="prepareEditSubmit(); $wire.updateDomain()" class="flex flex-col gap-4">
+                                <div x-show="editingServiceLabel" x-cloak class="w-full">
+                                    <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+                                        <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service application</label>
                                     </div>
-                                </form>
-                            </div>
+                                    <input type="text" class="input" readonly x-bind:value="editingServiceLabel" />
+                                    <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                                        Domains stay on the service they were added to. Remove and re-add to move.
+                                    </p>
+                                </div>
+
+                                <div class="w-full">
+                                    <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+                                        <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4" for="editingDomainLocal">
+                                            Domain URL <x-highlighted text="*" />
+                                        </label>
+                                    </div>
+                                    <input id="editingDomainLocal" type="url" class="input" required
+                                        placeholder="https://app.example.com"
+                                        x-model="localEditingDomain" />
+                                    @error('editingDomain')
+                                        <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
+                                    @enderror
+                                </div>
+
+                                @if ($editDomainDnsFailed)
+                                    <x-callout type="danger" title="DNS is not pointing to the right IP">
+                                        This domain does not currently resolve to this server.
+                                        Traffic may not reach Coolify until you update DNS.
+                                        Are you sure you want to save it anyway?
+                                        @if (filled($editDomainDnsMessage))
+                                            <div class="pt-2">{{ $editDomainDnsMessage }}</div>
+                                        @endif
+                                    </x-callout>
+                                @endif
+
+                                <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
+                                    <x-forms.button type="button" @click="closeEditDomain()">
+                                        Cancel
+                                    </x-forms.button>
+                                    @if ($editDomainDnsFailed)
+                                        <x-forms.button type="button" isError
+                                            @click="prepareEditSubmit(); $wire.forceSaveEditDns = true; $wire.confirmUpdateDomainDespiteDns()">
+                                            Continue
+                                        </x-forms.button>
+                                    @else
+                                        <x-forms.button type="submit" isHighlighted>
+                                            Save
+                                        </x-forms.button>
+                                    @endif
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
-            </template>
-        </div>
-    @endif
+            </div>
+        </template>
+    </div>
 
     <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal"
         confirmAction="confirmDomainUsage" />

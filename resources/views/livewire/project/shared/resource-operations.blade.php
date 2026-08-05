@@ -110,7 +110,8 @@
 
                 <x-forms.listbox id="clone-resource-destination" label="Network destination" :wire="false"
                     x-model="selectedCloneDestination" x-effect="options = cloneDestinationOptions"
-                    x-bind:disabled="!selectedCloneServer" placeholder="Choose a destination…" />
+                    x-bind:disabled="!selectedCloneServer" placeholder="Choose a destination…"
+                    emptyText="No network destinations are available on this server." />
             </div>
 
             <div x-show="selectedCloneDestination" x-cloak

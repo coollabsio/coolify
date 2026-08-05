@@ -3,7 +3,7 @@
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
         <livewire:project.shared.configuration-checker :resource="$application" />
-        <livewire:project.application.heading :application="$application" />
+        <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-show" />
         <div x-data="{
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},

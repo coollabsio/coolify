@@ -32,6 +32,14 @@ class All extends Component
 
     public string $environmentFilter = 'all';
 
+    /** @var list<string> */
+    public array $variableFilters = [];
+
+    /** @var list<string> */
+    public array $serviceFilters = [];
+
+    public string $tableSort = 'default';
+
     public int $page = 1;
 
     public int $perPage = 10;
@@ -79,7 +87,8 @@ class All extends Component
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
-        if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
+        $hasGitRepository = filled(data_get($this->resource, 'git_repository'));
+        if (str($this->resourceClass)->contains($resourceWithPreviews) && $hasGitRepository && ! $simpleDockerfile) {
             $this->showPreview = true;
         }
         // Intentionally skip loading env vars / developer-view bulk text here.
@@ -357,6 +366,78 @@ class All extends Component
         $this->clearEnvironmentVariableCaches();
     }
 
+    public function toggleVariableFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'managed', 'user', 'buildtime', 'runtime', 'multiline', 'literal'], true)) {
+            return;
+        }
+
+        if ($filter === 'all') {
+            $this->variableFilters = [];
+        } elseif (in_array($filter, $this->variableFilters, true)) {
+            $this->variableFilters = array_values(array_diff($this->variableFilters, [$filter]));
+        } else {
+            if ($filter === 'managed') {
+                $this->variableFilters = array_values(array_diff($this->variableFilters, ['user']));
+            } elseif ($filter === 'user') {
+                $this->variableFilters = array_values(array_diff($this->variableFilters, ['managed']));
+            }
+            $this->variableFilters[] = $filter;
+        }
+
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    public function setTableSort(string $sort): void
+    {
+        if (! in_array($sort, ['default', 'name_asc', 'name_desc'], true)) {
+            return;
+        }
+
+        $this->tableSort = $sort;
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    public function toggleServiceFilter(string $service): void
+    {
+        if (! in_array($service, $this->serviceFilterOptions, true)) {
+            return;
+        }
+
+        $this->serviceFilters = in_array($service, $this->serviceFilters, true)
+            ? array_values(array_diff($this->serviceFilters, [$service]))
+            : [...$this->serviceFilters, $service];
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    public function clearFilters(): void
+    {
+        $this->variableFilters = [];
+        $this->serviceFilters = [];
+        $this->environmentFilter = 'all';
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
+    public function getServiceFilterOptionsProperty(): array
+    {
+        $compose = $this->resource->docker_compose_raw ?? $this->resource->docker_compose;
+        if (blank($compose)) {
+            return [];
+        }
+
+        return extractHardcodedEnvironmentVariables($compose)
+            ->pluck('service_name')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
     public function setEnvironmentVariablePage(int $page): void
     {
         $this->page = max(1, min($page, $this->environmentVariableLastPage));
@@ -388,35 +469,35 @@ class All extends Component
         $segments = [];
 
         if ($includeProduction) {
-            $segments[] = [
-                'kind' => 'managed',
-                'is_preview' => false,
-                'count' => $this->countManagedEnvironmentVariables(false),
-            ];
-
-            if ($this->showsHardcodedEnvironmentVariables()) {
+            if ($this->includesHardcodedVariables() && $this->showsHardcodedEnvironmentVariables()) {
                 $segments[] = [
                     'kind' => 'hardcoded',
                     'is_preview' => false,
                     'count' => $this->hardcodedEnvironmentVariables->count(),
                 ];
             }
+
+            $segments[] = [
+                'kind' => 'managed',
+                'is_preview' => false,
+                'count' => $this->countManagedEnvironmentVariables(false),
+            ];
         }
 
         if ($includePreview) {
-            $segments[] = [
-                'kind' => 'managed',
-                'is_preview' => true,
-                'count' => $this->countManagedEnvironmentVariables(true),
-            ];
-
-            if ($this->showsHardcodedEnvironmentVariables()) {
+            if ($this->includesHardcodedVariables() && $this->showsHardcodedEnvironmentVariables()) {
                 $segments[] = [
                     'kind' => 'hardcoded',
                     'is_preview' => true,
                     'count' => $this->hardcodedEnvironmentVariablesPreview->count(),
                 ];
             }
+
+            $segments[] = [
+                'kind' => 'managed',
+                'is_preview' => true,
+                'count' => $this->countManagedEnvironmentVariables(true),
+            ];
         }
 
         return $segments;
@@ -429,6 +510,12 @@ class All extends Component
             ->where('resourceable_id', $this->resource->id)
             ->where('is_preview', $isPreview);
 
+        if ($this->serviceFilters !== []) {
+            $query->whereRaw('1 = 0');
+        }
+
+        $query->orderByRaw("CASE WHEN key LIKE 'SERVICE_FQDN%' OR key LIKE 'SERVICE_URL%' OR key LIKE 'SERVICE_NAME%' THEN 0 ELSE 1 END");
+
         $query->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
 
         if ($this->searchTerm() !== '') {
@@ -436,7 +523,26 @@ class All extends Component
             $query->whereRaw("LOWER(key) LIKE ? ESCAPE '\\'", ['%'.$escapedSearch.'%']);
         }
 
-        if ($this->is_env_sorting_enabled) {
+        if (in_array('managed', $this->variableFilters, true) || in_array('user', $this->variableFilters, true)) {
+            $method = in_array('managed', $this->variableFilters, true) ? 'where' : 'whereNot';
+            $query->{$method}(function (Builder $query): void {
+                $query->where('key', 'like', 'SERVICE_FQDN%')
+                    ->orWhere('key', 'like', 'SERVICE_URL%')
+                    ->orWhere('key', 'like', 'SERVICE_NAME%');
+            });
+        }
+
+        foreach (['buildtime', 'runtime', 'multiline', 'literal'] as $filter) {
+            if (in_array($filter, $this->variableFilters, true)) {
+                $query->where('is_'.$filter, true);
+            }
+        }
+
+        if ($this->tableSort === 'name_asc') {
+            $query->orderBy('key');
+        } elseif ($this->tableSort === 'name_desc') {
+            $query->orderByDesc('key');
+        } elseif ($this->is_env_sorting_enabled) {
             $query->orderBy('key');
         } else {
             $query->orderBy('order')->orderBy('id');
@@ -553,6 +659,12 @@ class All extends Component
         return $this->resource->type() === 'service' || $this->resource?->build_pack === 'dockercompose';
     }
 
+    private function includesHardcodedVariables(): bool
+    {
+        return ! in_array('user', $this->variableFilters, true)
+            && collect($this->variableFilters)->intersect(['buildtime', 'runtime', 'multiline', 'literal'])->isEmpty();
+    }
+
     protected function getHardcodedVariables(bool $isPreview)
     {
         if ($isPreview && ! $this->supportsPreviewEnvironmentVariables()) {
@@ -598,6 +710,12 @@ class All extends Component
             $hardcodedVars = $hardcodedVars->filter(function ($var) {
                 return str($var['key'])->contains($this->searchTerm(), true);
             });
+        }
+
+        if ($this->serviceFilters !== []) {
+            $hardcodedVars = $hardcodedVars->filter(
+                fn ($var) => in_array($var['service_name'] ?? '', $this->serviceFilters, true)
+            );
         }
 
         // Apply sorting based on is_env_sorting_enabled

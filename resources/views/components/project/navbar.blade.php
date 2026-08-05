@@ -28,8 +28,9 @@
                 @foreach ($items as $item)
                     <a @class([
                         'app-tab shrink-0',
-                        'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $item['active'],
+                        'app-tab-active' => $item['active'],
                     ])
+                        @if ($item['active']) aria-current="page" @endif
                         {{ wireNavigate() }} href="{{ route($item['route'], $routeParameters) }}">
                         <x-reicon :name="$item['icon']" class="size-3.5" />
                         {{ $item['label'] }}

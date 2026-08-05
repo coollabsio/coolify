@@ -5,6 +5,7 @@
     'required' => false,
     'options' => [], // list of ['value' => ..., 'label' => ..., 'disabled' => bool]
     'placeholder' => 'Select…',
+    'emptyText' => 'No options available.',
     'live' => false,
     'onChange' => null, // optional $wire method to call after a selection
     'wire' => true, // false = purely client-side value (no Livewire binding)
@@ -51,7 +52,7 @@
         {{ $attributes->whereStartsWith('x-effect') }}
         @click.outside="open = false" @keydown.escape="open = false">
         <button id="{{ $id }}-trigger" type="button" class="listbox-trigger" @click="open = !open"
-            @disabled($disabled) aria-haspopup="listbox"
+            @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
             :aria-expanded="open" :title="current">
             <span class="listbox-trigger-label" x-text="current"></span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
@@ -60,6 +61,10 @@
             </svg>
         </button>
         <div class="listbox-panel" x-show="open" x-cloak role="listbox">
+            <div x-show="options.length === 0"
+                class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
+                {{ $emptyText }}
+            </div>
             <template x-for="option in options" :key="String(option.value)">
                 <button type="button" class="listbox-option" role="option"
                     :class="{ 'listbox-option-disabled': option.disabled }"

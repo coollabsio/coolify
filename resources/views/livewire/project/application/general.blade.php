@@ -501,7 +501,7 @@
                         icon-name="admin">
                         <x-slot:contents>
                             <button type="button" class="button"
-                                @click="document.getElementById('container-labels-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
+                                @click="window.scrollToSettingsSection?.('container-labels-section')">
                                 Go to Container labels
                             </button>
                         </x-slot:contents>

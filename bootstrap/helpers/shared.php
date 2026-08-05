@@ -2029,7 +2029,8 @@ function dnsGuidanceTargetAddress(?string $ipOrLabel): ?string
 
 /**
  * User-facing guidance when a hostname does not resolve to the server.
- * Format: "A record → 1.2.3.4" or "AAAA record → 2001:db8::1".
+ * Format: "Required DNS record type A pointing to 1.2.3.4"
+ * or "Required DNS record type AAAA pointing to 2001:db8::1".
  *
  * @param  ?string  $targetLabel  Display target (IP, or "IP (hostname)") used as fallback.
  * @param  ?string  $ipForRecordType  Preferred IP for type + display (defaults to $targetLabel).
@@ -2045,7 +2046,7 @@ function dnsMismatchGuidanceMessage(?string $targetLabel, ?string $ipForRecordTy
 
     $recordType = dnsRecordTypeForIp($address);
 
-    return "{$recordType} record → {$address}";
+    return "Required DNS record type {$recordType} pointing to {$address}";
 }
 
 function validateDNSEntry(string $fqdn, Server $server)

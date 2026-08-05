@@ -35,11 +35,16 @@ it('builds entries for every hostname without duplicates', function () {
         ->and(collect($records)->pluck('type')->unique()->all())->toBe(['A']);
 });
 
-it('formats a copy-paste text block with all entries', function () {
+it('formats a BIND-compatible zone snippet for copy all', function () {
     $text = DnsRecordHints::toCopyText([
         ['type' => 'A', 'name' => 'app.example.com', 'value' => '203.0.113.10'],
         ['type' => 'A', 'name' => 'www.example.com', 'value' => '203.0.113.10'],
+        ['type' => 'AAAA', 'name' => 'app.example.com', 'value' => '2001:db8::1'],
     ]);
 
-    expect($text)->toBe("Type\tName\tValue\nA\tapp.example.com\t203.0.113.10\nA\twww.example.com\t203.0.113.10");
+    expect($text)->toBe(
+        "app.example.com.  IN A     203.0.113.10\n".
+        "www.example.com.  IN A     203.0.113.10\n".
+        "app.example.com.  IN AAAA  2001:db8::1\n"
+    );
 });

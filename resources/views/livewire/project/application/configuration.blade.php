@@ -3,7 +3,7 @@
         {{ data_get_str($application, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
     <livewire:project.shared.configuration-checker :resource="$application" />
-    <livewire:project.application.heading :application="$application" />
+    <livewire:project.application.heading :application="$application" :wire:key="'application-heading-'.$currentRoute" />
 
     @php
         $applicationRouteParameters = [
@@ -238,11 +238,18 @@
                                 @endif
                             </a>
                             @if ($menuItem['active'] && count($pageSections[$menuItem['route']] ?? []) >= 4)
-                                <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex" x-data="{ activeSection: '' }">
+                                <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                                    x-data="{
+                                        activeSection: '',
+                                        scrollToSection(id) {
+                                            this.activeSection = id;
+                                            window.scrollToSettingsSection?.(id);
+                                        },
+                                    }">
                                     @foreach ($pageSections[$menuItem['route']] as $section)
                                         <button type="button" class="menu-subitem"
                                             :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
-                                            @click="activeSection = '{{ $section['id'] }}'; document.getElementById('{{ $section['id'] }}')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">
+                                            @click="scrollToSection('{{ $section['id'] }}')">
                                             <span class="menu-item-label text-left">{{ $section['label'] }}</span>
                                         </button>
                                     @endforeach

@@ -2,10 +2,11 @@
     @php
         $canUpdate = auth()->user()->can('update', $application);
         $labelsManagedByCoolify = $application->settings->is_container_label_readonly_enabled;
+        // Use model UUIDs: Livewire update requests do not carry page route params.
         $generalRouteParameters = [
-            'project_uuid' => request()->route('project_uuid'),
-            'environment_uuid' => request()->route('environment_uuid'),
-            'application_uuid' => request()->route('application_uuid'),
+            'project_uuid' => data_get($application, 'environment.project.uuid'),
+            'environment_uuid' => data_get($application, 'environment.uuid'),
+            'application_uuid' => $application->uuid,
         ];
     @endphp
 
@@ -43,7 +44,7 @@
                         ['value' => false, 'label' => 'Generated name (rolling updates)'],
                         ['value' => true, 'label' => 'Consistent name (no rolling updates)'],
                     ]" :disabled="! $canUpdate" />
-                @if ($isConsistentContainerNameEnabled === false)
+                @if ($isConsistentContainerNameEnabled === true)
                     <x-forms.input
                         helper="You can add a custom name for your container.<br><br>The name is saved automatically and converted to slug format. <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"
                         id="customInternalName" label="Custom container name" canGate="update"

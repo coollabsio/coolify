@@ -155,8 +155,9 @@
                     @foreach ($databasePageItems as $menuItem)
                         <a @class([
                             'app-tab shrink-0',
-                            'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $menuItem['active'],
+                            'app-tab-active' => $menuItem['active'],
                         ])
+                            @if ($menuItem['active']) aria-current="page" @endif
                             @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                             href="{{ route($menuItem['route'], $parameters) }}">
                             {{ $menuItem['label'] }}
@@ -175,8 +176,9 @@
                         <a wire:key="database-primary-nav-{{ str($menuItem['label'])->slug() }}"
                             @class([
                                 'app-tab shrink-0',
-                                'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $menuItem['active'],
+                                'app-tab-active' => $menuItem['active'],
                             ])
+                            @if ($menuItem['active']) aria-current="page" @endif
                             @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                             href="{{ route($menuItem['route'], $parameters) }}">
                             {{ $menuItem['label'] }}

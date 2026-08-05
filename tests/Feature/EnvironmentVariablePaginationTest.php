@@ -31,6 +31,17 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
+it('hides preview scope for non-git applications', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'build_pack' => 'dockerimage',
+        'git_repository' => null,
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSet('showPreview', false);
+});
+
 it('paginates managed environment variables without loading every row into the page collection', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,

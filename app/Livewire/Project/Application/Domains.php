@@ -200,6 +200,10 @@ class Domains extends Component
             }
         }
 
+        // Do not auto-promote www/non-www pairs here: load/refresh also runs after
+        // removeDomain, and re-adding counterparts would undo intentional deletes.
+        // Pairs are still ensured on setRedirect, addDomain, and generateDomain.
+
         $this->domainRows = $this->buildDomainRows();
     }
 
@@ -269,14 +273,26 @@ class Domains extends Component
                 }
             }
 
-            return $rows;
+            return $this->sortDomainRowsByDnsStatus($rows);
         }
 
         foreach ($this->splitDomains($this->application->fqdn) as $url) {
             $rows[] = $this->domainRowFromStored($url, null, $stored);
         }
 
-        return array_merge($rows, $this->buildSuggestedWwwRows($rows, $stored));
+        return $this->sortDomainRowsByDnsStatus(array_merge($rows, $this->buildSuggestedWwwRows($rows, $stored)));
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    protected function sortDomainRowsByDnsStatus(array $rows): array
+    {
+        return collect($rows)
+            ->sortBy(fn (array $row): int => ($row['dns_status'] ?? null) === 'failed' ? 0 : 1)
+            ->values()
+            ->all();
     }
 
     /**
@@ -327,19 +343,10 @@ class Domains extends Component
 
             $base['is_suggested'] = true;
             $base['suggested_for'] = $url;
-            $base['suggestion_label'] = $meta['label'];
+            $base['suggestion_label'] = null;
             $base['suggestion_role'] = $meta['role'];
             $base['needs_force_add'] = false;
-
-            // Always show role-specific guidance for suggested rows (even after DNS checks).
-            if (($base['dns_status'] ?? 'pending') === 'pending') {
-                $base['dns_message'] = $meta['pending_message'];
-            } elseif (in_array($base['dns_status'], ['ok', 'failed', 'skipped'], true)) {
-                // Keep stored DNS result message, but append role context when redirect is set.
-                if ($meta['role'] !== 'pair' && ! str_contains((string) $base['dns_message'], 'redirect')) {
-                    $base['dns_message'] = trim((string) $base['dns_message'].' '.$meta['dns_suffix']);
-                }
-            }
+            $base['dns_message'] = $meta['pending_message'];
 
             $suggested[] = $base;
         }
@@ -354,41 +361,40 @@ class Domains extends Component
      */
     protected function suggestedDomainMeta(bool $suggestedIsWww, ?string $redirectOverride = null): array
     {
-        $pointDns = dnsMismatchGuidanceMessage($this->dnsTargetLabel(), $this->serverIp);
-
+        $pendingMessage = 'Not configured yet.';
         $redirect = $redirectOverride ?? ($this->redirect ?: 'both');
 
         return match ($redirect) {
             'www' => $suggestedIsWww
                 ? [
-                    'label' => 'Canonical www',
+                    'label' => 'Not added · canonical www',
                     'role' => 'canonical',
-                    'pending_message' => "Required as the redirect target (www). {$pointDns}",
-                    'dns_suffix' => 'This is the canonical www host traffic should land on.',
+                    'pending_message' => $pendingMessage,
+                    'dns_suffix' => '',
                 ]
                 : [
-                    'label' => 'Redirect source',
+                    'label' => 'Not added · redirect source',
                     'role' => 'redirect_source',
-                    'pending_message' => "Needed so Coolify can redirect non-www to www. {$pointDns}",
-                    'dns_suffix' => 'Used only so Coolify can redirect this host to www. Still needs DNS to the server, not a provider URL-redirect record.',
+                    'pending_message' => $pendingMessage,
+                    'dns_suffix' => '',
                 ],
             'non-www' => $suggestedIsWww
                 ? [
-                    'label' => 'Redirect source',
+                    'label' => 'Not added · redirect source',
                     'role' => 'redirect_source',
-                    'pending_message' => "Needed so Coolify can redirect www to non-www. {$pointDns}",
-                    'dns_suffix' => 'Used only so Coolify can redirect this host to non-www. Still needs DNS to the server, not a provider URL-redirect record.',
+                    'pending_message' => $pendingMessage,
+                    'dns_suffix' => '',
                 ]
                 : [
-                    'label' => 'Canonical non-www',
+                    'label' => 'Not added · canonical non-www',
                     'role' => 'canonical',
-                    'pending_message' => "Required as the redirect target (non-www). {$pointDns}",
-                    'dns_suffix' => 'This is the canonical non-www host traffic should land on.',
+                    'pending_message' => $pendingMessage,
+                    'dns_suffix' => '',
                 ],
             default => [
-                'label' => $suggestedIsWww ? 'Suggested www' : 'Suggested non-www',
+                'label' => $suggestedIsWww ? 'Not added · www' : 'Not added · non-www',
                 'role' => 'pair',
-                'pending_message' => "Also add this host so both www and non-www work. {$pointDns}",
+                'pending_message' => $pendingMessage,
                 'dns_suffix' => '',
             ],
         };
@@ -546,7 +552,7 @@ class Domains extends Component
             $this->domainRows[$index]['dns_message'] = 'Could not validate DNS for this domain.';
         }
 
-        // Clarify purpose for redirect-source / canonical suggested hosts.
+        // Keep suggested-row copy short after DNS checks (no role badge).
         if ($this->domainRows[$index]['is_suggested'] ?? false) {
             $isWww = str_starts_with(strtolower((string) $this->domainHost((string) $this->domainRows[$index]['url'])), 'www.');
             $serviceName = $this->domainRows[$index]['service'] ?? null;
@@ -554,10 +560,8 @@ class Domains extends Component
                 $isWww,
                 $this->serviceRedirectFor(is_string($serviceName) ? $serviceName : null)
             );
-            if ($meta['dns_suffix'] !== '') {
-                $this->domainRows[$index]['dns_message'] = trim($this->domainRows[$index]['dns_message'].' '.$meta['dns_suffix']);
-            }
-            $this->domainRows[$index]['suggestion_label'] = $meta['label'];
+            $this->domainRows[$index]['dns_message'] = $meta['pending_message'];
+            $this->domainRows[$index]['suggestion_label'] = null;
             $this->domainRows[$index]['suggestion_role'] = $meta['role'];
         }
 
@@ -727,6 +731,11 @@ class Domains extends Component
             }
 
             $newUrls = $this->splitDomains($normalized);
+            $pairedUrls = collect($newUrls)
+                ->map(fn (string $url) => $this->wwwCounterpartUrl($url))
+                ->filter()
+                ->values()
+                ->all();
             $current = $this->currentDomainList($this->newDomainService);
 
             foreach ($newUrls as $url) {
@@ -747,10 +756,9 @@ class Domains extends Component
                 }
             }
 
-            $merged = $current->merge($newUrls)->unique()->values();
+            $merged = $current->merge($newUrls)->merge($pairedUrls)->unique()->values();
             $this->pendingAction = 'add';
-            // DNS was already validated (or overridden) in the modal; skip save-time toast noise.
-            if (! $this->saveDomainList($merged, $this->newDomainService, checkDns: false)) {
+            if (! $this->saveDomainList($merged, $this->newDomainService)) {
                 return;
             }
 
@@ -761,7 +769,7 @@ class Domains extends Component
             $this->dispatch('close-modal');
             $this->dispatch('success', 'Domain added.');
             $this->refreshDomains();
-            $this->checkUrlsDns($newUrls, $serviceForCheck);
+            $this->checkUrlsDns(array_values(array_unique(array_merge($newUrls, $pairedUrls))), $serviceForCheck);
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -931,7 +939,6 @@ class Domains extends Component
                     $this->forceAddSuggestedIndex = $index;
                     $this->editingIndex = $index;
                     $this->persistDomainDnsStatuses();
-                    $this->dispatch('error', 'DNS validation failed.', $dnsFailure);
 
                     return;
                 }
@@ -940,7 +947,7 @@ class Domains extends Component
             $merged = $current->merge($newUrls)->unique()->values();
             $this->pendingAction = 'suggested';
             $this->editingIndex = $index;
-            if (! $this->saveDomainList($merged, $serviceName, checkDns: false)) {
+            if (! $this->saveDomainList($merged, $serviceName)) {
                 return;
             }
 
@@ -1017,6 +1024,7 @@ class Domains extends Component
                 if ($dnsFailure !== null) {
                     $this->editDomainDnsFailed = true;
                     $this->editDomainDnsMessage = str_replace('add it anyway', 'save it anyway', $dnsFailure);
+                    $this->showEditDomainModal = true;
 
                     return;
                 }
@@ -1024,7 +1032,7 @@ class Domains extends Component
 
             $updated = $current->map(fn (string $url) => $url === $oldUrl ? $newUrl : $url)->unique()->values();
             $this->pendingAction = 'update';
-            if (! $this->saveDomainList($updated, $service, checkDns: false)) {
+            if (! $this->saveDomainList($updated, $service)) {
                 return;
             }
 
@@ -1058,7 +1066,7 @@ class Domains extends Component
             $service = $this->domainRows[$index]['service'];
             $updated = $this->currentDomainList($service)->reject(fn (string $item) => $item === $url)->values();
 
-            if (! $this->saveDomainList($updated, $service, checkConflicts: false, checkDns: false)) {
+            if (! $this->saveDomainList($updated, $service, checkConflicts: false)) {
                 return;
             }
 
@@ -1104,26 +1112,32 @@ class Domains extends Component
                 $current = $this->currentDomainList($serviceName);
                 $merged = $current->push($domain)->unique()->values();
 
-                if (! $this->saveDomainList($merged, $serviceName, checkConflicts: false, checkDns: false)) {
+                if (! $this->saveDomainList($merged, $serviceName, checkConflicts: false)) {
                     return;
                 }
 
+                $pairedUrls = $this->syncRedirectDomainPairs($serviceName);
                 $this->resetAddDomainForm();
                 $this->dispatch('close-modal');
                 $this->dispatch('success', 'Domain generated.');
                 $this->refreshDomains();
+                $this->checkUrlsDns(array_values(array_unique(array_merge([$domain], $pairedUrls))), $serviceName);
 
                 return;
             }
 
             $fqdn = generateUrl(server: $server, random: $this->application->uuid);
-            $this->application->fqdn = $fqdn;
-            $this->application->save();
-            $this->resetDefaultLabels();
+            $merged = $this->currentDomainList()->push($fqdn)->unique()->values();
+            if (! $this->saveDomainList($merged, null, checkConflicts: false)) {
+                return;
+            }
+
+            $pairedUrls = $this->syncRedirectDomainPairs(null);
             $this->resetAddDomainForm();
             $this->dispatch('close-modal');
             $this->dispatch('success', 'Domain generated.');
             $this->refreshDomains();
+            $this->checkUrlsDns(array_values(array_unique(array_merge([$fqdn], $pairedUrls))));
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -1299,6 +1313,74 @@ class Domains extends Component
     }
 
     /**
+     * When saved redirect is www/non-www, ensure missing counterparts exist as real domains
+     * (not suggestion rows the user must click Add domain for).
+     *
+     * @return array<int, string> newly added domain URLs
+     */
+    protected function syncRedirectDomainPairs(?string $serviceName = null): array
+    {
+        if ($this->labelsAreWritable) {
+            return [];
+        }
+
+        $user = auth()->user();
+        if ($user === null || ! $user->can('update', $this->application)) {
+            return [];
+        }
+
+        if ($this->isCompose && $serviceName === null) {
+            $added = [];
+            $serviceNames = $this->composeServices;
+            $domains = $this->application->docker_compose_domains
+                ? json_decode($this->application->docker_compose_domains, true)
+                : [];
+            if (is_array($domains)) {
+                foreach (array_keys($domains) as $name) {
+                    if (! in_array($name, $serviceNames, true)) {
+                        $serviceNames[] = $name;
+                    }
+                }
+            }
+            foreach ($serviceNames as $name) {
+                $added = array_merge($added, $this->syncRedirectDomainPairs($name));
+            }
+
+            return array_values(array_unique($added));
+        }
+
+        $redirect = $this->savedRedirectForService($serviceName);
+        if (! in_array($redirect, ['www', 'non-www'], true)) {
+            return [];
+        }
+
+        $before = $this->currentDomainList($serviceName)->all();
+        if (! $this->ensureWwwNonWwwPairsConfigured($serviceName)) {
+            return [];
+        }
+
+        $this->application->refresh();
+        $after = $this->currentDomainList($serviceName);
+
+        return $after->reject(fn (string $url) => in_array($url, $before, true))->values()->all();
+    }
+
+    protected function savedRedirectForService(?string $serviceName): string
+    {
+        if ($this->isCompose && filled($serviceName)) {
+            $domains = $this->application->docker_compose_domains
+                ? json_decode($this->application->docker_compose_domains, true)
+                : [];
+            $entry = is_array($domains) ? ($domains[$serviceName] ?? null) : null;
+            $stored = is_array($entry) ? ($entry['redirect'] ?? null) : null;
+
+            return $this->normalizeRedirect(is_string($stored) ? $stored : null);
+        }
+
+        return $this->normalizeRedirect($this->application->redirect ?? null);
+    }
+
+    /**
      * Persist missing www/non-www counterparts as normal domains (not suggestions).
      *
      * @return bool false when save was blocked (e.g. domain conflict modal shown)
@@ -1346,9 +1428,12 @@ class Domains extends Component
         $this->pendingRedirectService = $serviceName;
 
         // Skip DNS: pairing for redirects must still be configured even when DNS is not ready.
-        if (! $this->saveDomainList($merged, $serviceName, checkDns: false)) {
+        if (! $this->saveDomainList($merged, $serviceName)) {
             return false;
         }
+
+        $this->pendingAction = null;
+        $this->pendingRedirectService = null;
 
         return true;
     }
@@ -1446,7 +1531,6 @@ class Domains extends Component
         Collection $domains,
         ?string $serviceName = null,
         bool $checkConflicts = true,
-        bool $checkDns = true,
     ): bool {
         $domainString = $domains->filter()->unique()->implode(',');
         $domainString = $domainString === '' ? null : ValidationPatterns::normalizeApplicationDomains($domainString);
@@ -1486,25 +1570,6 @@ class Domains extends Component
             $this->application->fqdn = null;
         } else {
             $this->application->fqdn = $domainString;
-        }
-
-        if ($checkDns && $domainString && $this->application->additional_servers->count() === 0) {
-            $server = $this->application->destination?->server;
-            if ($server) {
-                foreach ($this->splitDomains($domainString) as $domain) {
-                    if (! validateDNSEntry($domain, $server)) {
-                        $guidance = dnsMismatchGuidanceMessage(
-                            $this->dnsTargetLabel() ?? serverDnsTargetIp($server) ?? $server->ip,
-                            $this->serverIp ?? serverDnsTargetIp($server) ?? $server->ip,
-                        );
-                        $this->dispatch(
-                            'error',
-                            'Validating DNS failed.',
-                            "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help."
-                        );
-                    }
-                }
-            }
         }
 
         if ($checkConflicts && ! $this->forceSaveDomains) {

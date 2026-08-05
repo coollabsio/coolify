@@ -24,24 +24,32 @@
     <div @class([
         'data-table-row',
         $gridClass,
-        'opacity-90' => $isSuggested,
+        'domains-row-suggested' => $isSuggested,
     ])>
         <div class="flex min-w-0 flex-col gap-1">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank"
-                    class="min-w-0 font-mono text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
-                    title="{{ $row['url'] }}">
-                    {{ $row['url'] }}
-                </a>
+                @if ($isSuggested)
+                    <span
+                        class="min-w-0 text-[13px] text-black sm:truncate dark:text-white"
+                        title="{{ $row['url'] }} (not configured yet)">
+                        {{ $row['url'] }}
+                    </span>
+                @else
+                    <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank"
+                        class="min-w-0 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                        title="{{ $row['url'] }}">
+                        {{ $row['url'] }}
+                    </a>
+                @endif
                 @if ($isSuggested && ! empty($row['suggestion_label']))
-                    <span class="table-badge shrink-0">{{ $row['suggestion_label'] }}</span>
+                    <span class="table-badge table-badge-warning shrink-0">{{ $row['suggestion_label'] }}</span>
                 @endif
                 @if ($isCompose ?? false)
                     <span class="domains-service-mobile table-badge shrink-0">{{ $row['service'] ?? '-' }}</span>
                 @endif
             </div>
-            @if ($row['dns_status'] !== 'ok' && filled($row['dns_message']))
-                <p class="text-[12px] leading-4 text-neutral-500 sm:truncate dark:text-fg-dim"
+            @if ($isSuggested && filled($row['dns_message']))
+                <p class="text-[12px] leading-4 text-amber-700 sm:truncate dark:text-amber-400/90"
                     title="{{ $row['dns_message'] }}">
                     {{ $row['dns_message'] }}
                 </p>
@@ -56,8 +64,13 @@
         @endif
 
         <div class="flex min-w-0 items-center">
-            <x-status-badge :status="$dnsLabel" :type="$dnsType"
-                :title="$row['dns_status'] === 'ok' ? null : $row['dns_message']" />
+            @if ($row['dns_status'] === 'failed')
+                <x-status-badge as="button" @click="$dispatch('open-dns-records-modal')" :status="$dnsLabel" :type="$dnsType"
+                    title="View DNS records to fix" class="cursor-pointer hover:bg-neutral-200 dark:hover:bg-white/[0.1]" />
+            @else
+                <x-status-badge :status="$dnsLabel" :type="$dnsType"
+                    :title="$row['dns_status'] === 'ok' ? null : $row['dns_message']" />
+            @endif
         </div>
 
         <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim"
@@ -84,12 +97,18 @@
                                 Continue
                             </x-forms.button>
                         @else
-                            <x-forms.button wire:click="addSuggestedDomain({{ $index }})" isHighlighted class="h-7! px-2! text-[12px]!">
-                                Add
+                            <x-forms.button wire:click="addSuggestedDomain({{ $index }})" isHighlighted class="h-7! shrink-0 px-2.5! text-[12px]!">
+                                Add domain
                             </x-forms.button>
                         @endif
                     @else
-                        <button type="button" wire:click="startEdit({{ $index }})" class="icon-button shrink-0"
+                        <button type="button"
+                            @click="$dispatch('open-edit-domain', {
+                                index: {{ $index }},
+                                url: @js($row['url']),
+                                service: @js($row['service'] ?? null),
+                            })"
+                            class="icon-button shrink-0"
                             title="Edit domain" aria-label="Edit domain">
                             <x-reicon name="settings" class="size-3.5" />
                         </button>

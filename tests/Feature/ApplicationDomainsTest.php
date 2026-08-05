@@ -189,7 +189,8 @@ it('adds a domain to the application', function () {
 
     $this->application->refresh();
 
-    expect($this->application->fqdn)->toBe('https://app.example.com');
+    expect(explode(',', (string) $this->application->fqdn))
+        ->toBe(['https://app.example.com', 'https://www.app.example.com']);
 });
 
 it('adds multiple domains without replacing existing ones', function () {
@@ -218,7 +219,8 @@ it('blocks adding a domain with bad dns until the user continues', function () {
         ->set('newDomain', 'https://this-domain-should-not-resolve-for-coolify-tests.invalid')
         ->call('addDomain')
         ->assertSet('addDomainDnsFailed', true)
-        ->assertSee('DNS validation failed');
+        ->assertSee('DNS is not pointing to the right IP')
+        ->assertSee('Are you sure you want to add it anyway');
 
     $this->application->refresh();
     expect($this->application->fqdn)->toBeNull();
@@ -229,7 +231,10 @@ it('blocks adding a domain with bad dns until the user continues', function () {
         ->assertDispatched('close-modal');
 
     $this->application->refresh();
-    expect($this->application->fqdn)->toBe('https://this-domain-should-not-resolve-for-coolify-tests.invalid');
+    expect(explode(',', (string) $this->application->fqdn))->toBe([
+        'https://this-domain-should-not-resolve-for-coolify-tests.invalid',
+        'https://www.this-domain-should-not-resolve-for-coolify-tests.invalid',
+    ]);
 });
 
 it('resets the dns gate when the domain input changes', function () {
@@ -281,7 +286,8 @@ it('blocks editing a domain with bad dns until the user continues', function () 
         ->call('updateDomain')
         ->assertSet('editDomainDnsFailed', true)
         ->assertSet('showEditDomainModal', true)
-        ->assertSee('DNS validation failed');
+        ->assertSee('DNS is not pointing to the right IP')
+        ->assertSee('Are you sure you want to save it anyway');
 
     $this->application->refresh();
     expect($this->application->fqdn)->toBe('https://old.example.com');
@@ -365,6 +371,101 @@ it('auto-adds missing www counterpart as a normal domain when setting www redire
         ->and(explode(',', (string) $this->application->fqdn))
         ->toContain('https://example.com')
         ->toContain('https://www.example.com');
+});
+
+it('does not re-add a removed www counterpart on page load when redirect is www', function () {
+    $this->application->update([
+        'fqdn' => 'https://asd.hu',
+        'redirect' => 'www',
+    ]);
+
+    // Mount alone must not re-add missing pairs (would undo deletes).
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.url', 'https://asd.hu');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))
+        ->toContain('https://asd.hu')
+        ->not->toContain('https://www.asd.hu');
+});
+
+it('keeps a domain removed when its www counterpart remains and redirect is www', function () {
+    $this->application->update([
+        'fqdn' => 'https://asd.hu,https://www.asd.hu',
+        'redirect' => 'www',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomain', 0)
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+
+    expect(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://www.asd.hu')
+        ->not->toContain('https://asd.hu');
+});
+
+it('auto-adds www pair when adding a domain while redirect is www', function () {
+    $settings = InstanceSettings::get();
+    $settings->is_dns_validation_enabled = false;
+    $settings->save();
+
+    $this->application->update([
+        'fqdn' => null,
+        'redirect' => 'www',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://app.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+
+    expect(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://app.example.com')
+        ->toContain('https://www.app.example.com');
+});
+
+it('auto-adds the suggested www pair when adding a domain with both directions', function () {
+    $settings = InstanceSettings::get();
+    $settings->is_dns_validation_enabled = false;
+    $settings->save();
+
+    $this->application->update([
+        'fqdn' => null,
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://app.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))
+        ->toContain('https://app.example.com')
+        ->toContain('https://www.app.example.com');
+});
+
+it('appends a generated domain without replacing existing domains', function () {
+    $this->application->update([
+        'fqdn' => 'https://existing.example.com,https://www.existing.example.com',
+        'redirect' => 'both',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('generateDomain')
+        ->assertDispatched('success')
+        ->assertNotDispatched('error');
+
+    $domains = explode(',', (string) $this->application->fresh()->fqdn);
+
+    expect($domains)
+        ->toContain('https://existing.example.com')
+        ->toContain('https://www.existing.example.com')
+        ->toHaveCount(3);
 });
 
 it('auto-adds missing non-www counterpart as a normal domain when setting non-www redirect', function () {
@@ -479,7 +580,25 @@ it('loads persisted dns status on page load', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSet('domainRows.0.dns_status', 'failed')
         ->assertSet('domainRows.0.dns_message', 'DNS does not point to 203.0.113.10.')
-        ->assertSee('DNS does not point to 203.0.113.10.');
+        ->assertSee('DNS mismatch')
+        ->assertDontSee('DNS does not point to 203.0.113.10.')
+        ->call('openDnsRecordsModal')
+        ->assertSet('showDnsRecordsModal', true);
+});
+
+it('shows dns mismatches before other domain entries', function () {
+    $this->application->update([
+        'fqdn' => 'https://healthy.example.com,https://broken.example.com',
+        'domain_dns_statuses' => [
+            'https://healthy.example.com' => ['status' => 'ok', 'message' => 'OK'],
+            'https://broken.example.com' => ['status' => 'failed', 'message' => 'Mismatch'],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.url', 'https://broken.example.com')
+        ->assertSet('domainRows.0.dns_status', 'failed')
+        ->assertSet('domainRows.1.url', 'https://healthy.example.com');
 });
 
 it('hides dns message text when dns status is ok', function () {
@@ -550,7 +669,7 @@ it('resolves hostname server addresses to a real ip for dns messages', function 
     $message = $component->get('domainRows.0.dns_message');
     $recordType = dnsRecordTypeForIp($resolvedIp);
 
-    // Failed checks show short "A record → ip" guidance; ok checks mention the hostname label.
+    // Failed checks show required DNS record guidance; ok checks mention the hostname label.
     if ($component->get('domainRows.0.dns_status') === 'failed') {
         expect($message)->toBe("{$recordType} record → {$resolvedIp}")
             ->and($message)->not->toContain('CNAME');
@@ -574,7 +693,7 @@ it('uses short aaaa guidance when the server ip is ipv6', function () {
         ->call('checkDomainDns', 0);
 
     expect($component->get('serverIp'))->toBe('2001:db8::10')
-        ->and($component->get('domainRows.0.dns_message'))->toBe('AAAA record → 2001:db8::10');
+        ->and($component->get('domainRows.0.dns_message'))->toBe('Required DNS record type AAAA pointing to 2001:db8::10');
 });
 
 it('uses short a-record guidance for compose applications', function () {
@@ -596,7 +715,7 @@ it('uses short a-record guidance for compose applications', function () {
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('checkDomainDns', 0);
 
-    expect($component->get('domainRows.0.dns_message'))->toBe('A record → 172.16.0.3')
+    expect($component->get('domainRows.0.dns_message'))->toBe('Required DNS record type A pointing to 172.16.0.3')
         ->and($component->get('domainRows.0.dns_status'))->toBe('failed');
 });
 
@@ -608,7 +727,10 @@ it('normalizes domains before saving', function () {
 
     $this->application->refresh();
 
-    expect($this->application->fqdn)->toBe(ValidationPatterns::normalizeApplicationDomains('HTTPS://App.Example.COM/Path'));
+    expect(explode(',', (string) $this->application->fqdn))->toBe([
+        ValidationPatterns::normalizeApplicationDomains('HTTPS://App.Example.COM/Path'),
+        'https://www.app.example.com/Path',
+    ]);
 });
 
 it('shows the missing www counterpart as a suggested domain row', function () {
@@ -622,23 +744,28 @@ it('shows the missing www counterpart as a suggested domain row', function () {
         ->assertSet('domainRows.0.is_suggested', false)
         ->assertSet('domainRows.1.url', 'https://www.example.com')
         ->assertSet('domainRows.1.is_suggested', true)
-        ->assertSee('Suggested www')
-        ->assertSee('Add')
+        ->assertSet('domainRows.1.suggestion_label', null)
+        ->assertSet('domainRows.1.dns_message', 'Not configured yet.')
+        ->assertSee('Add domain')
+        ->assertSee('Not configured yet.')
+        ->assertDontSee('Not added ·')
+        ->assertDontSee('click Add domain')
+        ->assertDontSee('does not add this automatically')
         ->assertSee('https://www.example.com');
 });
 
-it('does not change suggested domain labels or persist until Set Direction saves', function () {
+it('does not change suggested domain role or persist until Set Direction saves', function () {
     $this->application->update([
         'fqdn' => 'https://example.com',
         'redirect' => 'both',
     ]);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->assertSet('domainRows.1.suggestion_label', 'Suggested www')
+        ->assertSet('domainRows.1.suggestion_label', null)
         ->assertSet('domainRows.1.suggestion_role', 'pair')
         ->set('redirect', 'www')
         // Dropdown alone must not rebuild suggestions or persist redirect.
-        ->assertSet('domainRows.1.suggestion_label', 'Suggested www')
+        ->assertSet('domainRows.1.suggestion_label', null)
         ->assertSet('domainRows.1.suggestion_role', 'pair');
 
     expect($this->application->fresh()->redirect)->toBe('both');
@@ -1138,20 +1265,20 @@ it('auto-adds missing www pair for a single compose service redirect', function 
         ->and($webDomains)->toContain('https://www.web.example.com');
 });
 
-it('uses compose service redirect for suggested domain messaging', function () {
+it('uses compose service redirect for suggested domain messaging when direction is both', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
         'fqdn' => null,
         'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
         'docker_compose_domains' => json_encode([
-            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'www'],
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
         ]),
     ]);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->set('isCompose', true)
         ->set('composeServices', ['web'])
-        ->set('serviceRedirects.web', 'www');
+        ->set('serviceRedirects.web', 'both');
 
     $component->instance()->domainRows = (function () use ($component) {
         $method = new ReflectionMethod($component->instance(), 'buildDomainRows');
@@ -1162,6 +1289,6 @@ it('uses compose service redirect for suggested domain messaging', function () {
     $suggested = collect($component->get('domainRows'))->firstWhere('is_suggested', true);
 
     expect($suggested)->not->toBeNull()
-        ->and($suggested['suggestion_role'] ?? null)->toBe('canonical')
+        ->and($suggested['suggestion_role'] ?? null)->toBe('pair')
         ->and($suggested['url'] ?? null)->toBe('https://www.web.example.com');
 });

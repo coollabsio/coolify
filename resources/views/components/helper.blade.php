@@ -43,14 +43,14 @@
     {{ $attributes->merge(['class' => 'relative z-10 inline-block align-middle']) }}>
     {{-- button (not div) so label-for associations do not steal the click on mobile --}}
     <button type="button" x-ref="trigger"
-        class="info-helper relative z-10 inline-flex size-4 shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none"
+        class="info-helper relative z-10 inline-flex size-3.5 shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none"
         aria-label="More information" @mouseenter="show(false)" @mouseleave="hide"
         @click.prevent.stop="open && pinned ? close() : show(true)">
         @isset($icon)
             {{ $icon }}
         @else
             <x-reicon name="info-circle"
-                class="size-4 text-neutral-400 transition-colors hover:text-neutral-600 dark:text-fg-faint dark:hover:text-fg-dim"
+                class="size-3.5 text-neutral-400 transition-colors hover:text-neutral-600 dark:text-fg-faint dark:hover:text-fg-dim"
                 aria-hidden="true" />
         @endisset
     </button>

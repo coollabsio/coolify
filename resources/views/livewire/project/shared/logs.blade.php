@@ -6,7 +6,7 @@
     <livewire:project.shared.configuration-checker :resource="$resource" />
 
     @if ($type === 'application')
-        <livewire:project.application.heading :application="$resource" />
+        <livewire:project.application.heading :application="$resource" wire:key="application-heading-logs" />
     @elseif ($type === 'database')
         <livewire:project.database.heading :database="$resource" />
     @elseif ($type === 'service')

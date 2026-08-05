@@ -29,7 +29,6 @@ services:
       PUSHER_HOST: "${PUSHER_HOST:-}"
       PUSHER_PORT: "${PUSHER_PORT:-}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
-      PUSHER_FORCE_WS: "${PUSHER_FORCE_WS:-false}"
       PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
       PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"

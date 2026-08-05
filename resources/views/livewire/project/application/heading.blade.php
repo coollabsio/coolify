@@ -1,11 +1,21 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
     @php
         $routeIs = fn (string|array $routes): bool => \Illuminate\Support\Str::is($routes, $activeRouteName);
+        // Settings covers all configuration sub-pages (General, Webhooks, Domains, …),
+        // not only project.application.configuration. Primary tabs that are NOT settings:
+        // backups, console, deployment logs, runtime logs.
+        $isSettingsRoute = $routeIs('project.application.*')
+            && ! $routeIs([
+                'project.application.backup.*',
+                'project.application.command',
+                'project.application.deployment.*',
+                'project.application.logs',
+            ]);
         $applicationMenuItems = [
             [
                 'label' => 'Settings',
                 'route' => 'project.application.configuration',
-                'active' => $routeIs('project.application.configuration'),
+                'active' => $isSettingsRoute,
             ],
             [
                 'label' => 'Backups',
@@ -31,112 +41,10 @@
             ],
         ];
 
-        $configurationMenuItems = [
-            [
-                'label' => 'General',
-                'route' => 'project.application.configuration',
-                'active' => $routeIs('project.application.configuration'),
-            ],
-            [
-                'label' => 'Domains',
-                'route' => 'project.application.domains',
-                'active' => $routeIs('project.application.domains'),
-            ],
-            [
-                'label' => 'Advanced',
-                'route' => 'project.application.advanced',
-                'active' => $routeIs('project.application.advanced'),
-            ],
-            [
-                'label' => 'Swarm',
-                'route' => 'project.application.swarm',
-                'active' => $routeIs('project.application.swarm'),
-                'visible' => $application->destination->server->isSwarm(),
-            ],
-            [
-                'label' => 'Environment Variables',
-                'route' => 'project.application.environment-variables',
-                'active' => $routeIs('project.application.environment-variables'),
-            ],
-            [
-                'label' => 'Persistent Storage',
-                'route' => 'project.application.persistent-storage',
-                'active' => $routeIs('project.application.persistent-storage'),
-            ],
-            [
-                'label' => 'Git Source',
-                'route' => 'project.application.source',
-                'active' => $routeIs('project.application.source'),
-                'visible' => $application->git_based(),
-            ],
-            [
-                'label' => 'Servers',
-                'route' => 'project.application.servers',
-                'active' => $routeIs('project.application.servers'),
-            ],
-            [
-                'label' => 'Scheduled Tasks',
-                'route' => 'project.application.scheduled-tasks.show',
-                'active' => $routeIs(['project.application.scheduled-tasks.show', 'project.application.scheduled-tasks']),
-            ],
-            [
-                'label' => 'Webhooks',
-                'route' => 'project.application.webhooks',
-                'active' => $routeIs('project.application.webhooks'),
-            ],
-            [
-                'label' => 'Preview Deployments',
-                'route' => 'project.application.preview-deployments',
-                'active' => $routeIs('project.application.preview-deployments'),
-                'visible' => $application->git_based() || $application->build_pack === 'dockerimage',
-            ],
-            [
-                'label' => 'Healthcheck',
-                'route' => 'project.application.healthcheck',
-                'active' => $routeIs('project.application.healthcheck'),
-                'visible' => $application->build_pack !== 'dockercompose',
-            ],
-            [
-                'label' => 'Rollback',
-                'route' => 'project.application.rollback',
-                'active' => $routeIs('project.application.rollback'),
-            ],
-            [
-                'label' => 'Resource Limits',
-                'route' => 'project.application.resource-limits',
-                'active' => $routeIs('project.application.resource-limits'),
-            ],
-            [
-                'label' => 'Resource Operations',
-                'route' => 'project.application.resource-operations',
-                'active' => $routeIs('project.application.resource-operations'),
-            ],
-            [
-                'label' => 'Metrics',
-                'route' => 'project.application.metrics',
-                'active' => $routeIs('project.application.metrics'),
-            ],
-            [
-                'label' => 'Tags',
-                'route' => 'project.application.tags',
-                'active' => $routeIs('project.application.tags'),
-            ],
-            [
-                'label' => 'Danger Zone',
-                'route' => 'project.application.danger',
-                'active' => $routeIs('project.application.danger'),
-            ],
-        ];
-
         $applicationMenuItems = array_values(array_filter(
             $applicationMenuItems,
             fn (array $item): bool => $item['visible'] ?? true,
         ));
-        $configurationMenuItems = array_values(array_filter(
-            $configurationMenuItems,
-            fn (array $item): bool => $item['visible'] ?? true,
-        ));
-        $activeConfigurationMenuItem = collect($configurationMenuItems)->firstWhere('active', true);
         $applicationStatus = str($application->status ?? 'exited');
         [$applicationStatusLabel, $applicationStatusType] = match (true) {
             $applicationStatus->startsWith('running') => ['Running', 'success'],
@@ -276,14 +184,11 @@
                 {{-- Tabs may scroll; keep Links outside overflow so the dropdown never creates a scrollbar. --}}
                 <x-resource-heading-tabs class="min-w-0 flex-1">
                     @foreach ($applicationMenuItems as $menuItem)
-                        @php
-                            $isMobileApplicationItemActive = $menuItem['active']
-                                || ($menuItem['label'] === 'Settings' && $activeConfigurationMenuItem);
-                        @endphp
                         <a @class([
                             'app-tab shrink-0',
-                            'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $isMobileApplicationItemActive,
+                            'app-tab-active' => $menuItem['active'],
                         ])
+                            @if ($menuItem['active']) aria-current="page" @endif
                             @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                             href="{{ route($menuItem['route'], $parameters) }}">
                             {{ $menuItem['label'] }}
@@ -326,15 +231,12 @@
                     {{-- Tabs alone may scroll; keep Links outside overflow so the dropdown never creates a scrollbar. --}}
                     <x-resource-heading-tabs class="min-w-0">
                         @foreach ($applicationMenuItems as $menuItem)
-                            @php
-                                $isApplicationMenuItemActive = $menuItem['active']
-                                    || ($menuItem['label'] === 'Settings' && $activeConfigurationMenuItem);
-                            @endphp
                             <a wire:key="application-primary-nav-{{ str($menuItem['label'])->slug() }}"
                                 @class([
                                     'app-tab shrink-0',
-                                    'bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20' => $isApplicationMenuItemActive,
+                                    'app-tab-active' => $menuItem['active'],
                                 ])
+                                @if ($menuItem['active']) aria-current="page" @endif
                                 @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                                 href="{{ route($menuItem['route'], $parameters) }}">
                                 {{ $menuItem['label'] }}

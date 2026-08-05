@@ -113,7 +113,11 @@ class DnsRecordHints
     }
 
     /**
-     * Plain-text block suitable for clipboard (type / name / value).
+     * BIND-compatible zone snippet for clipboard (absolute names with trailing dots).
+     *
+     * Example:
+     * asd.hu.     IN A 172.16.0.2
+     * www.asd.hu. IN A 172.16.0.2
      *
      * @param  array<int, array{type: string, name: string, value: string}>  $records
      */
@@ -123,11 +127,38 @@ class DnsRecordHints
             return '';
         }
 
-        $lines = ["Type\tName\tValue"];
+        $lines = [];
+        $nameWidth = 0;
+
         foreach ($records as $record) {
-            $lines[] = "{$record['type']}\t{$record['name']}\t{$record['value']}";
+            $name = self::bindAbsoluteName((string) $record['name']);
+            $nameWidth = max($nameWidth, strlen($name));
         }
 
-        return implode("\n", $lines);
+        foreach ($records as $record) {
+            $name = self::bindAbsoluteName((string) $record['name']);
+            $type = strtoupper((string) $record['type']);
+            $value = (string) $record['value'];
+            // AAAA values may be IPv6; leave as-is (no quotes needed for A/AAAA).
+            $format = '%-'.$nameWidth.'s  IN %-5s %s';
+            $lines[] = sprintf($format, $name, $type, $value);
+        }
+
+        return implode("\n", $lines)."\n";
+    }
+
+    /**
+     * Absolute BIND name (trailing dot). Leaves @ as-is.
+     */
+    public static function bindAbsoluteName(string $name): string
+    {
+        $name = trim($name);
+        if ($name === '' || $name === '@') {
+            return '@';
+        }
+
+        $name = rtrim($name, '.');
+
+        return $name.'.';
     }
 }

@@ -1,7 +1,7 @@
 <div>
     <x-slot:title>{{ data_get_str($application, 'name')->limit(10) }} > Deployments | Coolify</x-slot>
     <livewire:project.shared.configuration-checker :resource="$application" />
-    <livewire:project.application.heading :application="$application" />
+    <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-index" />
 
     @php
         $lastPage = max(1, (int) ceil($deployments_count / $defaultTake));

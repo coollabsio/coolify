@@ -48,7 +48,7 @@
         {{ data_get_str($application, 'name')->limit(10) }} > Backups | Coolify
     </x-slot>
     <livewire:project.shared.configuration-checker :resource="$application" />
-    <livewire:project.application.heading :application="$application" />
+    <livewire:project.application.heading :application="$application" wire:key="application-heading-backup-index" />
 
     <div class="application-settings-form flex flex-col gap-6">
         <x-application.settings-section title="Storage backups"

@@ -1,3 +1,17 @@
+@php
+    $showEnvironmentType = $showPreview;
+    $activeFilterCount = count($variableFilters) + count($serviceFilters) + ($environmentFilter !== 'all' ? 1 : 0);
+    $filterLabels = [
+        'managed' => 'Managed', 'user' => 'User-defined', 'buildtime' => 'Buildtime',
+        'runtime' => 'Runtime', 'multiline' => 'Multiline', 'literal' => 'Literal',
+    ];
+    $activeFilterLabels = collect($variableFilters)->map(fn ($filter) => $filterLabels[$filter] ?? $filter);
+    $activeFilterLabels = $activeFilterLabels->merge($serviceFilters);
+    if ($environmentFilter !== 'all') {
+        $activeFilterLabels->push(str($environmentFilter)->headline()->toString());
+    }
+    $activeFilterText = $activeFilterLabels->implode(', ');
+@endphp
 <div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables">
     <x-application.settings-section id="environment-variables-section" title="Environment variables"
         helper="Environment variables (secrets) for this resource.">
@@ -77,40 +91,114 @@
                 </div>
             </div>
             <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-                @if ($resource->type() === 'application' && $showPreview)
-                    <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
-                        <button type="button" class="button" @click="open = !open" @click.outside="open = false"
-                            aria-haspopup="listbox" :aria-expanded="open" @disabled(! $readyToLoad)>
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
-                                stroke="currentColor" class="size-3.5">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
-                            </svg>
-                            Filter
-                        </button>
-                        <div class="listbox-panel left-auto! right-0! z-[90]! min-w-48!" x-show="open" x-cloak
-                            role="listbox">
-                            @foreach ([
-                                'all' => 'All environments',
-                                'production' => 'Production',
-                                'preview' => 'Preview',
-                            ] as $filterValue => $filterLabel)
-                                <button type="button" class="listbox-option" role="option"
-                                    aria-selected="{{ $environmentFilter === $filterValue ? 'true' : 'false' }}"
-                                    wire:click="setEnvironmentFilter('{{ $filterValue }}')" @click="open = false">
-                                    <span class="truncate">{{ $filterLabel }}</span>
-                                    @if ($environmentFilter === $filterValue)
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="2.5" stroke="currentColor" class="size-3.5 shrink-0">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="m4.5 12.75 6 6 9-13.5" />
+                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
+                    <button type="button" @click="open = !open" @click.outside="open = false"
+                        @if ($activeFilterCount > 0) title="{{ $activeFilterText }}" @endif
+                        @class([
+                            'button max-w-80 min-w-0',
+                            'bg-coollabs/10! text-coollabs! ring-1 ring-coollabs/25 dark:bg-warning/15! dark:text-warning! dark:ring-warning/25' => $activeFilterCount > 0,
+                        ])>
+                        <x-reicon name="filter" class="size-3.5 shrink-0" />
+                        <span class="truncate">{{ $activeFilterCount > 0 ? $activeFilterText : 'Filter' }}</span>
+                        @if ($activeFilterCount > 0)
+                            <span class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim">{{ $activeFilterCount }}</span>
+                        @endif
+                    </button>
+                    <div class="listbox-panel left-auto! right-0! z-[90]! min-w-44! overflow-hidden! p-0!" x-show="open" x-cloak>
+                        <div class="max-h-80 overflow-y-auto p-1">
+                        @foreach ([
+                            'managed' => 'Managed',
+                            'user' => 'User-defined',
+                            'buildtime' => 'Buildtime',
+                            'runtime' => 'Runtime',
+                            'multiline' => 'Multiline',
+                            'literal' => 'Literal',
+                        ] as $value => $label)
+                            <button type="button" class="listbox-option" wire:click="toggleVariableFilter('{{ $value }}')">
+                                <span>{{ $label }}</span>
+                                @php
+                                    $selected = in_array($value, $variableFilters, true);
+                                @endphp
+                                <span @class([
+                                    'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                    'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                    'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
+                                ])>
+                                    @if ($selected)
+                                        <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                            <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
                                         </svg>
                                     @endif
+                                </span>
+                            </button>
+                        @endforeach
+                        @if ($showPreview)
+                            <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+                            @foreach (['all' => 'All environments', 'production' => 'Production', 'preview' => 'Preview'] as $value => $label)
+                                <button type="button" class="listbox-option" wire:click="setEnvironmentFilter('{{ $value }}')" @click="open = false">
+                                    <span>{{ $label }}</span>
+                                    <span @class([
+                                        'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $environmentFilter === $value,
+                                        'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => $environmentFilter !== $value,
+                                    ])>
+                                        @if ($environmentFilter === $value)
+                                            <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        @endif
+                                    </span>
                                 </button>
                             @endforeach
+                        @endif
+                        @if ($this->serviceFilterOptions !== [])
+                            <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+                            <div class="px-3 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400 dark:text-fg-faint">Services</div>
+                            @foreach ($this->serviceFilterOptions as $serviceName)
+                                <button type="button" class="listbox-option" wire:click="toggleServiceFilter(@js($serviceName))">
+                                    <span class="truncate">{{ $serviceName }}</span>
+                                    @php
+                                        $serviceSelected = in_array($serviceName, $serviceFilters, true);
+                                    @endphp
+                                    <span @class([
+                                        'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $serviceSelected,
+                                        'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $serviceSelected,
+                                    ])>
+                                        @if ($serviceSelected)
+                                            <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        @endif
+                                    </span>
+                                </button>
+                            @endforeach
+                        @endif
+                        </div>
+                        <div class="relative z-20 border-t border-neutral-200 bg-white p-1 dark:border-white/10 dark:bg-[#171717]">
+                            <button type="button" class="listbox-option text-neutral-500 dark:text-fg-dim"
+                                wire:click="clearFilters" @click="open = false" @disabled($activeFilterCount === 0)>
+                                <span>Clear filters</span>
+                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" d="m6 6 12 12M18 6 6 18" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
-                @endif
+                </div>
+                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
+                    <button type="button" class="button" @click="open = !open" @click.outside="open = false">
+                        Sort
+                    </button>
+                    <div class="listbox-panel left-auto! right-0! z-[90]! min-w-44!" x-show="open" x-cloak>
+                        @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
+                            <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
+                                <span>{{ $label }}</span>
+                                @if ($tableSort === $value)<span>✓</span>@endif
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
                 @can('manageEnvironment', $resource)
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
@@ -145,34 +233,45 @@
                 $lastVisibleRow = min($currentPage * $perPage, $totalRows);
             @endphp
             <div id="environment-table-section"
-                class="application-settings-section-body mt-1 scroll-mt-28 {{ $totalRows > 0 ? 'is-flush' : '' }} w-full">
+                class="application-settings-section-body relative mt-1 scroll-mt-28 {{ $totalRows > 0 ? 'is-flush' : '' }} w-full">
                 @if ($this->isSearchActive && $totalRows === 0)
                     <x-empty size="sm" title="No environment variables found"
                         description="No variables match your search." />
                 @elseif ($totalRows > 0)
-                    <div class="data-table w-full transition-opacity"
-                        wire:loading.class="opacity-50 pointer-events-none"
-                        wire:target="setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
-                        <div class="data-table-header env-table-grid">
+                    <div class="data-table w-full">
+                        <div class="relative">
+                            <div class="transition-all"
+                                wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
+                                wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
+                            <div class="data-table-header env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
                             <span>Name</span>
-                            <span>Type</span>
-                            <span>Comment</span>
+                            <span class="text-center">Managed</span>
+                            @if ($showEnvironmentType)
+                                <span>Type</span>
+                            @endif
                             <span class="text-center">Literal</span>
                             <span class="text-center">Multiline</span>
                             <span class="text-center">Buildtime</span>
                             <span class="text-center">Runtime</span>
                             <span></span>
                         </div>
-                        @foreach ($this->environmentVariablePageRows as $row)
+                            @foreach ($this->environmentVariablePageRows as $row)
                             @if ($row['kind'] === 'managed')
                                 <livewire:project.shared.environment-variable.show wire:key="{{ $row['id'] }}"
-                                    :env="$row['environmentVariable']" :type="$resource->type()" />
+                                    :env="$row['environmentVariable']" :type="$resource->type()" :showEnvironmentType="$showEnvironmentType" />
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"
-                                    :isPreview="$row['scope'] === 'preview'" />
+                                    :isPreview="$row['scope'] === 'preview'" :showEnvironmentType="$showEnvironmentType" />
                             @endif
-                        @endforeach
+                            @endforeach
+                            </div>
+                            <div wire:loading.flex
+                                wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
+                                class="absolute inset-0 z-10 hidden items-center justify-center bg-black/5 backdrop-blur-[1px] dark:bg-black/20">
+                                <x-loading text="Loading environment variables..." />
+                            </div>
+                        </div>
                         <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$totalRows"
                             :current-page="$currentPage" :last-page="$lastPage"
                             wire-target="setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
@@ -182,9 +281,17 @@
                             last-action="setEnvironmentVariablePage({{ $lastPage }})" />
                     </div>
                 @else
-                    <x-empty size="sm" title="No environment variables"
-                        description="Add your first variable with the + Add button above."
-                        icon-name="variables" />
+                    <div class="relative min-h-40">
+                        <div wire:loading.class="pointer-events-none opacity-40 blur-[2px]" wire:target="clearFilters">
+                            <x-empty size="sm" title="No environment variables"
+                                description="Add your first variable with the + Add button above."
+                                icon-name="variables" />
+                        </div>
+                        <div wire:loading.flex wire:target="clearFilters"
+                            class="absolute inset-0 z-10 hidden items-center justify-center bg-black/5 backdrop-blur-[1px] dark:bg-black/20">
+                            <x-loading text="Loading environment variables..." />
+                        </div>
+                    </div>
                 @endif
             </div>
         @endif

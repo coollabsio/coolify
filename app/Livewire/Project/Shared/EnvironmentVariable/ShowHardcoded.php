@@ -6,6 +6,8 @@ use Livewire\Component;
 
 class ShowHardcoded extends Component
 {
+    public bool $showEnvironmentType = true;
+
     public array $env;
 
     public string $key;

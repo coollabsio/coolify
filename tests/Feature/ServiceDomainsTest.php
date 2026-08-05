@@ -177,6 +177,21 @@ it('auto-adds missing non-www pair for a service application redirect', function
         ->toContain('https://api.example.com');
 });
 
+it('auto-adds the suggested www pair when adding a service domain with both directions', function () {
+    $this->webApp->update(['redirect' => 'both']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->webApp->id)
+        ->set('newDomain', 'https://web.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(explode(',', (string) $this->webApp->fresh()->fqdn))
+        ->toContain('https://web.example.com')
+        ->toContain('https://www.web.example.com');
+});
+
 it('adds a domain to a selected service application', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('newServiceApplicationId', $this->webApp->id)
@@ -186,7 +201,8 @@ it('adds a domain to a selected service application', function () {
         ->assertDispatched('success');
 
     $this->webApp->refresh();
-    expect($this->webApp->fqdn)->toBe('https://web.example.com');
+    expect(explode(',', (string) $this->webApp->fqdn))
+        ->toBe(['https://web.example.com', 'https://www.web.example.com']);
 });
 
 it('rolls back a domain change when compose regeneration fails', function () {
@@ -282,8 +298,10 @@ it('does not restore stale dns status when a removed service domain is re-added'
 
     $this->apiApp->refresh();
 
-    expect($this->apiApp->fqdn)->toBe('https://api.example.com')
-        ->and($this->apiApp->domain_dns_statuses)->toBeNull();
+    expect(explode(',', (string) $this->apiApp->fqdn))
+        ->toBe(['https://api.example.com', 'https://www.api.example.com'])
+        ->and($this->apiApp->domain_dns_statuses['https://api.example.com']['status'] ?? null)->toBe('skipped')
+        ->and($this->apiApp->domain_dns_statuses['https://api.example.com']['message'] ?? null)->not->toBe('Stale DNS result.');
 });
 
 it('saves after confirming both a domain conflict and a missing required port', function () {
@@ -317,7 +335,8 @@ YAML,
         ->assertSet('pendingAction', null)
         ->assertDispatched('success');
 
-    expect($this->webApp->fresh()->fqdn)->toBe('https://api.example.com');
+    expect(explode(',', (string) $this->webApp->fresh()->fqdn))
+        ->toBe(['https://api.example.com', 'https://www.api.example.com']);
 });
 
 it('loads persisted dns status for service applications', function () {
@@ -333,7 +352,30 @@ it('loads persisted dns status for service applications', function () {
     ]);
 
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->assertSee('DNS mismatch stored.');
+        ->assertSee('DNS mismatch')
+        ->assertDontSee('DNS mismatch stored.')
+        ->call('openDnsRecordsModal')
+        ->assertSet('showDnsRecordsModal', true);
+});
+
+it('shows service dns mismatches before other domain entries', function () {
+    $this->webApp->update([
+        'fqdn' => 'https://healthy.example.com',
+        'domain_dns_statuses' => [
+            'https://healthy.example.com' => ['status' => 'ok', 'message' => 'OK'],
+        ],
+    ]);
+    $this->apiApp->update([
+        'fqdn' => 'https://broken.example.com',
+        'domain_dns_statuses' => [
+            'https://broken.example.com' => ['status' => 'failed', 'message' => 'Mismatch'],
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSet('domainRows.0.url', 'https://broken.example.com')
+        ->assertSet('domainRows.0.dns_status', 'failed')
+        ->assertSet('domainRows.2.url', 'https://healthy.example.com');
 });
 
 it('hides dns message text when service domain dns status is ok', function () {

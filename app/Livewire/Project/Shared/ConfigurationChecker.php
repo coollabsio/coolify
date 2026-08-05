@@ -43,11 +43,6 @@ class ConfigurationChecker extends Component
         return view('livewire.project.shared.configuration-checker');
     }
 
-    public function refreshConfigurationChanges(): void
-    {
-        $this->configurationChanged();
-    }
-
     /**
      * Members must never see environment variable values, so redact every
      * environment-section change before it is serialized to the browser.
@@ -81,17 +76,41 @@ class ConfigurationChecker extends Component
 
     public function configurationChanged(): void
     {
+        // Banner only needs a lightweight summary in the Livewire snapshot.
+        $this->loadConfigurationState(includeChanges: false);
+    }
+
+    public function refreshConfigurationChanges(): void
+    {
+        // Full change list is only needed when the user opens "View changes".
+        $this->loadConfigurationState(includeChanges: true);
+    }
+
+    /**
+     * @param  bool  $includeChanges  When false, only summary keys are stored (smaller HTML/snapshots).
+     */
+    private function loadConfigurationState(bool $includeChanges = false): void
+    {
         $this->resource->refresh();
 
         if ($this->resource instanceof Application) {
             $diff = $this->resource->pendingDeploymentConfigurationDiff();
-            // Fail closed: only owners/admins may see unlocked env values.
-            $redactEnvironment = ! (bool) auth()->user()?->isAdmin();
+            $this->isConfigurationChanged = $diff->isChanged();
 
             $array = $diff->toArray();
-            $array['changes'] = $this->redactEnvironmentChanges($array['changes'] ?? [], $redactEnvironment);
 
-            $this->isConfigurationChanged = $diff->isChanged();
+            if (! $includeChanges) {
+                $this->configurationDiff = [
+                    'count' => data_get($array, 'count', 0),
+                    'requires_build' => (bool) data_get($array, 'requires_build', false),
+                ];
+
+                return;
+            }
+
+            // Fail closed: only owners/admins may see unlocked env values.
+            $redactEnvironment = ! (bool) auth()->user()?->isAdmin();
+            $array['changes'] = $this->redactEnvironmentChanges($array['changes'] ?? [], $redactEnvironment);
             $this->configurationDiff = $array;
 
             return;

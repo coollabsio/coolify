@@ -12,6 +12,7 @@ test('helper trigger is a button that stops label activation', function () {
         ->toContain('aria-label="More information"')
         ->toContain('info-helper-popup')
         ->toContain('name="info-circle"')
+        ->toContain('class="size-3.5 text-neutral-400')
         ->not->toContain('<div x-ref="trigger" class="info-helper"');
 });
 

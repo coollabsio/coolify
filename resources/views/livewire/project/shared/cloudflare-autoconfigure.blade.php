@@ -20,7 +20,7 @@
             </button>
         @endif
         <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
-            wire:click="openDnsRecordsModal" @click="dnsEntriesOpen = false">
+            @click="dnsEntriesOpen = false; $dispatch('open-dns-records-modal')">
             <x-reicon name="documentation" class="size-3.5 shrink-0 opacity-70" />
             Manual records
         </button>
@@ -97,143 +97,162 @@
     </div>
 @endif
 
-@if ($showDnsRecordsModal)
-    @php
-        $dnsHints = $this->dnsRecordHints();
-        $dnsCopyText = $this->dnsRecordsCopyText();
-    @endphp
-    <div x-data="{ modalOpen: @entangle('showDnsRecordsModal') }"
-        @keydown.escape.window="modalOpen = false; $wire.closeDnsRecordsModal()"
-        class="relative h-auto w-auto" :class="{ 'z-40': modalOpen }">
-        <template x-teleport="body">
-            <div x-show="modalOpen" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
-                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
-                    x-transition:leave-end="opacity-0"
-                    class="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-[2px]"
-                    @click="modalOpen = false; $wire.closeDnsRecordsModal()"></div>
-                <div class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
-                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
-                        x-transition:enter="ease-out duration-100"
-                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                        x-transition:leave="ease-in duration-100"
-                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                        class="application-settings-form application-settings-section relative flex w-full max-w-2xl flex-col overflow-hidden"
-                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                        <header class="flex-nowrap!">
-                            <h3 class="min-w-0 flex-1 truncate">DNS entries</h3>
-                            <button type="button" wire:click="closeDnsRecordsModal"
-                                class="icon-button shrink-0" aria-label="Close">
-                                <x-reicon name="x" class="size-4" />
-                            </button>
-                        </header>
-                        <div class="application-settings-section-body flex flex-col gap-4">
-                            <p class="text-sm leading-6 text-neutral-600 dark:text-fg-dim">
-                                Hosts that still need DNS at your provider (working domains are omitted). Create matching
-                                Type / Name / Value records so traffic reaches this server.
-                            </p>
+{{-- Always mounted so open/close is Alpine-only (no Livewire round-trip). --}}
+@php
+    $dnsHints = $this->dnsRecordHints();
+    $dnsCopyText = $this->dnsRecordsCopyText();
+@endphp
+<div
+    x-data="{
+        modalOpen: false,
+        openDnsRecords() {
+            this.modalOpen = true;
+        },
+        closeDnsRecords() {
+            this.modalOpen = false;
+        },
+        async recheckDns() {
+            this.modalOpen = true;
+            try {
+                await $wire.recheckDnsRecordsInModal();
+            } finally {
+                // Re-assert open after Livewire morph may re-init Alpine.
+                this.modalOpen = true;
+            }
+        },
+    }"
+    @open-dns-records-modal.window="openDnsRecords()"
+    class="relative h-auto w-auto" :class="{ 'z-40': modalOpen }"
+    @keydown.window.escape="if (modalOpen) { closeDnsRecords() }">
+    <template x-teleport="body">
+        <div x-show="modalOpen" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+            <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                x-transition:leave-end="opacity-0"
+                class="absolute inset-0 h-full w-full bg-black/50 backdrop-blur-[2px]"
+                @click="closeDnsRecords()"></div>
+            <div class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                    x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave="ease-in duration-100"
+                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                    class="application-settings-form application-settings-section relative flex w-full max-w-2xl flex-col overflow-hidden"
+                    style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                    <header class="flex-nowrap!">
+                        <h3 class="min-w-0 flex-1 truncate">DNS entries</h3>
+                        <button type="button" @click="closeDnsRecords()"
+                            class="icon-button shrink-0" aria-label="Close">
+                            <x-reicon name="x" class="size-4" />
+                        </button>
+                    </header>
+                    <div class="application-settings-section-body flex flex-col gap-4">
+                        <p class="text-sm leading-6 text-neutral-600 dark:text-fg-dim">
+                            Hosts that still need DNS at your provider (working domains are omitted). Create matching
+                            Type / Name / Value records so traffic reaches this server.
+                        </p>
 
-                            @if (blank($serverIp) && count($dnsHints) === 0)
-                                <x-callout type="warning" title="No server IP">
-                                    Could not determine a public IP for this destination. Set the server IP (or instance public IPv4 for localhost) first.
-                                </x-callout>
-                            @elseif (count($dnsHints) === 0)
-                                <x-callout type="info" title="Nothing to configure">
-                                    No pending DNS entries. All listed domains already resolve correctly, or no domains are configured yet.
-                                    Use Recheck after changing DNS.
-                                </x-callout>
-                            @else
-                                <div class="overflow-x-auto rounded-md border border-neutral-200 dark:border-coolgray-300">
-                                    <table class="w-full min-w-[32rem] text-left text-sm">
-                                        <thead
-                                            class="bg-neutral-50 text-[12px] uppercase tracking-wide text-neutral-500 dark:bg-coolgray-100 dark:text-fg-dim">
-                                            <tr>
-                                                <th class="px-3 py-2 font-medium">Type</th>
-                                                <th class="px-3 py-2 font-medium">Name</th>
-                                                <th class="px-3 py-2 font-medium">Value</th>
+                        @if (blank($serverIp) && count($dnsHints) === 0)
+                            <x-callout type="warning" title="No server IP">
+                                Could not determine a public IP for this destination. Set the server IP (or instance public IPv4 for localhost) first.
+                            </x-callout>
+                        @elseif (count($dnsHints) === 0)
+                            <x-callout type="info" title="Nothing to configure">
+                                No pending DNS entries. All listed domains already resolve correctly, or no domains are configured yet.
+                                Use Recheck after changing DNS.
+                            </x-callout>
+                        @else
+                            <div class="overflow-x-auto rounded-md border border-neutral-200 dark:border-coolgray-300">
+                                <table class="w-full min-w-[32rem] text-left text-sm">
+                                    <thead
+                                        class="bg-neutral-50 text-[12px] uppercase tracking-wide text-neutral-500 dark:bg-coolgray-100 dark:text-fg-dim">
+                                        <tr>
+                                            <th class="px-3 py-2 font-medium">Type</th>
+                                            <th class="px-3 py-2 font-medium">Name</th>
+                                            <th class="px-3 py-2 font-medium">Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-neutral-200 dark:divide-coolgray-300">
+                                        @foreach ($dnsHints as $record)
+                                            <tr class="text-[13px] text-black dark:text-fg">
+                                                <td class="px-3 py-2.5">{{ $record['type'] }}</td>
+                                                <td class="px-3 py-2.5">
+                                                    @include('livewire.project.shared.partials.dns-copy-cell', [
+                                                        'text' => $record['name'],
+                                                        'label' => 'Copy name',
+                                                        'break' => true,
+                                                    ])
+                                                </td>
+                                                <td class="px-3 py-2.5">
+                                                    @include('livewire.project.shared.partials.dns-copy-cell', [
+                                                        'text' => $record['value'],
+                                                        'label' => 'Copy value',
+                                                        'break' => true,
+                                                    ])
+                                                </td>
                                             </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-neutral-200 dark:divide-coolgray-300">
-                                            @foreach ($dnsHints as $record)
-                                                <tr class="font-mono text-[13px] text-black dark:text-fg">
-                                                    <td class="px-3 py-2.5">{{ $record['type'] }}</td>
-                                                    <td class="px-3 py-2.5">
-                                                        @include('livewire.project.shared.partials.dns-copy-cell', [
-                                                            'text' => $record['name'],
-                                                            'label' => 'Copy name',
-                                                            'break' => true,
-                                                        ])
-                                                    </td>
-                                                    <td class="px-3 py-2.5">
-                                                        @include('livewire.project.shared.partials.dns-copy-cell', [
-                                                            'text' => $record['value'],
-                                                            'label' => 'Copy value',
-                                                            'break' => true,
-                                                        ])
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                @if (filled($dnsCopyText))
-                                    <div class="flex flex-wrap items-center justify-between gap-2"
-                                        x-data="{
-                                            copied: false,
-                                            async copyAll(text) {
-                                                try {
-                                                    if (navigator.clipboard?.writeText) {
-                                                        await navigator.clipboard.writeText(text);
-                                                    } else {
-                                                        const el = document.createElement('textarea');
-                                                        el.value = text;
-                                                        el.setAttribute('readonly', '');
-                                                        el.style.position = 'fixed';
-                                                        el.style.left = '-9999px';
-                                                        document.body.appendChild(el);
-                                                        el.select();
-                                                        document.execCommand('copy');
-                                                        document.body.removeChild(el);
-                                                    }
-                                                    this.copied = true;
-                                                    setTimeout(() => this.copied = false, 1000);
-                                                } catch (e) {
-                                                    console.error('Copy failed', e);
-                                                }
-                                            }
-                                        }">
-                                        <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
-                                            {{ count($dnsHints) }}
-                                            {{ count($dnsHints) === 1 ? 'entry' : 'entries' }}
-                                            · Type / Name / Value
-                                        </p>
-                                        <button type="button" class="button shrink-0"
-                                            @click.prevent="copyAll(@js($dnsCopyText))">
-                                            <span x-text="copied ? 'Copied' : 'Copy all'"></span>
-                                        </button>
-                                    </div>
-                                @endif
-                            @endif
-
-                            <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-                                <x-forms.button type="button" wire:click="recheckDnsRecordsInModal"
-                                    wire:target="recheckDnsRecordsInModal,checkAllDns,checkDomainDns"
-                                    title="Recheck DNS">
-                                    <x-reicon name="refresh" class="size-3.5" />
-                                    Recheck
-                                </x-forms.button>
-                                <x-forms.button type="button" wire:click="closeDnsRecordsModal" isHighlighted>
-                                    Done
-                                </x-forms.button>
+                                        @endforeach
+                                    </tbody>
+                                </table>
                             </div>
+
+                            @if (filled($dnsCopyText))
+                                <div class="flex flex-wrap items-center justify-between gap-2"
+                                    x-data="{
+                                        copied: false,
+                                        async copyAll(text) {
+                                            try {
+                                                if (navigator.clipboard?.writeText) {
+                                                    await navigator.clipboard.writeText(text);
+                                                } else {
+                                                    const el = document.createElement('textarea');
+                                                    el.value = text;
+                                                    el.setAttribute('readonly', '');
+                                                    el.style.position = 'fixed';
+                                                    el.style.left = '-9999px';
+                                                    document.body.appendChild(el);
+                                                    el.select();
+                                                    document.execCommand('copy');
+                                                    document.body.removeChild(el);
+                                                }
+                                                this.copied = true;
+                                                setTimeout(() => this.copied = false, 1000);
+                                            } catch (e) {
+                                                console.error('Copy failed', e);
+                                            }
+                                        }
+                                    }">
+                                    <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                                        {{ count($dnsHints) }}
+                                        {{ count($dnsHints) === 1 ? 'entry' : 'entries' }}
+                                        · BIND zone format
+                                    </p>
+                                    <button type="button" class="button shrink-0"
+                                        title="Copy as BIND-compatible zone file"
+                                        @click.prevent="copyAll(@js($dnsCopyText))">
+                                        <span x-text="copied ? 'Copied' : 'Copy all'"></span>
+                                    </button>
+                                </div>
+                            @endif
+                        @endif
+
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+                            <x-forms.button type="button" @click="recheckDns()"
+                                wire:target="recheckDnsRecordsInModal,checkAllDns,checkDomainDns"
+                                title="Recheck DNS">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                Recheck
+                            </x-forms.button>
+                            <x-forms.button type="button" @click="closeDnsRecords()" isHighlighted>
+                                Done
+                            </x-forms.button>
                         </div>
                     </div>
                 </div>
             </div>
-        </template>
-    </div>
-@endif
+        </div>
+    </template>
+</div>

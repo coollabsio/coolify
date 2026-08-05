@@ -31,7 +31,7 @@
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
-        @if ($resource instanceof \App\Models\Application)
+        @if ($resource instanceof \App\Models\Application && $resource->git_based())
             @can('update', $resource)
                 <div class="w-full sm:w-96">
                     <x-forms.listbox id="isPreviewSuffixEnabled" label="PR deployment suffix"
@@ -47,7 +47,7 @@
             <x-unsaved-bar action="submit" />
             @if (!$isReadOnly)
                 @can('update', $resource)
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         @if ($fileStorage->is_host_file)
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Host File Mount Removal?"
                                 buttonTitle="Delete" isErrorButton submitAction="delete" :checkboxes="$hostFileDeletionCheckboxes"

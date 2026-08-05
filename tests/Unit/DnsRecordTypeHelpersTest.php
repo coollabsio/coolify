@@ -20,7 +20,7 @@ it('defaults to A when the address is missing or not an ip', function () {
 it('builds a short A-record guidance message for ipv4 targets', function () {
     $message = dnsMismatchGuidanceMessage('172.16.0.3 (coolify-testing-host)', '172.16.0.3');
 
-    expect($message)->toBe('A record → 172.16.0.3')
+    expect($message)->toBe('Required DNS record type A pointing to 172.16.0.3')
         ->and($message)->not->toContain('—')
         ->and($message)->not->toContain('continue');
 });
@@ -28,14 +28,14 @@ it('builds a short A-record guidance message for ipv4 targets', function () {
 it('builds a short AAAA-record guidance message for ipv6 targets', function () {
     $message = dnsMismatchGuidanceMessage('2001:db8::1', '2001:db8::1');
 
-    expect($message)->toBe('AAAA record → 2001:db8::1')
+    expect($message)->toBe('Required DNS record type AAAA pointing to 2001:db8::1')
         ->and($message)->not->toContain('—')
         ->and($message)->not->toContain('continue');
 });
 
 it('prefers the bare ip over a hostname label', function () {
     expect(dnsMismatchGuidanceMessage('coolify-testing-host', '172.16.0.3'))
-        ->toBe('A record → 172.16.0.3');
+        ->toBe('Required DNS record type A pointing to 172.16.0.3');
 });
 
 it('falls back when no target is available', function () {

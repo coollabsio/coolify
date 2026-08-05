@@ -366,14 +366,16 @@ it('shows the configure backup modal trigger inside the volume card instead of i
         'resource' => $application,
     ])
         ->set('isReadOnly', true)
-        ->assertSee('Configure Backup')
+        ->assertSee('Backup')
         ->assertDontSee('Backups made while the application is writing');
 
     $html = $component->html();
 
-    expect(strpos($html, 'Configure Backup'))
-        ->toBeGreaterThan(strpos($html, '<form'))
-        ->toBeLessThan(strpos($html, '</form>'));
+    // Read-only volume rows are table cells (no form); backup action still renders in the row.
+    expect($html)
+        ->toContain('Configure Volume Backup')
+        ->toContain('data-table-row')
+        ->toContain('Backup');
 });
 
 it('only shows the backup enabled badge for an enabled volume backup', function () {
@@ -391,7 +393,7 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
     $component = Livewire::test(Show::class, [
         'storage' => $volume,
         'resource' => $application,
-    ])->assertDontSee('Backup enabled');
+    ])->assertDontSee('table-badge-success', false);
 
     $backup->update(['enabled' => true]);
 
@@ -404,14 +406,17 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
 
     $component
         ->dispatch('refreshVolumeBackups')
-        ->assertSeeInOrder(['Volume Name', 'Backup enabled'])
+        ->assertSee('table-badge-success', false)
+        ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 
     Livewire::test(Show::class, [
         'storage' => $volume,
         'resource' => $application,
         'isFirst' => false,
-    ])->assertSeeInOrder(['Volume Name', 'Backup enabled']);
+    ])
+        ->assertSee('table-badge-success', false)
+        ->assertSee('Volume backup is enabled');
 });
 
 it('links the backup enabled badge to a filtered backup list when the application has multiple schedules', function () {
@@ -441,7 +446,8 @@ it('links the backup enabled badge to a filtered backup list when the applicatio
         'storage' => $volume,
         'resource' => $application,
     ])
-        ->assertSee('Backup enabled')
+        ->assertSee('table-badge-success', false)
+        ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 });
 

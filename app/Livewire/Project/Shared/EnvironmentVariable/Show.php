@@ -19,6 +19,8 @@ use Livewire\Component;
 
 class Show extends Component
 {
+    public bool $showEnvironmentType = true;
+
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
 
     public $parameters;

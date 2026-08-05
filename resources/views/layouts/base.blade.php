@@ -171,15 +171,7 @@
             }
         }
         @auth
-            @php
-                $pusherForceWs = (bool) config('constants.pusher.force_ws');
-            @endphp
             window.Pusher = Pusher;
-            @if ($pusherForceWs)
-            if (window.Pusher && window.Pusher.Runtime) {
-                window.Pusher.Runtime.getProtocol = function () { return 'http:'; };
-            }
-            @endif
             const EchoConstructor = typeof Echo === 'function' ? Echo : Echo.default;
             window.Echo = new EchoConstructor({
                 broadcaster: 'pusher',
@@ -189,11 +181,13 @@
                 wsPort: "{{ getRealtime() }}",
                 wssPort: "{{ getRealtime() }}",
                 forceTLS: false,
-                encrypted: @json($pusherForceWs ? false : true),
+                encrypted: true,
                 enableStats: false,
                 enableLogging: true,
+                enabledTransports: ['ws', 'wss'],
                 disableStats: true,
-                enabledTransports: @json($pusherForceWs ? ['ws'] : ['ws', 'wss']),
+                // Add auto reconnection settings
+                enabledTransports: ['ws', 'wss'],
                 disabledTransports: ['sockjs', 'xhr_streaming', 'xhr_polling'],
                 // Attempt to reconnect on connection lost
                 autoReconnect: true,

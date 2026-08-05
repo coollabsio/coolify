@@ -2,10 +2,12 @@
     $hasVolumes = $this->volumeCount > 0;
     $hasFiles = $this->fileCount > 0;
     $hasDirectories = $this->directoryCount > 0;
-    $defaultTab = $hasVolumes ? 'volumes' : ($hasFiles ? 'files' : 'directories');
+    $tabButtonBase = 'h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+    $tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
+    $tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
 @endphp
 
-<div class="flex flex-col gap-6" x-data="{ activeTab: '{{ $defaultTab }}' }">
+<div class="flex flex-col gap-6">
     @if (
         $resource->getMorphClass() == 'App\Models\Application' ||
             $resource->getMorphClass() == 'App\Models\StandalonePostgresql' ||
@@ -16,8 +18,10 @@
             $resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMongodb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMysql')
-        <x-application.settings-section id="storage-mounts-section" title="Persistent storage"
-            helper="Preview deployment volumes can use a -pr-#PRNumber suffix so each pull request receives isolated storage.">
+        <x-application.settings-section id="storage-mounts-section" title="Persistent storage" :flush="true"
+            :helper="$resource instanceof \App\Models\Application && $resource->git_based()
+                ? 'Preview deployment volumes can use a -pr-#PRNumber suffix so each pull request receives isolated storage.'
+                : 'Mount volumes, files, or directories to preserve data between deployments.'">
             <x-slot:actions>
                 @if ($resource?->build_pack !== 'dockercompose')
                     @can('update', $resource)
@@ -353,28 +357,19 @@
                 @if ($hasVolumes || $hasFiles || $hasDirectories)
                     <div
                         class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
-                        <button type="button" @click="activeTab = 'volumes'"
-                            :class="activeTab === 'volumes'
-                                ? 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]'
-                                : 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg'"
+                        <button type="button" wire:click="setActiveTab('volumes')"
                             @disabled(!$hasVolumes)
-                            class="h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40">
+                            @class([$tabButtonBase, $activeTab === 'volumes' ? $tabButtonActive : $tabButtonInactive])>
                             Volumes ({{ $this->volumeCount }})
                         </button>
-                        <button type="button" @click="activeTab = 'files'"
-                            :class="activeTab === 'files'
-                                ? 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]'
-                                : 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg'"
+                        <button type="button" wire:click="setActiveTab('files')"
                             @disabled(!$hasFiles)
-                            class="h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40">
+                            @class([$tabButtonBase, $activeTab === 'files' ? $tabButtonActive : $tabButtonInactive])>
                             Files ({{ $this->fileCount }})
                         </button>
-                        <button type="button" @click="activeTab = 'directories'"
-                            :class="activeTab === 'directories'
-                                ? 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]'
-                                : 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg'"
+                        <button type="button" wire:click="setActiveTab('directories')"
                             @disabled(!$hasDirectories)
-                            class="h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40">
+                            @class([$tabButtonBase, $activeTab === 'directories' ? $tabButtonActive : $tabButtonInactive])>
                             Directories ({{ $this->directoryCount }})
                         </button>
                     </div>
@@ -382,140 +377,109 @@
             </x-slot:actions>
 
         @if (!$hasVolumes && !$hasFiles && !$hasDirectories)
-            <x-empty title="No persistent storage"
+            <x-empty size="sm" title="No persistent storage"
                 description="Add a volume, file, or directory mount to preserve data between deployments."
                 icon-name="storages" />
-        @else
-            {{-- Volumes Tab --}}
-            <div x-show="activeTab === 'volumes'" class="flex flex-col gap-6">
-                @if ($hasVolumes)
-                    <livewire:project.shared.storages.all :resource="$resource" />
-                @else
-                    <div class="py-6 text-center text-neutral-400 dark:text-neutral-500">
-                        No volumes configured.
-                    </div>
-                @endif
-            </div>
-
-            {{-- Files Tab --}}
-            <div x-show="activeTab === 'files'" class="flex flex-col gap-6">
+        @elseif ($activeTab === 'volumes')
+            @if ($hasVolumes)
+                <livewire:project.shared.storages.all wire:key="volumes-{{ $resource->id }}-{{ $this->volumeCount }}"
+                    :resource="$resource" />
+            @else
+                <x-empty size="sm" title="No volumes configured"
+                    description="Switch tabs or add a volume mount." icon-name="storages" />
+            @endif
+        @elseif ($activeTab === 'files')
+            <div class="flex flex-col gap-4 p-4">
                 @if ($hasFiles)
                     @foreach ($this->files as $fs)
                         <livewire:project.service.file-storage :fileStorage="$fs"
                             wire:key="file-{{ $fs->id }}" />
                     @endforeach
                 @else
-                    <div class="py-6 text-center text-neutral-400 dark:text-neutral-500">
-                        No file mounts configured.
-                    </div>
+                    <x-empty size="sm" title="No file mounts configured"
+                        description="Switch tabs or add a file mount." icon-name="file" />
                 @endif
             </div>
-
-            {{-- Directories Tab --}}
-            <div x-show="activeTab === 'directories'" class="flex flex-col gap-6">
+        @else
+            <div class="flex flex-col gap-4 p-4">
                 @if ($hasDirectories)
                     @foreach ($this->directories as $fs)
                         <livewire:project.service.file-storage :fileStorage="$fs"
                             wire:key="directory-{{ $fs->id }}" />
                     @endforeach
                 @else
-                    <div class="py-6 text-center text-neutral-400 dark:text-neutral-500">
-                        No directory mounts configured.
-                    </div>
+                    <x-empty size="sm" title="No directory mounts configured"
+                        description="Switch tabs or add a directory mount." icon-name="folder" />
                 @endif
             </div>
         @endif
         </x-application.settings-section>
     @else
-        <div class="flex flex-col gap-4 py-2">
-            <div>
-                <div class="flex items-center gap-2">
-                    <h2>{{ Str::headline($resource->name) }}</h2>
-                </div>
-            </div>
-            @if ($resource->persistentStorages()->get()->count() === 0 && $fileStorage->count() == 0)
-                <div>No storage found.</div>
-            @endif
-
-            @php
-                $hasVolumes = $this->volumeCount > 0;
-                $hasFiles = $this->fileCount > 0;
-                $hasDirectories = $this->directoryCount > 0;
-                $defaultTab = $hasVolumes ? 'volumes' : ($hasFiles ? 'files' : 'directories');
-            @endphp
-
-            @if ($hasVolumes || $hasFiles || $hasDirectories)
-                <div x-data="{
-                    activeTab: '{{ $defaultTab }}'
-                }">
-                    {{-- Tabs Navigation --}}
-                    <div class="flex gap-2 border-b dark:border-coolgray-300 border-neutral-200">
-                        <button @click="activeTab = 'volumes'"
-                            :class="activeTab === 'volumes' ? 'border-b-2 dark:border-white border-black' :
-                                'border-b-2 border-transparent'"
-                            @if (!$hasVolumes) disabled @endif
-                            class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasVolumes ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
+        {{-- Service stack resources: one settings card + table per service --}}
+        <x-application.settings-section :id="'storage-service-'.$resource->id"
+            :title="Str::headline($resource->name)" :flush="true"
+            helper="Volume mounts for this compose service. Compose-managed mounts are read-only in the dashboard.">
+            <x-slot:actions>
+                @if ($hasVolumes || $hasFiles || $hasDirectories)
+                    <div
+                        class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
+                        <button type="button" wire:click="setActiveTab('volumes')"
+                            @disabled(!$hasVolumes)
+                            @class([$tabButtonBase, $activeTab === 'volumes' ? $tabButtonActive : $tabButtonInactive])>
                             Volumes ({{ $this->volumeCount }})
                         </button>
-                        <button @click="activeTab = 'files'"
-                            :class="activeTab === 'files' ? 'border-b-2 dark:border-white border-black' :
-                                'border-b-2 border-transparent'"
-                            @if (!$hasFiles) disabled @endif
-                            class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasFiles ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
+                        <button type="button" wire:click="setActiveTab('files')"
+                            @disabled(!$hasFiles)
+                            @class([$tabButtonBase, $activeTab === 'files' ? $tabButtonActive : $tabButtonInactive])>
                             Files ({{ $this->fileCount }})
                         </button>
-                        <button @click="activeTab = 'directories'"
-                            :class="activeTab === 'directories' ? 'border-b-2 dark:border-white border-black' :
-                                'border-b-2 border-transparent'"
-                            @if (!$hasDirectories) disabled @endif
-                            class="px-4 py-2 -mb-px font-medium transition-colors {{ $hasDirectories ? 'dark:text-neutral-400 dark:hover:text-white text-neutral-600 hover:text-black cursor-pointer' : 'opacity-50 cursor-not-allowed' }} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-coolgray-100">
+                        <button type="button" wire:click="setActiveTab('directories')"
+                            @disabled(!$hasDirectories)
+                            @class([$tabButtonBase, $activeTab === 'directories' ? $tabButtonActive : $tabButtonInactive])>
                             Directories ({{ $this->directoryCount }})
                         </button>
                     </div>
+                @endif
+            </x-slot:actions>
 
-                    {{-- Tab Content --}}
-                    <div class="pt-4">
-                        {{-- Volumes Tab --}}
-                        <div x-show="activeTab === 'volumes'" class="flex flex-col gap-4">
-                            @if ($hasVolumes)
-                                <livewire:project.shared.storages.all :resource="$resource" />
-                            @else
-                                <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                    No volumes configured.
-                                </div>
-                            @endif
-                        </div>
-
-                        {{-- Files Tab --}}
-                        <div x-show="activeTab === 'files'" class="flex flex-col gap-4">
-                            @if ($hasFiles)
-                                @foreach ($this->files as $fs)
-                                    <livewire:project.service.file-storage :fileStorage="$fs"
-                                        wire:key="file-{{ $fs->id }}" />
-                                @endforeach
-                            @else
-                                <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                    No file mounts configured.
-                                </div>
-                            @endif
-                        </div>
-
-                        {{-- Directories Tab --}}
-                        <div x-show="activeTab === 'directories'" class="flex flex-col gap-4">
-                            @if ($hasDirectories)
-                                @foreach ($this->directories as $fs)
-                                    <livewire:project.service.file-storage :fileStorage="$fs"
-                                        wire:key="directory-{{ $fs->id }}" />
-                                @endforeach
-                            @else
-                                <div class="text-center py-8 dark:text-neutral-500 text-neutral-400">
-                                    No directory mounts configured.
-                                </div>
-                            @endif
-                        </div>
-                    </div>
+            @if (!$hasVolumes && !$hasFiles && !$hasDirectories)
+                <x-empty size="sm" title="No storage found"
+                    description="No volumes, files, or directories are defined for this service."
+                    icon-name="storages" />
+            @elseif ($activeTab === 'volumes')
+                @if ($hasVolumes)
+                    <livewire:project.shared.storages.all
+                        wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"
+                        :resource="$resource" />
+                @else
+                    <x-empty size="sm" title="No volumes configured"
+                        description="This service has no volume mounts." icon-name="storages" />
+                @endif
+            @elseif ($activeTab === 'files')
+                <div class="flex flex-col gap-4 p-4">
+                    @if ($hasFiles)
+                        @foreach ($this->files as $fs)
+                            <livewire:project.service.file-storage :fileStorage="$fs"
+                                wire:key="file-{{ $fs->id }}" />
+                        @endforeach
+                    @else
+                        <x-empty size="sm" title="No file mounts configured"
+                            description="This service has no file mounts." icon-name="file" />
+                    @endif
+                </div>
+            @else
+                <div class="flex flex-col gap-4 p-4">
+                    @if ($hasDirectories)
+                        @foreach ($this->directories as $fs)
+                            <livewire:project.service.file-storage :fileStorage="$fs"
+                                wire:key="directory-{{ $fs->id }}" />
+                        @endforeach
+                    @else
+                        <x-empty size="sm" title="No directory mounts configured"
+                            description="This service has no directory mounts." icon-name="folder" />
+                    @endif
                 </div>
             @endif
-        </div>
+        </x-application.settings-section>
     @endif
 </div>
