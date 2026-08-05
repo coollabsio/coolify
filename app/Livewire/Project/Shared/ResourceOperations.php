@@ -55,10 +55,18 @@ class ResourceOperations extends Component
         $this->cloneVolumeData = $value;
     }
 
-    public function cloneTo($destination_uuid)
+    public function cloneTo($destination_uuid, $environment_id = null)
     {
         try {
             $this->authorize('update', $this->resource);
+
+            $new_environment = $this->resource->environment;
+            if ($environment_id !== null) {
+                $new_environment = Environment::ownedByCurrentTeam()->find($environment_id);
+                if (! $new_environment) {
+                    return $this->addError('environment_id', 'Environment not found.');
+                }
+            }
 
             $new_destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $new_destination) {
@@ -71,11 +79,14 @@ class ResourceOperations extends Component
             }
 
             if ($this->resource->getMorphClass() === Application::class) {
-                $new_resource = clone_application($this->resource, $new_destination, ['uuid' => $uuid], $this->cloneVolumeData);
+                $new_resource = clone_application($this->resource, $new_destination, [
+                    'uuid' => $uuid,
+                    'environment_id' => $new_environment->id,
+                ], $this->cloneVolumeData);
 
                 $route = route('project.application.configuration', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
+                    'project_uuid' => $new_environment->project->uuid,
+                    'environment_uuid' => $new_environment->uuid,
                     'application_uuid' => $new_resource->uuid,
                 ]).'#resource-operations';
 
@@ -100,6 +111,7 @@ class ResourceOperations extends Component
                     'name' => $this->resource->name.'-clone-'.$uuid,
                     'status' => 'exited',
                     'started_at' => null,
+                    'environment_id' => $new_environment->id,
                     'destination_id' => $new_destination->id,
                     'destination_type' => $new_destination->getMorphClass(),
                 ]);
@@ -211,8 +223,8 @@ class ResourceOperations extends Component
                 }
 
                 $route = route('project.database.configuration', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
+                    'project_uuid' => $new_environment->project->uuid,
+                    'environment_uuid' => $new_environment->uuid,
                     'database_uuid' => $new_resource->uuid,
                 ]).'#resource-operations';
 
@@ -226,6 +238,7 @@ class ResourceOperations extends Component
                 ])->fill([
                     'uuid' => $uuid,
                     'name' => $this->resource->name.'-clone-'.$uuid,
+                    'environment_id' => $new_environment->id,
                     'destination_id' => $new_destination->id,
                     'destination_type' => $new_destination->getMorphClass(),
                     'server_id' => $new_destination->server_id,
@@ -354,8 +367,8 @@ class ResourceOperations extends Component
                 $new_resource->parse();
 
                 $route = route('project.service.configuration', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
+                    'project_uuid' => $new_environment->project->uuid,
+                    'environment_uuid' => $new_environment->uuid,
                     'service_uuid' => $new_resource->uuid,
                 ]).'#resource-operations';
 

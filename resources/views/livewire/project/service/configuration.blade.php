@@ -17,12 +17,15 @@
             ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
             ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables'],
             ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
+            ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
+            ['label' => 'Runtime', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
+            ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
             ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
             ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'shield-alert'],
-        ])->map(fn (array $item): array => [
+        ])->filter(fn (array $item): bool => $item['visible'] ?? true)->map(fn (array $item): array => [
             ...$item,
             'active' => $currentRoute === $item['route']
                 || ($item['route'] === 'project.service.scheduled-tasks.show'
@@ -30,9 +33,10 @@
         ]);
 
         $menuGroups = [
-            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
+            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Backups'],
             'Automation' => ['Scheduled Tasks', 'Webhooks'],
-            'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
+            'Logs' => ['Runtime'],
+            'Operations' => ['Terminal', 'Resource Operations', 'Tags', 'Danger Zone'],
         ];
 
         $groupedItems = collect($menuGroups)
@@ -63,7 +67,7 @@
                                 'menu-item',
                                 'menu-item-active' => $menuItem['active'],
                             ])
-                                {{ wireNavigate() }}
+                                @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                                 href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
                                 <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label">{{ $menuItem['label'] }}</span>
@@ -97,14 +101,14 @@
                             localStorage.setItem('service-compose-resources-view', mode);
                         }
                     }">
-                        <div class="mb-3 flex items-center justify-between gap-3">
+                        <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 class="text-base font-semibold text-black dark:text-fg">Compose resources</h2>
                                 <p class="mt-1 text-sm text-neutral-500 dark:text-fg-dim">
                                     Applications and databases defined in this service.
                                 </p>
                             </div>
-                            <div class="flex shrink-0 items-center gap-2">
+                            <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                                 <div
                                     class="flex h-8 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
                                     <button type="button" x-on:click="setViewMode('table')"

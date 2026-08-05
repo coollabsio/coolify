@@ -1,5 +1,6 @@
 @php
     $consoleThemes = [
+        ['key' => 'system', 'name' => 'System', 'background' => 'linear-gradient(135deg, #ffffff 0 50%, #121214 50% 100%)', 'accent' => '#8C8E9C'],
         ['key' => 'shadows-midnight', 'name' => 'Midnight', 'background' => 'linear-gradient(135deg, #2a3b4c, rgba(42, 59, 76, 0.4))', 'accent' => '#6d7a7c'],
         ['key' => 'shadows-golden-hour', 'name' => 'Golden Hour', 'background' => 'linear-gradient(135deg, #d58a42, rgba(213, 138, 66, 0.4))', 'accent' => '#bf8c3c'],
         ['key' => 'shadows-cosmic-purple', 'name' => 'Cosmic Purple', 'background' => 'linear-gradient(135deg, #5d3e66, rgba(93, 62, 102, 0.4))', 'accent' => '#A76DBE'],
@@ -63,7 +64,7 @@
             targetOpen: false,
             targetSearch: '',
             themeKeys: @js($consoleThemeKeys),
-            consoleTheme: 'shadows-cosmic-purple',
+            consoleTheme: 'system',
             themeOpen: false,
             get filteredTargets() {
                 const query = this.targetSearch.trim().toLowerCase();
@@ -73,7 +74,7 @@
             },
             init() {
                 const savedTheme = localStorage.getItem('coolify-console-theme');
-                this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'shadows-cosmic-purple';
+                this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';
                 localStorage.setItem('coolify-console-theme', this.consoleTheme);
             },
             setTheme(theme) {
@@ -191,10 +192,10 @@
                     </button>
 
                     <div x-cloak x-show="themeOpen" x-transition.origin.top.right
-                        class="absolute top-7 right-0 z-50 max-h-80 w-56 overflow-y-auto rounded-lg border border-white/[0.1] bg-[#111113] p-1 shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
+                        class="console-theme-selector absolute top-7 right-0 z-50 max-h-80 w-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-[0_18px_50px_rgba(0,0,0,0.18)] dark:border-white/[0.1] dark:bg-[#111113] dark:shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
                         @foreach ($consoleThemes as $theme)
                             <button type="button"
-                                class="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                class="flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[11px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-950 dark:text-white/65 dark:hover:bg-white/[0.07] dark:hover:text-white"
                                 x-on:click="setTheme('{{ $theme['key'] }}')">
                                 <span class="h-3 w-5 rounded-full border border-white/10"
                                     style="background: {{ $theme['background'] }}"></span>

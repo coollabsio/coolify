@@ -20,8 +20,7 @@
                             @endif
                             <button type="button"
                                 class="ml-1 inline-flex items-center gap-1 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80"
-                                x-on:click="$wire.refreshConfigurationChanges().then(() => configurationDiffModalOpen = true)"
-                                wire:loading.attr="disabled" wire:target="refreshConfigurationChanges">
+                                x-on:click="configurationDiffModalOpen = true">
                                 View changes
                                 <x-reicon name="arrow-right" class="size-3" />
                             </button>

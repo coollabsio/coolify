@@ -18,7 +18,8 @@
                     <a href="#{{ $provider }}-oauth-section" class="menu-item min-h-8! py-1! text-[12px]!"
                         :class="{ 'menu-item-active': activeProvider === '{{ $provider }}' }"
                         @click.prevent="activeProvider = '{{ $provider }}'; history.replaceState(null, '', '#{{ $provider }}-oauth-section'); window.scrollToSettingsSection?.('{{ $provider }}-oauth-section')">
-                        <x-reicon name="keys" class="menu-item-icon" />
+                        <span class="menu-item-icon bg-current"
+                            style="mask: url('{{ asset('svgs/' . $provider . '.svg') }}') center / contain no-repeat; -webkit-mask: url('{{ asset('svgs/' . $provider . '.svg') }}') center / contain no-repeat;"></span>
                         <span class="menu-item-label">{{ $providerLabel }}</span>
                     </a>
                 @endforeach
@@ -37,7 +38,7 @@
                     title="{{ $providerLabel }}">
                     <x-slot:actions>
                         <div x-data="{ enabled: @js((bool) $oauth_setting['enabled']), provider: @js($provider) }">
-                            <x-forms.button type="button"
+                            <x-forms.button type="button" :isHighlighted="!$oauth_setting['enabled']"
                                 x-on:click="
                                 if (!enabled) {
                                     const invalidField = [...$el.closest('section').querySelectorAll('[required]')]

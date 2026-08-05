@@ -29,15 +29,49 @@
             @if ($backup->database_type === 'App\Models\StandalonePostgresql' && $backup->database_id !== 0
                     || $backup->database_type === 'App\Models\StandaloneMysql'
                     || $backup->database_type === 'App\Models\StandaloneMariadb')
-                <div class="grid gap-4 sm:grid-cols-2">
+                <div class="grid w-full gap-4">
                     <x-forms.listbox id="dumpAll" label="Database selection" onChange="instantSave" :options="[
                         ['value' => true, 'label' => 'Back up all databases'],
                         ['value' => false, 'label' => 'Choose databases'],
                     ]" />
                     @if (! $backup->dump_all)
-                        <x-forms.input label="Databases to back up"
-                            helper="Comma-separated database names. Leave empty to include the default database."
-                            id="databasesToBackup" />
+                        <div class="w-full" x-data="{
+                            value: @entangle('databasesToBackup').live,
+                            draft: '',
+                            get databases() {
+                                return (this.value || '').split(',').map(name => name.trim()).filter(Boolean);
+                            },
+                            addDatabase() {
+                                const names = this.draft.split(',').map(name => name.trim()).filter(Boolean);
+                                if (names.length === 0) return;
+                                this.value = [...new Set([...this.databases, ...names])].join(',');
+                                this.draft = '';
+                            },
+                            removeDatabase(index) {
+                                this.value = this.databases.filter((_, itemIndex) => itemIndex !== index).join(',');
+                            },
+                        }">
+                            <label class="mb-1.5 block text-sm font-medium">Databases to back up</label>
+                            <div class="chip-input">
+                                <template x-for="(database, index) in databases" :key="database">
+                                    <span class="chip font-mono">
+                                        <span x-text="database"></span>
+                                        <button type="button" @click="removeDatabase(index)"
+                                            class="chip-remove"
+                                            :aria-label="`Remove ${database}`">
+                                            <x-reicon name="x" class="size-3" />
+                                        </button>
+                                    </span>
+                                </template>
+                                <input x-model="draft" @keydown.enter.prevent="addDatabase()"
+                                    @keydown="if ($event.key === ',') { $event.preventDefault(); addDatabase(); }"
+                                    @blur="addDatabase()" type="text"
+                                    placeholder="Type a database and press Enter" />
+                            </div>
+                            <p class="mt-1.5 text-xs text-neutral-500 dark:text-fg-dim">
+                                Add one or more database names. Leave empty to include the default database.
+                            </p>
+                        </div>
                     @endif
                 </div>
             @elseif ($backup->database_type === 'App\Models\StandaloneMongodb')

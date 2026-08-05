@@ -59,19 +59,22 @@ it('does not render the notification for preview deployment toggles', function (
         ->assertSet('isConfigurationChanged', false);
 });
 
-it('renders the changed configuration labels', function () {
+it('renders the changed configuration labels without a second backend request', function () {
     $application = configurationCheckerApplication($this->environment);
     markConfigurationCheckerApplicationDeployed($application);
 
     $application->update(['build_command' => 'pnpm build']);
 
-    // Banner summary is always available; full change rows load on demand.
     Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
         ->assertSee('The latest configuration has not been applied')
         ->assertSee('A rebuild is required.')
-        ->assertDontSee('Build command')
-        ->call('refreshConfigurationChanges')
         ->assertSee('Build command');
+
+    $view = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
+
+    expect($view)
+        ->toContain('x-on:click="configurationDiffModalOpen = true"')
+        ->not->toContain('$wire.refreshConfigurationChanges()');
 });
 
 it('refreshes configuration changes when the event is received', function () {
@@ -88,7 +91,6 @@ it('refreshes configuration changes when the event is received', function () {
         ->dispatch('configurationChanged')
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('The latest configuration has not been applied')
-        ->call('refreshConfigurationChanges')
         ->assertSee('Build command');
 });
 
@@ -113,7 +115,6 @@ it('shows an unapplied configuration warning after a directory mount is added', 
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('The latest configuration has not been applied')
         ->assertSee('Please redeploy to apply the new configuration.')
-        ->call('refreshConfigurationChanges')
         ->assertSee('Directory mount');
 });
 
@@ -124,7 +125,6 @@ it('refreshes stale modal configuration diff before opening changes', function (
     $application->update(['build_command' => 'pnpm build']);
 
     $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
-        ->call('refreshConfigurationChanges')
         ->assertSee('Build command')
         ->assertDontSee('Start command');
 
@@ -134,13 +134,13 @@ it('refreshes stale modal configuration diff before opening changes', function (
     ]);
 
     $component
-        ->call('refreshConfigurationChanges')
+        ->dispatch('configurationChanged')
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('Start command')
         ->assertDontSee('Build command');
 });
 
-it('keeps full configuration change rows out of the initial Livewire snapshot', function () {
+it('includes full configuration change rows in the initial Livewire snapshot', function () {
     $application = configurationCheckerApplication($this->environment);
     markConfigurationCheckerApplicationDeployed($application);
     $application->update(['build_command' => 'pnpm build']);
@@ -148,12 +148,7 @@ it('keeps full configuration change rows out of the initial Livewire snapshot', 
     $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
 
     expect($component->get('isConfigurationChanged'))->toBeTrue()
-        ->and($component->get('configurationDiff'))->toHaveKeys(['count', 'requires_build'])
-        ->and($component->get('configurationDiff'))->not->toHaveKey('changes');
-
-    $component->call('refreshConfigurationChanges');
-
-    expect($component->get('configurationDiff'))->toHaveKey('changes')
+        ->and($component->get('configurationDiff'))->toHaveKey('changes')
         ->and(data_get($component->get('configurationDiff'), 'changes'))->not->toBeEmpty();
 });
 
@@ -177,8 +172,7 @@ it('redacts unlocked environment values for team members in the change list', fu
 
     $application->environment_variables()->where('key', 'API_TOKEN')->first()->update(['value' => 'new-secret']);
 
-    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
-        ->call('refreshConfigurationChanges');
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
 
     $envChange = collect(data_get($component->get('configurationDiff'), 'changes', []))
         ->first(fn (array $change): bool => str_contains((string) data_get($change, 'key'), 'API_TOKEN')
@@ -211,7 +205,6 @@ it('redacts newly added environment values for team members', function () {
     ]);
 
     $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
-        ->call('refreshConfigurationChanges')
         ->assertSee('API_TOKEN')
         ->assertSee('Current')
         ->assertSee('New');

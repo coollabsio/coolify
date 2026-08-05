@@ -1,7 +1,9 @@
 <div>
-    <x-slot:title>{{ data_get_str($application, 'name')->limit(10) }} > Deployments | Coolify</x-slot>
-    <livewire:project.shared.configuration-checker :resource="$application" />
-    <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-index" />
+    @unless ($embedded)
+        <x-slot:title>{{ data_get_str($application, 'name')->limit(10) }} > Deployments | Coolify</x-slot>
+        <livewire:project.shared.configuration-checker :resource="$application" />
+        <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-index" />
+    @endunless
 
     @php
         $lastPage = max(1, (int) ceil($deployments_count / $defaultTake));
@@ -11,7 +13,20 @@
         $hasActiveQuery = trim($search) !== '' || $hasActiveFilter;
     @endphp
 
-    <div class="application-settings-form"
+    <section @class([
+        'application-settings-workspace w-full',
+        'mt-4 max-w-[1180px] lg:mt-0' => ! $embedded,
+    ])>
+        <div @class([
+            'min-w-0',
+            'grid gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10' => ! $embedded,
+        ])>
+            @unless ($embedded)
+                <x-application.configuration-sidebar :application="$application"
+                    current-route="project.application.deployment.index" />
+            @endunless
+
+            <div class="application-settings-form min-w-0"
         @if (!$skip) wire:poll.5000ms="reloadDeployments" @endif>
         <x-application.settings-section title="Deployment history"
             helper="Search, filter, and open a deployment to inspect its build logs." flush>
@@ -204,7 +219,10 @@
                         <a wire:key="deployment-{{ data_get($deployment, 'deployment_uuid') }}"
                             href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
                             {{ wireNavigate() }}
-                            class="data-table-row deployment-table-grid border-b border-neutral-200 text-[13px] text-neutral-600 dark:border-white/[0.08] dark:text-fg-dim">
+                            @class([
+                                'data-table-row deployment-table-grid border-b border-neutral-200 text-[13px] text-neutral-600 dark:border-white/[0.08] dark:text-fg-dim',
+                                'data-table-row-active' => $selectedDeploymentUuid === data_get($deployment, 'deployment_uuid'),
+                            ])>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>{{ $sourceLabel }}</span>
                             <span class="min-w-0">
@@ -247,4 +265,6 @@
             @endif
         </x-application.settings-section>
     </div>
+        </div>
+    </section>
 </div>

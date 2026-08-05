@@ -57,7 +57,8 @@ test('unsubscribed cloud sidebar does not expose global search', function () {
 
     $response->assertSuccessful();
     // Search button is gated; global-search listener markup may still be present.
-    $response->assertDontSee('title="Search (Press / or ⌘K)"', false);
+    // Search button is gated; OS-aware title uses Alpine :title, so assert on the trigger instead.
+    $response->assertDontSee("\$dispatch('open-global-search')", false);
     $response->assertDontSee('>Search</span>', false);
 });
 

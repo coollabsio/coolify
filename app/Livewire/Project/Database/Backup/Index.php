@@ -29,7 +29,9 @@ class Index extends Component
                 'database_uuid' => $database->uuid,
             ]);
         }
-        $this->database = $database;
+        $this->database = $database->load([
+            'scheduledBackups' => fn ($query) => $query->withCount('executions'),
+        ]);
     }
 
     public function render()

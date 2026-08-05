@@ -496,7 +496,7 @@ top-anchored overlay:
 
 - elevated shell with hairline ring and modal shadow (not a heavy floating card);
 - recessed-neutral header strip with outline search glyph and 14px input;
-- compact `⌘K` / `/` / `ESC` kbd chips matching the sidebar search trigger;
+- compact OS-aware mod+K (`⌘K` on macOS, `Ctrl+K` on Windows/Linux) / `/` / `ESC` kbd chips matching the sidebar search trigger;
 - nested base-color results body with group labels in sentence case;
 - dense result rows as inset 6px-radius pills (listbox anatomy), not full-bleed
   bars with global focus rings;
@@ -511,7 +511,7 @@ top-anchored overlay:
   `application-settings-section` layer-card shell.
 
 Preserve keyboard navigation (arrow keys, Enter via focused links, Escape to
-clear then close), `/` and `⌘K` open shortcuts, and the multi-step
+clear then close), `/` and mod+K (⌘K / Ctrl+K by OS) open shortcuts, and the multi-step
 server → destination → project → environment create flow.
 
 ### Toasts

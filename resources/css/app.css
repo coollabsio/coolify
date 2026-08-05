@@ -433,6 +433,55 @@ tr td:first-child {
         opacity 220ms ease;
 }
 
+.application-console-shell[data-console-theme="system"],
+.terminal-fullscreen-shell[data-console-theme="system"] {
+    --console-theme-background: #fff;
+    --console-theme-opacity: 1;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header {
+    color: #52525b;
+    border-color: rgb(0 0 0 / 0.1);
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header [class*="text-white"] {
+    color: #52525b !important;
+}
+
+html.dark .application-console-shell[data-console-theme="system"],
+html.dark .terminal-fullscreen-shell[data-console-theme="system"] {
+    --console-theme-background: #121214;
+}
+
+.console-theme-selector {
+    scrollbar-color: rgb(161 161 170) transparent;
+    scrollbar-width: thin;
+}
+
+.console-theme-selector::-webkit-scrollbar {
+    width: 8px;
+}
+
+.console-theme-selector::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: rgb(161 161 170);
+    background-clip: padding-box;
+}
+
+.console-theme-selector::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html.dark .console-theme-selector {
+    scrollbar-color: rgb(255 255 255 / 0.28) transparent;
+}
+
+html.dark .console-theme-selector::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.28);
+    background-clip: padding-box;
+}
+
 .application-console-shell[data-console-theme="shadows-midnight"],
 .terminal-fullscreen-shell[data-console-theme="shadows-midnight"] {
     --console-theme-background: linear-gradient(135deg, #2a3b4c, rgb(42 59 76 / 0.4));
@@ -1030,6 +1079,33 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     padding: 1rem;
 }
 
+.settings-mobile-header {
+    margin-bottom: 1.25rem;
+}
+
+.settings-mobile-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.75rem;
+    letter-spacing: -0.025em;
+    color: #000000;
+}
+
+.dark .settings-mobile-title {
+    color: #ffffff;
+}
+
+.settings-mobile-description {
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: #737373;
+}
+
+.dark .settings-mobile-description {
+    color: var(--coollabs-subtle);
+}
+
 /* All settings sidebars share one alignment rule. Keep the sticky offset equal
    to the desktop main-content top padding so the menu does not jump upward
    when it changes from its natural position to sticky positioning. */
@@ -1048,6 +1124,18 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
         overflow-y: auto;
         overscroll-behavior: contain;
         scrollbar-width: thin;
+    }
+
+    /* Resource pages have a second fixed header row below the main header. */
+    .application-settings-workspace > .application-settings-navigation {
+        top: 4rem;
+        max-height: calc(100dvh - 5rem);
+    }
+
+    .application-settings-navigation.is-flush {
+        position: static;
+        max-height: none;
+        overflow: visible;
     }
 }
 
@@ -1460,6 +1548,11 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     background: var(--coollabs-fill);
 }
 
+.data-table-row-active {
+    background: var(--coollabs-fill);
+    color: var(--coollabs-fg);
+}
+
 .listbox-option-disabled {
     cursor: not-allowed;
     opacity: 0.4;
@@ -1542,9 +1635,20 @@ input[type="search"]::-webkit-search-results-decoration {
     padding: 0;
 }
 
-/* Empty states sit edge-to-edge in settings cards — no outer inset/padding. */
-.application-settings-section-body:has(> .empty-state:only-child) {
-    padding: 0;
+/* Empty states inside cards keep the same inset as other card content. */
+.application-settings-section-body:has(> .empty-state:only-child),
+.application-settings-section-body.is-flush:has(> .empty-state:only-child) {
+    padding: 1rem;
+}
+
+.empty-state {
+    background: var(--coollabs-base);
+}
+
+.loading-state-card {
+    border: 1px dashed var(--coollabs-line);
+    border-radius: 12px;
+    background: var(--coollabs-base);
 }
 
 .application-settings-section-body.is-flush .empty-state,
@@ -1554,8 +1658,6 @@ input[type="search"]::-webkit-search-results-decoration {
     width: 100%;
     max-width: none;
     box-sizing: border-box;
-    /* Match the layer-card body corners when the empty fills the body. */
-    border-radius: 8px;
 }
 
 /* Centered process dialog (startup / activity logs) — full-height log body.

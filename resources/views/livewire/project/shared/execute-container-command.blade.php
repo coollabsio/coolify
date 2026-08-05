@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($resource, 'name')->limit(10) }} > Console | Coolify
+        {{ data_get_str($resource, 'name')->limit(10) }} > Terminal | Coolify
     </x-slot>
 
     @if ($type === 'application')
@@ -11,7 +11,7 @@
         <livewire:project.database.heading :database="$resource" />
     @elseif ($type === 'service')
         <livewire:project.shared.configuration-checker :resource="$resource" />
-        <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Console" />
+        <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
     @else
         <livewire:server.navbar :server="$servers->first()" />
     @endif
@@ -20,6 +20,7 @@
         $consoleUnavailable = ($type === 'server' && (! $servers->first()->isTerminalEnabled() || ! $servers->first()->isFunctional()))
             || ($type !== 'server' && $containers->isEmpty());
         $consoleThemes = [
+            ['key' => 'system', 'name' => 'System', 'background' => 'linear-gradient(135deg, #ffffff 0 50%, #121214 50% 100%)', 'accent' => '#8C8E9C'],
             ['key' => 'shadows-midnight', 'name' => 'Midnight', 'background' => 'linear-gradient(135deg, #2a3b4c, rgba(42, 59, 76, 0.4))', 'accent' => '#6d7a7c'],
             ['key' => 'shadows-golden-hour', 'name' => 'Golden Hour', 'background' => 'linear-gradient(135deg, #d58a42, rgba(213, 138, 66, 0.4))', 'accent' => '#bf8c3c'],
             ['key' => 'shadows-cosmic-purple', 'name' => 'Cosmic Purple', 'background' => 'linear-gradient(135deg, #5d3e66, rgba(93, 62, 102, 0.4))', 'accent' => '#A76DBE'],
@@ -40,14 +41,29 @@
         ])->values();
     @endphp
 
+    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
+        <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+            <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+                @if ($type === 'server')
+                    <x-server.sidebar :server="$resource" activeMenu="terminal" />
+                @elseif ($type === 'application')
+                    <x-application.configuration-sidebar :application="$resource" current-route="project.application.command" />
+                @elseif ($type === 'database')
+                    <x-database.configuration-sidebar :database="$resource" current-route="project.database.command" />
+                @else
+                    <x-service.configuration-sidebar :service="$resource" current-route="project.service.command" />
+                @endif
+                <div class="min-w-0">
+    @endif
+
     @if ($consoleUnavailable)
         <section class="mt-8 w-full max-w-[1180px] xl:mt-0">
             @if ($type === 'server')
-                <x-empty size="lg" title="Console unavailable"
+                <x-empty size="lg" title="Terminal unavailable"
                     description="This server is not functional or terminal access is disabled."
                     icon-name="browser-terminal" />
             @else
-                <x-empty size="lg" title="Console unavailable"
+                <x-empty size="lg" title="Terminal unavailable"
                     description="No containers are running, or terminal access is disabled on the destination server."
                     icon-name="browser-terminal" />
             @endif
@@ -56,14 +72,14 @@
         <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full max-w-[1180px] xl:mt-0"
             x-data="{
                 themeKeys: @js($consoleThemeKeys),
-                consoleTheme: 'shadows-cosmic-purple',
+                consoleTheme: 'system',
                 themeOpen: false,
                 containerOpen: false,
                 selectedContainer: @entangle('selected_container').live,
                 containerOptions: @js($containerOptions),
                 init() {
                     const savedTheme = localStorage.getItem('coolify-console-theme');
-                    this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'shadows-cosmic-purple';
+                    this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';
                     localStorage.setItem('coolify-console-theme', this.consoleTheme);
                 },
                 setTheme(theme) {
@@ -170,10 +186,10 @@
                         </button>
 
                         <div x-cloak x-show="themeOpen" x-transition.origin.top.right
-                            class="absolute top-7 right-0 z-50 max-h-80 w-56 overflow-y-auto rounded-lg border border-white/[0.1] bg-[#111113] p-1 shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
+                            class="console-theme-selector absolute top-7 right-0 z-50 max-h-80 w-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-[0_18px_50px_rgba(0,0,0,0.18)] dark:border-white/[0.1] dark:bg-[#111113] dark:shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
                             @foreach ($consoleThemes as $theme)
                                 <button type="button"
-                                    class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                    class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-950 dark:text-white/65 dark:hover:bg-white/[0.07] dark:hover:text-white"
                                     @click="setTheme('{{ $theme['key'] }}')">
                                     <span class="h-3 w-5 rounded-full border border-white/10"
                                         style="background: {{ $theme['background'] }}"></span>
@@ -192,6 +208,11 @@
 
                 <div class="application-console-block min-h-0 flex-1">
                     <livewire:project.shared.terminal variant="application" />
+                </div>
+            </div>
+        </section>
+    @endif
+    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
                 </div>
             </div>
         </section>

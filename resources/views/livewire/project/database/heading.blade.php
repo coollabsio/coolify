@@ -30,7 +30,7 @@
                 'navigate' => false,
             ],
             [
-                'label' => 'Console',
+                'label' => 'Terminal',
                 'route' => 'project.database.command',
                 'active' => request()->routeIs('project.database.command'),
                 'navigate' => false,
@@ -77,7 +77,7 @@
     @endteleport
 
     <div x-data>
-        <div class="mb-3 w-full lg:hidden">
+        <div class="mb-3 w-full xl:hidden">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $database->name }}
@@ -86,7 +86,7 @@
             </div>
         </div>
 
-        <div class="w-full md:hidden">
+        <div class="w-full xl:hidden">
             @if ($database->destination->server->isFunctional())
                 <div id="database-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
@@ -149,56 +149,38 @@
                 </div>
             @endif
 
-            <div
-                class="flex min-w-0 items-center gap-0.5 rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                <x-resource-heading-tabs class="min-w-0 flex-1">
-                    @foreach ($databasePageItems as $menuItem)
-                        <a @class([
-                            'app-tab shrink-0',
-                            'app-tab-active' => $menuItem['active'],
-                        ])
-                            @if ($menuItem['active']) aria-current="page" @endif
-                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                            href="{{ route($menuItem['route'], $parameters) }}">
-                            {{ $menuItem['label'] }}
-                        </a>
-                    @endforeach
-                </x-resource-heading-tabs>
-            </div>
         </div>
 
-        <div class="hidden w-full items-center md:flex lg:fixed lg:top-12 lg:right-0 lg:z-30 lg:h-12 lg:w-auto lg:border-b lg:border-neutral-200 lg:bg-white/95 lg:pr-4 lg:pl-2 lg:backdrop-blur lg:transition-[left] lg:duration-200 lg:dark:border-white/[0.06] lg:dark:bg-panel/95"
-            :class="[typeof collapsed !== 'undefined' && collapsed ? 'lg:left-16' : 'lg:left-56']">
+        @teleport('#resource-action-hud-slot')
+        <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
-                class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-between gap-2 overflow-visible rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
-                <x-resource-heading-tabs class="min-w-0">
-                    @foreach ($databasePageItems as $menuItem)
-                        <a wire:key="database-primary-nav-{{ str($menuItem['label'])->slug() }}"
-                            @class([
-                                'app-tab shrink-0',
-                                'app-tab-active' => $menuItem['active'],
-                            ])
-                            @if ($menuItem['active']) aria-current="page" @endif
-                            @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
-                            href="{{ route($menuItem['route'], $parameters) }}">
-                            {{ $menuItem['label'] }}
-                        </a>
-                    @endforeach
-                </x-resource-heading-tabs>
-
-                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5 border-l border-neutral-200 pl-1 dark:border-white/[0.08]">
+                class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
                     @if ($database->destination->server->isFunctional())
                         @if (! $databaseStatus->startsWith('exited'))
-                            <x-forms.button canGate="manage" :canResource="$database"
-                                @click="document.getElementById('database-restart-trigger')?.click()">
-                                <x-reicon name="restart" class="size-4 text-orange-500 dark:text-warning" />
-                                Restart
-                            </x-forms.button>
-                            <x-forms.button canGate="manage" :canResource="$database" isError
-                                @click="document.getElementById('database-stop-trigger')?.click()">
-                                <x-reicon name="stop" class="size-4 text-error" />
-                                Stop
-                            </x-forms.button>
+                            <div id="database-desktop-actions" class="relative" x-data="{ open: false }"
+                                @click.outside="open = false" @keydown.escape.window="open = false">
+                                <button type="button" class="button" @click="open = !open" :aria-expanded="open">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    Actions
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                                </button>
+                                <div x-cloak x-show="open" x-transition.origin.top.right
+                                    class="listbox-panel top-full! right-0! left-auto! mt-1! w-52! min-w-0!" role="menu">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('manage', $database))
+                                        @click="open = false; document.getElementById('database-restart-trigger')?.click()">
+                                        <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                        Restart
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('manage', $database))
+                                        @click="open = false; document.getElementById('database-stop-trigger')?.click()">
+                                        <x-reicon name="stop" class="size-3.5 text-error" />
+                                        Stop
+                                    </button>
+                                </div>
+                            </div>
                         @else
                             <x-forms.button canGate="manage" :canResource="$database"
                                 @click="$wire.dispatch('startEvent')">
@@ -212,8 +194,8 @@
                 </div>
             </div>
         </div>
+        @endteleport
 
-        <div class="hidden lg:block lg:h-12" aria-hidden="true"></div>
     </div>
 
     @if ($database->destination->server->isFunctional())

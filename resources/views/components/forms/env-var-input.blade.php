@@ -233,15 +233,14 @@
         @endif
 
         {{-- Dropdown for suggestions --}}
-        <div x-show="showDropdown"
-             x-transition
-             class="absolute z-[60] w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg">
+        <div x-show="showDropdown" x-cloak x-transition.origin.top
+            class="listbox-panel top-full! z-[60]! mt-1! w-full! min-w-0! max-w-full!" role="listbox">
 
             <template x-if="suggestions.length === 0 && currentScope">
-                <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
+                <div class="px-2 py-2 text-sm text-neutral-500 dark:text-fg-dim">
                     <div>No shared variables found in <span class="font-semibold" x-text="currentScope"></span> scope.</div>
                     <a :href="getScopeUrl(currentScope)"
-                       class="text-coollabs dark:text-warning hover:underline text-xs mt-1 inline-block"
+                       class="mt-1 inline-block text-xs text-coollabs hover:underline dark:text-warning"
                        target="_blank">
                         Add <span x-text="currentScope"></span> variables →
                     </a>
@@ -250,24 +249,25 @@
 
             <div x-show="suggestions.length > 0"
                  x-ref="dropdownList"
-                 class="max-h-48 overflow-y-scroll"
+                 class="max-h-48 overflow-y-auto"
                  style="scrollbar-width: thin;">
                 <template x-for="(suggestion, index) in suggestions" :key="index">
                     <div :id="'suggestion-' + index"
                          @click="selectSuggestion(suggestion)"
-                         class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-2"
-                         :class="{ 'bg-neutral-50 dark:bg-coolgray-300': index === selectedIndex }">
+                         class="listbox-option justify-start! gap-2.5!"
+                         :class="{ 'bg-neutral-100 dark:bg-white/[0.08]': index === selectedIndex }"
+                         role="option" :aria-selected="index === selectedIndex">
                         <template x-if="suggestion.type === 'scope'">
-                            <span class="text-xs px-2 py-0.5 bg-coollabs/10 dark:bg-warning/10 text-coollabs dark:text-warning rounded">
+                            <span class="rounded-md border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-warning">
                                 SCOPE
                             </span>
                         </template>
                         <template x-if="suggestion.type === 'variable'">
-                            <span class="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded">
+                            <span class="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-600 dark:text-emerald-400">
                                 VAR
                             </span>
                         </template>
-                        <span class="text-sm font-mono" x-text="suggestion.display"></span>
+                        <span class="min-w-0 truncate font-mono text-sm" x-text="suggestion.display"></span>
                     </div>
                 </template>
             </div>

@@ -7,7 +7,7 @@
 
     <div
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-        <x-server.sidebar-security :server="$server" :parameters="$parameters" />
+        <x-server.sidebar :server="$server" activeMenu="security" />
 
         <div class="application-settings-form w-full">
             <x-application.settings-section id="server-terminal-access-section" title="Terminal access"
@@ -47,7 +47,7 @@
                                 ]" confirmationText="{{ $server->name }}"
                                 shortConfirmationLabel="Server Name"
                                 step3ButtonText="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
-                                isHighlightedButton />
+                                :isHighlightedButton="!$isTerminalEnabled" />
                         </div>
                     @endif
                 </div>

@@ -1,10 +1,14 @@
 <div x-data="{
     selectedCloneServer: null,
     selectedCloneDestination: null,
+    selectedCloneProject: null,
+    selectedCloneEnvironment: null,
     selectedMoveProject: null,
     selectedMoveEnvironment: null,
     currentProjectId: {{ $resource->environment->project->id }},
     currentEnvironmentId: {{ $resource->environment->id }},
+    currentServerId: @js($resource->destination->server->id),
+    currentDestinationUuid: @js($resource->destination->uuid),
     servers: @js(
         $servers->map(
             fn ($server) => [
@@ -38,9 +42,14 @@
         )->values(),
     ),
     get availableDestinations() {
-        if (!this.selectedCloneServer) return [];
+        if (this.selectedCloneServer === null || this.selectedCloneServer === '') return [];
         const server = this.servers.find(server => server.id == this.selectedCloneServer);
         return server ? server.destinations : [];
+    },
+    get availableCloneEnvironments() {
+        if (this.selectedCloneProject === null || this.selectedCloneProject === '') return [];
+        const project = this.projects.find(project => project.id == this.selectedCloneProject);
+        return project ? project.environments : [];
     },
     get availableEnvironments() {
         if (!this.selectedMoveProject) return [];
@@ -60,7 +69,7 @@
         return [
             ...this.servers.map(server => ({
                 value: server.id,
-                label: `${server.name} (${server.ip})`,
+                label: `${server.name} (${server.ip})${server.id == this.currentServerId ? ' (current)' : ''}`,
             })),
             ...@js(
                 $buildServers->map(
@@ -76,7 +85,19 @@
     get cloneDestinationOptions() {
         return this.availableDestinations.map(destination => ({
             value: destination.uuid,
-            label: destination.name,
+            label: destination.name + (destination.uuid == this.currentDestinationUuid ? ' (current)' : ''),
+        }));
+    },
+    get cloneProjectOptions() {
+        return this.projects.map(project => ({
+            value: project.id,
+            label: project.name + (project.id == this.currentProjectId ? ' (current)' : ''),
+        }));
+    },
+    get cloneEnvironmentOptions() {
+        return this.availableCloneEnvironments.map(environment => ({
+            value: environment.id,
+            label: environment.name + (environment.id == this.currentEnvironmentId ? ' (current)' : ''),
         }));
     },
     get moveProjectOptions() {
@@ -92,12 +113,17 @@
         }));
     }
 }" x-init="
+    selectedCloneServer = null;
+    selectedCloneDestination = null;
+    selectedCloneProject = null;
+    selectedCloneEnvironment = null;
     $watch('selectedCloneServer', () => selectedCloneDestination = null);
+    $watch('selectedCloneProject', () => selectedCloneEnvironment = null);
     $watch('selectedMoveProject', () => selectedMoveEnvironment = null);
 " class="flex flex-col gap-6">
     @can('update', $resource)
-        <x-application.settings-section id="clone-resource-section" title="Clone resource"
-            helper="Duplicate this resource configuration onto another server and network destination.">
+        <x-application.settings-section id="clone-destination-section" title="Clone to another destination"
+            helper="Create the clone in the current environment on another server or network.">
             <x-callout type="info" title="Configuration only">
                 Cloning copies settings, environment variables, and resource configuration. Stored files,
                 database records, and other persistent data are not copied.
@@ -110,7 +136,8 @@
 
                 <x-forms.listbox id="clone-resource-destination" label="Network destination" :wire="false"
                     x-model="selectedCloneDestination" x-effect="options = cloneDestinationOptions"
-                    x-bind:disabled="!selectedCloneServer" placeholder="Choose a destination…"
+                    x-bind:disabled="selectedCloneServer === null || selectedCloneServer === ''"
+                    placeholder="Choose a destination…"
                     emptyText="No network destinations are available on this server." />
             </div>
 
@@ -120,6 +147,32 @@
                     The running resource will not be changed.
                 </p>
                 <x-forms.button @click="$wire.cloneTo(selectedCloneDestination)">
+                    Clone resource
+                </x-forms.button>
+            </div>
+        </x-application.settings-section>
+
+        <x-application.settings-section id="clone-environment-section" title="Clone to another environment"
+            helper="Create the clone in another project environment while keeping the current server and network.">
+            <div class="grid gap-4 md:grid-cols-2">
+                <x-forms.listbox id="clone-resource-project" label="Project" :wire="false"
+                    x-model="selectedCloneProject" x-effect="options = cloneProjectOptions"
+                    placeholder="Choose a project…" />
+
+                <x-forms.listbox id="clone-resource-environment" label="Environment" :wire="false"
+                    x-model="selectedCloneEnvironment" x-effect="options = cloneEnvironmentOptions"
+                    x-bind:disabled="!selectedCloneProject || availableCloneEnvironments.length === 0"
+                    placeholder="Choose an environment…" />
+            </div>
+
+            <div x-show="selectedCloneEnvironment" x-cloak
+                class="mt-4 flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
+                <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                    Uses {{ data_get($resource, 'destination.server.name') }} ·
+                    {{ data_get($resource, 'destination.network') }}.
+                </p>
+                <x-forms.button
+                    @click="$wire.cloneTo(@js($resource->destination->uuid), selectedCloneEnvironment)">
                     Clone resource
                 </x-forms.button>
             </div>

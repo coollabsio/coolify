@@ -13,7 +13,7 @@
                     @endcan
                 @endif
                 @can('update', $resource)
-                    <x-forms.button type="button" wire:click="toggleEnabled">
+                    <x-forms.button type="button" wire:click="toggleEnabled" :isHighlighted="!$isEnabled">
                         {{ $isEnabled ? 'Disable' : 'Enable' }}
                     </x-forms.button>
                     <x-modal-confirmation title="Delete scheduled task?" isErrorButton buttonTitle="Delete"

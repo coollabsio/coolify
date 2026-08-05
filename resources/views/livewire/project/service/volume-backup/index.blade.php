@@ -158,7 +158,10 @@
             </div>
         </div>
 
-        <div class="application-settings-section-body is-flush w-full">
+        <div @class([
+            'application-settings-section-body w-full',
+            'is-flush' => $backups->isNotEmpty(),
+        ])>
             <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
                 <x-empty size="sm" title="No backups found"
                     description="No scheduled backups match your search." />

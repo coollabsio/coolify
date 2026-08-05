@@ -6,17 +6,12 @@
 ])
 
 <section {{ $attributes->merge(['class' => 'application-settings-section']) }}>
-    <header @class(['items-start!' => filled($description)])>
+    <header @class(['items-start!' => filled($description ?? $helper)])>
         <div class="min-w-0 py-0.5">
-            <div class="flex items-center gap-2">
-                <h3>{{ $title }}</h3>
-                @if ($helper)
-                    <x-helper :helper="$helper" />
-                @endif
-            </div>
-            @if (filled($description))
+            <h3>{{ $title }}</h3>
+            @if (filled($description ?? $helper))
                 <p class="mt-0.5 text-xs leading-4 text-neutral-500 dark:text-[var(--coollabs-subtle)]">
-                    {{ $description }}
+                    {!! $description ?? $helper !!}
                 </p>
             @endif
         </div>

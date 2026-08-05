@@ -92,7 +92,7 @@
                                 @endif
                             </div>
 
-                            @if ($showActionsColumn)
+                            @if ($showBackupAction)
                                 <div
                                     class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
                                     @if ($canUpdate)
@@ -170,7 +170,7 @@
                                     Update
                                 </x-forms.button>
 
-                                @if ($showActionsColumn)
+                                @if ($showBackupAction)
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
                                             <x-forms.button type="button" class="!px-2.5 !text-xs">Backup</x-forms.button>
@@ -184,6 +184,14 @@
                                                 :selected-target-key="'volume:' . $id"
                                                 wire:key="configure-service-volume-backup-{{ $id }}" />
                                         @endif
+                                    </x-modal-input>
+                                @elseif (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable())
+                                    <x-modal-input title="New Scheduled Backup" :wireIgnore="false">
+                                        <x-slot:content>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs">Backup</x-forms.button>
+                                        </x-slot:content>
+                                        <livewire:project.database.create-scheduled-backup :database="$resource"
+                                            wire:key="configure-database-backup-{{ $id }}" />
                                     </x-modal-input>
                                 @endif
 

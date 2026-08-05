@@ -273,6 +273,37 @@ YAML;
     expect(getComposeServiceDomainString($domains, 'another-service'))->toBe('https://legacy.example.com');
 });
 
+test('applicationParser reads redirect settings from the compose service domain', function () {
+    $this->server->proxy->set('type', 'TRAEFIK');
+    $this->server->save();
+    ServerSetting::query()
+        ->where('server_id', $this->server->id)
+        ->update(['generate_exact_labels' => true]);
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => [
+                'domain' => 'https://example.com,https://www.example.com',
+                'redirect' => 'www',
+            ],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_contains($label, 'redirectregex.replacement=${1}://www.${2}')))->toBeTrue();
+});
+
 test('compose domain reconciliation preserves stored domains when parsing returns no services', function () {
     $storedDomains = json_encode([
         'frontend' => ['domain' => 'https://frontend.example.com'],

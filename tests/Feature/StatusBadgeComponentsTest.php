@@ -12,7 +12,7 @@ it('renders application and database statuses as shared status badges', function
     ])->render();
 
     expect($html)
-        ->toContain('inline-flex h-5 max-w-full items-center gap-1 rounded-sm border')
+        ->toContain('inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border')
         ->toContain($expectedText)
         ->not->toContain('badge-success')
         ->not->toContain('badge-warning')
@@ -21,7 +21,7 @@ it('renders application and database statuses as shared status badges', function
     'running healthy' => ['running:healthy', 'Running (healthy)'],
     'starting unknown' => ['starting:unknown', 'Starting (unknown)'],
     'degraded unhealthy' => ['degraded:unhealthy', 'Degraded (unhealthy)'],
-    'exited unhealthy' => ['exited:unhealthy', 'Exited'],
+    'exited unhealthy' => ['exited:unhealthy', 'Stopped'],
 ]);
 
 it('renders service container statuses as shared status badges', function () {
@@ -31,7 +31,7 @@ it('renders service container statuses as shared status badges', function () {
     ])->render();
 
     expect($html)
-        ->toContain('inline-flex h-5 max-w-full items-center gap-1 rounded-sm border')
+        ->toContain('inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border')
         ->toContain('Running (healthy)')
         ->not->toContain('badge-success');
 });
@@ -68,7 +68,7 @@ it('renders health warning helpers without increasing the badge row height', fun
     expect($html)
         ->toContain($expectedText)
         ->toContain('class="flex items-center gap-1 leading-none"')
-        ->toContain('inline-flex h-5 max-w-full items-center gap-1 rounded-sm border')
+        ->toContain('inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border')
         ->not->toContain('<svg');
 
     expect($runningStatus)
@@ -108,7 +108,7 @@ it('renders restart counts as warning badges', function () {
 
     expect($html)
         ->toContain('9x restarts')
-        ->toContain('border-yellow-300 bg-yellow-50')
+        ->toContain('bg-warning')
         ->not->toContain('(9x restarts)');
 
     expect($statusIndex)

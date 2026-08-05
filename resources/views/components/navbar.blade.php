@@ -15,6 +15,12 @@
     @mouseleave="tooltip.show = false"
     x-data="{
         tooltip: { text: '', x: 0, y: 0, show: false },
+        // macOS/iOS use ⌘; Windows/Linux use Ctrl+
+        modKeyLabel: (() => {
+            const platform = navigator.userAgentData?.platform || navigator.platform || '';
+            const ua = navigator.userAgent || '';
+            return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
+        })(),
         init() {
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
                     const userSettings = localStorage.getItem('theme');
@@ -45,7 +51,8 @@
     {{-- Search is only useful when workspace resources are available --}}
     @if (isSubscribed() || ! isCloud())
         <div class="px-1 pb-3" :class="collapsed && 'lg:px-0 lg:flex lg:justify-center'">
-            <button @click="$dispatch('open-global-search')" type="button" title="Search (Press / or ⌘K)"
+            <button @click="$dispatch('open-global-search')" type="button"
+                :title="'Search (Press / or ' + modKeyLabel + 'K)'"
                 class="menu-item justify-between !bg-neutral-100 dark:!bg-white/[0.04] hover:!bg-neutral-200 dark:hover:!bg-white/[0.07] !text-fg-faint"
                 :class="collapsed && 'lg:w-8 lg:justify-center lg:px-0'">
                 <span class="flex items-center gap-2.5 min-w-0">
@@ -53,7 +60,7 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Search</span>
                 </span>
                 <kbd class="px-1.5 py-0.5 text-[11px] font-medium text-fg-faint bg-neutral-200 dark:bg-white/[0.06] rounded-md border border-transparent dark:border-white/5"
-                    :class="collapsed && 'lg:hidden'">⌘K</kbd>
+                    :class="collapsed && 'lg:hidden'" x-text="modKeyLabel + 'K'"></kbd>
             </button>
         </div>
     @endif
@@ -199,9 +206,11 @@
         @endif
     </ul>
     {{-- Sticky sidebar collapser (desktop only; mobile uses a temporary slide-over) --}}
-    <div class="sticky bottom-0 mt-auto -mx-2 hidden border-t border-neutral-200 bg-white px-2 py-2 dark:border-white/[0.06] dark:bg-panel lg:-mx-3 lg:block lg:px-3">
+    <div class="sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 border-t border-neutral-200 bg-white px-2 py-2 dark:border-white/[0.06] dark:bg-panel lg:-mx-3 lg:flex lg:px-3"
+        :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
+        <x-top-user-menu sidebar />
         <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"
-            class="menu-item mx-auto w-8 justify-center px-0">
+            class="menu-item w-8 shrink-0 justify-center px-0">
             <svg class="menu-item-icon" viewBox="0 0 24 24" fill="none">
                 <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.6" />
                 <path d="M9 4v16" stroke="currentColor" stroke-width="1.6" />

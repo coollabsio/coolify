@@ -5,76 +5,10 @@
 
     <livewire:project.database.heading :database="$database" />
 
-    @php
-        $databaseRouteParameters = [
-            'project_uuid' => $project->uuid,
-            'environment_uuid' => $environment->uuid,
-            'database_uuid' => $database->uuid,
-        ];
-
-        $configurationItems = [
-            ['label' => 'General', 'route' => 'project.database.configuration', 'icon' => 'settings'],
-            ['label' => 'Environment Variables', 'route' => 'project.database.environment-variables', 'icon' => 'variables'],
-            ['label' => 'Servers', 'route' => 'project.database.servers', 'icon' => 'servers'],
-            ['label' => 'Persistent Storage', 'route' => 'project.database.persistent-storage', 'icon' => 'storages'],
-            [
-                'label' => 'Import Backup',
-                'route' => 'project.database.import-backup',
-                'icon' => 'upload',
-                'visible' => auth()->user()?->can('update', $database),
-            ],
-            ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
-            ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
-            ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
-            ['label' => 'Resource Operations', 'route' => 'project.database.resource-operations', 'icon' => 'server-update'],
-            ['label' => 'Metrics', 'route' => 'project.database.metrics', 'icon' => 'graph'],
-            ['label' => 'Tags', 'route' => 'project.database.tags', 'icon' => 'tags'],
-            ['label' => 'Danger Zone', 'route' => 'project.database.danger', 'icon' => 'shield-alert'],
-        ];
-
-        $configurationItems = collect($configurationItems)
-            ->filter(fn (array $item): bool => $item['visible'] ?? true)
-            ->map(fn (array $item): array => [
-                ...$item,
-                'active' => $currentRoute === $item['route'],
-            ]);
-
-        $menuGroups = [
-            'Settings' => ['General', 'Environment Variables', 'Servers', 'Persistent Storage', 'Import Backup'],
-            'Automation' => ['Webhooks', 'Healthcheck'],
-            'Operations' => ['Resource Limits', 'Resource Operations', 'Metrics', 'Tags', 'Danger Zone'],
-        ];
-
-        $groupedItems = collect($menuGroups)
-            ->map(fn (array $labels) => $configurationItems->whereIn('label', $labels)->values())
-            ->filter(fn ($items) => $items->isNotEmpty());
-    @endphp
 
     <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
-            <aside class="application-settings-navigation min-w-0 xl:self-start">
-                <nav aria-label="Database settings"
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-                    @foreach ($groupedItems as $groupLabel => $groupItems)
-                        @unless ($loop->first)
-                            <div class="my-2 hidden border-t border-neutral-200 xl:block dark:border-white/[0.06]"
-                                aria-hidden="true"></div>
-                        @endunless
-                        <div class="nav-section hidden xl:block">{{ $groupLabel }}</div>
-                        @foreach ($groupItems as $menuItem)
-                            <a @class([
-                                'menu-item',
-                                'menu-item-active' => $menuItem['active'],
-                            ])
-                                {{ wireNavigate() }}
-                                href="{{ route($menuItem['route'], $databaseRouteParameters) }}">
-                                <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
-                                <span class="menu-item-label">{{ $menuItem['label'] }}</span>
-                            </a>
-                        @endforeach
-                    @endforeach
-                </nav>
-            </aside>
+            <x-database.configuration-sidebar :database="$database" :current-route="$currentRoute" />
 
             <div class="min-w-0">
                 @if ($currentRoute === 'project.database.configuration')

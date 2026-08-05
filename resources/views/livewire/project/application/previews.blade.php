@@ -63,6 +63,11 @@
                         icon-name="sources" />
                 @endforelse
             </div>
+            <div class="w-full" wire:loading wire:target="load_prs">
+                <div class="flex min-h-32 items-center justify-center px-4 py-10">
+                    <x-loading text="Loading pull requests…" />
+                </div>
+            </div>
         </x-application.settings-section>
     @endif
 
