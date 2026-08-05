@@ -38,6 +38,13 @@
         $groupedItems = collect($menuGroups)
             ->map(fn (array $labels) => $configurationItems->whereIn('label', $labels)->values())
             ->filter(fn ($items) => $items->isNotEmpty());
+
+        $storageSections = $applications
+            ->concat($databases)
+            ->map(fn ($resource): array => [
+                'id' => 'storage-service-'.$resource->uuid,
+                'label' => Str::headline($resource->name),
+            ]);
     @endphp
 
     <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
@@ -61,6 +68,19 @@
                                 <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                             </a>
+                            @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
+                                <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                                    x-data="{ activeSection: '' }">
+                                    @foreach ($storageSections as $section)
+                                        <button type="button" class="menu-subitem"
+                                            :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                            @click="activeSection = '{{ $section['id'] }}'; window.scrollToSettingsSection?.('{{ $section['id'] }}')">
+                                            <span class="menu-item-label truncate text-left"
+                                                title="{{ $section['label'] }}">{{ $section['label'] }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
                         @endforeach
                     @endforeach
                 </nav>
@@ -112,6 +132,10 @@
                     <livewire:project.shared.environment-variable.all :resource="$service" />
                 @elseif ($currentRoute === 'project.service.storages')
                     <div class="space-y-6">
+                        <div
+                            class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-800 dark:border-warning/15 dark:bg-warning/[0.07] dark:text-amber-300/90">
+                            Service volume mounts are read-only here. Edit the Docker Compose file and reload it to change volumes.
+                        </div>
                         @foreach ($applications as $application)
                             <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                                 :resource="$application" />

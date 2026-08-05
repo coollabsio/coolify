@@ -47,7 +47,7 @@
                             x-transition:leave="ease-in duration-100"
                             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                             x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                            class="application-settings-form application-settings-section relative max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-hidden"
+                            class="application-settings-form application-settings-section relative max-h-[calc(100dvh-2rem)] w-full max-w-6xl overflow-hidden"
                             style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
                             <header>
                                 <div class="flex items-center gap-2">

@@ -118,7 +118,9 @@ it('batches volume backup meta and exposes forms for every volume', function () 
     $component = Livewire::test(All::class, ['resource' => $application]);
 
     expect($component->get('volumeBackupMeta'))->toHaveCount(5)
-        ->and($component->get('forms'))->toHaveCount(5);
+        ->and($component->get('forms'))->toHaveCount(5)
+        ->and($component->html())->toContain('volumes-col-backup')
+        ->not->toContain('table-badge table-badge-success');
 
     foreach ($component->get('volumeBackupMeta') as $meta) {
         expect($meta['enabled'])->toBeTrue()

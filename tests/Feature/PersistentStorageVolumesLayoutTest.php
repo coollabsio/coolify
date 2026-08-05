@@ -101,13 +101,15 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('Volume Name')
         ->toContain('Source Path')
         ->toContain('Destination Path')
+        ->toContain('volumes-col-backup')
         ->toContain('supportsPreviewSuffix')
         ->toContain('openBackupModal')
         ->toContain('data-table-row')
         ->toContain('volumes-mobile-label')
-        ->toContain('table-badge-success')
+        ->not->toContain('table-badge table-badge-success')
         ->not->toContain('livewire:project.shared.storages.show')
-        ->not->toContain('x-status-badge');
+        ->not->toContain('x-status-badge')
+        ->not->toContain('Service volume mounts are read-only here.');
 
     // Show remains available for isolated embeds/tests but is no longer nested from All.
     expect($showView)
@@ -118,7 +120,16 @@ it('renders volumes as a data table with shared column headers', function () {
     expect($storageView)
         ->toContain('Str::headline($resource->name)')
         ->toContain(':flush="true"')
-        ->toContain('storage-service-');
+        ->toContain("'storage-service-'.\$resource->uuid");
+
+    $serviceConfigurationView = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
+
+    expect($serviceConfigurationView)
+        ->toContain('storageSections')
+        ->toContain('menu-subitem')
+        ->toContain('scrollToSettingsSection')
+        ->toContain('Service volume mounts are read-only here.')
+        ->toContain("'storage-service-'.\$resource->uuid");
 
     $css = file_get_contents(resource_path('css/app.css'));
 
@@ -130,6 +141,8 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('font-size: 13px') // same as .application-settings-form label
         ->toContain('@media (max-width: 768px)')
         ->toContain('.table-badge-success');
+
+    expect($css)->toContain('17.5rem');
 
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)

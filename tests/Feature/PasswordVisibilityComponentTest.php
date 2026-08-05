@@ -131,6 +131,12 @@ it('uses the same eye-off2 icon in configuration changes expand toggle', functio
         ->not->toContain('M22.2954 6.31083');
 });
 
+it('uses a wide configuration changes dialog', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
+
+    expect($view)->toContain('max-w-6xl');
+});
+
 it('renders env var password input before visibility toggle in tab order', function () {
     $html = Blade::render('<x-forms.env-var-input type="password" id="secret" />');
 

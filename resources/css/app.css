@@ -1881,17 +1881,17 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(8rem, 1fr) 5rem;
 }
 
-/* Persistent storage volumes: Name | Source | Destination | [PR suffix] | [Actions] */
+/* Persistent storage volumes: Name | Source | Destination | [PR suffix] | Backup | [Actions] */
 .volumes-table-grid-readonly {
-    grid-template-columns: minmax(12rem, 1.5fr) minmax(8rem, 1fr) minmax(8rem, 1fr);
+    grid-template-columns: minmax(12rem, 1.5fr) minmax(8rem, 1fr) minmax(8rem, 1fr) 5rem;
 }
 
 .volumes-table-grid {
-    grid-template-columns: minmax(10rem, 1.4fr) minmax(6rem, 1fr) minmax(6rem, 1fr) minmax(10.5rem, auto);
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(6rem, 1fr) minmax(6rem, 1fr) 5rem 17.5rem;
 }
 
 .volumes-table-grid-with-pr {
-    grid-template-columns: minmax(9rem, 1.2fr) minmax(5.5rem, 0.85fr) minmax(5.5rem, 0.85fr) 9.25rem minmax(10.5rem, auto);
+    grid-template-columns: minmax(9rem, 1.2fr) minmax(5.5rem, 0.85fr) minmax(5.5rem, 0.85fr) 9.25rem 5rem 17.5rem;
 }
 
 .volumes-mobile-label {
@@ -1927,7 +1927,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 @media (max-width: 1100px) {
     .volumes-table-grid {
-        grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) minmax(9rem, auto);
+        grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) 5rem 17.5rem;
     }
 
     .volumes-table-grid > .volumes-col-source,
@@ -1936,7 +1936,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-table-grid-with-pr {
-        grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem minmax(9rem, auto);
+        grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 17.5rem;
     }
 
     .volumes-table-grid-with-pr > .volumes-col-source,
@@ -1945,7 +1945,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-table-grid-readonly {
-        grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr);
+        grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) 5rem;
     }
 
     .volumes-table-grid-readonly > .volumes-col-source,
@@ -2001,6 +2001,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-cell-name,
+    .volumes-col-backup,
     .volumes-cell-dest,
     .volumes-cell-actions {
         display: flex;
@@ -2008,6 +2009,10 @@ input[type="search"]::-webkit-search-results-decoration {
         gap: 0.25rem;
         min-width: 0;
         width: 100%;
+    }
+
+    .volumes-col-backup {
+        align-items: flex-start;
     }
 
     .volumes-cell-actions {

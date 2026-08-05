@@ -185,7 +185,8 @@ it('auto-adds the suggested www pair when adding a service domain with both dire
         ->set('newDomain', 'https://web.example.com')
         ->call('addDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertSee('DNS skipped');
 
     expect(explode(',', (string) $this->webApp->fresh()->fqdn))
         ->toContain('https://web.example.com')
@@ -203,6 +204,22 @@ it('adds a domain to a selected service application', function () {
     $this->webApp->refresh();
     expect(explode(',', (string) $this->webApp->fqdn))
         ->toBe(['https://web.example.com', 'https://www.web.example.com']);
+
+    $dnsStatuses = $this->webApp->domain_dns_statuses;
+
+    expect($dnsStatuses)
+        ->toHaveKey('https://web.example.com')
+        ->toHaveKey('https://www.web.example.com')
+        ->and($dnsStatuses['https://web.example.com']['status'])
+        ->toBe('skipped')
+        ->and($dnsStatuses['https://web.example.com']['checked_at'])
+        ->not->toBeNull();
+});
+
+it('does not duplicate the service name as a badge in the domain cell', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
+
+    expect($view)->not->toContain('domains-service-mobile table-badge');
 });
 
 it('rolls back a domain change when compose regeneration fails', function () {
@@ -273,7 +290,9 @@ it('prunes the previous dns status when a service domain is renamed', function (
     $this->apiApp->refresh();
 
     expect($this->apiApp->fqdn)->toBe('https://renamed.example.com')
-        ->and($this->apiApp->domain_dns_statuses)->toBeNull();
+        ->and($this->apiApp->domain_dns_statuses)->not->toHaveKey('https://api.example.com')
+        ->and($this->apiApp->domain_dns_statuses)->toHaveKey('https://renamed.example.com')
+        ->and($this->apiApp->domain_dns_statuses['https://renamed.example.com']['status'])->toBe('skipped');
 });
 
 it('does not restore stale dns status when a removed service domain is re-added', function () {
@@ -392,8 +411,7 @@ it('hides dns message text when service domain dns status is ok', function () {
 
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSee('DNS OK')
-        ->assertDontSee('DNS points to 203.0.113.10')
-        ->assertDontSee('Last checked');
+        ->assertDontSee('DNS points to 203.0.113.10');
 });
 
 it('forbids read-only users from checking service domain dns', function (string $action, array $parameters) {

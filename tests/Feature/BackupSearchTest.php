@@ -60,6 +60,7 @@ it('renders frontend-only application backup search data for volume names and fr
         ->assertSee('Target A–Z')
         ->assertSee('filterOpen')
         ->assertSee('sortOpen')
+        ->assertDontSee('class="font-mono text-xs">daily', false)
         ->assertDontSee('backup-type-filter-trigger', false)
         ->assertDontSee('backup-sort-trigger', false);
 });

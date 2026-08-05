@@ -202,7 +202,7 @@
                                 {{ $backup->targetName() }}
                             </span>
                             <span>{{ $backup->targetType() }}</span>
-                            <span class="font-mono text-xs">{{ $backup->frequency }}</span>
+                            <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}

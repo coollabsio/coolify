@@ -3,6 +3,7 @@
     selectedIndex: -1,
     isSearching: false,
     isLoadingInitialData: false,
+    isPaletteTransitioning: false,
     allSearchableItems: [],
     searchQuery: '',
     creatableItems: [],
@@ -97,12 +98,19 @@
         this.isLoadingInitialData = false;
         this.searchQuery = '';
         this.allSearchableItems = [];
+        this.isPaletteTransitioning = false;
         // Ensure scroll is restored
         document.body.style.overflow = '';
         // Use $wire instead of @this for SPA navigation compatibility
         if ($wire) {
             $wire.closeSearchModal();
         }
+    },
+    runPaletteTransition(callback) {
+        this.isPaletteTransitioning = true;
+        return Promise.resolve(callback()).finally(() => {
+            this.isPaletteTransitioning = false;
+        });
     },
     navigateResults(direction) {
         const results = document.querySelectorAll('.search-result-item');
@@ -162,7 +170,7 @@
                 });
 
                 if (matchingItem && typeof $wire !== 'undefined' && $wire) {
-                    $wire.navigateToResource(matchingItem.type);
+                    this.runPaletteTransition(() => $wire.navigateToResource(matchingItem.type));
                 }
             }
         });
@@ -313,14 +321,21 @@
                 </div>
 
                 <!-- Search results -->
-                <div x-show="searchQuery.length >= 1" x-cloak class="command-palette-body">
+                <div x-show="searchQuery.length >= 1" x-cloak class="command-palette-body relative">
+                    <div x-show="isPaletteTransitioning" x-cloak
+                        class="absolute inset-0 z-30 flex items-center justify-center bg-white/50 backdrop-blur-[2px] dark:bg-black/40">
+                        <x-loading text="Loading…" />
+                    </div>
                     @if ($isSelectingResource)
                         <!-- Resource selection flow -->
-                        <div class="command-palette-section">
+                        <div class="relative min-h-32">
+                            <div class="command-palette-section transition-all"
+                                wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
+                                wire:target="selectServer,selectDestination,selectProject,selectEnvironment">
                             @if ($selectedServerId === null)
                                 <div x-init="selectedIndex = -1">
                                     <div class="command-palette-step-header">
-                                        <button type="button" @click="$wire.goBack()" class="command-palette-step-back"
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
                                             <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
                                         </button>
@@ -367,7 +382,7 @@
                             @if ($selectedServerId !== null && $selectedDestinationUuid === null)
                                 <div x-init="selectedIndex = -1">
                                     <div class="command-palette-step-header">
-                                        <button type="button" @click="$wire.goBack()" class="command-palette-step-back"
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
                                             <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
                                         </button>
@@ -415,7 +430,7 @@
                             @if ($selectedDestinationUuid !== null && $selectedProjectUuid === null)
                                 <div x-init="selectedIndex = -1">
                                     <div class="command-palette-step-header">
-                                        <button type="button" @click="$wire.goBack()" class="command-palette-step-back"
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
                                             <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
                                         </button>
@@ -463,7 +478,7 @@
                             @if ($selectedProjectUuid !== null && $selectedEnvironmentUuid === null)
                                 <div x-init="selectedIndex = -1">
                                     <div class="command-palette-step-header">
-                                        <button type="button" @click="$wire.goBack()" class="command-palette-step-back"
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
                                             <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
                                         </button>
@@ -509,6 +524,12 @@
                                     @endif
                                 </div>
                             @endif
+                            </div>
+                            <div wire:loading.flex
+                                wire:target="selectServer,selectDestination,selectProject,selectEnvironment"
+                                class="absolute inset-0 z-10 hidden items-center justify-center bg-white/40 backdrop-blur-[1px] dark:bg-black/30">
+                                <x-loading text="Loading selection…" />
+                            </div>
                         </div>
                     @elseif ($isCreateMode && count($this->filteredCreatableItems) > 0 && !$autoOpenResource)
                         <!-- Create mode (server-rendered path) -->
@@ -569,7 +590,7 @@
                                 <div class="command-palette-section">
                                     <div class="command-palette-group-label">{{ $category }}</div>
                                     @foreach ($items as $item)
-                                        <button type="button" wire:click="navigateToResource('{{ $item['type'] }}')"
+                                        <button type="button" @click="runPaletteTransition(() => $wire.navigateToResource('{{ $item['type'] }}'))"
                                             class="search-result-item command-palette-item">
                                             @if (!empty($item['logo']))
                                                 <div class="command-palette-item-icon">
@@ -646,7 +667,7 @@
                                 <div class="command-palette-section">
                                     <div class="command-palette-group-label" x-text="categoryName"></div>
                                     <template x-for="item in items" :key="item.type">
-                                        <button type="button" @click="$wire.navigateToResource(item.type)"
+                                        <button type="button" @click="runPaletteTransition(() => $wire.navigateToResource(item.type))"
                                             class="search-result-item command-palette-item">
                                             <template x-if="item.logo">
                                                 <div class="command-palette-item-icon">

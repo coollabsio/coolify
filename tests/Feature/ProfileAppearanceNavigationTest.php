@@ -17,6 +17,22 @@ it('adds profile navigation with an appearance tab and route', function () {
         ->not->toContain('<h1>Profile</h1>\n    <div class="subtitle -mt-2">');
 });
 
+it('opens the email change form without a Livewire request', function () {
+    $profileView = file_get_contents(resource_path('views/livewire/profile/index.blade.php'));
+
+    expect($profileView)
+        ->toContain('@click="openEmailModal()"')
+        ->toContain('this.$refs.newEmailInput?.focus()')
+        ->toContain('x-ref="newEmailInput"')
+        ->toContain('x-show="emailModalOpen"')
+        ->toContain('x-teleport="body"')
+        ->toContain('Change email')
+        ->toContain('Send code')
+        ->toContain('Verify email')
+        ->not->toContain('>Cancel</x-forms.button>')
+        ->not->toContain('wire:click="showEmailChangeForm"');
+});
+
 it('keeps color theme preferences on the profile appearance view without page width or density controls', function () {
     $appearanceView = file_get_contents(resource_path('views/livewire/profile/appearance.blade.php'));
 

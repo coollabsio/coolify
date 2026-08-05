@@ -1,4 +1,11 @@
-<div>
+<div x-data="{
+    emailModalOpen: @js($show_verification),
+    openEmailModal() {
+        this.emailModalOpen = true;
+        this.$nextTick(() => this.$refs.newEmailInput?.focus());
+    },
+}"
+    @close-email-change-modal.window="emailModalOpen = false">
     <x-slot:title>Profile | Coolify</x-slot>
     <x-profile.navbar />
 
@@ -16,8 +23,8 @@
                     <x-forms.input id="name" label="Name" required />
                     <div class="flex items-end gap-2">
                         <x-forms.input id="email" label="Email" readonly />
-                        <x-forms.button wire:click="showEmailChangeForm" type="button"
-                            :disabled="$show_email_change || $show_verification">
+                        <x-forms.button @click="openEmailModal()" type="button"
+                            x-bind:disabled="emailModalOpen">
                             Change
                         </x-forms.button>
                     </div>
@@ -25,53 +32,56 @@
             </section>
         </form>
 
-        @if ($show_email_change)
-            <form wire:submit="requestEmailChange">
-                <section class="application-settings-section">
-                    <div class="application-settings-section-header">
+        <template x-teleport="body">
+            <div x-show="emailModalOpen" x-cloak
+                class="fixed inset-0 z-99 flex h-screen w-screen items-center justify-center p-4">
+                <div class="absolute inset-0 h-full w-full bg-black/55 backdrop-blur-[3px]"></div>
+                <div x-show="emailModalOpen" x-trap.inert.noscroll="emailModalOpen"
+                    class="application-settings-form application-settings-section relative w-full max-w-xl overflow-hidden"
+                    style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                    <header>
                         <div>
-                            <h2>Change email</h2>
-                            <p>A six-digit verification code will be sent to the new address.</p>
-                        </div>
-                    </div>
-                    <div class="application-settings-section-body">
-                        <div class="flex max-w-xl items-end gap-2">
-                            <x-forms.input id="new_email" label="New email address" required type="email" />
-                            <x-forms.button type="submit">Send code</x-forms.button>
-                            <x-forms.button wire:click="$set('show_email_change', false)" type="button">
-                                Cancel
-                            </x-forms.button>
-                        </div>
-                    </div>
-                </section>
-            </form>
-        @endif
-
-        @if ($show_verification)
-            <form wire:submit="verifyEmailChange">
-                <section class="application-settings-section">
-                    <div class="application-settings-section-header">
-                        <div>
-                            <h2>Verify new email</h2>
-                            <p>
-                                Code sent to {{ $new_email ?? auth()->user()->pending_email }}.
-                                It expires after {{ config('constants.email_change.verification_code_expiry_minutes', 10) }}
-                                minutes.
+                            <h3>{{ $show_verification ? 'Verify new email' : 'Change email' }}</h3>
+                            <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                                @if ($show_verification)
+                                    Code sent to {{ $new_email ?: auth()->user()->pending_email }}.
+                                @else
+                                    A six-digit verification code will be sent to the new address.
+                                @endif
                             </p>
                         </div>
-                    </div>
-                    <div class="application-settings-section-body">
-                        <div class="flex max-w-xl items-end gap-2">
+                        <button type="button"
+                            @click="@if ($show_verification) $wire.cancelEmailChange().then(() => emailModalOpen = false) @else emailModalOpen = false @endif"
+                            class="icon-button shrink-0" aria-label="Close">
+                            <x-reicon name="x" class="size-4" />
+                        </button>
+                    </header>
+
+                    @if ($show_verification)
+                        <form wire:submit="verifyEmailChange" class="application-settings-section-body space-y-4">
                             <x-forms.input id="email_verification_code" label="Verification code" required
                                 inputmode="numeric" maxlength="6" />
-                            <x-forms.button type="submit">Verify email</x-forms.button>
-                            <x-forms.button wire:click="resendVerificationCode" type="button">Resend</x-forms.button>
-                            <x-forms.button wire:click="cancelEmailChange" type="button">Cancel</x-forms.button>
-                        </div>
-                    </div>
-                </section>
-            </form>
-        @endif
+                            <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                                The code expires after
+                                {{ config('constants.email_change.verification_code_expiry_minutes', 10) }} minutes.
+                            </p>
+                            <div class="flex justify-end gap-2">
+                                <x-forms.button wire:click="resendVerificationCode" type="button">Resend code</x-forms.button>
+                                <x-forms.button type="submit" isHighlighted>Verify email</x-forms.button>
+                            </div>
+                        </form>
+                    @else
+                        <form wire:submit="requestEmailChange" class="application-settings-section-body space-y-4">
+                            <x-forms.input id="new_email" label="New email address" required type="email"
+                                x-ref="newEmailInput" />
+                            <div class="flex justify-end">
+                                <x-forms.button type="submit" isHighlighted>Send code</x-forms.button>
+                            </div>
+                        </form>
+                    @endif
+                </div>
+            </div>
+        </template>
 
         <form wire:submit="resetPassword">
             <section class="application-settings-section">

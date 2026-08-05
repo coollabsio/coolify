@@ -67,9 +67,6 @@
                         @if ($isSuggested && ! empty($row['suggestion_label']))
                             <span class="table-badge table-badge-warning shrink-0">{{ $row['suggestion_label'] }}</span>
                         @endif
-                        @if ($showServiceColumn)
-                            <span class="domains-service-mobile table-badge shrink-0">{{ $serviceLabel }}</span>
-                        @endif
                     </div>
                     @if ($isSuggested && filled($row['dns_message']))
                         <p class="text-[12px] leading-4 text-amber-700 sm:truncate dark:text-amber-400/90"

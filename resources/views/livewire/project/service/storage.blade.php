@@ -416,7 +416,7 @@
         </x-application.settings-section>
     @else
         {{-- Service stack resources: one settings card + table per service --}}
-        <x-application.settings-section :id="'storage-service-'.$resource->id"
+        <x-application.settings-section :id="'storage-service-'.$resource->uuid"
             :title="Str::headline($resource->name)" :flush="true"
             helper="Volume mounts for this compose service. Compose-managed mounts are read-only in the dashboard.">
             <x-slot:actions>

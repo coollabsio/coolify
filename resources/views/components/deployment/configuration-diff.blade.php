@@ -19,7 +19,7 @@
                 <div class="overflow-x-auto rounded-lg ring-1 ring-neutral-200 dark:ring-white/[0.08]">
                     <div class="min-w-[640px]">
                         <div
-                            class="grid grid-cols-[minmax(12rem,1.5fr)_minmax(8rem,1fr)_1.5rem_minmax(8rem,1fr)_1.75rem] items-center gap-3 bg-neutral-100 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:bg-white/[0.04] dark:text-fg-faint">
+                            class="grid grid-cols-[minmax(10rem,0.8fr)_minmax(14rem,1fr)_1.5rem_minmax(14rem,1fr)_1.75rem] items-center gap-3 bg-neutral-100 px-3 py-2 text-[11px] font-medium text-neutral-500 dark:bg-white/[0.04] dark:text-fg-faint">
                             <div>Field</div>
                             <div>Current</div>
                             <div></div>
@@ -42,7 +42,7 @@
                                 @endphp
 
                                 <div
-                                    class="grid grid-cols-[minmax(12rem,1.5fr)_minmax(8rem,1fr)_1.5rem_minmax(8rem,1fr)_1.75rem] items-start gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
+                                    class="grid grid-cols-[minmax(10rem,0.8fr)_minmax(14rem,1fr)_1.5rem_minmax(14rem,1fr)_1.75rem] items-start gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
                                     <div class="min-w-0 font-medium text-neutral-900 dark:text-fg">
                                         @if ($rowExpandable)
                                             <div class="break-words"

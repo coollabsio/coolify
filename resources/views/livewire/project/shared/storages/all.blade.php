@@ -7,14 +7,10 @@
 @endphp
 
 <div class="flex w-full flex-col">
-    @if ($isComposeOrService)
+    @if (data_get($resource, 'build_pack') === 'dockercompose')
         <div
             class="border-b border-neutral-200 px-4 py-3 text-[13px] leading-5 text-amber-800 dark:border-white/[0.08] dark:text-amber-300/90">
-            @if ($resource->type() === 'service')
-                Service volume mounts are read-only here. Edit the Docker Compose file and reload it to change volumes.
-            @else
-                Docker Compose volume mounts are read-only here. Edit the compose file and reload it to change volumes.
-            @endif
+            Docker Compose volume mounts are read-only here. Edit the compose file and reload it to change volumes.
         </div>
     @endif
 
@@ -30,6 +26,7 @@
                         PR suffix
                     </span>
                 @endif
+                <span class="volumes-col-backup text-center">Backup</span>
                 @if ($showActionsColumn)
                     <span class="volumes-col-actions text-right">Actions</span>
                 @endif
@@ -58,16 +55,6 @@
                                     <span
                                         class="min-w-0 truncate font-mono text-[13px] font-medium text-neutral-950 dark:text-fg"
                                         title="{{ $form['name'] }}">{{ $form['name'] }}</span>
-                                    @if ($hasEnabledBackup)
-                                        @if ($backupUrl)
-                                            <a href="{{ $backupUrl }}"
-                                                class="table-badge table-badge-success shrink-0 underline-offset-2 hover:underline"
-                                                title="Volume backup is enabled">Backup</a>
-                                        @else
-                                            <span class="table-badge table-badge-success shrink-0"
-                                                title="Volume backup is enabled">Backup</span>
-                                        @endif
-                                    @endif
                                 </div>
                             </div>
 
@@ -90,6 +77,20 @@
                                     <span>{{ $form['isPreviewSuffixEnabled'] ? 'Add suffix' : 'Share volume' }}</span>
                                 </div>
                             @endif
+
+                            <div class="volumes-col-backup data-table-cell-check">
+                                <span class="volumes-mobile-label volumes-field-label">Backup</span>
+                                @if ($hasEnabledBackup)
+                                    <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="2" stroke="currentColor" class="size-4">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                        </svg>
+                                    </a>
+                                @else
+                                    <span class="data-table-cell-dash">-</span>
+                                @endif
+                            </div>
 
                             @if ($showActionsColumn)
                                 <div
@@ -115,16 +116,6 @@
                                     <div class="min-w-0 flex-1">
                                         <x-forms.input id="forms.{{ $id }}.name" required />
                                     </div>
-                                    @if ($hasEnabledBackup)
-                                        @if ($backupUrl)
-                                            <a href="{{ $backupUrl }}"
-                                                class="table-badge table-badge-success shrink-0 underline-offset-2 hover:underline"
-                                                title="Volume backup is enabled">Backup</a>
-                                        @else
-                                            <span class="table-badge table-badge-success shrink-0"
-                                                title="Volume backup is enabled">Backup</span>
-                                        @endif
-                                    @endif
                                 </div>
                             </div>
 
@@ -148,6 +139,20 @@
                                     ]" />
                                 </div>
                             @endif
+
+                            <div class="volumes-col-backup data-table-cell-check">
+                                <span class="volumes-mobile-label volumes-field-label">Backup</span>
+                                @if ($hasEnabledBackup)
+                                    <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                            stroke-width="2" stroke="currentColor" class="size-4">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                        </svg>
+                                    </a>
+                                @else
+                                    <span class="data-table-cell-dash">-</span>
+                                @endif
+                            </div>
 
                             <div
                                 class="volumes-col-actions volumes-cell-actions flex flex-wrap items-center justify-end gap-1.5">
