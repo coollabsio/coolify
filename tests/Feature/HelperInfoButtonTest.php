@@ -10,6 +10,7 @@ test('helper trigger is a button that stops label activation', function () {
         ->toContain('type="button"')
         ->toContain('@click.prevent.stop')
         ->toContain('aria-label="{{ $label }}"')
+        ->toContain('data-icon-tooltip-ignore')
         ->toContain('info-helper-popup')
         ->toContain('name="info-circle"')
         ->toContain('class="size-3.5 text-neutral-400')
@@ -76,6 +77,18 @@ test('helper popup prefers a position below its trigger and falls back above', f
         ->toContain('let top = triggerRect.bottom + padding;')
         ->toContain('let left = triggerRect.right - popupRect.width;')
         ->toContain('top = triggerRect.top - popupRect.height - padding;');
+});
+
+test('helper popup stays within the visual viewport on mobile', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('window.visualViewport')
+        ->toContain('viewport?.offsetLeft')
+        ->toContain('viewport?.offsetTop')
+        ->toContain('max-width: ${availableWidth}px;')
+        ->toContain('max-height: ${availableHeight}px;')
+        ->toContain('overflow-y: auto;');
 });
 
 test('helper popup supports focus dismissal and tooltip aria relationships', function () {

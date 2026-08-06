@@ -8,6 +8,7 @@ it('uses the custom tooltip for icon actions across layouts', function () {
         ->and($tooltip)
         ->toContain("closest('button, a, [data-tooltip]')")
         ->toContain("target.querySelector('svg')")
+        ->toContain("target.matches('[data-icon-tooltip-ignore]')")
         ->toContain("target.removeAttribute('title')")
         ->toContain('role="tooltip"')
         ->toContain('aria-label')

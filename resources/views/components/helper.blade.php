@@ -7,6 +7,18 @@
     open: false,
     hideTimer: null,
     style: '',
+    visualViewport: null,
+    reposition: null,
+    init() {
+        this.visualViewport = window.visualViewport;
+        this.reposition = () => this.open && this.position();
+        this.visualViewport?.addEventListener('resize', this.reposition);
+        this.visualViewport?.addEventListener('scroll', this.reposition);
+    },
+    destroy() {
+        this.visualViewport?.removeEventListener('resize', this.reposition);
+        this.visualViewport?.removeEventListener('scroll', this.reposition);
+    },
     show() {
         this.cancelHide();
         this.open = true;
@@ -51,26 +63,38 @@
             return;
         }
 
+        const padding = 8;
+        const viewport = window.visualViewport;
+        const viewportLeft = viewport?.offsetLeft ?? 0;
+        const viewportTop = viewport?.offsetTop ?? 0;
+        const viewportWidth = viewport?.width ?? window.innerWidth;
+        const viewportHeight = viewport?.height ?? window.innerHeight;
+        const viewportRight = viewportLeft + viewportWidth;
+        const viewportBottom = viewportTop + viewportHeight;
+        const availableWidth = Math.max(0, viewportWidth - padding * 2);
+        const availableHeight = Math.max(0, viewportHeight - padding * 2);
+
+        this.style = `max-width: ${availableWidth}px; max-height: ${availableHeight}px; overflow-y: auto;`;
+
         const triggerRect = trigger.getBoundingClientRect();
         const popupRect = popup.getBoundingClientRect();
-        const padding = 8;
         let top = triggerRect.bottom + padding;
         let left = triggerRect.right - popupRect.width;
 
-        if (top + popupRect.height > window.innerHeight - padding) {
+        if (top + popupRect.height > viewportBottom - padding) {
             top = triggerRect.top - popupRect.height - padding;
         }
 
-        left = Math.min(Math.max(padding, left), window.innerWidth - popupRect.width - padding);
-        top = Math.max(padding, top);
+        left = Math.min(Math.max(viewportLeft + padding, left), viewportRight - popupRect.width - padding);
+        top = Math.min(Math.max(viewportTop + padding, top), viewportBottom - popupRect.height - padding);
 
-        this.style = `top: ${top}px; left: ${left}px;`;
+        this.style += ` top: ${top}px; left: ${left}px;`;
     }
 }" @pointerdown.window="closeWhenPointerIsOutside($event)" @keydown.window.escape="close"
     @resize.window="open && position()" @scroll.window="open && position()"
     {{ $attributes->merge(['class' => 'relative inline-block align-middle']) }}>
     {{-- button (not div) so label-for associations do not steal the click on mobile --}}
-    <button type="button" x-ref="trigger"
+    <button type="button" x-ref="trigger" data-icon-tooltip-ignore
         @class([
             'info-helper relative inline-flex shrink-0 items-center justify-center border-0 bg-transparent p-0 leading-none',
             'size-3.5' => ! isset($trigger),

@@ -6,6 +6,7 @@
     below: false,
     activeTarget: null,
     isIconAction(target) {
+        if (target.matches('[data-icon-tooltip-ignore]')) return false;
         return target.matches('[data-tooltip], .icon-button') || target.querySelector('svg');
     },
     prepare(root) {
