@@ -26,7 +26,11 @@
 
             </x-application.settings-section>
 
-            <x-application.settings-section id="public-access-section" title="Public access" helper="Connect public domains and control how incoming requests are redirected between www and non-www.">
+            <x-application.settings-section id="access-section" title="Access" helper="Manage how this application is reached publicly and from the Docker network.">
+            <section id="public-access-section" @class([
+                'border-b border-neutral-200 pb-5 dark:border-white/[0.07]' => $buildPack !== 'dockercompose',
+            ])>
+            <h3 class="mb-4 text-sm font-semibold text-black dark:text-fg">Public access</h3>
             @php
                 $domainCount = 0;
                 if ($buildPack === 'dockercompose') {
@@ -54,15 +58,6 @@
                     @else
                         {{ $domainCount }} domains set.
                     @endif
-                    Manage domains, DNS checks, and www redirects
-                    <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-warning dark:decoration-warning/30 dark:hover:decoration-warning"
-                        href="{{ route('project.application.domains', [
-                            'project_uuid' => $application->environment->project->uuid,
-                            'environment_uuid' => $application->environment->uuid,
-                            'application_uuid' => $application->uuid,
-                        ]) }}" {{ wireNavigate() }}>
-                        on the Domains page
-                    </a>.
                 </p>
                 <a class="button shrink-0"
                     href="{{ route('project.application.domains', [
@@ -74,51 +69,13 @@
                     Manage domains
                 </a>
             </div>
-            </x-application.settings-section>
+            </section>
 
             @if ($buildPack !== 'dockercompose')
-            @php
-                $networkAliases = str($customNetworkAliases ?? '')
-                    ->explode(',')
-                    ->map(fn ($alias) => trim($alias))
-                    ->filter()
-                    ->values();
-                $exposedPorts = str($portsExposes ?? '')
-                    ->explode(',')
-                    ->map(fn ($port) => trim($port))
-                    ->filter()
-                    ->implode(', ');
-            @endphp
-            <x-application.settings-section id="internal-access-section" title="Internal access"
-                wire:init="loadCurrentInternalHostname"
-                helper="Connect to this application from other containers on the same Docker network.">
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    @if ($currentInternalHostname)
-                        <x-forms.copy-button label="Internal hostname" :text="$currentInternalHostname" />
-                    @else
-                        <div class="w-full">
-                            <label class="mb-1 flex items-center gap-1 text-sm font-medium text-black dark:text-white">Internal hostname</label>
-                            <input type="text"
-                                value="{{ $currentInternalHostnameLoaded ? 'No deployed container found' : 'Loading…' }}"
-                                class="input input-with-copy-button bg-white dark:bg-coolgray-100 dark:read-only:bg-coolgray-100 dark:read-only:text-white"
-                                readonly aria-live="polite">
-                        </div>
-                    @endif
-                    <x-forms.copy-button label="Docker network" :text="$application->destination->network" />
-                    <x-forms.copy-button label="Exposed ports" :text="$exposedPorts ?: 'None'" />
-                    <x-forms.copy-button label="Network aliases" :text="$networkAliases->implode(', ') ?: 'None'" />
-                </div>
-                <div class="mt-4 flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
-                    <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                        Internal hostnames are only reachable by resources connected to this Docker network.
-                    </p>
-                    <button type="button" class="button shrink-0"
-                        @click="window.scrollToSettingsSection?.('networking-section')">
-                        Edit networking
-                    </button>
-                </div>
-            </x-application.settings-section>
+                <livewire:project.application.internal-access :application="$application"
+                    :key="'application-internal-access-'.$application->id" />
             @endif
+            </x-application.settings-section>
 
             <x-application.settings-section id="build-pipeline-section" title="Build pipeline" helper="Commands, directories and options used while building the application.">
             @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')

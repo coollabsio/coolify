@@ -244,24 +244,11 @@
     @endif
 
     @if ($currentApplication)
-        @php
-            $applicationStatus = str($currentApplication->status ?? 'exited');
-            [$statusDotClass, $statusLabel] = match (true) {
-                $applicationStatus->startsWith('running') => ['bg-[#3fb950]', 'Running'],
-                $applicationStatus->startsWith('degraded') => ['bg-orange-400', 'Degraded'],
-                $applicationStatus->startsWith('restarting'),
-                $applicationStatus->startsWith('starting') => ['bg-warning', 'Restarting'],
-                default => ['bg-neutral-400 dark:bg-fg-faint', 'Stopped'],
-            };
-        @endphp
         <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
         <span class="flex min-w-0 shrink items-center gap-2 h-8 px-2">
             <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentApplication->name }}</span>
-            <span class="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2.5 text-xs font-medium text-black dark:border-white/[0.12] dark:bg-white/[0.08] dark:text-fg"
-                title="{{ $currentApplication->status }}">
-                <span class="size-1.5 rounded-full {{ $statusDotClass }}"></span>
-                {{ $statusLabel }}
-            </span>
+            <livewire:project.application.status :application="$currentApplication"
+                :wire:key="'application-status-'.$currentApplication->uuid" />
         </span>
     @endif
 </div>

@@ -36,6 +36,17 @@ test('unsaved bar delays show and hides while loading to avoid instant-save flas
         ->toContain('delay-0');
 });
 
+test('unsaved bar saves with enter and shows the shortcut on the save button', function () {
+    $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+
+    expect($contents)
+        ->toContain('@keydown.enter.window')
+        ->toContain("classList.contains('is-dirty')")
+        ->toContain('$wire.{{ $action }}()')
+        ->toContain('<kbd')
+        ->toContain('Enter</kbd>');
+});
+
 test('unsaved bar stays above floating notifications so save actions remain accessible', function () {
     $unsavedBar = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
     $popup = file_get_contents(resource_path('views/components/popup-small.blade.php'));

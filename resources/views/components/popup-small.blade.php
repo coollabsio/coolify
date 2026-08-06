@@ -6,7 +6,6 @@
     'compactStoragePrefix' => null,
 ])
 
-<template x-teleport="body">
 <div x-data="{
         bannerVisible: true,
         compact: false,
@@ -79,4 +78,3 @@
         </button>
     </div>
 </div>
-</template>

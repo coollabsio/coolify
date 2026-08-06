@@ -38,10 +38,19 @@ it('renders service container statuses as shared status badges', function () {
 
 it('uses bordered status badges in the top breadcrumb', function () {
     $breadcrumb = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
+    $applicationStatus = file_get_contents(resource_path('views/livewire/project/application/status.blade.php'));
     $borderedBadgeClasses = 'rounded-full border border-neutral-200 bg-neutral-100';
 
-    expect(substr_count($breadcrumb, $borderedBadgeClasses))->toBe(4)
+    expect(substr_count($breadcrumb.$applicationStatus, $borderedBadgeClasses))->toBe(4)
         ->and(substr_count($breadcrumb, 'rounded-full bg-neutral-100'))->toBe(0);
+});
+
+it('renders application status through a reactive livewire component', function () {
+    $breadcrumb = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
+
+    expect($breadcrumb)
+        ->toContain('<livewire:project.application.status')
+        ->not->toContain('$applicationStatus = str($currentApplication->status');
 });
 
 it('uses a shared refresh badge for resource status refresh actions', function () {

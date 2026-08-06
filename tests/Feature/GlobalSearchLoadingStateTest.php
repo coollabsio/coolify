@@ -12,3 +12,16 @@ it('shows a loading overlay while resource selection steps load', function () {
         ->toContain('runPaletteTransition')
         ->toContain('Loading…');
 });
+
+it('uses a single Alpine result renderer for every command palette result type', function () {
+    $view = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
+
+    expect($view)
+        ->not->toContain('Create mode (server-rendered path)')
+        ->not->toContain('!$wire.isCreateMode')
+        ->toContain("<!-- Command palette -->\n    <div x-show=\"modalOpen\"")
+        ->not->toContain("<!-- Command palette -->\n    <template x-teleport=\"body\">")
+        ->toContain("<div wire:ignore>\n                        <template x-if=\"searchQuery.length")
+        ->toContain('x-for="(result, index) in searchResults"')
+        ->toContain('x-for="[categoryName, items] in Object.entries(groupedCreatableItems)"');
+});

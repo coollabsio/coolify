@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Project\Application\Heading as ApplicationHeading;
+use App\Livewire\Project\Application\Status as ApplicationStatus;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -164,6 +165,21 @@ it('keeps activeRouteName when request is not an application page route', functi
 
     $component->call('$refresh')
         ->assertSet('activeRouteName', 'project.application.webhooks');
+});
+
+it('refreshes the breadcrumb application status after it changes', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(ApplicationStatus::class, ['application' => $this->application])
+        ->assertSee('Running');
+
+    $this->application->update(['status' => 'exited']);
+
+    $component
+        ->call('refreshStatus')
+        ->assertSee('Stopped')
+        ->assertDontSee('Running');
 });
 
 it('uses app-tab-active utility for resource heading active styles', function () {

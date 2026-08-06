@@ -88,7 +88,7 @@ it('supports timed compact popup notifications', function () {
         ->toContain("localStorage.setItem(this.storageKey, 'compact')")
         ->toContain("localStorage.setItem(this.storageKey, 'icon')")
         ->toContain('localStorage.removeItem(key)')
-        ->toContain('<template x-teleport="body">')
+        ->not->toContain('<template x-teleport="body">')
         ->toContain('compact = true')
         ->toContain('@click="restore()"')
         ->toContain('@click.stop="minimizeToIcon()"')
@@ -111,6 +111,22 @@ it('refreshes configuration changes when the event is received', function () {
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('The latest configuration has not been applied')
         ->assertSee('Build command');
+});
+
+it('shows domain changes when the domain page dispatches a configuration change', function () {
+    $application = configurationCheckerApplication($this->environment);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
+        ->assertSet('isConfigurationChanged', false);
+
+    $application->update(['fqdn' => 'https://changed.example.com']);
+
+    $component
+        ->dispatch('configurationChanged')
+        ->assertSet('isConfigurationChanged', true)
+        ->assertSee('Domains')
+        ->assertSee('https://changed.example.com');
 });
 
 it('shows an unapplied configuration warning after a directory mount is added', function () {

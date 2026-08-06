@@ -283,9 +283,8 @@
 }">
 
     <!-- Command palette -->
-    <template x-teleport="body">
-        <div x-show="modalOpen" x-cloak
-            class="fixed inset-0 z-99 flex items-start justify-center px-4 pt-[12vh]">
+    <div x-show="modalOpen" x-cloak
+        class="fixed inset-0 z-99 flex items-start justify-center px-4 pt-[12vh]">
             <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]">
             </div>
             <div x-show="modalOpen" x-trap.inert="modalOpen"
@@ -537,94 +536,10 @@
                                 <x-loading text="Loading selection…" />
                             </div>
                         </div>
-                    @elseif ($isCreateMode && count($this->filteredCreatableItems) > 0 && !$autoOpenResource)
-                        <!-- Create mode (server-rendered path) -->
-                        <div>
-                            @php
-                                $existingResources = collect($searchResults)
-                                    ->filter(fn($r) => !isset($r['is_creatable_suggestion']))
-                                    ->count();
-                            @endphp
-                            @if ($existingResources > 0)
-                                <div class="command-palette-section">
-                                    <div class="command-palette-group-label">Existing resources</div>
-                                    @foreach ($searchResults as $result)
-                                        @if (!isset($result['is_creatable_suggestion']))
-                                            <a href="{{ $result['link'] ?? '#' }}"
-                                                class="search-result-item command-palette-item">
-                                                <div class="command-palette-item-main">
-                                                    <div class="command-palette-item-title">
-                                                        <span class="command-palette-item-name">{{ $result['name'] }}</span>
-                                                        <span class="command-palette-type-badge">
-                                                            @if ($result['type'] === 'application')
-                                                                Application
-                                                            @elseif ($result['type'] === 'service')
-                                                                Service
-                                                            @elseif ($result['type'] === 'database')
-                                                                {{ ucfirst($result['subtype'] ?? 'Database') }}
-                                                            @elseif ($result['type'] === 'server')
-                                                                Server
-                                                            @elseif ($result['type'] === 'project')
-                                                                Project
-                                                            @elseif ($result['type'] === 'environment')
-                                                                Environment
-                                                            @endif
-                                                        </span>
-                                                    </div>
-                                                    @if (!empty($result['project']) && !empty($result['environment']))
-                                                        <div class="command-palette-item-meta">
-                                                            {{ $result['project'] }} / {{ $result['environment'] }}
-                                                        </div>
-                                                    @endif
-                                                    @if (!empty($result['description']))
-                                                        <div class="command-palette-item-meta">
-                                                            {{ Str::limit($result['description'], 80) }}
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                                <x-reicon name="arrow-right" class="command-palette-item-chevron" />
-                                            </a>
-                                        @endif
-                                    @endforeach
-                                </div>
-                            @endif
-
-                            @php
-                                $grouped = collect($this->filteredCreatableItems)->groupBy('category');
-                            @endphp
-                            @foreach ($grouped as $category => $items)
-                                <div class="command-palette-section">
-                                    <div class="command-palette-group-label">{{ $category }}</div>
-                                    @foreach ($items as $item)
-                                        <button type="button" @click="runPaletteTransition(() => $wire.navigateToResource('{{ $item['type'] }}'))"
-                                            class="search-result-item command-palette-item">
-                                            @if (!empty($item['logo']))
-                                                <div class="command-palette-item-icon">
-                                                    <img src="{{ asset($item['logo']) }}" alt="{{ $item['name'] }}">
-                                                </div>
-                                            @else
-                                                <div class="command-palette-item-icon is-create">
-                                                    <x-reicon name="plus" class="size-3.5" />
-                                                </div>
-                                            @endif
-                                            <div class="command-palette-item-main">
-                                                <div class="command-palette-item-title">
-                                                    <span class="command-palette-item-name">{{ $item['name'] }}</span>
-                                                    @if (isset($item['quickcommand']))
-                                                        <span class="command-palette-quickcommand">{{ trim(preg_replace('/^\(type:\s*|\)$/i', '', $item['quickcommand'])) }}</span>
-                                                    @endif
-                                                </div>
-                                                <div class="command-palette-item-meta">{{ $item['description'] }}</div>
-                                            </div>
-                                            <x-reicon name="arrow-right" class="command-palette-item-chevron" />
-                                        </button>
-                                    @endforeach
-                                </div>
-                            @endforeach
-                        </div>
                     @endif
 
-                    <template x-if="searchQuery.length >= 1 && searchResults.length > 0 && !$wire.isSelectingResource">
+                    <div wire:ignore>
+                        <template x-if="searchQuery.length >= 1 && searchResults.length > 0 && !$wire.isSelectingResource">
                         <div class="command-palette-section">
                             <template x-if="filteredCreatableItems.length > 0">
                                 <div class="command-palette-group-label">Existing resources</div>
@@ -664,9 +579,9 @@
                                 </a>
                             </template>
                         </div>
-                    </template>
+                        </template>
 
-                    <template x-if="filteredCreatableItems.length > 0 && !$wire.isSelectingResource">
+                        <template x-if="filteredCreatableItems.length > 0 && !$wire.isSelectingResource">
                         <div>
                             <template x-for="[categoryName, items] in Object.entries(groupedCreatableItems)"
                                 :key="categoryName">
@@ -721,21 +636,21 @@
                                 </div>
                             </template>
                         </div>
-                    </template>
+                        </template>
 
-                    <template
-                        x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
-                        <div class="command-palette-empty">
-                            <p class="command-palette-empty-title">No results found</p>
-                            <p class="command-palette-empty-desc">
-                                Try different keywords, or type <span class="font-medium">new</span> to create a resource.
-                            </p>
-                        </div>
-                    </template>
+                        <template
+                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
+                            <div class="command-palette-empty">
+                                <p class="command-palette-empty-title">No results found</p>
+                                <p class="command-palette-empty-desc">
+                                    Try different keywords, or type <span class="font-medium">new</span> to create a resource.
+                                </p>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </div>
-        </div>
-    </template>
+    </div>
 
     {{-- Create resource modals: always mounted with stable Livewire keys so
          Alpine teleport can open them. Do not loop @livewire() — Livewire

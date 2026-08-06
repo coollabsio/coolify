@@ -55,10 +55,6 @@ class General extends Component
 
     public ?string $customNetworkAliases = null;
 
-    public ?string $currentInternalHostname = null;
-
-    public bool $currentInternalHostnameLoaded = false;
-
     public ?string $dockerfile = null;
 
     public ?string $dockerfileLocation = null;
@@ -449,32 +445,6 @@ class General extends Component
             $this->isPreserveRepositoryEnabled = $this->application->settings->is_preserve_repository_enabled;
             $this->isContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $this->isContainerLabelReadonlyEnabled = $this->application->settings->is_container_label_readonly_enabled;
-        }
-    }
-
-    public function loadCurrentInternalHostname(): void
-    {
-        if ($this->application->build_pack === 'dockercompose') {
-            $this->currentInternalHostnameLoaded = true;
-
-            return;
-        }
-
-        try {
-            $containers = getCurrentApplicationContainerStatus(
-                $this->application->destination->server,
-                $this->application->id,
-                0
-            );
-            $currentContainer = $containers->first(
-                fn ($container) => data_get($container, 'State') === 'running'
-            ) ?? $containers->first();
-
-            $this->currentInternalHostname = data_get($currentContainer, 'Names');
-        } catch (\Throwable) {
-            $this->currentInternalHostname = null;
-        } finally {
-            $this->currentInternalHostnameLoaded = true;
         }
     }
 
