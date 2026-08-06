@@ -9,7 +9,10 @@ it('shows internal Docker access details in application general settings', funct
 
     expect($generalSettings)
         ->toContain('id="access-section" title="Access"')
-        ->toContain('<h3 class="mb-4 text-sm font-semibold text-black dark:text-fg">Public access</h3>')
+        ->toContain('<h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Public access</h3>')
+        ->toContain("Str::plural('domain', \$domainCount)")
+        ->toContain('Domains, DNS checks, and redirect settings')
+        ->toContain('<x-reicon name="arrow-right" class="size-3.5" />')
         ->toContain('<livewire:project.application.internal-access')
         ->not->toContain('wire:init="loadCurrentInternalHostname"')
         ->and($internalAccessSettings)

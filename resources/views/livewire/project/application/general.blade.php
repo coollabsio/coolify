@@ -30,7 +30,7 @@
             <section id="public-access-section" @class([
                 'border-b border-neutral-200 pb-5 dark:border-white/[0.07]' => $buildPack !== 'dockercompose',
             ])>
-            <h3 class="mb-4 text-sm font-semibold text-black dark:text-fg">Public access</h3>
+            <h3 class="mb-3 text-sm font-semibold text-black dark:text-fg">Public access</h3>
             @php
                 $domainCount = 0;
                 if ($buildPack === 'dockercompose') {
@@ -49,24 +49,28 @@
                     $domainCount = countDomains($fqdn);
                 }
             @endphp
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                    @if ($domainCount === 0)
-                        No domains set.
-                    @elseif ($domainCount === 1)
-                        1 domain set.
-                    @else
-                        {{ $domainCount }} domains set.
-                    @endif
-                </p>
-                <a class="button shrink-0"
+            <div class="flex flex-col gap-3 rounded-lg border border-neutral-200 bg-neutral-50/60 px-4 py-3 sm:flex-row sm:items-center dark:border-white/[0.07] dark:bg-white/[0.025]">
+                <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <div class="flex size-9 shrink-0 items-center justify-center rounded-md bg-neutral-200/70 text-neutral-600 dark:bg-white/[0.07] dark:text-fg-dim">
+                        <x-reicon name="globe" class="size-4" />
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-black dark:text-fg">
+                            {{ $domainCount }} configured {{ Str::plural('domain', $domainCount) }}
+                        </p>
+                        <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                            Domains, DNS checks, and redirect settings
+                        </p>
+                    </div>
+                </div>
+                <a class="inline-flex shrink-0 items-center gap-1.5 self-start text-sm font-medium text-coollabs hover:underline sm:self-auto dark:text-warning"
                     href="{{ route('project.application.domains', [
                         'project_uuid' => $application->environment->project->uuid,
                         'environment_uuid' => $application->environment->uuid,
                         'application_uuid' => $application->uuid,
                     ]) }}" {{ wireNavigate() }}>
-                    <x-reicon name="globe" class="size-4" />
-                    Manage domains
+                    Manage
+                    <x-reicon name="arrow-right" class="size-3.5" />
                 </a>
             </div>
             </section>
