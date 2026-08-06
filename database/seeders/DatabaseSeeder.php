@@ -35,7 +35,6 @@ class DatabaseSeeder extends Seeder
         if (in_array(config('app.env'), ['local', 'development', 'dev'], true)) {
             $this->call([
                 DevelopmentRailpackExamplesSeeder::class,
-                V5DevLimaSeeder::class,
             ]);
         }
     }

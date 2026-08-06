@@ -38,7 +38,8 @@
             $wire.showEditDomainModal = true;
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service)">
+    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service)"
+    @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="domains-section" title="Domains" :helper="$helperText">
         @can('update', $application)
             <x-slot:actions>
@@ -368,16 +369,13 @@
                                 @endif
 
                                 <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
-                                    <x-forms.button type="button" @click="closeEditDomain()">
-                                        Cancel
-                                    </x-forms.button>
                                     @if ($editDomainDnsFailed)
                                         <x-forms.button type="button" isError
                                             @click="prepareEditSubmit(); $wire.forceSaveEditDns = true; $wire.confirmUpdateDomainDespiteDns()">
                                             Continue
                                         </x-forms.button>
                                     @else
-                                        <x-forms.button type="submit" isHighlighted>
+                                        <x-forms.button type="submit" wire:target="updateDomain" isHighlighted>
                                             Save
                                         </x-forms.button>
                                     @endif

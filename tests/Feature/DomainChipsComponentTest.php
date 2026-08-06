@@ -1,5 +1,19 @@
 <?php
 
+test('edit domain dialogs close after saving and omit redundant cancel actions', function () {
+    foreach ([
+        resource_path('views/livewire/project/application/domains.blade.php'),
+        resource_path('views/livewire/project/service/domains.blade.php'),
+    ] as $viewPath) {
+        $view = file_get_contents($viewPath);
+
+        expect($view)
+            ->toContain('@edit-domain-saved.window="closeEditDomain()"')
+            ->toContain('<x-forms.button type="submit" wire:target="updateDomain" isHighlighted>')
+            ->not->toContain("@click=\"closeEditDomain()\">\n                                        Cancel");
+    }
+});
+
 it('provides a reusable domain chips form component', function () {
     $component = file_get_contents(resource_path('views/components/forms/domain-chips.blade.php'));
 

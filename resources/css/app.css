@@ -2692,6 +2692,10 @@ input[type="search"]::-webkit-search-results-decoration {
     color: #fff;
 }
 
+.dark .logs-viewer-btn-active {
+    color: #fff;
+}
+
 .logs-viewer-viewport {
     min-width: 0;
     padding: 0.5rem 0.75rem;

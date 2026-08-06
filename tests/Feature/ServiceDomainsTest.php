@@ -332,6 +332,7 @@ it('prunes the previous dns status when a service domain is renamed', function (
         ->set('editingDomain', 'https://renamed.example.com')
         ->call('updateDomain')
         ->assertHasNoErrors()
+        ->assertDispatched('edit-domain-saved')
         ->assertDispatched('success');
 
     $this->apiApp->refresh();

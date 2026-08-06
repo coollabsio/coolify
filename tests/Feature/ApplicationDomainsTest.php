@@ -275,6 +275,7 @@ it('updates a domain in place via modal', function () {
         ->call('updateDomain')
         ->assertHasNoErrors()
         ->assertSet('showEditDomainModal', false)
+        ->assertDispatched('edit-domain-saved')
         ->assertDispatched('success');
 
     $this->application->refresh();

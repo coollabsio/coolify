@@ -32,7 +32,7 @@ it('runs the v5 dev Lima seeder with the normal development database seeder', fu
     $developmentSeederBlock = str($databaseSeeder)->after("if (in_array(config('app.env'), ['local', 'development', 'dev'], true)) {")->before('        }')->toString();
 
     expect($developmentSeederBlock)->toContain('DevelopmentRailpackExamplesSeeder::class')
-        ->and($developmentSeederBlock)->toContain('V5DevLimaSeeder::class');
+        ->and($developmentSeederBlock)->not->toContain('V5DevLimaSeeder::class');
 });
 
 it('disables Flux host binding by default in the Docker development environment', function () {

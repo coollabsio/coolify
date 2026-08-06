@@ -1039,6 +1039,7 @@ class Domains extends Component
             $this->forceSaveDomains = false;
             $this->pendingAction = null;
             $this->cancelEdit();
+            $this->dispatch('edit-domain-saved');
             $this->dispatch('success', 'Domain updated.');
             $this->refreshDomains();
             $this->checkUrlsDns([$newUrl], $service);

@@ -964,6 +964,7 @@ class Domains extends Component
             }
 
             $this->cancelEdit();
+            $this->dispatch('edit-domain-saved');
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
             $this->pendingAction = null;

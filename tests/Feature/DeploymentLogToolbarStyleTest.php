@@ -5,6 +5,7 @@ test('active deployment log controls use a coollabs background and white icon', 
 
     expect($styles)
         ->toMatch('/\.logs-viewer-btn-active\s*\{[^}]*background:\s*var\(--color-coollabs\);[^}]*color:\s*#fff;/s')
+        ->toMatch('/\.dark \.logs-viewer-btn-active\s*\{[^}]*color:\s*#fff;/s')
         ->not->toMatch('/\.logs-viewer-btn-active\s*\{[^}]*var\(--color-warning\)/s');
 });
 
