@@ -176,6 +176,19 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('relative order-7 shrink-0');
 });
 
+it('keeps deployment history fields and the log status badge accessible on mobile', function () {
+    $deploymentIndexView = file_get_contents(resource_path('views/livewire/project/application/deployment/index.blade.php'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($deploymentIndexView)
+        ->toContain('deployment-table-scroll')
+        ->and($appCss)
+        ->toContain(".deployment-table-scroll {\n    overflow-x: auto;")
+        ->toContain(".deployment-table-grid {\n    min-width: 59rem;")
+        ->not->toContain('.deployment-table-grid > :nth-child')
+        ->toContain(".logs-viewer-primary .logs-viewer-actions {\n    width: auto;\n    flex: 1 1 auto;");
+});
+
 it('places cancel deployment controls inside the deployment logs toolbar', function () {
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $this->application->id,

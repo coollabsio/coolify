@@ -168,16 +168,17 @@
                     <x-table.loading id="deployment-table-filter-loading"
                         target="toggleDeploymentFilter,clearFilter,setPullRequestFilter"
                         text="Filtering deployments..." class="rounded-lg" />
-                    <div class="data-table-header deployment-table-grid rounded-none!">
-                        <span>Status</span>
-                        <span>Source</span>
-                        <span>Commit</span>
-                        <span>Started</span>
-                        <span>Duration</span>
-                        <span>Server</span>
-                    </div>
+                    <div class="deployment-table-scroll">
+                        <div class="data-table-header deployment-table-grid rounded-none!">
+                            <span>Status</span>
+                            <span>Source</span>
+                            <span>Commit</span>
+                            <span>Started</span>
+                            <span>Duration</span>
+                            <span>Server</span>
+                        </div>
 
-                    @foreach ($deployments as $deployment)
+                        @foreach ($deployments as $deployment)
                         @php
                             $deploymentStatus = data_get($deployment, 'status');
                             $statusLabel = match ($deploymentStatus) {
@@ -245,7 +246,8 @@
                                 {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
                             </span>
                         </a>
-                    @endforeach
+                        @endforeach
+                    </div>
 
                     <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$deployments_count"
                         :current-page="$currentPage" :last-page="$lastPage"

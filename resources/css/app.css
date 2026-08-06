@@ -2329,7 +2329,14 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
+.deployment-table-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
 .deployment-table-grid {
+    min-width: 59rem;
     grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr);
 }
 
@@ -2408,15 +2415,6 @@ input[type="search"]::-webkit-search-results-decoration {
         display: none;
     }
 
-    .deployment-table-grid {
-        grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(10rem, 1.4fr) minmax(8rem, 0.9fr);
-    }
-
-    .deployment-table-grid > :nth-child(5),
-    .deployment-table-grid > :nth-child(6) {
-        display: none;
-    }
-
     .team-members-table-grid {
         grid-template-columns: minmax(0, 1fr) 7rem 7rem;
     }
@@ -2474,15 +2472,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .backup-table-grid > :nth-child(2),
     .backup-table-grid > :nth-child(5) {
-        display: none;
-    }
-
-    .deployment-table-grid {
-        grid-template-columns: 7.5rem minmax(0, 1fr);
-    }
-
-    .deployment-table-grid > :nth-child(2),
-    .deployment-table-grid > :nth-child(4) {
         display: none;
     }
 
@@ -2669,6 +2658,11 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     width: 100%;
     align-items: center;
     gap: 0.5rem;
+}
+
+.logs-viewer-primary .logs-viewer-actions {
+    width: auto;
+    flex: 1 1 auto;
 }
 
 .logs-viewer-search {
