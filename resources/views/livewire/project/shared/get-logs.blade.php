@@ -284,36 +284,14 @@
                 :class="fullscreen ? 'h-full w-full' : ''">
                 <div class="runtime-log-toolbar logs-viewer-toolbar">
                     <div class="logs-viewer-toolbar-controls">
-                        <div class="logs-viewer-search relative">
-                            <x-reicon name="search"
-                                class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
-                            <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
-                                aria-label="Find in logs"
-                                class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint" />
-                            <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
-                                class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
-                                aria-label="Clear search">
-                                <x-reicon name="x" class="size-3" />
-                            </button>
-                        </div>
-                        <div class="logs-viewer-meta">
-                            <form wire:submit="getLogs(true)" class="logs-viewer-lines">
-                                <span class="logs-viewer-lines-label">Lines</span>
-                                <input type="number" wire:model="numberOfLines" placeholder="100" min="1" max="50000"
-                                    title="Number of Lines (max 50,000)" {{ $streamLogs ? 'readonly' : '' }}
-                                    class="input logs-viewer-lines-input" />
-                            </form>
-                            <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
-                                class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"></span>
-                        </div>
                         <div class="logs-viewer-actions">
                             <button wire:click="getLogs(true)" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
-                                class="runtime-log-icon-button">
+                                class="runtime-log-icon-button order-8">
                                 <x-reicon name="refresh" class="size-3.5" />
                             </button>
                             <button wire:click="toggleStreamLogs"
                                 title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
-                                class="runtime-log-icon-button {{ $streamLogs ? 'runtime-log-icon-button-active' : '' }}">
+                                class="runtime-log-icon-button order-9 {{ $streamLogs ? 'runtime-log-icon-button-active' : '' }}">
                                 @if ($streamLogs)
                                     {{-- Pause icon --}}
                                     <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
@@ -345,14 +323,14 @@
                                     });
                                 "
                                 title="Copy Logs"
-                                class="runtime-log-icon-button">
+                                class="runtime-log-icon-button order-6">
                                 <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
                                 </svg>
                             </button>
-                            <div x-data="{ downloadMenuOpen: false, downloadingAllLogs: false }" class="relative shrink-0">
+                            <div x-data="{ downloadMenuOpen: false, downloadingAllLogs: false }" class="relative order-7 shrink-0">
                                 <button x-on:click="downloadMenuOpen = !downloadMenuOpen" title="Download Logs"
                                     class="runtime-log-icon-button">
                                     <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
@@ -368,7 +346,7 @@
                                     x-transition:leave="transition ease-in duration-75"
                                     x-transition:leave-start="transform opacity-100 scale-100"
                                     x-transition:leave-end="transform opacity-0 scale-95"
-                                    class="listbox-panel left-auto! right-0! z-[90]! min-w-52!">
+                                    class="runtime-log-menu listbox-panel left-auto! right-0! z-[90]! min-w-52!">
                                     <div>
                                         <button x-on:click="downloadLogs(); downloadMenuOpen = false"
                                             class="listbox-option">
@@ -408,7 +386,7 @@
                                 </div>
                             </div>
                             <button wire:click="toggleTimestamps" title="Toggle Timestamps"
-                                class="runtime-log-icon-button {{ $showTimeStamps ? 'runtime-log-icon-button-active' : '' }}">
+                                class="runtime-log-icon-button order-1 {{ $showTimeStamps ? 'runtime-log-icon-button-active' : '' }}">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
                                     stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -417,14 +395,14 @@
                             </button>
                             <button title="Toggle Log Colors" x-on:click="toggleColorLogs"
                                 :class="colorLogs ? 'runtime-log-icon-button-active' : ''"
-                                class="runtime-log-icon-button">
+                                class="runtime-log-icon-button order-3">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
                                     stroke="currentColor" stroke-width="1.5">
                                     <path stroke-linecap="round" stroke-linejoin="round"
                                         d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
                                 </svg>
                             </button>
-                            <div x-data="{ filterOpen: false }" class="relative shrink-0">
+                            <div x-data="{ filterOpen: false }" class="relative order-4 shrink-0">
                                 <button x-on:click="filterOpen = !filterOpen" title="Filter Log Levels"
                                     :class="Object.values(logFilters).some(v => !v) ? 'runtime-log-icon-button-active' : ''"
                                     class="runtime-log-icon-button">
@@ -441,7 +419,7 @@
                                     x-transition:leave="transition ease-in duration-75"
                                     x-transition:leave-start="transform opacity-100 scale-100"
                                     x-transition:leave-end="transform opacity-0 scale-95"
-                                    class="listbox-panel left-auto! right-0! z-[90]! min-w-40!">
+                                    class="runtime-log-menu listbox-panel left-auto! right-0! z-[90]! min-w-40!">
                                     <div>
                                         <button type="button" class="listbox-option" x-on:click="toggleLogFilter('error')">
                                             <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
@@ -468,14 +446,14 @@
                             </div>
                             <button title="Follow Logs" :class="alwaysScroll ? 'runtime-log-icon-button-active' : ''"
                                 x-on:click="toggleScroll"
-                                class="runtime-log-icon-button">
+                                class="runtime-log-icon-button order-2">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                         stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                                 </svg>
                             </button>
                             <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen"
-                                class="runtime-log-icon-button">
+                                class="runtime-log-icon-button order-5">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <g fill="none">
                                         <path
@@ -486,12 +464,36 @@
                                 </svg>
                             </button>
                             <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen"
-                                class="runtime-log-icon-button">
+                                class="runtime-log-icon-button order-5">
                                 <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                                         stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                                 </svg>
                             </button>
+                        </div>
+                        <div class="logs-viewer-end runtime-logs-viewer-end">
+                            <div class="logs-viewer-meta">
+                                <form wire:submit="getLogs(true)" class="logs-viewer-lines">
+                                    <span class="logs-viewer-lines-label">Lines</span>
+                                    <input type="number" wire:model="numberOfLines" placeholder="100" min="1" max="50000"
+                                        title="Number of Lines (max 50,000)" {{ $streamLogs ? 'readonly' : '' }}
+                                        class="input logs-viewer-lines-input" />
+                                </form>
+                                <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
+                                    class="text-xs text-gray-500 whitespace-nowrap dark:text-gray-400"></span>
+                            </div>
+                            <div class="logs-viewer-search relative">
+                                <x-reicon name="search"
+                                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                                <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
+                                    aria-label="Find in logs"
+                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint" />
+                                <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
+                                    class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                                    aria-label="Clear search">
+                                    <x-reicon name="x" class="size-3" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

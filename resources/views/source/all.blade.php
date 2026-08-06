@@ -54,10 +54,28 @@
                 description="Connect a Git provider to deploy applications directly from your repositories."
                 icon-name="sources" />
         @else
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            @php
+                $items = $sources->map(function ($source) {
+                    $isGithub = $source->getMorphClass() === 'App\\Models\\GithubApp';
+                    return [
+                        'name' => $source->name,
+                        'provider' => $isGithub ? 'GitHub' : 'GitLab',
+                        'organization' => $isGithub ? $source->organization : $source->group_name,
+                        'status' => $source->isConnected() ? 'Connected' : 'Setup incomplete',
+                    ];
+                })->values();
+            @endphp
+            <div x-data="{
+                search: '', viewMode: localStorage.getItem('coolify-sources-view') || 'table', items: @js($items),
+                get filteredItems() { const query = this.search.trim().toLowerCase(); return query ? this.items.filter(item => Object.values(item).some(value => String(value || '').toLowerCase().includes(query))) : this.items; },
+                matches(values) { const query = this.search.trim().toLowerCase(); return !query || values.some(value => String(value || '').toLowerCase().includes(query)); },
+                setViewMode(mode) { this.viewMode = mode; localStorage.setItem('coolify-sources-view', mode); }
+            }">
+            @include('livewire.shared.list-search-controls', ['placeholder' => 'Search sources', 'singular' => 'source', 'plural' => 'sources'])
+            <div x-cloak x-show="viewMode === 'grid'" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 @foreach ($sources as $source)
                     @if ($source->getMorphClass() === 'App\Models\GithubApp')
-                        <a class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                        <a x-show="matches(@js([$source->name, 'GitHub', $source->organization, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
                             {{ wireNavigate() }}
                             href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
                             <div class="flex items-start gap-3">
@@ -84,7 +102,7 @@
                             </div>
                         </a>
                     @elseif ($source->getMorphClass() === 'App\Models\GitlabApp')
-                        <a class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
+                        <a x-show="matches(@js([$source->name, 'GitLab', $source->group_name, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" class="group flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
                             {{ wireNavigate() }}
                             href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => data_get($source, 'uuid')]) }}">
                             <div class="flex items-start gap-3">
@@ -112,6 +130,24 @@
                         </a>
                     @endif
                 @endforeach
+            </div>
+            <div x-show="viewMode === 'table'" class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                <div class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint"><div>Source</div><div>Provider</div><div>Status</div></div>
+                @foreach ($sources as $source)
+                    @php
+                        $isGithub = $source->getMorphClass() === 'App\\Models\\GithubApp';
+                        $provider = $isGithub ? 'GitHub' : 'GitLab';
+                        $organization = $isGithub ? $source->organization : $source->group_name;
+                        $href = $isGithub ? route('source.github.show', ['github_app_uuid' => $source->uuid]) : route('source.gitlab.show', ['gitlab_app_uuid' => $source->uuid]);
+                    @endphp
+                    <a x-show="matches(@js([$source->name, $provider, $organization, $source->isConnected() ? 'Connected' : 'Setup incomplete']))" {{ wireNavigate() }} href="{{ $href }}" class="grid min-h-14 min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        <div class="truncate font-semibold text-black dark:text-fg">{{ $source->name }}</div>
+                        <div class="truncate text-neutral-500 dark:text-fg-dim">{{ $organization ? "{$provider} · {$organization}" : $provider }}</div>
+                        <div><x-status-badge :label="$source->isConnected() ? 'Connected' : 'Setup incomplete'" :type="$source->isConnected() ? 'success' : 'warning'" /></div>
+                    </a>
+                @endforeach
+            </div>
+            @include('livewire.shared.list-search-empty', ['label' => 'sources'])
             </div>
         @endif
     </div>

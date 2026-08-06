@@ -18,6 +18,7 @@
         ->values();
 @endphp
 
+<x-shared-variables.layout>
 <div class="application-settings-form w-full" x-data="{
     sharedSearch: '',
     sharedSort: 'alphabetical',
@@ -29,9 +30,6 @@
         return this.rows.filter(row => [row.key, row.comment, row.scope].some(value => value.includes(query))).length;
     }
 }">
-    <x-dashboard.navbar section="shared-variables" title="Shared variables"
-        subtitle="Reusable environment variables across resources" :titleOnDesktop="false" />
-
     <x-application.settings-section :title="$title" flush>
         <x-slot:actions>
             <x-forms.button type="button" wire:click="switch" class="whitespace-nowrap">
@@ -136,3 +134,4 @@
         @endif
     </x-application.settings-section>
 </div>
+</x-shared-variables.layout>

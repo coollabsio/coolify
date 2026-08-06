@@ -8,8 +8,8 @@
         x-data="{ open: false }" @keydown.escape.window="open = false">
         <button type="button" @click="open = !open" @click.outside="open = false"
             title="Switch team"
-            class="group/team flex h-8 min-w-0 max-w-full items-center gap-1.5 rounded-lg px-2 -ml-1 text-left opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
-            <span class="min-w-0 truncate text-[13px] font-semibold text-black dark:text-fg">{{ $currentTeam->name }}</span>
+            class="group/team flex h-8 items-center gap-1.5 rounded-lg px-2 -ml-1 text-left opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
+            <span class="whitespace-nowrap text-[13px] font-semibold text-black dark:text-fg">{{ $currentTeam->name }}</span>
             <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                 <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
                     stroke-linecap="round" stroke-linejoin="round" />

@@ -34,13 +34,15 @@ class Index extends Component
 
     public string $search = '';
 
-    public string $deploymentFilter = 'all';
+    public array $deploymentFilters = [];
 
     public string $deploymentSort = 'newest';
 
     public array $statusFilterOptions = [];
 
     public array $sourceFilterOptions = [];
+
+    public array $serverFilterOptions = [];
 
     public bool $embedded = false;
 
@@ -90,7 +92,7 @@ class Index extends Component
         $this->loadDeploymentFilterOptions();
         ['deployments' => $deployments, 'count' => $count] = $application->deployments(
             search: $this->search,
-            filter: $this->deploymentFilter,
+            filters: $this->deploymentFilters,
             sort: $this->deploymentSort,
             take: $this->defaultTake,
             pullRequestId: $this->pull_request_id,
@@ -123,28 +125,17 @@ class Index extends Component
         $this->loadDeployments();
     }
 
-    public function previousPage(?int $take = null)
+    public function previousPage(): void
     {
-        if ($take) {
-            $this->skip = $this->skip - $take;
-        }
-        $this->skip = $this->skip - $this->defaultTake;
-        if ($this->skip < 0) {
-            $this->showPrev = false;
-            $this->skip = 0;
-        }
+        $this->skip = max(0, $this->skip - $this->defaultTake);
+        $this->showPrev = $this->skip > 0;
         $this->updateCurrentPage();
         $this->loadDeployments();
     }
 
-    public function nextPage(?int $take = null)
+    public function nextPage(): void
     {
-        if ($take) {
-            $this->skip = $this->skip + $take;
-        }
-        $this->showPrev = true;
-        $this->updateCurrentPage();
-        $this->loadDeployments();
+        $this->goToPage($this->currentPage + 1);
     }
 
     public function goToPage(int $page): void
@@ -164,7 +155,7 @@ class Index extends Component
             take: $this->defaultTake,
             pullRequestId: $this->pull_request_id,
             search: $this->search,
-            filter: $this->deploymentFilter,
+            filters: $this->deploymentFilters,
             sort: $this->deploymentSort,
         );
         $this->deployments = $deployments;
@@ -177,18 +168,24 @@ class Index extends Component
         $this->resetPaginationAndLoad();
     }
 
-    public function setDeploymentFilter(string $filter): void
+    public function toggleDeploymentFilter(string $filter): void
     {
         $validFilters = collect($this->statusFilterOptions)
             ->concat($this->sourceFilterOptions)
+            ->concat($this->serverFilterOptions)
             ->pluck('value')
-            ->push('all');
+            ->values();
 
         if (! $validFilters->contains($filter)) {
             return;
         }
 
-        $this->deploymentFilter = $filter;
+        if (in_array($filter, $this->deploymentFilters, true)) {
+            $this->deploymentFilters = array_values(array_diff($this->deploymentFilters, [$filter]));
+        } else {
+            $this->deploymentFilters[] = $filter;
+        }
+
         $this->pull_request_id = null;
         $this->resetPaginationAndLoad();
     }
@@ -202,7 +199,7 @@ class Index extends Component
         }
 
         $this->pull_request_id = $pullRequestId === '' ? null : $pullRequestId;
-        $this->deploymentFilter = 'all';
+        $this->deploymentFilters = [];
         $this->resetPaginationAndLoad();
     }
 
@@ -233,14 +230,14 @@ class Index extends Component
             $this->pull_request_id = null;
         }
 
-        $this->deploymentFilter = 'all';
+        $this->deploymentFilters = [];
         $this->resetPaginationAndLoad();
     }
 
     public function clearFilter()
     {
         $this->pull_request_id = null;
-        $this->deploymentFilter = 'all';
+        $this->deploymentFilters = [];
         $this->resetPaginationAndLoad();
     }
 
@@ -326,6 +323,27 @@ class Index extends Component
                 'value' => "source:{$source}",
                 'label' => $label,
             ])
+            ->values()
+            ->all();
+
+        $servers = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->whereNotNull('server_id')
+            ->select(['server_id', 'server_name'])
+            ->distinct()
+            ->orderBy('server_name')
+            ->get()
+            ->unique('server_id');
+
+        $this->serverFilterOptions = $servers
+            ->map(function (ApplicationDeploymentQueue $deployment): array {
+                $serverId = (int) $deployment->server_id;
+
+                return [
+                    'value' => "server:{$serverId}",
+                    'label' => $deployment->server_name ?: "Server #{$serverId}",
+                ];
+            })
             ->values()
             ->all();
     }

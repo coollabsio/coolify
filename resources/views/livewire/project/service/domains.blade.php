@@ -156,7 +156,6 @@
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
                     $heading = \Illuminate\Support\Str::headline($app['name'] ?? $rows->first()['service_name'] ?? 'Service');
-                    $appDomainCount = $rows->where('is_suggested', false)->count();
                     $redirect = $serviceRedirects[$appId] ?? 'both';
                     $redirectLabel = match ($redirect) {
                         'www' => 'Redirect to www',
@@ -168,9 +167,6 @@
                     class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
                     <div class="flex w-full items-center gap-3 px-4 py-3">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
-                        <span class="hidden shrink-0 text-xs text-neutral-500 sm:inline dark:text-fg-dim">
-                            {{ $appDomainCount }} domain{{ $appDomainCount === 1 ? '' : 's' }}
-                        </span>
                         @can('update', $service)
                             <div class="relative flex shrink-0 items-center gap-2 px-1 py-1 text-sm text-neutral-600 dark:text-fg-dim"
                                 wire:loading.class="opacity-50" wire:target="serviceRedirects.{{ $appId }}">

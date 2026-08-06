@@ -1101,6 +1101,7 @@ class Application extends BaseModel
     }
 
     /**
+     * @param  array<int, string>  $filters
      * @return array{count: int, deployments: Collection<int, ApplicationDeploymentQueue>}
      */
     public function deployments(
@@ -1108,7 +1109,7 @@ class Application extends BaseModel
         int $take = 10,
         ?string $pullRequestId = null,
         ?string $search = null,
-        string $filter = 'all',
+        array $filters = [],
         string $sort = 'newest',
     ): array {
         $deployments = ApplicationDeploymentQueue::query()
@@ -1160,32 +1161,40 @@ class Application extends BaseModel
             });
         }
 
-        if (Str::startsWith($filter, 'status:')) {
-            $deployments->where('status', Str::after($filter, 'status:'));
+        $statusFilters = collect($filters)
+            ->filter(fn (string $filter) => Str::startsWith($filter, 'status:'))
+            ->map(fn (string $filter) => Str::after($filter, 'status:'));
+        if ($statusFilters->isNotEmpty()) {
+            $deployments->whereIn('status', $statusFilters);
         }
 
-        if (Str::startsWith($filter, 'source:')) {
-            match (Str::after($filter, 'source:')) {
-                'pull-request' => $deployments->where('pull_request_id', '>', 0),
-                'webhook' => $deployments
-                    ->where('pull_request_id', '<=', 0)
-                    ->where('is_webhook', true),
-                'rollback' => $deployments
-                    ->where('pull_request_id', '<=', 0)
-                    ->where('is_webhook', false)
-                    ->where('rollback', true),
-                'api' => $deployments
-                    ->where('pull_request_id', '<=', 0)
-                    ->where('is_webhook', false)
-                    ->where('rollback', false)
-                    ->where('is_api', true),
-                'manual' => $deployments
-                    ->where('pull_request_id', '<=', 0)
-                    ->where('is_webhook', false)
-                    ->where('rollback', false)
-                    ->where('is_api', false),
-                default => null,
-            };
+        $sourceFilters = collect($filters)
+            ->filter(fn (string $filter) => Str::startsWith($filter, 'source:'))
+            ->map(fn (string $filter) => Str::after($filter, 'source:'));
+        if ($sourceFilters->isNotEmpty()) {
+            $deployments->where(function ($query) use ($sourceFilters) {
+                foreach ($sourceFilters as $source) {
+                    $query->orWhere(function ($sourceQuery) use ($source) {
+                        match ($source) {
+                            'pull-request' => $sourceQuery->where('pull_request_id', '>', 0),
+                            'webhook' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', true),
+                            'rollback' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', true),
+                            'api' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', true),
+                            'manual' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', false),
+                            default => $sourceQuery->where('id', -1),
+                        };
+                    });
+                }
+            });
+        }
+
+        $serverFilters = collect($filters)
+            ->filter(fn (string $filter) => Str::startsWith($filter, 'server:'))
+            ->map(fn (string $filter) => Str::after($filter, 'server:'))
+            ->filter(fn (string $serverId) => ctype_digit($serverId))
+            ->map(fn (string $serverId) => (int) $serverId);
+        if ($serverFilters->isNotEmpty()) {
+            $deployments->whereIn('server_id', $serverFilters);
         }
 
         $count = $deployments->count();

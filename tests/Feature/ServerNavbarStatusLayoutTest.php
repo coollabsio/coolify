@@ -23,7 +23,9 @@ it('collapses server subsystem badges into one status summary', function () {
         ->toContain('<x-loading compact />')
         ->toContain('name="refresh" class="size-2.5 opacity-70"')
         ->toContain('min-h-0! h-7! gap-1.5! px-2! py-1! text-[11px]')
-        ->not->toContain('@click="open = false" role="menuitem"');
+        ->toContain("href=\"{{ route('server.proxy', ['server_uuid' => \$server->uuid]) }}\"")
+        ->toContain("href=\"{{ route('server.sentinel', ['server_uuid' => \$server->uuid]) }}\"")
+        ->toContain('@click="open = false" role="menuitem"');
 
     expect($badgeView)
         ->not->toContain('text-neutral-500')

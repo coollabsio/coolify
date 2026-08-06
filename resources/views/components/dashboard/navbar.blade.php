@@ -12,13 +12,6 @@
 
 @php
     $items = match ($section) {
-        'shared-variables' => [
-            ['label' => 'Overview', 'route' => 'shared-variables.index', 'active' => request()->routeIs('shared-variables.index')],
-            ['label' => 'Team', 'route' => 'shared-variables.team.index', 'active' => request()->routeIs('shared-variables.team.*')],
-            ['label' => 'Projects', 'route' => 'shared-variables.project.index', 'active' => request()->routeIs('shared-variables.project.*')],
-            ['label' => 'Environments', 'route' => 'shared-variables.environment.index', 'active' => request()->routeIs('shared-variables.environment.*')],
-            ['label' => 'Servers', 'route' => 'shared-variables.server.index', 'active' => request()->routeIs('shared-variables.server.*')],
-        ],
         'team' => [
             ['label' => 'General', 'route' => 'team.index', 'active' => request()->routeIs('team.index', 'team.member.index', 'team.admin-view', 'team.danger-zone')],
         ],
@@ -79,14 +72,6 @@
     $hasTitle = filled($title);
     $hasActions = isset($actions);
     $showNav = $showTabs || $hasActions;
-    $stackTabsOnMobile = $section === 'shared-variables';
-    $sharedVariableIcons = [
-        'Overview' => 'dashboard',
-        'Team' => 'teams',
-        'Projects' => 'projects',
-        'Environments' => 'layers',
-        'Servers' => 'servers',
-    ];
 @endphp
 
 @if ($hasTitle)
@@ -131,24 +116,7 @@
         <div
             class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:h-full lg:gap-4">
             @if ($showTabs)
-            @if ($stackTabsOnMobile)
-                <div
-                    class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:hidden dark:border-white/[0.06]">
-                    @foreach ($items as $item)
-                        <a @class([
-                            'menu-item',
-                            'menu-item-active' => $item['active'],
-                        ]) {{ wireNavigate() }} href="{{ route($item['route'], $parameters) }}">
-                            <x-reicon :name="$sharedVariableIcons[$item['label']]" class="menu-item-icon" />
-                            <span class="menu-item-label">{{ $item['label'] }}</span>
-                        </a>
-                    @endforeach
-                </div>
-            @endif
-            <div @class([
-                'flex min-w-0 w-full items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 sm:flex-1 dark:border-white/[0.07] dark:bg-white/[0.035]',
-                'hidden lg:flex' => $stackTabsOnMobile,
-            ])>
+            <div class="flex min-w-0 w-full items-center gap-0.5 overflow-x-auto rounded-[10px] border border-neutral-200 bg-neutral-100 p-1 sm:flex-1 dark:border-white/[0.07] dark:bg-white/[0.035]">
                 @foreach ($items as $item)
                     <a @class([
                         'app-tab shrink-0',

@@ -51,9 +51,10 @@
                 </div>
                 {{-- Collapse toggle + team switcher --}}
                 <div class="flex items-center gap-0.5 min-w-0 flex-1 pl-3 pr-4">
-                    <x-top-breadcrumb />
-                    <div id="server-topbar-context" class="min-w-0"></div>
-                    <div class="flex-1"></div>
+                    <div class="relative flex min-w-0 flex-1 items-center">
+                        <x-top-breadcrumb />
+                        <div id="server-topbar-context" class="min-w-0"></div>
+                    </div>
                     {{-- Dev Server-Timing HUD docks here (local only; empty in production) --}}
                     <div id="server-timing-hud-slot" data-server-timing-hud-slot class="hidden shrink-0 items-center"></div>
                     {{-- Resource actions dock here on desktop. --}}

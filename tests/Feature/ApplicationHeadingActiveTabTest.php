@@ -180,6 +180,9 @@ it('refreshes the breadcrumb application status after it changes', function () {
         ->call('refreshStatus')
         ->assertSee('Stopped')
         ->assertDontSee('Running');
+
+    expect($component->instance()->getListeners())
+        ->toHaveKey("echo-private:team.{$this->team->id},ServiceChecked", 'refreshStatus');
 });
 
 it('uses app-tab-active utility for resource heading active styles', function () {

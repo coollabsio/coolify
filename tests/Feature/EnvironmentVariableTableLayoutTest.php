@@ -9,6 +9,8 @@ test('resource environment variables table has a Managed column and no name-cell
     $show = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show.blade.php'));
     $hardcoded = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show-hardcoded.blade.php'));
     $css = file_get_contents(resource_path('css/app.css'));
+    $filter = file_get_contents(resource_path('views/components/table/filter.blade.php'));
+    $loading = file_get_contents(resource_path('views/components/table/loading.blade.php'));
 
     // Header includes Managed between Name and Type.
     expect($all)
@@ -17,13 +19,8 @@ test('resource environment variables table has a Managed column and no name-cell
         ->toContain('toggleServiceFilter(@js($serviceName))')
         ->toContain('$this->serviceFilterOptions')
         ->toContain('toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter')
-        ->toContain('wire:loading.flex wire:target="clearFilters"')
-        ->toContain('wire:click="clearFilters"')
-        ->toContain('Clear filters')
-        ->toContain('max-h-80 overflow-y-auto p-1')
-        ->toContain('min-w-44! overflow-hidden! p-0!')
-        ->toContain('relative z-20 border-t')
-        ->toContain('dark:bg-[#171717]')
+        ->toContain('<x-table.loading target="clearFilters"')
+        ->toContain('reset-action="clearFilters"')
         ->not->toContain("'all' => 'All variables'")
         ->toContain("setTableSort('{{ \$value }}')")
         ->toContain('Loading environment variables...')
@@ -35,12 +32,17 @@ test('resource environment variables table has a Managed column and no name-cell
         ->toContain("'literal' => 'Literal'")
         ->toContain('$activeFilterCount')
         ->toContain('$activeFilterText')
-        ->toContain("'button max-w-80 min-w-0'")
         ->toContain("'flex size-4 shrink-0 items-center justify-center rounded-[5px] border'")
         ->toContain('m2.25 6.15 2.35 2.3 5.15-5')
         ->toContain('>Name</span>')
         ->toContain('>Managed</span>')
-        ->toContain('>Type</span>');
+        ->toContain('>Type</span>')
+        ->and($filter)
+        ->toContain('Reset filters')
+        ->toContain('max-h-80 overflow-y-auto p-1')
+        ->toContain('min-w-44! overflow-hidden! p-0!')
+        ->and($loading)
+        ->toContain('wire:loading.flex');
 
     // Name cell does not repeat the environment type; Type owns Production/Preview.
     expect($show)
@@ -103,4 +105,12 @@ test('managed environment variables are ordered first', function () {
     expect($component)
         ->toContain("CASE WHEN key LIKE 'SERVICE_FQDN%'")
         ->toMatch("/'kind' => 'hardcoded',[\\s\\S]+?'kind' => 'managed'/");
+});
+
+test('environment variable toolbar does not use blade directives inside component attributes', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/all.blade.php'));
+
+    expect($view)
+        ->not->toMatch('/<x-table\.toolbar[^>]*@if/')
+        ->toContain('aria-busy="{{ ! $readyToLoad ? \'true\' : \'false\' }}"');
 });

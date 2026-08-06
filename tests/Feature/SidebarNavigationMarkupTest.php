@@ -1,5 +1,20 @@
 <?php
 
+it('keeps server submenu state independent from the Livewire update route', function () {
+    $sidebar = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+    $dynamicConfigurations = file_get_contents(resource_path('views/livewire/server/proxy/dynamic-configurations.blade.php'));
+    $proxyConfiguration = file_get_contents(resource_path('views/livewire/server/proxy/show.blade.php'));
+    $proxyLogs = file_get_contents(resource_path('views/livewire/server/proxy/logs.blade.php'));
+
+    expect($sidebar)
+        ->toContain("'active' => \$activeMenu === 'proxy'")
+        ->toContain("'active' => \$activeSubMenu === 'dynamic-confs'")
+        ->not->toContain("'active' => request()->routeIs('server.proxy.dynamic-confs')")
+        ->and($dynamicConfigurations)->toContain('activeSubMenu="dynamic-confs"')
+        ->and($proxyConfiguration)->toContain('activeSubMenu="configuration"')
+        ->and($proxyLogs)->toContain('activeSubMenu="logs"');
+});
+
 it('initializes persisted sidebar state before enabling layout transitions', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
@@ -40,7 +55,7 @@ it('separates the mobile sidebar from the page with a visible border', function 
     expect($layout)->toContain('max-w-56 min-w-0 flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-white/[0.12] dark:bg-panel');
 });
 
-it('truncates long team names within the mobile header', function () {
+it('shows the full team name in the header', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
     $switcher = file_get_contents(resource_path('views/livewire/switch-team.blade.php'));
 
@@ -49,8 +64,22 @@ it('truncates long team names within the mobile header', function () {
         ->toContain('size-8 shrink-0 items-center justify-center rounded-lg')
         ->toContain('flex shrink-0 items-center gap-1')
         ->and($switcher)
-        ->toContain('group/team flex h-8 min-w-0 max-w-full items-center')
-        ->toContain('min-w-0 truncate text-[13px]');
+        ->toContain('group/team flex h-8 items-center')
+        ->toContain('whitespace-nowrap text-[13px]')
+        ->not->toContain('max-w-56 truncate text-[13px]');
+});
+
+it('allows more of the team name to display in the desktop breadcrumb', function () {
+    $breadcrumb = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
+
+    expect($breadcrumb)
+        ->toContain('class="shrink-0" x-data="{ collapsed: false }"')
+        ->toContain('<div class="flex min-w-0 items-center gap-0.5 text-[13px]">')
+        ->not->toContain('<div class="flex w-full min-w-0 items-center gap-0.5 text-[13px]">');
+
+    $switcher = file_get_contents(resource_path('views/livewire/switch-team.blade.php'));
+
+    expect($switcher)->toContain('whitespace-nowrap text-[13px]');
 });
 
 it('shows section titles and descriptions above settings navigation on smaller screens', function (string $view, string $title, string $description) {

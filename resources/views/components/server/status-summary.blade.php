@@ -45,7 +45,8 @@
             <span>{{ $serverReady ? 'Ready' : 'Unavailable' }}</span>
         </div>
         @if ($server->proxySet())
-            <div class="listbox-option cursor-default! gap-2.5!">
+            <a href="{{ route('server.proxy', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span @class([
                     'size-1.5 shrink-0 rounded-full',
                     'bg-success' => $proxyStatus === 'running',
@@ -54,14 +55,15 @@
                 ])></span>
                 <span class="flex-1">Proxy</span>
                 <span>{{ str($proxyStatus ?: 'unknown')->headline() }}</span>
-            </div>
+            </a>
         @endif
         @if ($showSentinelStatus)
-            <div class="listbox-option cursor-default! gap-2.5!">
+            <a href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+                class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span class="size-1.5 shrink-0 rounded-full {{ $server->isSentinelLive() ? 'bg-success' : 'bg-error' }}"></span>
                 <span class="flex-1">Sentinel</span>
                 <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
-            </div>
+            </a>
         @endif
         @if ($server->proxySet())
             <button type="button"

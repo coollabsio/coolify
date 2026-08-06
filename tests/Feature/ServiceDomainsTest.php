@@ -109,6 +109,7 @@ it('groups configured domains with their service redirect and excludes services 
         ->toContain("wire:target=\"serviceRedirects.{$this->apiApp->id}\"")
         ->not->toContain("service-domain-redirect-toggle-{$this->apiApp->id}")
         ->not->toContain("service-domain-group-{$this->webApp->id}")
+        ->and(substr_count($html, '2 domains'))->toBe(1)
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });
 

@@ -45,11 +45,13 @@ it('uses bordered status badges in the top breadcrumb', function () {
         ->and(substr_count($breadcrumb, 'rounded-full bg-neutral-100'))->toBe(0);
 });
 
-it('renders application status through a reactive livewire component', function () {
+it('renders resource statuses through reactive livewire components', function () {
     $breadcrumb = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
 
     expect($breadcrumb)
         ->toContain('<livewire:project.application.status')
+        ->toContain('<livewire:project.database.status')
+        ->toContain('<livewire:project.service.status')
         ->not->toContain('$applicationStatus = str($currentApplication->status');
 });
 

@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Livewire\Project\Application;
+namespace App\Livewire\Project\Service;
 
-use App\Models\Application;
+use App\Models\Service;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class Status extends Component
 {
-    public Application $application;
+    public Service $service;
 
     public function getListeners(): array
     {
@@ -22,11 +22,11 @@ class Status extends Component
 
     public function refreshStatus(): void
     {
-        $this->application->refresh();
+        $this->service->refresh()->load(['applications', 'databases']);
     }
 
     public function render(): View
     {
-        return view('livewire.project.application.status');
+        return view('livewire.project.service.status');
     }
 }

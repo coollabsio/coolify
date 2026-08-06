@@ -1,3 +1,5 @@
+@props(['server', 'activeMenu', 'activeSubMenu' => null])
+
 @php
     $serverRouteParameters = ['server_uuid' => $server->uuid];
     $serverMenuItems = [
@@ -49,14 +51,14 @@
         [
             'label' => 'Proxy',
             'route' => 'server.proxy',
-            'active' => request()->routeIs('server.proxy', 'server.proxy.*'),
+            'active' => $activeMenu === 'proxy',
             'icon' => 'network',
             'group' => 'Platform',
             'visible' => ! $server->isSwarmWorker() && ! $server->settings->is_build_server,
             'children' => [
-                ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => request()->routeIs('server.proxy'), 'icon' => 'settings'],
-                ['label' => 'Dynamic Configurations', 'route' => 'server.proxy.dynamic-confs', 'active' => request()->routeIs('server.proxy.dynamic-confs'), 'icon' => 'sliders', 'visible' => $server->proxySet()],
-                ['label' => 'Logs', 'route' => 'server.proxy.logs', 'active' => request()->routeIs('server.proxy.logs'), 'icon' => 'file-content', 'visible' => $server->proxySet(), 'navigate' => false],
+                ['label' => 'Configuration', 'route' => 'server.proxy', 'active' => $activeSubMenu === 'configuration', 'icon' => 'settings'],
+                ['label' => 'Dynamic Configurations', 'route' => 'server.proxy.dynamic-confs', 'active' => $activeSubMenu === 'dynamic-confs', 'icon' => 'sliders', 'visible' => $server->proxySet()],
+                ['label' => 'Logs', 'route' => 'server.proxy.logs', 'active' => $activeSubMenu === 'logs', 'icon' => 'file-content', 'visible' => $server->proxySet(), 'navigate' => false],
             ],
         ],
         [

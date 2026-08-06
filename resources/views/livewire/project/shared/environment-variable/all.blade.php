@@ -72,40 +72,14 @@
 
     {{-- Toolbar: search left; filter and add right --}}
     @if ($view === 'normal')
-        <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center"
-            @if (! $readyToLoad) aria-busy="true" @endif>
-            <div class="relative min-w-0 w-full flex-1 sm:max-w-md">
-                <input type="search" placeholder="Search environment variables"
-                    aria-label="Search environment variables" wire:model.live.debounce.300ms="search"
-                    class="input w-full pl-8!" @disabled(! $readyToLoad) />
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-                    <x-reicon name="search" wire:loading.remove wire:target="search,loadEnvironmentVariables"
-                        class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                    <svg wire:loading wire:target="search,loadEnvironmentVariables" aria-hidden="true"
-                        class="size-3.5 animate-spin text-neutral-400 dark:text-fg-dim" fill="none"
-                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                </div>
-            </div>
-            <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
-                    <button type="button" @click="open = !open" @click.outside="open = false"
-                        @if ($activeFilterCount > 0) title="{{ $activeFilterText }}" @endif
-                        @class([
-                            'button max-w-80 min-w-0',
-                            'button-highlighted' => $activeFilterCount > 0,
-                        ])>
-                        <x-reicon name="filter" class="size-3.5 shrink-0" />
-                        <span class="truncate">{{ $activeFilterCount > 0 ? $activeFilterText : 'Filter' }}</span>
-                        @if ($activeFilterCount > 0)
-                            <span class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim">{{ $activeFilterCount }}</span>
-                        @endif
-                    </button>
-                    <div class="listbox-panel left-auto! right-0! z-[90]! min-w-44! overflow-hidden! p-0!" x-show="open" x-cloak>
-                        <div class="max-h-80 overflow-y-auto p-1">
+        <x-table.toolbar class="mt-2" aria-busy="{{ ! $readyToLoad ? 'true' : 'false' }}">
+            <x-slot:search>
+                <x-table.search placeholder="Search environment variables"
+                    loading-target="search,loadEnvironmentVariables" wire:model.live.debounce.300ms="search"
+                    :disabled="! $readyToLoad" />
+            </x-slot:search>
+            <x-table.filter :active-count="$activeFilterCount" :active-text="$activeFilterText"
+                reset-action="clearFilters">
                         @foreach ([
                             'managed' => 'Managed',
                             'user' => 'User-defined',
@@ -174,31 +148,15 @@
                                 </button>
                             @endforeach
                         @endif
-                        </div>
-                        <div class="relative z-20 border-t border-neutral-200 bg-white p-1 dark:border-white/10 dark:bg-[#171717]">
-                            <button type="button" class="listbox-option text-neutral-500 dark:text-fg-dim"
-                                wire:click="clearFilters" @click="open = false" @disabled($activeFilterCount === 0)>
-                                <span>Clear filters</span>
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                    <path stroke-linecap="round" d="m6 6 12 12M18 6 6 18" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
-                    <button type="button" class="button" @click="open = !open" @click.outside="open = false">
-                        Sort
-                    </button>
-                    <div class="listbox-panel left-auto! right-0! z-[90]! min-w-44!" x-show="open" x-cloak>
+            </x-table.filter>
+            <x-table.sort>
                         @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
                             <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
                                 <span>{{ $label }}</span>
                                 @if ($tableSort === $value)<span>✓</span>@endif
                             </button>
                         @endforeach
-                    </div>
-                </div>
+            </x-table.sort>
                 @can('manageEnvironment', $resource)
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
@@ -213,8 +171,7 @@
                         <livewire:project.shared.environment-variable.add />
                     </x-modal-input>
                 @endcan
-            </div>
-        </div>
+        </x-table.toolbar>
     @endif
 
     @if ($view === 'normal')
@@ -266,11 +223,9 @@
                             @endif
                             @endforeach
                             </div>
-                            <div wire:loading.flex
-                                wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
-                                class="absolute inset-0 z-10 hidden items-center justify-center bg-black/5 backdrop-blur-[1px] dark:bg-black/20">
-                                <x-loading text="Loading environment variables..." />
-                            </div>
+                            <x-table.loading
+                                target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
+                                text="Loading environment variables..." />
                         </div>
                         <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$totalRows"
                             :current-page="$currentPage" :last-page="$lastPage"
@@ -287,10 +242,7 @@
                                 description="Add your first variable with the + Add button above."
                                 icon-name="variables" />
                         </div>
-                        <div wire:loading.flex wire:target="clearFilters"
-                            class="absolute inset-0 z-10 hidden items-center justify-center bg-black/5 backdrop-blur-[1px] dark:bg-black/20">
-                            <x-loading text="Loading environment variables..." />
-                        </div>
+                        <x-table.loading target="clearFilters" text="Loading environment variables..." />
                     </div>
                 @endif
             </div>

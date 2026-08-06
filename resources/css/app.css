@@ -2489,6 +2489,14 @@ input[type="search"]::-webkit-search-results-decoration {
     gap: 0.5rem;
 }
 
+.logs-viewer-primary {
+    display: flex;
+    min-width: 0;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .logs-viewer-search {
     position: relative;
     min-width: 0;
@@ -2612,7 +2620,7 @@ input[type="search"]::-webkit-search-results-decoration {
     flex-shrink: 0;
 }
 
-/* Status badge + cancel/force-start — right-aligned as a group */
+/* Cancel/force-start + search — right-aligned as a group */
 .logs-viewer-end {
     display: flex;
     min-width: 0;
@@ -2621,6 +2629,15 @@ input[type="search"]::-webkit-search-results-decoration {
     align-items: center;
     justify-content: flex-end;
     gap: 0.5rem;
+}
+
+.logs-viewer-end .logs-viewer-meta {
+    width: auto;
+}
+
+.runtime-logs-viewer-end {
+    align-items: stretch;
+    flex-direction: column;
 }
 
 .logs-viewer-deployment-actions {
@@ -2725,12 +2742,17 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 @media (min-width: 640px) {
-    /* Desktop: [meta] [search] [actions] single row */
+    /* Desktop: [actions + status] ... [cancel + search] */
     .logs-viewer-toolbar-controls {
         flex-direction: row;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         align-items: center;
         gap: 0.5rem 0.75rem;
+    }
+
+    .logs-viewer-primary {
+        width: auto;
+        flex: 0 1 auto;
     }
 
     .logs-viewer-meta {
@@ -2747,7 +2769,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .logs-viewer-actions {
-        order: 2;
+        order: 0;
         width: auto;
         flex: 0 0 auto;
         max-width: 100%;
@@ -2756,10 +2778,19 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .logs-viewer-end {
-        order: 3;
+        order: 1;
         width: auto;
         flex: 0 0 auto;
         margin-left: auto;
+    }
+
+    .logs-viewer-end .logs-viewer-meta {
+        order: 2;
+    }
+
+    .runtime-logs-viewer-end {
+        align-items: center;
+        flex-direction: row;
     }
 
     .logs-viewer-deployment-actions {
@@ -2847,6 +2878,8 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .runtime-log-toolbar {
+    position: relative;
+    z-index: 20;
     border-bottom-color: var(--coollabs-fill);
     background: transparent;
 }
@@ -2886,13 +2919,18 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .runtime-log-icon-button-active {
-    background: color-mix(in oklab, var(--color-coollabs) 10%, transparent);
-    color: var(--color-coollabs);
+    background: var(--color-coollabs);
+    color: #fff;
 }
 
 .dark .runtime-log-icon-button-active {
-    background: color-mix(in oklab, var(--color-warning) 14%, transparent);
-    color: var(--color-warning);
+    background: var(--color-coollabs);
+    color: #fff;
+}
+
+.runtime-log-menu {
+    background: var(--coollabs-elevated) !important;
+    opacity: 1 !important;
 }
 
 .runtime-log-viewport {

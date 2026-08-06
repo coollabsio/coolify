@@ -1,9 +1,6 @@
 <?php
 
-/**
- * Shared variables family: hide the page H1 on desktop; editor view toggle lives in layer-2 nav.
- */
-test('shared variables pages hide the family title on desktop', function () {
+test('shared variables pages use the shared variables submenu instead of horizontal tabs', function () {
     $paths = [
         resource_path('views/livewire/shared-variables/index.blade.php'),
         resource_path('views/livewire/shared-variables/project/index.blade.php'),
@@ -14,9 +11,54 @@ test('shared variables pages hide the family title on desktop', function () {
 
     foreach ($paths as $path) {
         expect(file_get_contents($path))
-            ->toContain('section="shared-variables"')
-            ->toContain(':titleOnDesktop="false"');
+            ->toContain('<x-shared-variables.layout')
+            ->not->toContain('section="shared-variables"');
     }
+
+    $layout = file_get_contents(resource_path('views/components/shared-variables/layout.blade.php'));
+
+    expect($layout)
+        ->toContain("'Overview'")
+        ->toContain("'Team'")
+        ->toContain("'Projects'")
+        ->toContain("'Environments'")
+        ->toContain("'Servers'")
+        ->toContain("request()->routeIs('shared-variables.project.*')")
+        ->toContain('xl:grid-cols-[210px_minmax(0,1fr)]')
+        ->toContain("'menu-item-active' => \$menuItem['active']");
+});
+
+test('shared variables are not registered as dashboard tabs', function () {
+    $navbar = file_get_contents(resource_path('views/components/dashboard/navbar.blade.php'));
+
+    expect($navbar)
+        ->not->toContain("'shared-variables' => [")
+        ->not->toContain('$stackTabsOnMobile')
+        ->not->toContain('$sharedVariableIcons');
+});
+
+test('shared variable collection pages provide search and persistent grid and list views', function () {
+    $paths = [
+        resource_path('views/livewire/shared-variables/project/index.blade.php'),
+        resource_path('views/livewire/shared-variables/environment/index.blade.php'),
+        resource_path('views/livewire/shared-variables/server/index.blade.php'),
+    ];
+
+    foreach ($paths as $path) {
+        expect(file_get_contents($path))
+            ->toContain('<x-shared-variables.view-controls')
+            ->toContain("x-show=\"viewMode === 'grid'\"")
+            ->toContain("x-show=\"viewMode === 'list'\"")
+            ->toContain('matches(');
+    }
+
+    $controls = file_get_contents(resource_path('views/components/shared-variables/view-controls.blade.php'));
+
+    expect($controls)
+        ->toContain('placeholder="Search {{ strtolower($label) }}"')
+        ->toContain('aria-label="List view"')
+        ->toContain('aria-label="Grid view"')
+        ->toContain("localStorage.setItem('{{ \$storageKey }}'");
 });
 
 test('shared variables editor places the view toggle in the variables section title', function () {
@@ -30,18 +72,6 @@ test('shared variables editor places the view toggle in the variables section ti
         ->toContain('Normal view')
         ->toMatch('/settings-section[\s\S]{0,300}<x-slot:actions>[\s\S]{0,300}wire:click="switch"/')
         ->not->toContain('actionsInTitle');
-});
-
-test('shared variables navigation uses the standard mobile settings menu', function () {
-    $navbar = file_get_contents(resource_path('views/components/dashboard/navbar.blade.php'));
-
-    expect($navbar)
-        ->toContain("\$stackTabsOnMobile = \$section === 'shared-variables'")
-        ->toContain('grid grid-cols-2 gap-0.5 border-y')
-        ->toContain("'menu-item'")
-        ->toContain("'menu-item-active' => \$item['active']")
-        ->toContain("\$sharedVariableIcons[\$item['label']]")
-        ->toContain('hidden lg:flex');
 });
 
 test('shared variables table omits resource-only flag columns', function () {

@@ -9,7 +9,7 @@
         $lastPage = max(1, (int) ceil($deployments_count / $defaultTake));
         $firstVisibleRow = $deployments_count === 0 ? 0 : $skip + 1;
         $lastVisibleRow = min($skip + $deployments->count(), $deployments_count);
-        $hasActiveFilter = $deploymentFilter !== 'all' || filled($pull_request_id);
+        $hasActiveFilter = count($deploymentFilters) > 0 || filled($pull_request_id);
         $hasActiveQuery = trim($search) !== '' || $hasActiveFilter;
     @endphp
 
@@ -30,85 +30,90 @@
         @if (!$skip) wire:poll.5000ms="reloadDeployments" @endif>
         <x-application.settings-section title="Deployment history"
             helper="Search, filter, and open a deployment to inspect its build logs." flush>
-            <div
-                class="flex flex-wrap items-center gap-2 border-b border-neutral-200 p-3 dark:border-white/[0.08]">
-                <div class="relative min-w-0 max-w-md flex-1">
-                    <input type="search" placeholder="Search deployments" aria-label="Search deployments"
-                        wire:model.live.debounce.300ms="search" class="input w-full pl-8!" />
-                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-                        <x-reicon name="search" wire:loading.remove wire:target="search"
-                            class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                        <svg wire:loading wire:target="search" aria-hidden="true"
-                            class="size-3.5 animate-spin text-neutral-400 dark:text-fg-dim" fill="none"
-                            viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10"
-                                stroke="currentColor" stroke-width="4" />
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                    </div>
-                </div>
-
-                <div class="ml-auto flex items-center gap-2">
-                    <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
-                        <button type="button" class="button" @click="open = !open"
-                            @click.outside="open = false" aria-haspopup="listbox" :aria-expanded="open">
-                            <x-reicon name="filter" class="size-3.5" />
-                            Filter
-                        </button>
-                        <div class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!" x-show="open"
-                            x-cloak role="listbox">
-                            <button type="button" class="listbox-option" role="option"
-                                aria-selected="{{ !$hasActiveFilter ? 'true' : 'false' }}"
-                                wire:click="clearFilter" @click="open = false">
-                                <span>All deployments</span>
-                                @if (!$hasActiveFilter)
-                                    <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
-                                        <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
-                                            stroke-width="2.5" stroke-linecap="round"
-                                            stroke-linejoin="round" />
-                                    </svg>
-                                @endif
-                            </button>
-
+            <x-table.toolbar class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
+                <x-slot:search>
+                    <x-table.search placeholder="Search deployments" loading-target="search"
+                        wire:model.live.debounce.300ms="search" />
+                </x-slot:search>
+                <x-table.filter :active-count="count($deploymentFilters) + (filled($pull_request_id) ? 1 : 0)"
+                    reset-action="clearFilter">
                             @if (count($statusFilterOptions) > 0)
                                 <span
                                     class="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Status</span>
                                 @foreach ($statusFilterOptions as $option)
                                     <button type="button" class="listbox-option" role="option"
-                                        aria-selected="{{ $deploymentFilter === $option['value'] ? 'true' : 'false' }}"
-                                        wire:click="setDeploymentFilter('{{ $option['value'] }}')"
-                                        @click="open = false">
+                                        aria-selected="{{ in_array($option['value'], $deploymentFilters, true) ? 'true' : 'false' }}"
+                                        wire:click="toggleDeploymentFilter('{{ $option['value'] }}')">
                                         <span>{{ $option['label'] }}</span>
-                                        @if ($deploymentFilter === $option['value'] && !$pull_request_id)
-                                            <svg class="size-3.5 shrink-0" viewBox="0 0 24 24"
-                                                fill="none">
-                                                <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
-                                                    stroke-width="2.5" stroke-linecap="round"
-                                                    stroke-linejoin="round" />
-                                            </svg>
-                                        @endif
+                                        @php
+                                            $selected = in_array($option['value'], $deploymentFilters, true);
+                                        @endphp
+                                        <span @class([
+                                            'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                            'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
+                                        ])>
+                                            @if ($selected)
+                                                <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            @endif
+                                        </span>
                                     </button>
                                 @endforeach
                             @endif
 
-                            @if (count($sourceFilterOptions) > 1)
+                            @if (count($sourceFilterOptions) > 0)
                                 <span
                                     class="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Source</span>
                                 @foreach ($sourceFilterOptions as $option)
                                     <button type="button" class="listbox-option" role="option"
-                                        aria-selected="{{ $deploymentFilter === $option['value'] ? 'true' : 'false' }}"
-                                        wire:click="setDeploymentFilter('{{ $option['value'] }}')"
-                                        @click="open = false">
+                                        aria-selected="{{ in_array($option['value'], $deploymentFilters, true) ? 'true' : 'false' }}"
+                                        wire:click="toggleDeploymentFilter('{{ $option['value'] }}')">
                                         <span>{{ $option['label'] }}</span>
-                                        @if ($deploymentFilter === $option['value'] && !$pull_request_id)
-                                            <svg class="size-3.5 shrink-0" viewBox="0 0 24 24"
-                                                fill="none">
-                                                <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
-                                                    stroke-width="2.5" stroke-linecap="round"
-                                                    stroke-linejoin="round" />
-                                            </svg>
-                                        @endif
+                                        @php
+                                            $selected = in_array($option['value'], $deploymentFilters, true);
+                                        @endphp
+                                        <span @class([
+                                            'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                            'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
+                                        ])>
+                                            @if ($selected)
+                                                <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            @endif
+                                        </span>
+                                    </button>
+                                @endforeach
+                            @endif
+
+                            @if (count($serverFilterOptions) > 0)
+                                <span
+                                    class="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Server</span>
+                                @foreach ($serverFilterOptions as $option)
+                                    <button type="button" class="listbox-option" role="option"
+                                        aria-selected="{{ in_array($option['value'], $deploymentFilters, true) ? 'true' : 'false' }}"
+                                        wire:click="toggleDeploymentFilter('{{ $option['value'] }}')">
+                                        <span class="truncate">{{ $option['label'] }}</span>
+                                        @php
+                                            $selected = in_array($option['value'], $deploymentFilters, true);
+                                        @endphp
+                                        <span @class([
+                                            'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                            'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
+                                        ])>
+                                            @if ($selected)
+                                                <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            @endif
+                                        </span>
                                     </button>
                                 @endforeach
                             @endif
@@ -133,17 +138,8 @@
                                     </button>
                                 @endforeach
                             @endif
-                        </div>
-                    </div>
-
-                    <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
-                        <button type="button" class="button" @click="open = !open"
-                            @click.outside="open = false" aria-haspopup="listbox" :aria-expanded="open">
-                            <x-reicon name="sort-direction" class="size-3.5" />
-                            Sort
-                        </button>
-                        <div class="listbox-panel left-auto! right-0! z-[90]! w-44! min-w-44!" x-show="open"
-                            x-cloak role="listbox">
+                </x-table.filter>
+                <x-table.sort>
                             @foreach ([
                                 'newest' => 'Newest first',
                                 'oldest' => 'Oldest first',
@@ -162,15 +158,16 @@
                                     @endif
                                 </button>
                             @endforeach
-                        </div>
-                    </div>
-                </div>
-            </div>
+                </x-table.sort>
+            </x-table.toolbar>
 
             @if ($deployments->isNotEmpty())
-                <div class="data-table w-full transition-opacity"
+                <div class="data-table relative w-full transition-opacity"
                     wire:loading.class="opacity-50 pointer-events-none"
-                    wire:target="goToPage,previousPage,nextPage">
+                    wire:target="goToPage,previousPage,nextPage,toggleDeploymentFilter,clearFilter,setPullRequestFilter">
+                    <x-table.loading id="deployment-table-filter-loading"
+                        target="toggleDeploymentFilter,clearFilter,setPullRequestFilter"
+                        text="Filtering deployments..." class="rounded-lg" />
                     <div class="data-table-header deployment-table-grid rounded-none!">
                         <span>Status</span>
                         <span>Source</span>

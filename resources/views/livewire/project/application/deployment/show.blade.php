@@ -290,23 +290,55 @@
                             };
                         @endphp
                         <div class="logs-viewer-toolbar-controls">
-                            <div class="logs-viewer-search relative">
-                                <x-reicon name="search"
-                                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" />
-                                <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
-                                    aria-label="Find in logs"
-                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! text-neutral-800! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.05]! dark:text-white! dark:placeholder:text-neutral-500" />
-                                <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
-                                    class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-500 dark:hover:bg-white/[0.07] dark:hover:text-white"
-                                    aria-label="Clear search">
-                                    <x-reicon name="x" class="size-3" />
+                            <div class="logs-viewer-primary">
+                                <div class="logs-viewer-actions">
+                                <button title="Toggle Timestamps" x-on:click="showTimestamps = !showTimestamps"
+                                    :class="showTimestamps ? 'logs-viewer-btn-active' : ''"
+                                    class="logs-viewer-btn">
+                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                        stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                    </svg>
                                 </button>
-                            </div>
-                            <div class="logs-viewer-meta">
-                                <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
-                                    class="text-xs text-neutral-500 whitespace-nowrap"></span>
-                            </div>
-                            <div class="logs-viewer-actions">
+                                <button title="Follow Logs" :class="alwaysScroll ? 'logs-viewer-btn-active' : ''"
+                                    x-on:click="toggleScroll"
+                                    class="logs-viewer-btn">
+                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill="none" stroke="currentColor" stroke-linecap="round"
+                                            stroke-linejoin="round" stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
+                                    </svg>
+                                </button>
+                                @can('update', $application)
+                                <button wire:click="toggleDebug"
+                                    title="{{ $is_debug_enabled ? 'Hide Debug Logs' : 'Show Debug Logs' }}"
+                                    class="logs-viewer-btn {{ $is_debug_enabled ? 'logs-viewer-btn-active' : '' }}">
+                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                        stroke="currentColor" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round"
+                                            d="M12 12.75c1.148 0 2.278.08 3.383.237 1.037.146 1.866.966 1.866 2.013 0 3.728-2.35 6.75-5.25 6.75S6.75 18.728 6.75 15c0-1.046.83-1.867 1.866-2.013A24.204 24.204 0 0 1 12 12.75Zm0 0c2.883 0 5.647.508 8.207 1.44a23.91 23.91 0 0 1-1.152 6.06M12 12.75c-2.883 0-5.647.508-8.208 1.44.125 2.104.52 4.136 1.153 6.06M12 12.75a2.25 2.25 0 0 0 2.248-2.354M12 12.75a2.25 2.25 0 0 1-2.248-2.354M12 8.25c.995 0 1.971-.08 2.922-.236.403-.066.74-.358.795-.762a3.778 3.778 0 0 0-.399-2.25M12 8.25c-.995 0-1.97-.08-2.922-.236-.402-.066-.74-.358-.795-.762a3.734 3.734 0 0 1 .4-2.253M12 8.25a2.25 2.25 0 0 0-2.248 2.146M12 8.25a2.25 2.25 0 0 1 2.248 2.146M8.683 5a6.032 6.032 0 0 1-1.155-1.002c.07-.63.27-1.222.574-1.747m.581 2.749A3.75 3.75 0 0 1 15.318 5m0 0c.427-.283.815-.62 1.155-.999a4.471 4.471 0 0 0-.575-1.752M4.921 6a24.048 24.048 0 0 0-.392 3.314c1.668.546 3.416.914 5.223 1.082M19.08 6c.205 1.08.337 2.187.392 3.314a23.882 23.882 0 0 1-5.223 1.082" />
+                                    </svg>
+                                </button>
+                                @endcan
+                                <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen"
+                                    class="logs-viewer-btn">
+                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <g fill="none">
+                                            <path
+                                                d="M24 0v24H0V0h24ZM12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035c-.01-.004-.019-.001-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427c-.002-.01-.009-.017-.017-.018Zm.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093c.012.004.023 0 .029-.008l.004-.014l-.034-.614c-.003-.012-.01-.02-.02-.022Zm-.715.002a.023.023 0 0 0-.027.006l-.006.014l-.034.614c0 .012.007.02.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01l-.184-.092Z" />
+                                            <path fill="currentColor"
+                                                d="M9.793 12.793a1 1 0 0 1 1.497 1.32l-.083.094L6.414 19H9a1 1 0 0 1 .117 1.993L9 21H4a1 1 0 0 1-.993-.883L3 20v-5a1 1 0 0 1 1.993-.117L5 15v2.586l4.793-4.793ZM20 3a1 1 0 0 1 .993.883L21 4v5a1 1 0 0 1-1.993.117L19 9V6.414l-4.793 4.793a1 1 0 0 1-1.497-1.32l.083-.094L17.586 5H15a1 1 0 0 1-.117-1.993L15 3h5Z" />
+                                        </g>
+                                    </svg>
+                                </button>
+                                <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen"
+                                    class="logs-viewer-btn">
+                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path fill="none" stroke="currentColor" stroke-linecap="round"
+                                            stroke-linejoin="round" stroke-width="2"
+                                            d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
+                                    </svg>
+                                </button>
                                 <button
                                     x-on:click="copyLogs()"
                                     title="Copy Logs"
@@ -374,59 +406,29 @@
                                         </div>
                                     </div>
                                 </div>
-                                <button title="Toggle Timestamps" x-on:click="showTimestamps = !showTimestamps"
-                                    :class="showTimestamps ? 'logs-viewer-btn-active' : ''"
-                                    class="logs-viewer-btn">
-                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                        stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                    </svg>
-                                </button>
-                                @can('update', $application)
-                                <button wire:click="toggleDebug"
-                                    title="{{ $is_debug_enabled ? 'Hide Debug Logs' : 'Show Debug Logs' }}"
-                                    class="logs-viewer-btn {{ $is_debug_enabled ? 'logs-viewer-btn-active' : '' }}">
-                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                        stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M12 12.75c1.148 0 2.278.08 3.383.237 1.037.146 1.866.966 1.866 2.013 0 3.728-2.35 6.75-5.25 6.75S6.75 18.728 6.75 15c0-1.046.83-1.867 1.866-2.013A24.204 24.204 0 0 1 12 12.75Zm0 0c2.883 0 5.647.508 8.207 1.44a23.91 23.91 0 0 1-1.152 6.06M12 12.75c-2.883 0-5.647.508-8.208 1.44.125 2.104.52 4.136 1.153 6.06M12 12.75a2.25 2.25 0 0 0 2.248-2.354M12 12.75a2.25 2.25 0 0 1-2.248-2.354M12 8.25c.995 0 1.971-.08 2.922-.236.403-.066.74-.358.795-.762a3.778 3.778 0 0 0-.399-2.25M12 8.25c-.995 0-1.97-.08-2.922-.236-.402-.066-.74-.358-.795-.762a3.734 3.734 0 0 1 .4-2.253M12 8.25a2.25 2.25 0 0 0-2.248 2.146M12 8.25a2.25 2.25 0 0 1 2.248 2.146M8.683 5a6.032 6.032 0 0 1-1.155-1.002c.07-.63.27-1.222.574-1.747m.581 2.749A3.75 3.75 0 0 1 15.318 5m0 0c.427-.283.815-.62 1.155-.999a4.471 4.471 0 0 0-.575-1.752M4.921 6a24.048 24.048 0 0 0-.392 3.314c1.668.546 3.416.914 5.223 1.082M19.08 6c.205 1.08.337 2.187.392 3.314a23.882 23.882 0 0 1-5.223 1.082" />
-                                    </svg>
-                                </button>
-                                @endcan
-                                <button title="Follow Logs" :class="alwaysScroll ? 'logs-viewer-btn-active' : ''"
-                                    x-on:click="toggleScroll"
-                                    class="logs-viewer-btn">
-                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path fill="none" stroke="currentColor" stroke-linecap="round"
-                                            stroke-linejoin="round" stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
-                                    </svg>
-                                </button>
-                                <button title="Fullscreen" x-show="!fullscreen" x-on:click="makeFullscreen"
-                                    class="logs-viewer-btn">
-                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <g fill="none">
-                                            <path
-                                                d="M24 0v24H0V0h24ZM12.593 23.258l-.011.002l-.071.035l-.02.004l-.014-.004l-.071-.035c-.01-.004-.019-.001-.024.005l-.004.01l-.017.428l.005.02l.01.013l.104.074l.015.004l.012-.004l.104-.074l.012-.016l.004-.017l-.017-.427c-.002-.01-.009-.017-.017-.018Zm.265-.113l-.013.002l-.185.093l-.01.01l-.003.011l.018.43l.005.012l.008.007l.201.093c.012.004.023 0 .029-.008l.004-.014l-.034-.614c-.003-.012-.01-.02-.02-.022Zm-.715.002a.023.023 0 0 0-.027.006l-.006.014l-.034.614c0 .012.007.02.017.024l.015-.002l.201-.093l.01-.008l.004-.011l.017-.43l-.003-.012l-.01-.01l-.184-.092Z" />
-                                            <path fill="currentColor"
-                                                d="M9.793 12.793a1 1 0 0 1 1.497 1.32l-.083.094L6.414 19H9a1 1 0 0 1 .117 1.993L9 21H4a1 1 0 0 1-.993-.883L3 20v-5a1 1 0 0 1 1.993-.117L5 15v2.586l4.793-4.793ZM20 3a1 1 0 0 1 .993.883L21 4v5a1 1 0 0 1-1.993.117L19 9V6.414l-4.793 4.793a1 1 0 0 1-1.497-1.32l.083-.094L17.586 5H15a1 1 0 0 1-.117-1.993L15 3h5Z" />
-                                        </g>
-                                    </svg>
-                                </button>
-                                <button title="Minimize" x-show="fullscreen" x-on:click="makeFullscreen"
-                                    class="logs-viewer-btn">
-                                    <svg class="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path fill="none" stroke="currentColor" stroke-linecap="round"
-                                            stroke-linejoin="round" stroke-width="2"
-                                            d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div class="logs-viewer-end">
+                                </div>
                                 <x-status-badge :status="$deploymentStatusLabel" :type="$deploymentStatusType"
                                     class="logs-viewer-status-badge" />
+                            </div>
+                            <div class="logs-viewer-end">
                                 <livewire:project.application.deployment-navbar
                                     :application_deployment_queue="$application_deployment_queue" />
+                            <div class="logs-viewer-search relative">
+                                <x-reicon name="search"
+                                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" />
+                                <input type="search" x-model.debounce.300ms="searchQuery" placeholder="Find in logs"
+                                    aria-label="Find in logs"
+                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! text-neutral-800! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.05]! dark:text-white! dark:placeholder:text-neutral-500" />
+                                <button x-cloak x-show="searchQuery" x-on:click="searchQuery = ''" type="button"
+                                    class="absolute top-1/2 right-2 z-10 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-500 dark:hover:bg-white/[0.07] dark:hover:text-white"
+                                    aria-label="Clear search">
+                                    <x-reicon name="x" class="size-3" />
+                                </button>
+                            </div>
+                            <div class="logs-viewer-meta">
+                                <span x-show="searchQuery.trim()" x-text="matchCount + ' matches'"
+                                    class="text-xs text-neutral-500 whitespace-nowrap"></span>
+                            </div>
                             </div>
                         </div>
                     </div>

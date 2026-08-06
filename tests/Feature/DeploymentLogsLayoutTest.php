@@ -89,6 +89,7 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
     expect($deploymentView)
         ->toContain('logs-viewer-toolbar')
         ->toContain('logs-viewer-toolbar-controls')
+        ->toContain('logs-viewer-primary')
         ->toContain('logs-viewer-meta')
         ->toContain('logs-viewer-end')
         ->toContain('logs-viewer-status-badge')
@@ -119,22 +120,60 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('flex-direction: column')
         ->toContain('@media (min-width: 640px)');
 
-    // Status badge lives in the right-side end group, immediately before cancel controls.
+    $primaryGroup = str($deploymentView)
+        ->after('class="logs-viewer-primary"')
+        ->before('class="logs-viewer-end"')
+        ->toString();
     $endGroup = str($deploymentView)
         ->after('class="logs-viewer-end"')
         ->before('logs-viewer-viewport')
         ->toString();
 
-    expect($endGroup)
+    expect($primaryGroup)
         ->toContain('logs-viewer-status-badge')
-        ->toContain('livewire:project.application.deployment-navbar');
+        ->not->toContain('livewire:project.application.deployment-navbar');
 
-    $badgePos = strpos($endGroup, 'logs-viewer-status-badge');
-    $navbarPos = strpos($endGroup, 'livewire:project.application.deployment-navbar');
+    $timestampPos = strpos($primaryGroup, 'Toggle Timestamps');
+    $followPos = strpos($primaryGroup, 'Follow Logs');
+    $debugPos = strpos($primaryGroup, 'wire:click="toggleDebug"');
+    $fullscreenPos = strpos($primaryGroup, 'title="Fullscreen"');
+    $copyPos = strpos($primaryGroup, 'title="Copy Logs"');
+    $downloadPos = strpos($primaryGroup, 'title="Download Logs"');
+    $badgePos = strpos($primaryGroup, 'logs-viewer-status-badge');
 
-    expect($badgePos)->not->toBeFalse()
-        ->and($navbarPos)->not->toBeFalse()
-        ->and($badgePos)->toBeLessThan($navbarPos);
+    expect([$timestampPos, $followPos, $debugPos, $fullscreenPos, $copyPos, $downloadPos, $badgePos])
+        ->not->toContain(false)
+        ->and($timestampPos)->toBeLessThan($followPos)
+        ->and($followPos)->toBeLessThan($debugPos)
+        ->and($debugPos)->toBeLessThan($fullscreenPos)
+        ->and($fullscreenPos)->toBeLessThan($copyPos)
+        ->and($copyPos)->toBeLessThan($downloadPos)
+        ->and($downloadPos)->toBeLessThan($badgePos)
+        ->and($endGroup)->toContain('livewire:project.application.deployment-navbar')
+        ->toContain('Find in logs');
+
+    $runtimeActionsPos = strpos($sharedLogsView, 'class="logs-viewer-actions"');
+    $runtimeEndPos = strpos($sharedLogsView, 'class="logs-viewer-end runtime-logs-viewer-end"');
+    $runtimeLinesPos = strpos($sharedLogsView, 'class="logs-viewer-lines"');
+    $runtimeSearchPos = strpos($sharedLogsView, 'placeholder="Find in logs"');
+
+    expect([$runtimeActionsPos, $runtimeEndPos, $runtimeLinesPos, $runtimeSearchPos])
+        ->not->toContain(false)
+        ->and($runtimeActionsPos)->toBeLessThan($runtimeEndPos)
+        ->and($runtimeEndPos)->toBeLessThan($runtimeLinesPos)
+        ->and($runtimeLinesPos)->toBeLessThan($runtimeSearchPos)
+        ->and($appCss)->toContain('.runtime-logs-viewer-end')
+        ->toContain('.dark .runtime-log-icon-button-active')
+        ->toContain('background: var(--color-coollabs)')
+        ->toContain(".dark .runtime-log-icon-button {\n    color: var(--color-fg-faint);")
+        ->toContain(".dark .runtime-log-icon-button-active {\n    background: var(--color-coollabs);\n    color: #fff;")
+        ->toContain(".runtime-log-toolbar {\n    position: relative;\n    z-index: 20;")
+        ->and($sharedLogsView)
+        ->toContain('runtime-log-icon-button order-1')
+        ->toContain('runtime-log-icon-button order-2')
+        ->toContain('runtime-log-icon-button order-5')
+        ->toContain('runtime-log-icon-button order-6')
+        ->toContain('relative order-7 shrink-0');
 });
 
 it('places cancel deployment controls inside the deployment logs toolbar', function () {
@@ -180,15 +219,15 @@ it('places cancel deployment controls inside the deployment logs toolbar', funct
         ->and($endPos)->toBeGreaterThan($toolbarPos)
         ->and($endPos)->toBeLessThan($viewportPos);
 
-    // Within the right-side end group: status badge, then cancel controls.
+    // Within the right-side end group: cancel controls, then log search.
     $endGroup = substr($content, $endPos, $viewportPos - $endPos);
-    $badgePos = strpos($endGroup, 'logs-viewer-status-badge');
     $cancelPos = strpos($endGroup, 'Cancel deployment');
+    $searchPos = strpos($endGroup, 'Find in logs');
 
-    expect($badgePos)->not->toBeFalse()
-        ->and($cancelPos)->not->toBeFalse()
-        ->and($badgePos)->toBeLessThan($cancelPos)
-        ->and($endGroup)->toContain('In progress');
+    expect($cancelPos)->not->toBeFalse()
+        ->and($searchPos)->not->toBeFalse()
+        ->and($cancelPos)->toBeLessThan($searchPos)
+        ->and($content)->toContain('In progress');
 });
 
 it('uses the shared mobile logs layout for proxy and sentinel log pages', function () {

@@ -398,6 +398,50 @@ do not create an unnecessarily wide menu.
 Toolbar filter and sort buttons keep static labels (`Filter`, `Sort`). The
 selected option is indicated inside the menu, not repeated on the trigger.
 
+#### Multi-select filter dropdowns
+
+Toolbar filters that can combine criteria use one multi-select listbox rather
+than separate dropdowns or a single selected value. Follow the deployment
+history filter in
+`resources/views/livewire/project/application/deployment/index.blade.php`:
+
+- set `aria-multiselectable="true"` on the listbox;
+- group related options under compact uppercase labels;
+- keep the dropdown open while options are toggled;
+- use the shared 16px custom checkbox treatment: purple checked fill in light
+  mode, yellow checked fill in dark mode, and a high-contrast check mark;
+- show the number of active selections in a small count pill on the static
+  `Filter` trigger;
+- combine selections within one group with OR logic and combine different
+  groups with AND logic;
+- constrain only the options area with `max-h-80 overflow-y-auto`;
+- place a persistent `Reset filters` action in a separate footer below the
+  scrollable options, divided by a top border;
+- disable the reset action when no filter is active, and close the dropdown
+  after resetting.
+
+Do not represent the empty state as a selectable `All` option. The footer reset
+action is the single way to return the multi-select to its unfiltered state.
+
+### Standard table controls
+
+Dense tables use the shared `x-table.*` components so search, filters, sorting,
+and backend loading states remain visually and behaviorally consistent:
+
+- `<x-table.toolbar>` owns the responsive search-left/actions-right layout;
+- `<x-table.search>` owns the search icon, optional loading indicator, clear
+  action, sizing, and input anatomy;
+- `<x-table.filter>` owns the static Filter trigger, active-count pill,
+  multi-select panel, scrollable options area, and Reset filters footer;
+- `<x-table.sort>` owns the static Sort trigger and single-select panel;
+- `<x-table.loading>` overlays only the changing table data for backend search,
+  filter, sort, and pagination requests.
+
+Tables continue to own their filter options, sort choices, headers, rows,
+queries, permissions, and empty states. Backend-filtered or paginated tables
+must use `x-table.loading`; frontend-only Alpine tables reuse the same toolbar
+and control anatomy but do not show an artificial loading state.
+
 ### Buttons
 
 - neutral actions use the shared `.button`;
@@ -590,6 +634,7 @@ Use these as implementation references:
 | Fixed layer-2 resource navigation | `resources/views/livewire/project/application/heading.blade.php`, `resources/views/livewire/server/navbar.blade.php` |
 | Grouped settings sidebar | `resources/views/livewire/project/application/configuration.blade.php`, `resources/views/components/server/sidebar.blade.php` |
 | Dense environment table and footer | `resources/views/livewire/project/shared/environment-variable/all.blade.php` |
+| Standard table toolbar controls | `resources/views/components/table/*` |
 | Application metrics charts | `resources/views/livewire/project/shared/metrics.blade.php` |
 | Browser terminal workspace | `resources/views/livewire/terminal/index.blade.php` |
 | Layer card | `resources/views/components/application/settings-section.blade.php` |

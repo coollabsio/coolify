@@ -13,6 +13,14 @@
     $currentApplication = $currentEnvironment && $applicationUuid
         ? $currentEnvironment->applications()->where('uuid', $applicationUuid)->first()
         : null;
+    $databaseUuid = request()->route('database_uuid');
+    $currentDatabase = $currentEnvironment && $databaseUuid
+        ? $currentEnvironment->databases()->firstWhere('uuid', $databaseUuid)
+        : null;
+    $serviceUuid = request()->route('service_uuid');
+    $currentService = $currentEnvironment && $serviceUuid
+        ? $currentEnvironment->services()->where('uuid', $serviceUuid)->first()
+        : null;
     $storageUuid = request()->route('storage_uuid');
     $storages = $storageUuid && $team ? \App\Models\S3Storage::ownedByCurrentTeam()->orderBy('name')->get() : collect();
     $currentStorage = $storages->firstWhere('uuid', $storageUuid);
@@ -79,7 +87,7 @@
         ])->filter()
         : collect();
 @endphp
-<div class="flex items-center gap-0.5 min-w-0 text-[13px]">
+<div class="flex min-w-0 items-center gap-0.5 text-[13px]">
     {{-- Team --}}
     <div class="shrink-0" x-data="{ collapsed: false }">
         <livewire:switch-team />
@@ -249,6 +257,24 @@
             <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentApplication->name }}</span>
             <livewire:project.application.status :application="$currentApplication"
                 :wire:key="'application-status-'.$currentApplication->uuid" />
+        </span>
+    @endif
+
+    @if ($currentDatabase)
+        <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
+        <span class="flex min-w-0 shrink items-center gap-2 h-8 px-2">
+            <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentDatabase->name }}</span>
+            <livewire:project.database.status :database="$currentDatabase"
+                :wire:key="'database-status-'.$currentDatabase->uuid" />
+        </span>
+    @endif
+
+    @if ($currentService)
+        <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
+        <span class="flex min-w-0 shrink items-center gap-2 h-8 px-2">
+            <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentService->name }}</span>
+            <livewire:project.service.status :service="$currentService"
+                :wire:key="'service-status-'.$currentService->uuid" />
         </span>
     @endif
 </div>

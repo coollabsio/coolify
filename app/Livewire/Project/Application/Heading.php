@@ -132,12 +132,12 @@ class Heading extends Component
                 return;
             }
 
-            return $this->redirectRoute('project.application.deployment.show', [
+            return redirectRoute($this, 'project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'application_uuid' => $this->parameters['application_uuid'],
                 'deployment_uuid' => $this->deploymentUuid,
                 'environment_uuid' => $this->parameters['environment_uuid'],
-            ], navigate: false);
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -189,12 +189,12 @@ class Heading extends Component
                 return;
             }
 
-            return $this->redirectRoute('project.application.deployment.show', [
+            return redirectRoute($this, 'project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'application_uuid' => $this->parameters['application_uuid'],
                 'deployment_uuid' => $this->deploymentUuid,
                 'environment_uuid' => $this->parameters['environment_uuid'],
-            ], navigate: false);
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

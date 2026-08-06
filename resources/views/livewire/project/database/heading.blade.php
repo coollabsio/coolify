@@ -64,18 +64,6 @@
         </x-slot:content>
     </x-process-dialog>
 
-    @teleport('#server-topbar-context')
-        <div class="flex min-w-0 items-center gap-1 text-[13px]">
-            <span class="shrink-0 px-0.5 text-neutral-300 dark:text-fg-faint">/</span>
-            <span class="flex min-w-0 shrink items-center gap-2 px-1">
-                <span class="max-w-48 min-w-0 truncate font-semibold text-black dark:text-fg xl:max-w-64">
-                    {{ $database->name }}
-                </span>
-                <x-status-badge :status="$databaseStatusLabel" :type="$databaseStatusType" />
-            </span>
-        </div>
-    @endteleport
-
     <div x-data>
         <div class="mb-3 w-full xl:hidden">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
