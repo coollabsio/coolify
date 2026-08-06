@@ -183,6 +183,13 @@ class Select extends Component
                 'logo' => asset('svgs/resources/public-repo.svg'),
             ],
             [
+                'id' => 'private-deploy-key',
+                'name' => 'Private Repository (with Deploy Key)',
+                'description' => 'Connect a private Git repository over SSH using a repository-scoped deploy key.',
+                'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/deploy-key',
+                'logo' => asset('svgs/resources/deploy-key.svg'),
+            ],
+            [
                 'id' => 'private-gh-app',
                 'name' => 'Private Repository (with GitHub App)',
                 'description' => 'Deploy a private GitHub repository with automatic webhooks and pull request support.',
@@ -195,13 +202,6 @@ class Select extends Component
                 'name' => 'Private Repository (with GitLab App)',
                 'description' => 'You can deploy public & private repositories through your GitLab Apps.',
                 'logo' => asset('svgs/resources/gitlab-app.svg'),
-            ],
-            [
-                'id' => 'private-deploy-key',
-                'name' => 'Private Repository (with Deploy Key)',
-                'description' => 'Connect a private Git repository over SSH using a repository-scoped deploy key.',
-                'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/deploy-key',
-                'logo' => asset('svgs/resources/deploy-key.svg'),
             ],
         ];
         $dockerBasedApplications = [
