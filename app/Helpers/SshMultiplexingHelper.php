@@ -94,7 +94,8 @@ class SshMultiplexingHelper
 
     public static function removeMuxFile(Server $server): void
     {
-        Process::run(self::muxControlCommand($server, 'exit'));
+        $timeout = config('constants.ssh.mux_health_check_timeout');
+        Process::run('timeout '.$timeout.' '.self::muxControlCommand($server, 'exit'));
         self::clearConnectionMetadata($server);
     }
 
@@ -234,7 +235,8 @@ class SshMultiplexingHelper
 
     private static function masterConnectionExists(Server $server): bool
     {
-        return Process::run(self::muxControlCommand($server, 'check'))->exitCode() === 0;
+        $timeout = config('constants.ssh.mux_health_check_timeout');
+        return Process::run('timeout '.$timeout.' '.self::muxControlCommand($server, 'check'))->exitCode() === 0;
     }
 
     private static function connectionIsReusable(Server $server): bool
