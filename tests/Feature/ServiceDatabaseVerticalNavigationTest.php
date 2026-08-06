@@ -65,6 +65,15 @@ it('shows the database sidebar on backup pages', function () {
         ->toContain("str(\$currentRoute)->startsWith('project.database.backup')");
 });
 
+it('shows the service sidebar on the storage backups page', function () {
+    $backups = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($backups)
+        ->toContain('<x-service.configuration-sidebar :service="$service"')
+        ->toContain('current-route="project.service.volume-backups.index"')
+        ->toContain('xl:grid-cols-[210px_minmax(0,1fr)]');
+});
+
 it('uses a distinct backup icon across resource sidebars', function () {
     $sidebars = [
         resource_path('views/components/application/configuration-sidebar.blade.php'),

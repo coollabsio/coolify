@@ -58,14 +58,14 @@
         <div
             class="flex items-center justify-end gap-1 border-t border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-white/[0.06] dark:bg-white/[0.02]">
         @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))
-            <a class="button" {{ wireNavigate() }}
+            <a class="icon-button" title="Database backups" aria-label="Database backups" {{ wireNavigate() }}
                 href="{{ route('project.service.database.backups', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
-                Backups
+                <x-reicon name="database" class="size-4" />
             </a>
         @endif
-        <a class="button" {{ wireNavigate() }}
+        <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
             href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
-            Settings
+            <x-reicon name="settings" class="size-4" />
         </a>
         @if (str($resource->status)->contains('running'))
             @can('update', $service)
@@ -82,7 +82,7 @@
     </div>
 
     <div x-cloak x-show="viewMode === 'table'"
-        class="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto] dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+        class="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem_5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
         <div class="flex min-w-0 items-center gap-3">
             <div
                 class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
@@ -98,11 +98,19 @@
         <div class="hidden truncate font-mono text-xs text-neutral-500 sm:block dark:text-fg-faint">
             {{ $resource->image }}
         </div>
-        <x-status-badge :status="$statusLabel" :type="$statusType" />
-        <div class="flex w-20 justify-end">
-            <a class="button" {{ wireNavigate() }}
+        <div class="justify-self-start">
+            <x-status-badge :status="$statusLabel" :type="$statusType" />
+        </div>
+        <div class="flex items-center justify-end gap-1">
+            @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))
+                <a class="icon-button" title="Database backups" aria-label="Database backups" {{ wireNavigate() }}
+                    href="{{ route('project.service.database.backups', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
+                    <x-reicon name="database" class="size-4" />
+                </a>
+            @endif
+            <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
                 href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
-                Settings
+                <x-reicon name="settings" class="size-4" />
             </a>
         </div>
     </div>

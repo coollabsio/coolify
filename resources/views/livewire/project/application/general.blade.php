@@ -63,14 +63,14 @@
                         </p>
                     </div>
                 </div>
-                <a class="inline-flex shrink-0 items-center gap-1.5 self-start text-sm font-medium text-coollabs hover:underline sm:self-auto dark:text-warning"
+                <a class="icon-button shrink-0 self-start sm:self-auto" title="Manage domains"
+                    aria-label="Manage domains"
                     href="{{ route('project.application.domains', [
                         'project_uuid' => $application->environment->project->uuid,
                         'environment_uuid' => $application->environment->uuid,
                         'application_uuid' => $application->uuid,
                     ]) }}" {{ wireNavigate() }}>
-                    Manage
-                    <x-reicon name="arrow-right" class="size-3.5" />
+                    <x-reicon name="settings" class="size-4" />
                 </a>
             </div>
             </section>

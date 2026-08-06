@@ -6,10 +6,17 @@
     $domainGroups = collect($domainRows)
         ->groupBy('service_application_id')
         ->filter(fn ($rows) => $rows->contains(fn ($row) => ! ($row['is_suggested'] ?? false)));
+    $domainSearchValues = $domainGroups->map(function ($rows, $appId) use ($serviceApps) {
+        $app = collect($serviceApps)->firstWhere('id', (int) $appId);
+        $heading = \Illuminate\Support\Str::headline($app['name'] ?? $rows->first()['service_name'] ?? 'Service');
+
+        return $heading.' '.$rows->pluck('url')->implode(' ');
+    })->values();
 @endphp
 
 <div class="flex flex-col gap-4"
     x-data="{
+        domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: '',
         localEditingIndex: @js($editingIndex),
@@ -35,6 +42,12 @@
             $wire.editingDomain = this.localEditingDomain;
             $wire.editingServiceApplicationId = this.localEditingServiceApplicationId;
             $wire.showEditDomainModal = true;
+        },
+        matchesDomainSearch(value) {
+            return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
+        },
+        hasDomainSearchResults(values) {
+            return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
     @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel)"
@@ -71,6 +84,14 @@
             @endif
         </p>
         <div class="ml-auto flex flex-wrap items-center gap-2">
+            @if ($domainGroups->isNotEmpty())
+                <div class="relative w-full sm:w-64">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input type="search" x-model="domainSearch" aria-label="Search services or domains"
+                        class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search services or domains" />
+                </div>
+            @endif
             @can('update', $service)
                 @if ($serviceAppCount > 0)
                     @include('livewire.project.shared.cloudflare-autoconfigure')
@@ -164,6 +185,7 @@
                     };
                 @endphp
                 <section id="service-domain-group-{{ $appId }}" wire:key="service-domain-group-{{ $appId }}"
+                    x-show="matchesDomainSearch(@js($heading.' '.$rows->pluck('url')->implode(' ')))"
                     class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
                     <div class="flex w-full items-center gap-3 px-4 py-3">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
@@ -200,6 +222,12 @@
                     </div>
                 </section>
             @endforeach
+            <div x-cloak
+                x-show="domainSearch.trim() && !hasDomainSearchResults(@js($domainSearchValues))"
+                class="px-4 py-8">
+                <x-empty size="sm" title="No domains found"
+                    description="No service or domain matches your search." icon-name="search" />
+            </div>
         </div>
     @endif
 

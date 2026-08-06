@@ -97,7 +97,7 @@
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('database-restart-trigger')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
                                     Restart
                                 </button>
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -122,7 +122,7 @@
                             @can('manage', $database)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; $wire.dispatch('startEvent')" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                     Start
                                 </button>
                             @else
@@ -158,7 +158,7 @@
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @disabled(!auth()->user()->can('manage', $database))
                                         @click="open = false; document.getElementById('database-restart-trigger')?.click()">
-                                        <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                        <x-reicon name="restart" class="size-3.5 opacity-70" />
                                         Restart
                                     </button>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -172,7 +172,7 @@
                         @else
                             <x-forms.button canGate="manage" :canResource="$database"
                                 @click="$wire.dispatch('startEvent')">
-                                <x-reicon name="play-circle" class="size-4 text-warning" />
+                                <x-reicon name="play-circle" class="size-4 opacity-70" />
                                 Start
                             </x-forms.button>
                         @endif

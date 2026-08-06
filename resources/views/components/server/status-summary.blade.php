@@ -34,7 +34,16 @@
 
     <div x-cloak x-show="open" x-transition.origin.top.right
         class="listbox-panel top-8! right-0! left-auto! z-[90]! w-64! min-w-64!" role="menu">
-        <div class="px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">System status</div>
+        <div class="flex items-center gap-1 px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">
+            <span>System status</span>
+            @if ($server->proxySet())
+                <button type="button" wire:click="checkProxyStatus" wire:loading.attr="disabled"
+                    wire:target="checkProxyStatus" aria-label="Refresh status" title="Refresh status"
+                    class="inline-flex size-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700 disabled:cursor-wait dark:text-fg-faint dark:hover:bg-white/10 dark:hover:text-fg">
+                    <x-reicon name="refresh" class="size-3" wire:loading.class="animate-spin" wire:target="checkProxyStatus" />
+                </button>
+            @endif
+        </div>
         <div class="listbox-option cursor-default! gap-2.5!">
             <span @class([
                 'size-1.5 shrink-0 rounded-full',
@@ -64,21 +73,6 @@
                 <span class="flex-1">Sentinel</span>
                 <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
             </a>
-        @endif
-        @if ($server->proxySet())
-            <button type="button"
-                class="listbox-option justify-start! min-h-0! h-7! gap-1.5! px-2! py-1! text-[11px] text-neutral-500 dark:text-fg-muted"
-                wire:click="checkProxyStatus" wire:loading.attr="disabled" wire:target="checkProxyStatus"
-                role="menuitem">
-                <span class="contents" wire:loading.remove wire:target="checkProxyStatus">
-                    <x-reicon name="refresh" class="size-2.5 opacity-70" />
-                    Refresh status
-                </span>
-                <span class="hidden items-center gap-1.5" wire:loading.flex wire:target="checkProxyStatus">
-                    <x-loading compact />
-                    Refreshing status
-                </span>
-            </button>
         @endif
     </div>
 </div>

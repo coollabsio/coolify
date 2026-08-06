@@ -28,3 +28,16 @@ it('directs compose application domain management to the parent service', functi
         ->toContain('Manage domains')
         ->not->toContain('<x-forms.domain-chips model="fqdn" label="Domains"');
 });
+
+it('aligns compose resource columns and uses icon actions', function () {
+    $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
+    $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
+    $columns = 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem_5rem]';
+
+    expect($configuration)->toContain($columns)
+        ->and($resourceCard)->toContain($columns)
+        ->toContain('aria-label="Resource settings"')
+        ->toContain('aria-label="Database backups"')
+        ->not->toContain('>Settings</a>')
+        ->not->toContain('>Backups</a>');
+});

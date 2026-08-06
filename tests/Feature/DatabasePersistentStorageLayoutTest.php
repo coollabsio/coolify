@@ -13,5 +13,6 @@ it('keeps editable standalone database storage actions in the table action colum
         ->toContain('@if ($showBackupAction)')
         ->toContain('title="New Scheduled Backup"')
         ->toContain('<livewire:project.database.create-scheduled-backup :database="$resource"')
-        ->toContain('Backup');
+        ->toContain('aria-label="Configure backup"')
+        ->toContain('<x-reicon name="database" class="size-4" />');
 });

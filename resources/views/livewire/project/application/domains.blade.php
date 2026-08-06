@@ -2,6 +2,9 @@
     $configuredCount = collect($domainRows)->where('is_suggested', false)->count();
     $suggestedCount = collect($domainRows)->where('is_suggested', true)->count();
     $hasRows = count($domainRows) > 0;
+    $composeDomainGroups = collect($domainRows)
+        ->groupBy(fn ($row) => $row['service'] ?? '__unknown')
+        ->filter(fn ($rows) => $rows->contains(fn ($row) => ! ($row['is_suggested'] ?? false)));
     $helperText = $isCompose
         ? 'Manage domains for every service in this Docker Compose application.'
         : 'Manage domains for this application.';
@@ -9,6 +12,7 @@
 
 <div class="flex flex-col gap-4"
     x-data="{
+        domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: @js($editingService ?? ''),
         // Local-only until Save — never touch $wire on open/close (avoids Livewire toJSON proxy bugs).
@@ -36,6 +40,12 @@
             $wire.editingDomain = this.localEditingDomain;
             $wire.editingService = this.localEditingService;
             $wire.showEditDomainModal = true;
+        },
+        matchesDomainSearch(value) {
+            return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
+        },
+        hasDomainSearchResults(values) {
+            return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
     @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service)"
@@ -103,7 +113,7 @@
                     @endcan
                 </div>
             @endif
-        @elseif (! $labelsAreWritable && count($composeServices) > 0)
+        @elseif (! $labelsAreWritable && count($composeServices) > 0 && $composeDomainGroups->isNotEmpty())
             <p class="text-sm text-neutral-500 dark:text-fg-dim">
                 Per-service www/non-www redirects are available next to each service group in the table below.
             </p>
@@ -121,6 +131,14 @@
             </p>
         </div>
         <div class="ml-auto flex flex-wrap items-center gap-2">
+            @if ($isCompose && $composeDomainGroups->isNotEmpty())
+                <div class="relative w-full sm:w-64">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input type="search" x-model="domainSearch" aria-label="Search services or domains"
+                        class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search services or domains" />
+                </div>
+            @endif
             @can('update', $application)
                 @include('livewire.project.shared.cloudflare-autoconfigure')
                 @unless ($labelsAreWritable)
@@ -189,97 +207,106 @@
             <x-empty size="sm" title="No services available"
                 description="No non-database services found in the Docker Compose file."
                 icon-name="globe" />
+        @elseif ($isCompose && $composeDomainGroups->isEmpty())
+            <x-empty size="sm" title="No domains configured"
+                description="Add your first domain with the + Add button above. Choose which service receives it."
+                icon-name="globe" />
         @elseif (! $hasRows)
             <x-empty size="sm" title="No domains configured"
                 description="Add your first domain with the + Add button above, or generate one with the server wildcard domain."
                 icon-name="globe" />
         @elseif ($isCompose)
             @php
-                $grouped = collect($domainRows)->groupBy(fn ($row) => $row['service'] ?? '__unknown');
-                $serviceOrder = $composeServices;
+                $grouped = $composeDomainGroups;
+                $serviceOrder = collect($composeServices)
+                    ->filter(fn ($serviceName) => $grouped->has($serviceName))
+                    ->values()
+                    ->all();
                 foreach ($grouped->keys() as $name) {
                     if ($name !== '__unknown' && ! in_array($name, $serviceOrder, true)) {
                         $serviceOrder[] = $name;
                     }
                 }
+                $domainSearchValues = collect($serviceOrder)
+                    ->map(fn ($serviceName) => $serviceName.' '.$grouped->get($serviceName, collect())->pluck('url')->implode(' '))
+                    ->values();
             @endphp
-            <div class="flex flex-col gap-6">
+            <div class="overflow-hidden">
                 @foreach ($serviceOrder as $serviceName)
                     @php
                         $rows = $grouped->get($serviceName, collect());
-                        $serviceConfigured = $rows->where('is_suggested', false)->count();
-                        $serviceSuggested = $rows->where('is_suggested', true)->count();
                         $redirectWireKey = $this->serviceRedirectWireKey($serviceName);
+                        $redirect = $serviceRedirects[$redirectWireKey] ?? 'both';
+                        $redirectLabel = match ($redirect) {
+                            'www' => 'Redirect to www',
+                            'non-www' => 'Redirect to non-www',
+                            default => 'Allow both',
+                        };
                     @endphp
-                    <div class="flex flex-col gap-3">
-                        <div class="flex flex-wrap items-end justify-between gap-3">
-                            <div>
-                                <h3 class="text-[14px] font-semibold text-black dark:text-fg">{{ $serviceName }}</h3>
-                                <p class="mt-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">
-                                    {{ $serviceConfigured }} domain{{ $serviceConfigured === 1 ? '' : 's' }}
-                                    @if ($serviceSuggested > 0)
-                                        · {{ $serviceSuggested }} not added
-                                    @endif
-                                </p>
-                            </div>
+                    <section id="application-compose-domain-group-{{ $redirectWireKey }}"
+                        wire:key="application-compose-domain-group-{{ $redirectWireKey }}"
+                        x-show="matchesDomainSearch(@js($serviceName.' '.$rows->pluck('url')->implode(' ')))"
+                        class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
+                        <div class="flex w-full items-center gap-3 px-4 py-3">
+                            <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">
+                                {{ $serviceName }}
+                            </span>
                             @unless ($labelsAreWritable)
-                                <div class="flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
-                                    <div class="min-w-0 flex-1">
-                                        <x-forms.select label="Direction" id="serviceRedirects.{{ $redirectWireKey }}"
-                                            wire:model="serviceRedirects.{{ $redirectWireKey }}" required
-                                            helper="Per-service www/non-www redirect. Add both hosts when using a redirect."
-                                            canGate="update" :canResource="$application">
+                                @can('update', $application)
+                                    <div class="relative flex shrink-0 items-center gap-2 px-1 py-1 text-sm text-neutral-600 dark:text-fg-dim"
+                                        wire:loading.class="opacity-50"
+                                        wire:target="serviceRedirects.{{ $redirectWireKey }}">
+                                        <span>{{ $redirectLabel }}</span>
+                                        <x-reicon name="chevron-down" class="size-4 shrink-0"
+                                            wire:loading.remove
+                                            wire:target="serviceRedirects.{{ $redirectWireKey }}" />
+                                        <x-loading-on-button wire:loading.delay
+                                            wire:target="serviceRedirects.{{ $redirectWireKey }}" />
+                                        <select id="application-compose-domain-redirect-{{ $redirectWireKey }}"
+                                            wire:model.change="serviceRedirects.{{ $redirectWireKey }}"
+                                            wire:change="setServiceRedirect(@js($serviceName))"
+                                            wire:loading.attr="disabled"
+                                            wire:target="serviceRedirects.{{ $redirectWireKey }}"
+                                            class="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-wait"
+                                            aria-label="Redirect direction for {{ $serviceName }}">
                                             <option value="both">Allow www & non-www</option>
                                             <option value="www">Redirect to www</option>
                                             <option value="non-www">Redirect to non-www</option>
-                                        </x-forms.select>
+                                        </select>
                                     </div>
-                                    @can('update', $application)
-                                        <x-modal-confirmation title="Confirm redirection setting?" buttonTitle="Set direction"
-                                            submitAction='setServiceRedirect({{ \Illuminate\Support\Js::from($serviceName) }})'
-                                            :actions="['Traffic for this service will be redirected to the selected direction. Missing www/non-www counterparts will be added automatically when possible.']"
-                                            confirmationText="{{ $serviceName }}/"
-                                            confirmationLabel="Please confirm by entering the service name below"
-                                            shortConfirmationLabel="Service name" :confirmWithPassword="false"
-                                            step2ButtonText="Set direction" canGate="update" :canResource="$application" />
-                                    @endcan
-                                </div>
+                                @else
+                                    <span class="shrink-0 text-sm text-neutral-600 dark:text-fg-dim">{{ $redirectLabel }}</span>
+                                @endcan
                             @endunless
                         </div>
 
-                        @if ($rows->isEmpty())
-                            <x-empty size="sm" title="No domains for this service"
-                                description="Use + Add and select {{ $serviceName }}."
-                                icon-name="globe" />
-                        @else
-                            <div class="data-table w-full">
-                                <div class="data-table-header domains-table-grid-compose">
-                                    <span>Domain</span>
-                                    <span>Service</span>
-                                    <span>DNS Check</span>
-                                    <span>Last checked</span>
-                                    <span></span>
-                                </div>
-                                @foreach ($rows as $row)
-                                    @php
-                                        $index = collect($domainRows)->search(
-                                            fn ($item) => $item['url'] === $row['url']
-                                                && ($item['service'] ?? null) === ($row['service'] ?? null)
-                                                && (bool) ($item['is_suggested'] ?? false) === (bool) ($row['is_suggested'] ?? false),
-                                        );
-                                    @endphp
-                                    @include('livewire.project.application.partials.domain-row', [
-                                        'index' => $index,
-                                        'row' => $row,
-                                        'application' => $application,
-                                        'labelsAreWritable' => $labelsAreWritable,
-                                        'isCompose' => true,
-                                    ])
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
+                        <div wire:key="application-compose-domain-rows-{{ $redirectWireKey }}-{{ md5(serialize($rows->all())) }}"
+                            class="data-table w-full">
+                            @foreach ($rows as $row)
+                                @php
+                                    $index = collect($domainRows)->search(
+                                        fn ($item) => $item['url'] === $row['url']
+                                            && ($item['service'] ?? null) === ($row['service'] ?? null)
+                                            && (bool) ($item['is_suggested'] ?? false) === (bool) ($row['is_suggested'] ?? false),
+                                    );
+                                @endphp
+                                @include('livewire.project.application.partials.domain-row', [
+                                    'index' => $index,
+                                    'row' => $row,
+                                    'application' => $application,
+                                    'labelsAreWritable' => $labelsAreWritable,
+                                    'isCompose' => false,
+                                ])
+                            @endforeach
+                        </div>
+                    </section>
                 @endforeach
+                <div x-cloak
+                    x-show="domainSearch.trim() && !hasDomainSearchResults(@js($domainSearchValues))"
+                    class="px-4 py-8">
+                    <x-empty size="sm" title="No domains found"
+                        description="No service or domain matches your search." icon-name="search" />
+                </div>
             </div>
         @else
             <div class="data-table w-full">

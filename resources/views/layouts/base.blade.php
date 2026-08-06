@@ -97,6 +97,7 @@
 
 <body class="dark:text-inherit text-black">
     <x-toast />
+    <x-icon-tooltip />
     <script data-navigate-once>
         // Global HTML sanitization function using DOMPurify
         window.sanitizeHTML = function (html) {

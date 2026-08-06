@@ -98,7 +98,10 @@
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
-                                                <x-forms.button type="button" class="!px-2.5 !text-xs">Backup</x-forms.button>
+                                                <button type="button" class="icon-button" title="Configure backup"
+                                                    aria-label="Configure backup">
+                                                    <x-reicon name="database" class="size-4" />
+                                                </button>
                                             </x-slot:content>
                                             @if ($resource instanceof \App\Models\Application)
                                                 <livewire:project.application.backup.create :application="$resource"
@@ -173,7 +176,10 @@
                                 @if ($showBackupAction)
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <x-forms.button type="button" class="!px-2.5 !text-xs">Backup</x-forms.button>
+                                            <button type="button" class="icon-button" title="Configure backup"
+                                                aria-label="Configure backup">
+                                                <x-reicon name="database" class="size-4" />
+                                            </button>
                                         </x-slot:content>
                                         @if ($resource instanceof \App\Models\Application)
                                             <livewire:project.application.backup.create :application="$resource"
@@ -188,7 +194,10 @@
                                 @elseif (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable())
                                     <x-modal-input title="New Scheduled Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <x-forms.button type="button" class="!px-2.5 !text-xs">Backup</x-forms.button>
+                                            <button type="button" class="icon-button" title="Configure backup"
+                                                aria-label="Configure backup">
+                                                <x-reicon name="database" class="size-4" />
+                                            </button>
                                         </x-slot:content>
                                         <livewire:project.database.create-scheduled-backup :database="$resource"
                                             wire:key="configure-database-backup-{{ $id }}" />

@@ -51,7 +51,12 @@
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="request()->query()"
         wire:key="service-heading-volume-backup-index" />
 
-    <div class="application-settings-form flex flex-col gap-6">
+    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+            <x-service.configuration-sidebar :service="$service"
+                current-route="project.service.volume-backups.index" />
+
+            <div class="application-settings-form min-w-0 flex flex-col gap-6">
         <x-application.settings-section title="Storage backups"
             helper="Schedule backups for persistent volumes and directory mounts attached to this service.">
             @can('update', $service)
@@ -223,5 +228,7 @@
                     icon-name="storages" />
             @endif
         </div>
-    </div>
+            </div>
+        </div>
+    </section>
 </div>

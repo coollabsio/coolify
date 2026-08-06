@@ -1184,7 +1184,7 @@ it('does not show a suggested row when both www variants are configured', functi
     expect(collect($component->get('domainRows'))->where('is_suggested', true))->toHaveCount(0);
 });
 
-it('groups compose domains by service and shows empty services', function () {
+it('groups compose domains by service and hides empty services', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
         'fqdn' => null,
@@ -1207,8 +1207,30 @@ it('groups compose domains by service and shows empty services', function () {
     $component
         ->assertSee('web')
         ->assertSee('https://web.example.com')
-        ->assertSee('api')
-        ->assertSee('No domains for this service yet');
+        ->assertDontSee('No domains for this service');
+});
+
+it('uses the compact service domains layout for compose applications', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+
+    expect($view)
+        ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
+        ->toContain('class="application-settings-section-body mt-1 scroll-mt-28')
+        ->toContain('aria-label="Redirect direction for {{ $serviceName }}"')
+        ->toContain('wire:target="serviceRedirects.{{ $redirectWireKey }}"')
+        ->not->toContain('wire:target="serviceRedirects.{{ $redirectWireKey }},setServiceRedirect"')
+        ->not->toContain('title="No domains for this service"');
+});
+
+it('provides client-side search for compose service domains', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+
+    expect($view)
+        ->toContain('x-model="domainSearch"')
+        ->toContain('placeholder="Search services or domains"')
+        ->toContain('x-show="matchesDomainSearch(')
+        ->toContain('title="No domains found"')
+        ->toContain('hasDomainSearchResults(');
 });
 
 it('exposes the domains route in the application configuration menu', function () {

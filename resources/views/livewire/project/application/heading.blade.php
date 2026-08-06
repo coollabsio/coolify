@@ -66,7 +66,7 @@
                                 @can('deploy', $application)
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         wire:click="deploy" @click="open = false" role="menuitem">
-                                        <x-reicon name="refresh" class="size-3.5 text-orange-500 dark:text-orange-400" />
+                                        <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         Redeploy
                                     </button>
                                 @else
@@ -82,7 +82,7 @@
                                     @can('deploy', $application)
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             wire:click="deploy" @click="open = false" role="menuitem">
-                                            <x-reicon name="refresh" class="size-3.5 text-warning" />
+                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             Update Service
                                         </button>
                                     @else
@@ -97,7 +97,7 @@
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('application-mobile-restart-trigger')?.click()"
                                             role="menuitem">
-                                            <x-reicon name="restart" class="size-3.5 text-warning" />
+                                            <x-reicon name="restart" class="size-3.5 opacity-70" />
                                             Restart
                                         </button>
                                     @else
@@ -127,7 +127,7 @@
                             @can('deploy', $application)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     wire:click="deploy" @click="open = false" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                     Deploy
                                 </button>
                             @else
@@ -203,7 +203,7 @@
                         @if (str($application->status)->startsWith('exited'))
                             <x-forms.button id="application-desktop-deploy" canGate="deploy" :canResource="$application"
                                 wire:click="deploy">
-                                <x-reicon name="play-circle" class="size-4 text-warning" />
+                                <x-reicon name="play-circle" class="size-4 opacity-70" />
                                 Deploy
                             </x-forms.button>
                         @else
@@ -222,7 +222,7 @@
                                         @can('deploy', $application)
                                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                                 wire:click="deploy" @click="open = false" role="menuitem">
-                                                <x-reicon name="refresh" class="size-3.5 text-orange-500 dark:text-orange-400" />
+                                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                                 Redeploy
                                             </button>
                                         @else
@@ -237,7 +237,7 @@
                                             @can('deploy', $application)
                                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                                     wire:click="deploy" @click="open = false" role="menuitem">
-                                                    <x-reicon name="refresh" class="size-3.5 text-warning" />
+                                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                                     Update Service
                                                 </button>
                                             @else
@@ -251,7 +251,7 @@
                                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                                     @click="open = false; document.getElementById('application-mobile-restart-trigger')?.click()"
                                                     role="menuitem">
-                                                    <x-reicon name="restart" class="size-3.5 text-warning" />
+                                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
                                                     Restart
                                                 </button>
                                             @else

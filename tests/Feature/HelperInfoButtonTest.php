@@ -59,12 +59,23 @@ test('helper popup stays in its alpine scope during livewire morphs', function (
         ->not->toContain('x-teleport');
 });
 
-test('helper popup prefers a position above its info button', function () {
+test('helper triggers do not create stacking contexts above open tooltips', function () {
     $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
 
     expect($helper)
-        ->toContain('let top = triggerRect.top - popupRect.height - padding;')
-        ->toContain('top = triggerRect.bottom + padding;');
+        ->toContain("'class' => 'relative inline-block align-middle'")
+        ->toContain("'info-helper relative inline-flex")
+        ->not->toContain("'class' => 'relative z-10 inline-block align-middle'")
+        ->not->toContain("'info-helper relative z-10 inline-flex");
+});
+
+test('helper popup prefers a position below its trigger and falls back above', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('let top = triggerRect.bottom + padding;')
+        ->toContain('let left = triggerRect.right - popupRect.width;')
+        ->toContain('top = triggerRect.top - popupRect.height - padding;');
 });
 
 test('helper popup supports focus dismissal and tooltip aria relationships', function () {

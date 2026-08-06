@@ -9,9 +9,9 @@
     $loadingTarget = null;
     if ($showLoadingIndicator) {
         if (filled($wireClickValue)) {
-            $loadingTarget = trim(explode('(', (string) $wireClickValue, 2)[0]);
+            $loadingTarget = trim((string) $wireClickValue);
         } elseif ($hasExplicitWireTarget) {
-            $loadingTarget = trim(explode('(', (string) $wireTargetValue, 2)[0]);
+            $loadingTarget = trim((string) $wireTargetValue);
         }
     }
 

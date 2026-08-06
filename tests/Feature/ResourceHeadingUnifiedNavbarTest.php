@@ -170,13 +170,36 @@ it('centers the rollback image loading state across the card', function () {
         ->toContain('flex items-center justify-center');
 });
 
-it('shows pull request loading feedback inside its settings card', function () {
+it('shows pull request loading feedback only on the action button', function () {
     $previews = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
 
     expect($previews)
-        ->toContain('class="w-full" wire:loading wire:target="load_prs"')
-        ->toContain('min-h-32 items-center justify-center')
-        ->toContain('<x-loading text="Loading pull requests…"');
+        ->toContain('wire:click="load_prs"')
+        ->not->toContain('wire:loading.remove wire:target="load_prs"')
+        ->not->toContain('wire:loading wire:target="load_prs"')
+        ->not->toContain('Loading pull requests…');
+});
+
+it('shows loading feedback while a service deployment starts', function () {
+    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+
+    expect($service)
+        ->toContain('deploying: false')
+        ->toContain('@service-deploy-finished.window="deploying = false"')
+        ->toContain('<x-loading-on-button x-show="deploying"')
+        ->toContain("window.dispatchEvent(new CustomEvent('service-deploy-finished'))");
+});
+
+it('uses neutral icons for non-destructive resource actions', function () {
+    foreach (['application', 'service', 'database'] as $resource) {
+        $heading = file_get_contents(resource_path("views/livewire/project/{$resource}/heading.blade.php"));
+
+        expect($heading)
+            ->not->toContain('class="size-3.5 text-orange-500')
+            ->not->toContain('class="size-3.5 text-warning"')
+            ->not->toContain('class="size-4 text-warning"')
+            ->toContain('name="stop" class="size-3.5 text-error"');
+    }
 });
 
 it('allows the shared empty state to control the storage backups background', function () {
@@ -325,6 +348,15 @@ it('shows an icon in application and service Links controls', function () {
         ->toContain('<x-reicon name="external-link"')
         ->and($applicationLinks)->not->toContain('<x-external-link')
         ->and($serviceLinks)->not->toContain('<x-external-link');
+});
+
+it('visually distinguishes production and pull request application links', function () {
+    $links = file_get_contents(resource_path('views/components/applications/links.blade.php'));
+
+    expect($links)
+        ->toContain('Production')
+        ->toContain('PR #{{ data_get($preview, \'pull_request_id\') }}')
+        ->not->toContain("PR{{ data_get(\$preview, 'pull_request_id') }} |");
 });
 
 it('shows application and service Links on mobile headings', function () {

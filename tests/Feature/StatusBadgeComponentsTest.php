@@ -41,7 +41,8 @@ it('uses bordered status badges in the top breadcrumb', function () {
     $applicationStatus = file_get_contents(resource_path('views/livewire/project/application/status.blade.php'));
     $borderedBadgeClasses = 'rounded-full border border-neutral-200 bg-neutral-100';
 
-    expect(substr_count($breadcrumb.$applicationStatus, $borderedBadgeClasses))->toBe(4)
+    expect(substr_count($breadcrumb.$applicationStatus, $borderedBadgeClasses))->toBe(3)
+        ->and($applicationStatus)->toContain('<x-status-summary')
         ->and(substr_count($breadcrumb, 'rounded-full bg-neutral-100'))->toBe(0);
 });
 

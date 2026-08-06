@@ -263,6 +263,17 @@ it('keeps a stable key for the rendered domain list', function () {
         ->not->toContain('md5(serialize($domainRows))');
 });
 
+it('provides client-side search for service domains', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+
+    expect($view)
+        ->toContain('x-model="domainSearch"')
+        ->toContain('placeholder="Search services or domains"')
+        ->toContain('x-show="matchesDomainSearch(')
+        ->toContain('title="No domains found"')
+        ->toContain('hasDomainSearchResults(');
+});
+
 it('does not duplicate the service name as a badge in the domain cell', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
 

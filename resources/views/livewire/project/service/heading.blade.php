@@ -61,7 +61,7 @@
         </x-slot:content>
     </x-process-dialog>
 
-    <div x-data>
+    <div x-data="{ deploying: false }" @service-deploy-finished.window="deploying = false">
         <div class="mb-3 w-full xl:hidden">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
                 <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
@@ -76,11 +76,13 @@
                 <div id="service-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
-                    <button type="button" class="button w-full justify-between" @click="open = !open"
+                    <button type="button" class="button w-full justify-between" x-bind:disabled="deploying"
+                        @click="open = !open"
                         :aria-expanded="open" aria-haspopup="menu">
                         <span class="inline-flex items-center gap-2">
-                            <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                            Actions
+                            <x-loading-on-button x-show="deploying" x-cloak />
+                            <x-reicon name="play-circle" class="size-3.5 opacity-70" x-show="!deploying" />
+                            <span x-text="deploying ? 'Deploying…' : 'Actions'">Actions</span>
                         </span>
                         <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
                             <x-reicon name="chevron-down" class="size-3 opacity-55" />
@@ -94,7 +96,7 @@
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('service-restart-trigger')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
                                     Restart
                                 </button>
                             @else
@@ -138,8 +140,8 @@
                         @else
                             @can('deploy', $service)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    @click="open = false; $wire.dispatch('startEvent')" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    @click="open = false; deploying = true; $wire.dispatch('startEvent')" role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                     Deploy
                                 </button>
                             @else
@@ -194,7 +196,7 @@
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @disabled(!auth()->user()->can('deploy', $service))
                                         @click="open = false; document.getElementById('service-restart-trigger')?.click()">
-                                        <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                        <x-reicon name="restart" class="size-3.5 opacity-70" />
                                         Restart
                                     </button>
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -207,9 +209,11 @@
                             </div>
                         @else
                             <x-forms.button canGate="deploy" :canResource="$service"
-                                @click="$wire.dispatch('startEvent')">
-                                <x-reicon name="play-circle" class="size-4 text-warning" />
-                                Deploy
+                                x-bind:disabled="deploying"
+                                @click="deploying = true; $wire.dispatch('startEvent')">
+                                <x-loading-on-button x-show="deploying" x-cloak />
+                                <x-reicon name="play-circle" class="size-4 opacity-70" x-show="!deploying" />
+                                <span x-text="deploying ? 'Deploying…' : 'Deploy'">Deploy</span>
                             </x-forms.button>
                         @endif
                     @else
@@ -250,15 +254,19 @@
                 $wire.$call('stop');
             });
             $wire.$on('startEvent', async () => {
-                const isDeploymentProgress = await $wire.$call('checkDeployments');
+                try {
+                    const isDeploymentProgress = await $wire.$call('checkDeployments');
 
-                if (isDeploymentProgress) {
-                    $wire.$dispatch('error',
-                        'There is a deployment in progress.<br><br>You can force deploy in the Advanced section.');
-                    return;
+                    if (isDeploymentProgress) {
+                        $wire.$dispatch('error',
+                            'There is a deployment in progress.<br><br>You can force deploy in the Advanced section.');
+                        return;
+                    }
+
+                    await $wire.$call('start');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('service-deploy-finished'));
                 }
-
-                $wire.$call('start');
             });
             $wire.$on('restartEvent', async () => {
                 const isDeploymentProgress = await $wire.$call('checkDeployments');

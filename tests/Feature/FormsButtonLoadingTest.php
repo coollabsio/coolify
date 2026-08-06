@@ -30,13 +30,13 @@ it('uses an explicit wire target for submit buttons without wire click', functio
         ->toContain('Validate and add');
 });
 
-it('strips method arguments when deriving the loading target', function () {
+it('keeps method arguments when deriving the loading target', function () {
     $html = Blade::render(
         '<x-forms.button wire:click="setPrivateKey(42)">Use this key</x-forms.button>'
     );
 
     expect($html)
-        ->toContain('wire:target="setPrivateKey"')
+        ->toContain('wire:target="setPrivateKey(42)"')
         ->toContain('wire:loading.attr="disabled"')
         ->toContain('wire:loading.class="is-loading"');
 });
