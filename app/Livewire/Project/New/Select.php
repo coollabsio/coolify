@@ -121,7 +121,11 @@ class Select extends Component
                 }
             }
 
-            if (! is_string($logo) || ! file_exists(public_path($logo))) {
+            $hasLogo = is_string($logo)
+                && basename($logo) !== basename($default_logo)
+                && file_exists(public_path($logo));
+
+            if (! $hasLogo) {
                 $logo = $default_logo;
             }
 
@@ -132,6 +136,7 @@ class Select extends Component
                 'id' => $serviceKey,
                 'name' => str($serviceKey)->headline(),
                 'docsSlug' => str($serviceKey)->lower()->value(),
+                'has_logo' => $hasLogo,
                 'logo' => asset($logo),
                 'logo_github_url' => file_exists($local_logo_path)
                     ? 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo
