@@ -11,16 +11,23 @@
 <div @class(['relative', 'min-w-0' => $sidebar]) x-data="{
     open: false,
     appearanceOpen: false,
-    theme: localStorage.getItem('theme') || 'dark',
+    theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
+    themeColor: localStorage.getItem('themeColor') || '#6b16ed',
     setTheme(type) {
         this.theme = type;
         localStorage.setItem('theme', type);
 
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const isDark = type === 'dark' || (type === 'system' && prefersDark);
+        const isDark = type === 'dark' || type === 'custom' || (type === 'system' && prefersDark);
         document.documentElement.classList.toggle('dark', isDark);
-        document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+        document.documentElement.dataset.theme = type === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
+        document.documentElement.style.setProperty('--theme-base-color', localStorage.themeColor || '#6b16ed');
+        document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
         document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+    },
+    setThemeColor() {
+        localStorage.setItem('themeColor', this.themeColor);
+        this.setTheme('custom');
     },
 }" @keydown.escape.window="open = false; appearanceOpen = false"
     @click.outside="open = false; appearanceOpen = false">
@@ -80,16 +87,37 @@
                 ['value' => 'light', 'label' => 'Light'],
                 ['value' => 'system', 'label' => 'System'],
                 ['value' => 'dark', 'label' => 'Dark'],
+                ['value' => 'custom', 'label' => 'Custom'],
             ] as $option)
-                <button type="button" @click="setTheme('{{ $option['value'] }}')"
-                    class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
-                    <span>{{ $option['label'] }}</span>
-                    <svg x-show="theme === '{{ $option['value'] }}'" class="size-3.5 text-coollabs dark:text-warning"
-                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
-                            stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                </button>
+                @if ($option['value'] === 'custom')
+                    <div
+                        class="relative flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                        <span class="flex items-center gap-2">
+                            <span class="size-3.5 rounded-full border border-white/20"
+                                :style="`background: ${themeColor}`"></span>
+                            Custom
+                        </span>
+                        <svg x-show="theme === 'custom'" class="size-3.5 text-coollabs dark:text-warning"
+                            viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <input type="color" x-model="themeColor" @input="setThemeColor()"
+                            aria-label="Custom theme color"
+                            class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
+                    </div>
+                @else
+                    <button type="button" @click="setTheme('{{ $option['value'] }}')"
+                        class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                        <span>{{ $option['label'] }}</span>
+                        <svg x-show="theme === '{{ $option['value'] }}'"
+                            class="size-3.5 text-coollabs dark:text-warning" viewBox="0 0 12 12" fill="none"
+                            aria-hidden="true">
+                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                @endif
             @endforeach
         </div>
 

@@ -26,6 +26,7 @@
                     const userSettings = localStorage.getItem('theme');
                     if (userSettings !== 'system') { return; }
                     document.documentElement.classList.toggle('dark', e.matches);
+                    document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
                 });
                 this.queryTheme();
             },
@@ -34,7 +35,7 @@
                 const userSettings = localStorage.getItem('theme') || 'dark';
                 localStorage.setItem('theme', userSettings);
                 let isDark = false;
-                if (userSettings === 'dark') {
+                if (userSettings === 'dark' || userSettings === 'custom') {
                     document.documentElement.classList.add('dark');
                     isDark = true;
                 } else if (userSettings === 'light') {
@@ -45,7 +46,8 @@
                 } else {
                     document.documentElement.classList.remove('dark');
                 }
-                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#0d0d0d' : '#ffffff');
+                document.documentElement.dataset.theme = userSettings === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
+                document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
             }
     }">
     {{-- Search is only useful when workspace resources are available --}}

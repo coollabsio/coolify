@@ -36,6 +36,12 @@ it('renders empty states flush with no outer inset inside settings sections', fu
         ->toMatch('/\.application-settings-section-body\.is-flush \.empty-state[\s\S]*?margin:\s*0/');
 });
 
+it('insets empty states nested inside a flush settings section wrapper', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)->toContain('.application-settings-section-body.is-flush > div:has(> .empty-state:only-child)');
+});
+
 it('renders compact size without the full-page min height class', function () {
     $html = $this->blade(
         '<x-empty title="No cloud tokens" description="Add a provider token." icon-name="keys" size="sm" />'

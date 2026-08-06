@@ -34,6 +34,20 @@
         --sth-document: #a3e635;
     }
 
+    html[data-theme="custom"] #server-timing-hud {
+        --sth-background: var(--color-surface);
+        --sth-text: var(--color-fg-dim);
+        --sth-strong: var(--color-fg);
+        --sth-secondary: var(--color-fg-dim);
+        --sth-muted: var(--color-fg-faint);
+        --sth-border: var(--coollabs-line);
+        --sth-surface: var(--color-raised);
+        --sth-scrollbar-track: var(--color-panel);
+        --sth-scrollbar-thumb: var(--color-selected);
+        --sth-livewire: var(--theme-bright-color);
+        --sth-xhr: var(--theme-bright-color);
+    }
+
     #server-timing-hud [data-sth-log] {
         scrollbar-color: var(--sth-scrollbar-thumb) var(--sth-scrollbar-track);
         scrollbar-width: thin;

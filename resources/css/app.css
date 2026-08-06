@@ -56,7 +56,12 @@
     --color-fg-dim: #b4b4b8;
     --color-fg-faint: #6e6e74;
     --color-accent: #6b16ed;
+    --color-accent-foreground: #ffffff;
     --color-hairline: rgba(255, 255, 255, 0.08);
+    --color-nav-text: #525252;
+    --color-nav-muted: #666666;
+    --color-nav-active: #171717;
+    --color-log: #0d0d0d;
 
     --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.4);
 }
@@ -105,6 +110,14 @@
 }
 
 @layer base {
+
+    html {
+        color-scheme: light;
+    }
+
+    html.dark {
+        color-scheme: dark;
+    }
 
     *,
     ::after,
@@ -372,6 +385,26 @@ tr td:first-child {
     border-left-color: var(--color-warning) !important;
 }
 
+html[data-theme="custom"] .loading-indicator,
+html[data-theme="custom"] .animate-spin {
+    color: var(--theme-bright-color) !important;
+}
+
+html[data-theme="custom"] #nprogress .bar {
+    background: var(--theme-bright-color) !important;
+}
+
+html[data-theme="custom"] #nprogress .peg {
+    box-shadow:
+        0 0 10px var(--theme-bright-color),
+        0 0 5px var(--theme-bright-color) !important;
+}
+
+html[data-theme="custom"] #nprogress .spinner-icon {
+    border-top-color: var(--theme-bright-color) !important;
+    border-left-color: var(--theme-bright-color) !important;
+}
+
 .log-highlight {
     background-color: rgba(234, 179, 8, 0.4);
     border-radius: 2px;
@@ -480,6 +513,12 @@ html.dark .application-console-shell[data-console-theme="system"],
 html.dark .terminal-fullscreen-shell[data-console-theme="system"] {
     --console-theme-background: #121214;
     --console-theme-border: rgb(255 255 255 / 0.08);
+}
+
+html[data-theme="custom"] .application-console-shell[data-console-theme="system"],
+html[data-theme="custom"] .terminal-fullscreen-shell[data-console-theme="system"] {
+    --console-theme-background: var(--color-log);
+    --console-theme-border: var(--coollabs-line);
 }
 
 .console-theme-selector {
@@ -741,6 +780,120 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     --coollabs-line: oklch(32% 0 0);
     --coollabs-hairline: oklch(26.9% 0 0);
     --coollabs-subtle: oklch(70.8% 0 0);
+    --color-nav-text: #a8a8b0;
+    --color-nav-muted: #7a7a84;
+    --color-nav-active: #f2f2f2;
+}
+
+/* Theme surfaces are derived from one brand color. Changing
+   --theme-base-color is enough to generate a complete dark surface ladder. */
+html[data-theme="custom"] {
+    --theme-base-color: #6b16ed;
+    --theme-bright-color: color-mix(in srgb, var(--theme-base-color) 85%, white);
+    --theme-scrollbar-thumb: color-mix(in srgb, var(--theme-bright-color) 70%, var(--theme-accent-foreground));
+    --theme-border-color: color-mix(in oklab, var(--theme-base-color) 42%, #52525b);
+    --theme-placeholder-color: color-mix(in srgb, white 82%, var(--theme-base-color));
+    --color-accent: var(--theme-bright-color);
+    --color-coollabs: var(--theme-bright-color);
+    --color-coollabs-100: color-mix(in oklab, var(--theme-bright-color) 88%, white);
+    --color-coollabs-200: color-mix(in oklab, var(--theme-bright-color) 88%, black);
+    --color-coollabs-300: color-mix(in oklab, var(--theme-bright-color) 72%, black);
+    /* Legacy dark-theme accent utilities use warning as the brand color. */
+    --color-warning: var(--theme-bright-color);
+    --color-accent-foreground: var(--theme-accent-foreground);
+    --color-app: color-mix(in oklab, var(--theme-base-color) 12%, #09090a);
+    --color-panel: color-mix(in oklab, var(--theme-base-color) 14%, #0c0c0d);
+    --color-surface: color-mix(in oklab, var(--theme-base-color) 18%, #101011);
+    --color-raised: color-mix(in oklab, var(--theme-base-color) 24%, #141416);
+    --color-selected: color-mix(in oklab, var(--theme-base-color) 32%, #18181a);
+    --color-coolgray-100: var(--color-surface);
+    --color-coolgray-200: var(--color-raised);
+    --color-coolgray-300: var(--color-selected);
+    --color-coolgray-400: color-mix(in oklab, var(--theme-base-color) 28%, #1b1b1e);
+    --color-coolgray-500: color-mix(in oklab, var(--theme-base-color) 32%, #202024);
+    --coollabs-canvas: var(--color-app);
+    --coollabs-elevated: var(--color-surface);
+    --coollabs-recessed: var(--color-raised);
+    --coollabs-base: color-mix(in oklab, var(--theme-base-color) 22%, #111112);
+    --color-content-surface: var(--coollabs-base);
+    --coollabs-fill: color-mix(in oklab, var(--theme-base-color) 32%, #18181a);
+    --coollabs-line: var(--theme-border-color);
+    --coollabs-hairline: color-mix(in srgb, var(--theme-border-color) 55%, var(--color-panel));
+    --color-nav-text: #e4dfea;
+    --color-nav-muted: #d8d2df;
+    --color-nav-active: #ffffff;
+    --color-log: color-mix(in oklab, var(--theme-base-color) 20%, #080809);
+    --color-log-toolbar: color-mix(in oklab, var(--theme-base-color) 26%, #101011);
+    --color-fg-dim: #e4dfea;
+    --color-fg-faint: #d8d2df;
+    --coollabs-subtle: #d8d2df;
+}
+
+html[data-theme="custom"] .control-selected,
+html[data-theme="custom"] .logs-viewer-btn-active,
+html[data-theme="custom"] .button-highlighted:hover {
+    color: var(--color-accent-foreground);
+}
+
+html[data-theme="custom"] * {
+    scrollbar-color: var(--theme-scrollbar-thumb) var(--color-panel);
+}
+
+html[data-theme="custom"] *::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: var(--theme-scrollbar-thumb);
+}
+
+html[data-theme="custom"] *::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-bright-color);
+}
+
+html[data-theme="custom"] *::-webkit-scrollbar-track {
+    background: var(--color-panel);
+}
+
+html[data-theme="custom"] .application-settings-navigation {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+}
+
+html[data-theme="custom"] .application-settings-navigation::-webkit-scrollbar {
+    width: 8px;
+}
+
+/* Use the same surface recipe as application settings cards for legacy
+   translucent cards and tables across the application. */
+html[data-theme="custom"] .data-table,
+html[data-theme="custom"] .box,
+html[data-theme="custom"] .coolbox,
+html[data-theme="custom"] .resource-view,
+html[data-theme="custom"] [class~="bg-surface"],
+html[data-theme="custom"] [class~="dark:bg-surface"],
+html[data-theme="custom"] [class~="dark:bg-white/[0.025]"] {
+    background-color: var(--color-content-surface) !important;
+}
+
+.dark [class~="dark:border-white/[0.07]"],
+.dark [class~="dark:border-white/[0.08]"] {
+    border-color: var(--coollabs-line) !important;
+}
+
+.dark [class~="dark:border-white/[0.06]"] {
+    border-color: var(--coollabs-hairline) !important;
+}
+
+html[data-theme="custom"] input::placeholder,
+html[data-theme="custom"] textarea::placeholder {
+    color: var(--theme-placeholder-color) !important;
+    opacity: 1;
+}
+
+html[data-theme="custom"] input:read-only,
+html[data-theme="custom"] textarea:read-only,
+html[data-theme="custom"] input:disabled,
+html[data-theme="custom"] textarea:disabled {
+    color: var(--color-fg-dim) !important;
 }
 
 /* Public authentication surfaces */
@@ -1680,7 +1833,8 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Empty states inside cards keep the same inset as other card content. */
 .application-settings-section-body:has(> .empty-state:only-child),
-.application-settings-section-body.is-flush:has(> .empty-state:only-child) {
+.application-settings-section-body.is-flush:has(> .empty-state:only-child),
+.application-settings-section-body.is-flush > div:has(> .empty-state:only-child) {
     padding: 1rem;
 }
 
@@ -2480,6 +2634,15 @@ input[type="search"]::-webkit-search-results-decoration {
     background: rgba(255, 255, 255, 0.035);
 }
 
+html[data-theme="custom"] .logs-viewer-toolbar {
+    border-bottom-color: var(--coollabs-line);
+    background: var(--color-log-toolbar);
+}
+
+html[data-theme="custom"] .logs-viewer-timestamp {
+    color: var(--color-fg-faint);
+}
+
 .logs-viewer-toolbar-controls {
     display: flex;
     min-width: 0;
@@ -2947,7 +3110,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .dark .runtime-log-viewport {
-    background: oklch(11.5% 0 0);
+    background: var(--color-log);
     color: var(--color-fg-dim);
 }
 

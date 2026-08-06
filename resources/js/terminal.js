@@ -42,7 +42,25 @@ function createApplicationTerminalTheme(accent, colors = {}) {
     };
 }
 
+function customThemeAccent() {
+    const color = localStorage.getItem('themeColor') || '#6b16ed';
+
+    if (!/^#[0-9a-f]{6}$/i.test(color)) {
+        return '#7c3aed';
+    }
+
+    const channels = color.match(/[a-f\d]{2}/gi).map((channel) => (
+        Math.round(parseInt(channel, 16) * 0.85 + 255 * 0.15)
+    ));
+
+    return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
 function createSystemTerminalTheme() {
+    if (document.documentElement.dataset.theme === 'custom') {
+        return createApplicationTerminalTheme(customThemeAccent());
+    }
+
     if (document.documentElement.classList.contains('dark')) {
         return createApplicationTerminalTheme('#8C8E9C');
     }
@@ -193,7 +211,7 @@ export function initializeTerminalComponent() {
                 });
                 this.themeObserver.observe(document.documentElement, {
                     attributes: true,
-                    attributeFilter: ['class', 'data-theme'],
+                    attributeFilter: ['class', 'data-theme', 'style'],
                 });
 
                 // Recover if a previous portal build left the terminal on <body>.

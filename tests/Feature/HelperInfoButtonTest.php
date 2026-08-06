@@ -59,6 +59,14 @@ test('helper popup stays in its alpine scope during livewire morphs', function (
         ->not->toContain('x-teleport');
 });
 
+test('helper popup prefers a position above its info button', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('let top = triggerRect.top - popupRect.height - padding;')
+        ->toContain('top = triggerRect.bottom + padding;');
+});
+
 test('helper popup supports focus dismissal and tooltip aria relationships', function () {
     $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
 

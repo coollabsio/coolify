@@ -54,11 +54,11 @@
         const triggerRect = trigger.getBoundingClientRect();
         const popupRect = popup.getBoundingClientRect();
         const padding = 8;
-        let top = triggerRect.bottom + padding;
+        let top = triggerRect.top - popupRect.height - padding;
         let left = triggerRect.right - popupRect.width;
 
-        if (top + popupRect.height > window.innerHeight - padding) {
-            top = triggerRect.top - popupRect.height - padding;
+        if (top < padding) {
+            top = triggerRect.bottom + padding;
         }
 
         left = Math.min(Math.max(padding, left), window.innerWidth - popupRect.width - padding);

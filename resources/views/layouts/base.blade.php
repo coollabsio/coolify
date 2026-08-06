@@ -1,12 +1,32 @@
 <!DOCTYPE html>
 <html data-theme="dark" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<script>
+<script data-navigate-once>
     // Immediate theme application - runs before any rendering
     (function () {
-        const t = localStorage.theme || 'dark';
-        const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList[d ? 'add' : 'remove']('dark');
-        document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+        window.themeAccentForeground = (color) => {
+            const channels = color.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) * 0.85 + 255 * 0.15);
+            const luminance = channels
+                .map(channel => channel / 255)
+                .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+                .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+
+            return luminance > 0.179 ? '#000000' : '#ffffff';
+        };
+        window.applyStoredTheme = () => {
+            const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
+            const themeColor = localStorage.themeColor || '#6b16ed';
+            const isDark = theme === 'dark' || theme === 'custom' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+
+            localStorage.theme = theme;
+            document.documentElement.classList.toggle('dark', isDark);
+            document.documentElement.dataset.theme = theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
+            document.documentElement.style.setProperty('--theme-base-color', themeColor);
+            document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(themeColor));
+            document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+        };
+
+        document.addEventListener('livewire:navigated', window.applyStoredTheme);
+        window.applyStoredTheme();
     })();
 </script>
 
@@ -54,7 +74,7 @@
     <script>
         // Update theme-color meta tag (non-critical, can run async)
         const t = localStorage.theme || 'dark';
-        const isDark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        const isDark = t === 'dark' || t === 'custom' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.getElementById('theme-color-meta')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
     </script>
     <style>
@@ -156,7 +176,7 @@
             if (theme == 'system') {
                 theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
             }
-            if (theme == 'dark') {
+            if (theme == 'dark' || theme == 'custom') {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
                 textColor = '#ffffff'
