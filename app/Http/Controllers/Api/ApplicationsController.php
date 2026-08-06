@@ -49,6 +49,7 @@ class ApplicationsController extends Controller
         'is_gzip_enabled',
         'is_stripprefix_enabled',
         'is_raw_compose_deployment_enabled',
+        'is_container_label_readonly_enabled',
     ];
 
     private const BOOLEAN_APPLICATION_SETTING_FIELDS = [
@@ -63,6 +64,7 @@ class ApplicationsController extends Controller
         'is_gzip_enabled',
         'is_stripprefix_enabled',
         'is_raw_compose_deployment_enabled',
+        'is_container_label_readonly_enabled',
     ];
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
