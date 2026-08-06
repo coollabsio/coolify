@@ -119,7 +119,17 @@
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                        <img class="size-8 object-contain" :src="application.logo" alt="" />
+                                        <template x-if="!application.logoDark">
+                                            <img class="size-full object-contain" :src="application.logo" alt="" />
+                                        </template>
+                                        <template x-if="application.logoDark">
+                                            <span class="size-full">
+                                                <img class="size-full object-contain block dark:hidden"
+                                                    :src="application.logo" alt="" />
+                                                <img class="size-full object-contain hidden dark:block"
+                                                    :src="application.logoDark" alt="" />
+                                            </span>
+                                        </template>
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
@@ -154,7 +164,7 @@
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                        <img class="size-8 object-contain" :src="application.logo" alt="" />
+                                        <img class="size-full object-contain" :src="application.logo" alt="" />
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
@@ -202,11 +212,22 @@
                                 <div class="flex min-w-0 items-center gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                        <span x-show="database.logo">
+                                        <template x-if="database.logo && database.logo.trim().startsWith('<')">
                                             <span
-                                                class="flex size-8 items-center justify-center [&>div]:h-8! [&>div]:w-8! [&>div]:bg-transparent! [&>div]:p-0! [&>div>svg]:h-8! [&>div>svg]:w-8! [&>svg]:h-8! [&>svg]:w-8! [&>svg]:bg-transparent! [&>svg]:p-0!"
+                                                class="flex size-full items-center justify-center [&>div]:h-full! [&>div]:w-full! [&>div]:bg-transparent! [&>div]:p-0! [&>div>svg]:h-full! [&>div>svg]:w-full! [&>svg]:h-full! [&>svg]:w-full! [&>svg]:bg-transparent! [&>svg]:p-0!"
                                                 x-html="database.logo"></span>
-                                        </span>
+                                        </template>
+                                        <template x-if="database.logo && !database.logo.trim().startsWith('<') && !database.logoDark">
+                                            <img class="size-full object-contain" :src="database.logo" alt="" />
+                                        </template>
+                                        <template x-if="database.logo && !database.logo.trim().startsWith('<') && database.logoDark">
+                                            <span class="size-full">
+                                                <img class="size-full object-contain block dark:hidden"
+                                                    :src="database.logo" alt="" />
+                                                <img class="size-full object-contain hidden dark:block"
+                                                    :src="database.logoDark" alt="" />
+                                            </span>
+                                        </template>
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"
