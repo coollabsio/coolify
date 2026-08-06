@@ -55,6 +55,13 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         // Get all servers to process
         $servers = $this->getServers();
 
+        // Provider state checks run independently so slow APIs cannot block SSH checks.
+        $this->dispatchCloudProviderStatusChecks($servers);
+
+        $servers = $servers
+            ->reject(fn (Server $server) => $server->hasPlaceholderIp())
+            ->values();
+
         // Dispatch ServerConnectionCheck for all servers efficiently
         $this->dispatchConnectionChecks($servers);
 
@@ -64,16 +71,33 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
 
     private function getServers(): Collection
     {
-        $allServers = Server::with('settings')->where('ip', '!=', '1.2.3.4');
+        $allServers = Server::with(['settings', 'cloudProviderToken']);
 
         if (isCloud()) {
             $servers = $allServers->whereRelation('team.subscription', 'stripe_invoice_paid', true)->get();
-            $own = Team::find(0)->servers()->with('settings')->get();
+            $own = Team::find(0)->servers()->with(['settings', 'cloudProviderToken'])->get();
 
-            return $servers->merge($own);
+            return $servers->merge($own)->unique('id')->values();
         } else {
             return $allServers->get();
         }
+    }
+
+    private function dispatchCloudProviderStatusChecks(Collection $servers): void
+    {
+        if (! shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-cloud-provider-status-checks', $this->executionTime)) {
+            return;
+        }
+
+        $servers->each(function (Server $server) {
+            $hasCloudResource = $server->hetzner_server_id
+                || $server->vultr_instance_id
+                || $server->digitalocean_droplet_id;
+
+            if ($hasCloudResource && $server->cloudProviderToken) {
+                ServerCloudProviderStatusCheckJob::dispatch($server);
+            }
+        });
     }
 
     private function dispatchConnectionChecks(Collection $servers): void
@@ -82,6 +106,10 @@ class ServerManagerJob implements ShouldBeEncrypted, ShouldQueue
         if (shouldRunCronNow($this->checkFrequency, $this->instanceTimezone, 'server-connection-checks', $this->executionTime)) {
             $servers->each(function (Server $server) {
                 try {
+                    if ($server->hasPlaceholderIp()) {
+                        return;
+                    }
+
                     // Skip SSH connection check if Sentinel is healthy — its heartbeat already proves connectivity
                     if ($server->isSentinelEnabled() && $server->isSentinelLive()) {
                         return;

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\DiscordNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 class Discord extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     public Team $team;
 
@@ -110,7 +111,9 @@ class Discord extends Component
             refreshSession();
         } else {
             $this->discordEnabled = $this->settings->discord_enabled;
-            $this->discordWebhookUrl = $this->settings->discord_webhook_url;
+            $this->discordWebhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->discord_webhook_url
+                : null;
 
             $this->deploymentSuccessDiscordNotifications = $this->settings->deployment_success_discord_notifications;
             $this->deploymentFailureDiscordNotifications = $this->settings->deployment_failure_discord_notifications;

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -13,7 +14,7 @@ use Livewire\Component;
 
 class Slack extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -110,7 +111,9 @@ class Slack extends Component
             refreshSession();
         } else {
             $this->slackEnabled = $this->settings->slack_enabled;
-            $this->slackWebhookUrl = $this->settings->slack_webhook_url;
+            $this->slackWebhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->slack_webhook_url
+                : null;
 
             $this->deploymentSuccessSlackNotifications = $this->settings->deployment_success_slack_notifications;
             $this->deploymentFailureSlackNotifications = $this->settings->deployment_failure_slack_notifications;

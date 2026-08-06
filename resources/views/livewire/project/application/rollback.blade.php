@@ -1,82 +1,99 @@
-<div x-init="$wire.loadImages">
-    <div class="flex items-center gap-2">
-        <h2>Rollback</h2>
-        @can('view', $application)
-            <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
-        @endcan
-    </div>
-    <div class="pb-4">You can easily rollback to a previously built (local) images quickly.</div>
+<div class="flex flex-col gap-6" x-init="$wire.loadImages">
+    <form wire:submit="saveSettings" class="application-settings-form flex flex-col">
+        <x-unsaved-bar action="saveSettings" />
+        <x-application.settings-section id="rollback-retention-section" title="Image retention"
+            helper="Keep previously built Docker images available for fast rollbacks.">
+            @if ($serverRetentionDisabled)
+                <div class="mb-4">
+                    <x-callout type="warning" title="Disabled by the server">
+                        Image retention is disabled at the server level. This setting has no effect until a server
+                        administrator enables it.
+                    </x-callout>
+                </div>
+            @endif
 
-    @if($serverRetentionDisabled)
-        <x-callout type="warning" class="mb-4">
-            Image retention is disabled at the server level. This setting has no effect until the server administrator enables it.
-        </x-callout>
-    @endif
+            <div class="max-w-sm">
+                <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100"
+                    label="Images to keep"
+                    helper="Set to 0 to keep only the running image. Pull request images are always removed during cleanup."
+                    canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
+            </div>
+        </x-application.settings-section>
+    </form>
 
-    <div class="pb-4">
-        <form wire:submit="saveSettings" class="flex items-end gap-2 w-96">
-            <x-forms.input id="dockerImagesToKeep" type="number" min="0" max="100" label="Images to keep for rollback"
-                helper="Number of Docker images to keep for rollback during cleanup. Set to 0 to only keep the currently running image. PR images are always deleted during cleanup.<br><br><strong>Note:</strong> Server administrators can disable image retention at the server level, which overrides this setting."
-                canGate="update" :canResource="$application" :disabled="$serverRetentionDisabled" />
-            <x-forms.button canGate="update" :canResource="$application" type="submit" :disabled="$serverRetentionDisabled">Save</x-forms.button>
-        </form>
-    </div>
-    <div wire:target='loadImages' wire:loading.remove>
-        <div class="flex flex-wrap">
+    <x-application.settings-section id="rollback-images-section" title="Available images"
+        helper="Rollback uses an existing local image without rebuilding the application." flush>
+        <x-slot:actions>
+            @can('view', $application)
+                <x-forms.button wire:click="loadImages(true)">
+                    Reload images
+                </x-forms.button>
+            @endcan
+        </x-slot:actions>
+
+        <div wire:target="loadImages" wire:loading.remove>
             @forelse ($images as $image)
-                <div class="w-2/4 p-2">
+                @php
+                    $tag = data_get($image, 'tag');
+                    $date = data_get($image, 'created_at');
+                    $createdAt = \Illuminate\Support\Carbon::parse($date);
+                    $isCommitSha = preg_match('/^[0-9a-f]{7,128}$/i', $tag);
+                    $isPrTag = preg_match('/^pr-\d+$/', $tag);
+                    $isRollbackable = $isCommitSha || $isPrTag;
+                    $isCurrent = data_get($image, 'is_current');
+                @endphp
+                <div
+                    class="flex flex-col gap-3 border-b border-neutral-200 px-4 py-3.5 last:border-b-0 sm:flex-row sm:items-center dark:border-white/[0.07]">
                     <div
-                        class="bg-white border rounded-sm dark:border-coolgray-300 dark:bg-coolgray-100 border-neutral-200">
-                        @php
-                            $tag = data_get($image, 'tag');
-                            $date = data_get($image, 'created_at');
-                            $interval = \Illuminate\Support\Carbon::parse($date);
-                            // Check if tag looks like a commit SHA (hex string) or PR tag (pr-N)
-                            $isCommitSha = preg_match('/^[0-9a-f]{7,128}$/i', $tag);
-                            $isPrTag = preg_match('/^pr-\d+$/', $tag);
-                            $isRollbackable = $isCommitSha || $isPrTag;
-                        @endphp
-                        <div class="p-2">
-                            <div class="">
-                                @if (data_get($image, 'is_current'))
-                                    <span class="font-bold dark:text-warning">LIVE</span>
-                                    |
-                                @endif
-                                @if ($isCommitSha)
-                                    SHA: {{ $tag }}
-                                @elseif ($isPrTag)
-                                    PR: {{ $tag }}
-                                @else
-                                    Tag: {{ $tag }}
-                                @endif
-                            </div>
-                            <div class="text-xs">{{ $interval->diffForHumans() }}</div>
-                            <div class="text-xs">{{ $date }}</div>
-                        </div>
-                        <div class="flex justify-end p-2">
-                            @can('deploy', $application)
-                                @if (data_get($image, 'is_current'))
-                                    <x-forms.button disabled tooltip="This image is currently running.">
-                                        Rollback
-                                    </x-forms.button>
-                                @elseif (!$isRollbackable)
-                                    <x-forms.button disabled tooltip="Rollback not available for '{{ $tag }}' tag. Only commit-based tags support rollback. Re-deploy to create a rollback-enabled image.">
-                                        Rollback
-                                    </x-forms.button>
-                                @else
-                                    <x-forms.button class="dark:bg-coolgray-100"
-                                        wire:click="rollbackImage('{{ $tag }}')">
-                                        Rollback
-                                    </x-forms.button>
-                                @endif
-                            @endcan
-                        </div>
+                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
+                        <x-reicon name="layers" class="size-[18px]" />
                     </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <code class="truncate font-mono text-[13px] font-semibold text-black dark:text-fg">
+                                {{ $tag }}
+                            </code>
+                            @if ($isCurrent)
+                                <x-status-badge status="Running image" type="success" />
+                            @elseif (!$isRollbackable)
+                                <x-status-badge status="Rollback unavailable" type="neutral" />
+                            @endif
+                        </div>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                            Built {{ $createdAt->diffForHumans() }}
+                            <span class="mx-1 text-neutral-300 dark:text-fg-faint">·</span>
+                            {{ $date }}
+                        </p>
+                    </div>
+                    @can('deploy', $application)
+                        @if ($isCurrent)
+                            <x-forms.button disabled tooltip="This image is currently running.">
+                                Rollback
+                            </x-forms.button>
+                        @elseif (!$isRollbackable)
+                            <x-forms.button disabled
+                                tooltip="Only commit and pull-request image tags support rollback.">
+                                Rollback
+                            </x-forms.button>
+                        @else
+                            <x-forms.button wire:click="rollbackImage('{{ $tag }}')">
+                                Roll back to this image
+                            </x-forms.button>
+                        @endif
+                    @endcan
                 </div>
             @empty
-                <div>No images found locally.</div>
+                <x-empty title="No rollback images"
+                    description="No previous application images are currently stored on this server."
+                    icon-name="layers" />
             @endforelse
         </div>
-    </div>
-    <div wire:target='loadImages' wire:loading>Loading available docker images...</div>
+
+        <div class="w-full" wire:target="loadImages" wire:loading>
+            <div class="flex items-center justify-center gap-2 px-4 py-10 text-[13px] text-neutral-500 dark:text-fg-dim">
+                <x-loading class="size-4" />
+                Loading available images…
+            </div>
+        </div>
+    </x-application.settings-section>
 </div>

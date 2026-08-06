@@ -92,7 +92,7 @@ test('file storage accepts paths with underscores and hyphens', function () {
         ->not->toThrow(Exception::class);
 });
 
-// --- Regression tests for GHSA-46hp-7m8g-7622 ---
+// --- Regression tests for file mount path validation ---
 // These verify that file mount paths (not just directory mounts) are validated,
 // and that saveStorageOnServer() validates fs_path before any shell interpolation.
 
@@ -140,4 +140,78 @@ test('file storage accepts relative dot-prefixed paths', function () {
 
     expect(fn () => validateShellSafePath('./data', 'storage path'))
         ->not->toThrow(Exception::class);
+});
+
+test('file mount path validator rejects parent segments and unsafe separators', function (string $path) {
+    expect(fn () => validateFileMountPath($path, 'file storage path'))
+        ->toThrow(Exception::class);
+})->with([
+    'parent segment to etc' => ['/../../etc/passwd'],
+    'embedded parent segment' => ['/foo/../bar'],
+    'parent segment' => ['/..'],
+    'double slash before parent segment' => ['/foo//../bar'],
+    'current directory segment' => ['/foo/./bar'],
+    'backslash parent segment' => ['\\..\\etc\\passwd'],
+    'null byte' => ["/app/config\0/../../etc/passwd"],
+]);
+
+test('file mount path validator accepts safe absolute container file paths', function (string $path, string $expected) {
+    expect(validateFileMountPath($path, 'file storage path'))->toBe($expected);
+})->with([
+    'nginx config' => ['/etc/nginx/nginx.conf', '/etc/nginx/nginx.conf'],
+    'app env filename' => ['/app/.env', '/app/.env'],
+    'relative input becomes absolute' => ['config/app.yaml', '/config/app.yaml'],
+    'duplicate slashes collapse' => ['/opt//app///config.json', '/opt/app/config.json'],
+]);
+
+test('host file mount path validator accepts absolute host file paths', function () {
+    expect(validateHostFileMountPath('/etc/nginx/nginx.conf', 'host file path'))
+        ->toBe('/etc/nginx/nginx.conf');
+});
+
+test('host file mount path validator rejects ambiguous or directory paths', function (string $path) {
+    expect(fn () => validateHostFileMountPath($path, 'host file path'))
+        ->toThrow(Exception::class);
+})->with([
+    'relative path' => ['etc/nginx/nginx.conf'],
+    'root directory' => ['/'],
+    'trailing slash' => ['/etc/nginx/'],
+    'parent segment' => ['/etc/../shadow'],
+    'current segment' => ['/etc/./nginx.conf'],
+    'backslash' => ['\\etc\\nginx.conf'],
+]);
+
+test('confined path resolver keeps file mounts inside their resource configuration root', function () {
+    expect(confineFileMountPath('/data/coolify/applications/app-uuid', '/etc/nginx/nginx.conf', 'file storage path'))
+        ->toBe('/data/coolify/applications/app-uuid/etc/nginx/nginx.conf');
+
+    expect(confineFileMountPath('/data/coolify/databases/db-uuid/', 'postgres/postgresql.conf', 'file storage path'))
+        ->toBe('/data/coolify/databases/db-uuid/postgres/postgresql.conf');
+
+    expect(confineFileMountPath('/data/coolify/services/service-uuid', '/config.yaml', 'file storage path'))
+        ->toBe('/data/coolify/services/service-uuid/config.yaml');
+});
+
+test('confined path resolver rejects paths that escape the resource configuration root', function (string $base, string $path) {
+    expect(fn () => confineFileMountPath($base, $path, 'file storage path'))
+        ->toThrow(Exception::class);
+})->with([
+    'application parent segment' => ['/data/coolify/applications/app-uuid', '/../../etc/passwd'],
+    'database parent segment' => ['/data/coolify/databases/db-uuid', '/postgres/../../../etc/shadow'],
+    'service dot segment' => ['/data/coolify/services/service-uuid', '/./config.yaml'],
+]);
+
+test('local file volume write sink keeps saved managed file paths for compatibility', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
+
+    expect($source)->not->toContain('confinePathToBase($workdir, $path->value(), \'storage path\')')
+        ->and($source)->toContain('tee {$escapedPath}');
+});
+
+test('host file mounts are bind-only and skipped by server storage writes', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Models/LocalFileVolume.php');
+
+    expect($source)->toContain('if ($this->is_host_file) {')
+        ->and($source)->toContain('return;')
+        ->and($source)->toContain('tee {$escapedPath}');
 });

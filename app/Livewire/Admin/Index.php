@@ -37,7 +37,7 @@ class Index extends Component
             Auth::login($user);
             refreshSession($team_to_switch_to);
 
-            return redirect(request()->header('Referer'));
+            return redirect()->route('admin.index');
         }
     }
 
@@ -54,6 +54,9 @@ class Index extends Component
 
     public function getSubscribers()
     {
+        if (Auth::id() !== 0 && ! session('impersonating')) {
+            return redirect()->route('dashboard');
+        }
         $this->inactiveSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', false)->count();
         $this->activeSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', true)->count();
     }
@@ -70,7 +73,7 @@ class Index extends Component
         Auth::login($user);
         refreshSession($team_to_switch_to);
 
-        return redirect(request()->header('Referer'));
+        return redirect()->route('dashboard');
     }
 
     private function authorizeAdminAccess(): void

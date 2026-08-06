@@ -2,10 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Events\ServerReachabilityChanged;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use App\Services\ConfigurationRepository;
-use App\Services\HetznerService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,8 +41,15 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         $configRepository->disableSshMux();
     }
 
-    public function handle()
+    public function handle(): void
     {
+        if ($this->server->hasPlaceholderIp()) {
+            return;
+        }
+
+        $wasReachable = (bool) $this->server->settings->is_reachable;
+        $wasNotified = (bool) $this->server->unreachable_notification_sent;
+
         try {
             // Check if server is disabled
             if ($this->server->settings->force_disabled) {
@@ -56,11 +63,6 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
 
                 return;
-            }
-
-            // Check Hetzner server status if applicable
-            if ($this->server->hetzner_server_id && $this->server->cloudProviderToken) {
-                $this->checkHetznerStatus();
             }
 
             // Temporarily disable mux if requested
@@ -84,6 +86,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                     'server_ip' => $this->server->ip,
                 ]);
 
+                $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
+
                 return;
             }
 
@@ -99,6 +103,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server->update(['unreachable_count' => 0]);
             }
 
+            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, true);
+
         } catch (\Throwable $e) {
 
             Log::error('ServerConnectionCheckJob failed', [
@@ -111,6 +117,8 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             $this->server->increment('unreachable_count');
 
+            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
+
             return;
         }
     }
@@ -118,38 +126,28 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         if ($exception instanceof TimeoutExceededException) {
-            $this->server->settings->update([
-                'is_reachable' => false,
-                'is_usable' => false,
-            ]);
-            $this->server->increment('unreachable_count');
-
             // Delete the queue job so it doesn't appear in Horizon's failed list.
             $this->job?->delete();
         }
     }
 
-    private function checkHetznerStatus(): void
+    /**
+     * Fire ServerReachabilityChanged when state crosses the unreachable threshold (count >= 2)
+     * or when a previously-notified server recovers. Skips noise from single transient flaps.
+     */
+    private function dispatchReachabilityChangedIfNeeded(bool $wasReachable, bool $wasNotified, bool $isReachable): void
     {
-        $status = null;
-
-        try {
-            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
-            $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
-            $status = $serverData['status'] ?? null;
-
-        } catch (\Throwable) {
-            // Silently ignore — server may have been deleted from Hetzner.
-        }
-        if ($this->server->hetzner_server_status !== $status) {
-            $this->server->update(['hetzner_server_status' => $status]);
-            $this->server->hetzner_server_status = $status;
-            if ($status === 'off') {
-                ray('Server is powered off, marking as unreachable');
-                throw new \Exception('Server is powered off');
+        if ($isReachable) {
+            if (! $wasReachable || $wasNotified) {
+                ServerReachabilityChanged::dispatch($this->server);
             }
+
+            return;
         }
 
+        if ($this->server->unreachable_count >= 2 && ! $wasNotified) {
+            ServerReachabilityChanged::dispatch($this->server);
+        }
     }
 
     private function checkConnection(): bool

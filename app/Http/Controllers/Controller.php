@@ -6,8 +6,9 @@ use App\Events\TestEvent;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
@@ -39,9 +40,29 @@ class Controller extends BaseController
         return view('auth.verify-email');
     }
 
-    public function email_verify(EmailVerificationRequest $request)
+    public function email_verify(Request $request)
     {
-        $request->fulfill();
+        if (! $request->hasValidSignature()) {
+            abort(403);
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            abort(403);
+        }
+
+        if (! hash_equals((string) $request->route('id'), (string) $user->getKey())) {
+            abort(403);
+        }
+
+        if (! hash_equals((string) $request->route('hash'), hash('sha256', $user->getEmailForVerification()))) {
+            abort(403);
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new Verified($user));
+        }
 
         return redirect(RouteServiceProvider::HOME);
     }
@@ -77,27 +98,50 @@ class Controller extends BaseController
     public function link()
     {
         $token = request()->get('token');
-        if ($token) {
-            $decrypted = Crypt::decryptString($token);
-            $email = str($decrypted)->before('@@@');
-            $password = str($decrypted)->after('@@@');
+        if (is_string($token) && $token !== '') {
+            try {
+                $decrypted = Crypt::decryptString($token);
+            } catch (DecryptException) {
+                return redirect()->route('login')->with('error', 'Invalid credentials.');
+            }
+
+            if (! str_contains($decrypted, '@@@')) {
+                return redirect()->route('login')->with('error', 'Invalid credentials.');
+            }
+
+            $payload = explode('@@@', $decrypted, 3);
+            if (count($payload) === 3) {
+                [$email, $invitationUuid, $password] = $payload;
+            } else {
+                [$email, $password] = $payload;
+                $invitationUuid = null;
+            }
+
+            $email = Str::lower($email);
             $user = User::whereEmail($email)->first();
             if (! $user) {
                 return redirect()->route('login');
             }
+
+            $invitation = TeamInvitation::query()
+                ->where('email', $email)
+                ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
+                ->first();
+            if (! $invitation || ! $this->invitationLinkMatchesToken($invitation, $token) || ! $invitation->isValid()) {
+                return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+            }
+
             if (Hash::check($password, $user->password)) {
-                $invitation = TeamInvitation::whereEmail($email);
-                if ($invitation->exists()) {
-                    $team = $invitation->first()->team;
-                    $user->teams()->attach($team->id, ['role' => $invitation->first()->role]);
-                    $invitation->delete();
-                } else {
-                    $team = $user->teams()->first();
+                $team = $invitation->team;
+                if (! $user->teams()->where('team_id', $team->id)->exists()) {
+                    $user->teams()->attach($team->id, ['role' => $invitation->role]);
                 }
-                if (is_null(data_get($user, 'email_verified_at'))) {
-                    $user->email_verified_at = now();
-                    $user->save();
-                }
+                $invitation->delete();
+
+                $user->forceFill([
+                    'password' => Hash::make(Str::random(64)),
+                ])->save();
+
                 Auth::login($user);
                 session(['currentTeam' => $team]);
 
@@ -106,6 +150,19 @@ class Controller extends BaseController
         }
 
         return redirect()->route('login')->with('error', 'Invalid credentials.');
+    }
+
+    private function invitationLinkMatchesToken(TeamInvitation $invitation, string $token): bool
+    {
+        $query = parse_url($invitation->link, PHP_URL_QUERY);
+        if (! is_string($query)) {
+            return false;
+        }
+
+        parse_str($query, $parameters);
+        $storedToken = $parameters['token'] ?? null;
+
+        return is_string($storedToken) && hash_equals($storedToken, $token);
     }
 
     public function showInvitation()

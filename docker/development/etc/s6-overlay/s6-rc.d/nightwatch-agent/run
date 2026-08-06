@@ -2,6 +2,14 @@
 
 cd /var/www/html
 
+. /etc/s6-overlay/scripts/container-role
+role="$(coolify_container_role_value)"
+
+if ! coolify_container_has_role worker && ! coolify_container_has_role nightwatch && ! coolify_container_has_role nightwatch-agent; then
+    echo "   INFO  Nightwatch is disabled for role '$role', sleeping."
+    exec sleep infinity
+fi
+
 if grep -qE '^NIGHTWATCH_ENABLED=true' .env 2>/dev/null; then
     echo "   INFO  Nightwatch is enabled, starting..."
     exec php artisan nightwatch:agent

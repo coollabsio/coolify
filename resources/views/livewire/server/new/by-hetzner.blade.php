@@ -1,204 +1,202 @@
 <div class="w-full">
     @if ($limit_reached)
         <x-limit-reached name="servers" />
-    @else
-        @if ($current_step === 1)
-            <div class="flex flex-col w-full gap-4">
-                @if ($available_tokens->count() > 0)
-                    <div class="flex gap-2">
-                        <div class="flex-1">
-                            <x-forms.select label="Select Hetzner Token" id="selected_token_id"
-                                wire:change="selectToken($event.target.value)" required>
-                                <option value="">Select a saved token...</option>
-                                @foreach ($available_tokens as $token)
-                                    <option value="{{ $token->id }}">
-                                        {{ $token->name ?? 'Hetzner Token' }}
-                                    </option>
-                                @endforeach
-                            </x-forms.select>
-                        </div>
-                        <div class="flex items-end">
-                            <x-forms.button canGate="create" :canResource="App\Models\Server::class" wire:click="nextStep"
-                                :disabled="!$selected_token_id">
-                                Continue
-                            </x-forms.button>
-                        </div>
-                    </div>
-
-                    <div class="text-center text-sm dark:text-neutral-500">OR</div>
-                @endif
-
-                <x-modal-input isFullWidth
-                    buttonTitle="{{ $available_tokens->count() > 0 ? '+ Add New Token' : 'Add Hetzner Token' }}"
-                    title="Add Hetzner Token">
-                    <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner" />
-                </x-modal-input>
-            </div>
-        @elseif ($current_step === 2)
+    @elseif ($current_step === 1)
+        <div class="flex flex-col gap-6">
+            <x-server.provider-token-picker provider="hetzner" providerLabel="Hetzner"
+                :tokens="$available_tokens" />
+            <p class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                New to Hetzner?
+                <a href="https://coolify.io/hetzner" target="_blank"
+                    class="font-medium text-coollabs hover:underline dark:text-warning">Create an account</a>
+                through Coolify's affiliate link.
+            </p>
+        </div>
+    @elseif ($current_step === 2)
+        <div wire:init="loadHetznerData">
             @if ($loading_data)
-                <div class="flex items-center justify-center py-8">
-                    <div class="text-center">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                        <p class="mt-4 text-sm dark:text-neutral-400">Loading Hetzner data...</p>
+                <x-application.settings-section title="Loading Hetzner"
+                    description="Fetching locations, server types, images, and account resources.">
+                    <div class="flex min-h-40 items-center justify-center">
+                        <x-loading text="Loading Hetzner data..." />
                     </div>
-                </div>
+                </x-application.settings-section>
+            @elseif ($provider_data_error)
+                <x-application.settings-section title="Unable to load Hetzner"
+                    description="The selected token could not access the provider API.">
+                    <x-callout type="error" title="Provider request failed">
+                        <pre class="mt-2 whitespace-pre-wrap break-words text-[11px]">{{ $provider_data_error }}</pre>
+                    </x-callout>
+                    <div class="mt-4">
+                        <a class="button" href="{{ route('server.create.type', ['type' => 'hetzner']) }}"
+                            {{ wireNavigate() }}>Select another token</a>
+                    </div>
+                </x-application.settings-section>
             @else
-                <form class="flex flex-col w-full gap-2" wire:submit='submit'>
-                    <div>
-                        <x-forms.input id="server_name" label="Server Name" helper="A friendly name for your server." />
-                    </div>
+                @php
+                    $locationOptions = collect($locations)->map(fn ($location) => [
+                        'value' => $location['name'],
+                        'label' => $location['city'] . ' · ' . $location['country'],
+                    ])->values()->all();
+                    $serverTypeOptions = collect($this->availableServerTypes)->map(function ($type) {
+                        $price = data_get($type, 'prices.0.price_monthly.gross');
+                        $label = ($type['description'] ?? $type['name'])
+                            . ' · ' . ($type['cores'] ?? '?') . ' vCPU'
+                            . ' · ' . ($type['memory'] ?? '?') . ' GB RAM'
+                            . ' · ' . ($type['disk'] ?? '?') . ' GB';
+                        return [
+                            'value' => $type['name'],
+                            'label' => $price ? $label . ' · €' . number_format($price, 2) . '/mo' : $label,
+                        ];
+                    })->values()->all();
+                    $imageOptions = collect($this->availableImages)->map(fn ($image) => [
+                        'value' => $image['id'],
+                        'label' => ($image['description'] ?? $image['name'])
+                            . (isset($image['architecture']) ? ' · ' . $image['architecture'] : ''),
+                    ])->values()->all();
+                    $privateKeyOptions = $private_keys->map(fn ($key) => [
+                        'value' => $key->id,
+                        'label' => $key->name,
+                    ])->values()->all();
+                    $scriptOptions = collect([
+                        ['value' => '', 'label' => 'Start with an empty script'],
+                        ...$saved_cloud_init_scripts->map(fn ($script) => [
+                            'value' => $script->id,
+                            'label' => $script->name,
+                        ])->all(),
+                    ])->all();
+                @endphp
 
-                    <div>
-                        <x-forms.select label="Location" id="selected_location" wire:model.live="selected_location" required>
-                            <option value="">Select a location...</option>
-                            @foreach ($locations as $location)
-                                <option value="{{ $location['name'] }}">
-                                    {{ $location['city'] }} - {{ $location['country'] }}
-                                </option>
-                            @endforeach
-                        </x-forms.select>
-                    </div>
+                <form wire:submit="submit" class="flex flex-col gap-6">
+                    <x-application.settings-section title="Hetzner server"
+                        description="Choose the location, hardware, operating system, and Coolify SSH key.">
+                        <x-slot:actions>
+                            <button type="submit"
+                                class="button button-highlighted"
+                                @disabled(!$private_key_id)>
+                                Buy and create
+                                @if ($this->selectedServerPrice)
+                                    <span class="opacity-70">· {{ $this->selectedServerPrice }}/mo</span>
+                                @endif
+                            </button>
+                        </x-slot:actions>
 
-                    <div>
-                        <x-forms.select label="Server Type" id="selected_server_type" wire:model.live="selected_server_type"
-                            helper="Learn more about <a class='inline-block underline dark:text-white' href='https://www.hetzner.com/cloud/' target='_blank'>Hetzner server types</a>"
-                            required :disabled="!$selected_location">
-                            <option value="">
-                                {{ $selected_location ? 'Select a server type...' : 'Select a location first' }}
-                            </option>
-                            @foreach ($this->availableServerTypes as $serverType)
-                                <option value="{{ $serverType['name'] }}">
-                                    {{ $serverType['description'] }} -
-                                    {{ $serverType['cores'] }} vCPU
-                                    @if (isset($serverType['cpu_vendor_info']) && $serverType['cpu_vendor_info'])
-                                        ({{ $serverType['cpu_vendor_info'] }})
-                                    @endif
-                                    , {{ $serverType['memory'] }}GB RAM, 
-                                    {{ $serverType['disk'] }}GB
-                                    @if (isset($serverType['architecture']))
-                                        [{{ $serverType['architecture'] }}]
-                                    @endif
-                                    @if (isset($serverType['prices']))
-                                        -
-                                        €{{ number_format($serverType['prices'][0]['price_monthly']['gross'] ?? 0, 2) }}/mo
-                                    @endif
-                                </option>
-                            @endforeach
-                        </x-forms.select>
-                    </div>
-
-                    <div>
-                        <x-forms.select label="Image" id="selected_image" required :disabled="!$selected_server_type">
-                            <option value="">
-                                {{ $selected_server_type ? 'Select an image...' : 'Select a server type first' }}
-                            </option>
-                            @foreach ($this->availableImages as $image)
-                                <option value="{{ $image['id'] }}">
-                                    {{ $image['description'] ?? $image['name'] }}
-                                    @if (isset($image['architecture']))
-                                        ({{ $image['architecture'] }})
-                                    @endif
-                                </option>
-                            @endforeach
-                        </x-forms.select>
-                    </div>
-
-                    <div>
-                        @if ($private_keys->count() === 0)
-                            <div class="flex flex-col gap-2">
-                                <label class="flex gap-1 items-center mb-1 text-sm font-medium">
-                                    Private Key
-                                    <x-highlighted text="*" />
-                                </label>
-                                <div
-                                    class="p-4 border border-warning-500 dark:border-warning-600 rounded bg-warning-50 dark:bg-warning-900/10">
-                                    <p class="text-sm mb-3 text-neutral-700 dark:text-neutral-300">
-                                        No private keys found. You need to create a private key to continue.
-                                    </p>
-                                    <x-modal-input buttonTitle="Create New Private Key" title="New Private Key" isHighlightedButton>
-                                        <livewire:security.private-key.create :modal_mode="true" from="server" />
-                                    </x-modal-input>
-                                </div>
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <div class="lg:col-span-2">
+                                <x-forms.input id="server_name" label="Server name"
+                                    helper="A friendly name shown in Coolify." />
                             </div>
-                        @else
-                            <x-forms.select label="Private Key" id="private_key_id" required>
-                                <option value="">Select a private key...</option>
-                                @foreach ($private_keys as $key)
-                                    <option value="{{ $key->id }}">
-                                        {{ $key->name }}
-                                    </option>
-                                @endforeach
-                            </x-forms.select>
-                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                This SSH key will be automatically added to your Hetzner account and used to access the
-                                server.
-                            </p>
-                        @endif
-                    </div>
-                    <div>
-                        <x-forms.datalist label="Additional SSH Keys (from Hetzner)" id="selectedHetznerSshKeyIds"
-                            helper="Select existing SSH keys from your Hetzner account to add to this server. The Coolify SSH key will be automatically added."
-                            :multiple="true" :disabled="count($hetznerSshKeys) === 0" :placeholder="count($hetznerSshKeys) > 0
-                                ? 'Search and select SSH keys...'
-                                : 'No SSH keys found in Hetzner account'">
-                            @foreach ($hetznerSshKeys as $sshKey)
-                                <option value="{{ $sshKey['id'] }}">
-                                    {{ $sshKey['name'] }} - {{ substr($sshKey['fingerprint'], 0, 20) }}...
-                                </option>
-                            @endforeach
-                        </x-forms.datalist>
-                    </div>
-
-                    <div class="flex flex-col gap-2">
-                        <label class="text-sm font-medium">Network Configuration</label>
-                        <div class="flex gap-4">
-                            <x-forms.checkbox id="enable_ipv4" label="Enable IPv4"
-                                helper="Enable public IPv4 address for this server" />
-                            <x-forms.checkbox id="enable_ipv6" label="Enable IPv6"
-                                helper="Enable public IPv6 address for this server" />
-                        </div>
-                    </div>
-
-                    <div class="flex flex-col gap-2">
-                        <div class="flex justify-between items-center gap-2">
-                            <label class="text-sm font-medium w-32">Cloud-Init Script</label>
-                            @if ($saved_cloud_init_scripts->count() > 0)
-                                <div class="flex items-center gap-2 flex-1">
-                                    <x-forms.select wire:model.live="selected_cloud_init_script_id" label="" helper="">
-                                        <option value="">Load saved script...</option>
-                                        @foreach ($saved_cloud_init_scripts as $script)
-                                            <option value="{{ $script->id }}">{{ $script->name }}</option>
-                                        @endforeach
-                                    </x-forms.select>
-                                    <x-forms.button type="button" wire:click="clearCloudInitScript">
-                                        Clear
-                                    </x-forms.button>
+                            <x-forms.listbox id="selected_location" label="Location" required live
+                                placeholder="Select a location" :options="$locationOptions" />
+                            <x-forms.listbox id="selected_server_type" label="Server type" required live
+                                :disabled="!$selected_location" placeholder="Select a server type"
+                                :options="$serverTypeOptions" />
+                            <x-forms.listbox id="selected_image" label="Image" required
+                                :disabled="!$selected_server_type" placeholder="Select an image"
+                                :options="$imageOptions" />
+                            @if ($private_keys->isEmpty())
+                                <div>
+                                    <label class="mb-1.5 flex w-fit items-center gap-1.5">Private key
+                                        <x-highlighted text="*" />
+                                    </label>
+                                    <div
+                                        class="flex min-h-8 items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2">
+                                        <span class="text-[11px] text-neutral-600 dark:text-fg-dim">A private key is required.</span>
+                                        <x-modal-input title="New Private Key">
+                                            <x-slot:content>
+                                                <button type="button" class="button">Create key</button>
+                                            </x-slot:content>
+                                            <livewire:security.private-key.create :modal_mode="true" from="server" />
+                                        </x-modal-input>
+                                    </div>
                                 </div>
+                            @else
+                                <x-forms.listbox id="private_key_id" label="Private key" required
+                                    placeholder="Select a private key" :options="$privateKeyOptions"
+                                    helper="This key is added to the Hetzner server automatically." />
                             @endif
                         </div>
-                        <x-forms.textarea id="cloud_init_script" label=""
-                            helper="Add a cloud-init script to run when the server is created. See Hetzner's documentation for details."
-                            rows="8" />
+                    </x-application.settings-section>
 
-                        <div class="flex items-center gap-2">
-                            <x-forms.checkbox id="save_cloud_init_script" label="Save this script for later use" />
-                            <div class="flex-1">
-                                <x-forms.input id="cloud_init_script_name" label="" placeholder="Script name..." />
+                    <x-application.settings-section title="Advanced options"
+                        description="Provider SSH keys, networking, backups, and cloud-init.">
+                        @if (count($this->advancedHetznerOptionsSummary) > 0)
+                            <div class="mb-4 flex flex-wrap gap-1.5">
+                                @foreach ($this->advancedHetznerOptionsSummary as $summaryItem)
+                                    <span
+                                        class="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+                                        {{ $summaryItem }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        <div class="flex flex-col gap-4">
+                            <x-forms.datalist label="Extra SSH keys" id="selectedHetznerSshKeyIds"
+                                helper="Existing keys from the Hetzner account." :multiple="true"
+                                :disabled="count($hetznerSshKeys) === 0"
+                                :placeholder="count($hetznerSshKeys) ? 'Search SSH keys' : 'No account keys found'">
+                                @foreach ($hetznerSshKeys as $sshKey)
+                                    <option value="{{ $sshKey['id'] }}">{{ $sshKey['name'] }}</option>
+                                @endforeach
+                            </x-forms.datalist>
+
+                            <div class="grid gap-4 lg:grid-cols-2">
+                                <x-forms.datalist label="Firewalls" id="selectedHetznerFirewallIds"
+                                    :multiple="true" :disabled="count($hetznerFirewalls) === 0"
+                                    :placeholder="count($hetznerFirewalls) ? 'Search firewalls' : 'No firewalls found'">
+                                    @foreach ($hetznerFirewalls as $firewall)
+                                        <option value="{{ $firewall['id'] }}">{{ $firewall['name'] }}</option>
+                                    @endforeach
+                                </x-forms.datalist>
+                                <x-forms.datalist label="Private networks" id="selectedHetznerNetworkIds"
+                                    :multiple="true" :disabled="count($this->availableNetworks) === 0"
+                                    :placeholder="count($this->availableNetworks) ? 'Search networks' : 'No compatible networks'">
+                                    @foreach ($this->availableNetworks as $network)
+                                        <option value="{{ $network['id'] }}">
+                                            {{ $network['name'] }} · {{ $network['ip_range'] }}
+                                        </option>
+                                    @endforeach
+                                </x-forms.datalist>
+                            </div>
+
+                            <div class="grid gap-3 lg:grid-cols-3">
+                                <x-forms.checkbox id="enable_ipv4" label="Enable IPv4" fullWidth />
+                                <x-forms.checkbox id="enable_ipv6" label="Enable IPv6" fullWidth />
+                                <x-forms.checkbox id="enable_backups" label="Enable Hetzner backups" fullWidth
+                                    helper="Adds 20% to the provider server price." />
+                            </div>
+
+                            <div class="border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                @if (!$show_cloud_init_script && blank($cloud_init_script) && blank($selected_cloud_init_script_id))
+                                    <button type="button" class="button" wire:click="showCloudInitScript">
+                                        <x-reicon name="plus" class="size-3.5" />
+                                        Add cloud-init script
+                                    </button>
+                                @else
+                                    <div class="flex flex-col gap-4">
+                                        <div class="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                                            <x-forms.listbox id="selected_cloud_init_script_id"
+                                                label="Saved cloud-init script" live :options="$scriptOptions" />
+                                            <button type="button" class="button"
+                                                wire:click="clearCloudInitScript">Clear</button>
+                                        </div>
+                                        <x-forms.textarea id="cloud_init_script" label="Cloud-init script"
+                                            rows="8" monospace />
+                                        <div class="grid items-end gap-4 lg:grid-cols-2">
+                                            <x-forms.checkbox id="save_cloud_init_script"
+                                                label="Save this script for later" />
+                                            @if ($save_cloud_init_script)
+                                                <x-forms.input id="cloud_init_script_name" label="Saved script name" />
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endif
                             </div>
                         </div>
-                    </div>
-
-                    <div class="flex gap-2 justify-between">
-                        <x-forms.button type="button" wire:click="previousStep">
-                            Back
-                        </x-forms.button>
-                        <x-forms.button isHighlighted canGate="create" :canResource="App\Models\Server::class" type="submit"
-                            :disabled="!$private_key_id">
-                            Buy & Create Server{{ $this->selectedServerPrice ? ' (' . $this->selectedServerPrice . '/mo)' : '' }}
-                        </x-forms.button>
-                    </div>
+                    </x-application.settings-section>
                 </form>
             @endif
-        @endif
+        </div>
     @endif
 </div>

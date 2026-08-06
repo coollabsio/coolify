@@ -4,11 +4,24 @@
         notification: true,
         realtime: false,
     },
+    reminders: {
+        sponsorship: { compact: false },
+        notification: { compact: false },
+    },
+    reminderCollapseAfter: 10000,
     isDevelopment: {{ isDev() ? 'true' : 'false' }},
     init() {
         this.popups.sponsorship = this.shouldShowMonthlyPopup('popupSponsorship');
         this.popups.notification = this.shouldShowMonthlyPopup('popupNotification');
         this.popups.realtime = localStorage.getItem('popupRealtime');
+
+        if (this.popups.sponsorship) {
+            this.scheduleReminderCollapse('sponsorship');
+        }
+
+        if (this.popups.notification) {
+            this.scheduleReminderCollapse('notification');
+        }
 
         let checkNumber = 1;
         let checkPusherInterval = null;
@@ -32,6 +45,17 @@
                 }
             }, 2000);
         }
+    },
+    scheduleReminderCollapse(reminder) {
+        setTimeout(() => {
+            if (reminder === 'sponsorship') {
+                this.reminders.sponsorship.compact = true;
+            }
+
+            if (reminder === 'notification') {
+                this.reminders.notification.compact = true;
+            }
+        }, this.reminderCollapseAfter);
     },
     shouldShowMonthlyPopup(storageKey) {
         const disabledTimestamp = localStorage.getItem(storageKey);
@@ -67,21 +91,51 @@
         <span x-show="popups.realtime === true">
             @if (!isCloud())
                 <x-popup>
-                    <x-slot:title>
-                        <span class="font-bold text-left text-red-500">WARNING: </span> Cannot connect to real-time service
-                    </x-slot:title>
-                    <x-slot:description>
-                        <div>This will cause unusual problems on the
-                            UI! <br><br>
-                            Please ensure that you have opened the
-                            <a class="underline" href='https://coolify.io/docs/knowledge-base/server/firewall'
-                                target='_blank'>required ports</a> or get
-                            help on <a class="underline" href='https://coollabs.io/discord' target='_blank'>Discord</a>.
+                    <x-slot:customActions>
+                        <div
+                            class="relative mx-auto flex w-full max-w-2xl flex-col gap-5 overflow-hidden rounded-2xl border border-red-200 bg-white p-5 shadow-modal sm:p-6 dark:border-red-500/20 dark:bg-surface">
+                            <button type="button" aria-label="Dismiss real-time connection warning"
+                                class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                                @click="bannerVisible=false;disableRealtime()">
+                                <x-reicon name="x" class="size-3.5" />
+                            </button>
+
+                            <div class="flex items-start gap-4 pr-8">
+                                <div
+                                    class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 sm:flex dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
+                                    <x-reicon name="alert-triangle" class="size-6" />
+                                </div>
+                                <div class="min-w-0">
+                                    <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
+                                        Cannot connect to real-time service
+                                    </h2>
+                                    <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                        This will cause unusual problems on the UI. Open the
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                            href="https://coolify.io/docs/knowledge-base/server/firewall"
+                                            target="_blank" rel="noopener noreferrer">required ports</a>
+                                        or get help on
+                                        <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90"
+                                            href="https://coollabs.io/discord" target="_blank"
+                                            rel="noopener noreferrer">Discord</a>.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                                <a target="_blank" rel="noopener noreferrer"
+                                    href="https://coolify.io/docs/knowledge-base/server/firewall"
+                                    class="button h-9 justify-center sm:min-w-28">
+                                    View docs
+                                </a>
+                                <button type="button"
+                                    class="button h-9 justify-center bg-red-600! text-white! ring-1 ring-red-600/25 hover:bg-red-700! sm:min-w-40 dark:bg-red-500! dark:ring-red-500/30 dark:hover:bg-red-400!"
+                                    @click="bannerVisible=false;disableRealtime()">
+                                    Acknowledge &amp; disable
+                                </button>
+                            </div>
                         </div>
-                    </x-slot:description>
-                    <x-slot:button-text @click="disableRealtime()">
-                        Acknowledge & Disable This Popup
-                    </x-slot:button-text>
+                    </x-slot:customActions>
                 </x-popup>
             @endif
         </span>
@@ -90,42 +144,52 @@
         <span x-show="popups.sponsorship">
             <x-popup>
                 <x-slot:customActions>
-                    <div
-                        class="flex md:flex-row flex-col max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 border-neutral-200 dark:bg-coolgray-100 lg:p-8 lg:pb-4 sm:rounded-sm gap-2">
-                        <div class="md:block hidden">
-                            <img src="{{ asset('heart.png') }}" class="w-20 h-20">
+                    <div class="relative mx-auto flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-modal transition-all duration-300 dark:border-white/[0.1] dark:bg-surface"
+                        :class="reminders.sponsorship.compact ? 'max-w-sm gap-3 p-4' : 'max-w-2xl gap-5 p-5 sm:p-6'">
+                        <button type="button" aria-label="Dismiss sponsorship reminder"
+                            class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                            @click="bannerVisible=false;disableSponsorship()">
+                            <x-reicon name="x" class="size-3.5" />
+                        </button>
+
+                        <div class="flex items-start gap-4 pr-8">
+                            <div x-show="!reminders.sponsorship.compact" x-transition.opacity
+                                class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50 sm:flex dark:border-white/[0.08] dark:bg-white/[0.04]">
+                                <img src="{{ asset('heart.png') }}" alt="" class="size-9">
+                            </div>
+                            <div class="min-w-0">
+                                <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
+                                    Love Coolify? Support our work.
+                                </h2>
+                                <p x-show="!reminders.sponsorship.compact" x-transition.opacity
+                                    class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                    Coolify is profitable thanks to <span
+                                        class="font-semibold text-coollabs dark:text-warning">you</span>. Your support
+                                    helps us build more features and keep improving the project.
+                                </p>
+                            </div>
                         </div>
-                        <div class="flex flex-col gap-2 lg:px-10 px-1">
-                            <div class="lg:text-xl text-md dark:text-white font-bold">Love Coolify? Support our work.
-                            </div>
-                            <div class="lg:text-sm text-xs dark:text-white">
-                                We are already profitable thanks to <span class="font-bold text-pink-500">YOU</span>
-                                but...<br />We
-                                would
-                                like to
-                                make
-                                more cool features.
-                            </div>
-                            <div class="lg:text-sm text-xs dark:text-white pt-2 ">
-                                For this we need your help to support our work financially.
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-2 text-center md:mx-auto lg:py-0 pt-2">
-                            <x-forms.button isHighlighted class="md:w-36 w-full"><a target="_blank"
-                                    href="https://github.com/sponsors/coollabsio"
-                                    class="font-bold dark:text-white">GitHub
-                                    Sponsors</a></x-forms.button>
-                            <x-forms.button isHighlighted class="md:w-36 w-full"><a target="_blank"
-                                    href="https://opencollective.com/coollabsio/donate?interval=month&amount=10&name=&legalName=&email="
-                                    class="font-bold dark:text-white">Open
-                                    Collective</a></x-forms.button>
-                            <x-forms.button isHighlighted class="md:w-36 w-full"><a
-                                    href="https://donate.stripe.com/8x2bJ104ifmB9kB45u38402" target="_blank"
-                                    class="font-bold dark:text-white">Stripe</a></x-forms.button>
-                            <div class="pt-4 dark:text-white hover:underline cursor-pointer lg:text-base text-xs"
+
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <a target="_blank" href="https://github.com/sponsors/coollabsio"
+                                class="button button-highlighted h-9 justify-center sm:flex-1">
+                                GitHub Sponsors
+                            </a>
+                            <a x-show="!reminders.sponsorship.compact" x-transition.opacity target="_blank"
+                                href="https://opencollective.com/coollabsio/donate?interval=month&amount=10&name=&legalName=&email="
+                                class="button h-9 justify-center sm:flex-1">
+                                Open Collective
+                            </a>
+                            <a x-show="!reminders.sponsorship.compact" x-transition.opacity
+                                href="https://donate.stripe.com/8x2bJ104ifmB9kB45u38402" target="_blank"
+                                class="button h-9 justify-center sm:flex-1">
+                                Stripe
+                            </a>
+                            <button x-show="!reminders.sponsorship.compact" x-transition.opacity type="button"
+                                class="h-9 cursor-pointer px-2 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black sm:shrink-0 dark:text-fg-dim dark:hover:text-fg"
                                 @click="bannerVisible=false;disableSponsorship()">
                                 Maybe next time
-                            </div>
+                            </button>
                         </div>
                     </div>
                 </x-slot:customActions>
@@ -184,28 +248,49 @@
     @if (!currentTeam()->isAnyNotificationEnabled())
         <span x-show="popups.notification">
             <x-popup>
-                <x-slot:title>
-                    No notifications enabled.
-                </x-slot:title>
-                <x-slot:icon>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="text-red-500 stroke-current w-14 h-14 shrink-0"
-                        fill="none" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                </x-slot:icon>
-                <x-slot:description>
-                    It is
-                    highly recommended to enable at least
-                    one
-                    notification channel to receive important alerts.<br>Visit <a
-                        href="{{ route('notifications.email') }}" {{ wireNavigate() }} class="underline dark:text-white">/notification</a> to
-                    enable notifications.</span>
-        </x-slot:description>
-        <x-slot:button-text @click="disableNotification()">
-            Accept and Close
-        </x-slot:button-text>
-        </x-popup>
+                <x-slot:customActions>
+                    <div class="relative mx-auto flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-modal transition-all duration-300 dark:border-white/[0.1] dark:bg-surface"
+                        :class="reminders.notification.compact ? 'max-w-sm gap-3 p-4' : 'max-w-2xl gap-5 p-5 sm:p-6'">
+                        <button type="button" aria-label="Dismiss notifications reminder"
+                            class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                            @click="bannerVisible=false;disableNotification()">
+                            <x-reicon name="x" class="size-3.5" />
+                        </button>
+
+                        <div class="flex items-start gap-4 pr-8">
+                            <div x-show="!reminders.notification.compact" x-transition.opacity
+                                class="hidden size-12 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 sm:flex dark:border-warning/20 dark:bg-warning/10 dark:text-warning">
+                                <x-reicon name="alert-triangle" class="size-6" />
+                            </div>
+                            <div class="min-w-0">
+                                <h2 class="text-[15px]! leading-5! font-semibold! text-black dark:text-fg">
+                                    No notifications enabled
+                                </h2>
+                                <p x-show="!reminders.notification.compact" x-transition.opacity
+                                    class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                    Enable at least one notification channel so you receive important alerts.
+                                    Visit
+                                    <a href="{{ route('notifications.email') }}" {{ wireNavigate() }}
+                                        class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 transition-colors hover:text-coollabs-100 dark:text-warning dark:decoration-warning/30 dark:hover:text-warning/90">notifications</a>
+                                    to get started.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                            <a href="{{ route('notifications.email') }}" {{ wireNavigate() }}
+                                class="button h-9 justify-center sm:min-w-28">
+                                Open notifications
+                            </a>
+                            <button x-show="!reminders.notification.compact" x-transition.opacity type="button"
+                                class="button h-9 justify-center sm:min-w-32"
+                                @click="bannerVisible=false;disableNotification()">
+                                Accept and close
+                            </button>
+                        </div>
+                    </div>
+                </x-slot:customActions>
+            </x-popup>
         </span>
     @endif
     <script>

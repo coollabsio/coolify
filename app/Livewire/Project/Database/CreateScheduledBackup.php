@@ -3,8 +3,8 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -16,35 +16,21 @@ class CreateScheduledBackup extends Component
     #[Validate(['required', 'string'])]
     public $frequency;
 
-    #[Validate(['required', 'boolean'])]
-    public bool $saveToS3 = false;
-
     #[Locked]
     public $database;
 
     public bool $enabled = true;
 
-    #[Validate(['nullable', 'integer'])]
-    public ?int $s3StorageId = null;
-
-    public Collection $definedS3s;
-
-    public function mount()
-    {
-        try {
-            $this->definedS3s = currentTeam()->s3s;
-            if ($this->definedS3s->count() > 0) {
-                $this->s3StorageId = $this->definedS3s->first()->id;
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
     public function submit()
     {
         try {
             $this->authorize('manageBackups', $this->database);
+
+            if (! $this->database->isBackupSolutionAvailable()) {
+                $this->dispatch('error', 'Scheduled backups are not supported for this database type.');
+
+                return;
+            }
 
             $this->validate();
 
@@ -58,8 +44,8 @@ class CreateScheduledBackup extends Component
             $payload = [
                 'enabled' => true,
                 'frequency' => $this->frequency,
-                'save_s3' => $this->saveToS3,
-                's3_storage_id' => $this->s3StorageId,
+                'save_s3' => false,
+                's3_storage_id' => null,
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
@@ -71,15 +57,28 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $this->database->mysql_database;
             } elseif ($this->database->type() === 'standalone-mariadb') {
                 $payload['databases_to_backup'] = $this->database->mariadb_database;
+            } elseif ($this->database->type() === 'standalone-clickhouse') {
+                $payload['databases_to_backup'] = $this->database->clickhouse_db;
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
-            if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $this->dispatch('refreshScheduledBackups', $databaseBackup->id);
+            if ($this->database->getMorphClass() === ServiceDatabase::class) {
+                $service = $this->database->service;
+                $this->redirectRoute('project.service.database.backup.show', [
+                    'project_uuid' => $service->project()->uuid,
+                    'environment_uuid' => $service->environment->uuid,
+                    'service_uuid' => $service->uuid,
+                    'stack_service_uuid' => $this->database->uuid,
+                    'backup_uuid' => $databaseBackup->uuid,
+                ], navigate: true);
             } else {
-                $this->dispatch('refreshScheduledBackups');
+                $this->redirectRoute('project.database.backup.execution', [
+                    'project_uuid' => $this->database->project()->uuid,
+                    'environment_uuid' => $this->database->environment->uuid,
+                    'database_uuid' => $this->database->uuid,
+                    'backup_uuid' => $databaseBackup->uuid,
+                ], navigate: true);
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Actions\User\RevokeUserTeamTokens;
 use App\Events\ServerReachabilityChanged;
+use App\Jobs\V5TeardownTeamJob;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
+use App\Support\V5\V5Feature;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -46,10 +49,16 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'personal_team',
         'show_boarding',
         'custom_server_limit',
+        'is_mcp_server_enabled',
+    ];
+
+    protected $attributes = [
+        'is_mcp_server_enabled' => true,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
+        'is_mcp_server_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -65,13 +74,29 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->webhookNotificationSettings()->create();
         });
 
-        static::saving(function ($team) {
+        static::updating(function ($team) {
             if (auth()->user()?->isMember()) {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });
 
         static::deleting(function (Team $team) {
+            // Best-effort on-host teardown of this team's v5 resources BEFORE the
+            // DB cascade removes the servers/applications/private keys. Captured
+            // synchronously into a queued job so an unreachable host cannot block
+            // or fail the team deletion (see V5TeardownTeamJob). Guarded so a v5
+            // teardown problem never breaks v4 team deletion. This is disabled
+            // with the rest of v5 outside development environments.
+            if (V5Feature::enabled()) {
+                try {
+                    V5TeardownTeamJob::dispatchForTeam($team);
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+
+            RevokeUserTeamTokens::forTeam($team->id);
+
             foreach ($team->privateKeys as $key) {
                 $key->delete();
             }
@@ -214,13 +239,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('webhook')?->isEnabled();
     }
 
-    public function subscriptionEnded()
+    public function subscriptionEnded(?Subscription $subscription = null): void
     {
-        if (! $this->subscription) {
+        $subscription ??= $this->subscription;
+
+        if (! $subscription) {
             return;
         }
 
-        $this->subscription->update([
+        $subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,
@@ -233,6 +260,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
                 'is_reachable' => false,
             ]);
             ServerReachabilityChanged::dispatch($server);
+            $server->unreachable_count = 3;
+            $server->unreachable_notification_sent = true;
+            $server->save();
         }
     }
 
@@ -344,5 +374,4 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     {
         return $this->hasOne(WebhookNotificationSettings::class);
     }
-
 }

@@ -15,9 +15,11 @@
         "danharrin/livewire-rate-limiting": "^2.1.0",
         "doctrine/dbal": "^4.4.1",
         "guzzlehttp/guzzle": "^7.10.0",
+        "inertiajs/inertia-laravel": "^3.1",
         "laravel/fortify": "^1.34.0",
         "laravel/framework": "^12.49.0",
         "laravel/horizon": "^5.43.0",
+        "laravel/mcp": "^0.6.7",
         "laravel/nightwatch": "^1.24",
         "laravel/pail": "^1.2.4",
         "laravel/prompts": "^0.3.11|^0.3.11|^0.3.11",
@@ -49,7 +51,6 @@
         "spatie/laravel-activitylog": "^4.11.0",
         "spatie/laravel-data": "^4.19.1",
         "spatie/laravel-markdown": "^2.7.1",
-        "spatie/laravel-ray": "^1.43.5",
         "spatie/laravel-schemaless-attributes": "^2.5.1",
         "spatie/url": "^2.4",
         "stevebauman/purify": "^6.3.1",
@@ -60,13 +61,11 @@
         "zircote/swagger-php": "^5.8.0"
     },
     "require-dev": {
-        "barryvdh/laravel-debugbar": "^3.16.5",
         "driftingly/rector-laravel": "^2.1.9",
         "fakerphp/faker": "^1.24.1",
         "laravel/boost": "^2.1",
         "laravel/dusk": "^8.3.4",
         "laravel/pint": "^1.27",
-        "laravel/telescope": "^5.16.1",
         "mockery/mockery": "^1.6.12",
         "nunomaduro/collision": "^8.8.3",
         "pestphp/pest": "^4.3.2",
@@ -102,13 +101,6 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true
-    },
-    "extra": {
-        "laravel": {
-            "dont-discover": [
-                "laravel/telescope"
-            ]
-        }
     },
     "scripts": {
         "post-update-cmd": [
