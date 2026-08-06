@@ -96,11 +96,12 @@
                     @if ($currentInternalHostname)
                         <x-forms.copy-button label="Internal hostname" :text="$currentInternalHostname" />
                     @else
-                        <div>
-                            <p class="mb-1 text-sm font-medium text-black dark:text-white">Internal hostname</p>
-                            <p class="flex min-h-10 items-center rounded border border-neutral-300 px-3 text-sm text-neutral-500 dark:border-coolgray-300 dark:text-fg-dim">
-                                {{ $currentInternalHostnameLoaded ? 'No deployed container found' : 'Loading…' }}
-                            </p>
+                        <div class="w-full">
+                            <label class="mb-1 flex items-center gap-1 text-sm font-medium text-black dark:text-white">Internal hostname</label>
+                            <input type="text"
+                                value="{{ $currentInternalHostnameLoaded ? 'No deployed container found' : 'Loading…' }}"
+                                class="input input-with-copy-button bg-white dark:bg-coolgray-100 dark:read-only:bg-coolgray-100 dark:read-only:text-white"
+                                readonly aria-live="polite">
                         </div>
                     @endif
                     <x-forms.copy-button label="Docker network" :text="$application->destination->network" />

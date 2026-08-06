@@ -14,6 +14,7 @@ it('shows internal Docker access details in application general settings', funct
         ->toContain('Network aliases')
         ->toContain('wire:init="loadCurrentInternalHostname"')
         ->toContain('$currentInternalHostname')
+        ->toContain('class="input input-with-copy-button bg-white dark:bg-coolgray-100 dark:read-only:bg-coolgray-100 dark:read-only:text-white"')
         ->not->toContain('Changes with each deployment')
         ->toContain("window.scrollToSettingsSection?.('networking-section')")
         ->and($generalComponent)
