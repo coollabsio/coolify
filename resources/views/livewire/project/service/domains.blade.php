@@ -3,9 +3,9 @@
     $suggestedCount = collect($domainRows)->where('is_suggested', true)->count();
     $hasRows = count($domainRows) > 0;
     $serviceAppCount = count($serviceApps);
-    $isSingleService = $serviceAppCount === 1;
-    $singleApp = $isSingleService ? collect($serviceApps)->first() : null;
-    $singleAppId = $singleApp['id'] ?? null;
+    $domainGroups = collect($domainRows)
+        ->groupBy('service_application_id')
+        ->filter(fn ($rows) => $rows->contains(fn ($row) => ! ($row['is_suggested'] ?? false)));
 @endphp
 
 <div class="flex flex-col gap-4"
@@ -38,8 +38,7 @@
         },
     }"
     @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel)">
-    <x-application.settings-section id="service-domains-section" title="Domains"
-        helper="Manage domains and www/non-www redirects for applications in this stack.">
+    <x-application.settings-section id="service-domains-section" title="Domains">
         @can('update', $service)
             <x-slot:actions>
                 <x-forms.button wire:click="checkAllDns" wire:loading.attr="disabled"
@@ -56,35 +55,10 @@
             </x-callout>
         @endcannot
 
-        @if ($isSingleService && $singleAppId)
-            <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-end">
-                <div class="min-w-0 flex-1">
-                    <x-forms.select canGate="update" :canResource="$service" label="Direction"
-                        id="serviceRedirects.{{ $singleAppId }}" wire:model="serviceRedirects.{{ $singleAppId }}"
-                        required
-                        helper="Add both www and non-www hosts when using a redirect. Both hostnames must resolve to this server.">
-                        <option value="both">Allow www & non-www</option>
-                        <option value="www">Redirect to www</option>
-                        <option value="non-www">Redirect to non-www</option>
-                    </x-forms.select>
-                </div>
-                @can('update', $service)
-                    <div class="w-full shrink-0 sm:w-auto">
-                        <x-modal-confirmation title="Confirm redirection setting?" buttonTitle="Set direction"
-                            submitAction="setServiceRedirect({{ (int) $singleAppId }})"
-                            :actions="['Traffic for this service will be redirected to the selected direction.']"
-                            confirmationText="{{ ($singleApp['name'] ?? 'service') . '/' }}"
-                            confirmationLabel="Please confirm by entering the service name below"
-                            shortConfirmationLabel="Service name" :confirmWithPassword="false"
-                            step2ButtonText="Set direction" canGate="update" :canResource="$service" />
-                    </div>
-                @endcan
-            </div>
-        @elseif ($serviceAppCount > 1)
-            <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                Domains are listed with their service name. Set each service redirect from the group controls under the table when needed.
-            </p>
-        @endif
+        <p class="text-sm text-neutral-500 dark:text-fg-dim">
+            Manage domains and www/non-www redirects for applications in this stack.
+        </p>
+
     </x-application.settings-section>
 
     {{-- Toolbar --}}
@@ -175,60 +149,61 @@
                 icon-name="globe" />
         </div>
     @else
-        {{-- Flat table with Service column so assignment is always visible --}}
-        <div wire:key="service-domains-list-{{ md5(serialize($domainRows)) }}"
-            class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28">
-            @include('livewire.project.service.partials.domain-table', [
-                'rows' => collect($domainRows),
-                'domainRows' => $domainRows,
-                'service' => $service,
-                'showServiceColumn' => true,
-            ])
-        </div>
-
-        {{-- Multi-service redirect controls under the table --}}
-        @if ($serviceAppCount > 1)
-            <div class="mt-2 flex flex-col gap-4">
-                @foreach ($serviceApps as $app)
-                    @php
-                        $appId = $app['id'];
-                        $heading = $app['name'] ?? 'Service';
-                        $appDomainCount = collect($domainRows)
-                            ->where('service_application_id', $appId)
-                            ->where('is_suggested', false)
-                            ->count();
-                    @endphp
-                    <x-application.settings-section
-                        :id="'service-domain-redirect-'.$appId"
-                        :title="\Illuminate\Support\Str::headline($heading)"
-                        :helper="$appDomainCount.' domain'.($appDomainCount === 1 ? '' : 's')">
-                        <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-end">
-                            <div class="min-w-0 flex-1">
-                                <x-forms.select canGate="update" :canResource="$service" label="Direction"
-                                    id="serviceRedirects.{{ $appId }}" wire:model="serviceRedirects.{{ $appId }}"
-                                    required
-                                    helper="Per-service www/non-www redirect. Add both hosts when using a redirect.">
+        <div wire:key="service-domains-list"
+            class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-hidden">
+            @foreach ($domainGroups as $appId => $rows)
+                @php
+                    $app = collect($serviceApps)->firstWhere('id', (int) $appId);
+                    $heading = \Illuminate\Support\Str::headline($app['name'] ?? $rows->first()['service_name'] ?? 'Service');
+                    $appDomainCount = $rows->where('is_suggested', false)->count();
+                    $redirect = $serviceRedirects[$appId] ?? 'both';
+                    $redirectLabel = match ($redirect) {
+                        'www' => 'Redirect to www',
+                        'non-www' => 'Redirect to non-www',
+                        default => 'Allow both',
+                    };
+                @endphp
+                <section id="service-domain-group-{{ $appId }}" wire:key="service-domain-group-{{ $appId }}"
+                    class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
+                    <div class="flex w-full items-center gap-3 px-4 py-3">
+                        <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
+                        <span class="hidden shrink-0 text-xs text-neutral-500 sm:inline dark:text-fg-dim">
+                            {{ $appDomainCount }} domain{{ $appDomainCount === 1 ? '' : 's' }}
+                        </span>
+                        @can('update', $service)
+                            <div class="relative flex shrink-0 items-center gap-2 px-1 py-1 text-sm text-neutral-600 dark:text-fg-dim"
+                                wire:loading.class="opacity-50" wire:target="serviceRedirects.{{ $appId }}">
+                                <span>{{ $redirectLabel }}</span>
+                                <x-reicon name="chevron-down" class="size-4 shrink-0"
+                                    wire:loading.remove wire:target="serviceRedirects.{{ $appId }}" />
+                                <x-loading-on-button wire:loading.delay wire:target="serviceRedirects.{{ $appId }}" />
+                                <select id="service-domain-redirect-{{ $appId }}"
+                                    wire:model.change="serviceRedirects.{{ $appId }}"
+                                    wire:loading.attr="disabled" wire:target="serviceRedirects.{{ $appId }}"
+                                    class="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-wait"
+                                    aria-label="Redirect direction for {{ $heading }}">
                                     <option value="both">Allow www & non-www</option>
                                     <option value="www">Redirect to www</option>
                                     <option value="non-www">Redirect to non-www</option>
-                                </x-forms.select>
+                                </select>
                             </div>
-                            @can('update', $service)
-                                <div class="w-full shrink-0 sm:w-auto">
-                                    <x-modal-confirmation title="Confirm redirection setting?" buttonTitle="Set direction"
-                                        submitAction="setServiceRedirect({{ (int) $appId }})"
-                                        :actions="['Traffic for this service will be redirected to the selected direction.']"
-                                        confirmationText="{{ ($heading ?: 'service') . '/' }}"
-                                        confirmationLabel="Please confirm by entering the service name below"
-                                        shortConfirmationLabel="Service name" :confirmWithPassword="false"
-                                        step2ButtonText="Set direction" canGate="update" :canResource="$service" />
-                                </div>
-                            @endcan
-                        </div>
-                    </x-application.settings-section>
-                @endforeach
-            </div>
-        @endif
+                        @else
+                            <span class="shrink-0 text-sm text-neutral-600 dark:text-fg-dim">{{ $redirectLabel }}</span>
+                        @endcan
+                    </div>
+
+                    <div wire:key="service-domain-rows-{{ $appId }}-{{ md5(serialize($rows->all())) }}">
+                        @include('livewire.project.service.partials.domain-table', [
+                            'rows' => $rows,
+                            'domainRows' => $domainRows,
+                            'service' => $service,
+                            'showServiceColumn' => false,
+                            'showHeader' => false,
+                        ])
+                    </div>
+                </section>
+            @endforeach
+        </div>
     @endif
 
     {{-- Edit domain modal: open/close is Alpine-only; server runs only on Save / Continue. --}}

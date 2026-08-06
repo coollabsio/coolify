@@ -44,12 +44,27 @@ test('helper popup remains open while moving from the trigger into interactive c
         ->toContain('@mouseleave="hide()"');
 });
 
+test('clicking a helper does not pin its popup open', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('@click.prevent.stop="show()"')
+        ->not->toContain('pinned');
+});
+
+test('helper popup stays in its alpine scope during livewire morphs', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->not->toContain('x-teleport');
+});
+
 test('helper popup supports focus dismissal and tooltip aria relationships', function () {
     $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
 
     expect($helper)
         ->toContain('closeWhenFocusLeaves()')
-        ->toContain('@focus="show(false)"')
+        ->toContain('@focus="show()"')
         ->toContain('@blur="closeWhenFocusLeaves()"')
         ->toContain('role="tooltip"')
         ->toContain(':aria-describedby="open ? $id(\'helper-popup\') : null"')

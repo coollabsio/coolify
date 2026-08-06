@@ -1,18 +1,21 @@
 @php
     $showServiceColumn = $showServiceColumn ?? false;
+    $showHeader = $showHeader ?? true;
     $gridClass = $showServiceColumn ? 'domains-table-grid-compose' : 'domains-table-grid';
 @endphp
 
 <div class="data-table w-full">
-    <div class="data-table-header {{ $gridClass }}">
-        <span>Domain</span>
-        @if ($showServiceColumn)
-            <span>Service</span>
-        @endif
-        <span>DNS</span>
-        <span>Last checked</span>
-        <span></span>
-    </div>
+    @if ($showHeader)
+        <div class="data-table-header {{ $gridClass }}">
+            <span>Domain</span>
+            @if ($showServiceColumn)
+                <span>Service</span>
+            @endif
+            <span>DNS</span>
+            <span>Last checked</span>
+            <span></span>
+        </div>
+    @endif
     @foreach ($rows as $row)
         @php
             $index = collect($domainRows)->search(

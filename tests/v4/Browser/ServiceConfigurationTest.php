@@ -94,6 +94,60 @@ it('opens service environment variables domains and storages pages', function ()
         ->screenshot(filename: 'service-storages');
 });
 
+it('renders an automatically added redirect counterpart without reloading', function () {
+    $this->serviceApplication->update([
+        'fqdn' => 'https://web.example.com',
+        'redirect' => 'both',
+    ]);
+
+    loginAndSkipBoarding();
+
+    $base = serviceConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->service
+    );
+
+    $page = visit("{$base}/domains")
+        ->assertSee('https://web.example.com');
+
+    $selector = '#service-domain-redirect-'.$this->serviceApplication->id;
+    $page->select($selector, 'www')
+        ->wait(3);
+
+    $this->serviceApplication->refresh();
+    expect($this->serviceApplication->redirect)->toBe('www');
+
+    $page->assertSee('https://www.web.example.com')
+        ->screenshot(filename: 'service-domain-redirect-counterpart');
+
+    $page->script(<<<'JS'
+        (() => {
+            const domain = document.querySelector('a[title="https://www.web.example.com"]');
+            domain.closest('.env-table-item').querySelector('[aria-label="Remove domain"]').click();
+        })()
+    JS);
+
+    $page->wait(0.5)
+        ->script(<<<'JS'
+            (() => {
+                const button = [...document.querySelectorAll('button')]
+                    .find((candidate) => candidate.offsetParent && candidate.textContent.trim() === 'Remove domain');
+                button.click();
+            })()
+        JS);
+
+    $page->wait(3);
+
+    $configuredCounterparts = $page->script(
+        'document.querySelectorAll(\'a[title="https://www.web.example.com"]\').length'
+    );
+
+    expect($configuredCounterparts)->toBe(0);
+
+    $page->screenshot(filename: 'service-domain-remove-without-reload');
+});
+
 it('opens compose stack application general settings', function () {
     loginAndSkipBoarding();
 

@@ -1,29 +1,81 @@
 {{-- Dev-only Server-Timing HUD. Injected by AddServerTimingHeaders on full HTML responses.
      JS docks into the top bar: #server-timing-hud-slot (lg+) or #server-timing-hud-slot-mobile (<lg);
      floats bottom-left only if no navbar slot is available. --}}
+<style data-server-timing-hud-styles>
+    #server-timing-hud {
+        --sth-background: rgba(255, 255, 255, .96);
+        --sth-text: #18181b;
+        --sth-strong: #09090b;
+        --sth-secondary: #52525b;
+        --sth-muted: #71717a;
+        --sth-border: rgba(0, 0, 0, .14);
+        --sth-surface: rgba(0, 0, 0, .035);
+        --sth-shadow: 0 12px 32px rgba(0, 0, 0, .18);
+        --sth-scrollbar-track: rgba(0, 0, 0, .06);
+        --sth-scrollbar-thumb: #a1a1aa;
+        --sth-livewire: #0284c7;
+        --sth-xhr: #9333ea;
+        --sth-document: #4d7c0f;
+    }
+
+    html.dark #server-timing-hud {
+        --sth-background: rgba(16, 16, 16, .96);
+        --sth-text: #e5e5e5;
+        --sth-strong: #fafafa;
+        --sth-secondary: #a3a3a3;
+        --sth-muted: #737373;
+        --sth-border: rgba(255, 255, 255, .12);
+        --sth-surface: rgba(255, 255, 255, .04);
+        --sth-shadow: 0 12px 32px rgba(0, 0, 0, .4);
+        --sth-scrollbar-track: rgba(255, 255, 255, .06);
+        --sth-scrollbar-thumb: #71717a;
+        --sth-livewire: #38bdf8;
+        --sth-xhr: #c084fc;
+        --sth-document: #a3e635;
+    }
+
+    #server-timing-hud [data-sth-log] {
+        scrollbar-color: var(--sth-scrollbar-thumb) var(--sth-scrollbar-track);
+        scrollbar-width: thin;
+    }
+
+    #server-timing-hud [data-sth-log]::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #server-timing-hud [data-sth-log]::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        background: var(--sth-scrollbar-thumb);
+    }
+
+    #server-timing-hud [data-sth-log]::-webkit-scrollbar-track {
+        border-radius: 9999px;
+        background: var(--sth-scrollbar-track);
+    }
+</style>
 <div id="server-timing-hud" data-server-timing-hud data-metrics='@json($metrics)' data-path="{{ $path }}"
     data-sth-mode="float"
-    style="position:fixed;bottom:12px;left:12px;z-index:2147483000;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:#e5e5e5;pointer-events:auto">
+    style="position:fixed;bottom:12px;left:12px;z-index:2147483000;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;color:var(--sth-text);pointer-events:auto">
     <div data-sth-shell style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;position:relative">
         <button type="button" data-sth-toggle aria-expanded="false" aria-controls="server-timing-hud-panel"
-            style="border:1px solid rgba(255,255,255,.12);background:rgba(16,16,16,.92);color:#fafafa;border-radius:999px;padding:5px 9px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28);backdrop-filter:blur(8px);user-select:none;white-space:nowrap;line-height:1.2"
+            style="border:1px solid var(--sth-border);background:var(--sth-background);color:var(--sth-strong);border-radius:999px;padding:5px 9px;cursor:pointer;box-shadow:var(--sth-shadow);backdrop-filter:blur(8px);user-select:none;white-space:nowrap;line-height:1.2"
             title="Show/hide Server-Timing history">
             <span data-sth-summary>ST …</span>
         </button>
         <div id="server-timing-hud-panel" data-sth-panel hidden
-            style="width:min(420px,calc(100vw - 24px));border:1px solid rgba(255,255,255,.12);background:rgba(16,16,16,.96);border-radius:12px;padding:10px 12px;box-shadow:0 12px 32px rgba(0,0,0,.4);backdrop-filter:blur(10px);position:absolute;right:0;bottom:calc(100% + 6px);z-index:2147483001">
+            style="width:min(420px,calc(100vw - 24px));border:1px solid var(--sth-border);background:var(--sth-background);color:var(--sth-text);border-radius:12px;padding:10px 12px;box-shadow:var(--sth-shadow);backdrop-filter:blur(10px);position:absolute;right:0;bottom:calc(100% + 6px);z-index:2147483001">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-                <strong style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#a3a3a3">Server Timing</strong>
+                <strong style="font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--sth-secondary)">Server Timing</strong>
                 <div style="display:flex;align-items:center;gap:8px">
-                    <span data-sth-count style="font-size:10px;color:#737373"></span>
+                    <span data-sth-count style="font-size:10px;color:var(--sth-muted)"></span>
                     <button type="button" data-sth-clear
-                        style="border:0;background:transparent;color:#a3a3a3;cursor:pointer;font:inherit;font-size:10px;padding:0;text-decoration:underline"
+                        style="border:0;background:transparent;color:var(--sth-secondary);cursor:pointer;font:inherit;font-size:10px;padding:0;text-decoration:underline"
                         title="Clear request log">Clear</button>
                 </div>
             </div>
             <div data-sth-log
                 style="max-height:min(50vh,420px);overflow:auto;display:flex;flex-direction:column;gap:6px;margin:0;padding:0"></div>
-            <p style="margin:8px 0 0;font-size:10px;color:#737373">Local only · click row to copy AI-ready dump · pill toggles</p>
+            <p style="margin:8px 0 0;font-size:10px;color:var(--sth-muted)">Local only · click row to copy AI-ready dump · pill toggles</p>
         </div>
     </div>
 </div>
@@ -84,7 +136,7 @@
             'opacity:1',
             isMobileSlot ? 'margin-right:4px' : 'margin-right:8px',
             'font:11px/1.3 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace',
-            'color:#e5e5e5',
+            'color:var(--sth-text)',
             'pointer-events:auto',
         ].join(';');
 
@@ -136,7 +188,7 @@
             'visibility:visible',
             'opacity:1',
             'font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace',
-            'color:#e5e5e5',
+            'color:var(--sth-text)',
             'pointer-events:auto',
         ].join(';');
 
@@ -354,12 +406,12 @@
 
     function kindColor(kind) {
         if (kind === 'livewire') {
-            return '#38bdf8';
+            return 'var(--sth-livewire)';
         }
         if (kind === 'xhr') {
-            return '#c084fc';
+            return 'var(--sth-xhr)';
         }
-        return '#a3e635';
+        return 'var(--sth-document)';
     }
 
     function formatTime(ts) {
@@ -509,7 +561,7 @@
             card.style.outline = prev || '';
             if (hint) {
                 hint.textContent = 'Click to copy';
-                hint.style.color = '#737373';
+                hint.style.color = 'var(--sth-muted)';
             }
         }, 1200);
     }
@@ -585,7 +637,7 @@
             if (countEl) {
                 countEl.textContent = '0 requests';
             }
-            log.innerHTML = '<div style="color:#737373;font-size:11px;padding:8px 0">No requests yet</div>';
+            log.innerHTML = '<div style="color:var(--sth-muted);font-size:11px;padding:8px 0">No requests yet</div>';
             return;
         }
 
@@ -617,10 +669,10 @@
             card.style.width = '100%';
             card.style.textAlign = 'left';
             card.style.cursor = 'pointer';
-            card.style.border = '1px solid rgba(255,255,255,.08)';
+            card.style.border = '1px solid var(--sth-border)';
             card.style.borderRadius = '8px';
             card.style.padding = '8px';
-            card.style.background = index === 0 ? 'rgba(255,255,255,.04)' : 'transparent';
+            card.style.background = index === 0 ? 'var(--sth-surface)' : 'transparent';
             card.style.color = 'inherit';
             card.style.font = 'inherit';
 
@@ -640,18 +692,18 @@
 
             const time = document.createElement('span');
             time.textContent = formatTime(entry.at);
-            time.style.color = '#737373';
+            time.style.color = 'var(--sth-muted)';
             time.style.fontSize = '10px';
 
             const method = document.createElement('span');
             method.textContent = entry.method;
-            method.style.color = '#a3a3a3';
+            method.style.color = 'var(--sth-secondary)';
             method.style.fontSize = '10px';
 
             const path = document.createElement('span');
             path.textContent = entry.path;
             path.title = entry.path;
-            path.style.color = '#e5e5e5';
+            path.style.color = 'var(--sth-text)';
             path.style.fontSize = '10px';
             path.style.overflow = 'hidden';
             path.style.textOverflow = 'ellipsis';
@@ -663,7 +715,7 @@
             copyHint.setAttribute('data-sth-copy-hint', '');
             copyHint.textContent = 'Click to copy';
             copyHint.style.fontSize = '10px';
-            copyHint.style.color = '#737373';
+            copyHint.style.color = 'var(--sth-muted)';
             copyHint.style.marginLeft = 'auto';
 
             head.appendChild(kind);
@@ -699,10 +751,10 @@
                 row.style.gap = '8px';
                 const k = document.createElement('span');
                 k.textContent = labels[name] || name;
-                k.style.color = '#737373';
+                k.style.color = 'var(--sth-muted)';
                 const v = document.createElement('span');
                 v.textContent = formatValue(name, entry.metrics[name]);
-                v.style.color = '#fafafa';
+                v.style.color = 'var(--sth-strong)';
                 if (name === 'app' && Number(entry.metrics[name]) >= 500) {
                     v.style.color = '#fbbf24';
                 }

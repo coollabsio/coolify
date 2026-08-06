@@ -131,6 +131,20 @@ test('Server-Timing HUD docks into navbar slots and floats only as fallback', fu
         ->toContain('compactSummary');
 });
 
+test('Server-Timing HUD follows the application color mode', function () {
+    $hud = file_get_contents(resource_path('views/components/server-timing-hud.blade.php'));
+
+    expect($hud)
+        ->toContain('#server-timing-hud {')
+        ->toContain('html.dark #server-timing-hud {')
+        ->toContain('--sth-background: rgba(255, 255, 255, .96)')
+        ->toContain('--sth-background: rgba(16, 16, 16, .96)')
+        ->toContain('var(--sth-text)')
+        ->toContain('var(--sth-border)')
+        ->toContain('[data-sth-log]::-webkit-scrollbar-thumb')
+        ->toContain('scrollbar-color: var(--sth-scrollbar-thumb) var(--sth-scrollbar-track)');
+});
+
 test('does not inject HUD into non-HTML or fragment responses', function () {
     Config::set('app.server_timing', true);
 

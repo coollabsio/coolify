@@ -139,7 +139,7 @@
 }
 
 @utility loading-indicator {
-    @apply text-coollabs dark:text-coollabs-100;
+    @apply text-coollabs dark:text-warning;
 }
 
 /* Compact icon-only control (gear, chevrons, etc.) */

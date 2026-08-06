@@ -90,12 +90,26 @@ beforeEach(function () {
     ]);
 });
 
-it('lists domains grouped by service application on the stack domains page', function () {
-    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+it('groups configured domains with their service redirect and excludes services without domains', function () {
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com,https://admin.example.com',
+    ]);
+
+    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSuccessful()
         ->assertSee('API')
         ->assertSee('https://api.example.com')
-        ->assertSee('Web');
+        ->assertSee('https://admin.example.com')
+        ->html();
+
+    expect($html)
+        ->toContain("service-domain-group-{$this->apiApp->id}")
+        ->toContain("service-domain-redirect-{$this->apiApp->id}")
+        ->toContain("wire:model.change=\"serviceRedirects.{$this->apiApp->id}\"")
+        ->toContain("wire:target=\"serviceRedirects.{$this->apiApp->id}\"")
+        ->not->toContain("service-domain-redirect-toggle-{$this->apiApp->id}")
+        ->not->toContain("service-domain-group-{$this->webApp->id}")
+        ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });
 
 it('shows dns entries control next to Add', function () {
@@ -139,14 +153,18 @@ it('lists dns entries for service hosts that still need dns', function () {
         ->not->toContain('web.example.com');
 });
 
-it('does not persist service redirect until Set Direction is called', function () {
+it('persists a service redirect when its dropdown changes', function () {
     $this->webApp->update(['fqdn' => 'https://web.example.com', 'redirect' => 'both']);
 
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->set("serviceRedirects.{$this->webApp->id}", 'www');
+        ->set("serviceRedirects.{$this->webApp->id}", 'www')
+        ->assertDispatched('success')
+        ->assertSee('https://www.web.example.com');
 
-    expect($this->webApp->fresh()->redirect)->toBe('both')
-        ->and($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
+    expect($this->webApp->fresh()->redirect)->toBe('www')
+        ->and(explode(',', (string) $this->webApp->fresh()->fqdn))
+        ->toContain('https://web.example.com')
+        ->toContain('https://www.web.example.com');
 });
 
 it('sets redirect direction per service application without changing other apps', function () {
@@ -164,6 +182,18 @@ it('sets redirect direction per service application without changing other apps'
         ->toContain('https://www.web.example.com')
         ->and($this->apiApp->fresh()->redirect)->toBe('both')
         ->and($this->apiApp->fresh()->fqdn)->toBe('https://api.example.com');
+});
+
+it('saves the explicitly selected service redirect value', function () {
+    $this->webApp->update(['fqdn' => 'https://web.example.com', 'redirect' => 'both']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('updateServiceRedirect', $this->webApp->id, 'www')
+        ->assertDispatched('success')
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->pluck('url')->contains('https://www.web.example.com'))
+        ->assertSee('https://www.web.example.com');
+
+    expect($this->webApp->fresh()->redirect)->toBe('www');
 });
 
 it('auto-adds missing non-www pair for a service application redirect', function () {
@@ -185,7 +215,7 @@ it('auto-adds missing non-www pair for a service application redirect', function
         ->toContain('https://api.example.com');
 });
 
-it('auto-adds the suggested www pair when adding a service domain with both directions', function () {
+it('adds only the entered domain when redirects allow both directions', function () {
     $this->webApp->update(['redirect' => 'both']);
 
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
@@ -196,9 +226,7 @@ it('auto-adds the suggested www pair when adding a service domain with both dire
         ->assertDispatched('success')
         ->assertSee('DNS skipped');
 
-    expect(explode(',', (string) $this->webApp->fresh()->fqdn))
-        ->toContain('https://web.example.com')
-        ->toContain('https://www.web.example.com');
+    expect($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
 });
 
 it('adds a domain to a selected service application', function () {
@@ -212,24 +240,26 @@ it('adds a domain to a selected service application', function () {
         ->assertSee('https://web.example.com');
 
     $this->webApp->refresh();
-    expect(explode(',', (string) $this->webApp->fqdn))
-        ->toBe(['https://web.example.com', 'https://www.web.example.com']);
+    expect($this->webApp->fqdn)->toBe('https://web.example.com');
 
     $dnsStatuses = $this->webApp->domain_dns_statuses;
 
     expect($dnsStatuses)
         ->toHaveKey('https://web.example.com')
-        ->toHaveKey('https://www.web.example.com')
+        ->not->toHaveKey('https://www.web.example.com')
         ->and($dnsStatuses['https://web.example.com']['status'])
         ->toBe('skipped')
         ->and($dnsStatuses['https://web.example.com']['checked_at'])
         ->not->toBeNull();
 });
 
-it('replaces the rendered domain list when its rows change', function () {
+it('keeps a stable key for the rendered domain list', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
 
-    expect($view)->toContain('wire:key="service-domains-list-{{ md5(serialize($domainRows)) }}"');
+    expect($view)
+        ->toContain('wire:key="service-domains-list"')
+        ->toContain('wire:key="service-domain-rows-{{ $appId }}-{{ md5(serialize($rows->all())) }}"')
+        ->not->toContain('md5(serialize($domainRows))');
 });
 
 it('does not duplicate the service name as a badge in the domain cell', function () {
@@ -279,7 +309,8 @@ it('prunes dns status when a service domain is removed', function () {
 
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->call('removeDomain', 0)
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->pluck('url')->doesntContain('https://api.example.com'));
 
     expect($this->apiApp->fresh()->domain_dns_statuses)->toBeNull();
 });
@@ -334,7 +365,7 @@ it('does not restore stale dns status when a removed service domain is re-added'
     $this->apiApp->refresh();
 
     expect(explode(',', (string) $this->apiApp->fqdn))
-        ->toBe(['https://api.example.com', 'https://www.api.example.com'])
+        ->toBe(['https://api.example.com'])
         ->and($this->apiApp->domain_dns_statuses['https://api.example.com']['status'] ?? null)->toBe('skipped')
         ->and($this->apiApp->domain_dns_statuses['https://api.example.com']['message'] ?? null)->not->toBe('Stale DNS result.');
 });
@@ -371,7 +402,7 @@ YAML,
         ->assertDispatched('success');
 
     expect(explode(',', (string) $this->webApp->fresh()->fqdn))
-        ->toBe(['https://api.example.com', 'https://www.api.example.com']);
+        ->toBe(['https://api.example.com']);
 });
 
 it('loads persisted dns status for service applications', function () {

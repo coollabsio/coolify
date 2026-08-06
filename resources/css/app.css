@@ -352,6 +352,26 @@ tr td:first-child {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
+/* Loading feedback uses the yellow brand accent consistently in dark mode. */
+.dark .animate-spin {
+    color: var(--color-warning) !important;
+}
+
+.dark #nprogress .bar {
+    background: var(--color-warning) !important;
+}
+
+.dark #nprogress .peg {
+    box-shadow:
+        0 0 10px var(--color-warning),
+        0 0 5px var(--color-warning) !important;
+}
+
+.dark #nprogress .spinner-icon {
+    border-top-color: var(--color-warning) !important;
+    border-left-color: var(--color-warning) !important;
+}
+
 .log-highlight {
     background-color: rgba(234, 179, 8, 0.4);
     border-radius: 2px;
@@ -409,7 +429,7 @@ tr td:first-child {
 
 .application-console-shell {
     box-shadow:
-        inset 0 0 0 1px rgb(255 255 255 / 0.08),
+        inset 0 0 0 1px var(--console-theme-border, rgb(255 255 255 / 0.08)),
         0 18px 50px rgb(0 0 0 / 0.18);
 }
 
@@ -436,12 +456,20 @@ tr td:first-child {
 .application-console-shell[data-console-theme="system"],
 .terminal-fullscreen-shell[data-console-theme="system"] {
     --console-theme-background: #fff;
+    --console-theme-border: #d4d4d8;
     --console-theme-opacity: 1;
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header {
+    background: transparent;
     color: #52525b;
     border-color: rgb(0 0 0 / 0.1);
+    backdrop-filter: none;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-block::before {
+    background: transparent;
+    backdrop-filter: none;
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header [class*="text-white"] {
@@ -451,6 +479,7 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .applica
 html.dark .application-console-shell[data-console-theme="system"],
 html.dark .terminal-fullscreen-shell[data-console-theme="system"] {
     --console-theme-background: #121214;
+    --console-theme-border: rgb(255 255 255 / 0.08);
 }
 
 .console-theme-selector {

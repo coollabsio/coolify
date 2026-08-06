@@ -12,6 +12,8 @@
     @forelse($executions as $execution)
         <div class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
             <button type="button" wire:click="selectExecution({{ data_get($execution, 'id') }})"
+                wire:loading.attr="disabled"
+                wire:target="selectExecution({{ data_get($execution, 'id') }})"
                 class="flex w-full items-center gap-4 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.03]">
                 <x-status-badge
                     :status="match (data_get($execution, 'status')) {
@@ -40,7 +42,10 @@
                     </p>
                 </div>
                 <x-chevron-down
+                    wire:loading.remove wire:target="selectExecution({{ data_get($execution, 'id') }})"
                     class="size-4 shrink-0 text-neutral-400 transition-transform {{ data_get($execution, 'id') == $selectedKey ? 'rotate-180' : '' }}" />
+                <x-loading wire:loading wire:target="selectExecution({{ data_get($execution, 'id') }})"
+                    class="size-4 shrink-0" />
             </button>
 
             @if (data_get($execution, 'id') == $selectedKey)
@@ -57,7 +62,7 @@
                     </div>
 
                     @if ($this->logLines->isNotEmpty())
-                        <pre class="max-h-80 overflow-auto rounded-lg bg-neutral-950 p-4 font-mono text-xs leading-5 text-neutral-300">@foreach ($this->logLines as $line)
+                        <pre class="max-h-80 overflow-auto rounded-lg bg-white text-neutral-700 p-4 font-mono text-xs leading-5 ring-1 ring-neutral-200 dark:bg-neutral-950 dark:text-neutral-300 dark:ring-white/[0.08]">@foreach ($this->logLines as $line)
 {{ $line }}
 @endforeach</pre>
                         @if ($this->hasMoreLogs())

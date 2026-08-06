@@ -60,6 +60,9 @@ it('defaults to a system console theme that follows the page color mode', functi
         ->toContain("attributeFilter: ['class', 'data-theme']")
         ->and($appCss)
         ->toContain('[data-console-theme="system"]')
+        ->toContain('html:not(.dark) .application-console-shell[data-console-theme="system"]')
+        ->toContain('--console-theme-border: #d4d4d8')
+        ->toContain('background: transparent')
         ->toContain('html.dark .application-console-shell[data-console-theme="system"]');
 });
 

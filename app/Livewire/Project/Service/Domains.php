@@ -179,6 +179,11 @@ class Domains extends Component
         return $this->normalizeRedirect($this->serviceRedirects[$serviceApplicationId] ?? null);
     }
 
+    public function updatedServiceRedirects(string $redirect, int|string $serviceApplicationId): void
+    {
+        $this->updateServiceRedirect((int) $serviceApplicationId, $redirect);
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -583,6 +588,12 @@ class Domains extends Component
         };
     }
 
+    public function updateServiceRedirect(int $serviceApplicationId, string $redirect): void
+    {
+        $this->serviceRedirects[$serviceApplicationId] = $redirect;
+        $this->setServiceRedirect($serviceApplicationId);
+    }
+
     /**
      * @param  mixed  ...$modalArgs  Extra args from modal-confirmation (password, etc.)
      */
@@ -634,10 +645,9 @@ class Domains extends Component
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
             $this->dispatch('success', 'Redirect updated.');
-            $this->dispatch('refresh');
-            $this->dispatch('refreshServices');
             $this->dispatch('configurationChanged');
             $this->pruneDomainDnsStatusesToCurrentDomains();
+            $this->refreshDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -825,11 +835,13 @@ class Domains extends Component
             }
 
             $newUrls = $this->splitDomains($normalized);
-            $pairedUrls = collect($newUrls)
-                ->map(fn (string $url) => $this->wwwCounterpartUrl($url))
-                ->filter()
-                ->values()
-                ->all();
+            $pairedUrls = in_array($this->normalizeRedirect($app->redirect), ['www', 'non-www'], true)
+                ? collect($newUrls)
+                    ->map(fn (string $url) => $this->wwwCounterpartUrl($url))
+                    ->filter()
+                    ->values()
+                    ->all()
+                : [];
             $current = collect($this->splitDomains($app->fqdn));
             foreach ($newUrls as $url) {
                 if ($current->contains($url)) {
@@ -990,6 +1002,7 @@ class Domains extends Component
             $this->forceRemovePort = false;
             $this->dispatch('success', 'Domain removed.');
             $this->pruneDomainDnsStatusesToCurrentDomains();
+            $this->refreshDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -1156,8 +1169,6 @@ class Domains extends Component
             $this->dispatch('warning', 'Some services do not support multiple domains, which can lead to problems and is NOT RECOMMENDED.<br><br>Only use multiple domains if you know what you are doing.');
         }
 
-        $this->dispatch('refresh');
-        $this->dispatch('refreshServices');
         $this->dispatch('configurationChanged');
 
         return true;

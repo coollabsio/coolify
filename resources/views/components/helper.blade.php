@@ -5,21 +5,17 @@
 
 <div x-data="{
     open: false,
-    pinned: false,
     hideTimer: null,
     style: '',
-    show(pinned = false) {
+    show() {
         this.cancelHide();
-        this.pinned = pinned;
         this.open = true;
         this.$nextTick(() => this.position());
     },
     hide() {
         this.cancelHide();
         this.hideTimer = setTimeout(() => {
-            if (!this.pinned) {
-                this.open = false;
-            }
+            this.open = false;
         }, 150);
     },
     cancelHide() {
@@ -30,7 +26,6 @@
     },
     close() {
         this.cancelHide();
-        this.pinned = false;
         this.open = false;
     },
     closeWhenFocusLeaves() {
@@ -81,8 +76,8 @@
             'size-3.5' => ! isset($trigger),
         ])
         aria-label="{{ $label }}" :aria-describedby="open ? $id('helper-popup') : null"
-        @mouseenter="show(false)" @mouseleave="hide" @focus="show(false)" @blur="closeWhenFocusLeaves()"
-        @click.prevent.stop="open && pinned ? close() : show(true)">
+        @mouseenter="show()" @mouseleave="hide" @focus="show()" @blur="closeWhenFocusLeaves()"
+        @click.prevent.stop="show()">
         @isset($trigger)
             {{ $trigger }}
         @elseif (isset($icon))
@@ -93,20 +88,18 @@
                 aria-hidden="true" />
         @endisset
     </button>
-    <template x-teleport="body">
-        <div x-ref="popup" x-show="open" x-cloak :id="$id('helper-popup')" role="tooltip"
-            x-transition:enter="transition ease-out duration-100"
-            x-transition:enter-start="opacity-0 translate-y-0.5"
-            x-transition:enter-end="opacity-100 translate-y-0"
-            x-transition:leave="transition ease-in duration-75"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            :style="style"
-            class="info-helper-popup fixed z-[9999] w-max max-w-[min(20rem,calc(100vw-2rem))]"
-            @mouseenter="cancelHide()" @mouseleave="hide()" @focusout="closeWhenFocusLeaves()" @click.stop>
-            <div class="px-3 py-2.5 text-[13px] leading-5">
-                {!! $helper !!}
-            </div>
+    <div x-ref="popup" x-show="open" x-cloak :id="$id('helper-popup')" role="tooltip"
+        x-transition:enter="transition ease-out duration-100"
+        x-transition:enter-start="opacity-0 translate-y-0.5"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-75"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        :style="style"
+        class="info-helper-popup fixed z-[9999] w-max max-w-[min(20rem,calc(100vw-2rem))]"
+        @mouseenter="cancelHide()" @mouseleave="hide()" @focusout="closeWhenFocusLeaves()" @click.stop>
+        <div class="px-3 py-2.5 text-[13px] leading-5">
+            {!! $helper !!}
         </div>
-    </template>
+    </div>
 </div>
