@@ -1247,7 +1247,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 if ($docker_compose_domains->count() > 0) {
                     $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                     if ($found_fqdn) {
-                        $fqdns = collect($found_fqdn);
+                        $fqdns = str($found_fqdn)->explode(',')->map(fn ($d) => trim($d))->filter()->values();
                     } else {
                         $fqdns = collect([]);
                     }

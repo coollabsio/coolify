@@ -95,9 +95,13 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn()
+    public function generate_preview_fqdn(bool $force = true)
     {
         if ($this->application->fqdn) {
+            if (! $force && filled($this->fqdn)) {
+                return $this;
+            }
+
             if (str($this->application->fqdn)->contains(',')) {
                 $url = Url::fromString(str($this->application->fqdn)->explode(',')[0]);
             } else {
@@ -122,7 +126,7 @@ class ApplicationPreview extends BaseModel
         return $this;
     }
 
-    public function generate_preview_fqdn_compose()
+    public function generate_preview_fqdn_compose(bool $force = true)
     {
         $applicationDomains = json_decode($this->application->docker_compose_domains ?: '[]', true) ?: [];
         $previewDomains = json_decode(data_get($this, 'docker_compose_domains') ?: '[]', true) ?: [];
@@ -171,6 +175,18 @@ class ApplicationPreview extends BaseModel
                     $docker_compose_domains,
                     $service_name,
                     '',
+                    $serviceNames,
+                );
+
+                continue;
+            }
+
+            // Preserve existing preview domain unless forcing regeneration
+            if (! $force && filled(getComposeServiceDomainString($previewDomains, $service_name))) {
+                $docker_compose_domains = putComposeServiceDomain(
+                    $docker_compose_domains,
+                    $service_name,
+                    getComposeServiceDomainString($previewDomains, $service_name),
                     $serviceNames,
                 );
 

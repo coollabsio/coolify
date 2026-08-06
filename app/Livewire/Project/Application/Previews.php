@@ -175,7 +175,7 @@ class Previews extends Component
                 return;
             }
             if ($this->application->build_pack === 'dockercompose') {
-                $preview->generate_preview_fqdn_compose();
+                $preview->generate_preview_fqdn_compose(force: true);
                 $this->application->refresh();
                 $this->syncData(false);
                 $this->dispatch('success', 'Domain generated.');
@@ -183,7 +183,7 @@ class Previews extends Component
                 return;
             }
 
-            $preview->generate_preview_fqdn();
+            $preview->generate_preview_fqdn(force: true);
             $this->application->refresh();
             $this->syncData(false);
             $this->dispatch('update_links');

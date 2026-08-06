@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -397,4 +398,47 @@ YAML;
     $plainApplication->refresh();
 
     expect(json_decode($plainApplication->docker_compose_domains, true))->toBeNull();
+});
+
+test('applicationParser splits preview compose domains into separate traefik router rules', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+    environment:
+      - SERVICE_FQDN_FRONTEND=${FRONTEND_URL}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'preview_url_template' => '{{pr_id}}.{{domain}}',
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com,https://www.example.com'],
+        ]),
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://github.com/example/repo/pull/42',
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://42.example.com, https://42.www.example.com'],
+        ]),
+    ]);
+
+    $parsed = applicationParser($application, pull_request_id: 42, preview_id: $preview->id);
+
+    $services = $parsed->get('services');
+    $frontend = $services->get('frontend-pr-42');
+    $labels = collect(data_get($frontend, 'labels'));
+
+    $hostRules = $labels->filter(fn ($label) => str($label)->startsWith('traefik.http.routers.') && str($label)->contains('.rule=Host('));
+
+    expect($hostRules)->toHaveCount(4)
+        ->and($hostRules->implode("\n"))->toContain('42.example.com')
+        ->and($hostRules->implode("\n"))->toContain('42.www.example.com');
 });
