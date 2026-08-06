@@ -42,14 +42,6 @@
         ));
 
         $serviceStatus = str($service->status ?? 'exited');
-        [$serviceStatusLabel, $serviceStatusType] = match (true) {
-            $serviceStatus->contains('running') => ['Running', 'success'],
-            $serviceStatus->contains('degraded') => ['Degraded', 'warning'],
-            $serviceStatus->contains('restarting'),
-            $serviceStatus->contains('starting') => ['Starting', 'warning'],
-            $serviceStatus->contains('exited') => ['Stopped', 'neutral'],
-            default => ['Deploying', 'warning'],
-        };
     @endphp
 
     <livewire:project.shared.configuration-checker :resource="$service" />
@@ -63,11 +55,11 @@
 
     <div x-data="{ deploying: false }" @service-deploy-finished.window="deploying = false">
         <div class="mb-3 w-full xl:hidden">
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+            <div class="flex min-w-0 flex-col items-start gap-2">
+                <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $service->name }}
                 </h1>
-                <x-status-badge :status="$serviceStatusLabel" :type="$serviceStatusType" />
+                <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
             </div>
         </div>
 

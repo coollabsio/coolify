@@ -33,6 +33,27 @@ it('uses a single unified navbar for application, service, database, and server 
         ->not->toContain('border-l border-neutral-200 pl-1');
 });
 
+it('uses interactive status summaries in mobile resource headings', function () {
+    $headings = [
+        resource_path('views/livewire/project/application/heading.blade.php') => '<x-status-summary :status="$application->status" />',
+        resource_path('views/livewire/project/database/heading.blade.php') => '<x-status-summary :status="$database->status" title="Database status" />',
+        resource_path('views/livewire/project/service/heading.blade.php') => '<x-status-summary :status="$service->status" title="Service status" container-name="Containers" />',
+    ];
+
+    foreach ($headings as $path => $statusSummary) {
+        $mobileHeading = str(file_get_contents($path))
+            ->after('<div class="mb-3 w-full xl:hidden">')
+            ->before('<div class="w-full xl:hidden">')
+            ->toString();
+
+        expect($mobileHeading)
+            ->toContain('flex min-w-0 flex-col items-start gap-2')
+            ->toContain('min-w-0 max-w-full truncate')
+            ->toContain($statusSummary)
+            ->not->toContain('<x-status-badge');
+    }
+});
+
 it('docks desktop resource actions in the top bar instead of floating over content', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
     $files = [

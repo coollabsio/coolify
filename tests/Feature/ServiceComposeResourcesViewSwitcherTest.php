@@ -36,8 +36,11 @@ it('aligns compose resource columns and uses icon actions', function () {
 
     expect($configuration)->toContain($columns)
         ->and($resourceCard)->toContain($columns)
+        ->toContain('flex flex-wrap items-center justify-end gap-1 sm:contents')
         ->toContain('aria-label="Resource settings"')
-        ->toContain('aria-label="Database backups"')
+        ->toContain('aria-label="Service backups"')
+        ->toContain("route('project.service.volume-backups.index', \$parameters)")
+        ->not->toContain("route('project.service.database.backups'")
         ->not->toContain('>Settings</a>')
         ->not->toContain('>Backups</a>');
 });

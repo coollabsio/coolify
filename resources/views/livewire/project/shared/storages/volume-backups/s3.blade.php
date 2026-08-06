@@ -28,25 +28,25 @@
                 </div>
                 @if (! $saveToS3)
                     <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
-                        wire:target="toggleS3" isHighlighted canGate="update" :canResource="$backup">
+                        wire:target="toggleS3" isHighlighted canGate="update" :canResource="$resource">
                         Enable S3
                     </x-forms.button>
                 @else
                     <x-forms.button type="button" wire:click="toggleS3" wire:loading.attr="disabled"
-                        wire:target="toggleS3" canGate="update" :canResource="$backup">
+                        wire:target="toggleS3" canGate="update" :canResource="$resource">
                         Disable S3
                     </x-forms.button>
                 @endif
             </div>
             <div class="application-settings-section-body grid gap-4 sm:grid-cols-2">
                 <x-forms.listbox id="s3StorageId" label="S3 storage" :required="$saveToS3"
-                    :disabled="! auth()->user()?->can('update', $backup)"
+                    :disabled="! auth()->user()?->can('update', $resource)"
                     :options="$availableS3Storages->map(fn ($s3Storage) => [
                         'value' => $s3Storage->id,
                         'label' => $s3Storage->name,
                     ])->values()->all()" />
                 <x-forms.listbox id="disableLocalBackup" label="Local copy"
-                    :disabled="! $saveToS3 || ! auth()->user()?->can('update', $backup)" :options="[
+                    :disabled="! $saveToS3 || ! auth()->user()?->can('update', $resource)" :options="[
                         ['value' => false, 'label' => 'Keep local backup'],
                         ['value' => true, 'label' => 'Delete after S3 upload'],
                     ]" />

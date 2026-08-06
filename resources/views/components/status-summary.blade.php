@@ -62,7 +62,7 @@
     </x-status-badge>
 
     <div x-cloak x-show="open" x-transition.origin.top.left
-        class="listbox-panel top-8! right-auto! left-0! z-[90]! w-64! min-w-64!" role="menu">
+        class="listbox-panel top-8! right-auto! left-0! z-[90]! w-[min(16rem,calc(100vw-1.5rem))]! min-w-0! sm:w-64! sm:min-w-64!" role="menu">
         <div class="px-3 py-2 text-[11px] font-medium text-neutral-400 dark:text-fg-faint">{{ $title }}</div>
         <div class="listbox-option cursor-default! gap-2.5!">
             <span @class([

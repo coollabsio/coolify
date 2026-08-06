@@ -5,6 +5,7 @@
 ])
 
 @php
+    $serviceParameters = \Illuminate\Support\Arr::except($parameters, ['stack_service_uuid']);
     $items = [
         [
             'label' => 'General',
@@ -20,7 +21,8 @@
         ],
         [
             'label' => 'Backups',
-            'route' => 'project.service.database.backups',
+            'route' => 'project.service.volume-backups.index',
+            'parameters' => $serviceParameters,
             'icon' => 'storages',
             'active' => request()->routeIs('project.service.database.backup*'),
             'visible' => $serviceDatabase?->isBackupSolutionAvailable() || $serviceDatabase?->is_migrated,
@@ -54,7 +56,7 @@
                 'menu-item-active' => $item['active'],
             ])
                 @if ($item['navigate'] ?? true) {{ wireNavigate() }} @endif
-                href="{{ route($item['route'], $parameters) }}">
+                href="{{ route($item['route'], $item['parameters'] ?? $parameters) }}">
                 <x-reicon :name="$item['icon']" class="menu-item-icon" />
                 <span class="menu-item-label">{{ $item['label'] }}</span>
             </a>

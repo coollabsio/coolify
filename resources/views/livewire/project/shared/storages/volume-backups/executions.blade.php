@@ -23,9 +23,9 @@
             </x-slot:actions>
 
             @if ($executionCount > 0)
-                <div class="data-table w-full">
+                <div class="data-table w-full overflow-x-auto">
                     <div
-                        class="grid grid-cols-[7.5rem_minmax(0,1fr)_8.5rem_7rem_9rem_minmax(9rem,.7fr)] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                        class="data-table-header volume-backup-executions-grid border-b border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.025]">
                         <span>Status</span>
                         <span>Archive</span>
                         <span>Time</span>
@@ -65,7 +65,7 @@
                         @endphp
 
                         <div wire:key="volume-backup-execution-{{ $execution->id }}"
-                            class="grid min-h-16 grid-cols-[7.5rem_minmax(0,1fr)_8.5rem_7rem_9rem_minmax(9rem,.7fr)] items-center gap-x-3 border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]">
+                            class="data-table-row volume-backup-executions-grid min-h-16 items-center gap-x-3 border-b border-neutral-200 text-[12px] last:border-b-0 dark:border-white/[0.07]">
                             <span>
                                 <x-status-badge :status="$statusLabel" :type="$statusType" />
                             </span>
@@ -124,7 +124,7 @@
 
                             @if ($execution->message)
                                 <pre
-                                    class="col-span-6 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">{{ $execution->message }}</pre>
+                                    class="volume-backup-execution-message col-span-6 mt-2 max-h-32 overflow-auto rounded-lg border border-neutral-200 bg-neutral-50 p-2 text-[11px] whitespace-pre-wrap text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">{{ $execution->message }}</pre>
                             @endif
                         </div>
                     @endforeach

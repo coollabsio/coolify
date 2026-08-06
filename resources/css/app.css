@@ -1016,8 +1016,14 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 /* Public error surfaces (401/404/500/…). Match auth shell canvas + accent. */
+.error-page-body {
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+}
+
 .error-shell {
-    min-height: 100dvh;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2373,6 +2379,11 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .backup-executions-table-grid {
     grid-template-columns: 7.5rem minmax(9rem, 1fr) 8rem 6rem 5rem minmax(9rem, 1fr) minmax(9rem, auto);
+}
+
+.volume-backup-executions-grid {
+    grid-template-columns: 7.5rem minmax(0, 1fr) 8.5rem 7rem 9rem minmax(9rem, 0.7fr);
+    min-width: 50rem;
 }
 
 .clone-destinations-table-grid {

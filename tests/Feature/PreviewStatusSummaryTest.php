@@ -13,7 +13,9 @@ it('aggregates preview container and health check status', function () {
         ->toContain('Not configured')
         ->toContain('aria-label="About unconfigured health checks"')
         ->toContain('Traffic can still be routed to the container')
-        ->toContain('aria-haspopup="menu"');
+        ->toContain('aria-haspopup="menu"')
+        ->toContain('right-auto! left-0!')
+        ->toContain('w-[min(16rem,calc(100vw-1.5rem))]!');
 });
 
 it('uses the aggregated preview status in the previews list', function () {

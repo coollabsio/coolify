@@ -19,7 +19,28 @@
      Mobile: stacked layout (full label, buttons on the next line) inset from
      the viewport edges so body overflow-x-clip cannot clip it.
      Desktop: compact single-row centered pill. --}}
-<div wire:dirty.class="is-dirty"
+<div x-data="{
+    keyboardInset: 0,
+    updateKeyboardInset: null,
+    init() {
+        this.updateKeyboardInset = () => {
+            const viewport = window.visualViewport;
+            this.keyboardInset = window.innerWidth < 640 && viewport
+                ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+                : 0;
+        };
+
+        this.updateKeyboardInset();
+        window.visualViewport?.addEventListener('resize', this.updateKeyboardInset);
+        window.visualViewport?.addEventListener('scroll', this.updateKeyboardInset);
+        window.addEventListener('resize', this.updateKeyboardInset);
+    },
+    destroy() {
+        window.visualViewport?.removeEventListener('resize', this.updateKeyboardInset);
+        window.visualViewport?.removeEventListener('scroll', this.updateKeyboardInset);
+        window.removeEventListener('resize', this.updateKeyboardInset);
+    },
+}" x-bind:style="`--keyboard-inset: ${keyboardInset}px`" wire:dirty.class="is-dirty"
     wire:loading.class="!opacity-0 !translate-y-6 !pointer-events-none"
     @keydown.enter.window="
         if ($el.classList.contains('is-dirty') &&
@@ -35,7 +56,7 @@
         }
     "
     @if ($targets) wire:target="{{ $targets }}" @endif
-    class="pointer-events-none fixed inset-x-3 bottom-[max(1.5rem,env(safe-area-inset-bottom,0px)+0.75rem)] z-[1000] flex max-w-full translate-y-6 flex-col items-stretch gap-2 rounded-2xl border border-white/10 bg-surface py-2.5 pr-2.5 pl-4 opacity-0 shadow-modal transition-[opacity,transform] duration-200 ease-out delay-0 [&.is-dirty]:pointer-events-auto [&.is-dirty]:translate-y-0 [&.is-dirty]:opacity-100 [&.is-dirty]:delay-300 sm:inset-x-auto sm:left-1/2 sm:bottom-6 sm:w-max sm:max-w-none sm:-translate-x-1/2 sm:flex-row sm:items-center sm:gap-8 sm:py-2 sm:pl-5 sm:pr-2">
+    class="pointer-events-none fixed inset-x-3 bottom-[calc(var(--keyboard-inset,0px)+max(1.5rem,env(safe-area-inset-bottom,0px)+0.75rem))] z-[1000] flex max-w-full translate-y-6 flex-col items-stretch gap-2 rounded-2xl border border-white/10 bg-surface py-2.5 pr-2.5 pl-4 opacity-0 shadow-modal transition-[opacity,transform] duration-200 ease-out delay-0 [&.is-dirty]:pointer-events-auto [&.is-dirty]:translate-y-0 [&.is-dirty]:opacity-100 [&.is-dirty]:delay-300 sm:inset-x-auto sm:left-1/2 sm:bottom-6 sm:w-max sm:max-w-none sm:-translate-x-1/2 sm:flex-row sm:items-center sm:gap-8 sm:py-2 sm:pl-5 sm:pr-2">
     <span class="text-[13px] font-semibold leading-snug text-fg sm:whitespace-nowrap">{{ $label }}</span>
     <div class="flex shrink-0 items-center justify-end gap-2">
         <button type="button" onclick="window.location.reload()"

@@ -23,23 +23,14 @@
             $applicationMenuItems,
             fn (array $item): bool => $item['visible'] ?? true,
         ));
-        $applicationStatus = str($application->status ?? 'exited');
-        [$applicationStatusLabel, $applicationStatusType] = match (true) {
-            $applicationStatus->startsWith('running') => ['Running', 'success'],
-            $applicationStatus->startsWith('degraded') => ['Degraded', 'warning'],
-            $applicationStatus->startsWith('restarting'),
-            $applicationStatus->startsWith('starting') => ['Starting', 'warning'],
-            $applicationStatus->startsWith('exited') => ['Stopped', 'neutral'],
-            default => ['Deploying', 'warning'],
-        };
     @endphp
     <div>
         <div class="mb-3 w-full xl:hidden">
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+            <div class="flex min-w-0 flex-col items-start gap-2">
+                <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $application->name }}
                 </h1>
-                <x-status-badge :status="$applicationStatusLabel" :type="$applicationStatusType" />
+                <x-status-summary :status="$application->status" />
             </div>
         </div>
 

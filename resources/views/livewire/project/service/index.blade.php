@@ -127,7 +127,6 @@
                                                 @else
                                                     {{ $domainCount }} domains set.
                                                 @endif
-                                                Manage domains, DNS checks, and redirects on the parent service's Domains page.
                                             </p>
                                             <a class="button shrink-0" href="{{ route('project.service.domains', $parameters) }}"
                                                 {{ wireNavigate() }}>

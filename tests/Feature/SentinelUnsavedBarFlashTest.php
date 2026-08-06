@@ -56,6 +56,16 @@ test('unsaved bar stays above floating notifications so save actions remain acce
         ->and($popup)->toContain('z-999');
 });
 
+test('unsaved bar stays above the mobile keyboard', function () {
+    $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+
+    expect($contents)
+        ->toContain('window.visualViewport')
+        ->toContain('keyboardInset')
+        ->toContain('--keyboard-inset')
+        ->toContain('removeEventListener');
+});
+
 test('settings general unsaved bar excludes auto-saving instance timezone', function () {
     $path = resource_path('views/livewire/settings/index.blade.php');
     $contents = file_get_contents($path);

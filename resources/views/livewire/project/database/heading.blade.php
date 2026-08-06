@@ -44,13 +44,6 @@
         ));
 
         $databaseStatus = str($database->status ?? 'exited');
-        [$databaseStatusLabel, $databaseStatusType] = match (true) {
-            $databaseStatus->startsWith('running') => ['Running', 'success'],
-            $databaseStatus->startsWith('degraded') => ['Degraded', 'warning'],
-            $databaseStatus->startsWith('restarting'),
-            $databaseStatus->startsWith('starting') => ['Starting', 'warning'],
-            default => ['Stopped', 'neutral'],
-        };
     @endphp
 
     <livewire:project.shared.configuration-checker :resource="$database" />
@@ -66,11 +59,11 @@
 
     <div x-data>
         <div class="mb-3 w-full xl:hidden">
-            <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <h1 class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+            <div class="flex min-w-0 flex-col items-start gap-2">
+                <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $database->name }}
                 </h1>
-                <x-status-badge :status="$databaseStatusLabel" :type="$databaseStatusType" />
+                <x-status-summary :status="$database->status" title="Database status" />
             </div>
         </div>
 

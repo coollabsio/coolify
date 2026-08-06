@@ -826,6 +826,7 @@ it('enables and disables volume S3 backups from the S3 title action', function (
         'section' => 's3',
     ])
         ->assertSee('Enable S3')
+        ->assertDontSee('You do not have permission to perform this action.')
         ->call('toggleS3')
         ->assertSet('saveToS3', true)
         ->assertSee('Disable S3');
@@ -863,6 +864,22 @@ it('shows and saves volume S3 retention while S3 backups are disabled', function
         ->and($backup->retention_amount_s3)->toBe(12)
         ->and($backup->retention_days_s3)->toBe(30)
         ->and($backup->retention_max_storage_s3)->toBe(4.5);
+});
+
+it('allows team owners to edit volume backup retention settings', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+
+    Livewire::test(VolumeBackups::class, [
+        'storage' => $volume,
+        'resource' => $application,
+        'section' => 'retention',
+    ])->assertDontSee('You do not have permission to perform this action.');
 });
 
 it('only updates S3 fields when toggling volume S3 backups', function () {

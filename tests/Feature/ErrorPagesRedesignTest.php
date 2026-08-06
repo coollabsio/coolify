@@ -16,6 +16,7 @@ it('renders redesigned error pages with shared shell and actions', function (str
     $html = view($view, ['exception' => $exception])->render();
 
     expect($html)
+        ->toContain('error-page-body')
         ->toContain('error-shell')
         ->toContain('error-code')
         ->toContain('error-title')

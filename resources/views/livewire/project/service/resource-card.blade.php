@@ -58,8 +58,8 @@
         <div
             class="flex items-center justify-end gap-1 border-t border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-white/[0.06] dark:bg-white/[0.02]">
         @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))
-            <a class="icon-button" title="Database backups" aria-label="Database backups" {{ wireNavigate() }}
-                href="{{ route('project.service.database.backups', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
+            <a class="icon-button" title="Service backups" aria-label="Service backups" {{ wireNavigate() }}
+                href="{{ route('project.service.volume-backups.index', $parameters) }}">
                 <x-reicon name="database" class="size-4" />
             </a>
         @endif
@@ -98,20 +98,22 @@
         <div class="hidden truncate font-mono text-xs text-neutral-500 sm:block dark:text-fg-faint">
             {{ $resource->image }}
         </div>
-        <div class="justify-self-start">
-            <x-status-badge :status="$statusLabel" :type="$statusType" />
-        </div>
-        <div class="flex items-center justify-end gap-1">
-            @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))
-                <a class="icon-button" title="Database backups" aria-label="Database backups" {{ wireNavigate() }}
-                    href="{{ route('project.service.database.backups', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
-                    <x-reicon name="database" class="size-4" />
+        <div class="flex flex-wrap items-center justify-end gap-1 sm:contents">
+            <div class="justify-self-start">
+                <x-status-badge :status="$statusLabel" :type="$statusType" />
+            </div>
+            <div class="flex items-center justify-end gap-1">
+                @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))
+                    <a class="icon-button" title="Service backups" aria-label="Service backups" {{ wireNavigate() }}
+                        href="{{ route('project.service.volume-backups.index', $parameters) }}">
+                        <x-reicon name="database" class="size-4" />
+                    </a>
+                @endif
+                <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
+                    href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
+                    <x-reicon name="settings" class="size-4" />
                 </a>
-            @endif
-            <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
-                href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
-                <x-reicon name="settings" class="size-4" />
-            </a>
+            </div>
         </div>
     </div>
 </div>

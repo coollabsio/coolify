@@ -74,6 +74,16 @@ it('shows the service sidebar on the storage backups page', function () {
         ->toContain('xl:grid-cols-[210px_minmax(0,1fr)]');
 });
 
+it('links compose database backups to the parent service backups page', function () {
+    $sidebar = file_get_contents(resource_path('views/components/service-database/sidebar.blade.php'));
+
+    expect($sidebar)
+        ->toContain("'route' => 'project.service.volume-backups.index'")
+        ->toContain("'parameters' => \$serviceParameters")
+        ->toContain("\$item['parameters'] ?? \$parameters")
+        ->not->toContain("'route' => 'project.service.database.backups'");
+});
+
 it('uses a distinct backup icon across resource sidebars', function () {
     $sidebars = [
         resource_path('views/components/application/configuration-sidebar.blade.php'),

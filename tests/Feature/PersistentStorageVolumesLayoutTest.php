@@ -1,5 +1,18 @@
 <?php
 
+it('keeps the volume backup executions table horizontally scrollable on mobile', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toContain('volume-backup-executions-grid')
+        ->toContain('data-table w-full overflow-x-auto')
+        ->and($css)
+        ->toContain('.volume-backup-executions-grid')
+        ->toContain('min-width: 50rem;')
+        ->not->toContain('.data-table-header.volume-backup-executions-grid');
+});
+
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
