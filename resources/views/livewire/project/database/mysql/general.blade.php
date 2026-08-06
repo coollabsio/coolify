@@ -12,6 +12,8 @@
         <div class="flex gap-2">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
             <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
+            <x-forms.input label="Custom Host / FQDN" id="fqdn" placeholder="e.g. mysql.example.com" canGate="update" :canResource="$database"
+                helper="Optional custom domain or host used for external database connection strings." />
             <x-forms.input label="Image" id="image" required
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/mysql'>https://hub.docker.com/_/mysql</a>" canGate="update" :canResource="$database" />
         </div>

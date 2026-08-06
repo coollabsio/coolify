@@ -23,6 +23,7 @@ class StandaloneRedis extends BaseModel
         'image',
         'is_public',
         'public_port',
+        'fqdn',
         'ports_mappings',
         'limits_memory',
         'limits_memory_swap',

@@ -24,9 +24,11 @@
             </x-modal-input>
         </div>
         <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-            <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
-            <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
-            <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
+            <x-forms.input label="Name" id="database.name" canGate="update" :canResource="$database" />
+            <x-forms.input label="Description" id="database.description" canGate="update" :canResource="$database" />
+            <x-forms.input label="Custom Host / FQDN" id="database.fqdn" placeholder="e.g. db.example.com" canGate="update" :canResource="$database"
+                helper="Optional custom domain or host used for external database connection strings." />
+            <x-forms.input label="Image" id="database.image" required canGate="update" :canResource="$database"
                 helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/postgres'>https://hub.docker.com/_/postgres</a>" />
         </div>
         <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise

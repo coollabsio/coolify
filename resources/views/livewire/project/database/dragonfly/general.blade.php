@@ -12,6 +12,8 @@
         <div class="flex gap-2">
             <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
             <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
+            <x-forms.input label="Custom Host / FQDN" id="fqdn" placeholder="e.g. dragonfly.example.com" canGate="update" :canResource="$database"
+                helper="Optional custom domain or host used for external database connection strings." />
             <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database" />
         </div>
         <x-forms.input

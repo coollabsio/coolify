@@ -29,6 +29,7 @@ class StandalonePostgresql extends BaseModel
         'image',
         'is_public',
         'public_port',
+        'fqdn',
         'ports_mappings',
         'limits_memory',
         'limits_memory_swap',
@@ -340,7 +341,7 @@ class StandalonePostgresql extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    $serverIp = $this->destination->server->getIp;
+                    $serverIp = $this->fqdn ?? $this->destination->server->getIp;
                     if (empty($serverIp)) {
                         return null;
                     }
