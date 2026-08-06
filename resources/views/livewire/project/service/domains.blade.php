@@ -176,7 +176,8 @@
         </div>
     @else
         {{-- Flat table with Service column so assignment is always visible --}}
-        <div class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28">
+        <div wire:key="service-domains-list-{{ md5(serialize($domainRows)) }}"
+            class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28">
             @include('livewire.project.service.partials.domain-table', [
                 'rows' => collect($domainRows),
                 'domainRows' => $domainRows,

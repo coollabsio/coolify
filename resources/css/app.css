@@ -1174,6 +1174,20 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     box-shadow: none !important;
 }
 
+/* Reserve the trailing area used by the native select chevron. */
+.application-settings-workspace .select,
+.application-settings-form .select {
+    padding-right: 2.5rem;
+}
+
+@media (max-width: 767px) {
+    .application-settings-workspace .select,
+    .application-settings-form .select {
+        font-size: 0.75rem !important;
+        line-height: 1.25rem;
+    }
+}
+
 /* Keep password toggle / copy button clear of the value inside denser settings inputs */
 .application-settings-workspace .input.input-with-password-toggle,
 .application-settings-workspace .input[type="password"],

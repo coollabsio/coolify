@@ -105,6 +105,14 @@ it('shows dns entries control next to Add', function () {
         ->assertSee('Manual records');
 });
 
+it('rotates the dns entries chevron while its dropdown is open', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/cloudflare-autoconfigure.blade.php'));
+
+    expect($view)
+        ->toContain('class="inline-flex transition-transform"')
+        ->toContain(':class="dnsEntriesOpen && \'rotate-180\'"');
+});
+
 it('lists dns entries for service hosts that still need dns', function () {
     $this->webApp->update([
         'fqdn' => 'https://web.example.com',
@@ -199,7 +207,9 @@ it('adds a domain to a selected service application', function () {
         ->set('newDomain', 'https://web.example.com')
         ->call('addDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->pluck('url')->contains('https://web.example.com'))
+        ->assertSee('https://web.example.com');
 
     $this->webApp->refresh();
     expect(explode(',', (string) $this->webApp->fqdn))
@@ -214,6 +224,12 @@ it('adds a domain to a selected service application', function () {
         ->toBe('skipped')
         ->and($dnsStatuses['https://web.example.com']['checked_at'])
         ->not->toBeNull();
+});
+
+it('replaces the rendered domain list when its rows change', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+
+    expect($view)->toContain('wire:key="service-domains-list-{{ md5(serialize($domainRows)) }}"');
 });
 
 it('does not duplicate the service name as a badge in the domain cell', function () {

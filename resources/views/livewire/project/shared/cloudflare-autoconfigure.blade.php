@@ -8,7 +8,9 @@
         x-bind:aria-expanded="dnsEntriesOpen" title="DNS entries for this server">
         <x-reicon name="globe" class="size-3.5" />
         DNS entries
-        <x-reicon name="chevron-down" class="size-3 opacity-55" />
+        <span class="inline-flex transition-transform" :class="dnsEntriesOpen && 'rotate-180'">
+            <x-reicon name="chevron-down" class="size-3 opacity-55" />
+        </span>
     </button>
     <div x-show="dnsEntriesOpen" x-cloak role="menu" x-transition.origin.top.right
         class="listbox-panel left-auto! right-0! z-[90]! w-56! min-w-56!">

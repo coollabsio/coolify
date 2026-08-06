@@ -44,6 +44,39 @@ test('helper popup remains open while moving from the trigger into interactive c
         ->toContain('@mouseleave="hide()"');
 });
 
+test('helper popup supports focus dismissal and tooltip aria relationships', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('closeWhenFocusLeaves()')
+        ->toContain('@focus="show(false)"')
+        ->toContain('@blur="closeWhenFocusLeaves()"')
+        ->toContain('role="tooltip"')
+        ->toContain(':aria-describedby="open ? $id(\'helper-popup\') : null"')
+        ->toContain(':id="$id(\'helper-popup\')"');
+});
+
+test('teleported helper popup closes from taps outside on mobile', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('@pointerdown.window="closeWhenPointerIsOutside($event)"')
+        ->toContain('closeWhenPointerIsOutside(event)')
+        ->toContain('this.$refs.popup?.contains(event.target)');
+});
+
+test('button tooltips are available to keyboard and assistive technology users', function () {
+    $button = file_get_contents(resource_path('views/components/forms/button.blade.php'));
+
+    expect($button)
+        ->toContain('@focusin="showTooltip()"')
+        ->toContain('@focusout="hideTooltip()"')
+        ->toContain('@click.outside="hideTooltip()"')
+        ->toContain('role="tooltip"')
+        ->toContain(':aria-describedby="visible ? $id(\'button-tooltip\') : null"')
+        ->toContain(':id="$id(\'button-tooltip\')"');
+});
+
 test('listbox keeps the helper outside the label association', function () {
     $path = resource_path('views/components/forms/listbox.blade.php');
     $contents = file_get_contents($path);
