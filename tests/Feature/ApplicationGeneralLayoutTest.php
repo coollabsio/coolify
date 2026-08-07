@@ -16,5 +16,19 @@ test('compose actions are grouped with the application details header', function
 test('docker compose heading separates its title and action', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
 
-    expect($view)->toContain('<div class="flex items-center gap-4">');
+    expect($view)
+        ->toContain('<div x-data="{ showRaw: true }" class="mt-5">')
+        ->toContain('<div class="flex items-center justify-between gap-4">');
+});
+
+test('onboarding uses the reusable advanced settings component', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+    $onboarding = file_get_contents(resource_path('views/livewire/boarding/index.blade.php'));
+
+    expect($view)
+        ->toContain('id="dockerComposeCustomBuildCommand"')
+        ->not->toContain('<x-forms.collapsible class="pt-4" content-class="grid gap-4">')
+        ->not->toContain('The following commands are for advanced use cases.')
+        ->and($onboarding)
+        ->toContain('<x-forms.collapsible title="Advanced Connection Settings"');
 });

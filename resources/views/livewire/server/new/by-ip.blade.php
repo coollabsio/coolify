@@ -76,27 +76,17 @@
                     <x-forms.input id="description" label="Description" />
                 </div>
 
-                <div x-data="{ advancedOpen: false }"
-                    class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                    <button type="button" @click="advancedOpen = !advancedOpen"
-                        class="flex w-full cursor-pointer items-center justify-between gap-3 text-left text-[13px] font-medium text-neutral-600 dark:text-fg-dim"
-                        :aria-expanded="advancedOpen">
-                        Advanced settings
-                        <x-reicon name="chevron-down" class="size-3.5 transition-transform"
-                            x-bind:class="advancedOpen && 'rotate-180'" />
-                    </button>
-
-                    <div x-show="advancedOpen" x-cloak class="mt-4 flex flex-col gap-4">
-                        <div class="grid gap-4 lg:grid-cols-2">
-                            <x-forms.input id="user" label="User" required
-                                helper="Non-root SSH users are experimental." />
-                            <x-forms.input type="number" id="port" label="Port" required />
-                        </div>
-                        <x-forms.checkbox id="is_build_server"
-                            helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
-                            label="Use as a dedicated build server" />
+                <x-forms.collapsible class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]"
+                    content-class="flex flex-col gap-4">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input id="user" label="User" required
+                            helper="Non-root SSH users are experimental." />
+                        <x-forms.input type="number" id="port" label="Port" required />
                     </div>
-                </div>
+                    <x-forms.checkbox id="is_build_server"
+                        helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
+                        label="Use as a dedicated build server" />
+                </x-forms.collapsible>
             </x-application.settings-section>
         </form>
     @endif
