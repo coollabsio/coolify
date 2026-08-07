@@ -6,13 +6,16 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
         <div class="flex flex-wrap items-center gap-2">
-            @can('create', App\Models\Server::class)
-                <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
-                    class="button w-fit shrink-0 whitespace-nowrap">
-                    <x-reicon name="upload" class="size-3.5" />
-                    Import transfer
-                </a>
-            @endcan
+            @if (isDev())
+                @can('create', App\Models\Server::class)
+                    <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
+                        class="button w-fit shrink-0 whitespace-nowrap">
+                        <x-reicon name="upload" class="size-3.5" />
+                        Import transfer
+                        <x-status-badge label="Dev" />
+                    </a>
+                @endcan
+            @endif
             @can('createAnyResource')
                 <a href="{{ route('server.create') }}" {{ wireNavigate() }}
                     class="button w-fit shrink-0 whitespace-nowrap button-highlighted">

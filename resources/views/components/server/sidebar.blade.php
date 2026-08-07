@@ -147,7 +147,7 @@
             'active' => $activeMenu === 'transfer',
             'icon' => 'arrow-right',
             'group' => 'Operations',
-            'visible' => ! $server->isLocalhost() && auth()->user()?->can('view', $server),
+            'visible' => isDev() && ! $server->isLocalhost() && auth()->user()?->can('view', $server),
         ],
         [
             'label' => 'Danger',

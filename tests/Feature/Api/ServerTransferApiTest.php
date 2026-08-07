@@ -20,6 +20,8 @@ use Illuminate\Support\Once;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config(['app.env' => 'local']);
+
     Storage::fake('ssh-keys');
 
     InstanceSettings::forceCreate([
@@ -75,6 +77,21 @@ beforeEach(function () {
         $env->save();
     });
 });
+
+test('server transfer API is unavailable outside development mode', function (string $method, string $uri) {
+    config(['app.env' => 'production']);
+
+    $this->withHeaders(transferHeaders($this->sensitiveToken))
+        ->json($method, str_replace('{uuid}', $this->server->uuid, $uri))
+        ->assertNotFound();
+})->with([
+    ['POST', '/api/v1/servers/import'],
+    ['GET', '/api/v1/servers/{uuid}/export'],
+    ['POST', '/api/v1/servers/{uuid}/export/mailbox'],
+    ['POST', '/api/v1/servers/{uuid}/claim'],
+    ['POST', '/api/v1/servers/{uuid}/transfer/complete'],
+    ['POST', '/api/v1/servers/{uuid}/migrate'],
+]);
 
 function transferHeaders(string $token): array
 {

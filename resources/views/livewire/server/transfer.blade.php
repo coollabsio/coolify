@@ -11,14 +11,14 @@
 
         <div class="application-settings-form flex w-full flex-col gap-6">
             @if ($this->isLocalhost)
-                <x-application.settings-section id="server-transfer-section" title="Transfer server"
+                <x-application.settings-section id="server-transfer-section" title="Transfer server (Dev)"
                     helper="Move this server’s control-plane config to another Coolify instance (same physical host).">
                     <x-callout type="warning" title="Localhost cannot be transferred">
                         The Coolify host (localhost) cannot be transferred between instances.
                     </x-callout>
                 </x-application.settings-section>
             @else
-                <x-application.settings-section id="server-transfer-section" title="Transfer server"
+                <x-application.settings-section id="server-transfer-section" title="Transfer server (Dev)"
                     helper="Move this server’s control-plane config to another Coolify instance (same physical host).">
                     <x-slot:actions>
                         <x-status-badge

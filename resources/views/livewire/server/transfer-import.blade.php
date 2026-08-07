@@ -4,7 +4,7 @@
     </x-slot>
     <div class="flex flex-col gap-6">
         <div class="flex flex-wrap items-center gap-2">
-            <h1>Import server transfer</h1>
+            <h1>Import server transfer <x-status-badge label="Dev" /></h1>
             <a href="{{ route('server.index') }}" {{ wireNavigate() }}>
                 <x-forms.button>Back to servers</x-forms.button>
             </a>

@@ -14,6 +14,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config(['app.env' => 'local']);
+
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'fqdn' => 'https://coolify-a.test']);
 
     $this->team = Team::factory()->create();
@@ -29,6 +31,27 @@ beforeEach(function () {
         'ip' => '10.77.0.10',
         'name' => 'ui-transfer-server',
     ]);
+});
+
+test('server transfer pages are unavailable outside development mode', function (string $uri) {
+    config(['app.env' => 'production']);
+
+    $this->get($uri)->assertNotFound();
+})->with([
+    '/servers/import',
+    fn () => '/server/'.$this->server->uuid.'/transfer',
+]);
+
+test('server transfer links are hidden outside development mode', function () {
+    config(['app.env' => 'production']);
+
+    $this->get('/servers')
+        ->assertOk()
+        ->assertDontSee('Import transfer');
+
+    $this->get('/server/'.$this->server->uuid)
+        ->assertOk()
+        ->assertDontSee('Transfer', escape: false);
 });
 
 test('transfer page renders for owned server', function () {

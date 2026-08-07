@@ -40,11 +40,14 @@ class TransferImport extends Component
 
     public function mount(): void
     {
+        $this->ensureDevelopmentAvailability();
         $this->authorize('create', Server::class);
     }
 
     public function updatedBundleFile(): void
     {
+        $this->ensureDevelopmentAvailability();
+
         if (! $this->bundleFile) {
             return;
         }
@@ -88,11 +91,13 @@ class TransferImport extends Component
 
     public function dryRun(ServerTransferImporter $importer): void
     {
+        $this->ensureDevelopmentAvailability();
         $this->runImport($importer, dryRun: true);
     }
 
     public function importBundle(ServerTransferImporter $importer): void
     {
+        $this->ensureDevelopmentAvailability();
         $this->runImport($importer, dryRun: false);
     }
 
@@ -133,5 +138,10 @@ class TransferImport extends Component
     public function render()
     {
         return view('livewire.server.transfer-import');
+    }
+
+    private function ensureDevelopmentAvailability(): void
+    {
+        abort_unless(isDev(), 404);
     }
 }

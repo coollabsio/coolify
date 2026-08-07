@@ -22,7 +22,9 @@ class ServerTransferController extends Controller
         private ServerTransferImporter $importer,
         private ServerTransferClaimer $claimer,
         private ServerTransferMigrator $migrator,
-    ) {}
+    ) {
+        abort_unless(isDev(), 404);
+    }
 
     #[OA\Post(
         summary: 'Migrate server to another Coolify instance',

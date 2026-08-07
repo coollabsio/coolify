@@ -44,6 +44,8 @@ class Transfer extends Component
 
     public function mount(string $server_uuid): void
     {
+        $this->ensureDevelopmentAvailability();
+
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid($server_uuid)->firstOrFail();
             $this->authorize('view', $this->server);
@@ -66,6 +68,8 @@ class Transfer extends Component
 
     public function migrateServer(ServerTransferMigrator $migrator): void
     {
+        $this->ensureDevelopmentAvailability();
+
         try {
             $this->authorize('update', $this->server);
             if ($this->isLocalhost) {
@@ -95,6 +99,8 @@ class Transfer extends Component
 
     public function exportBundle(ServerTransferExporter $exporter)
     {
+        $this->ensureDevelopmentAvailability();
+
         try {
             $this->authorize('view', $this->server);
             if ($this->isLocalhost) {
@@ -135,6 +141,8 @@ class Transfer extends Component
 
     public function completeTransfer(ServerTransferClaimer $claimer): void
     {
+        $this->ensureDevelopmentAvailability();
+
         try {
             $this->authorize('update', $this->server);
             if ($this->isLocalhost) {
@@ -156,6 +164,8 @@ class Transfer extends Component
 
     public function claimServer(ServerTransferClaimer $claimer): void
     {
+        $this->ensureDevelopmentAvailability();
+
         try {
             $this->authorize('update', $this->server);
             if ($this->isLocalhost) {
@@ -179,5 +189,10 @@ class Transfer extends Component
     public function render()
     {
         return view('livewire.server.transfer');
+    }
+
+    private function ensureDevelopmentAvailability(): void
+    {
+        abort_unless(isDev(), 404);
     }
 }
