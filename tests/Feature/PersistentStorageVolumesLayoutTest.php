@@ -13,6 +13,26 @@ it('keeps the volume backup executions table horizontally scrollable on mobile',
         ->not->toContain('.data-table-header.volume-backup-executions-grid');
 });
 
+it('uses compact icon actions for volume backup executions', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php'));
+
+    expect($view)
+        ->toContain('title="Download backup" aria-label="Download backup"')
+        ->toContain('<x-reicon name="upload" class="size-3.5 rotate-180" />')
+        ->toContain('title="Delete backup" aria-label="Delete backup"')
+        ->toContain('<x-reicon name="trash" class="size-3.5" />');
+});
+
+it('keeps storage backup schedule tables horizontally scrollable on mobile', function () {
+    $applicationView = file_get_contents(resource_path('views/livewire/project/application/backup/index.blade.php'));
+    $serviceView = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($applicationView)->toContain('class="data-table w-full overflow-x-auto"')
+        ->and($serviceView)->toContain('class="data-table w-full overflow-x-auto"')
+        ->and($css)->toMatch('/\.backup-table-grid\s*\{[^}]*min-width:\s*50rem;/');
+});
+
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
