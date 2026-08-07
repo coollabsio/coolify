@@ -421,39 +421,21 @@
                             <x-forms.input placeholder="Optional: Note what this server hosts" label="Description"
                                 id="remoteServerDescription" wire:model="remoteServerDescription" />
 
-                            <div x-data="{ showAdvanced: false }" class="flex flex-col gap-4">
-                                <button @click="showAdvanced = !showAdvanced" type="button"
-                                    class="flex items-center gap-2 text-left text-sm font-medium  hover:underline">
-                                    <svg x-show="!showAdvanced" class="size-4" xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    <svg x-show="showAdvanced" class="size-4" xmlns="http://www.w3.org/2000/svg"
-                                        viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                                            clip-rule="evenodd" />
-                                    </svg>
-                                    Advanced Connection Settings
-                                </button>
-                                <div x-show="showAdvanced" x-cloak
-                                    class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 rounded-lg border border-neutral-200 dark:border-coolgray-400">
-                                    <x-forms.input placeholder="Default: 22" label="SSH Port" type="number"
-                                        id="remoteServerPort" wire:model="remoteServerPort" />
-                                    <div>
-                                        <x-forms.input placeholder="Default: root" label="SSH User" id="remoteServerUser"
-                                            wire:model="remoteServerUser" />
-                                        <p class="mt-1 text-xs dark:text-white text-black">
-                                            Non-root user support is experimental.
-                                            <a class="font-bold underline hover:text-coollabs" target="_blank"
-                                                href="https://coolify.io/docs/knowledge-base/server/non-root-user">Learn
-                                                more</a>
-                                        </p>
-                                    </div>
+                            <x-forms.collapsible title="Advanced Connection Settings"
+                                content-class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                <x-forms.input placeholder="Default: 22" label="SSH Port" type="number"
+                                    id="remoteServerPort" wire:model="remoteServerPort" />
+                                <div>
+                                    <x-forms.input placeholder="Default: root" label="SSH User" id="remoteServerUser"
+                                        wire:model="remoteServerUser" />
+                                    <p class="mt-1 text-xs text-black dark:text-white">
+                                        Non-root user support is experimental.
+                                        <a class="font-bold underline hover:text-coollabs" target="_blank"
+                                            href="https://coolify.io/docs/knowledge-base/server/non-root-user">Learn
+                                            more</a>
+                                    </p>
                                 </div>
-                            </div>
+                            </x-forms.collapsible>
                             <x-forms.button type="submit" class="w-full lg:w-auto">Validate Connection</x-forms.button>
                         </form>
                     </x-slot:actions>

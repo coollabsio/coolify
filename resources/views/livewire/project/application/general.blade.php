@@ -157,35 +157,32 @@
                                         helper="Git repository (based on the base directory settings) will be copied to the deployment directory."
                                         x-bind:disabled="shouldDisable()" />
                                 </div>
-                                <div class="pt-4">The following commands are for advanced use cases.
-                                    Only
-                                    modify them if you
-                                    know what are
-                                    you doing.</div>
-                                <div class="grid gap-4 lg:grid-cols-2">
-                                    <x-forms.input x-bind:disabled="shouldDisable()"
-                                        placeholder="docker compose build" id="dockerComposeCustomBuildCommand"
-                                        helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose build</span>"
-                                        label="Custom build command" />
-                                    <x-forms.input x-bind:disabled="shouldDisable()"
-                                        placeholder="docker compose up -d" id="dockerComposeCustomStartCommand"
-                                        helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose up -d</span>"
-                                        label="Custom start command" />
+                                <div class="grid gap-4 pt-4">
+                                        <div class="grid gap-4 lg:grid-cols-2">
+                                            <x-forms.input x-bind:disabled="shouldDisable()"
+                                                placeholder="docker compose build" id="dockerComposeCustomBuildCommand"
+                                                helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose build</span>"
+                                                label="Custom build command" />
+                                            <x-forms.input x-bind:disabled="shouldDisable()"
+                                                placeholder="docker compose up -d" id="dockerComposeCustomStartCommand"
+                                                helper="The compose file path (<span class='dark:text-warning'>-f</span> flag) and environment variables (<span class='dark:text-warning'>--env-file</span> flag) are automatically injected based on your Base Directory and Docker Compose Location settings. You can override by providing your own <span class='dark:text-warning'>-f</span> or <span class='dark:text-warning'>--env-file</span> flags.<br><br>If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>Example usage: <span class='dark:text-warning'>docker compose up -d</span>"
+                                                label="Custom start command" />
+                                        </div>
+                                        @if ($this->dockerComposeCustomBuildCommand)
+                                            <div wire:key="docker-compose-build-preview">
+                                                <x-forms.input readonly value="{{ $this->dockerComposeBuildCommandPreview }}"
+                                                    label="Final build command (preview)"
+                                                    helper="This shows the actual command that will be executed with auto-injected flags." />
+                                            </div>
+                                        @endif
+                                        @if ($this->dockerComposeCustomStartCommand)
+                                            <div wire:key="docker-compose-start-preview">
+                                                <x-forms.input readonly value="{{ $this->dockerComposeStartCommandPreview }}"
+                                                    label="Final start command (preview)"
+                                                    helper="This shows the actual command that will be executed with auto-injected flags." />
+                                            </div>
+                                        @endif
                                 </div>
-                                @if ($this->dockerComposeCustomBuildCommand)
-                                    <div wire:key="docker-compose-build-preview">
-                                        <x-forms.input readonly value="{{ $this->dockerComposeBuildCommandPreview }}"
-                                            label="Final build command (preview)"
-                                            helper="This shows the actual command that will be executed with auto-injected flags." />
-                                    </div>
-                                @endif
-                                @if ($this->dockerComposeCustomStartCommand)
-                                    <div wire:key="docker-compose-start-preview">
-                                        <x-forms.input readonly value="{{ $this->dockerComposeStartCommandPreview }}"
-                                            label="Final start command (preview)"
-                                            helper="This shows the actual command that will be executed with auto-injected flags." />
-                                    </div>
-                                @endif
                                 @if ($this->application->is_github_based() && !$this->application->is_public_repository())
                                     <div class="pt-4">
                                         <x-forms.textarea
@@ -306,8 +303,8 @@
                 </div>
             @endif
             @if ($buildPack === 'dockercompose')
-                <div x-data="{ showRaw: true }">
-                    <div class="flex items-center gap-4">
+                <div x-data="{ showRaw: true }" class="mt-5">
+                    <div class="flex items-center justify-between gap-4">
                         <h3>Docker Compose</h3>
                         <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
                             @click.prevent="showRaw = !showRaw"

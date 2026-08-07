@@ -9,7 +9,26 @@
                     <x-status-badge label="Parser {{ $service->compose_parsing_version }}" type="neutral" />
                 @endif
                 @can('update', $service)
-                    <x-modal-input buttonTitle="Edit Compose file" title="Edit Docker Compose" :closeOutside="false">
+                    <x-modal-input buttonTitle="Edit Compose file" title="Docker Compose" :closeOutside="false"
+                        :isLarge="true">
+                        <x-slot:headerActions>
+                            <div x-data="{ preview: false, saving: false }"
+                                @compose-save-finished.window="saving = false" class="flex items-center gap-2">
+                                <x-forms.button
+                                    @click="preview = !preview; $dispatch('compose-preview-toggle')">
+                                    <x-reicon name="eye" class="size-3.5" />
+                                    <span x-text="preview ? 'Back to source Compose' : 'Preview generated Compose'"></span>
+                                </x-forms.button>
+                                @if (blank($service->service_type))
+                                    <x-forms.button @click="$dispatch('compose-validate')">Validate</x-forms.button>
+                                @endif
+                                <x-forms.button @click="saving = true; $dispatch('compose-save')"
+                                    x-bind:disabled="saving" isHighlighted>
+                                    <x-loading-on-button x-show="saving" x-cloak />
+                                    Save changes
+                                </x-forms.button>
+                            </div>
+                        </x-slot:headerActions>
                         <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
                     </x-modal-input>
                 @endcan

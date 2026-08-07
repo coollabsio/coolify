@@ -5,10 +5,7 @@ test('server creation keeps private key actions together and advanced options co
 
     expect($view)
         ->toContain('class="flex items-end gap-3"')
-        ->toContain('x-data="{ advancedOpen: false }"')
-        ->toContain('x-show="advancedOpen" x-cloak')
-        ->toContain('Advanced settings')
-        ->toContain('class="flex w-full cursor-pointer items-center justify-between gap-3')
+        ->toContain('<x-forms.collapsible class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]"')
         ->toContain('label="Use as a dedicated build server"')
         ->toContain('helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."');
 });
