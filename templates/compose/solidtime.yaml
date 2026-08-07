@@ -1,0 +1,224 @@
+# documentation: https://docs.solidtime.io/self-hosting/intro
+# slogan: Modern open-source time tracking for freelancers, agencies and teams.
+# category: productivity
+# tags: time-tracking,timesheet,billing,freelancer,agency,open-source
+# logo: svgs/solidtime.svg
+# port: 8000
+
+services:
+  solidtime:
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    user: '1000:1000'
+    environment:
+      - SERVICE_URL_SOLIDTIME_8000
+      - APP_NAME=${APP_NAME:-solidtime}
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=${SERVICE_URL_SOLIDTIME}
+      - APP_KEY=base64:${SERVICE_REALBASE64_APPKEY}
+      - APP_FORCE_HTTPS=${APP_FORCE_HTTPS:-false}
+      - APP_ENABLE_REGISTRATION=${APP_ENABLE_REGISTRATION:-true}
+      - SUPER_ADMINS=${SUPER_ADMINS}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-0.0.0.0/0,2000:0:0:0:0:0:0:0/3}
+      - AUTO_DB_MIGRATE=true
+      - CONTAINER_MODE=http
+      - LOG_CHANNEL=stderr_daily
+      - DB_CONNECTION=pgsql
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_SSLMODE=prefer
+      - DB_DATABASE=${POSTGRES_DB:-solidtime}
+      - DB_USERNAME=${SERVICE_USER_POSTGRES}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - QUEUE_CONNECTION=database
+      - MAIL_MAILER=${MAIL_MAILER:-log}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-solidtime@example.com}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-solidtime}
+      - GOTENBERG_URL=http://gotenberg:3000
+    volumes:
+      - 'solidtime-storage:/var/www/html/storage'
+    depends_on:
+      database:
+        condition: service_healthy
+      keygen:
+        condition: service_completed_successfully
+      gotenberg:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '--fail'
+        - 'http://127.0.0.1:8000/health-check/up'
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  scheduler:
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    user: '1000:1000'
+    environment:
+      - APP_NAME=${APP_NAME:-solidtime}
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=${SERVICE_URL_SOLIDTIME}
+      - APP_KEY=base64:${SERVICE_REALBASE64_APPKEY}
+      - APP_FORCE_HTTPS=${APP_FORCE_HTTPS:-false}
+      - SUPER_ADMINS=${SUPER_ADMINS}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-0.0.0.0/0,2000:0:0:0:0:0:0:0/3}
+      - CONTAINER_MODE=scheduler
+      - LOG_CHANNEL=stderr_daily
+      - DB_CONNECTION=pgsql
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_SSLMODE=prefer
+      - DB_DATABASE=${POSTGRES_DB:-solidtime}
+      - DB_USERNAME=${SERVICE_USER_POSTGRES}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - QUEUE_CONNECTION=database
+      - MAIL_MAILER=${MAIL_MAILER:-log}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-solidtime@example.com}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-solidtime}
+      - GOTENBERG_URL=http://gotenberg:3000
+    volumes:
+      - 'solidtime-storage:/var/www/html/storage'
+    depends_on:
+      database:
+        condition: service_healthy
+      keygen:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  queue:
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    user: '1000:1000'
+    environment:
+      - APP_NAME=${APP_NAME:-solidtime}
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=${SERVICE_URL_SOLIDTIME}
+      - APP_KEY=base64:${SERVICE_REALBASE64_APPKEY}
+      - APP_FORCE_HTTPS=${APP_FORCE_HTTPS:-false}
+      - SUPER_ADMINS=${SUPER_ADMINS}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-0.0.0.0/0,2000:0:0:0:0:0:0:0/3}
+      - CONTAINER_MODE=worker
+      - WORKER_COMMAND=php /var/www/html/artisan queue:work
+      - LOG_CHANNEL=stderr_daily
+      - DB_CONNECTION=pgsql
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_SSLMODE=prefer
+      - DB_DATABASE=${POSTGRES_DB:-solidtime}
+      - DB_USERNAME=${SERVICE_USER_POSTGRES}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - QUEUE_CONNECTION=database
+      - MAIL_MAILER=${MAIL_MAILER:-log}
+      - MAIL_HOST=${MAIL_HOST}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-solidtime@example.com}
+      - MAIL_FROM_NAME=${MAIL_FROM_NAME:-solidtime}
+      - GOTENBERG_URL=http://gotenberg:3000
+    volumes:
+      - 'solidtime-storage:/var/www/html/storage'
+    depends_on:
+      database:
+        condition: service_healthy
+      keygen:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  keygen:
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    user: '1000:1000'
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_KEY=base64:${SERVICE_REALBASE64_APPKEY}
+      - LOG_CHANNEL=stderr_daily
+      - DB_CONNECTION=pgsql
+      - DB_HOST=database
+      - DB_PORT=5432
+      - DB_SSLMODE=prefer
+      - DB_DATABASE=${POSTGRES_DB:-solidtime}
+      - DB_USERNAME=${SERVICE_USER_POSTGRES}
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    entrypoint:
+      - /bin/sh
+      - '-euc'
+      - |
+        if [ ! -f /var/www/html/storage/oauth-private.key ]; then
+          php /var/www/html/artisan passport:keys
+          echo "Passport keys generated."
+        else
+          echo "Passport keys already exist, skipping."
+        fi
+    volumes:
+      - 'solidtime-storage:/var/www/html/storage'
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: 'no'
+    exclude_from_hc: true
+
+  database:
+    image: 'postgres:15'
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-solidtime}
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - 'solidtime-database:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -q -d $${POSTGRES_DB} -U $${POSTGRES_USER}'
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  gotenberg:
+    image: 'gotenberg/gotenberg:8'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '--silent'
+        - '--fail'
+        - 'http://localhost:3000/health'
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  solidtime-storage:
+  solidtime-database:
