@@ -53,6 +53,10 @@ class All extends Component
         unset($this->hasEnvironmentVariables);
     }
 
+    protected $queryString = [
+        'view' => ['except' => 'normal'],
+    ];
+
     public function mount()
     {
         $this->is_env_sorting_enabled = data_get($this->resource, 'settings.is_env_sorting_enabled', false);
@@ -60,7 +64,8 @@ class All extends Component
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
-        if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile) {
+        $isPreviewEnabled = data_get($this->resource, 'settings.is_preview_deployments_enabled', false);
+        if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile && $isPreviewEnabled) {
             $this->showPreview = true;
         }
         $this->getDevView();
@@ -126,7 +131,11 @@ class All extends Component
 
     private function supportsPreviewEnvironmentVariables(): bool
     {
-        return $this->showPreview && $this->resource instanceof Application;
+        if (! $this->showPreview || ! ($this->resource instanceof Application)) {
+            return false;
+        }
+
+        return (bool) data_get($this->resource, 'settings.is_preview_deployments_enabled', false);
     }
 
     public function getHasEnvironmentVariablesProperty(): bool
