@@ -142,6 +142,14 @@
             ],
         ],
         [
+            'label' => 'Transfer',
+            'route' => 'server.transfer',
+            'active' => $activeMenu === 'transfer',
+            'icon' => 'arrow-right',
+            'group' => 'Operations',
+            'visible' => isDev() && ! $server->isLocalhost() && auth()->user()?->can('view', $server),
+        ],
+        [
             'label' => 'Danger',
             'route' => 'server.delete',
             'active' => $activeMenu === 'danger',

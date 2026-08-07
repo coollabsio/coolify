@@ -21,3 +21,20 @@ Resource migration is under development and is not available in production.
 
 Before promoting this feature, remove all three runtime gates together and
 update the tests and this document in the same change.
+
+## Server transfer between Coolify instances
+
+Server transfer is under development and is not available in production.
+
+- **UI:** Transfer and import links are rendered only when `isDev()` returns
+  `true`, and the transfer Livewire components return `404 Not Found` outside
+  development mode. Public Livewire actions repeat the check before doing work.
+- **API:** Every endpoint handled by `ServerTransferController` returns `404 Not
+  Found` unless `isDev()` returns `true`.
+- **Tests:** Development-mode behavior and production isolation for all API
+  endpoints, UI routes, and navigation links are covered by
+  `tests/Feature/Api/ServerTransferApiTest.php` and
+  `tests/Feature/Livewire/ServerTransferUiTest.php`.
+
+Before promoting this feature, remove the API and UI runtime gates together and
+update the tests and this document in the same change.

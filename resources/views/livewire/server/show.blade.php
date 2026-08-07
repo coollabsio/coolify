@@ -89,8 +89,12 @@
                                     </x-forms.button>
                                 @endif
                             @endif
-                            <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
-                                :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            @if ($server->isTransferredAway())
+                                <x-status-badge label="Transferred away" type="warning" />
+                            @else
+                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
+                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            @endif
                         </x-slot:actions>
 
                         <div class="flex items-start gap-3">
@@ -103,7 +107,9 @@
                                     {{ $server->name }}
                                 </p>
                                 <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
-                                    @if ($server->isFunctional())
+                                    @if ($server->isTransferredAway())
+                                        This server was migrated away from this Coolify instance and cannot be managed here.
+                                    @elseif ($server->isFunctional())
                                         The server is reachable, validated, and ready to host resources.
                                     @else
                                         Validate the SSH connection before using this server.
@@ -205,6 +211,14 @@
                                 </x-forms.button>
                             </x-process-dialog>
                         </x-slot:actions>
+
+                        @if ($server->isTransferredAway())
+                            <x-callout type="warning" title="Transferred to another instance" class="mb-4">
+                                This server was migrated away from this Coolify instance. It cannot be revalidated or
+                                managed here. Use the target instance, or delete this server when you no longer need the
+                                archive.
+                            </x-callout>
+                        @endif
 
                         @if ($this->limaStartCommand)
                             <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
