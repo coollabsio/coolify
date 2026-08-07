@@ -255,6 +255,7 @@ Route::group([
     Route::delete('/applications/{uuid}/tags/{tag_uuid}', [ApplicationsController::class, 'delete_tag'])->middleware(['api.ability:write']);
 
     Route::post('/applications/{uuid}/move', [ApplicationsController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/migrate', [ApplicationsController::class, 'migrate_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/applications/{uuid}/clone', [ApplicationsController::class, 'clone_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/applications/{uuid}/rollback-images', [ApplicationsController::class, 'rollback_images'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/rollback', [ApplicationsController::class, 'rollback_by_uuid'])->middleware(['api.ability:deploy']);
@@ -328,6 +329,7 @@ Route::group([
     Route::delete('/databases/{uuid}/tags/{tag_uuid}', [DatabasesController::class, 'delete_tag'])->middleware(['api.ability:write']);
 
     Route::post('/databases/{uuid}/move', [DatabasesController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
+    Route::post('/databases/{uuid}/migrate', [DatabasesController::class, 'migrate_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/databases/{uuid}/clone', [DatabasesController::class, 'clone_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/databases/{uuid}/start', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/databases/{uuid}/restart', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
@@ -369,6 +371,7 @@ Route::group([
     Route::delete('/services/{uuid}/tags/{tag_uuid}', [ServicesController::class, 'delete_tag'])->middleware(['api.ability:write']);
 
     Route::post('/services/{uuid}/move', [ServicesController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
+    Route::post('/services/{uuid}/migrate', [ServicesController::class, 'migrate_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/services/{uuid}/clone', [ServicesController::class, 'clone_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/services/{uuid}/start', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/services/{uuid}/restart', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
