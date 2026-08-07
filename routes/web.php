@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\OauthController;
+use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -159,6 +160,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/scheduled-jobs', SettingsScheduledJobs::class)->name('settings.scheduled-jobs');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
+    Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
 
     Route::prefix('tags')->group(function () {
