@@ -44,3 +44,13 @@ it('aligns compose resource columns and uses icon actions', function () {
         ->not->toContain('>Settings</a>')
         ->not->toContain('>Backups</a>');
 });
+
+it('distinguishes domain management from resource settings', function () {
+    $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
+
+    expect($resourceCard)
+        ->toContain('title="Manage domains" aria-label="Manage domains"')
+        ->toContain('<x-reicon name="globe" class="size-4" />')
+        ->toContain('title="Resource settings" aria-label="Resource settings"')
+        ->not->toContain('title="Edit domains" aria-label="Edit domains"');
+});

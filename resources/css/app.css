@@ -2149,7 +2149,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 5rem;
 }
 
 /* Persistent storage volumes: Name | Source | Destination | [PR suffix] | Backup | [Actions] */
@@ -2383,11 +2383,12 @@ input[type="search"]::-webkit-search-results-decoration {
 
 @media (max-width: 900px) {
     .backup-table-grid {
-        grid-template-columns: minmax(10rem, 1.5fr) 6rem 7.5rem minmax(8rem, 1fr);
+        grid-template-columns: minmax(10rem, 1.5fr) 6rem 7.5rem 6.5rem;
     }
 
     .backup-table-grid > :nth-child(3),
-    .backup-table-grid > :nth-child(6) {
+    .backup-table-grid > :nth-child(6),
+    .backup-table-grid > :nth-child(7) {
         display: none;
     }
 
@@ -2443,11 +2444,10 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-table-grid {
-        grid-template-columns: minmax(0, 1fr) 7.5rem;
+        grid-template-columns: minmax(0, 1fr) 7.5rem 6.5rem;
     }
 
-    .backup-table-grid > :nth-child(2),
-    .backup-table-grid > :nth-child(5) {
+    .backup-table-grid > :nth-child(2) {
         display: none;
     }
 

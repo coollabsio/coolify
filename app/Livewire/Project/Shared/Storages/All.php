@@ -28,7 +28,7 @@ class All extends Component
     /**
      * Precomputed per-volume backup badge/link data.
      *
-     * @var array<int, array{enabled: bool, url: ?string}>
+     * @var array<int, array{enabled: bool, s3: bool, url: ?string}>
      */
     public array $volumeBackupMeta = [];
 
@@ -241,6 +241,7 @@ class All extends Component
 
             $this->volumeBackupMeta[(int) $storage->id] = [
                 'enabled' => $enabled,
+                's3' => $enabled && (bool) $backup?->save_s3,
                 'url' => $url,
             ];
         }

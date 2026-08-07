@@ -39,17 +39,10 @@
             @endif
 
             @if ($isApplication && $resource->fqdn)
-                <div class="mt-2 flex min-w-0 items-center gap-1.5">
+                <div class="mt-2 min-w-0">
                     <span class="min-w-0 truncate text-xs text-neutral-500 dark:text-fg-dim">
                         {{ $resource->fqdn }}
                     </span>
-                    @can('update', $service)
-                        <a class="icon-button shrink-0" title="Edit domains" aria-label="Edit domains"
-                            {{ wireNavigate() }}
-                            href="{{ route('project.service.domains', $parameters) }}">
-                            <x-reicon name="settings" class="size-3.5" />
-                        </a>
-                    @endcan
                 </div>
             @endif
         </div>
@@ -62,6 +55,14 @@
                 href="{{ route('project.service.volume-backups.index', $parameters) }}">
                 <x-reicon name="database" class="size-4" />
             </a>
+        @endif
+        @if ($isApplication && $resource->fqdn)
+            @can('update', $service)
+                <a class="icon-button" title="Manage domains" aria-label="Manage domains" {{ wireNavigate() }}
+                    href="{{ route('project.service.domains', $parameters) }}">
+                    <x-reicon name="globe" class="size-4" />
+                </a>
+            @endcan
         @endif
         <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
             href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
@@ -108,6 +109,14 @@
                         href="{{ route('project.service.volume-backups.index', $parameters) }}">
                         <x-reicon name="database" class="size-4" />
                     </a>
+                @endif
+                @if ($isApplication && $resource->fqdn)
+                    @can('update', $service)
+                        <a class="icon-button" title="Manage domains" aria-label="Manage domains" {{ wireNavigate() }}
+                            href="{{ route('project.service.domains', $parameters) }}">
+                            <x-reicon name="globe" class="size-4" />
+                        </a>
+                    @endcan
                 @endif
                 <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
                     href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">

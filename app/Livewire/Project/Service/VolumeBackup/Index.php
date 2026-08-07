@@ -31,7 +31,7 @@ class Index extends Component
     public function render(): View
     {
         $backups = ScheduledVolumeBackup::query()
-            ->with(['backupable.resource', 'latestExecution'])
+            ->with(['backupable.resource', 'latestExecution', 's3'])
             ->withCount('executions')
             ->forService($this->service)
             ->latest()

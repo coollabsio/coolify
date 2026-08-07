@@ -107,11 +107,12 @@ it('renders volume rows without nesting Livewire Show components', function () {
 it('batches volume backup meta and exposes forms for every volume', function () {
     [$application, , $team] = createPerfApplicationWithVolumes(5);
 
-    foreach ($application->persistentStorages as $storage) {
+    foreach ($application->persistentStorages as $index => $storage) {
         $storage->scheduledBackups()->create([
             'team_id' => $team->id,
             'frequency' => 'daily',
             'enabled' => true,
+            'save_s3' => $index === 0,
         ]);
     }
 
@@ -120,7 +121,10 @@ it('batches volume backup meta and exposes forms for every volume', function () 
     expect($component->get('volumeBackupMeta'))->toHaveCount(5)
         ->and($component->get('forms'))->toHaveCount(5)
         ->and($component->html())->toContain('volumes-col-backup')
-        ->not->toContain('table-badge table-badge-success');
+        ->toContain('Backups are saved to S3')
+        ->toContain('Backups are stored locally only');
+
+    expect($component->get("volumeBackupMeta.{$application->persistentStorages->first()->id}.s3"))->toBeTrue();
 
     foreach ($component->get('volumeBackupMeta') as $meta) {
         expect($meta['enabled'])->toBeTrue()
