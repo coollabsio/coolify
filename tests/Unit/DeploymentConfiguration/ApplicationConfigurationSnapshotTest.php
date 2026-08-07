@@ -184,6 +184,27 @@ it('detects build-affecting application settings', function (string $field, stri
     'environment variable sorting' => ['is_env_sorting_enabled', 'Sort environment variables'],
 ]);
 
+it('detects Docker build cache configuration changes as build changes', function (string $field, string $label) {
+    $application = snapshotTestApplication(['build_pack' => 'dockerfile']);
+    markSnapshotTestApplicationDeployed($application);
+
+    $application->settings->update([
+        $field => [
+            'enabled' => true,
+            'cache_from' => ['type' => 'registry', 'value' => 'registry.example.com/team/app:buildcache'],
+            'cache_to' => ['type' => 'registry', 'value' => 'registry.example.com/team/app:buildcache'],
+            'failure_policy' => 'continue',
+        ],
+    ]);
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+
+    expect($diff->requiresBuild())->toBeTrue()
+        ->and(collect($diff->changes())->pluck('label'))->toContain($label);
+})->with([
+    'production cache' => ['docker_build_cache', 'External Docker build cache'],
+    'preview cache' => ['preview_docker_build_cache', 'Preview external Docker build cache'],
+]);
+
 it('detects runtime-affecting application settings as redeploy-only changes', function (string $field, string $label, mixed $newValue) {
     $application = snapshotTestApplication();
     $application->settings->update([$field => is_bool($newValue) ? ! $newValue : null]);

@@ -35,6 +35,84 @@
             </div>
         </x-application.settings-section>
 
+        @if ($application->build_pack === 'dockerfile')
+            <x-application.settings-section id="advanced-external-build-cache-section" title="External build cache"
+                helper="Import and export BuildKit cache through a registry or an advanced raw cache backend.">
+                <form class="application-settings-form flex w-full flex-col gap-4"
+                    wire:submit.prevent="saveDockerBuildCache">
+                    <div class="grid w-full gap-4 sm:grid-cols-2">
+                        <x-forms.listbox id="dockerBuildCacheEnabled" label="External cache" live
+                            helper="Force rebuild skips cache import but still exports a fresh cache. Rebuild from scratch overrides this setting."
+                            :options="[
+                                ['value' => false, 'label' => 'Disabled'],
+                                ['value' => true, 'label' => 'Enabled'],
+                            ]" :disabled="! $canUpdate" />
+
+                        @if ($dockerBuildCacheEnabled)
+                            <x-forms.listbox id="dockerBuildCacheMode" label="Configuration mode" live
+                                :options="[
+                                    ['value' => 'registry', 'label' => 'Registry'],
+                                    ['value' => 'raw', 'label' => 'Advanced raw'],
+                                ]" :disabled="! $canUpdate" />
+                            <x-forms.input id="dockerBuildCacheFrom" label="Cache source" required
+                                placeholder="{{ $dockerBuildCacheMode === 'registry' ? 'registry.example.com/team/app:buildcache' : 'type=local,src=/cache' }}"
+                                helper="{{ $dockerBuildCacheMode === 'registry' ? 'Registry cache reference to import.' : 'Complete BuildKit --cache-from value.' }}"
+                                :disabled="! $canUpdate" />
+                            <x-forms.input id="dockerBuildCacheTo" label="Cache destination" required
+                                placeholder="{{ $dockerBuildCacheMode === 'registry' ? 'registry.example.com/team/app:buildcache' : 'type=local,dest=/cache,mode=max' }}"
+                                helper="{{ $dockerBuildCacheMode === 'registry' ? 'Registry cache reference to export. Registry exports use mode=max.' : 'Complete BuildKit --cache-to value.' }}"
+                                :disabled="! $canUpdate" />
+                            <x-forms.listbox id="dockerBuildCacheFailurePolicy" label="Cache failure policy"
+                                :options="[
+                                    ['value' => 'continue', 'label' => 'Warn and continue'],
+                                    ['value' => 'fail', 'label' => 'Fail deployment'],
+                                ]" :disabled="! $canUpdate" />
+                        @endif
+                    </div>
+
+                    <div class="border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+                        <h4>Preview deployments</h4>
+                        <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                            Preview deployments inherit the production cache unless you override or disable it.
+                        </p>
+                    </div>
+                    <div class="grid w-full gap-4 sm:grid-cols-2">
+                        <x-forms.listbox id="previewDockerBuildCacheMode" label="Preview cache" live
+                            :options="[
+                                ['value' => 'inherit', 'label' => 'Inherit production'],
+                                ['value' => 'disabled', 'label' => 'Disabled'],
+                                ['value' => 'override', 'label' => 'Override'],
+                            ]" :disabled="! $canUpdate" />
+
+                        @if ($previewDockerBuildCacheMode === 'override')
+                            <x-forms.listbox id="previewDockerBuildCacheType" label="Preview configuration mode" live
+                                :options="[
+                                    ['value' => 'registry', 'label' => 'Registry'],
+                                    ['value' => 'raw', 'label' => 'Advanced raw'],
+                                ]" :disabled="! $canUpdate" />
+                            <x-forms.input id="previewDockerBuildCacheFrom" label="Preview cache source" required
+                                placeholder="{{ $previewDockerBuildCacheType === 'registry' ? 'registry.example.com/team/app:preview-buildcache' : 'type=local,src=/cache/previews' }}"
+                                :disabled="! $canUpdate" />
+                            <x-forms.input id="previewDockerBuildCacheTo" label="Preview cache destination" required
+                                placeholder="{{ $previewDockerBuildCacheType === 'registry' ? 'registry.example.com/team/app:preview-buildcache' : 'type=local,dest=/cache/previews,mode=max' }}"
+                                :disabled="! $canUpdate" />
+                            <x-forms.listbox id="previewDockerBuildCacheFailurePolicy"
+                                label="Preview cache failure policy" :options="[
+                                    ['value' => 'continue', 'label' => 'Warn and continue'],
+                                    ['value' => 'fail', 'label' => 'Fail deployment'],
+                                ]" :disabled="! $canUpdate" />
+                        @endif
+                    </div>
+
+                    @if ($canUpdate)
+                        <div>
+                            <x-forms.button type="submit">Save cache settings</x-forms.button>
+                        </div>
+                    @endif
+                </form>
+            </x-application.settings-section>
+        @endif
+
         <x-application.settings-section id="advanced-container-section" title="Container"
             helper="Control how the deployed container is named.">
             <div class="grid w-full gap-4 sm:grid-cols-2">

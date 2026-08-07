@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Application\CleanupDockerBuildCache;
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Server\CleanupDocker;
@@ -109,6 +110,13 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         } catch (\Throwable $e) {
             throw $e;
         } finally {
+            if ($this->resource instanceof Application) {
+                try {
+                    CleanupDockerBuildCache::run($this->resource);
+                } catch (\Throwable $e) {
+                    \Log::warning('Failed to clean Docker build cache for application '.$this->resource->uuid.': '.$e->getMessage());
+                }
+            }
             $this->resource->forceDelete();
             if ($this->dockerCleanup) {
                 $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');

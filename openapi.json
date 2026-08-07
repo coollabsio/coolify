@@ -401,6 +401,16 @@
                                         "type": "boolean",
                                         "description": "Disable the build cache."
                                     },
+                                    "docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "External BuildKit cache for Dockerfile builds: enabled, cache_from {type, value}, cache_to {type, value}, and failure_policy (continue or fail)."
+                                    },
+                                    "preview_docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "Preview cache override using the same shape. Null inherits production; {enabled: false} disables it."
+                                    },
                                     "inject_build_args_to_dockerfile": {
                                         "type": "boolean",
                                         "description": "Inject build arguments into the Dockerfile build."
@@ -969,6 +979,16 @@
                                     "disable_build_cache": {
                                         "type": "boolean",
                                         "description": "Disable the build cache."
+                                    },
+                                    "docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "External BuildKit cache for Dockerfile builds: enabled, cache_from {type, value}, cache_to {type, value}, and failure_policy (continue or fail)."
+                                    },
+                                    "preview_docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "Preview cache override using the same shape. Null inherits production; {enabled: false} disables it."
                                     },
                                     "inject_build_args_to_dockerfile": {
                                         "type": "boolean",
@@ -1539,6 +1559,16 @@
                                         "type": "boolean",
                                         "description": "Disable the build cache."
                                     },
+                                    "docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "External BuildKit cache for Dockerfile builds: enabled, cache_from {type, value}, cache_to {type, value}, and failure_policy (continue or fail)."
+                                    },
+                                    "preview_docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "Preview cache override using the same shape. Null inherits production; {enabled: false} disables it."
+                                    },
                                     "inject_build_args_to_dockerfile": {
                                         "type": "boolean",
                                         "description": "Inject build arguments into the Dockerfile build."
@@ -2013,6 +2043,16 @@
                                         "type": "boolean",
                                         "description": "Disable the build cache."
                                     },
+                                    "docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "External BuildKit cache for Dockerfile builds: enabled, cache_from {type, value}, cache_to {type, value}, and failure_policy (continue or fail)."
+                                    },
+                                    "preview_docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "Preview cache override using the same shape. Null inherits production; {enabled: false} disables it."
+                                    },
                                     "inject_build_args_to_dockerfile": {
                                         "type": "boolean",
                                         "description": "Inject build arguments into the Dockerfile build."
@@ -2466,6 +2506,16 @@
                                     "disable_build_cache": {
                                         "type": "boolean",
                                         "description": "Disable the build cache."
+                                    },
+                                    "docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "External BuildKit cache for Dockerfile builds: enabled, cache_from {type, value}, cache_to {type, value}, and failure_policy (continue or fail)."
+                                    },
+                                    "preview_docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "Preview cache override using the same shape. Null inherits production; {enabled: false} disables it."
                                     },
                                     "inject_build_args_to_dockerfile": {
                                         "type": "boolean",
@@ -3155,6 +3205,16 @@
                                     "disable_build_cache": {
                                         "type": "boolean",
                                         "description": "Disable the build cache."
+                                    },
+                                    "docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "External BuildKit cache for Dockerfile builds: enabled, cache_from {type, value}, cache_to {type, value}, and failure_policy (continue or fail)."
+                                    },
+                                    "preview_docker_build_cache": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "description": "Preview cache override using the same shape. Null inherits production; {enabled: false} disables it."
                                     },
                                     "inject_build_args_to_dockerfile": {
                                         "type": "boolean",
@@ -21479,6 +21539,16 @@
                     },
                     "disable_build_cache": {
                         "type": "boolean"
+                    },
+                    "docker_build_cache": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "External BuildKit cache for Dockerfile builds."
+                    },
+                    "preview_docker_build_cache": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Preview override; null inherits the production cache."
                     },
                     "is_spa": {
                         "type": "boolean"

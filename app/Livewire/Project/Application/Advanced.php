@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Rules\ValidDockerBuildCacheConfiguration;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -38,6 +39,26 @@ class Advanced extends Component
 
     #[Validate(['boolean'])]
     public bool $disableBuildCache = false;
+
+    public bool $dockerBuildCacheEnabled = false;
+
+    public string $dockerBuildCacheMode = 'registry';
+
+    public string $dockerBuildCacheFrom = '';
+
+    public string $dockerBuildCacheTo = '';
+
+    public string $dockerBuildCacheFailurePolicy = 'continue';
+
+    public string $previewDockerBuildCacheMode = 'inherit';
+
+    public string $previewDockerBuildCacheType = 'registry';
+
+    public string $previewDockerBuildCacheFrom = '';
+
+    public string $previewDockerBuildCacheTo = '';
+
+    public string $previewDockerBuildCacheFailurePolicy = 'continue';
 
     #[Validate(['boolean'])]
     public bool $injectBuildArgsToDockerfile = true;
@@ -153,6 +174,7 @@ class Advanced extends Component
             $this->injectBuildArgsToDockerfile = $this->application->settings->inject_build_args_to_dockerfile ?? true;
             $this->includeSourceCommitInBuild = $this->application->settings->include_source_commit_in_build ?? false;
             $this->maxRestartCount = $this->application->max_restart_count ?? 10;
+            $this->syncDockerBuildCacheData();
         }
 
         // Load stop_grace_period separately since it has its own save handler
@@ -306,6 +328,104 @@ class Advanced extends Component
             $this->dispatch('success', 'Max restart count saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function saveDockerBuildCache(): void
+    {
+        $this->authorize('update', $this->application);
+
+        $this->validate([
+            'dockerBuildCacheEnabled' => ['boolean'],
+            'dockerBuildCacheMode' => ['required', 'in:registry,raw'],
+            'dockerBuildCacheFailurePolicy' => ['required', 'in:continue,fail'],
+            'previewDockerBuildCacheMode' => ['required', 'in:inherit,disabled,override'],
+            'previewDockerBuildCacheType' => ['required', 'in:registry,raw'],
+            'previewDockerBuildCacheFailurePolicy' => ['required', 'in:continue,fail'],
+            'dockerBuildCacheFrom' => [$this->dockerBuildCacheEnabled ? 'required' : 'nullable', 'string', 'max:2048'],
+            'dockerBuildCacheTo' => [$this->dockerBuildCacheEnabled ? 'required' : 'nullable', 'string', 'max:2048'],
+            'previewDockerBuildCacheFrom' => [$this->previewDockerBuildCacheMode === 'override' ? 'required' : 'nullable', 'string', 'max:2048'],
+            'previewDockerBuildCacheTo' => [$this->previewDockerBuildCacheMode === 'override' ? 'required' : 'nullable', 'string', 'max:2048'],
+        ]);
+
+        $production = $this->dockerBuildCacheEnabled
+            ? $this->buildCacheConfiguration(
+                type: $this->dockerBuildCacheMode,
+                cacheFrom: $this->dockerBuildCacheFrom,
+                cacheTo: $this->dockerBuildCacheTo,
+                failurePolicy: $this->dockerBuildCacheFailurePolicy,
+            )
+            : null;
+
+        $preview = match ($this->previewDockerBuildCacheMode) {
+            'disabled' => ['enabled' => false],
+            'override' => $this->buildCacheConfiguration(
+                type: $this->previewDockerBuildCacheType,
+                cacheFrom: $this->previewDockerBuildCacheFrom,
+                cacheTo: $this->previewDockerBuildCacheTo,
+                failurePolicy: $this->previewDockerBuildCacheFailurePolicy,
+            ),
+            default => null,
+        };
+
+        $validator = Validator::make([
+            'dockerBuildCache' => $production,
+            'previewDockerBuildCache' => $preview,
+        ], [
+            'dockerBuildCache' => ['nullable', new ValidDockerBuildCacheConfiguration],
+            'previewDockerBuildCache' => ['nullable', new ValidDockerBuildCacheConfiguration],
+        ]);
+
+        if ($validator->fails()) {
+            throw ValidationException::withMessages([
+                'dockerBuildCacheFrom' => $validator->errors()->first('dockerBuildCache'),
+                'previewDockerBuildCacheFrom' => $validator->errors()->first('previewDockerBuildCache'),
+            ]);
+        }
+
+        $this->application->settings->docker_build_cache = $production;
+        $this->application->settings->preview_docker_build_cache = $preview;
+        $this->application->settings->save();
+
+        $this->dispatch('success', 'Docker build cache settings saved.');
+        $this->dispatch('configurationChanged');
+    }
+
+    /** @return array<string, mixed> */
+    private function buildCacheConfiguration(string $type, string $cacheFrom, string $cacheTo, string $failurePolicy): array
+    {
+        return [
+            'enabled' => true,
+            'cache_from' => ['type' => $type, 'value' => $cacheFrom],
+            'cache_to' => ['type' => $type, 'value' => $cacheTo],
+            'failure_policy' => $failurePolicy,
+        ];
+    }
+
+    private function syncDockerBuildCacheData(): void
+    {
+        $production = $this->application->settings->docker_build_cache;
+        $this->dockerBuildCacheEnabled = ($production['enabled'] ?? false) === true;
+
+        if ($this->dockerBuildCacheEnabled) {
+            $this->dockerBuildCacheMode = $production['cache_from']['type'];
+            $this->dockerBuildCacheFrom = $production['cache_from']['value'];
+            $this->dockerBuildCacheTo = $production['cache_to']['value'];
+            $this->dockerBuildCacheFailurePolicy = $production['failure_policy'] ?? 'continue';
+        }
+
+        $preview = $this->application->settings->preview_docker_build_cache;
+        $this->previewDockerBuildCacheMode = match ($preview['enabled'] ?? null) {
+            false => 'disabled',
+            true => 'override',
+            default => 'inherit',
+        };
+
+        if ($this->previewDockerBuildCacheMode === 'override') {
+            $this->previewDockerBuildCacheType = $preview['cache_from']['type'];
+            $this->previewDockerBuildCacheFrom = $preview['cache_from']['value'];
+            $this->previewDockerBuildCacheTo = $preview['cache_to']['value'];
+            $this->previewDockerBuildCacheFailurePolicy = $preview['failure_policy'] ?? 'continue';
         }
     }
 

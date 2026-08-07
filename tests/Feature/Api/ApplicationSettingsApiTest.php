@@ -68,18 +68,56 @@ function recommendedApplicationSettingsPayload(): array
     ];
 }
 
+function applicationApiRegistryCacheConfiguration(string $reference): array
+{
+    return [
+        'enabled' => true,
+        'cache_from' => ['type' => 'registry', 'value' => $reference],
+        'cache_to' => ['type' => 'registry', 'value' => $reference],
+        'failure_policy' => 'continue',
+    ];
+}
+
 test('GET /api/v1/applications/{uuid} includes settings without internal metadata', function () {
-    $this->application->settings->update(recommendedApplicationSettingsPayload());
+    $cache = applicationApiRegistryCacheConfiguration('registry.example.com/team/app:buildcache');
+    $this->application->settings->update(array_merge(recommendedApplicationSettingsPayload(), [
+        'docker_build_cache' => $cache,
+    ]));
 
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->getJson("/api/v1/applications/{$this->application->uuid}")
         ->assertOk()
         ->assertJsonPath('settings.disable_build_cache', true)
+        ->assertJsonPath('settings.docker_build_cache', $cache)
         ->assertJsonPath('settings.stop_grace_period', 45)
         ->assertJsonMissingPath('settings.id')
         ->assertJsonMissingPath('settings.application_id')
         ->assertJsonMissingPath('settings.created_at')
         ->assertJsonMissingPath('settings.updated_at');
+});
+
+test('Dockerfile application creation accepts Docker build cache settings', function () {
+    Queue::fake();
+    $cache = applicationApiRegistryCacheConfiguration('registry.example.com/team/app:buildcache');
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/docker-build-cache-test',
+            'git_branch' => 'main',
+            'build_pack' => 'dockerfile',
+            'autogenerate_domain' => false,
+            'docker_build_cache' => $cache,
+            'preview_docker_build_cache' => ['enabled' => false],
+        ])
+        ->assertCreated();
+
+    $settings = Application::where('uuid', $response->json('uuid'))->firstOrFail()->settings;
+
+    expect($settings->docker_build_cache)->toBe($cache)
+        ->and($settings->preview_docker_build_cache)->toBe(['enabled' => false]);
 });
 
 test('PATCH /api/v1/applications/{uuid} updates application settings', function () {
@@ -94,6 +132,37 @@ test('PATCH /api/v1/applications/{uuid} updates application settings', function 
     foreach (recommendedApplicationSettingsPayload() as $field => $value) {
         expect($settings->{$field})->toBe($value);
     }
+});
+
+test('PATCH /api/v1/applications/{uuid} stores Dockerfile build cache settings', function () {
+    $this->application->update(['build_pack' => 'dockerfile']);
+
+    $productionCache = applicationApiRegistryCacheConfiguration('registry.example.com/team/app:buildcache');
+    $previewCache = applicationApiRegistryCacheConfiguration('registry.example.com/team/app:preview-buildcache');
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_build_cache' => $productionCache,
+            'preview_docker_build_cache' => $previewCache,
+        ])
+        ->assertOk();
+
+    $settings = $this->application->fresh()->settings;
+
+    expect($settings->docker_build_cache)->toBe($productionCache)
+        ->and($settings->preview_docker_build_cache)->toBe($previewCache);
+});
+
+test('PATCH /api/v1/applications/{uuid} validates Docker build cache settings', function () {
+    $this->application->update(['build_pack' => 'dockerfile']);
+    $configuration = applicationApiRegistryCacheConfiguration('');
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'docker_build_cache' => $configuration,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('docker_build_cache');
 });
 
 test('application creation accepts application settings', function () {

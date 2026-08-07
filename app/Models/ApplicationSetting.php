@@ -37,6 +37,8 @@ use OpenApi\Attributes as OA;
         'is_container_label_readonly_enabled' => ['type' => 'boolean'],
         'is_preserve_repository_enabled' => ['type' => 'boolean'],
         'disable_build_cache' => ['type' => 'boolean'],
+        'docker_build_cache' => ['type' => 'object', 'nullable' => true, 'description' => 'External BuildKit cache for Dockerfile builds.'],
+        'preview_docker_build_cache' => ['type' => 'object', 'nullable' => true, 'description' => 'Preview override; null inherits the production cache.'],
         'is_spa' => ['type' => 'boolean'],
         'is_git_shallow_clone_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_enabled' => ['type' => 'boolean'],
@@ -80,6 +82,8 @@ class ApplicationSetting extends Model
         'connect_to_docker_network' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
         'disable_build_cache' => 'boolean',
+        'docker_build_cache' => 'array',
+        'preview_docker_build_cache' => 'array',
     ];
 
     protected $fillable = [
@@ -111,6 +115,8 @@ class ApplicationSetting extends Model
         'is_container_label_readonly_enabled',
         'is_preserve_repository_enabled',
         'disable_build_cache',
+        'docker_build_cache',
+        'preview_docker_build_cache',
         'is_spa',
         'is_git_shallow_clone_enabled',
         'is_pr_deployments_public_enabled',

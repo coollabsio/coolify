@@ -19,6 +19,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\DockerBuildCacheConfiguration;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -197,6 +198,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $dockerBuildxAvailable = false;
 
+    private ?DockerBuildCacheConfiguration $dockerBuildCacheConfiguration = null;
+
     private bool $dockerSecretsSupported = false;
 
     private bool $skip_build = false;
@@ -229,6 +232,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         if ($this->disableBuildCache) {
             $this->force_rebuild = true;
+        }
+        if ($this->application->build_pack === 'dockerfile' && ! $this->disableBuildCache) {
+            $this->dockerBuildCacheConfiguration = DockerBuildCacheConfiguration::resolve(
+                production: $this->application->settings->docker_build_cache,
+                preview: $this->application->settings->preview_docker_build_cache,
+                isPreview: $this->pull_request_id !== 0,
+            );
         }
         $this->restart_only = $this->application_deployment_queue->restart_only;
         $this->restart_only = $this->restart_only && $this->application->build_pack !== 'dockerimage' && $this->application->build_pack !== 'dockerfile';
@@ -2163,18 +2173,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $buildxMetadataVolume = isDev() && $this->server->isLocalhost()
             ? '-v coolify-buildx:/root/.docker/buildx'
             : "-v {$this->serverUserHomeDir}/.docker/buildx:/root/.docker/buildx";
+        $dockerBuildCacheVolume = $this->docker_build_cache_volume();
+        if ($dockerBuildCacheVolume !== '') {
+            $localCachePath = DockerBuildCacheConfiguration::localCachePath($this->application->uuid);
+            instant_remote_process(['mkdir -p '.escapeshellarg($localCachePath)], $this->server);
+            $dockerBuildCacheVolume = ' '.$dockerBuildCacheVolume;
+        }
         if ($this->use_build_server) {
             if ($this->dockerConfigFileExists === 'NOK') {
                 throw new DeploymentException('Docker config file (~/.docker/config.json) not found on the build server. Please run "docker login" to login to the docker registry on the server.');
             }
-            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runCommand = "docker run -d --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume}{$dockerBuildCacheVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
             if ($this->dockerConfigFileExists === 'OK') {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro {$buildxMetadataVolume}{$dockerBuildCacheVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             } else {
                 $safeNetwork = escapeshellarg($this->destination->network);
-                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+                $runCommand = "docker run -d --network {$safeNetwork} --name {$this->deployment_uuid} {$env_flags} --rm {$buildxMetadataVolume}{$dockerBuildCacheVolume} -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
             }
         }
         if ($firstTry) {
@@ -3641,8 +3657,63 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         return "cd {$this->workdir} && set -a && source ".self::BUILD_TIME_ENV_PATH." && set +a && {$build_command}";
     }
 
+    private function docker_build_cache_command(string $buildCommand): string
+    {
+        if ($this->dockerBuildCacheConfiguration === null) {
+            return $buildCommand;
+        }
+
+        $cacheArguments = implode(' ', $this->dockerBuildCacheConfiguration->buildArguments($this->force_rebuild));
+        $buildxCommand = 'DOCKER_CONFIG=/root/.docker docker buildx build'
+            .' --builder '.DockerBuildCacheConfiguration::BUILDER_NAME
+            .' --load '.$cacheArguments.' ';
+
+        $cachedBuildCommand = preg_replace(
+            '/(?:DOCKER_BUILDKIT=1 )?docker build /',
+            $buildxCommand,
+            $buildCommand,
+            1,
+        );
+
+        if ($cachedBuildCommand === null || $cachedBuildCommand === $buildCommand) {
+            throw new DeploymentException('Unable to apply the configured external Docker build cache to the Dockerfile build command.');
+        }
+
+        $builderName = DockerBuildCacheConfiguration::BUILDER_NAME;
+        $prepareBuilder = '(DOCKER_CONFIG=/root/.docker docker buildx inspect '.$builderName.' >/dev/null 2>&1'
+            .' || DOCKER_CONFIG=/root/.docker docker buildx create --name '.$builderName.' --driver docker-container >/dev/null)';
+        $buildWithCache = $prepareBuilder.' && '.$cachedBuildCommand;
+
+        if ($this->dockerBuildCacheConfiguration->shouldFail()) {
+            return $buildWithCache;
+        }
+
+        return '('.$buildWithCache.') || { printf \'%s\\n\' \'External Docker build cache failed; retrying without it.\' >&2; '
+            .$buildCommand.'; }';
+    }
+
+    private function docker_build_cache_volume(): string
+    {
+        if ($this->dockerBuildCacheConfiguration?->usesLocalCache() !== true) {
+            return '';
+        }
+
+        $volume = DockerBuildCacheConfiguration::localCachePath($this->application->uuid).':/cache';
+
+        return '-v '.escapeshellarg($volume);
+    }
+
     private function build_image()
     {
+        if ($this->dockerBuildCacheConfiguration !== null && ! $this->dockerBuildxAvailable) {
+            if ($this->dockerBuildCacheConfiguration->shouldFail()) {
+                throw new DeploymentException('External Docker build cache requires the Docker buildx CLI plugin on the build server.');
+            }
+
+            $this->application_deployment_queue->addLogEntry('Warning: External Docker build cache was skipped because Docker buildx is unavailable.', 'stderr');
+            $this->dockerBuildCacheConfiguration = null;
+        }
+
         // Add Coolify related variables to the build args/secrets
         if (! $this->dockerSecretsSupported) {
             // Traditional build args approach - generate COOLIFY_ variables locally
@@ -3758,6 +3829,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $build_command = $this->wrap_build_command_with_env_export("docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} -t $this->build_image_name {$this->workdir}");
                     }
                 }
+                $build_command = $this->docker_build_cache_command($build_command);
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
                     [
@@ -3843,6 +3915,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                         $build_command = $this->wrap_build_command_with_env_export("docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} -t {$this->production_image_name} {$this->workdir}");
                     }
                 }
+                $build_command = $this->docker_build_cache_command($build_command);
                 $base64_build_command = base64_encode($build_command);
                 $this->execute_remote_command(
                     [
@@ -3944,6 +4017,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                             $build_command = $this->wrap_build_command_with_env_export("docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} -t {$this->production_image_name} {$this->workdir}");
                         }
                     }
+                    $build_command = $this->docker_build_cache_command($build_command);
                     $base64_build_command = base64_encode($build_command);
                     $this->execute_remote_command(
                         [

@@ -456,6 +456,14 @@ it('uses persisted buildx metadata when pruning the railpack builder', function 
         ->not->toContain('--buildkitd-flags');
 });
 
+it('prunes the external Docker cache builder without deleting persistent local cache directories', function () {
+    $sourceFile = file_get_contents(__DIR__.'/../../../../app/Actions/Server/CleanupDocker.php');
+
+    expect($sourceFile)
+        ->toContain('docker buildx prune --builder coolify-docker-cache -af')
+        ->not->toContain('rm -rf /data/coolify/docker-build-cache');
+});
+
 it('preserves build image for currently running tag', function () {
     $images = collect([
         ['repository' => 'app-uuid', 'tag' => 'commit1', 'created_at' => '2024-01-01 10:00:00', 'image_ref' => 'app-uuid:commit1'],
