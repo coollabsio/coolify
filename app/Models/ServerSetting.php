@@ -219,7 +219,22 @@ class ServerSetting extends Model
         return $token;
     }
 
-    public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false)
+    public function ensureSentinelUrl(): string
+    {
+        $url = $this->sentinel_custom_url;
+
+        if (blank($url)) {
+            $url = $this->generateSentinelUrl(ignoreEvent: true);
+        }
+
+        if (blank($url)) {
+            throw new \RuntimeException('Set an instance FQDN or public IP before enabling Sentinel.');
+        }
+
+        return $url;
+    }
+
+    public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
         $domain = null;
         $settings = InstanceSettings::get();

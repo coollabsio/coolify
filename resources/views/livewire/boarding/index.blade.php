@@ -507,16 +507,16 @@
                                 </section>
                             @endif
 
-                            <x-slide-over closeWithX fullScreen>
+                            <x-process-dialog closeWithX size="xl">
                                 <x-slot:title>Server validation</x-slot:title>
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$this->createdServer" />
                                 </x-slot:content>
-                                <x-forms.button @click="slideOverOpen=true" class="w-full justify-center"
+                                <x-forms.button @click="processDialogOpen = true" class="w-full justify-center"
                                     wire:click.prevent="installServer" isHighlighted>
                                     Start validation
                                 </x-forms.button>
-                            </x-slide-over>
+                            </x-process-dialog>
                         </div>
                     </x-slot:actions>
                     <x-slot:explanation>
@@ -659,7 +659,7 @@
         </div>
 
         @if ($currentState !== 'welcome' && $currentState !== 'create-resource')
-            <div class="mt-6 flex w-full max-w-3xl flex-col items-center gap-3">
+            <div class="mx-auto mt-6 flex w-full max-w-3xl flex-col items-center gap-3">
                 <div
                     class="inline-flex flex-wrap items-center justify-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.025]">
                     <button type="button" wire:click="skipBoarding"

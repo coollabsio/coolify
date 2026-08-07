@@ -20,28 +20,17 @@
                     </button>
                 </x-slot:actions>
 
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.input id="name" label="Name" required />
-                    <x-forms.input id="description" label="Description" />
-                </div>
-
-                <div class="mt-5 grid gap-4 border-t border-neutral-200 pt-4 lg:grid-cols-3 dark:border-white/[0.08]">
+                <div class="mb-5">
                     <x-forms.input id="ip" label="IP address or domain" required
                         helper="For example 127.0.0.1 or server.example.com." />
-                    <x-forms.input id="user" label="User" required
-                        helper="Non-root SSH users are experimental." />
-                    <x-forms.input type="number" id="port" label="Port" required />
                 </div>
 
-                <div class="mt-5 grid items-end gap-4 border-t border-neutral-200 pt-4 lg:grid-cols-2 dark:border-white/[0.08]">
-                    <x-forms.listbox id="private_key_id" label="Private key"
-                        placeholder="Select a private key" :options="$privateKeyOptions" />
-
-                    <div class="flex items-center justify-between gap-3">
-                        <x-forms.checkbox id="is_build_server"
-                            helper="Build servers compile applications but do not host deployments."
-                            label="Use as a build server" />
-
+                <div class="mb-5">
+                    <div class="flex items-end gap-3">
+                        <div class="min-w-0 flex-1">
+                            <x-forms.listbox id="private_key_id" label="Private key"
+                                placeholder="Select a private key" :options="$privateKeyOptions" />
+                        </div>
                         @can('create', App\Models\PrivateKey::class)
                             <div x-data="{ dropdownOpen: false }" class="relative shrink-0"
                                 @click.outside="dropdownOpen = false"
@@ -79,6 +68,33 @@
                                 </div>
                             </div>
                         @endcan
+                    </div>
+                </div>
+
+                <div class="grid gap-4 border-t border-neutral-200 pt-4 lg:grid-cols-2 dark:border-white/[0.08]">
+                    <x-forms.input id="name" label="Name" required />
+                    <x-forms.input id="description" label="Description" />
+                </div>
+
+                <div x-data="{ advancedOpen: false }"
+                    class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                    <button type="button" @click="advancedOpen = !advancedOpen"
+                        class="flex w-full items-center justify-between gap-3 text-left text-[13px] font-medium text-neutral-600 dark:text-fg-dim"
+                        :aria-expanded="advancedOpen">
+                        Advanced settings
+                        <x-reicon name="chevron-down" class="size-3.5 transition-transform"
+                            x-bind:class="advancedOpen && 'rotate-180'" />
+                    </button>
+
+                    <div x-show="advancedOpen" x-cloak class="mt-4 flex flex-col gap-4">
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <x-forms.input id="user" label="User" required
+                                helper="Non-root SSH users are experimental." />
+                            <x-forms.input type="number" id="port" label="Port" required />
+                        </div>
+                        <x-forms.checkbox id="is_build_server"
+                            helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
+                            label="Use as a dedicated build server" />
                     </div>
                 </div>
             </x-application.settings-section>

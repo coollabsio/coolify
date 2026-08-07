@@ -3,38 +3,42 @@
         New Server | Coolify
     </x-slot>
 
-    <div class="mb-4 flex flex-wrap items-center justify-end gap-2">
-        <a href="{{ $selectedType ? route('server.create') : route('server.index') }}" class="button"
-            {{ wireNavigate() }}>
-            {{ $selectedType ? 'Change method' : 'Back to servers' }}
-        </a>
-        @if ($selectedType && $selectedType !== 'manual' && ! $selectedTokenUuid)
-            @php
-                $tokenProvider = $selectedType === 'digital-ocean' ? 'digitalocean' : $selectedType;
-                $tokenProviderName = $selectedType === 'digital-ocean'
-                    ? 'DigitalOcean'
-                    : str($selectedType)->headline();
-            @endphp
-            @can('create', App\Models\CloudProviderToken::class)
-                <x-modal-input title="New {{ $tokenProviderName }} token">
-                    <x-slot:content>
-                        <button type="button"
-                            class="button button-highlighted">
-                            <x-reicon name="plus" class="size-3.5" />
-                            New token
-                        </button>
-                    </x-slot:content>
-                    <livewire:security.cloud-provider-token-form :modal_mode="true" :provider="$tokenProvider"
-                        wire:key="new-server-token-{{ $tokenProvider }}" />
-                </x-modal-input>
-            @endcan
-        @endif
+    <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">New server</h1>
+        <div class="flex flex-wrap items-center gap-2">
+            @if ($selectedType)
+                <a href="{{ route('server.create') }}" class="button" {{ wireNavigate() }}>
+                    Change method
+                </a>
+            @endif
+            @if ($selectedType && $selectedType !== 'manual' && ! $selectedTokenUuid)
+                @php
+                    $tokenProvider = $selectedType === 'digital-ocean' ? 'digitalocean' : $selectedType;
+                    $tokenProviderName = $selectedType === 'digital-ocean'
+                        ? 'DigitalOcean'
+                        : str($selectedType)->headline();
+                @endphp
+                @can('create', App\Models\CloudProviderToken::class)
+                    <x-modal-input title="New {{ $tokenProviderName }} token">
+                        <x-slot:content>
+                            <button type="button"
+                                class="button button-highlighted">
+                                <x-reicon name="plus" class="size-3.5" />
+                                New token
+                            </button>
+                        </x-slot:content>
+                        <livewire:security.cloud-provider-token-form :modal_mode="true" :provider="$tokenProvider"
+                            wire:key="new-server-token-{{ $tokenProvider }}" />
+                    </x-modal-input>
+                @endcan
+            @endif
+        </div>
     </div>
 
     @if (!$selectedType)
         <div class="application-settings-form">
-            <x-application.settings-section title="Add a server"
-                description="Provision with a cloud provider or connect any reachable Linux server." flush>
+            <section class="application-settings-section">
+                <div class="application-settings-section-body is-flush">
                 <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4">
                     @can('viewAny', App\Models\CloudProviderToken::class)
                         <a href="{{ route('server.create.type', ['type' => 'hetzner']) }}"
@@ -115,7 +119,8 @@
                         </div>
                     </a>
                 </div>
-            </x-application.settings-section>
+                </div>
+            </section>
         </div>
     @else
         <div class="application-settings-form">
