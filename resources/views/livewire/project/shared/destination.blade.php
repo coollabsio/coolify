@@ -1,14 +1,6 @@
 <div>
     @if ($resource->getMorphClass() === 'App\Models\Application')
         @php
-            $primaryStatus = str($resource->realStatus());
-            $primaryStatusType = match (true) {
-                $primaryStatus->startsWith('running') => 'success',
-                $primaryStatus->startsWith('exited') => 'error',
-                $primaryStatus->startsWith(['starting', 'restarting']) => 'warning',
-                default => 'neutral',
-            };
-            $primaryStatusLabel = $primaryStatus->before(':')->headline()->value() ?: 'Unknown';
             $additionalDestinations = $resource->additional_networks;
             $hasAdditionalDestinations = $additionalDestinations->isNotEmpty();
         @endphp
@@ -41,21 +33,13 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2 sm:justify-end">
-                        @if ($primaryStatus->startsWith('running'))
-                            <x-status.running :status="$primaryStatus->value()" />
-                        @elseif ($primaryStatus->startsWith(['starting', 'restarting']))
-                            <x-status.restarting :status="$primaryStatus->value()" />
-                        @elseif ($primaryStatus->startsWith('exited'))
-                            <x-status.stopped :status="$primaryStatus->value()" />
-                        @else
-                            <x-status-badge :status="$primaryStatusLabel" :type="$primaryStatusType" />
-                        @endif
+                        <x-status-summary :status="$resource->status" />
                         @if ($hasAdditionalDestinations)
                             <x-forms.button canGate="deploy" :canResource="$resource"
                                 wire:click="redeploy('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">
                                 Deploy
                             </x-forms.button>
-                            @if ($primaryStatus->startsWith('running'))
+                            @if (str($resource->status)->startsWith('running'))
                                 <x-forms.button isError canGate="deploy" :canResource="$resource"
                                     wire:click="stop('{{ data_get($resource, 'destination.server.id') }}')">
                                     Stop

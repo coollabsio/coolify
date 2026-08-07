@@ -66,8 +66,8 @@ it('styles icon buttons with a visible hover state', function () {
         ->toContain('dark:hover:bg-white/[0.07]');
 
     expect($resourceCard)
-        ->toContain('class="icon-button shrink-0"')
-        ->toContain('title="Edit domains"');
+        ->toContain('class="icon-button"')
+        ->toContain('title="Manage domains"');
 });
 
 it('exposes enable and disable public access methods on service index', function () {

@@ -73,8 +73,10 @@
         const viewportBottom = viewportTop + viewportHeight;
         const availableWidth = Math.max(0, viewportWidth - padding * 2);
         const availableHeight = Math.max(0, viewportHeight - padding * 2);
+        const maxPopupWidth = 320;
+        const popupWidth = Math.min(maxPopupWidth, availableWidth);
 
-        this.style = `max-width: ${availableWidth}px; max-height: ${availableHeight}px; overflow-y: auto;`;
+        this.style = `max-width: ${popupWidth}px; max-height: ${availableHeight}px; overflow-y: auto;`;
 
         const triggerRect = trigger.getBoundingClientRect();
         const popupRect = popup.getBoundingClientRect();
@@ -120,7 +122,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
         :style="style"
-        class="info-helper-popup fixed z-[9999] w-max max-w-[min(20rem,calc(100vw-2rem))]"
+        class="info-helper-popup fixed z-[9999] w-max max-w-[min(20rem,calc(100vw-2rem))] whitespace-normal"
         @mouseenter="cancelHide()" @mouseleave="hide()" @focusout="closeWhenFocusLeaves()" @click.stop>
         <div class="px-3 py-2.5 text-[13px] leading-5">
             {!! $helper !!}

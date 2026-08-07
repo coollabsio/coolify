@@ -1,5 +1,161 @@
 <?php
 
+it('renders the resource terminal shell while containers are discovered', function () {
+    $terminalComponent = file_get_contents(app_path('Livewire/Project/Shared/ExecuteContainerCommand.php'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($terminalComponent)
+        ->toContain('public bool $containersLoaded = false;')
+        ->and($terminalView)
+        ->toContain('wire:init="loadContainers"')
+        ->not->toContain('@if (! $containersLoaded)')
+        ->not->toContain('Loading terminal containers…')
+        ->toContain(':auto-start="$type === \'server\' || ! $containersLoaded || $containers->count() === 1"')
+        ->not->toContain('Loading targets…')
+        ->not->toContain('<x-loading text="Loading containers" />');
+});
+
+it('starts a single discovered resource container without waiting for a missed browser event', function () {
+    $terminalComponent = file_get_contents(app_path('Livewire/Project/Shared/ExecuteContainerCommand.php'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($terminalComponent)
+        ->toMatch('/if \(\$this->containers->count\(\) === 1\) \{\s*\$this->selected_container = [^;]+;\s*\$this->connectToContainer\(\);/s')
+        ->and($terminalView)
+        ->not->toContain('x-on:containers-loaded.window');
+});
+
+it('integrates automatic terminal startup into the terminal console', function () {
+    $terminalComponent = file_get_contents(app_path('Livewire/Project/Shared/Terminal.php'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $commandView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($terminalComponent)
+        ->toContain('public bool $autoStart = false;')
+        ->and($terminalView)
+        ->toContain('data-auto-start="{{ $autoStart ? \'true\' : \'false\' }}"')
+        ->toContain("starting ? 'connecting…'")
+        ->and($commandView)
+        ->toContain(':auto-start="$type === \'server\' || ! $containersLoaded || $containers->count() === 1"')
+        ->not->toContain('terminalLoading')
+        ->not->toContain('Starting terminal');
+});
+
+it('resynchronizes the themed canvas whenever a terminal enters a loading state', function () {
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    foreach ([$resourceView, $globalView] as $view) {
+        expect($view)
+            ->toContain('x-on:terminal-starting.window="syncTheme()"')
+            ->toContain('syncTheme() {')
+            ->toContain("this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';");
+    }
+});
+
+it('keeps the xterm mount visible while the terminal connection starts', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+
+    expect($terminalView)
+        ->toMatch('/<div id="terminal"[^>]*wire:ignore/s')
+        ->not->toMatch('/<div id="terminal"[^>]*x-show="terminalActive"/s');
+});
+
+it('shows the initial resource container launcher and keeps the header picker for switching', function () {
+    $commandView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($commandView)
+        ->toContain('targetChosen: @js($selected_container !== \'default\')')
+        ->toContain('data-terminal-target-picker="launcher"')
+        ->toContain('x-show="!targetChosen"')
+        ->toContain('x-show="targetChosen"')
+        ->toContain('this.targetChosen = true;');
+});
+
+it('uses a larger high-contrast label for every terminal loading phase', function () {
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect(substr_count($resourceView.$terminalView.$globalView, 'terminal-loading-label'))
+        ->toBeGreaterThanOrEqual(3)
+        ->and($styles)
+        ->toContain('.terminal-loading-label')
+        ->toContain('font-size: 0.875rem;')
+        ->toContain('color: rgb(255 255 255 / 0.75);')
+        ->toContain('html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-loading-label');
+});
+
+it('styles centered terminal target pickers from the selected console theme', function () {
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect(substr_count($resourceView.$globalView, 'terminal-target-picker'))
+        ->toBeGreaterThanOrEqual(2)
+        ->and($styles)
+        ->toContain('.terminal-target-picker')
+        ->toContain('.application-console-shell[data-console-theme="system"] .terminal-target-picker')
+        ->toContain('background: rgb(0 0 0 / 0.18);')
+        ->toContain('background: #fff;')
+        ->toContain('color: #52525b;');
+});
+
+it('presents initial terminal targets as a top-aligned launcher instead of a centered dialog', function () {
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($resourceView.$globalView)
+        ->toContain('data-terminal-target-picker="launcher"')
+        ->toContain('items-start justify-start')
+        ->toContain('Start a terminal session')
+        ->not->toContain('data-terminal-target-picker="center"');
+});
+
+it('shows connection progress in the terminal body instead of the header', function () {
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($resourceView.$globalView)
+        ->toContain("new CustomEvent('terminal-starting')")
+        ->not->toContain('wire:loading.flex wire:target="selected_container,connectToContainer"')
+        ->not->toContain('wire:loading.flex wire:target="selected_uuid,connectToContainer"')
+        ->and($terminalView)
+        ->toContain("x-on:terminal-starting.window=\"starting = true; setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')\"")
+        ->toContain('data-auto-start="{{ $autoStart ? \'true\' : \'false\' }}"')
+        ->toContain("starting ? 'connecting…'")
+        ->and($terminalClient)
+        ->toContain('starting: false')
+        ->toContain("this.starting = this.\$el.dataset.autoStart === 'true';");
+});
+
+it('uses the redesigned terminal canvas and controls on resource terminal pages', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($view)
+        ->toContain('data-terminal-session-canvas')
+        ->toContain('terminal-session-toolbar absolute top-3 right-3 left-3')
+        ->toContain('terminal-session-panel mt-8')
+        ->toContain('<x-terminal.theme-selector')
+        ->not->toContain('application-console-header flex h-[30px]');
+});
+
+it('uses a readable theme-aware terminal session expiry label', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($terminalView)
+        ->toContain('terminal-session-expiry')
+        ->and($styles)
+        ->toContain('.terminal-session-expiry')
+        ->toContain('font-size: 0.75rem;')
+        ->toContain('color: rgb(255 255 255 / 0.6);')
+        ->toContain('.terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-expiry');
+});
+
 it('copies the realtime terminal utilities into the container image', function () {
     $dockerfile = file_get_contents(base_path('docker/coolify-realtime/Dockerfile'));
 
@@ -201,15 +357,18 @@ it('resizes after toggling the mobile terminal toolbar', function () {
 
 it('uses fixed viewport positioning for fullscreen terminal instead of inherited container size', function () {
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
 
     expect($terminalView)
         ->toContain('terminal-fullscreen-shell fixed inset-0')
         ->toContain('z-[100000]')
-        ->toContain('h-[100dvh]')
         ->toContain('w-screen')
         ->toContain('max-w-none')
         ->toContain('overflow-hidden')
-        ->toContain(':data-console-theme="fullscreen ? selectedTheme : null"');
+        ->toContain(':data-console-theme="fullscreen ? selectedTheme : null"')
+        ->not->toContain('h-[100dvh]')
+        ->and($styles)
+        ->toContain('height: auto !important;');
 });
 
 it('constrains normal terminal height after leaving fullscreen', function () {
@@ -229,17 +388,25 @@ it('keeps enter and exit fullscreen controls the same size and chrome', function
         ->and($appCss)
         ->toContain('.terminal-fullscreen-btn')
         ->toContain('width: 1.75rem')
-        ->toContain('height: 1.75rem');
+        ->toContain('height: 1.75rem')
+        ->toContain('color: var(--terminal-scrollbar')
+        ->toContain('background: transparent;')
+        ->toContain('color-mix(in srgb, var(--terminal-scrollbar');
 });
 
-it('does not apply backdrop-filter on the console block itself so fixed fullscreen can escape', function () {
+it('lets the selected theme show through the active terminal panel', function () {
     $appCss = file_get_contents(resource_path('css/app.css'));
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
 
     expect($appCss)
-        ->toContain('.application-console-block::before')
-        ->toContain('position:fixed descendants')
-        ->toMatch('/\.application-console-block::before\s*\{[^}]*backdrop-filter/s')
-        ->not->toMatch('/\.application-console-block\s*\{[^}]*\bbackdrop-filter\s*:/s');
+        ->toMatch('/\.terminal-session-panel\s*\{[^}]*background:\s*transparent;/s')
+        ->toMatch('/\.terminal-session-panel\s*\{[^}]*border:\s*0;/s')
+        ->toMatch('/\.terminal-session-panel\s*\{[^}]*box-shadow:\s*none;/s')
+        ->not->toContain('.application-console-block::before')
+        ->not->toMatch('/\.application-console-block\s*\{[^}]*\bbackdrop-filter\s*:/s')
+        ->and($terminalView)
+        ->toContain('items-center justify-center bg-transparent')
+        ->not->toContain('items-center justify-center bg-black/35');
 });
 
 it('keeps the terminal in the Livewire tree and unlocks ancestor stacking for fullscreen', function () {

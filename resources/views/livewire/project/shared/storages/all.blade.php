@@ -39,8 +39,9 @@
                     if (! $form) {
                         continue;
                     }
-                    $backupMeta = $volumeBackupMeta[$id] ?? ['enabled' => false, 'url' => null];
+                    $backupMeta = $volumeBackupMeta[$id] ?? ['enabled' => false, 's3' => false, 'url' => null];
                     $hasEnabledBackup = $backupMeta['enabled'];
+                    $hasS3Backup = $backupMeta['s3'];
                     $backupUrl = $backupMeta['url'];
                     $inputsReadonly = $form['isReadOnly'];
                     $displayHostPath = filled($form['hostPath']) ? $form['hostPath'] : '—';
@@ -78,7 +79,7 @@
                                 </div>
                             @endif
 
-                            <div class="volumes-col-backup data-table-cell-check">
+                            <div class="volumes-col-backup flex items-center justify-center gap-1.5">
                                 <span class="volumes-mobile-label volumes-field-label">Backup</span>
                                 @if ($hasEnabledBackup)
                                     <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
@@ -87,6 +88,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                         </svg>
                                     </a>
+                                    <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
+                                        title="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                        {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                    </span>
                                 @else
                                     <span class="data-table-cell-dash">-</span>
                                 @endif
@@ -153,7 +158,7 @@
                                 </div>
                             @endif
 
-                            <div class="volumes-col-backup data-table-cell-check">
+                            <div class="volumes-col-backup flex items-center justify-center gap-1.5">
                                 <span class="volumes-mobile-label volumes-field-label">Backup</span>
                                 @if ($hasEnabledBackup)
                                     <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
@@ -162,6 +167,10 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                         </svg>
                                     </a>
+                                    <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
+                                        title="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                        {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                    </span>
                                 @else
                                     <span class="data-table-cell-dash">-</span>
                                 @endif

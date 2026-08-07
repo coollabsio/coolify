@@ -2,7 +2,8 @@
     $isApplicationConsole = $variant === 'application';
 @endphp
 
-<div id="terminal-container" x-data="terminalData()"
+<div id="terminal-container" x-data="terminalData()" data-auto-start="{{ $autoStart ? 'true' : 'false' }}"
+    x-on:terminal-starting.window="starting = true; setTerminalTheme(localStorage.getItem('coolify-console-theme') ?? 'system')"
     x-on:terminal-theme-change.window="setTerminalTheme($event.detail.theme)"
     @class([
         'group/terminal relative h-full min-h-0 bg-transparent' => $isApplicationConsole,
@@ -40,15 +41,15 @@
     <div x-ref="terminalWrapper" wire:ignore
         :data-console-theme="fullscreen ? selectedTheme : null"
         :class="fullscreen
-            ? 'terminal-fullscreen-shell fixed inset-0 z-[100000] m-0 flex h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none p-0'
+            ? 'terminal-fullscreen-shell fixed inset-0 z-[100000] m-0 flex w-screen max-w-none flex-col overflow-hidden rounded-none p-0'
             : @js($isApplicationConsole
                 ? 'relative flex h-full min-h-0 w-full flex-col overflow-hidden bg-transparent'
                 : 'relative flex w-full h-full max-h-[510px] flex-col py-4 mx-auto')">
         @if ($isApplicationConsole)
             <div x-show="!terminalActive" x-cloak
-                class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/35">
-                <div class="flex items-center gap-2 text-[11px] text-[#6e6e74]">
-                    <svg x-show="connectionState === 'connecting' || connectionState === 'reconnecting'"
+                class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-transparent">
+                <div class="terminal-loading-label flex items-center gap-2">
+                    <svg x-show="starting || connectionState === 'connecting' || connectionState === 'reconnecting'"
                         class="size-3 animate-spin" viewBox="0 0 24 24" fill="none">
                         <circle class="opacity-25" cx="12" cy="12" r="9" stroke="currentColor"
                             stroke-width="3" />
@@ -56,11 +57,11 @@
                             stroke-width="3" stroke-linecap="round" />
                     </svg>
                     <span
-                        x-text="connectionState === 'connecting' ? 'connecting…' : (connectionState === 'reconnecting' ? `reconnecting… (attempt ${reconnectAttempts})` : 'choose a container to start a session')"></span>
+                        x-text="connectionState === 'reconnecting' ? `reconnecting… (attempt ${reconnectAttempts})` : (starting ? 'connecting…' : (connectionState === 'connecting' ? 'connecting…' : 'choose a container to start a session'))"></span>
                 </div>
             </div>
             <div x-show="terminalActive" x-cloak
-                class="pointer-events-none absolute right-3 bottom-2 z-20 font-mono text-[10px] text-white/25"
+                class="terminal-session-expiry pointer-events-none absolute right-3 bottom-2 z-20 font-mono"
                 x-text="terminalSessionRemainingLabel()">
             </div>
         @else
@@ -78,8 +79,7 @@
                     : 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-24')
                 : @js($isApplicationConsole
                     ? 'terminal-host relative min-h-0 flex-1 overflow-hidden pt-[5px] pr-px pb-[5px] pl-1 bg-transparent'
-                    : 'terminal-host h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')"
-            x-show="terminalActive">
+                    : 'terminal-host h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')">
         </div>
 
         <div x-show="terminalActive" x-cloak

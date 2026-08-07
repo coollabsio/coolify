@@ -56,6 +56,21 @@ it('keeps the volume backup script inside the Livewire root element', function (
     expect(strrpos($view, '@endscript'))->toBeLessThan(strrpos($view, '</div>'));
 });
 
+it('shows the S3 configuration state in application and service backup tables', function () {
+    $views = [
+        resource_path('views/livewire/project/application/backup/index.blade.php'),
+        resource_path('views/livewire/project/service/volume-backup/index.blade.php'),
+    ];
+
+    foreach ($views as $view) {
+        expect(file_get_contents($view))
+            ->toContain('<span>S3</span>')
+            ->toContain("'Configured'")
+            ->toContain("'Unavailable'")
+            ->toContain("'Not set'");
+    }
+});
+
 it('targets named volumes and application directory mounts through one backup relation', function () {
     $team = Team::factory()->create();
     [$application, $volume] = createVolumeBackupApplication($team);

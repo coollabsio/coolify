@@ -500,11 +500,6 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .applica
     backdrop-filter: none;
 }
 
-html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-block::before {
-    background: transparent;
-    backdrop-filter: none;
-}
-
 html:not(.dark) .application-console-shell[data-console-theme="system"] .application-console-header [class*="text-white"] {
     color: #52525b !important;
 }
@@ -678,7 +673,7 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell {
     inset: 0 !important;
     z-index: 100000 !important;
     width: 100vw !important;
-    height: 100dvh !important;
+    height: auto !important;
     max-width: none !important;
     margin: 0 !important;
     overflow: hidden !important;
@@ -707,23 +702,109 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     backdrop-filter: blur(20px);
 }
 
+.terminal-loading-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: rgb(255 255 255 / 0.75);
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-loading-label {
+    color: #52525b;
+}
+
+.terminal-session-expiry {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgb(255 255 255 / 0.6);
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-expiry,
+html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-expiry {
+    color: #52525b;
+}
+
+.terminal-target-picker {
+    color: rgb(255 255 255 / 0.75);
+    background: rgb(0 0 0 / 0.18);
+    border-color: rgb(255 255 255 / 0.1);
+    backdrop-filter: blur(16px);
+}
+
+.terminal-session-panel {
+    border: 0;
+    border-radius: 0.75rem;
+    background: transparent;
+    box-shadow: none;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-panel {
+    background: transparent;
+}
+
+.terminal-target-list {
+    scrollbar-width: thin;
+    scrollbar-color: var(--terminal-scrollbar, rgb(255 255 255 / 0.3)) transparent;
+}
+
+.terminal-target-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.terminal-target-list::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background: var(--terminal-scrollbar, rgb(255 255 255 / 0.3));
+    background-clip: padding-box;
+}
+
+.terminal-target-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-target-picker {
+    color: #52525b;
+    background: #fff;
+    border-color: #d4d4d8;
+    box-shadow: 0 18px 50px rgb(0 0 0 / 0.18);
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-target-picker [class*="text-white"] {
+    color: #52525b !important;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-target-picker input {
+    color: #27272a !important;
+    background: #f4f4f5 !important;
+    border-color: #d4d4d8 !important;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-target-picker input::placeholder {
+    color: #71717a !important;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-target-picker button:hover {
+    color: #18181b !important;
+    background: #f4f4f5;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-theme-trigger {
+    color: #52525b;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-target-trigger {
+    color: #52525b;
+}
+
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-theme-trigger:hover,
+html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-target-trigger:hover {
+    color: #18181b;
+    background: rgb(0 0 0 / 0.06);
+}
+
 .application-console-block {
-    /* Keep backdrop blur on a pseudo-element so position:fixed descendants
-       (terminal fullscreen) are not trapped by a backdrop-filter containing block. */
     position: relative;
     z-index: 1;
     isolation: isolate;
-}
-
-.application-console-block::before {
-    position: absolute;
-    z-index: -1;
-    inset: 0;
-    border-radius: inherit;
-    background: rgb(0 0 0 / 0.56);
-    backdrop-filter: blur(10px);
-    content: "";
-    pointer-events: none;
 }
 
 .terminal-fullscreen-btn {
@@ -733,10 +814,9 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
     align-items: center;
     justify-content: center;
     border-radius: 0.375rem;
-    border: 1px solid rgb(255 255 255 / 0.08);
-    background: rgb(0 0 0 / 0.55);
-    color: rgb(255 255 255 / 0.65);
-    backdrop-filter: blur(8px);
+    border: 0;
+    background: transparent;
+    color: var(--terminal-scrollbar, rgb(255 255 255 / 0.65));
     transition:
         background-color 150ms ease,
         color 150ms ease,
@@ -744,8 +824,8 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 }
 
 .terminal-fullscreen-btn:hover {
-    background: rgb(255 255 255 / 0.08);
-    color: rgb(255 255 255 / 0.95);
+    background: color-mix(in srgb, var(--terminal-scrollbar, #fff) 18%, transparent);
+    color: var(--terminal-scrollbar, #fff);
 }
 
 /*
@@ -2149,7 +2229,7 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 5rem;
 }
 
 /* Persistent storage volumes: Name | Source | Destination | [PR suffix] | Backup | [Actions] */
@@ -2383,11 +2463,12 @@ input[type="search"]::-webkit-search-results-decoration {
 
 @media (max-width: 900px) {
     .backup-table-grid {
-        grid-template-columns: minmax(10rem, 1.5fr) 6rem 7.5rem minmax(8rem, 1fr);
+        grid-template-columns: minmax(10rem, 1.5fr) 6rem 7.5rem 6.5rem;
     }
 
     .backup-table-grid > :nth-child(3),
-    .backup-table-grid > :nth-child(6) {
+    .backup-table-grid > :nth-child(6),
+    .backup-table-grid > :nth-child(7) {
         display: none;
     }
 
@@ -2443,11 +2524,10 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-table-grid {
-        grid-template-columns: minmax(0, 1fr) 7.5rem;
+        grid-template-columns: minmax(0, 1fr) 7.5rem 6.5rem;
     }
 
-    .backup-table-grid > :nth-child(2),
-    .backup-table-grid > :nth-child(5) {
+    .backup-table-grid > :nth-child(2) {
         display: none;
     }
 

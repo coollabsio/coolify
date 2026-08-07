@@ -152,6 +152,7 @@ export function initializeTerminalComponent() {
         return {
             fullscreen: false,
             terminalActive: false,
+            starting: false,
             message: '(connection closed)',
             term: null,
             fitAddon: null,
@@ -203,6 +204,7 @@ export function initializeTerminalComponent() {
                 : 'system',
 
             init() {
+                this.starting = this.$el.dataset.autoStart === 'true';
                 this.themeObserver = new MutationObserver(() => {
                     if (this.selectedTheme === 'system') {
                         applicationTerminalThemes.system = createSystemTerminalTheme();
@@ -676,6 +678,7 @@ export function initializeTerminalComponent() {
                 }
 
                 if (event.data === 'pty-ready') {
+                    this.starting = false;
                     if (!this.term._initialized) {
                         this.term.open(document.getElementById('terminal'));
                         this.term._initialized = true;
@@ -715,6 +718,7 @@ export function initializeTerminalComponent() {
                     // Notify parent component that terminal is connected
                     this.$wire.dispatch('terminalConnected');
                 } else if (event.data === 'unprocessable') {
+                    this.starting = false;
                     if (this.term) this.term.reset();
                     this.terminalActive = false;
                     this.lastSentCommand = null;
@@ -724,6 +728,7 @@ export function initializeTerminalComponent() {
                     // Notify parent component that terminal connection failed
                     this.$wire.dispatch('terminalDisconnected');
                 } else if (event.data === 'pty-exited') {
+                    this.starting = false;
                     this.exitFullscreen();
                     this.mobileToolbarCollapsed = false;
                     this.terminalActive = false;

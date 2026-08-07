@@ -179,6 +179,7 @@
                         <span>Type</span>
                         <span>Schedule</span>
                         <span>Status</span>
+                        <span>S3</span>
                         <span>Last run</span>
                         <span class="text-right">Executions</span>
                     </div>
@@ -213,6 +214,10 @@
                             <span>{{ $backup->targetType() }}</span>
                             <span>{{ $backup->frequency }}</span>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
+                            <span title="{{ $backup->save_s3 ? ($backup->s3?->name ?? 'S3 storage unavailable') : 'S3 storage is not configured' }}">
+                                <x-status-badge :status="$backup->save_s3 ? ($backup->s3 ? 'Configured' : 'Unavailable') : 'Not set'"
+                                    :type="$backup->save_s3 ? ($backup->s3 ? 'success' : 'error') : 'neutral'" />
+                            </span>
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
                             </span>
