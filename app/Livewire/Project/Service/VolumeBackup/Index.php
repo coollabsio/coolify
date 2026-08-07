@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Project\Service\VolumeBackup;
 
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
+use App\Models\ServiceDatabase;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -30,6 +32,18 @@ class Index extends Component
 
     public function render(): View
     {
+        $databaseTargets = $this->service->databases->filter(
+            fn (ServiceDatabase $database): bool => $database->isBackupSolutionAvailable(),
+        );
+
+        $databaseBackups = ScheduledDatabaseBackup::query()
+            ->with(['database', 'latest_log', 's3'])
+            ->withCount('executions')
+            ->where('database_type', (new ServiceDatabase)->getMorphClass())
+            ->whereHasMorph('database', [ServiceDatabase::class], fn ($query) => $query->where('service_id', $this->service->id))
+            ->latest()
+            ->get();
+
         $backups = ScheduledVolumeBackup::query()
             ->with(['backupable.resource', 'latestExecution', 's3'])
             ->withCount('executions')
@@ -37,7 +51,11 @@ class Index extends Component
             ->latest()
             ->get();
 
-        return view('livewire.project.service.volume-backup.index', ['backups' => $backups]);
+        return view('livewire.project.service.volume-backup.index', [
+            'backups' => $backups,
+            'databaseBackups' => $databaseBackups,
+            'databaseTargets' => $databaseTargets,
+        ]);
     }
 
     private function findService(): Service
