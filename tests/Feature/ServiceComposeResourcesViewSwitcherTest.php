@@ -54,3 +54,10 @@ it('distinguishes domain management from resource settings', function () {
         ->toContain('title="Resource settings" aria-label="Resource settings"')
         ->not->toContain('title="Edit domains" aria-label="Edit domains"');
 });
+
+it('does not display application domains on compose resource cards', function () {
+    $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
+
+    expect($resourceCard)
+        ->not->toContain('{{ $resource->fqdn }}');
+});

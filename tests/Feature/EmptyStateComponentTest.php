@@ -42,6 +42,38 @@ it('insets empty states nested inside a flush settings section wrapper', functio
     expect($css)->toContain('.application-settings-section-body.is-flush > div:has(> .empty-state:only-child)');
 });
 
+it('insets the backup executions empty state from the table header', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
+
+    expect($view)->toMatch('/@empty\s*<div class="p-4">\s*<x-empty size="sm" title="No backup executions"/');
+});
+
+it('keeps backup execution actions compact', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+    $view = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
+
+    expect($css)
+        ->toContain('grid-template-columns: 6.5rem minmax(7rem, 1fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;')
+        ->and($view)
+        ->toContain('title="Download backup" aria-label="Download backup"')
+        ->toContain('<x-reicon name="upload" class="size-3.5 rotate-180" />')
+        ->toContain('title="Delete backup" aria-label="Delete backup"')
+        ->toContain('<x-reicon name="trash" class="size-3.5" />');
+});
+
+it('uses the compact resource table styling for backup executions', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toContain('class="data-table deployment-table-scroll"')
+        ->toContain('data-table-header backup-executions-table-grid h-auto rounded-none px-4 py-2.5 text-[11px]')
+        ->toContain('data-table-row backup-executions-table-grid min-h-14 px-4 py-2.5')
+        ->toContain('flex min-h-11 items-center justify-between border-t')
+        ->and($css)
+        ->toMatch('/\.backup-executions-table-grid\s*\{[^}]*gap:\s*0\.75rem;[^}]*min-width:\s*49rem;/');
+});
+
 it('renders compact size without the full-page min height class', function () {
     $html = $this->blade(
         '<x-empty title="No cloud tokens" description="Add a provider token." icon-name="keys" size="sm" />'

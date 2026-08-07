@@ -15,6 +15,18 @@ it('renders the resource terminal shell while containers are discovered', functi
         ->not->toContain('<x-loading text="Loading containers" />');
 });
 
+it('provides opt-in diagnostics for connected terminal theme changes', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($terminalClient)
+        ->toContain('terminal-debug')
+        ->toContain("'[Terminal Theme] Applying theme'")
+        ->toContain("'[Terminal Theme] Theme applied'")
+        ->toContain('requestedTheme: themeName')
+        ->toContain('shellTheme: shell?.dataset.consoleTheme')
+        ->toContain("getComputedStyle(shell, '::before').background");
+});
+
 it('starts a single discovered resource container without waiting for a missed browser event', function () {
     $terminalComponent = file_get_contents(app_path('Livewire/Project/Shared/ExecuteContainerCommand.php'));
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
@@ -132,6 +144,17 @@ it('shows connection progress in the terminal body instead of the header', funct
         ->toContain("this.starting = this.\$el.dataset.autoStart === 'true';");
 });
 
+it('starts the global terminal only once when a target is selected', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $component = file_get_contents(app_path('Livewire/Terminal/Index.php'));
+
+    expect($view)
+        ->toContain("await \$wire.set('selected_uuid', target.value);")
+        ->not->toContain('await $wire.connectToContainer();')
+        ->and($component)
+        ->toMatch('/public function updatedSelectedUuid\(\).*?\$this->connectToContainer\(\);/s');
+});
+
 it('uses the redesigned terminal canvas and controls on resource terminal pages', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
 
@@ -171,11 +194,12 @@ it('mounts the realtime terminal utilities in local development compose files', 
     'maxio dev compose' => 'docker-compose-maxio.dev.yml',
 ]);
 
-it('keeps terminal browser logging restricted to Vite development mode', function () {
+it('keeps terminal browser logging restricted to development or explicit diagnostics', function () {
     $terminalClient = file_get_contents(base_path('resources/js/terminal.js'));
 
     expect($terminalClient)
-        ->toContain('const terminalDebugEnabled = import.meta.env.DEV;')
+        ->toContain('const terminalDebugEnabled = import.meta.env.DEV')
+        ->toContain("localStorage.getItem('coolify-terminal-debug') === '1'")
         ->toContain("logTerminal('log', '[Terminal] WebSocket connection established.');")
         ->not->toContain("console.log('[Terminal] WebSocket connection established. Cool cool cool cool cool cool.');");
 });

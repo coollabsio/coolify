@@ -46,6 +46,12 @@ beforeEach(function () {
 });
 
 describe('GitLab App authorization', function () {
+    test('empty gitlab app state is inset from the section edges', function () {
+        $view = file_get_contents(resource_path('views/livewire/project/new/gitlab-private-repository.blade.php'));
+
+        expect($view)->toContain("<div class=\"application-settings-section-body\">\n                <x-empty title=\"No GitLab Apps\"");
+    });
+
     test('unrelated users cannot inspect system-wide source secrets in the component payload', function () {
         $otherTeam = Team::factory()->create();
         $systemWideSource = GitlabApp::create([

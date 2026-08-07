@@ -253,7 +253,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             } catch (Exception) {
                 $timestamp->setTimezone('UTC');
             }
-            data_set($i, 'timestamp', $timestamp->format('Y-M-d H:i:s.u'));
+            data_set($i, 'timestamp', $timestamp->format('Y-M-d H:i:s'));
 
             return $i;
         })

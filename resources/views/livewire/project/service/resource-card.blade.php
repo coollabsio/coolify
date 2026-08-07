@@ -38,13 +38,6 @@
                 </p>
             @endif
 
-            @if ($isApplication && $resource->fqdn)
-                <div class="mt-2 min-w-0">
-                    <span class="min-w-0 truncate text-xs text-neutral-500 dark:text-fg-dim">
-                        {{ $resource->fqdn }}
-                    </span>
-                </div>
-            @endif
         </div>
         </div>
 
@@ -91,9 +84,6 @@
             </div>
             <div class="min-w-0">
                 <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $resourceName }}</div>
-                @if ($isApplication && $resource->fqdn)
-                    <div class="truncate text-[11px] text-neutral-500 sm:hidden dark:text-fg-faint">{{ $resource->fqdn }}</div>
-                @endif
             </div>
         </div>
         <div class="hidden truncate font-mono text-xs text-neutral-500 sm:block dark:text-fg-faint">

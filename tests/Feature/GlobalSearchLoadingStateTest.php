@@ -25,3 +25,10 @@ it('uses a single Alpine result renderer for every command palette result type',
         ->toContain('x-for="(result, index) in searchResults"')
         ->toContain('x-for="[categoryName, items] in Object.entries(groupedCreatableItems)"');
 });
+
+it('skips hidden command palette results during keyboard navigation', function () {
+    $view = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
+
+    expect($view)
+        ->toContain('filter(item => item.offsetParent !== null)');
+});

@@ -198,17 +198,18 @@
                                 </div>
                             @endif
 
-                            <x-slide-over closeWithX fullScreen>
+                            <x-process-dialog closeWithX size="xl" :open="$isValidating">
                                 <x-slot:title>Validate and configure</x-slot:title>
                                 <x-slot:content>
-                                    <livewire:server.validate-and-install :server="$server" :ask="$server->isFunctional()" />
+                                    <livewire:server.validate-and-install :server="$server"
+                                        :ask="$server->isFunctional() && ! $isValidating" />
                                 </x-slot:content>
-                                <x-forms.button type="button"
-                                    @click="slideOverOpen=true" wire:click.prevent="validateServer">
-                                    <x-reicon name="refresh" class="size-3.5" />
+                                <x-forms.button type="button" :isHighlighted="! $server->isFunctional()"
+                                    @click="processDialogOpen = true" wire:click.prevent="validateServer">
+                                    <x-reicon :name="$server->isFunctional() ? 'refresh' : 'alert-circle'" class="size-3.5" />
                                     {{ $server->isFunctional() ? 'Revalidate connection' : 'Validate connection' }}
                                 </x-forms.button>
-                            </x-slide-over>
+                            </x-process-dialog>
                         </x-slot:actions>
 
                         @if ($server->isTransferredAway())
@@ -275,10 +276,11 @@
                                 @if ($isBuildServerLocked)
                                     <x-forms.checkbox disabled id="isBuildServer"
                                         helper="This server already hosts resources and cannot become build-only."
-                                        label="Use as a build server" />
+                                        label="Use as a dedicated build server" />
                                 @else
                                     <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                                        id="isBuildServer" label="Use as a build server"
+                                        id="isBuildServer" label="Use as a dedicated build server"
+                                        helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
                                         :disabled="$isValidating" />
                                 @endif
                             </div>
@@ -295,17 +297,6 @@
                         </x-application.settings-section>
                     @endif
                 </form>
-            @endif
-
-            @if ($isValidating)
-                <div x-data="{ slideOverOpen: true }">
-                    <x-slide-over closeWithX fullScreen>
-                        <x-slot:title>Validation in progress</x-slot:title>
-                        <x-slot:content>
-                            <livewire:server.validate-and-install :server="$server" />
-                        </x-slot:content>
-                    </x-slide-over>
-                </div>
             @endif
         </div>
     </div>

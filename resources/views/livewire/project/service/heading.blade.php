@@ -78,7 +78,7 @@
                         :aria-expanded="open" aria-haspopup="menu">
                         <span class="inline-flex items-center gap-2">
                             <x-loading-on-button x-show="deploying" x-cloak />
-                            <x-reicon name="play-circle" class="size-3.5 opacity-70" x-show="!deploying" />
+                            <x-reicon name="play-circle" class="size-3.5 text-warning" x-show="!deploying" />
                             <span x-text="deploying ? 'Deploying…' : 'Actions'">Actions</span>
                         </span>
                         <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
@@ -189,7 +189,7 @@
                             <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
                                 @click.outside="open = false" @keydown.escape.window="open = false">
                                 <button type="button" class="button" @click="open = !open" :aria-expanded="open">
-                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
                                     Actions
                                     <x-reicon name="chevron-down" class="size-3 opacity-55" />
                                 </button>

@@ -301,7 +301,7 @@ YAML,
     $parsedCompose = applicationParser($application);
     $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
-    expect($labels->contains(fn (string $label): bool => str_contains($label, 'redirectregex.replacement=${1}://www.${2}')))->toBeTrue();
+    expect($labels->contains(fn (string $label): bool => str_contains($label, 'redirectregex.replacement=$${1}://www.$${2}')))->toBeTrue();
 });
 
 test('compose domain reconciliation preserves stored domains when parsing returns no services', function () {

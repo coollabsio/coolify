@@ -5,6 +5,8 @@ it('uses a database list editor instead of a comma-separated text field', functi
 
     expect($view)
         ->toContain('<div class="grid w-full gap-4">')
+        ->toContain("['value' => true, 'label' => 'All databases']")
+        ->toContain("['value' => false, 'label' => 'Specific databases']")
         ->toContain("value: @entangle('databasesToBackup').live")
         ->toContain('class="chip-input"')
         ->toContain('class="chip font-mono"')

@@ -3,6 +3,7 @@
 namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
+use App\Models\S3Storage;
 use App\Rules\ValidDnsServers;
 use App\Rules\ValidIpOrCidr;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -50,6 +51,10 @@ class Advanced extends Component
 
     public ?string $domain_connect_private_key = null;
 
+    public string $avatar_storage = 'local';
+
+    public array $avatar_storage_options = [];
+
     public function rules()
     {
         return [
@@ -89,6 +94,21 @@ class Advanced extends Component
         $this->webhook_allow_localhost = $this->settings->webhook_allow_localhost ?? false;
         // Do not prefill the secret into the form; only update when the admin pastes a new value.
         $this->domain_connect_private_key = null;
+        $this->avatar_storage = $this->settings->avatar_storage_type === 's3' && $this->settings->avatar_s3_storage_id
+            ? 's3:'.$this->settings->avatar_s3_storage_id
+            : 'local';
+        $this->avatar_storage_options = [
+            ['value' => 'local', 'label' => 'Local storage'],
+            ...S3Storage::query()
+                ->whereTeamId(0)
+                ->where('is_usable', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (S3Storage $storage): array => [
+                    'value' => 's3:'.$storage->id,
+                    'label' => $storage->name.' (S3)',
+                ])->all(),
+        ];
     }
 
     public function submit()
@@ -190,11 +210,35 @@ class Advanced extends Component
             $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
             $this->settings->webhook_allowed_internal_hosts = $webhookAllowedInternalHosts ?? $this->settings->webhook_allowed_internal_hosts ?? [];
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
+            $this->saveAvatarStorageSetting();
             $this->settings->save();
             $this->dispatch('success', 'Settings updated!');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function saveAvatarStorageSetting(): void
+    {
+        if ($this->avatar_storage === 'local') {
+            $this->settings->avatar_storage_type = 'local';
+            $this->settings->avatar_s3_storage_id = null;
+
+            return;
+        }
+
+        $storageId = (int) str($this->avatar_storage)->after('s3:')->value();
+        $storage = S3Storage::query()
+            ->whereTeamId(0)
+            ->where('is_usable', true)
+            ->find($storageId);
+
+        if (! $storage || $this->avatar_storage !== 's3:'.$storage->id) {
+            throw new \InvalidArgumentException('The selected avatar storage is not available.');
+        }
+
+        $this->settings->avatar_storage_type = 's3';
+        $this->settings->avatar_s3_storage_id = $storage->id;
     }
 
     public function clearDomainConnectPrivateKey(): void

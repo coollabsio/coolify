@@ -134,6 +134,19 @@
                         ]" />
                 </div>
             </x-application.settings-section>
+
+            <x-application.settings-section id="avatar-storage-section" title="Profile picture storage"
+                helper="Choose where compressed user profile pictures are stored. Use S3 for multi-instance or cloud deployments so every application replica can access the same files.">
+                <div class="max-w-md">
+                    <x-forms.listbox id="avatar_storage" label="Storage destination" onChange="instantSave"
+                        :options="$avatar_storage_options" />
+                </div>
+                @if (count($avatar_storage_options) === 1)
+                    <x-callout type="info" title="No usable S3 storage configured" class="mt-4">
+                        Add and test an S3-compatible storage under Storages before selecting it here.
+                    </x-callout>
+                @endif
+            </x-application.settings-section>
         </form>
     </x-settings.layout>
 </div>

@@ -1,5 +1,6 @@
 @props([
     'closeWithX' => false,
+    'open' => false,
     'size' => 'lg',
 ])
 
@@ -15,7 +16,7 @@
      ghost layout box above layer-2 tabs. Trigger buttons in the slot still flow
      into the parent as if unwrapped. --}}
 <div x-data="{
-        processDialogOpen: false
+        processDialogOpen: @js($open)
     }"
     x-init="$watch('processDialogOpen', value => {
         if (!value) {

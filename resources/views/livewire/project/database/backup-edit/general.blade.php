@@ -31,8 +31,8 @@
                     || $backup->database_type === 'App\Models\StandaloneMariadb')
                 <div class="grid w-full gap-4">
                     <x-forms.listbox id="dumpAll" label="Database selection" onChange="instantSave" :options="[
-                        ['value' => true, 'label' => 'Back up all databases'],
-                        ['value' => false, 'label' => 'Choose databases'],
+                        ['value' => true, 'label' => 'All databases'],
+                        ['value' => false, 'label' => 'Specific databases'],
                     ]" />
                     @if (! $backup->dump_all)
                         <div class="w-full" x-data="{

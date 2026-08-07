@@ -114,9 +114,10 @@ class Sentinel extends Component
 
                     return;
                 }
-                $this->isSentinelEnabled = true;
                 $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
                 StartSentinel::run($this->server, true, null, $customImage);
+                $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
+                $this->isSentinelEnabled = true;
             } else {
                 $this->isSentinelEnabled = false;
                 $this->isMetricsEnabled = false;

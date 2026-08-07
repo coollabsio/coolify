@@ -13,9 +13,15 @@
     appearanceOpen: false,
     theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
     themeColor: localStorage.getItem('themeColor') || '#6b16ed',
-    setTheme(type) {
+    avatarUrl: @js($user?->avatar_path ? route('profile.avatar', ['v' => $user->updated_at->timestamp]) : null),
+    setTheme(type, closeMenu = true) {
         this.theme = type;
         localStorage.setItem('theme', type);
+
+        if (closeMenu) {
+            this.appearanceOpen = false;
+            this.open = false;
+        }
 
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         const isDark = type === 'dark' || type === 'custom' || (type === 'system' && prefersDark);
@@ -27,9 +33,9 @@
     },
     setThemeColor() {
         localStorage.setItem('themeColor', this.themeColor);
-        this.setTheme('custom');
+        this.setTheme('custom', false);
     },
-}" @keydown.escape.window="open = false; appearanceOpen = false"
+}" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="open = false; appearanceOpen = false"
     @click.outside="open = false; appearanceOpen = false">
     <button type="button" @click="open = !open"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
@@ -38,7 +44,9 @@
             'flex h-8 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 shadow-sm transition-colors hover:bg-neutral-200 dark:border-white/[0.08] dark:bg-white/[0.06] dark:hover:bg-white/[0.1]',
             'max-w-36' => $sidebar,
         ])>
-        <span
+        <img x-cloak x-show="avatarUrl" :src="avatarUrl" alt="{{ $userName }}"
+            class="size-5 shrink-0 rounded-full object-cover">
+        <span x-show="!avatarUrl"
             class="flex size-5 shrink-0 items-center justify-center rounded-full bg-neutral-200 text-[11px] font-semibold text-neutral-700 dark:bg-white/[0.1] dark:text-fg">
             {{ $userInitial }}
         </span>
@@ -52,12 +60,12 @@
         </svg>
     </button>
 
-    <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-        @class([
-            'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
-            'right-0! left-auto!' => ! $sidebar,
-            'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
-        ])>
+    <template x-if="open">
+        <div @class([
+                'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
+                'right-0! left-auto!' => ! $sidebar,
+                'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
+            ])>
         <div class="min-w-0 px-2 py-1.5">
             <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
             <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $userEmail }}</div>
@@ -162,5 +170,6 @@
                 </span>
             </button>
         </form>
-    </div>
+        </div>
+    </template>
 </div>

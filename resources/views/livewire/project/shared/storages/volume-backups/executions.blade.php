@@ -101,12 +101,13 @@
                                 @endif
                             </span>
 
-                            <span class="flex items-center justify-end gap-2">
+                            <span class="flex items-center justify-end gap-1">
                                 @if ($execution->status === 'success' && ! $execution->local_storage_deleted)
-                                    <x-forms.button
-                                        x-on:click="download_volume_backup_file('{{ $execution->id }}')">
-                                        Download
-                                    </x-forms.button>
+                                    <button type="button" class="icon-button shrink-0"
+                                        x-on:click="download_volume_backup_file('{{ $execution->id }}')"
+                                        title="Download backup" aria-label="Download backup">
+                                        <x-reicon name="upload" class="size-3.5 rotate-180" />
+                                    </button>
                                 @endif
                                 @if ($execution->status !== 'running')
                                     <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
@@ -116,7 +117,11 @@
                                         confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
                                         shortConfirmationLabel="Backup Filename">
                                         <x-slot:trigger>
-                                            <x-forms.button isError>Delete</x-forms.button>
+                                            <button type="button"
+                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                title="Delete backup" aria-label="Delete backup">
+                                                <x-reicon name="trash" class="size-3.5" />
+                                            </button>
                                         </x-slot:trigger>
                                     </x-modal-confirmation>
                                 @endif

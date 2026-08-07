@@ -12,10 +12,10 @@
         ['label' => 'Environment Variables', 'route' => 'project.database.environment-variables', 'icon' => 'variables'],
         ['label' => 'Persistent Storage', 'route' => 'project.database.persistent-storage', 'icon' => 'storages'],
         ['label' => 'Backups', 'route' => 'project.database.backup.index', 'icon' => 'database', 'visible' => $database->isBackupSolutionAvailable()],
+        ['label' => 'Import Backup', 'route' => 'project.database.import-backup', 'icon' => 'upload', 'navigate' => false, 'visible' => auth()->user()?->can('update', $database)],
         ['label' => 'Servers', 'route' => 'project.database.servers', 'icon' => 'servers'],
         ['label' => 'Runtime', 'route' => 'project.database.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.database.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
-        ['label' => 'Import Backup', 'route' => 'project.database.import-backup', 'icon' => 'upload', 'visible' => auth()->user()?->can('update', $database)],
         ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
         ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
@@ -32,7 +32,7 @@
         ]);
 
     $menuGroups = [
-        'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Backups', 'Servers', 'Import Backup'],
+        'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Backups', 'Import Backup', 'Servers'],
         'Automation' => ['Webhooks', 'Healthcheck'],
         'Logs' => ['Runtime'],
         'Operations' => ['Terminal', 'Resource Limits', 'Resource Operations', 'Metrics', 'Tags', 'Danger Zone'],
@@ -41,6 +41,19 @@
     $groupedItems = collect($menuGroups)
         ->map(fn (array $labels) => $configurationItems->whereIn('label', $labels)->values())
         ->filter(fn ($items) => $items->isNotEmpty());
+
+    $pageSections = $database->type() === 'standalone-postgresql'
+        ? [
+            ['id' => 'database-details-section', 'label' => 'Database details'],
+            ['id' => 'credentials-section', 'label' => 'Credentials'],
+            ['id' => 'initialization-section', 'label' => 'Initialization'],
+            ['id' => 'runtime-network-section', 'label' => 'Runtime and network'],
+            ['id' => 'public-access-section', 'label' => 'Public access'],
+            ['id' => 'configuration-section', 'label' => 'Configuration'],
+            ['id' => 'log-delivery-section', 'label' => 'Log delivery'],
+            ['id' => 'initialization-scripts-section', 'label' => 'Initialization scripts'],
+        ]
+        : [];
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start">
@@ -58,6 +71,24 @@
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                 </a>
+                @if ($menuItem['active'] && $menuItem['route'] === 'project.database.configuration' && $pageSections !== [])
+                    <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"
+                        x-data="{
+                            activeSection: '',
+                            scrollToSection(id) {
+                                this.activeSection = id;
+                                window.scrollToSettingsSection?.(id);
+                            },
+                        }">
+                        @foreach ($pageSections as $section)
+                            <button type="button" class="menu-subitem"
+                                :class="activeSection === '{{ $section['id'] }}' && 'menu-subitem-active'"
+                                @click="scrollToSection('{{ $section['id'] }}')">
+                                <span class="menu-item-label text-left">{{ $section['label'] }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
             @endforeach
         @endforeach
     </nav>

@@ -15,7 +15,12 @@ it('matches the storage backup overview layout', function () {
         ->toContain('placeholder="Search backups"')
         ->toContain('data-table overflow-hidden rounded-xl border')
         ->toContain('<span class="block truncate text-[12px] font-semibold')
-        ->toContain('<a class="button" {{ wireNavigate() }} href="{{ $backupRoute }}">Manage</a>')
+        ->toContain("route('project.database.backup.execution'")
+        ->toContain("route('project.service.database.backup.show'")
+        ->toContain("route('project.database.backup.executions'")
+        ->toContain("route('project.service.database.backup.executions'")
+        ->toContain('<a wire:navigate href="{{ $backupExecutionsRoute }}"')
+        ->toContain('<a class="button" wire:navigate href="{{ $backupRoute }}">Manage</a>')
         ->and($component)->toContain("withCount('executions')");
 });
 
