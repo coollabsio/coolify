@@ -2,8 +2,16 @@
     @if ($limit_reached)
         <x-limit-reached name="servers" />
     @elseif ($current_step === 1)
-        <x-server.provider-token-picker provider="vultr" providerLabel="Vultr"
-            :tokens="$available_tokens" />
+        <div class="flex flex-col gap-6">
+            <x-server.provider-token-picker provider="vultr" providerLabel="Vultr"
+                :tokens="$available_tokens" />
+            <p class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                New to Vultr?
+                <a href="https://coolify.io/vultr" target="_blank"
+                    class="font-medium text-coollabs hover:underline dark:text-warning">Create an account</a>
+                through Coolify's affiliate link.
+            </p>
+        </div>
     @elseif ($current_step === 2)
         <div wire:init="loadVultrData">
             @if ($loading_data)

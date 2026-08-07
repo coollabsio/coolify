@@ -228,7 +228,7 @@ class ServerSetting extends Model
         }
 
         if (blank($url)) {
-            throw new \RuntimeException('Set an instance FQDN or public IP before enabling Sentinel.');
+            throw new \RuntimeException('Set an instance FQDN, public IP, or reachable Coolify URL before enabling Sentinel.');
         }
 
         return $url;
@@ -246,6 +246,8 @@ class ServerSetting extends Model
             $domain = 'http://'.$settings->public_ipv4.':8000';
         } elseif ($settings->public_ipv6) {
             $domain = 'http://'.$settings->public_ipv6.':8000';
+        } else {
+            $domain = $this->sentinelUrlFromCurrentRequest();
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {
@@ -257,6 +259,29 @@ class ServerSetting extends Model
         }
 
         return $domain;
+    }
+
+    private function sentinelUrlFromCurrentRequest(): ?string
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = request();
+        $host = strtolower($request->getHost());
+
+        if (
+            $host === 'localhost' ||
+            str_ends_with($host, '.localhost') ||
+            $host === '::1' ||
+            $host === '::' ||
+            $host === '0.0.0.0' ||
+            str_starts_with($host, '127.')
+        ) {
+            return null;
+        }
+
+        return $request->getSchemeAndHttpHost();
     }
 
     public function server()

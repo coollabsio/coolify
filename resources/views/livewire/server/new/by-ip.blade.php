@@ -79,7 +79,7 @@
                 <div x-data="{ advancedOpen: false }"
                     class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                     <button type="button" @click="advancedOpen = !advancedOpen"
-                        class="flex w-full items-center justify-between gap-3 text-left text-[13px] font-medium text-neutral-600 dark:text-fg-dim"
+                        class="flex w-full cursor-pointer items-center justify-between gap-3 text-left text-[13px] font-medium text-neutral-600 dark:text-fg-dim"
                         :aria-expanded="advancedOpen">
                         Advanced settings
                         <x-reicon name="chevron-down" class="size-3.5 transition-transform"

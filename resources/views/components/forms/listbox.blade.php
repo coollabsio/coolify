@@ -11,6 +11,7 @@
     'wire' => true, // false = purely client-side value (no Livewire binding)
     'value' => null, // initial value when wire=false
     'disabled' => false,
+    'tooltip' => true,
 ])
 
 <div class="w-full min-w-0">
@@ -53,7 +54,7 @@
         @click.outside="open = false" @keydown.escape="open = false">
         <button id="{{ $id }}-trigger" type="button" class="listbox-trigger" @click="open = !open"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
-            :aria-expanded="open" :title="current">
+            :aria-expanded="open" @if ($tooltip) :title="current" @endif>
             <span class="listbox-trigger-label" x-text="current"></span>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
                 stroke="currentColor" class="size-3.5 shrink-0 opacity-60">

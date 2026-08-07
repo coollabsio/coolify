@@ -97,8 +97,12 @@
                     <x-slot:actions>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
                             <button
-                                class="group relative min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]"
+                                class="group relative cursor-pointer min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
                                 wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">
+                                <span role="button" tabindex="0" aria-label="About this machine"
+                                    data-tooltip="The machine running Coolify. Not recommended for production workloads due to resource contention."
+                                    @click.stop @keydown.enter.stop @keydown.space.prevent.stop
+                                    class="absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border border-neutral-200 text-[11px] font-semibold text-neutral-500 hover:border-coollabs/35 hover:text-coollabs dark:border-white/[0.1] dark:text-fg-dim dark:hover:border-warning/30 dark:hover:text-warning">i</span>
                                 <div class="flex flex-col gap-4 text-left">
                                     <svg class="size-10" xmlns="http://www.w3.org/2000/svg" fill="none"
                                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -117,8 +121,12 @@
 
 
                             <button
-                                class="group relative min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]"
+                                class="group relative cursor-pointer min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
                                 wire:target="setServerType('remote')" wire:click="setServerType('remote')">
+                                <span role="button" tabindex="0" aria-label="About remote servers"
+                                    data-tooltip="Any SSH-accessible server, including cloud VPS, bare metal, and self-hosted infrastructure."
+                                    @click.stop @keydown.enter.stop @keydown.space.prevent.stop
+                                    class="absolute top-3 right-3 flex size-6 items-center justify-center rounded-full border border-neutral-200 text-[11px] font-semibold text-neutral-500 hover:border-coollabs/35 hover:text-coollabs dark:border-white/[0.1] dark:text-fg-dim dark:hover:border-warning/30 dark:hover:text-warning">i</span>
                                 <div class="flex flex-col gap-4 text-left">
                                     <svg class="size-10" xmlns="http://www.w3.org/2000/svg" fill="none"
                                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -138,7 +146,7 @@
                                     <x-modal-input title="Connect a Hetzner Server" isFullWidth>
                                         <x-slot:content>
                                             <div
-                                                class="group relative flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]">
+                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                                 <div class="flex h-full flex-col gap-4 text-left">
                                                     <svg class="size-10 shrink-0" viewBox="0 0 200 200"
                                                         xmlns="http://www.w3.org/2000/svg">
@@ -160,7 +168,7 @@
                                     <x-modal-input title="Connect a Vultr Server" isFullWidth>
                                         <x-slot:content>
                                             <div
-                                                class="group relative flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]">
+                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                                 <div class="flex h-full flex-col gap-4 text-left">
                                                     <svg class="size-10 shrink-0" viewBox="0 0 200 200"
                                                         xmlns="http://www.w3.org/2000/svg">
@@ -178,6 +186,23 @@
                                             </div>
                                         </x-slot:content>
                                         <livewire:server.new.by-vultr :limit_reached="false" :from_onboarding="true" />
+                                    </x-modal-input>
+                                    <x-modal-input title="Connect a DigitalOcean Server" isFullWidth>
+                                        <x-slot:content>
+                                            <div
+                                                class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                                <div class="flex h-full flex-col gap-4 text-left">
+                                                    <x-digital-ocean-icon class="size-10 shrink-0" />
+                                                    <div class="min-h-0 flex-1">
+                                                        <h3 class="mb-1 text-[14px] font-semibold">DigitalOcean</h3>
+                                                        <p class="text-sm dark:text-neutral-400">
+                                                            Deploy servers directly from your DigitalOcean account.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </x-slot:content>
+                                        <livewire:server.new.by-digital-ocean :limit_reached="false" :from_onboarding="true" />
                                     </x-modal-input>
                                 @endif
                             @endcan
@@ -229,20 +254,6 @@
                             </div>
                         @endif
                     </x-slot:actions>
-                    <x-slot:explanation>
-                        <p>
-                            <x-highlighted text="Servers" /> host your applications, databases, and services (collectively
-                            called resources). All CPU-intensive operations run on the target server.
-                        </p>
-                        <p>
-                            <x-highlighted text="Localhost:" /> The machine running Coolify. Not recommended for production
-                            workloads due to resource contention.
-                        </p>
-                        <p>
-                            <x-highlighted text="Remote Server:" /> Any SSH-accessible server: cloud providers (AWS, Hetzner,
-                            DigitalOcean), bare metal, or self-hosted infrastructure.
-                        </p>
-                    </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'private-key')
                 <x-boarding-progress :currentStep="2" />
@@ -268,7 +279,7 @@
                                         class="flex flex-col gap-3 sm:flex-row sm:items-end">
                                         <div class="min-w-0 flex-1">
                                             <x-forms.listbox id="selectedExistingPrivateKey"
-                                                label="Existing SSH key" :options="$privateKeyOptions" />
+                                                label="Existing SSH key" :options="$privateKeyOptions" :tooltip="false" />
                                         </div>
                                         <x-forms.button type="submit">Use selected key</x-forms.button>
                                     </form>
@@ -288,7 +299,7 @@
                         @endif
                         <div class="grid w-full grid-cols-1 gap-3 lg:grid-cols-2">
                             <button type="button"
-                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]"
+                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
                                 wire:target="setPrivateKey('own')" wire:click="setPrivateKey('own')">
                                 <span
                                     class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -302,7 +313,7 @@
                                 </span>
                             </button>
                             <button type="button"
-                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-coollabs/35 hover:bg-coollabs/[0.03] dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-warning/25 dark:hover:bg-warning/[0.04]"
+                                class="group flex h-full min-h-28 items-start gap-3 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
                                 wire:target="setPrivateKey('create')" wire:click="setPrivateKey('create')">
                                 <span
                                     class="flex size-9 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -446,21 +457,6 @@
                             <x-forms.button type="submit" class="w-full lg:w-auto">Validate Connection</x-forms.button>
                         </form>
                     </x-slot:actions>
-                    <x-slot:explanation>
-                        <p>
-                            <x-highlighted text="Connection Requirements:" /> Server must be accessible via SSH on the
-                            specified port (default 22).
-                        </p>
-                        <p>
-                            <x-highlighted text="Hostname Resolution:" /> Use IP addresses for direct connections or ensure
-                            DNS resolution is configured.
-                        </p>
-                        <p>
-                            <x-highlighted text="User Permissions:" /> Root or sudo-enabled users recommended for full
-                            Docker
-                            management capabilities.
-                        </p>
-                    </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'validate-server')
                 <x-boarding-progress :currentStep="2" />
@@ -582,22 +578,6 @@
                             @endif
                         </div>
                     </x-slot:actions>
-                    <x-slot:explanation>
-                        <p>
-                            <x-highlighted text="Project Organization:" /> Group related resources (apps, databases,
-                            services)
-                            into logical projects.
-                        </p>
-                        <p>
-                            <x-highlighted text="Environments:" /> Each project includes a production environment by
-                            default.
-                            Add staging, development, or custom environments as needed.
-                        </p>
-                        <p>
-                            <x-highlighted text="Team Access:" /> Projects inherit team permissions and can be managed
-                            collaboratively.
-                        </p>
-                    </x-slot:explanation>
                 </x-boarding-step>
             @elseif ($currentState === 'create-resource')
                 <x-boarding-progress :currentStep="3" />

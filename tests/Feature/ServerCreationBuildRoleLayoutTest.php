@@ -8,6 +8,7 @@ test('server creation keeps private key actions together and advanced options co
         ->toContain('x-data="{ advancedOpen: false }"')
         ->toContain('x-show="advancedOpen" x-cloak')
         ->toContain('Advanced settings')
+        ->toContain('class="flex w-full cursor-pointer items-center justify-between gap-3')
         ->toContain('label="Use as a dedicated build server"')
         ->toContain('helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."');
 });

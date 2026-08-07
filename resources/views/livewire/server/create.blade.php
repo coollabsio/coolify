@@ -3,34 +3,13 @@
         New Server | Coolify
     </x-slot>
 
-    <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="mb-5 flex min-h-9 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">New server</h1>
         <div class="flex flex-wrap items-center gap-2">
             @if ($selectedType)
                 <a href="{{ route('server.create') }}" class="button" {{ wireNavigate() }}>
                     Change method
                 </a>
-            @endif
-            @if ($selectedType && $selectedType !== 'manual' && ! $selectedTokenUuid)
-                @php
-                    $tokenProvider = $selectedType === 'digital-ocean' ? 'digitalocean' : $selectedType;
-                    $tokenProviderName = $selectedType === 'digital-ocean'
-                        ? 'DigitalOcean'
-                        : str($selectedType)->headline();
-                @endphp
-                @can('create', App\Models\CloudProviderToken::class)
-                    <x-modal-input title="New {{ $tokenProviderName }} token">
-                        <x-slot:content>
-                            <button type="button"
-                                class="button button-highlighted">
-                                <x-reicon name="plus" class="size-3.5" />
-                                New token
-                            </button>
-                        </x-slot:content>
-                        <livewire:security.cloud-provider-token-form :modal_mode="true" :provider="$tokenProvider"
-                            wire:key="new-server-token-{{ $tokenProvider }}" />
-                    </x-modal-input>
-                @endcan
             @endif
         </div>
     </div>
