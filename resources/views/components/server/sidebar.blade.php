@@ -76,7 +76,7 @@
         [
             'label' => 'Resources',
             'route' => 'server.resources',
-            'active' => request()->routeIs('server.resources'),
+            'active' => $activeMenu === 'resources',
             'icon' => 'projects',
             'group' => 'Platform',
         ],
