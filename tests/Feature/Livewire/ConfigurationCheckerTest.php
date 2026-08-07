@@ -111,6 +111,7 @@ it('warns when a service has missing required environment variables', function (
         ->assertSee('Required environment variable missing')
         ->assertSee('PLUNK_API_KEY')
         ->assertSee('Open environment variables');
+
 });
 
 it('marks the service environment variables menu when required values are missing', function () {

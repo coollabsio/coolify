@@ -214,3 +214,16 @@ test('SERVER_TIMING_ENABLED can force server_timing on or off regardless of APP_
     expect($resolve('0', 'local'))->toBeFalse();
     expect($resolve('off', 'local'))->toBeFalse();
 });
+test('server timing HUD can be toggled from the development command center', function () {
+    $hud = file_get_contents(resource_path('views/components/server-timing-hud.blade.php'));
+    $commandCenter = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
+
+    expect($hud)
+        ->toContain('coolify.serverTimingHud.enabled')
+        ->toContain('server-timing-hud-visibility-changed')
+        ->and($commandCenter)
+        ->toContain("app()->environment('local')")
+        ->toContain('Toggle Server Timing HUD')
+        ->toContain("localStorage.setItem('coolify.serverTimingHud.enabled'")
+        ->toContain("window.dispatchEvent(new CustomEvent('server-timing-hud-visibility-changed'))");
+});

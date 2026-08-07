@@ -82,6 +82,15 @@ it('docks desktop resource actions in the top bar instead of floating over conte
     }
 });
 
+it('links the service header missing variables warning to environment variables', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+
+    expect($heading)
+        ->toContain("route('project.service.environment-variables'")
+        ->toContain('Required variables missing')
+        ->toContain('href="{{ $environmentVariablesUrl }}"');
+});
+
 it('places the account menu beside the desktop sidebar toggle while retaining it on mobile', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
     $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));

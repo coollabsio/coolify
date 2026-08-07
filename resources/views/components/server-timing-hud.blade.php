@@ -101,6 +101,7 @@
     window.__coolifyServerTimingHud = true;
 
     const STORAGE_KEY = 'coolify.serverTimingHud.open';
+    const ENABLED_STORAGE_KEY = 'coolify.serverTimingHud.enabled';
     const MAX_ENTRIES = 50;
     const MS_KEYS = new Set(['app', 'db', 'php', 'dbslow']);
 
@@ -115,6 +116,25 @@
 
     function rootEl() {
         return document.getElementById('server-timing-hud');
+    }
+
+    function isHudEnabled() {
+        return localStorage.getItem(ENABLED_STORAGE_KEY) !== '0';
+    }
+
+    function applyVisibilityPreference() {
+        const root = rootEl();
+        if (!root) {
+            return;
+        }
+
+        const enabled = isHudEnabled();
+        root.style.display = enabled ? 'block' : 'none';
+
+        const slot = root.parentElement?.matches('[data-server-timing-hud-slot]') ? root.parentElement : null;
+        if (slot) {
+            slot.style.display = enabled ? 'flex' : 'none';
+        }
     }
 
     function pickSlot() {
@@ -306,6 +326,7 @@
             applyFloatStyles(keep);
         }
         applyOpenState();
+        applyVisibilityPreference();
         return keep;
     }
 
@@ -960,6 +981,7 @@
                 }
             });
             window.addEventListener('resize', redock);
+            window.addEventListener('server-timing-hud-visibility-changed', redock);
             // App shell uses x-cloak; re-dock once Alpine reveals the top bar.
             document.addEventListener('alpine:initialized', redock);
             // Safety: retry a few times after load in case cloak clears late.

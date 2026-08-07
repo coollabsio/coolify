@@ -14,6 +14,21 @@
         const ua = navigator.userAgent || '';
         return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
     })(),
+    serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
+    developerCommandsEnabled: @js(app()->environment('local')),
+
+    get showServerTimingCommand() {
+        if (!this.developerCommandsEnabled) return false;
+        const query = this.searchQuery.toLowerCase().trim();
+        return query.length > 0 && ['server timing', 'timing hud', 'debug hud'].some(term => term.includes(query) || query.includes(term));
+    },
+
+    toggleServerTimingHud() {
+        this.serverTimingHudEnabled = !this.serverTimingHudEnabled;
+        localStorage.setItem('coolify.serverTimingHud.enabled', this.serverTimingHudEnabled ? '1' : '0');
+        window.dispatchEvent(new CustomEvent('server-timing-hud-visibility-changed'));
+        this.closeModal();
+    },
 
     // Client-side search function
     get searchResults() {
@@ -327,6 +342,24 @@
 
                 <!-- Search results -->
                 <div x-show="searchQuery.length >= 1" x-cloak class="command-palette-body relative">
+                    @if (app()->environment('local'))
+                        <div x-show="showServerTimingCommand && !$wire.isSelectingResource"
+                            class="command-palette-section">
+                            <div class="command-palette-group-label">Developer tools</div>
+                            <button type="button" @click="toggleServerTimingHud()"
+                                class="search-result-item command-palette-item">
+                                <div class="command-palette-item-main">
+                                    <div class="command-palette-item-title">
+                                        <span class="command-palette-item-name">Toggle Server Timing HUD</span>
+                                        <span class="command-palette-type-badge" x-text="serverTimingHudEnabled ? 'Enabled' : 'Disabled'"></span>
+                                    </div>
+                                    <div class="command-palette-item-meta"
+                                        x-text="serverTimingHudEnabled ? 'Hide the local request timing overlay' : 'Show the local request timing overlay'"></div>
+                                </div>
+                                <x-reicon name="time-back" class="command-palette-item-chevron" />
+                            </button>
+                        </div>
+                    @endif
                     <div x-show="isPaletteTransitioning" x-cloak
                         class="absolute inset-0 z-30 flex items-center justify-center bg-white/50 backdrop-blur-[2px] dark:bg-black/40">
                         <x-loading text="Loading…" />
@@ -639,7 +672,7 @@
                         </template>
 
                         <template
-                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
+                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !showServerTimingCommand && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
                             <div class="command-palette-empty">
                                 <p class="command-palette-empty-title">No results found</p>
                                 <p class="command-palette-empty-desc">

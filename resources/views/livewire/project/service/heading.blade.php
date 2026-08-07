@@ -42,6 +42,11 @@
         ));
 
         $serviceStatus = str($service->status ?? 'exited');
+        $environmentVariablesUrl = route('project.service.environment-variables', [
+            'project_uuid' => $service->environment->project->uuid,
+            'environment_uuid' => $service->environment->uuid,
+            'service_uuid' => $service->uuid,
+        ]);
     @endphp
 
     <livewire:project.shared.configuration-checker :resource="$service" />
@@ -158,6 +163,11 @@
                         @endif
                     </div>
                 </div>
+            @else
+                <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                    class="mb-3 inline-flex" aria-label="Open required environment variables">
+                    <x-status-badge status="Required variables missing" type="error" />
+                </a>
             @endif
 
             <div class="resource-heading-menus w-full">
@@ -209,7 +219,10 @@
                             </x-forms.button>
                         @endif
                     @else
-                        <x-status-badge status="Required variables missing" type="error" />
+                        <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                            aria-label="Open required environment variables">
+                            <x-status-badge status="Required variables missing" type="error" />
+                        </a>
                     @endif
                 </div>
             </div>
