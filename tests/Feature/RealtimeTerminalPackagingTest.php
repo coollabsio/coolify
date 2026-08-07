@@ -183,11 +183,12 @@ it('mounts the realtime terminal utilities in local development compose files', 
     'maxio dev compose' => 'docker-compose-maxio.dev.yml',
 ]);
 
-it('keeps terminal browser logging restricted to Vite development mode', function () {
+it('keeps terminal browser logging restricted to development or explicit diagnostics', function () {
     $terminalClient = file_get_contents(base_path('resources/js/terminal.js'));
 
     expect($terminalClient)
-        ->toContain('const terminalDebugEnabled = import.meta.env.DEV;')
+        ->toContain('const terminalDebugEnabled = import.meta.env.DEV')
+        ->toContain("localStorage.getItem('coolify-terminal-debug') === '1'")
         ->toContain("logTerminal('log', '[Terminal] WebSocket connection established.');")
         ->not->toContain("console.log('[Terminal] WebSocket connection established. Cool cool cool cool cool cool.');");
 });

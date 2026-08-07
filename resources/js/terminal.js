@@ -8,7 +8,14 @@ import {
 } from './terminal-session-timer.js';
 import { FitAddon } from '@xterm/addon-fit';
 
-const terminalDebugEnabled = import.meta.env.DEV;
+const terminalDebugParameter = new URLSearchParams(window.location.search).get('terminal-debug');
+
+if (terminalDebugParameter === '1' || terminalDebugParameter === '0') {
+    localStorage.setItem('coolify-terminal-debug', terminalDebugParameter);
+}
+
+const terminalDebugEnabled = import.meta.env.DEV
+    || localStorage.getItem('coolify-terminal-debug') === '1';
 
 const baseApplicationTerminalTheme = {
     black: '#675f70',
@@ -393,8 +400,14 @@ export function initializeTerminalComponent() {
 
             setTerminalTheme(themeName) {
                 if (!applicationTerminalThemes[themeName]) {
+                    logTerminal('warn', '[Terminal Theme] Unknown theme', {
+                        requestedTheme: themeName,
+                        availableThemes: Object.keys(applicationTerminalThemes),
+                    });
                     return;
                 }
+
+                logTerminal('log', '[Terminal Theme] Applying theme', this.terminalThemeDebugSnapshot(themeName));
 
                 if (themeName === 'system') {
                     applicationTerminalThemes.system = createSystemTerminalTheme();
@@ -417,8 +430,34 @@ export function initializeTerminalComponent() {
                         this.term.options.cursorBlink = cursorBlink;
                         this.term.refresh(0, Math.max(0, this.term.rows - 1));
                         this.term.focus();
+                        logTerminal('log', '[Terminal Theme] Theme applied', this.terminalThemeDebugSnapshot(themeName));
                     });
                 }
+            },
+
+            terminalThemeDebugSnapshot(themeName) {
+                const shell = this.$el.closest('.application-console-shell');
+                const viewport = this.term?.element?.querySelector('.xterm-viewport');
+                const screen = this.term?.element?.querySelector('.xterm-screen');
+
+                return {
+                    requestedTheme: themeName,
+                    selectedTheme: this.selectedTheme,
+                    terminalExists: Boolean(this.term),
+                    terminalOpened: Boolean(this.term?.element),
+                    terminalActive: this.terminalActive,
+                    connectionState: this.connectionState,
+                    shellTheme: shell?.dataset.consoleTheme,
+                    shellBackground: shell ? getComputedStyle(shell).background : null,
+                    shellThemeBackground: shell ? getComputedStyle(shell).getPropertyValue('--console-theme-background') : null,
+                    shellThemeOpacity: shell ? getComputedStyle(shell).getPropertyValue('--console-theme-opacity') : null,
+                    shellPseudoBackground: shell ? getComputedStyle(shell, '::before').background : null,
+                    viewportBackground: viewport ? getComputedStyle(viewport).background : null,
+                    screenBackground: screen ? getComputedStyle(screen).background : null,
+                    xtermBackground: this.term?.options.theme?.background,
+                    xtermForeground: this.term?.options.theme?.foreground,
+                    xtermCursor: this.term?.options.theme?.cursor,
+                };
             },
 
             resetTerminal() {
