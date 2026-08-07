@@ -55,10 +55,11 @@
                 <a
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="error-contact-link"
                     href="{{ config('constants.urls.contact') }}">
-                    Contact support
-                    <x-external-link class="inline-flex size-3 text-current" />
+                    <x-forms.button type="button">
+                        Contact support
+                        <x-external-link class="inline-flex size-3 text-current" />
+                    </x-forms.button>
                 </a>
             @endif
         </div>

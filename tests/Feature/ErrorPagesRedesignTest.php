@@ -57,7 +57,20 @@ it('uses login as primary action on session expired page', function () {
         ->toContain('/login')
         ->toContain('Back to login')
         ->toContain('Using a reverse proxy or Cloudflare Tunnel?')
+        ->toContain('x-data="{ open: false }"')
+        ->toContain('x-on:click="open = !open"')
+        ->toContain('livewire.js')
         ->not->toContain('>Dashboard</');
+});
+
+it('renders contact support as a button', function () {
+    $exception = new HttpException(404, 'Not found');
+
+    $html = view('errors.404', ['exception' => $exception])->render();
+
+    expect($html)
+        ->toContain('href="'.config('constants.urls.contact').'"')
+        ->toMatch('/<button[^>]*>\s*Contact support/s');
 });
 
 it('shows purified exception message on 500 page', function () {

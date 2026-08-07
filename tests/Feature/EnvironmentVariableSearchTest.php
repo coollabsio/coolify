@@ -182,6 +182,34 @@ YAML,
         ->toBe(['API_TOKEN']);
 });
 
+it('shows a Compose-defined value as read-only when a managed variable has the same key', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      - API_TOKEN=from-compose
+YAML,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'API_TOKEN',
+        'value' => 'from-environment-tab',
+        'resourceable_type' => Service::class,
+        'resourceable_id' => $service->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables');
+
+    expect($component->instance()->environmentVariablePageRows)
+        ->toHaveCount(1)
+        ->and($component->instance()->environmentVariablePageRows->first()['kind'])->toBe('hardcoded')
+        ->and($component->instance()->environmentVariablePageRows->first()['environmentVariable']['value'])->toBe('from-compose');
+});
+
 it('searches service environment variables without requiring preview variables', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,
