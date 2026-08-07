@@ -4,7 +4,7 @@ it('includes a celld one-click service template', function () {
     $compose = file_get_contents(__DIR__.'/../../templates/compose/celld.yaml');
 
     expect($compose)
-        ->toContain('ghcr.io/denoland/celld:${CELLD_VERSION:-v0.1.0}')
+        ->toContain('ghcr.io/denoland/celld:${CELLD_VERSION:-latest}')
         ->toContain('SERVICE_URL_CELLD_8080')
         ->toContain('CELLD_BUCKET=${CELLD_BUCKET:?}')
         ->toContain('S3_ENDPOINT=${S3_ENDPOINT:-}')
@@ -27,7 +27,7 @@ it('includes a celld one-click service template', function () {
         $generatedCompose = base64_decode($templates['celld']['compose'], strict: true);
 
         expect($generatedCompose)
-            ->toContain('ghcr.io/denoland/celld:${CELLD_VERSION:-v0.1.0}')
+            ->toContain('ghcr.io/denoland/celld:${CELLD_VERSION:-latest}')
             ->toContain('CELLD_BUCKET=${CELLD_BUCKET:?}');
     }
 });

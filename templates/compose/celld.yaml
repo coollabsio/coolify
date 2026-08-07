@@ -7,7 +7,7 @@
 
 services:
   celld:
-    image: 'ghcr.io/denoland/celld:${CELLD_VERSION:-v0.1.0}'
+    image: 'ghcr.io/denoland/celld:${CELLD_VERSION:-latest}'
     environment:
       - SERVICE_URL_CELLD_8080
       - CELLD_BUCKET=${CELLD_BUCKET:?}
