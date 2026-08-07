@@ -54,6 +54,15 @@ class ValidateServer
             }
         }
 
+        if ($server->hostinger_virtual_machine_id) {
+            $status = $server->refreshHostingerState();
+            if (in_array($status, ['stopping', 'stopped', 'suspending', 'suspended', 'destroying', 'destroyed', 'error'], true)) {
+                $this->error = 'Hostinger VPS is '.($status ?? 'not running').'. Power it on before validating.';
+                $server->update(['validation_logs' => $this->error]);
+                throw new \Exception($this->error);
+            }
+        }
+
         ['uptime' => $this->uptime, 'error' => $error] = $server->validateConnection();
         if (! $this->uptime) {
             $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');

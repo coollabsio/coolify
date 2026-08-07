@@ -1,5 +1,5 @@
 <div x-data
-    x-init="@if ($server->hetzner_server_id && $server->cloudProviderToken && !$hetznerServerStatus) $wire.checkHetznerServerStatus(); @endif @if ($server->vultr_instance_id && $server->cloudProviderToken) $wire.checkVultrInstanceStatus(); @endif @if ($server->digitalocean_droplet_id && $server->cloudProviderToken && !$digitalOceanDropletStatus) $wire.checkDigitalOceanDropletStatus(); @endif">
+    x-init="@if ($server->hetzner_server_id && $server->cloudProviderToken && !$hetznerServerStatus) $wire.checkHetznerServerStatus(); @endif @if ($server->vultr_instance_id && $server->cloudProviderToken) $wire.checkVultrInstanceStatus(); @endif @if ($server->digitalocean_droplet_id && $server->cloudProviderToken && !$digitalOceanDropletStatus) $wire.checkDigitalOceanDropletStatus(); @endif @if ($server->hostinger_virtual_machine_id && $server->cloudProviderToken && !$hostingerVirtualMachineStatus) $wire.checkHostingerVirtualMachineStatus(); @endif">
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(24) }} | Server | Coolify
     </x-slot>
@@ -18,23 +18,26 @@
                         filled($server->hetzner_server_id) => 'Hetzner',
                         filled($server->digitalocean_droplet_id) => 'DigitalOcean',
                         filled($server->vultr_instance_id) => 'Vultr',
+                        filled($server->hostinger_virtual_machine_id) => 'Hostinger',
                         default => null,
                     };
                     $providerStatus = match ($provider) {
                         'Hetzner' => $hetznerServerStatus,
                         'DigitalOcean' => $digitalOceanDropletStatus,
                         'Vultr' => $vultrInstanceStatus,
+                        'Hostinger' => $hostingerVirtualMachineStatus,
                         default => null,
                     };
                     $providerStatusType = match (true) {
                         in_array($providerStatus, ['running', 'active']) => 'success',
-                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new']) => 'warning',
-                        in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted']) => 'error',
+                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new', 'creating', 'unsuspending', 'recreating', 'restoring']) => 'warning',
+                        in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted', 'destroyed', 'error']) => 'error',
                         default => 'neutral',
                     };
                     $hasLinkableCloudProviders = (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
                         || (!$server->vultr_instance_id && $availableVultrTokens->isNotEmpty())
-                        || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty());
+                        || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty())
+                        || (!$server->hostinger_virtual_machine_id && $availableHostingerTokens->isNotEmpty());
                     $hetznerMatch = $matchedHetznerServer
                         ? [
                             'name' => $matchedHetznerServer['name'] ?? 'Hetzner server',
@@ -54,6 +57,13 @@
                             'name' => $matchedVultrInstance['label'] ?? $matchedVultrInstance['hostname'] ?? 'Vultr instance',
                             'id' => $matchedVultrInstance['id'] ?? null,
                             'status' => $matchedVultrInstance['status'] ?? null,
+                        ]
+                        : null;
+                    $hostingerMatch = $matchedHostingerVirtualMachine
+                        ? [
+                            'name' => $matchedHostingerVirtualMachine['hostname'] ?? 'Hostinger VPS',
+                            'id' => $matchedHostingerVirtualMachine['id'] ?? null,
+                            'status' => $matchedHostingerVirtualMachine['state'] ?? null,
                         ]
                         : null;
                 @endphp
@@ -84,6 +94,12 @@
                                 @elseif ($provider === 'Vultr')
                                     <x-forms.button type="button" class="size-8! px-0!"
                                         wire:click.prevent="checkVultrInstanceStatus(true)"
+                                        title="Refresh provider status">
+                                        <x-reicon name="refresh" class="size-3.5" />
+                                    </x-forms.button>
+                                @elseif ($provider === 'Hostinger')
+                                    <x-forms.button type="button" class="size-8! px-0!"
+                                        wire:click.prevent="checkHostingerVirtualMachineStatus(true)"
                                         title="Refresh provider status">
                                         <x-reicon name="refresh" class="size-3.5" />
                                     </x-forms.button>
@@ -187,6 +203,18 @@
                                                 searchByIpMethod="searchVultrInstance" linkMethod="linkToVultr"
                                                 :searchError="$vultrSearchError" :noMatch="$vultrNoMatchFound"
                                                 :matched="$vultrMatch" />
+                                        @endif
+                                        @if (!$server->hostinger_virtual_machine_id && $availableHostingerTokens->isNotEmpty())
+                                            <x-server.provider-link-modal :server="$server" provider="hostinger"
+                                                providerLabel="Hostinger" tokenModel="selectedHostingerTokenId"
+                                                :tokens="$availableHostingerTokens"
+                                                manualModel="manualHostingerVirtualMachineId"
+                                                manualLabel="Virtual Machine ID" manualPlaceholder="17923"
+                                                searchByIdMethod="searchHostingerVirtualMachineById"
+                                                searchByIpMethod="searchHostingerVirtualMachine"
+                                                linkMethod="linkToHostinger"
+                                                :searchError="$hostingerSearchError" :noMatch="$hostingerNoMatchFound"
+                                                :matched="$hostingerMatch" />
                                         @endif
                                     </div>
                                 </div>

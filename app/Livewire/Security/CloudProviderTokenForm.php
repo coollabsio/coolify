@@ -5,6 +5,7 @@ namespace App\Livewire\Security;
 use App\Livewire\Server\CloudProviderToken\Show as ServerCloudProviderTokenShow;
 use App\Livewire\Server\New\ByDigitalOcean;
 use App\Livewire\Server\New\ByHetzner;
+use App\Livewire\Server\New\ByHostinger;
 use App\Models\CloudProviderToken;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Http;
@@ -41,7 +42,7 @@ class CloudProviderTokenForm extends Component
     protected function rules(): array
     {
         return [
-            'provider' => 'required|string|in:hetzner,digitalocean,vultr',
+            'provider' => 'required|string|in:hetzner,digitalocean,vultr,hostinger',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
@@ -82,6 +83,15 @@ class CloudProviderTokenForm extends Component
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.vultr.com/v2/account');
+
+                return $response->successful();
+            }
+
+            if ($provider === 'hostinger') {
+                $response = Http::withToken($token)
+                    ->acceptJson()
+                    ->timeout(10)
+                    ->get('https://developers.hostinger.com/api/vps/v1/virtual-machines');
 
                 return $response->successful();
             }
@@ -127,11 +137,17 @@ class CloudProviderTokenForm extends Component
 
             if ($savedToken->provider === 'digitalocean') {
                 $this->dispatch('tokenAdded.digitalocean', tokenId: $savedToken->id)->to(ByDigitalOcean::class);
+                $this->dispatch('tokenAdded.digitalocean', tokenId: $savedToken->id)->to(ServerCloudProviderTokenShow::class);
             }
 
             if ($savedToken->provider === 'hetzner') {
                 $this->dispatch('tokenAdded.hetzner', tokenId: $savedToken->id)->to(ByHetzner::class);
                 $this->dispatch('tokenAdded.hetzner', tokenId: $savedToken->id)->to(ServerCloudProviderTokenShow::class);
+            }
+
+            if ($savedToken->provider === 'hostinger') {
+                $this->dispatch('tokenAdded.hostinger', tokenId: $savedToken->id)->to(ByHostinger::class);
+                $this->dispatch('tokenAdded.hostinger', tokenId: $savedToken->id)->to(ServerCloudProviderTokenShow::class);
             }
 
             if ($this->modal_mode) {

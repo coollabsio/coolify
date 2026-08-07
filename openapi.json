@@ -5315,7 +5315,8 @@
                                                 "enum": [
                                                     "hetzner",
                                                     "digitalocean",
-                                                    "vultr"
+                                                    "vultr",
+                                                    "hostinger"
                                                 ]
                                             },
                                             "team_id": {
@@ -5374,7 +5375,8 @@
                                         "enum": [
                                             "hetzner",
                                             "digitalocean",
-                                            "vultr"
+                                            "vultr",
+                                            "hostinger"
                                         ],
                                         "example": "hetzner",
                                         "description": "The cloud provider."
@@ -11504,6 +11506,109 @@
                     },
                     "429": {
                         "$ref": "#\/components\/responses\/429"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/data-centers": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS data centers",
+                "operationId": "get-hostinger-data-centers",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS data centers."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/catalog": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS plans and prices",
+                "operationId": "get-hostinger-catalog",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS plans and prices."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/hostinger\/templates": {
+            "get": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Get Hostinger VPS operating system templates",
+                "operationId": "get-hostinger-templates",
+                "responses": {
+                    "200": {
+                        "description": "List of Hostinger VPS templates."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/hostinger": {
+            "post": {
+                "tags": [
+                    "Hostinger"
+                ],
+                "summary": "Purchase a Hostinger VPS and create a linked server",
+                "operationId": "create-hostinger-server",
+                "responses": {
+                    "201": {
+                        "description": "Hostinger VPS purchased and linked to a Coolify server."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed."
+                    },
+                    "429": {
+                        "description": "Hostinger rate limit exceeded."
                     }
                 },
                 "security": [
@@ -22371,6 +22476,10 @@
         {
             "name": "Hetzner",
             "description": "Hetzner"
+        },
+        {
+            "name": "Hostinger",
+            "description": "Hostinger"
         },
         {
             "name": "Notifications",

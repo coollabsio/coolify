@@ -19,6 +19,7 @@ use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\HostingerService;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use App\Traits\ClearsGlobalSearchCache;
@@ -295,6 +296,8 @@ class Server extends BaseModel
         'vultr_instance_status',
         'digitalocean_droplet_id',
         'digitalocean_droplet_status',
+        'hostinger_virtual_machine_id',
+        'hostinger_virtual_machine_status',
         'is_validating',
         'validation_logs',
         'detected_traefik_version',
@@ -468,6 +471,27 @@ class Server extends BaseModel
         $ip = $digitalOceanService->getPublicIpAddress($droplet);
 
         $this->persistProviderState(['digitalocean_droplet_status' => $status]);
+        $this->backfillPlaceholderIp($ip);
+
+        return $status;
+    }
+
+    public function refreshHostingerState(): ?string
+    {
+        if (! $this->hostinger_virtual_machine_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hostinger') {
+            return $this->hostinger_virtual_machine_status;
+        }
+
+        $hostingerService = new HostingerService($this->cloudProviderToken->token);
+        $virtualMachine = $hostingerService->getVirtualMachine((int) $this->hostinger_virtual_machine_id);
+
+        if (empty($virtualMachine)) {
+            return $this->hostinger_virtual_machine_status;
+        }
+
+        $status = $virtualMachine['state'] ?? null;
+        $ip = $hostingerService->getPublicIpAddress($virtualMachine);
+        $this->persistProviderState(['hostinger_virtual_machine_status' => $status]);
         $this->backfillPlaceholderIp($ip);
 
         return $status;

@@ -127,6 +127,18 @@ class ValidateAndInstall extends Component
                 }
             }
 
+            if ($this->server->hostinger_virtual_machine_id) {
+                $status = $this->server->refreshHostingerState();
+                $this->server->refresh();
+
+                if (in_array($status, ['stopping', 'stopped', 'suspending', 'suspended', 'destroying', 'destroyed', 'error'], true)) {
+                    $this->error = 'Hostinger VPS is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->server->update(['validation_logs' => $this->error]);
+
+                    return;
+                }
+            }
+
             ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
             if (! $this->uptime) {
                 $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');

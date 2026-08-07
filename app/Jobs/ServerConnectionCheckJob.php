@@ -65,6 +65,22 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            if ($this->server->hetzner_server_id && $this->server->cloudProviderToken) {
+                $this->checkHetznerStatus();
+            }
+
+            if ($this->server->vultr_instance_id && $this->server->cloudProviderToken) {
+                $this->checkVultrStatus();
+            }
+
+            if ($this->server->digitalocean_droplet_id && $this->server->cloudProviderToken) {
+                $this->checkDigitalOceanStatus();
+            }
+
+            if ($this->server->hostinger_virtual_machine_id && $this->server->cloudProviderToken) {
+                $this->checkHostingerStatus();
+            }
+
             // Temporarily disable mux if requested
             if ($this->disableMux) {
                 $this->disableSshMux();
@@ -147,6 +163,78 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
         if ($this->server->unreachable_count >= 2 && ! $wasNotified) {
             ServerReachabilityChanged::dispatch($this->server);
+        }
+    }
+
+    private function checkHetznerStatus(): void
+    {
+        try {
+            $status = $this->server->refreshHetznerState();
+        } catch (\Throwable $e) {
+            Log::debug('ServerConnectionCheck: Hetzner status check failed', [
+                'server_id' => $this->server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        if ($status === 'off') {
+            throw new \Exception('Server is powered off');
+        }
+    }
+
+    private function checkVultrStatus(): void
+    {
+        try {
+            $status = $this->server->refreshVultrState();
+        } catch (\Throwable $e) {
+            Log::debug('ServerConnectionCheck: Vultr status check failed', [
+                'server_id' => $this->server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+            throw new \Exception('Vultr instance is not running');
+        }
+    }
+
+    private function checkDigitalOceanStatus(): void
+    {
+        try {
+            $status = $this->server->refreshDigitalOceanState();
+        } catch (\Throwable $e) {
+            Log::debug('ServerConnectionCheck: DigitalOcean status check failed', [
+                'server_id' => $this->server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        if (in_array($status, ['off', 'archive', 'deleted'], true)) {
+            throw new \Exception('DigitalOcean droplet is not running');
+        }
+    }
+
+    private function checkHostingerStatus(): void
+    {
+        try {
+            $status = $this->server->refreshHostingerState();
+        } catch (\Throwable $e) {
+            Log::debug('ServerConnectionCheck: Hostinger status check failed', [
+                'server_id' => $this->server->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        if (in_array($status, ['stopping', 'stopped', 'suspending', 'suspended', 'destroying', 'destroyed', 'error'], true)) {
+            throw new \Exception('Hostinger VPS is not running');
         }
     }
 
