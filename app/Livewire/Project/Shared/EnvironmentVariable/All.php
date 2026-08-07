@@ -60,6 +60,10 @@ class All extends Component
         'environmentVariableDeleted' => 'refreshEnvs',
     ];
 
+    protected $queryString = [
+        'view' => ['except' => 'normal'],
+    ];
+
     public function updatedSearch(): void
     {
         $this->page = 1;
@@ -87,10 +91,11 @@ class All extends Component
         $this->resourceClass = get_class($this->resource);
         $resourceWithPreviews = [Application::class];
         $simpleDockerfile = filled(data_get($this->resource, 'dockerfile'));
-        $hasGitRepository = filled(data_get($this->resource, 'git_repository'));
-        if (str($this->resourceClass)->contains($resourceWithPreviews) && $hasGitRepository && ! $simpleDockerfile) {
+        $isPreviewEnabled = data_get($this->resource, 'settings.is_preview_deployments_enabled', false);
+        if (str($this->resourceClass)->contains($resourceWithPreviews) && ! $simpleDockerfile && $isPreviewEnabled) {
             $this->showPreview = true;
         }
+        $this->getDevView();
         // Intentionally skip loading env vars / developer-view bulk text here.
         // loadEnvironmentVariables() is triggered from the frontend via wire:init.
     }
@@ -194,7 +199,11 @@ class All extends Component
 
     private function supportsPreviewEnvironmentVariables(): bool
     {
-        return $this->showPreview && $this->resource instanceof Application;
+        if (! $this->showPreview || ! ($this->resource instanceof Application)) {
+            return false;
+        }
+
+        return (bool) data_get($this->resource, 'settings.is_preview_deployments_enabled', false);
     }
 
     public function getHasEnvironmentVariablesProperty(): bool
