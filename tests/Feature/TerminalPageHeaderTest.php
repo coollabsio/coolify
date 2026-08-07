@@ -1,5 +1,126 @@
 <?php
 
+it('shows the initial terminal target launcher and keeps the header picker for switching', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($view)
+        ->toContain('targetChosen: @js($selected_uuid !== \'default\')')
+        ->toContain('data-terminal-target-picker="launcher"')
+        ->toContain('x-show="!targetChosen"')
+        ->toContain('x-show="targetChosen"')
+        ->toContain('this.targetChosen = true;');
+});
+
+it('shows a centered themed target canvas before loading xterm', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($view)
+        ->toContain("@if (\$selected_uuid === 'default')")
+        ->toContain('data-terminal-target-picker="page"')
+        ->toContain('data-terminal-target-canvas')
+        ->toContain('items-center justify-center')
+        ->toContain(':data-console-theme="consoleTheme"')
+        ->toContain("@else\n        <div data-terminal-session-canvas");
+});
+
+it('loads targets inside the themed session picker with an accent scrollbar', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toContain('Finding available servers and containers…')
+        ->toContain('terminal-target-list')
+        ->toContain('Loading servers and containers…')
+        ->toContain("'--terminal-scrollbar': themeAccents[consoleTheme]")
+        ->and($styles)
+        ->toContain('.terminal-target-list')
+        ->toContain('var(--terminal-scrollbar')
+        ->toContain('.terminal-target-list::-webkit-scrollbar-thumb');
+});
+
+it('uses the same padded themed canvas for the active terminal session', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toContain('data-terminal-session-canvas')
+        ->toContain('p-3 sm:p-6')
+        ->toContain('terminal-session-panel mt-8')
+        ->and($styles)
+        ->toContain('.terminal-session-panel')
+        ->toContain('border-radius: 0.75rem;')
+        ->toMatch('/\.terminal-session-panel\s*\{[^}]*border:\s*0;/s')
+        ->toMatch('/\.terminal-session-panel\s*\{[^}]*background:\s*transparent;/s')
+        ->toMatch('/\.terminal-session-panel\s*\{[^}]*box-shadow:\s*none;/s');
+});
+
+it('uses floating rounded controls instead of the legacy terminal header bar', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($view)
+        ->toContain('terminal-session-toolbar')
+        ->toContain('terminal-session-target-trigger')
+        ->toContain('<x-terminal.theme-selector')
+        ->not->toContain('application-console-header flex h-[30px]');
+});
+
+it('keeps the theme selector identical before and during a terminal session', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $selector = file_get_contents(resource_path('views/components/terminal/theme-selector.blade.php'));
+
+    expect(substr_count($view, '<x-terminal.theme-selector'))
+        ->toBe(2)
+        ->and($selector)
+        ->toContain('terminal-theme-trigger flex h-8 items-center gap-2 rounded-md px-2.5 text-xs font-medium')
+        ->and($view)
+        ->toContain('terminal-session-toolbar absolute top-3 right-3 left-3')
+        ->not->toContain('terminal-theme-trigger');
+});
+
+it('uses the same borderless control style for target and theme selectors', function () {
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($globalView.$resourceView)
+        ->not->toContain('terminal-session-target-trigger flex h-9')
+        ->not->toContain('terminal-session-target-trigger flex h-8 min-w-0 max-w-sm cursor-pointer items-center gap-2 rounded-md border')
+        ->toContain('terminal-session-target-trigger flex h-8')
+        ->toContain('rounded-md px-2.5');
+});
+
+it('reuses one chevron theme selector before and during terminal sessions', function () {
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $selector = file_get_contents(resource_path('views/components/terminal/theme-selector.blade.php'));
+
+    expect(substr_count($globalView.$resourceView, '<x-terminal.theme-selector'))
+        ->toBe(3)
+        ->and($selector)
+        ->toContain('terminal-theme-trigger')
+        ->toContain('viewBox="0 0 12 12"')
+        ->toContain('m3.5 4.75 2.5 2.5 2.5-2.5');
+});
+
+it('keeps the pre-session theme selector out of the centered picker layout', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($view)
+        ->toContain('class="absolute top-3 right-3 z-20"')
+        ->toContain('<x-terminal.theme-selector');
+});
+
+it('updates the owning terminal theme directly so its label and canvas stay synchronized', function () {
+    $globalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $resourceView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $selector = file_get_contents(resource_path('views/components/terminal/theme-selector.blade.php'));
+
+    expect($globalView.$resourceView)
+        ->toContain('setTheme(theme)')
+        ->and($selector)
+        ->toContain('@click="setTheme(')
+        ->not->toContain("\$dispatch('terminal-theme-selected'");
+});
+
 it('places the terminal helper beside the page title instead of under the subtitle', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 
@@ -57,7 +178,7 @@ it('defaults to a system console theme that follows the page color mode', functi
     expect($terminalClient)
         ->toContain("'system': createSystemTerminalTheme()")
         ->toContain('new MutationObserver')
-        ->toContain("attributeFilter: ['class', 'data-theme']")
+        ->toContain("attributeFilter: ['class', 'data-theme', 'style']")
         ->and($appCss)
         ->toContain('[data-console-theme="system"]')
         ->toContain('html:not(.dark) .application-console-shell[data-console-theme="system"]')
@@ -69,15 +190,18 @@ it('defaults to a system console theme that follows the page color mode', functi
 it('uses the page color mode for the console theme selector', function () {
     $terminalView = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
     $consoleView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+    $selector = file_get_contents(resource_path('views/components/terminal/theme-selector.blade.php'));
 
     foreach ([$terminalView, $consoleView] as $view) {
-        expect($view)
-            ->toContain('console-theme-selector')
-            ->toContain('border-neutral-200 bg-white')
-            ->toContain('dark:bg-[#111113]')
-            ->toContain('text-neutral-600 transition-colors')
-            ->toContain('dark:text-white/65');
+        expect($view)->toContain('<x-terminal.theme-selector');
     }
+
+    expect($selector)
+        ->toContain('console-theme-selector')
+        ->toContain('border-neutral-200 bg-white')
+        ->toContain('dark:bg-[#111113]')
+        ->toContain('text-neutral-600 transition-colors')
+        ->toContain('dark:text-white/65');
 
     $appCss = file_get_contents(resource_path('css/app.css'));
 
@@ -93,7 +217,7 @@ it('shows terminal unavailable without the terminal shell wrapper', function () 
 
     $unavailableBranch = str($consoleView)
         ->after('@if ($consoleUnavailable)')
-        ->before('@else')
+        ->before("@else\n        <section class=\"mt-8 mb-0!")
         ->toString();
 
     expect($consoleView)
