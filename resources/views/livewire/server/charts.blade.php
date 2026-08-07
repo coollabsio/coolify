@@ -280,10 +280,6 @@
             @else
                 <x-application.settings-section id="server-metrics-overview-section" title="Metrics"
                     helper="Inspect recent CPU and memory usage reported by Sentinel.">
-                    <x-slot:actions>
-                        <x-status-badge status="Unavailable" type="warning" />
-                    </x-slot:actions>
-
                     <x-empty size="sm" title="Sentinel is required"
                         description="Enable Sentinel before collecting CPU and memory metrics for this server."
                         icon-name="dashboard">

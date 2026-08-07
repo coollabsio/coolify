@@ -13,19 +13,14 @@
             helper="Monitor server and container health while collecting historical metrics.">
             <x-slot:actions>
                 <div class="flex items-center gap-2">
-                    <x-status-badge
-                        :status="!$isSentinelEnabled
-                            ? 'Disabled'
-                            : ($server->isSentinelLive() ? 'In sync' : 'Out of sync')"
-                        :type="!$isSentinelEnabled
-                            ? 'neutral'
-                            : ($server->isSentinelLive() ? 'success' : 'warning')" />
                     @if (!$isSentinelEnabled)
                         <x-forms.button canGate="update" :canResource="$server" isHighlighted
                             wire:click="toggleSentinel">
                             Enable Sentinel
                         </x-forms.button>
                     @else
+                        <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
+                            :type="$server->isSentinelLive() ? 'success' : 'warning'" />
                         <x-forms.button wire:click="restartSentinel" canGate="update"
                             :canResource="$server">
                             <x-reicon name="refresh" class="size-3.5" />

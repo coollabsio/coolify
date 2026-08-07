@@ -252,13 +252,12 @@
             </x-application.settings-section>
         </div>
 
-            {{-- Slide-over for activity monitor (all restore operations) --}}
-            <x-slide-over @databaserestore.window="slideOverOpen = true" closeWithX fullScreen>
+            <x-process-dialog @databaserestore.window="processDialogOpen = true" closeWithX size="xl">
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
-                    <div wire:ignore>
+                    <div class="flex h-full min-h-0 flex-col" wire:ignore>
                         <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" header="Logs" fullHeight />
                     </div>
                 </x-slot:content>
-            </x-slide-over>
+            </x-process-dialog>
 </div>

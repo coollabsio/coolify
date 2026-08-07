@@ -76,6 +76,9 @@
                         $backupRoute = $type === 'database'
                             ? route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid])
                             : route('project.service.database.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
+                        $backupExecutionsRoute = $type === 'database'
+                            ? route('project.database.backup.executions', [...$parameters, 'backup_uuid' => $backup->uuid])
+                            : route('project.service.database.backup.executions', [...$parameters, 'backup_uuid' => $backup->uuid]);
                     @endphp
                     <div x-show="search === ''
                         || @js(strtolower($database->name)).includes(search.toLowerCase())
@@ -97,10 +100,13 @@
                             {{ $backup->save_s3 ? ($backup->s3?->name ?? 'Unavailable') : 'Local only' }}
                         </div>
                         <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
-                            {{ $backup->executions_count ?? $backup->executions()->count() }}
+                            <a wire:navigate href="{{ $backupExecutionsRoute }}"
+                                class="font-medium hover:underline hover:text-black dark:hover:text-fg">
+                                {{ $backup->executions_count ?? $backup->executions()->count() }}
+                            </a>
                         </div>
                         <div class="flex justify-end">
-                            <a class="button" {{ wireNavigate() }} href="{{ $backupRoute }}">Manage</a>
+                            <a class="button" wire:navigate href="{{ $backupRoute }}">Manage</a>
                         </div>
                     </div>
                 @endforeach

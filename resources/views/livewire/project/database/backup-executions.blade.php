@@ -25,8 +25,9 @@
 
             <div @if (! $skip) wire:poll.5000ms="refreshBackupExecutions" @endif
                 class="application-settings-section-body p-0!">
-                <div class="data-table">
-                    <div class="data-table-header backup-executions-table-grid">
+                <div class="data-table deployment-table-scroll">
+                    <div
+                        class="data-table-header backup-executions-table-grid h-auto rounded-none px-4 py-2.5 text-[11px]">
                         <span>Status</span>
                         <span>Database</span>
                         <span>Finished</span>
@@ -67,7 +68,7 @@
                         @endphp
                         <div wire:key="{{ data_get($execution, 'id') }}"
                             class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
-                            <div class="data-table-row backup-executions-table-grid">
+                            <div class="data-table-row backup-executions-table-grid min-h-14 px-4 py-2.5">
                                 <div class="flex items-center gap-2">
                                     <x-status-badge :status="$executionStatusLabel"
                                         :type="$executionStatusType" />
@@ -110,19 +111,24 @@
                                 </div>
                                 <div class="flex items-center justify-end gap-1">
                                     @if ($executionStatus === 'success')
-                                        <button type="button" class="button"
-                                            x-on:click="download_file('{{ data_get($execution, 'id') }}')">
-                                            Download
+                                        <button type="button" class="icon-button shrink-0"
+                                            x-on:click="download_file('{{ data_get($execution, 'id') }}')"
+                                            title="Download backup" aria-label="Download backup">
+                                            <x-reicon name="upload" class="size-3.5 rotate-180" />
                                         </button>
                                     @endif
                                     <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
                                         submitAction="deleteBackup({{ data_get($execution, 'id') }})"
                                         :checkboxes="$executionCheckboxes" :actions="$deleteActions"
                                         confirmationText="{{ data_get($execution, 'filename') }}"
-                                        confirmationLabel="Enter the backup filename to confirm."
-                                        shortConfirmationLabel="Backup Filename">
+                                    confirmationLabel="Enter the backup filename to confirm."
+                                    shortConfirmationLabel="Backup Filename">
                                         <x-slot:trigger>
-                                            <x-forms.button isError>Delete</x-forms.button>
+                                            <button type="button"
+                                                class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                title="Delete backup" aria-label="Delete backup">
+                                                <x-reicon name="trash" class="size-3.5" />
+                                            </button>
                                         </x-slot:trigger>
                                     </x-modal-confirmation>
                                 </div>
@@ -135,18 +141,22 @@
                             @endif
                         </div>
                     @empty
-                        <x-empty size="sm" title="No backup executions"
-                            description="Execution history appears here after the schedule runs."
-                            icon-name="browser-terminal" />
+                        <div class="p-4">
+                            <x-empty size="sm" title="No backup executions"
+                                description="Execution history appears here after the schedule runs."
+                                icon-name="browser-terminal" />
+                        </div>
                     @endforelse
                 </div>
 
                 @if ($executions_count > 0)
                     <div
-                        class="flex items-center justify-between border-t border-neutral-200 px-4 py-3 text-sm text-neutral-500 dark:border-white/[0.06] dark:text-fg-dim">
-                        <span>{{ $executions_count }} execution{{ $executions_count === 1 ? '' : 's' }}</span>
-                        <div class="flex items-center gap-2">
-                            <span>Page {{ $currentPage }} of {{ ceil($executions_count / $defaultTake) }}</span>
+                        class="flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
+                        <span>
+                            {{ $skip + 1 }}-{{ min($skip + $defaultTake, $executions_count) }} of
+                            {{ $executions_count }}
+                        </span>
+                        <div class="flex items-center gap-1">
                             <button type="button" class="icon-button" @disabled(! $showPrev)
                                 wire:click="previousPage('{{ $defaultTake }}')" aria-label="Previous page">
                                 <x-reicon name="arrow-right" class="size-3.5 rotate-180" />

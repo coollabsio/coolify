@@ -39,6 +39,8 @@ class ValidateAndInstall extends Component
 
     public bool $ask = false;
 
+    public bool $isInstalling = false;
+
     protected $listeners = [
         'init',
         'validateConnection',
@@ -51,6 +53,7 @@ class ValidateAndInstall extends Component
 
     public function init(int $data = 0)
     {
+        $this->isInstalling = false;
         $this->uptime = null;
         $this->supported_os_type = null;
         $this->prerequisites_installed = null;
@@ -172,6 +175,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $this->installationStep = 'Prerequisites';
                         $activity = $this->server->installPrerequisites();
+                        $this->isInstalling = true;
                         $this->number_of_tries++;
                         $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
@@ -208,6 +212,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $this->installationStep = 'Docker';
                         $activity = $this->server->installDocker();
+                        $this->isInstalling = true;
                         $this->number_of_tries++;
                         $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }

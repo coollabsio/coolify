@@ -24,7 +24,6 @@
                 'uuid' => $server->uuid,
                 'name' => $server->name,
                 'description' => $server->description ?: 'No description',
-                'address' => $server->ip,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
                 'status' => $isReady ? 'Ready' : ($server->settings->force_disabled ? 'Disabled' : 'Validation required'),
                 'statusType' => $isReady ? 'success' : 'error',
@@ -41,7 +40,7 @@
             const query = this.search.trim().toLowerCase();
             if (!query) return this.servers;
             return this.servers.filter(server =>
-                [server.name, server.description, server.address, server.status]
+                [server.name, server.description, server.status]
                     .some(value => String(value || '').toLowerCase().includes(query))
             );
         },
@@ -109,7 +108,7 @@
                                 <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                     x-text="server.name"></h2>
                                 <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                    x-text="server.address"></p>
+                                    x-text="server.description"></p>
                             </div>
                         </div>
                         <div class="mt-auto flex items-center pt-4">
@@ -126,14 +125,13 @@
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
                 <div
-                    class="grid min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                     <div>Server</div>
-                    <div>Address</div>
                     <div>Status</div>
                 </div>
                 <template x-for="server in filteredServers" :key="server.uuid">
                     <a :href="server.href" {{ wireNavigate() }}
-                        class="grid min-h-14 min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -146,7 +144,6 @@
                                     x-text="server.description"></p>
                             </div>
                         </div>
-                        <div class="truncate text-neutral-500 dark:text-fg-dim" x-text="server.address"></div>
                         <div>
                             <x-status-badge dynamic>
                                 <span class="size-1.5 rounded-full"

@@ -5,12 +5,14 @@
 
     <livewire:server.navbar :server="$server" />
 
-    <x-slide-over closeWithX fullScreen @startupdate.window="slideOverOpen = true">
+    <x-process-dialog @startupdate.window="processDialogOpen = true" closeWithX size="xl">
         <x-slot:title>Updating packages</x-slot:title>
         <x-slot:content>
-            <livewire:activity-monitor header="Logs" />
+            <div class="flex h-full min-h-0 flex-col">
+                <livewire:activity-monitor header="Logs" fullHeight />
+            </div>
         </x-slot:content>
-    </x-slide-over>
+    </x-process-dialog>
 
     <div
         class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">

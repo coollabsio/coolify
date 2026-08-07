@@ -1,5 +1,18 @@
 <?php
 
+it('uses the themed warning color for resource action icons', function () {
+    foreach ([
+        'application',
+        'database',
+        'service',
+    ] as $resource) {
+        $heading = file_get_contents(resource_path("views/livewire/project/{$resource}/heading.blade.php"));
+
+        expect(substr_count($heading, 'name="play-circle" class="size-3.5 text-warning"'))
+            ->toBeGreaterThanOrEqual(2);
+    }
+});
+
 it('uses native mobile menus for databases and services', function () {
     $applicationHeading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));

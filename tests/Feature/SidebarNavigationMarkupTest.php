@@ -15,6 +15,14 @@ it('keeps server submenu state independent from the Livewire update route', func
         ->and($proxyLogs)->toContain('activeSubMenu="logs"');
 });
 
+it('keeps the server resources menu active during Livewire updates', function () {
+    $sidebar = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+
+    expect($sidebar)
+        ->toContain("'label' => 'Resources',\n            'route' => 'server.resources',\n            'active' => \$activeMenu === 'resources'")
+        ->not->toContain("'active' => request()->routeIs('server.resources')");
+});
+
 it('initializes persisted sidebar state before enabling layout transitions', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 

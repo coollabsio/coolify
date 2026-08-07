@@ -111,8 +111,9 @@ it('renders an automatically added redirect counterpart without reloading', func
     $page = visit("{$base}/domains")
         ->assertSee('https://web.example.com');
 
-    $selector = '#service-domain-redirect-'.$this->serviceApplication->id;
-    $page->select($selector, 'www')
+    $selector = '#service-domain-redirect-'.$this->serviceApplication->id.'-trigger';
+    $page->click($selector)
+        ->click('Redirect to www')
         ->wait(3);
 
     $this->serviceApplication->refresh();

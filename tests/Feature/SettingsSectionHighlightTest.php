@@ -44,3 +44,31 @@ test('configuration sidebar subitems trigger section highlight on scroll', funct
         ->toContain("addEventListener('scrollend'")
         ->toContain('stableFrames');
 });
+
+test('postgresql general navigation lists each in-page settings section', function () {
+    $sidebar = file_get_contents(resource_path('views/components/database/configuration-sidebar.blade.php'));
+    $general = file_get_contents(resource_path('views/livewire/project/database/postgresql/general.blade.php'));
+
+    $sections = [
+        'database-details-section' => 'Database details',
+        'credentials-section' => 'Credentials',
+        'initialization-section' => 'Initialization',
+        'runtime-network-section' => 'Runtime and network',
+        'public-access-section' => 'Public access',
+        'configuration-section' => 'Configuration',
+        'log-delivery-section' => 'Log delivery',
+        'initialization-scripts-section' => 'Initialization scripts',
+    ];
+
+    foreach ($sections as $id => $label) {
+        expect($sidebar)
+            ->toContain("['id' => '{$id}', 'label' => '{$label}']")
+            ->and($general)->toContain("id=\"{$id}\"");
+    }
+
+    expect($sidebar)
+        ->toContain("\$database->type() === 'standalone-postgresql'")
+        ->toContain('window.scrollToSettingsSection?.(id)')
+        ->toContain("activeSection === '{{ \$section['id'] }}'")
+        ->toContain("scrollToSection('{{ \$section['id'] }}')");
+});

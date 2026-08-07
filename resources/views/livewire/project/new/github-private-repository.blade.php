@@ -31,8 +31,9 @@
             <div class="application-settings-section-body p-0!">
                 @foreach ($github_apps as $ghapp)
                     <button type="button"
-                        class="group flex w-full items-center gap-3 border-b border-neutral-200 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.06] dark:hover:bg-white/[0.025]"
+                        class="group relative flex w-full items-center gap-3 border-b border-neutral-200 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.06] dark:hover:bg-white/[0.025]"
                         wire:click.prevent="loadRepositories({{ $ghapp->id }})"
+                        wire:loading.class="coolbox-loading"
                         wire:loading.attr="disabled" wire:target="loadRepositories({{ $ghapp->id }})"
                         wire:key="{{ $ghapp->id }}">
                         <div
@@ -71,13 +72,13 @@
             <div class="application-settings-section-body">
                 @if ($repositories->isNotEmpty())
                     <div class="flex items-end gap-2">
-                        <x-forms.datalist class="w-full" label="Repository"
-                            placeholder="Search repositories…" wire:model.live="selected_repository_id">
-                            @foreach ($repositories as $repo)
-                                <option value="{{ data_get($repo, 'id') }}">{{ data_get($repo, 'name') }}</option>
-                            @endforeach
-                        </x-forms.datalist>
+                        <x-forms.listbox id="selected_repository_id" label="Repository" required live
+                            :options="$repositories->map(fn ($repository) => [
+                                'value' => data_get($repository, 'id'),
+                                'label' => data_get($repository, 'name'),
+                            ])->values()->all()" />
                         <x-forms.button :showLoadingIndicator="false" wire:click.prevent="loadBranches"
+                            wire:loading.attr="disabled"
                             wire:target="loadBranches,selected_repository_id">
                             <x-loading-on-button wire:loading.delay
                                 wire:target="loadBranches,selected_repository_id" />
@@ -99,7 +100,7 @@
                             <h2>Build configuration</h2>
                             <p>Choose the branch and build strategy for this application.</p>
                         </div>
-                        <x-forms.button type="submit" isHighlighted>Continue</x-forms.button>
+                        <x-forms.button type="submit" wire:target="submit" isHighlighted>Continue</x-forms.button>
                     </div>
                     <div class="application-settings-section-body space-y-5">
                         <div class="grid gap-4 sm:grid-cols-2">

@@ -89,7 +89,7 @@
             </li>
             @can('canAccessTerminal')
                 <li>
-                    <a title="Terminal" {{ wireNavigate() }}
+                    <a title="Terminal"
                         class="{{ request()->is('terminal*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                         :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('terminal') }}">
                         <x-reicon name="browser-terminal" class="menu-item-icon" />

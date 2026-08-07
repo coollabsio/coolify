@@ -20,7 +20,7 @@ it('shows a centered themed target canvas before loading xterm', function () {
         ->toContain('data-terminal-target-canvas')
         ->toContain('items-center justify-center')
         ->toContain(':data-console-theme="consoleTheme"')
-        ->toContain("@else\n        <div data-terminal-session-canvas");
+        ->toContain("@else\n        <div wire:key=\"terminal-session-canvas\" data-terminal-session-canvas");
 });
 
 it('loads targets inside the themed session picker with an accent scrollbar', function () {
@@ -52,6 +52,23 @@ it('uses the same padded themed canvas for the active terminal session', functio
         ->toMatch('/\.terminal-session-panel\s*\{[^}]*border:\s*0;/s')
         ->toMatch('/\.terminal-session-panel\s*\{[^}]*background:\s*transparent;/s')
         ->toMatch('/\.terminal-session-panel\s*\{[^}]*box-shadow:\s*none;/s');
+});
+
+it('keeps pre-connection and connected terminal canvases in distinct Livewire DOM branches', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($view)
+        ->toContain('wire:key="terminal-target-canvas"')
+        ->toContain('wire:key="terminal-session-canvas"');
+});
+
+it('opens the global terminal outside Livewire navigation like resource terminals', function () {
+    $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
+
+    expect($navbar)
+        ->toContain('<a title="Terminal"')
+        ->toContain('href="{{ route(\'terminal\') }}"')
+        ->not->toMatch('/<a title="Terminal"[^>]*wireNavigate\(\)/s');
 });
 
 it('uses floating rounded controls instead of the legacy terminal header bar', function () {

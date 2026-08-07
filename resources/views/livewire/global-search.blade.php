@@ -134,7 +134,8 @@
         });
     },
     navigateResults(direction) {
-        const results = document.querySelectorAll('.search-result-item');
+        const results = Array.from(this.$el.querySelectorAll('.search-result-item'))
+            .filter(item => item.offsetParent !== null);
         if (results.length === 0) return;
 
         if (direction === 'down') {

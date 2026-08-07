@@ -7,15 +7,17 @@
                     <p>Connect a GitLab App before selecting a private repository.</p>
                 </div>
             </div>
-            <x-empty title="No GitLab Apps"
-                description="Create an app to grant Coolify access to selected repositories."
-                icon-name="sources">
-                <x-slot:contents>
-                    <x-modal-input buttonTitle="+ Add GitLab App" title="New GitLab App" closeOutside="false">
-                        <livewire:source.gitlab.create />
-                    </x-modal-input>
-                </x-slot:contents>
-            </x-empty>
+            <div class="application-settings-section-body">
+                <x-empty title="No GitLab Apps"
+                    description="Create an app to grant Coolify access to selected repositories."
+                    icon-name="sources">
+                    <x-slot:contents>
+                        <x-modal-input buttonTitle="+ Add GitLab App" title="New GitLab App" closeOutside="false">
+                            <livewire:source.gitlab.create />
+                        </x-modal-input>
+                    </x-slot:contents>
+                </x-empty>
+            </div>
         </section>
     @elseif ($current_step === 'gitlab_apps')
         <section class="application-settings-section">

@@ -102,7 +102,7 @@
             }
         }">
         @if ($selected_uuid === 'default')
-                <div data-terminal-target-canvas
+                <div wire:key="terminal-target-canvas" data-terminal-target-canvas
                     class="application-console-shell relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg p-6"
                     :data-console-theme="consoleTheme"
                     :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
@@ -161,7 +161,7 @@
                 </div>
                 </div>
         @else
-        <div data-terminal-session-canvas
+        <div wire:key="terminal-session-canvas" data-terminal-session-canvas
             class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg p-3 sm:p-6"
             :data-console-theme="consoleTheme"
             :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">

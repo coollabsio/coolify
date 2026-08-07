@@ -55,3 +55,13 @@ test('unmanaged container names use the same typeface as managed resource names'
         ->toContain('min-w-0 truncate text-[12px] font-medium text-neutral-950 dark:text-fg')
         ->not->toContain('truncate font-mono text-[12px] text-neutral-950 dark:text-fg');
 });
+
+test('server resource tabs show a loading state while switching', function () {
+    $view = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
+
+    expect(substr_count($view, 'wire:loading.attr="disabled" wire:target="loadManagedContainers,loadUnmanagedContainers"'))
+        ->toBe(2)
+        ->and($view)
+        ->toContain('<x-loading-on-button wire:loading wire:target="loadManagedContainers" />')
+        ->toContain('<x-loading-on-button wire:loading wire:target="loadUnmanagedContainers" />');
+});

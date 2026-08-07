@@ -172,7 +172,7 @@
         </div>
     @else
         <div wire:key="service-domains-list"
-            class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-hidden">
+            class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-visible">
             @foreach ($domainGroups as $appId => $rows)
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
@@ -190,21 +190,14 @@
                     <div class="flex w-full items-center gap-3 px-4 py-3">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
                         @can('update', $service)
-                            <div class="relative flex shrink-0 items-center gap-2 px-1 py-1 text-sm text-neutral-600 dark:text-fg-dim"
+                            <div class="w-52 shrink-0"
                                 wire:loading.class="opacity-50" wire:target="serviceRedirects.{{ $appId }}">
-                                <span>{{ $redirectLabel }}</span>
-                                <x-reicon name="chevron-down" class="size-4 shrink-0"
-                                    wire:loading.remove wire:target="serviceRedirects.{{ $appId }}" />
-                                <x-loading-on-button wire:loading.delay wire:target="serviceRedirects.{{ $appId }}" />
-                                <select id="service-domain-redirect-{{ $appId }}"
-                                    wire:model.change="serviceRedirects.{{ $appId }}"
-                                    wire:loading.attr="disabled" wire:target="serviceRedirects.{{ $appId }}"
-                                    class="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-wait"
-                                    aria-label="Redirect direction for {{ $heading }}">
-                                    <option value="both">Allow www & non-www</option>
-                                    <option value="www">Redirect to www</option>
-                                    <option value="non-www">Redirect to non-www</option>
-                                </select>
+                                <x-forms.listbox id="serviceRedirects.{{ $appId }}"
+                                    htmlId="service-domain-redirect-{{ $appId }}" live :options="[
+                                        ['value' => 'both', 'label' => 'Allow www & non-www'],
+                                        ['value' => 'www', 'label' => 'Redirect to www'],
+                                        ['value' => 'non-www', 'label' => 'Redirect to non-www'],
+                                    ]" />
                             </div>
                         @else
                             <span class="shrink-0 text-sm text-neutral-600 dark:text-fg-dim">{{ $redirectLabel }}</span>

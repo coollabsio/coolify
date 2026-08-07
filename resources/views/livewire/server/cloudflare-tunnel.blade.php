@@ -71,12 +71,12 @@
                             You do not have permission to configure Cloudflare Tunnel for this server.
                         </x-callout>
                     @else
-                        <x-slide-over @automated.window="slideOverOpen = true" fullScreen>
+                        <x-process-dialog @automated.window="processDialogOpen = true" closeWithX size="xl">
                             <x-slot:title>Cloudflare Tunnel Configuration</x-slot:title>
                             <x-slot:content>
                                 <livewire:activity-monitor header="Logs" fullHeight />
                             </x-slot:content>
-                        </x-slide-over>
+                        </x-process-dialog>
                         <form @submit.prevent="$wire.dispatch('automatedCloudflareConfig')">
                             <div class="grid gap-4 lg:grid-cols-2">
                                 <x-forms.input id="cloudflare_token" required label="Cloudflare token"

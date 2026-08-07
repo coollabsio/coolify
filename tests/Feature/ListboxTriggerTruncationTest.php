@@ -14,6 +14,14 @@ test('listbox trigger styles constrain width and ellipsize long labels', functio
         ->toContain('white-space: nowrap;');
 });
 
+test('listbox trigger height matches shared inputs', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toMatch('/\.listbox-trigger \{[^}]*height: 2\.25rem;/s')
+        ->toMatch('/\.application-settings-workspace \.listbox-trigger[^}]*height: 2rem;/s');
+});
+
 test('listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.listbox id="longOption" label="Example"
