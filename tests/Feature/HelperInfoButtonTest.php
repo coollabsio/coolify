@@ -86,9 +86,19 @@ test('helper popup stays within the visual viewport on mobile', function () {
         ->toContain('window.visualViewport')
         ->toContain('viewport?.offsetLeft')
         ->toContain('viewport?.offsetTop')
-        ->toContain('max-width: ${availableWidth}px;')
+        ->toContain('max-width: ${popupWidth}px;')
         ->toContain('max-height: ${availableHeight}px;')
         ->toContain('overflow-y: auto;');
+});
+
+test('helper popup width is capped while allowing content to wrap vertically', function () {
+    $helper = file_get_contents(resource_path('views/components/helper.blade.php'));
+
+    expect($helper)
+        ->toContain('const maxPopupWidth = 320;')
+        ->toContain('const popupWidth = Math.min(maxPopupWidth, availableWidth);')
+        ->toContain('max-width: ${popupWidth}px;')
+        ->toContain('whitespace-normal');
 });
 
 test('helper popup supports focus dismissal and tooltip aria relationships', function () {
