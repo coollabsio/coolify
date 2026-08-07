@@ -536,6 +536,25 @@
         "template_last_updated_at": "2026-03-13T12:05:06+05:30",
         "port": "8080"
     },
+    "celld": {
+        "documentation": "https://celld.dev/docs?utm_source=coolify.io",
+        "slogan": "Self-hosted, distributed Durable Objects powered by Deno.",
+        "compose": "c2VydmljZXM6CiAgY2VsbGQ6CiAgICBpbWFnZTogJ2doY3IuaW8vZGVub2xhbmQvY2VsbGQ6JHtDRUxMRF9WRVJTSU9OOi1sYXRlc3R9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0NFTExEXzgwODAKICAgICAgLSAnQ0VMTERfQlVDS0VUPSR7Q0VMTERfQlVDS0VUOj99JwogICAgICAtICdTM19FTkRQT0lOVD0ke1MzX0VORFBPSU5UOi19JwogICAgICAtICdBV1NfUkVHSU9OPSR7QVdTX1JFR0lPTjotdXMtZWFzdC0xfScKICAgICAgLSAnQVdTX0FDQ0VTU19LRVlfSUQ9JHtBV1NfQUNDRVNTX0tFWV9JRDo/fScKICAgICAgLSAnQVdTX1NFQ1JFVF9BQ0NFU1NfS0VZPSR7QVdTX1NFQ1JFVF9BQ0NFU1NfS0VZOj99JwogICAgICAtICdBV1NfU0VTU0lPTl9UT0tFTj0ke0FXU19TRVNTSU9OX1RPS0VOOi19JwogICAgICAtICdDRUxMRF9BRERSPTAuMC4wLjA6ODA4MCcKICAgICAgLSAnQ0VMTERfQURWRVJUSVNFPWNlbGxkOjgwODAnCiAgICAgIC0gQ0VMTERfV0FUQ0g9L3Zhci9saWIvY2VsbGQvc3RhdGUKICAgICAgLSAnUlVTVF9MT0c9JHtSVVNUX0xPRzotaW5mb30nCiAgICB2b2x1bWVzOgogICAgICAtICdjZWxsZC1kYXRhOi92YXIvbGliL2NlbGxkJwo=",
+        "tags": [
+            "deno",
+            "durable-objects",
+            "workers",
+            "sqlite",
+            "distributed",
+            "backend",
+            "serverless"
+        ],
+        "category": "backend",
+        "logo": "svgs/denoKV.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-08-07T14:41:11+02:00",
+        "port": "8080"
+    },
     "changedetection": {
         "documentation": "https://github.com/dgtlmoon/changedetection.io/?utm_source=coolify.io",
         "slogan": "Website change detection monitor and notifications.",
