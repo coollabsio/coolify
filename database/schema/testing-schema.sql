@@ -1280,25 +1280,8 @@ CREATE TABLE IF NOT EXISTS "telegram_notification_settings" (
     "traefik_outdated_telegram_notifications" INTEGER DEFAULT true NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS "telescope_entries" (
-    "sequence" INTEGER NOT NULL,
-    "uuid" TEXT NOT NULL,
-    "batch_id" TEXT NOT NULL,
-    "family_hash" TEXT,
-    "should_display_on_index" INTEGER DEFAULT true NOT NULL,
-    "type" TEXT NOT NULL,
-    "content" TEXT NOT NULL,
-    "created_at" TEXT
-);
 
-CREATE TABLE IF NOT EXISTS "telescope_entries_tags" (
-    "entry_uuid" TEXT NOT NULL,
-    "tag" TEXT NOT NULL
-);
 
-CREATE TABLE IF NOT EXISTS "telescope_monitoring" (
-    "tag" TEXT NOT NULL
-);
 
 CREATE TABLE IF NOT EXISTS "user_changelog_reads" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -1572,12 +1555,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "team_invitations_team_id_email_unique" ON "te
 CREATE UNIQUE INDEX IF NOT EXISTS "team_invitations_uuid_unique" ON "team_invitations" (uuid);
 CREATE UNIQUE INDEX IF NOT EXISTS "team_user_team_id_user_id_unique" ON "team_user" (team_id, user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS "telegram_notification_settings_team_id_unique" ON "telegram_notification_settings" (team_id);
-CREATE INDEX IF NOT EXISTS "telescope_entries_batch_id_index" ON "telescope_entries" (batch_id);
-CREATE INDEX IF NOT EXISTS "telescope_entries_created_at_index" ON "telescope_entries" (created_at);
-CREATE INDEX IF NOT EXISTS "telescope_entries_family_hash_index" ON "telescope_entries" (family_hash);
-CREATE INDEX IF NOT EXISTS "telescope_entries_type_should_display_on_index_index" ON "telescope_entries" (type, should_display_on_index);
-CREATE UNIQUE INDEX IF NOT EXISTS "telescope_entries_uuid_unique" ON "telescope_entries" (uuid);
-CREATE INDEX IF NOT EXISTS "telescope_entries_tags_tag_index" ON "telescope_entries_tags" (tag);
 CREATE INDEX IF NOT EXISTS "user_changelog_reads_release_tag_index" ON "user_changelog_reads" (release_tag);
 CREATE INDEX IF NOT EXISTS "user_changelog_reads_user_id_index" ON "user_changelog_reads" (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS "user_changelog_reads_user_id_release_tag_unique" ON "user_changelog_reads" (user_id, release_tag);
@@ -1593,7 +1570,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "webhook_notification_settings_team_id_unique"
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (1, '2014_10_12_000000_create_users_table', 1);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (2, '2014_10_12_100000_create_password_reset_tokens_table', 2);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (3, '2014_10_12_200000_add_two_factor_columns_to_users_table', 3);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (4, '2018_08_08_100000_create_telescope_entries_table', 4);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (5, '2019_12_14_000001_create_personal_access_tokens_table', 5);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (6, '2023_03_20_112410_create_activity_log_table', 6);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (7, '2023_03_20_112411_add_event_column_to_activity_log_table', 7);

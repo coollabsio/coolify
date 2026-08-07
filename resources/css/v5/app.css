@@ -159,10 +159,10 @@
     }
 
     @media (max-width: 767px) {
-        input,
-        textarea,
-        select {
-            font-size: 16px;
+        :root input,
+        :root textarea,
+        :root select {
+            font-size: 16px !important;
         }
     }
 

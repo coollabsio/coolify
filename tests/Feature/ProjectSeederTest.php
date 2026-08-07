@@ -9,7 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('seeds the first project with lima environments', function () {
+it('seeds the first project with only a production environment', function () {
     $this->seed([
         UserSeeder::class,
         TeamSeeder::class,
@@ -24,8 +24,6 @@ it('seeds the first project with lima environments', function () {
     expect($project)
         ->not->toBeNull()
         ->and($project->name)->toBe('My first project')
-        ->and($project->environments()->pluck('uuid', 'name')->all())->toBe([
-            'ubuntu24' => 'ubuntu24',
-            'ubuntu26' => 'ubuntu26',
-        ]);
+        ->and($project->environments)->toHaveCount(1)
+        ->and($project->environments->first()->name)->toBe('production');
 });

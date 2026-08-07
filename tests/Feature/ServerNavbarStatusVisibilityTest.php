@@ -54,6 +54,34 @@ it('shows sentinel sync status after the server is validated', function () {
         ->assertSee('In sync');
 });
 
+it('places mobile status badges on a separate row below the server title', function () {
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+
+    $mobileTitleBlock = str($navbar)
+        ->after('data-testid="server-subtitle"')
+        ->before('id="server-mobile-actions"')
+        ->toString();
+
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+
+    expect($navbar)
+        ->toContain('mb-3 w-full lg:hidden')
+        ->toContain('data-testid="server-subtitle"')
+        ->toContain('flex min-w-0 flex-col gap-2');
+
+    $titleBlock = str($navbar)
+        ->after('mb-3 w-full lg:hidden')
+        ->before('Phone-only actions')
+        ->toString();
+
+    $titlePos = strpos($titleBlock, 'data-testid="server-subtitle"');
+    $badgesRowPos = strpos($titleBlock, 'flex min-w-0 flex-wrap items-center gap-2');
+
+    expect($titlePos)->not->toBeFalse()
+        ->and($badgesRowPos)->not->toBeFalse()
+        ->and($titlePos)->toBeLessThan($badgesRowPos);
+});
+
 it('listens for sentinel restarted broadcasts', function () {
     [$server, , $team] = makeNavbarServer(isFunctional: true);
 

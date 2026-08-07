@@ -13,17 +13,12 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
-use Laravel\Telescope\TelescopeServiceProvider;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        if (App::isLocal()) {
-            $this->app->register(TelescopeServiceProvider::class);
-        }
-
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
     }
 

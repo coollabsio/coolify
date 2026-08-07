@@ -35,6 +35,8 @@ use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
 use App\Livewire\Project\Service\DatabaseBackups as ServiceDatabaseBackups;
 use App\Livewire\Project\Service\Index as ServiceIndex;
+use App\Livewire\Project\Service\VolumeBackup\Index;
+use App\Livewire\Project\Service\VolumeBackup\Show;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Project\Show as ProjectShow;
@@ -92,6 +94,7 @@ use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
+use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
 use App\Livewire\Terminal\Index as TerminalIndex;
@@ -113,6 +116,28 @@ Route::middleware(['throttle:login'])->group(function () {
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
+
+// Local-only previews for redesigned HTTP error pages (never registered in production).
+if (app()->environment('local')) {
+    Route::get('/__error/{code}', function (string $code) {
+        $allowed = ['400', '401', '402', '403', '404', '419', '429', '500', '503'];
+        abort_unless(in_array($code, $allowed, true), 404);
+
+        $messages = [
+            '400' => 'The request could not be understood by the server due to malformed syntax.',
+            '401' => 'You don\'t have permission to access this page.',
+            '402' => 'A valid subscription or payment is required to continue.',
+            '403' => 'You don\'t have permission to access this page.',
+            '404' => 'Sorry, we couldn\'t find the page you\'re looking for.',
+            '419' => 'Your session has expired. Please log in again to continue.',
+            '429' => 'You\'re making too many requests. Please wait a few seconds before trying again.',
+            '500' => 'Example server error: connection to the database timed out.',
+            '503' => 'Service unavailable. Be right back. Thanks for your patience.',
+        ];
+
+        abort((int) $code, $messages[$code]);
+    })->where('code', '[0-9]{3}')->name('dev.error-preview');
+}
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
@@ -154,6 +179,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('storages')->group(function () {
         Route::get('/', StorageIndex::class)->name('storage.index');
         Route::get('/{storage_uuid}', StorageShow::class)->name('storage.show');
+        Route::get('/{storage_uuid}/danger', StorageShow::class)->name('storage.danger');
         Route::get('/{storage_uuid}/resources', StorageShow::class)->name('storage.resources');
     });
     Route::prefix('shared-variables')->group(function () {
@@ -171,6 +197,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
+        Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
     });
 
     Route::get('/terminal', TerminalIndex::class)->name('terminal')->middleware('can.access.terminal');
@@ -225,6 +252,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');
+        Route::get('/domains', ApplicationConfiguration::class)->name('project.application.domains');
         Route::get('/swarm', ApplicationConfiguration::class)->name('project.application.swarm');
         Route::get('/advanced', ApplicationConfiguration::class)->name('project.application.advanced');
         Route::get('/environment-variables', ApplicationConfiguration::class)->name('project.application.environment-variables');
@@ -279,9 +307,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
+        Route::get('/domains', ServiceConfiguration::class)->name('project.service.domains');
         Route::get('/logs', Logs::class)->name('project.service.logs');
         Route::get('/environment-variables', ServiceConfiguration::class)->name('project.service.environment-variables');
         Route::get('/storages', ServiceConfiguration::class)->name('project.service.storages');
+        Route::get('/storage-backups', Index::class)->name('project.service.volume-backups.index');
+        Route::get('/storage-backups/{backup_uuid}', Show::class)->name('project.service.volume-backups.show');
+        Route::get('/storage-backups/{backup_uuid}/s3', Show::class)->name('project.service.volume-backups.s3');
+        Route::get('/storage-backups/{backup_uuid}/retention', Show::class)->name('project.service.volume-backups.retention');
+        Route::get('/storage-backups/{backup_uuid}/executions', Show::class)->name('project.service.volume-backups.executions');
+        Route::get('/storage-backups/{backup_uuid}/danger', Show::class)->name('project.service.volume-backups.danger');
         Route::get('/scheduled-tasks', ServiceConfiguration::class)->name('project.service.scheduled-tasks.show');
         Route::get('/webhooks', ServiceConfiguration::class)->name('project.service.webhooks');
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
@@ -333,6 +368,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::get('/destinations', DestinationIndex::class)->name('destination.index');
     Route::get('/destination/{destination_uuid}', DestinationShow::class)->name('destination.show');
+    Route::get('/destination/{destination_uuid}/danger', DestinationShow::class)->name('destination.danger');
     Route::get('/destination/{destination_uuid}/resources', DestinationResources::class)->name('destination.resources');
 
     // Route::get('/security', fn () => view('security.index'))->name('security.index');
@@ -356,6 +392,7 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
+    Route::get('/source/github/{github_app_uuid}/danger', GitHubChange::class)->name('source.github.danger');
     Route::get('/source/github/{github_app_uuid}/permissions', GitHubChange::class)->name('source.github.permissions');
     Route::get('/source/github/{github_app_uuid}/resources', GitHubChange::class)->name('source.github.resources');
     Route::get('/source/gitlab/{gitlab_app_uuid}', GitLabChange::class)->name('source.gitlab.show');

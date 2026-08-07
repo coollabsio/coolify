@@ -167,6 +167,7 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                $this->dispatch('close-email-change-modal');
             } else {
                 $this->dispatch('error', 'Failed to update email address.');
             }
@@ -229,12 +230,6 @@ class Index extends Component
         $this->show_verification = false;
 
         $this->dispatch('success', 'Email change request cancelled.');
-    }
-
-    public function showEmailChangeForm()
-    {
-        $this->show_email_change = true;
-        $this->new_email = '';
     }
 
     public function resetPassword()

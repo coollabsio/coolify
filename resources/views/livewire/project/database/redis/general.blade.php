@@ -1,124 +1,117 @@
-<div>
-    <form wire:submit="submit" class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit" canGate="update" :canResource="$database">
-                Save
-            </x-forms.button>
-            <x-modal-input title="Resource Details" buttonTitle="Details">
-                <livewire:project.shared.resource-details :resource="$database" />
-            </x-modal-input>
-        </div>
-        <div class="flex gap-2">
-            <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
-            <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
-            <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/redis'>https://hub.docker.com/_/redis</a>" />
-        </div>
-        <div class="flex flex-col gap-2">
-            @if ($database->started_at)
-                <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here,
-                    otherwise
-                    automations won't work. <br>Changing them here will not change the values in the database.
+<div class="application-settings-form">
+    <form wire:submit="submit" class="flex flex-col gap-6">
+        <x-unsaved-bar action="submit" />
+
+        <x-application.settings-section title="Database details"
+            description="Manage the identity and container image for this Redis database.">
+            <x-slot:actions>
+                <x-modal-input title="Resource details" buttonTitle="Details">
+                    <livewire:project.shared.resource-details :resource="$database" />
+                </x-modal-input>
+            </x-slot:actions>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
+                <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
+                <div class="lg:col-span-2">
+                    <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
+                        helper="Use a published Redis image from Docker Hub." />
                 </div>
-                <div class="flex gap-2">
-                    @if (version_compare($redisVersion, '6.0', '>='))
-                        <x-forms.input label="Username" id="redisUsername"
-                            helper="You can only change this in the database." canGate="update" :canResource="$database" />
-                    @endif
-                    @if ($isPasswordHiddenForMember)
-                        <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
-                    @else
-                        <x-forms.input label="Password" id="redisPassword" type="password"
-                            helper="You can only change this in the database." canGate="update" :canResource="$database" />
-                    @endif
+            </div>
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Credentials"
+            description="Keep these values aligned with the credentials configured inside Redis.">
+            <x-callout type="warning" title="{{ $database->started_at ? 'Keep credentials synchronized' : 'Verify the initial credentials' }}">
+                @if ($database->started_at)
+                    Changing values here does not update Redis. Update Redis first, then synchronize the values here so
+                    automations continue working.
+                @else
+                    These values can only be changed here before the first start.
+                @endif
+            </x-callout>
+            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                @if (version_compare($redisVersion, '6.0', '>='))
+                    <x-forms.input label="Username" id="redisUsername" :required="!$database->started_at"
+                        helper="{{ $database->started_at ? 'You can only change this in the database.' : 'Shared REDIS_USERNAME values make this field read-only.' }}"
+                        :disabled="!$database->started_at && $this->isSharedVariable('REDIS_USERNAME')"
+                        canGate="update" :canResource="$database" />
+                @endif
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.input label="Password" id="redisPassword" type="password"
+                        :required="!$database->started_at"
+                        helper="{{ $database->started_at ? 'You can only change this in the database.' : 'Shared REDIS_PASSWORD values make this field read-only.' }}"
+                        :disabled="!$database->started_at && $this->isSharedVariable('REDIS_PASSWORD')"
+                        canGate="update" :canResource="$database" />
+                @endif
+            </div>
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Runtime and network"
+            description="Configure Docker runtime options and host port mappings.">
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="lg:col-span-2">
+                    <x-forms.input
+                        helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
+                        placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
+                        id="customDockerRunOptions" label="Custom Docker options" canGate="update"
+                        :canResource="$database" />
                 </div>
-            @else
-                <div class="pt-2 dark:text-warning">You can only change the username and password in the database after
-                    initial start.</div>
-                <div class="flex gap-2">
-                    @if (version_compare($redisVersion, '6.0', '>='))
-                        <x-forms.input label="Username" id="redisUsername" required
-                            helper="You can change the Redis Username in the input field below or by editing the value of the REDIS_USERNAME environment variable.
-                    <br><br>
-                    If you change the Redis Username in the database, please sync it here, otherwise automations (like backups) won't work.
-                    <br><br>
-                    Note: If the environment variable REDIS_USERNAME is set as a shared variable (environment, project, or team-based), this input field will become read-only."
-                            :disabled="$this->isSharedVariable('REDIS_USERNAME')" canGate="update" :canResource="$database" />
-                    @endif
-                    @if ($isPasswordHiddenForMember)
-                        <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
-                    @else
-                        <x-forms.input label="Password" id="redisPassword" type="password" required
-                            helper="You can change the Redis Password in the input field below or by editing the value of the REDIS_PASSWORD environment variable.
-                <br><br>
-                If you change the Redis Password in the database, please sync it here, otherwise automations (like backups) won't work.
-                <br><br>
-                Note: If the environment variable REDIS_PASSWORD is set as a shared variable (environment, project, or team-based), this input field will become read-only."
-                            :disabled="$this->isSharedVariable('REDIS_PASSWORD')" canGate="update" :canResource="$database" />
-                    @endif
-                </div>
-            @endif
-        </div>
-        <x-forms.input
-            helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' {{ wireNavigate() }} href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
-            placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
-            id="customDockerRunOptions" label="Custom Docker Options" canGate="update" :canResource="$database" />
-        <div class="flex flex-col gap-2">
-            <h3 class="py-2">Network</h3>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="3000:5432" id="portsMappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433"
+                <x-forms.input placeholder="3000:6379" id="portsMappings" label="Port mappings"
+                    helper="Comma-separated host-to-container mappings, for example 3000:6379."
                     canGate="update" :canResource="$database" />
             </div>
-        </div>
-        <livewire:project.database.redis.status-info :database="$database" />
-        <div>
-            <div class="flex flex-col py-2 w-64">
-                <div class="flex items-center gap-2 pb-2">
-                    <div class="flex items-center">
-                        <h3>Proxy</h3>
-                        <x-loading wire:loading wire:target="instantSave" />
-                    </div>
-                    @if ($isPublic)
-                        <x-slide-over fullScreen>
-                            <x-slot:title>Proxy Logs</x-slot:title>
-                            <x-slot:content>
-                                <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                                    container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
-                            </x-slot:content>
-                            <x-forms.button disabled="{{ !$isPublic }}"
-                                @click="slideOverOpen=true">Logs</x-forms.button>
-                        </x-slide-over>
-                    @endif
-                </div>
-                <x-forms.checkbox instantSave id="isPublic" label="Make it publicly available"
-                    canGate="update" :canResource="$database" />
+            <div class="mt-4">
+                <livewire:project.database.redis.status-info :database="$database" />
             </div>
-            <div class="flex flex-col gap-2">
-                <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}"
-                    id="publicPort" label="Public Port" canGate="update" :canResource="$database" />
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Public access"
+            description="Expose this database through the managed TCP proxy.">
+            <x-slot:actions>
+                @if ($isPublic)
+                    <x-slide-over fullScreen>
+                        <x-slot:title>Proxy logs</x-slot:title>
+                        <x-slot:content>
+                            <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
+                        </x-slot:content>
+                        <x-forms.button @click="slideOverOpen=true">View logs</x-forms.button>
+                    </x-slide-over>
+                @endif
+            </x-slot:actions>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
+                    :disabled="! auth()->user()->can('update', $database)" :options="[
+                        ['value' => false, 'label' => 'Private'],
+                        ['value' => true, 'label' => 'Public through TCP proxy'],
+                    ]" />
+                <x-forms.input type="number" placeholder="6379" disabled="{{ $isPublic }}" id="publicPort"
+                    label="Public port" canGate="update" :canResource="$database" />
                 <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
-                    label="Proxy Timeout (seconds)" helper="Timeout for the public TCP proxy connection in seconds. Default: 3600 (1 hour)." canGate="update" :canResource="$database" />
+                    label="Proxy timeout" helper="Timeout in seconds. The default is 3600."
+                    canGate="update" :canResource="$database" />
             </div>
-        </div>
-        <x-forms.textarea placeholder="# maxmemory 256mb
+        </x-application.settings-section>
+
+        <x-application.settings-section title="Configuration"
+            description="Override only the Redis directives you need. All other defaults remain active.">
+            <x-forms.textarea placeholder="# maxmemory 256mb
 # maxmemory-policy allkeys-lru
 # timeout 300"
-            helper="You only need to provide the Redis directives you want to override — Redis will use default values for everything else. <br/><br/>
-⚠️ <strong>Important:</strong> Coolify automatically applies the requirepass directive using the password shown in the Password field above. If you override requirepass in your custom configuration, make sure it matches the password field to avoid authentication issues. <br/><br/>
-🔗 <strong>Tip:</strong> <a target='_blank' class='underline dark:text-white' href='https://raw.githubusercontent.com/redis/redis/7.2/redis.conf'>View the full Redis default configuration</a> to see what options are available."
-            label="Custom Redis Configuration" rows="10" id="redisConf" canGate="update"
-            :canResource="$database" />
+                helper="Coolify automatically applies requirepass using the password above. If you override requirepass here, keep both values identical."
+                label="Custom Redis configuration" rows="10" id="redisConf" canGate="update"
+                :canResource="$database" />
+        </x-application.settings-section>
 
-
-
-        <h3 class="pt-4">Advanced</h3>
-        <div class="flex flex-col">
-            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="isLogDrainEnabled" label="Drain Logs"
-                canGate="update" :canResource="$database" />
-        </div>
-
+        <x-application.settings-section title="Log delivery"
+            description="Forward container logs to the drain configured on the server.">
+            <x-forms.listbox id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
+                :disabled="! auth()->user()->can('update', $database)" :options="[
+                    ['value' => false, 'label' => 'Do not forward logs'],
+                    ['value' => true, 'label' => 'Forward logs to the server drain'],
+                ]" />
+        </x-application.settings-section>
     </form>
 </div>

@@ -131,6 +131,18 @@ it('rejects docker-style MinIO hostnames resolving to private IPs without allowl
     expect($validator->fails())->toBeTrue('Expected coolify-minio private IP rejection without allowlist');
 });
 
+it('allows the bundled MinIO endpoint only when explicitly trusted by S3 storage', function () {
+    $validator = Validator::make(
+        ['endpoint' => 'http://coolify-minio:9000'],
+        ['endpoint' => ['required', new SafeWebhookUrl(
+            fn (string $host): array => ['172.16.0.5'],
+            trustedInternalHosts: ['coolify-minio'],
+        )]],
+    );
+
+    expect($validator->passes())->toBeTrue();
+});
+
 it('accepts allowlisted docker MinIO hostname after custom DNS miss and system DNS hit', function () {
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
         'custom_dns_servers' => '1.1.1.1',

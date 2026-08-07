@@ -65,6 +65,21 @@ it('versions.json contains traefik branches with patch versions', function () {
         expect($branch)->toMatch('/^v\d+\.\d+$/'); // e.g., "v3.6"
         expect($version)->toMatch('/^\d+\.\d+\.\d+$/'); // e.g., "3.6.0"
     }
+
+    // Track current supported branches so the checker can surface security patches
+    // (see https://github.com/coollabsio/coolify/issues/11025)
+    expect($traefikVersions)->toHaveKeys(['v3.7', 'v3.6', 'v2.11']);
+    expect(version_compare($traefikVersions['v3.7'], '3.7.8', '>='))->toBeTrue();
+    expect(version_compare($traefikVersions['v3.6'], '3.6.23', '>='))->toBeTrue();
+    expect(version_compare($traefikVersions['v2.11'], '2.11.52', '>='))->toBeTrue();
+
+    // Newest tracked branch should sort as the highest major.minor
+    $newestBranch = collect($traefikVersions)
+        ->keys()
+        ->map(fn (string $branch) => ltrim($branch, 'v'))
+        ->sort(SORT_NATURAL)
+        ->last();
+    expect($newestBranch)->toBe('3.7');
 });
 
 it('formats version with v prefix for display', function () {

@@ -22,6 +22,7 @@ class CloudInitScripts extends Component
     {
         return [
             'scriptSaved' => 'loadScripts',
+            'securityResourceChanged' => 'loadScripts',
         ];
     }
 

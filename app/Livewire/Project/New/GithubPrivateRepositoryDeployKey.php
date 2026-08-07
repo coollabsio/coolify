@@ -47,7 +47,7 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public string $branch;
 
-    public $build_pack = 'nixpacks';
+    public $build_pack = 'railpack';
 
     public bool $show_is_static = true;
 
