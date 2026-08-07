@@ -555,12 +555,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $to_non_www_name = "{$loop}-{$uuid}-to-non-www";
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\${1}://\${2}",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\$\${1}://\$\${2}",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\${1}://www.\${2}",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\$\${1}://www.\$\${2}",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
             ];
             if ($schema === 'https') {

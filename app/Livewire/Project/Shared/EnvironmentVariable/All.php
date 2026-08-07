@@ -512,6 +512,11 @@ class All extends Component
             ->where('resourceable_id', $this->resource->id)
             ->where('is_preview', $isPreview);
 
+        $hardcodedKeys = $this->hardcodedEnvironmentVariableKeys();
+        if ($hardcodedKeys !== []) {
+            $query->whereNotIn('key', $hardcodedKeys);
+        }
+
         if ($this->serviceFilters !== []) {
             $query->whereRaw('1 = 0');
         }
@@ -716,18 +721,6 @@ class All extends Component
             return ! str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_']);
         });
 
-        // Filter out variables that exist in database (user has overridden/managed them)
-        // For preview, check against preview variables; for production, check against production variables
-        if ($isPreview) {
-            $managedKeys = $this->resource->environment_variables_preview()->pluck('key')->toArray();
-        } else {
-            $managedKeys = $this->resource->environment_variables()->where('is_preview', false)->pluck('key')->toArray();
-        }
-
-        $hardcodedVars = $hardcodedVars->filter(function ($var) use ($managedKeys) {
-            return ! in_array($var['key'], $managedKeys);
-        });
-
         if ($this->searchTerm() !== '') {
             $hardcodedVars = $hardcodedVars->filter(function ($var) {
                 return str($var['key'])->contains($this->searchTerm(), true);
@@ -747,6 +740,27 @@ class All extends Component
         // Otherwise keep order from docker-compose file
 
         return $hardcodedVars;
+    }
+
+    /** @return list<string> */
+    private function hardcodedEnvironmentVariableKeys(): array
+    {
+        if (! $this->showsHardcodedEnvironmentVariables()) {
+            return [];
+        }
+
+        $dockerComposeRaw = $this->resource->docker_compose_raw ?? $this->resource->docker_compose;
+
+        if (blank($dockerComposeRaw)) {
+            return [];
+        }
+
+        return extractHardcodedEnvironmentVariables($dockerComposeRaw)
+            ->pluck('key')
+            ->reject(fn (string $key): bool => str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_']))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function getDevView()

@@ -144,6 +144,17 @@ it('shows connection progress in the terminal body instead of the header', funct
         ->toContain("this.starting = this.\$el.dataset.autoStart === 'true';");
 });
 
+it('starts the global terminal only once when a target is selected', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $component = file_get_contents(app_path('Livewire/Terminal/Index.php'));
+
+    expect($view)
+        ->toContain("await \$wire.set('selected_uuid', target.value);")
+        ->not->toContain('await $wire.connectToContainer();')
+        ->and($component)
+        ->toMatch('/public function updatedSelectedUuid\(\).*?\$this->connectToContainer\(\);/s');
+});
+
 it('uses the redesigned terminal canvas and controls on resource terminal pages', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
 

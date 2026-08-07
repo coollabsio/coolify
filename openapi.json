@@ -366,6 +366,16 @@
                                                 "domain": {
                                                     "type": "string",
                                                     "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                },
+                                                "redirect": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "Per-service www\/non-www redirect for this compose service.",
+                                                    "enum": [
+                                                        "www",
+                                                        "non-www",
+                                                        "both"
+                                                    ]
                                                 }
                                             },
                                             "type": "object"
@@ -935,6 +945,16 @@
                                                 "domain": {
                                                     "type": "string",
                                                     "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                },
+                                                "redirect": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "Per-service www\/non-www redirect for this compose service.",
+                                                    "enum": [
+                                                        "www",
+                                                        "non-www",
+                                                        "both"
+                                                    ]
                                                 }
                                             },
                                             "type": "object"
@@ -1504,6 +1524,16 @@
                                                 "domain": {
                                                     "type": "string",
                                                     "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                },
+                                                "redirect": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "Per-service www\/non-www redirect for this compose service.",
+                                                    "enum": [
+                                                        "www",
+                                                        "non-www",
+                                                        "both"
+                                                    ]
                                                 }
                                             },
                                             "type": "object"
@@ -3122,6 +3152,16 @@
                                                 "domain": {
                                                     "type": "string",
                                                     "description": "Comma-separated list of URLs (e.g. \"https:\/\/app.coolify.io,https:\/\/app2.coolify.io\")"
+                                                },
+                                                "redirect": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "description": "Per-service www\/non-www redirect for this compose service.",
+                                                    "enum": [
+                                                        "www",
+                                                        "non-www",
+                                                        "both"
+                                                    ]
                                                 }
                                             },
                                             "type": "object"

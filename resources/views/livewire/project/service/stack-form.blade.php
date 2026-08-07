@@ -12,7 +12,8 @@
                     <x-modal-input buttonTitle="Edit Compose file" title="Docker Compose" :closeOutside="false"
                         :isLarge="true">
                         <x-slot:headerActions>
-                            <div x-data="{ preview: false, saving: false }"
+                            <div x-data="{ preview: false, validating: false, saving: false }"
+                                @compose-validate-finished.window="validating = false"
                                 @compose-save-finished.window="saving = false" class="flex items-center gap-2">
                                 <x-forms.button
                                     @click="preview = !preview; $dispatch('compose-preview-toggle')">
@@ -20,7 +21,11 @@
                                     <span x-text="preview ? 'Back to source Compose' : 'Preview generated Compose'"></span>
                                 </x-forms.button>
                                 @if (blank($service->service_type))
-                                    <x-forms.button @click="$dispatch('compose-validate')">Validate</x-forms.button>
+                                    <x-forms.button @click="validating = true; $dispatch('compose-validate')"
+                                        x-bind:disabled="validating">
+                                        <x-loading-on-button x-show="validating" x-cloak />
+                                        Validate
+                                    </x-forms.button>
                                 @endif
                                 <x-forms.button @click="saving = true; $dispatch('compose-save')"
                                     x-bind:disabled="saving" isHighlighted>

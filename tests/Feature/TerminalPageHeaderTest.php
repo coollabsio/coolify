@@ -23,6 +23,15 @@ it('shows a centered themed target canvas before loading xterm', function () {
         ->toContain("@else\n        <div wire:key=\"terminal-session-canvas\" data-terminal-session-canvas");
 });
 
+it('keeps the terminal target picker within the mobile canvas', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($view)
+        ->toContain('data-terminal-target-picker="page"')
+        ->toContain('flex max-h-full w-full max-w-lg flex-col')
+        ->toContain('class="terminal-target-list min-h-0 flex-1 overflow-y-auto p-2"');
+});
+
 it('loads targets inside the themed session picker with an accent scrollbar', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
     $styles = file_get_contents(resource_path('css/app.css'));

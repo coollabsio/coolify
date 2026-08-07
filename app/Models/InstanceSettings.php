@@ -49,6 +49,8 @@ class InstanceSettings extends Model
         'is_mcp_server_enabled',
         'webhook_allowed_internal_hosts',
         'webhook_allow_localhost',
+        'avatar_storage_type',
+        'avatar_s3_storage_id',
     ];
 
     protected $hidden = [

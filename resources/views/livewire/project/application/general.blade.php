@@ -7,8 +7,6 @@
 }">
     <form wire:submit='submit' class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit" />
-        {{-- Temporarily hidden: the "Compose parser" dev hint and the "View details"
-             resource-details modal trigger. --}}
         <div class="application-settings-grid flex flex-col gap-6">
             <x-application.settings-section id="application-details-section" title="Application details" helper="Name the application and choose the build strategy Coolify should use to deploy it." class="application-details-card">
             @if ($buildPack === 'dockercompose')

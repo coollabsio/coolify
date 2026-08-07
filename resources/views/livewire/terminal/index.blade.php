@@ -98,12 +98,11 @@
                 this.targetOpen = false;
                 this.targetSearch = '';
                 await $wire.set('selected_uuid', target.value);
-                await $wire.connectToContainer();
             }
         }">
         @if ($selected_uuid === 'default')
                 <div wire:key="terminal-target-canvas" data-terminal-target-canvas
-                    class="application-console-shell relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg p-6"
+                    class="application-console-shell relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg p-3 sm:p-6"
                     :data-console-theme="consoleTheme"
                     :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
                     <div class="absolute top-3 right-3 z-20">
@@ -111,8 +110,8 @@
                             :theme-accents="$consoleThemeAccents" />
                     </div>
                     <div data-terminal-target-picker="page"
-                        class="terminal-target-picker z-10 w-full max-w-lg overflow-hidden rounded-lg border shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
-                    <div class="border-b border-white/[0.08] p-4">
+                        class="terminal-target-picker z-10 flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-lg border shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
+                    <div class="shrink-0 border-b border-white/[0.08] p-4">
                         <h2 class="text-base font-semibold text-white/85">Start a terminal session</h2>
                         <p class="mt-1 text-sm text-white/55">
                             {{ $isLoadingContainers ? 'Finding available servers and containers…' : 'Choose a server or container. The terminal will open after you select a target.' }}
@@ -126,7 +125,7 @@
                             </div>
                         @endif
                     </div>
-                    <div class="terminal-target-list max-h-96 overflow-y-auto p-2">
+                    <div class="terminal-target-list min-h-0 flex-1 overflow-y-auto p-2">
                         @if ($isLoadingContainers)
                             <div class="flex min-h-28 items-center justify-center">
                                 <div class="terminal-loading-label flex items-center gap-2">
