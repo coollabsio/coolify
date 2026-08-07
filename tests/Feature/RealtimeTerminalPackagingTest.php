@@ -15,6 +15,18 @@ it('renders the resource terminal shell while containers are discovered', functi
         ->not->toContain('<x-loading text="Loading containers" />');
 });
 
+it('provides opt-in diagnostics for connected terminal theme changes', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($terminalClient)
+        ->toContain('terminal-debug')
+        ->toContain("'[Terminal Theme] Applying theme'")
+        ->toContain("'[Terminal Theme] Theme applied'")
+        ->toContain('requestedTheme: themeName')
+        ->toContain('shellTheme: shell?.dataset.consoleTheme')
+        ->toContain("getComputedStyle(shell, '::before').background");
+});
+
 it('starts a single discovered resource container without waiting for a missed browser event', function () {
     $terminalComponent = file_get_contents(app_path('Livewire/Project/Shared/ExecuteContainerCommand.php'));
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));

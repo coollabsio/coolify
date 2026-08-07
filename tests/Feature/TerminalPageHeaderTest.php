@@ -54,6 +54,15 @@ it('uses the same padded themed canvas for the active terminal session', functio
         ->toMatch('/\.terminal-session-panel\s*\{[^}]*box-shadow:\s*none;/s');
 });
 
+it('opens the global terminal outside Livewire navigation like resource terminals', function () {
+    $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
+
+    expect($navbar)
+        ->toContain('<a title="Terminal"')
+        ->toContain('href="{{ route(\'terminal\') }}"')
+        ->not->toMatch('/<a title="Terminal"[^>]*wireNavigate\(\)/s');
+});
+
 it('uses floating rounded controls instead of the legacy terminal header bar', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 
