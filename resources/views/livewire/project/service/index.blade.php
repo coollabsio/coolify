@@ -285,14 +285,14 @@
                                     <div class="flex items-center gap-2">
                                         <x-loading wire:loading wire:target="instantSave" />
                                         @if ($serviceDatabase->is_public)
-                                            <x-slide-over fullScreen>
+                                            <x-process-dialog closeWithX size="xl">
                                                 <x-slot:title>Proxy Logs</x-slot:title>
                                                 <x-slot:content>
                                                     <livewire:project.shared.get-logs :server="$server" :resource="$service"
                                                         :servicesubtype="$serviceDatabase" container="{{ $serviceDatabase->uuid }}-proxy" :collapsible="false" lazy />
                                                 </x-slot:content>
-                                                <x-forms.button @click="slideOverOpen=true">Logs</x-forms.button>
-                                            </x-slide-over>
+                                                <x-forms.button @click="processDialogOpen = true">Logs</x-forms.button>
+                                            </x-process-dialog>
                                         @endif
                                     </div>
                                 </div>

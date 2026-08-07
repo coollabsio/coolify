@@ -86,6 +86,7 @@
             $serverRouteParameters,
         );
         $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
+        $proxyCanBeStopped = in_array($proxyStatus, ['running', 'starting', 'restarting'], true);
     @endphp
 
     @teleport('#server-topbar-context')
@@ -166,7 +167,7 @@
 
                         <div x-cloak x-show="open" x-transition.origin.top.left
                             class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
-                            @if ($proxyStatus === 'running')
+                            @if ($proxyCanBeStopped)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('server-mobile-restart-proxy-trigger')?.click()"
                                     role="menuitem">
@@ -277,7 +278,7 @@
                     @can('manageProxy', $server)
                         <div
                             class="resource-heading-actions flex shrink-0 items-center gap-0.5">
-                            @if ($proxyStatus === 'running')
+                            @if ($proxyCanBeStopped)
                                 <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
                                     <x-loading text="Checking Traefik dashboard" />
                                 </div>
@@ -317,7 +318,8 @@
                                     </x-slot:content>
                                 </x-modal-confirmation>
                             @else
-                                <x-forms.button @click="$wire.dispatch('checkProxyEvent')">
+                                <x-forms.button @click="$wire.dispatch('checkProxyEvent')"
+                                    wire:target="checkProxy,startProxy">
                                     <x-reicon name="play-circle"
                                         class="size-4 text-coollabs dark:text-warning" />
                                     Start Proxy

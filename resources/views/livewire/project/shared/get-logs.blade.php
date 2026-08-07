@@ -1,4 +1,4 @@
-<div class="{{ $collapsible ? 'runtime-log-shell' : '' }}">
+<div @class(['w-full min-w-0', 'runtime-log-shell' => $collapsible])>
     <div id="screen" x-data="{
         collapsible: {{ $collapsible ? 'true' : 'false' }},
         expanded: {{ ($expandByDefault || !$collapsible) ? 'true' : 'false' }},

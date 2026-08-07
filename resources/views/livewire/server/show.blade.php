@@ -192,10 +192,11 @@
                                 </div>
                             @endif
 
-                            <x-process-dialog closeWithX size="xl">
+                            <x-process-dialog closeWithX size="xl" :open="$isValidating">
                                 <x-slot:title>Validate and configure</x-slot:title>
                                 <x-slot:content>
-                                    <livewire:server.validate-and-install :server="$server" :ask="$server->isFunctional()" />
+                                    <livewire:server.validate-and-install :server="$server"
+                                        :ask="$server->isFunctional() && ! $isValidating" />
                                 </x-slot:content>
                                 <x-forms.button type="button" :isHighlighted="! $server->isFunctional()"
                                     @click="processDialogOpen = true" wire:click.prevent="validateServer">
@@ -282,17 +283,6 @@
                         </x-application.settings-section>
                     @endif
                 </form>
-            @endif
-
-            @if ($isValidating)
-                <div x-data="{ slideOverOpen: true }">
-                    <x-slide-over closeWithX fullScreen>
-                        <x-slot:title>Validation in progress</x-slot:title>
-                        <x-slot:content>
-                            <livewire:server.validate-and-install :server="$server" />
-                        </x-slot:content>
-                    </x-slide-over>
-                </div>
             @endif
         </div>
     </div>

@@ -63,26 +63,29 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section title="Public access"
+        <x-application.settings-section title="Public access" class="relative"
             description="Expose this database through the managed TCP proxy.">
             <x-slot:actions>
                 @if ($isPublic)
-                    <x-slide-over fullScreen>
+                    <x-process-dialog closeWithX size="xl">
                         <x-slot:title>Proxy logs</x-slot:title>
                         <x-slot:content>
                             <livewire:project.shared.get-logs :server="$server" :resource="$database"
                                 container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
                         </x-slot:content>
-                        <x-forms.button @click="slideOverOpen=true">View logs</x-forms.button>
-                    </x-slide-over>
+                        <x-forms.button @click="processDialogOpen = true">View logs</x-forms.button>
+                    </x-process-dialog>
                 @endif
             </x-slot:actions>
+            <x-table.loading target="instantSave" text="Updating public access..." />
             <div class="grid gap-4 lg:grid-cols-2">
-                <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
-                    :disabled="! auth()->user()->can('update', $database)" :options="[
-                        ['value' => false, 'label' => 'Private'],
-                        ['value' => true, 'label' => 'Public through TCP proxy'],
-                    ]" />
+                <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
+                    <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
+                        :disabled="! auth()->user()->can('update', $database)" :options="[
+                            ['value' => false, 'label' => 'Private'],
+                            ['value' => true, 'label' => blank($publicPort) ? 'Public through TCP proxy (set public port first)' : 'Public through TCP proxy', 'disabled' => blank($publicPort)],
+                        ]" />
+                </div>
                 <x-forms.input type="number" placeholder="6379" disabled="{{ $isPublic }}" id="publicPort"
                     label="Public port" canGate="update" :canResource="$database" />
                 <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"

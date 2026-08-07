@@ -18,6 +18,12 @@ it('moves service and database page navigation into their sidebars', function ()
         ->toContain("['label' => 'Terminal'");
 });
 
+it('uses a full page load for database backup imports', function () {
+    $sidebar = file_get_contents(resource_path('views/components/database/configuration-sidebar.blade.php'));
+
+    expect($sidebar)->toContain("['label' => 'Import Backup', 'route' => 'project.database.import-backup', 'icon' => 'upload', 'navigate' => false");
+});
+
 it('matches application action bar behavior for services and databases', function () {
     $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $database = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
@@ -40,7 +46,7 @@ it('keeps database and service sidebar sections in the application sequence', fu
     $service = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
 
     expect($database)
-        ->toContain("'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Backups', 'Servers', 'Import Backup']")
+        ->toContain("'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Backups', 'Import Backup', 'Servers']")
         ->toContain("'Automation' => ['Webhooks', 'Healthcheck']")
         ->toContain("'Logs' => ['Runtime']")
         ->toContain("'Operations' => ['Terminal', 'Resource Limits', 'Resource Operations', 'Metrics', 'Tags', 'Danger Zone']");

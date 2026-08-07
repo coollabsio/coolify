@@ -4,9 +4,10 @@ test('server revalidation opens in the centered process dialog', function () {
     $view = file_get_contents(resource_path('views/livewire/server/show.blade.php'));
 
     expect($view)
-        ->toContain('<x-process-dialog closeWithX size="xl">')
+        ->toContain('<x-process-dialog closeWithX size="xl" :open="$isValidating">')
         ->toContain(':isHighlighted="! $server->isFunctional()"')
-        ->toContain('@click="processDialogOpen = true" wire:click.prevent="validateServer"');
+        ->toContain('@click="processDialogOpen = true" wire:click.prevent="validateServer"')
+        ->not->toContain('<x-slide-over');
 });
 
 test('completed server validation shows a close action instead of empty logs', function () {

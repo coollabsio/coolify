@@ -2,7 +2,7 @@
     <form wire:submit="submit" class="flex flex-col gap-6">
         <x-unsaved-bar action="submit" />
 
-        <x-application.settings-section title="Database details"
+        <x-application.settings-section id="database-details-section" title="Database details"
             description="Manage the identity and container image for this PostgreSQL database.">
             <x-slot:actions>
                 <x-modal-input title="Resource details" buttonTitle="Details">
@@ -19,7 +19,7 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section title="Credentials"
+        <x-application.settings-section id="credentials-section" title="Credentials"
             description="Keep these values aligned with the credentials configured inside PostgreSQL.">
             @if ($database->started_at)
                 <x-callout type="warning" title="Keep credentials synchronized">
@@ -43,7 +43,7 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section title="Initialization"
+        <x-application.settings-section id="initialization-section" title="Initialization"
             description="Configure the options used when PostgreSQL creates its initial data directory.">
             <div class="grid gap-4 lg:grid-cols-2">
                 <x-forms.input label="Initial database arguments" id="postgresInitdbArgs"
@@ -53,7 +53,7 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section title="Runtime and network"
+        <x-application.settings-section id="runtime-network-section" title="Runtime and network"
             description="Configure Docker runtime options and host port mappings.">
             <div class="grid gap-4 lg:grid-cols-2">
                 <div class="lg:col-span-2">
@@ -72,26 +72,29 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section title="Public access"
+        <x-application.settings-section id="public-access-section" title="Public access" class="relative"
             description="Expose this database through the managed TCP proxy.">
             <x-slot:actions>
                 @if ($isPublic)
-                    <x-slide-over fullScreen>
+                    <x-process-dialog closeWithX size="xl">
                         <x-slot:title>Proxy logs</x-slot:title>
                         <x-slot:content>
                             <livewire:project.shared.get-logs :server="$server" :resource="$database"
                                 container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
                         </x-slot:content>
-                        <x-forms.button @click="slideOverOpen=true">View logs</x-forms.button>
-                    </x-slide-over>
+                        <x-forms.button @click="processDialogOpen = true">View logs</x-forms.button>
+                    </x-process-dialog>
                 @endif
             </x-slot:actions>
+            <x-table.loading target="instantSave" text="Updating public access..." />
             <div class="grid gap-4 lg:grid-cols-2">
-                <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
-                    :disabled="! auth()->user()->can('update', $database)" :options="[
-                        ['value' => false, 'label' => 'Private'],
-                        ['value' => true, 'label' => 'Public through TCP proxy'],
-                    ]" />
+                <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
+                    <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
+                        :disabled="! auth()->user()->can('update', $database)" :options="[
+                            ['value' => false, 'label' => 'Private'],
+                            ['value' => true, 'label' => blank($publicPort) ? 'Public through TCP proxy (set public port first)' : 'Public through TCP proxy', 'disabled' => blank($publicPort)],
+                        ]" />
+                </div>
                 <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
                     label="Public port" canGate="update" :canResource="$database" />
                 <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
@@ -100,13 +103,13 @@
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section title="Configuration"
+        <x-application.settings-section id="configuration-section" title="Configuration"
             description="Override the PostgreSQL configuration used by this container.">
             <x-forms.textarea label="Custom PostgreSQL configuration" rows="10" id="postgresConf"
                 canGate="update" :canResource="$database" />
         </x-application.settings-section>
 
-        <x-application.settings-section title="Log delivery"
+        <x-application.settings-section id="log-delivery-section" title="Log delivery"
             description="Forward container logs to the drain configured on the server.">
             <x-forms.listbox id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
                 :disabled="! auth()->user()->can('update', $database)" :options="[
@@ -116,7 +119,7 @@
         </x-application.settings-section>
     </form>
 
-    <x-application.settings-section title="Initialization scripts"
+    <x-application.settings-section id="initialization-scripts-section" title="Initialization scripts"
         description="Run SQL files in order when PostgreSQL initializes for the first time." flush>
         <x-slot:actions>
             @can('update', $database)
