@@ -37,8 +37,8 @@ test('Dockerfile applications can save registry build cache settings', function 
     $application = createApplicationForDockerBuildCacheSettingsTest();
 
     Livewire::test(Advanced::class, ['application' => $application])
-        ->assertSee('External Build Cache')
-        ->assertSeeHtml('wire:model.live=dockerBuildCacheEnabled')
+        ->assertSee('External build cache')
+        ->assertSee('External cache')
         ->set('dockerBuildCacheEnabled', true)
         ->set('dockerBuildCacheMode', 'registry')
         ->set('dockerBuildCacheFrom', 'registry.example.com/team/app:buildcache')
@@ -107,5 +107,5 @@ test('external build cache settings are hidden for other build packs', function 
     $application = createApplicationForDockerBuildCacheSettingsTest('nixpacks');
 
     Livewire::test(Advanced::class, ['application' => $application])
-        ->assertDontSee('External Build Cache');
+        ->assertDontSee('External build cache');
 });
