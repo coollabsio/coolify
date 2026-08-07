@@ -1508,8 +1508,26 @@ function removeAnsiColors($text)
 
 function sanitizeLogsForExport(string $text): string
 {
-    // All sanitization is now handled by remove_iip()
-    return remove_iip($text);
+    // Ensure valid UTF-8 before processing
+    $text = sanitize_utf8_text($text);
+
+    // Handle multi-line patterns on the full text first.
+    // Private key blocks legitimately span multiple lines and must be
+    // redacted as a whole before per-line sanitization.
+    $text = preg_replace('/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', REDACTED, $text);
+
+    // Split into individual lines and apply single-line sanitization to each
+    // one independently. This prevents regexes like the URL password pattern
+    // ([^@]+) from greedily matching across newline boundaries when no "@"
+    // exists on the same line (issue #11066).
+    $lines = explode("\n", $text);
+
+    foreach ($lines as &$line) {
+        $line = remove_iip($line);
+    }
+    unset($line);
+
+    return implode("\n", $lines);
 }
 
 function getTopLevelNetworks(Service|Application $resource)

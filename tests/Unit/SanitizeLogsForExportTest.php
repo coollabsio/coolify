@@ -184,3 +184,78 @@ it('removes generic URL passwords', function () {
         expect($result)->toBe($expected);
     }
 });
+
+it('does not corrupt logs when URL password regex would cross line boundaries', function () {
+    $input = implode("\n", [
+        '{"timestamp":"2025-01-01T00:00:00Z","message":"connecting to postgres://user:secretpass"}',
+        '{"timestamp":"2025-01-01T00:00:01Z","message":"normal log line with no sensitive data"}',
+        '{"timestamp":"2025-01-01T00:00:02Z","message":"notification sent to admin@example.com"}',
+    ]);
+    $result = sanitizeLogsForExport($input);
+    $lines = explode("\n", $result);
+
+    // All 3 lines must be preserved as separate lines
+    expect($lines)->toHaveCount(3);
+
+    // Line 1 remains intact (no @ on this line means the URL regex does not match)
+    expect($lines[0])->toContain('postgres://user:secretpass');
+
+    // Line 2 should be completely untouched
+    expect($lines[1])->toBe('{"timestamp":"2025-01-01T00:00:01Z","message":"normal log line with no sensitive data"}');
+
+    // Line 3 email gets redacted independently
+    expect($lines[2])->not->toContain('admin@example.com');
+    expect($lines[2])->toContain(REDACTED);
+});
+
+it('sanitizes complete credential URLs on individual lines independently', function () {
+    $input = implode("\n", [
+        'postgres://user:secret1@localhost:5432/db',
+        'mysql://admin:secret2@db.host.com/app',
+    ]);
+    $result = sanitizeLogsForExport($input);
+    $lines = explode("\n", $result);
+
+    expect($lines)->toHaveCount(2);
+    expect($lines[0])->toBe('postgres://user:'.REDACTED.'@localhost:5432/db');
+    expect($lines[1])->toBe('mysql://admin:'.REDACTED.'@db.host.com/app');
+});
+
+it('still redacts private key blocks spanning multiple lines after line-by-line fix', function () {
+    $input = implode("\n", [
+        'Config:',
+        '-----BEGIN RSA PRIVATE KEY-----',
+        'MIIEowIBAAKCAQEAyZ3xL8v4xK3z9Z3',
+        'some-key-content-here',
+        '-----END RSA PRIVATE KEY-----',
+        'After key',
+    ]);
+    $result = sanitizeLogsForExport($input);
+
+    expect($result)->not->toContain('-----BEGIN RSA PRIVATE KEY-----');
+    expect($result)->not->toContain('MIIEowIBAAKCAQEAyZ3xL8v4xK3z9Z3');
+    expect($result)->not->toContain('some-key-content-here');
+    expect($result)->not->toContain('-----END RSA PRIVATE KEY-----');
+    expect($result)->toContain(REDACTED);
+    expect($result)->toContain('Config:');
+    expect($result)->toContain('After key');
+});
+
+it('preserves line count in multi-line log output', function () {
+    $input = implode("\n", [
+        '2025-01-01 INFO: Application started',
+        '2025-01-01 DEBUG: Connected to redis://default:mypass@redis:6379',
+        '2025-01-01 INFO: Processing complete',
+        '2025-01-01 WARN: Timeout on request',
+        '2025-01-01 INFO: Shutting down',
+    ]);
+    $result = sanitizeLogsForExport($input);
+    $inputLines = explode("\n", $input);
+    $outputLines = explode("\n", $result);
+
+    expect($outputLines)->toHaveCount(count($inputLines));
+    expect($outputLines[1])->toContain(REDACTED);
+    expect($outputLines[1])->not->toContain('mypass');
+    expect($outputLines[0])->toBe('2025-01-01 INFO: Application started');
+    expect($outputLines[2])->toBe('2025-01-01 INFO: Processing complete');
+});
