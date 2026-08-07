@@ -552,7 +552,7 @@
         "category": "backend",
         "logo": "svgs/denoKV.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-07T14:41:11+02:00",
+        "template_last_updated_at": "2026-08-07T18:17:33+02:00",
         "port": "8080"
     },
     "changedetection": {

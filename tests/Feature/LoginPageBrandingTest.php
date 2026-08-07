@@ -21,6 +21,22 @@ test('login register and forgot password headers are Coolify', function () {
         ->not->toContain("title=\"{{ __('auth.forgot_password_heading') }}\"");
 });
 
+test('page body uses the dynamic viewport height on mobile', function () {
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($styles)
+        ->toMatch('/body\s*\{[^}]*min-height:\s*100dvh;/s')
+        ->not->toMatch('/body\s*\{[^}]*@apply[^;]*min-h-screen/s');
+});
+
+test('auth pages use the Coollabs purple background glow', function () {
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($styles)
+        ->toMatch('/\.auth-shell\s*\{[^}]*color-mix\(in oklab, var\(--color-coollabs\) 9%, transparent\)/s')
+        ->not->toMatch('/\.auth-shell\s*\{[^}]*color-mix\(in oklab, var\(--color-accent\) 9%, transparent\)/s');
+});
+
 test('confirm password page uses the shared auth shell', function () {
     $confirm = file_get_contents(resource_path('views/auth/confirm-password.blade.php'));
 

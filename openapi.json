@@ -4132,6 +4132,73 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/migrate": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Migrate to Server",
+                "description": "Migrate an application to another destination\/server owned by the authenticated team. Stops the application, optionally transfers persistent volume data when both servers are managed by Coolify, and updates database records. Redeploy after migration completes.",
+                "operationId": "migrate-application-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "destination_uuid"
+                                ],
+                                "properties": {
+                                    "destination_uuid": {
+                                        "description": "UUID of the target destination.",
+                                        "type": "string"
+                                    },
+                                    "migrate_volumes": {
+                                        "description": "Whether to transfer persistent volume data when migrating across servers.",
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Application migration started or completed."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications\/{uuid}\/storages": {
             "get": {
                 "tags": [
@@ -7925,6 +7992,73 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/migrate": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Migrate to Server",
+                "description": "Migrate a database to another destination\/server owned by the authenticated team. Stops the database, optionally transfers persistent volume data when both servers are managed by Coolify, and updates database records. Redeploy after migration completes.",
+                "operationId": "migrate-database-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "destination_uuid"
+                                ],
+                                "properties": {
+                                    "destination_uuid": {
+                                        "description": "UUID of the target destination.",
+                                        "type": "string"
+                                    },
+                                    "migrate_volumes": {
+                                        "description": "Whether to transfer persistent volume data when migrating across servers.",
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Database migration started or completed."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -15494,6 +15628,382 @@
                 ]
             }
         },
+        "\/servers\/{uuid}\/migrate": {
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Migrate server to another Coolify instance",
+                "description": "One-shot handoff: export this server, import+claim on the target instance (using the provided token), then disable automations here. Requires read:sensitive and write.",
+                "operationId": "migrate-server-between-instances",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "target_url",
+                                    "target_token"
+                                ],
+                                "properties": {
+                                    "target_url": {
+                                        "type": "string",
+                                        "example": "https:\/\/coolify-b.example.com"
+                                    },
+                                    "target_token": {
+                                        "description": "API token on the target instance (root or write)",
+                                        "type": "string"
+                                    },
+                                    "write_remote": {
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "rebind_sentinel": {
+                                        "type": "boolean",
+                                        "default": true
+                                    },
+                                    "preserve_uuids": {
+                                        "type": "boolean",
+                                        "default": true
+                                    },
+                                    "adopt_mode": {
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Migrated"
+                    },
+                    "403": {
+                        "description": "Missing sensitive permission"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "description": "Validation or remote import failed"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/export": {
+            "get": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Export server transfer bundle",
+                "description": "Export a server and all resources hosted on it as a versioned transfer bundle for moving between Coolify instances. Requires read:sensitive.",
+                "operationId": "export-server-transfer-bundle",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "encrypt",
+                        "in": "query",
+                        "description": "If true and passphrase is provided, return an encrypted envelope.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "passphrase",
+                        "in": "query",
+                        "description": "Passphrase used when encrypt=true.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Transfer bundle"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Missing sensitive permission"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/import": {
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Import server transfer bundle",
+                "description": "Import a server transfer bundle into this Coolify instance (adopt mode by default).",
+                "operationId": "import-server-transfer-bundle",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "bundle": {
+                                        "description": "Plain or encrypted transfer bundle",
+                                        "type": "object"
+                                    },
+                                    "passphrase": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "dry_run": {
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "preserve_uuids": {
+                                        "type": "boolean",
+                                        "default": true
+                                    },
+                                    "adopt_mode": {
+                                        "description": "Import without forcing redeploy; keep statuses for adoption",
+                                        "type": "boolean",
+                                        "default": true
+                                    },
+                                    "claim": {
+                                        "description": "Automatically claim the host for this instance after import",
+                                        "type": "boolean",
+                                        "default": true
+                                    },
+                                    "write_remote": {
+                                        "description": "When claiming, write ownership file on the host via SSH",
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "rebind_sentinel": {
+                                        "description": "When claiming, rebind Sentinel to this instance",
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Dry-run result"
+                    },
+                    "201": {
+                        "description": "Imported"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "description": "Validation failed"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/claim": {
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Claim imported server",
+                "description": "Claim a managed host for this instance: write ownership file and rebind Sentinel.",
+                "operationId": "claim-server",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "write_remote": {
+                                        "type": "boolean",
+                                        "default": true
+                                    },
+                                    "rebind_sentinel": {
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Claim result"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/transfer\/complete": {
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Mark server transferred",
+                "description": "Source-instance step: disable automations after a successful export\/import handoff.",
+                "operationId": "complete-server-transfer",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "export_id": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    },
+                                    "target_instance_url": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Marked transferred"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/export\/mailbox": {
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Write transfer bundle to server mailbox",
+                "description": "Write an export bundle to \/data\/coolify\/exports on the managed host for air-gapped import.",
+                "operationId": "export-server-transfer-mailbox",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "passphrase": {
+                                        "type": [
+                                            "string",
+                                            "null"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mailbox write result"
+                    },
+                    "403": {
+                        "description": "Missing sensitive permission"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/servers": {
             "get": {
                 "tags": [
@@ -18218,6 +18728,73 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/migrate": {
+            "post": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Migrate to Server",
+                "description": "Migrate a service to another destination\/server owned by the authenticated team. Stops the service, optionally transfers persistent volume data when both servers are managed by Coolify, and updates database records. Redeploy after migration completes.",
+                "operationId": "migrate-service-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "destination_uuid"
+                                ],
+                                "properties": {
+                                    "destination_uuid": {
+                                        "description": "UUID of the target destination.",
+                                        "type": "string"
+                                    },
+                                    "migrate_volumes": {
+                                        "description": "Whether to transfer persistent volume data when migrating across servers.",
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Service migration started or completed."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
