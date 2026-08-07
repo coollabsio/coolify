@@ -1,4 +1,32 @@
 <div>
+    @if ($resource instanceof \App\Models\Service && $missingRequiredEnvironmentVariableCount > 0)
+        @php
+            $environmentVariablesUrl = route('project.service.environment-variables', [
+                'project_uuid' => $resource->environment->project->uuid,
+                'environment_uuid' => $resource->environment->uuid,
+                'service_uuid' => $resource->uuid,
+            ]);
+        @endphp
+        <x-popup-small :compact-after="5000" compact-storage-key="required-environment-variables:{{ $resource->uuid }}">
+            <x-slot:title>
+                {{ $missingRequiredEnvironmentVariableCount === 1 ? 'Required environment variable missing' : 'Required environment variables missing' }}
+            </x-slot:title>
+            <x-slot:icon>
+                <x-reicon name="alert-triangle" class="size-4" />
+            </x-slot:icon>
+            <x-slot:description>
+                <span>
+                    {{ implode(', ', $missingRequiredEnvironmentVariableNames) }} must be set before this service can be deployed.
+                    <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                        class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80">
+                        Open environment variables
+                        <x-reicon name="arrow-right" class="size-2.5" />
+                    </a>
+                </span>
+            </x-slot:description>
+        </x-popup-small>
+    @endif
+
     @if ($isConfigurationChanged && !is_null($resource->config_hash) && !$resource->isExited())
         @php
             $compactStoragePrefix = "configuration-warning:{$resource->uuid}:";

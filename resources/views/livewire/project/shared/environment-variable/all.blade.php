@@ -196,7 +196,7 @@
                         description="No variables match your search." />
                 @elseif ($totalRows > 0)
                     <div class="data-table w-full">
-                        <div class="relative">
+                        <div class="environment-table-scroll relative">
                             <div class="transition-all"
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
                                 wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">

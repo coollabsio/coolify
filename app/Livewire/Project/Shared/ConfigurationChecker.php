@@ -21,6 +21,10 @@ class ConfigurationChecker extends Component
 
     public array $configurationDiff = [];
 
+    public int $missingRequiredEnvironmentVariableCount = 0;
+
+    public array $missingRequiredEnvironmentVariableNames = [];
+
     public Application|Service|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $resource;
 
     public function getListeners(): array
@@ -30,6 +34,7 @@ class ConfigurationChecker extends Component
         return [
             "echo-private:team.{$teamId},ApplicationConfigurationChanged" => 'configurationChanged',
             'configurationChanged' => 'configurationChanged',
+            'envsUpdated' => 'configurationChanged',
         ];
     }
 
@@ -82,6 +87,12 @@ class ConfigurationChecker extends Component
     private function loadConfigurationState(): void
     {
         $this->resource->refresh();
+
+        if ($this->resource instanceof Service) {
+            $missingVariables = $this->resource->missingRequiredEnvironmentVariables();
+            $this->missingRequiredEnvironmentVariableCount = $missingVariables->count();
+            $this->missingRequiredEnvironmentVariableNames = $missingVariables->pluck('key')->all();
+        }
 
         if ($this->resource instanceof Application) {
             $diff = $this->resource->pendingDeploymentConfigurationDiff();

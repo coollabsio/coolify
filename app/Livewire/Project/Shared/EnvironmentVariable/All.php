@@ -456,7 +456,7 @@ class All extends Component
 
     /**
      * Ordered segments used for pagination: production managed → production hardcoded
-     * → preview managed → preview hardcoded (matching the historical table order).
+     * → preview managed → preview hardcoded.
      *
      * @return list<array{kind: string, is_preview: bool, count: int}>
      */
@@ -469,6 +469,12 @@ class All extends Component
         $segments = [];
 
         if ($includeProduction) {
+            $segments[] = [
+                'kind' => 'managed',
+                'is_preview' => false,
+                'count' => $this->countManagedEnvironmentVariables(false),
+            ];
+
             if ($this->includesHardcodedVariables() && $this->showsHardcodedEnvironmentVariables()) {
                 $segments[] = [
                     'kind' => 'hardcoded',
@@ -477,14 +483,15 @@ class All extends Component
                 ];
             }
 
-            $segments[] = [
-                'kind' => 'managed',
-                'is_preview' => false,
-                'count' => $this->countManagedEnvironmentVariables(false),
-            ];
         }
 
         if ($includePreview) {
+            $segments[] = [
+                'kind' => 'managed',
+                'is_preview' => true,
+                'count' => $this->countManagedEnvironmentVariables(true),
+            ];
+
             if ($this->includesHardcodedVariables() && $this->showsHardcodedEnvironmentVariables()) {
                 $segments[] = [
                     'kind' => 'hardcoded',
@@ -493,11 +500,6 @@ class All extends Component
                 ];
             }
 
-            $segments[] = [
-                'kind' => 'managed',
-                'is_preview' => true,
-                'count' => $this->countManagedEnvironmentVariables(true),
-            ];
         }
 
         return $segments;
@@ -514,9 +516,13 @@ class All extends Component
             $query->whereRaw('1 = 0');
         }
 
-        $query->orderByRaw("CASE WHEN key LIKE 'SERVICE_FQDN%' OR key LIKE 'SERVICE_URL%' OR key LIKE 'SERVICE_NAME%' THEN 0 ELSE 1 END");
+        $missingRequiredIds = $this->missingRequiredEnvironmentVariableIds($isPreview);
+        if ($missingRequiredIds !== []) {
+            $placeholders = implode(', ', array_fill(0, count($missingRequiredIds), '?'));
+            $query->orderByRaw("CASE WHEN id IN ({$placeholders}) THEN 0 ELSE 1 END", $missingRequiredIds);
+        }
 
-        $query->orderByRaw("CASE WHEN is_required = true AND (value IS NULL OR value = '') THEN 0 ELSE 1 END");
+        $query->orderByRaw("CASE WHEN key LIKE 'SERVICE_FQDN%' OR key LIKE 'SERVICE_URL%' OR key LIKE 'SERVICE_NAME%' THEN 0 ELSE 1 END");
 
         if ($this->searchTerm() !== '') {
             $escapedSearch = addcslashes(Str::lower($this->searchTerm()), '%_\\');
@@ -549,6 +555,22 @@ class All extends Component
         }
 
         return $query;
+    }
+
+    /** @return list<int> */
+    private function missingRequiredEnvironmentVariableIds(bool $isPreview): array
+    {
+        return EnvironmentVariable::query()
+            ->where('resourceable_type', $this->resource->getMorphClass())
+            ->where('resourceable_id', $this->resource->id)
+            ->where('is_preview', $isPreview)
+            ->where('is_required', true)
+            ->get()
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)
+            ->pluck('id')
+            ->map(fn (int|string $id): int => (int) $id)
+            ->values()
+            ->all();
     }
 
     private function countManagedEnvironmentVariables(bool $isPreview): int

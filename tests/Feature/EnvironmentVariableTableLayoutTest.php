@@ -80,6 +80,19 @@ test('resource environment variables table has a Managed column and no name-cell
     expect($show)->toContain('<x-helper :helper="e($comment)" />');
 });
 
+test('resource environment variables table remains horizontally scrollable on mobile', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/all.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toContain('environment-table-scroll')
+        ->and($css)
+        ->toContain(".environment-table-scroll {\n    overflow-x: auto;")
+        ->toContain(".environment-table-scroll .env-table-grid {\n    min-width: 53rem;")
+        ->not->toContain('.data-table-row.env-table-grid > :nth-child')
+        ->not->toContain(".env-type-desktop {\n        display: none");
+});
+
 test('shared environment variables table still omits Managed column', function () {
     $editor = file_get_contents(resource_path('views/components/shared-variables/editor.blade.php'));
     $show = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show.blade.php'));
@@ -104,7 +117,20 @@ test('managed environment variables are ordered first', function () {
 
     expect($component)
         ->toContain("CASE WHEN key LIKE 'SERVICE_FQDN%'")
-        ->toMatch("/'kind' => 'hardcoded',[\\s\\S]+?'kind' => 'managed'/");
+        ->toMatch("/'kind' => 'managed',[\\s\\S]+?'kind' => 'hardcoded'/");
+});
+
+test('missing required environment variables are ordered before generated service variables', function () {
+    $component = file_get_contents(app_path('Livewire/Project/Shared/EnvironmentVariable/All.php'));
+
+    $requiredOrder = strpos($component, '$this->missingRequiredEnvironmentVariableIds($isPreview)', strpos($component, 'private function managedEnvironmentVariablesQuery'));
+    $generatedOrder = strpos($component, "CASE WHEN key LIKE 'SERVICE_FQDN%'", strpos($component, 'private function managedEnvironmentVariablesQuery'));
+
+    expect($requiredOrder)
+        ->not->toBeFalse()
+        ->toBeLessThan($generatedOrder)
+        ->and($component)
+        ->toContain('->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)');
 });
 
 test('environment variable toolbar does not use blade directives inside component attributes', function () {

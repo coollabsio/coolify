@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\Project;
+use App\Models\Service;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -93,7 +94,35 @@ it('supports timed compact popup notifications', function () {
         ->toContain('@click="restore()"')
         ->toContain('@click.stop="minimizeToIcon()"')
         ->toContain('x-show="!iconOnly"')
-        ->toContain('x-show="!compact"');
+        ->toContain('x-show="!compact"')
+        ->toContain("'w-[calc(100%-2rem)] sm:w-auto sm:max-w-[calc(100%-2rem)]'");
+});
+
+it('warns when a service has missing required environment variables', function () {
+    $service = Service::factory()->create(['environment_id' => $this->environment->id]);
+    $service->environment_variables()->create([
+        'key' => 'PLUNK_API_KEY',
+        'value' => '',
+        'is_required' => true,
+    ]);
+
+    Livewire::test(ConfigurationChecker::class, ['resource' => $service])
+        ->assertSet('missingRequiredEnvironmentVariableCount', 1)
+        ->assertSee('Required environment variable missing')
+        ->assertSee('PLUNK_API_KEY')
+        ->assertSee('Open environment variables');
+});
+
+it('marks the service environment variables menu when required values are missing', function () {
+    $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
+    $sidebar = file_get_contents(resource_path('views/components/service/configuration-sidebar.blade.php'));
+
+    expect($configuration)
+        ->toContain("'hasWarning' => ! \$service->isDeployable")
+        ->toContain('title="Required environment variables missing"')
+        ->and($sidebar)
+        ->toContain("'hasWarning' => ! \$service->isDeployable")
+        ->toContain('title="Required environment variables missing"');
 });
 
 it('refreshes configuration changes when the event is received', function () {

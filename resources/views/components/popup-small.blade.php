@@ -51,7 +51,11 @@
     x-transition:leave-start="translate-y-0 opacity-100"
     x-transition:leave-end="translate-y-3 opacity-0"
     class="fixed bottom-4 right-4 z-999"
-    :class="compact ? 'w-auto max-w-[calc(100%-2rem)]' : 'w-[calc(100%-2rem)] max-w-sm'">
+    :class="iconOnly
+        ? 'w-auto max-w-[calc(100%-2rem)]'
+        : (compact
+            ? 'w-[calc(100%-2rem)] sm:w-auto sm:max-w-[calc(100%-2rem)]'
+            : 'w-[calc(100%-2rem)] max-w-sm')">
     <div class="relative flex items-start gap-2.5 rounded-lg p-3 pr-10"
         :class="compact ? (iconOnly ? 'cursor-pointer p-2! pr-2!' : 'cursor-pointer') : ''" @click="restore()"
         style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);">

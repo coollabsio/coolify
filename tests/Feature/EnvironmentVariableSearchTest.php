@@ -211,6 +211,48 @@ it('searches service environment variables without requiring preview variables',
         ->and($component->instance()->showPreview)->toBeFalse();
 });
 
+it('pins required service environment variables only while their values are missing', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      HARDCODED_FIRST: configured
+YAML,
+    ]);
+
+    EnvironmentVariable::create([
+        'key' => 'OPTIONAL_FIRST',
+        'value' => 'configured',
+        'order' => 1,
+        'resourceable_type' => Service::class,
+        'resourceable_id' => $service->id,
+    ]);
+
+    $required = EnvironmentVariable::create([
+        'key' => 'REQUIRED_SECOND',
+        'value' => '',
+        'order' => 2,
+        'is_required' => true,
+        'resourceable_type' => Service::class,
+        'resourceable_id' => $service->id,
+    ]);
+
+    $component = Livewire::test(All::class, ['resource' => $service])
+        ->call('loadEnvironmentVariables');
+
+    expect($component->instance()->environmentVariablePageRows->pluck('environmentVariable.key')->all())
+        ->toBe(['REQUIRED_SECOND', 'OPTIONAL_FIRST', 'HARDCODED_FIRST']);
+
+    $required->update(['value' => 'configured']);
+    $component->call('$refresh');
+
+    expect($component->instance()->environmentVariablePageRows->pluck('environmentVariable.key')->all())
+        ->toBe(['OPTIONAL_FIRST', 'REQUIRED_SECOND', 'HARDCODED_FIRST']);
+});
+
 it('does not show the empty production message when search only matches hardcoded variables', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,

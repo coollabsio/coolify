@@ -15,7 +15,7 @@
         $configurationItems = collect([
             ['label' => 'General', 'route' => 'project.service.configuration', 'icon' => 'settings'],
             ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
-            ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables'],
+            ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
             ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
             ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
             ['label' => 'Runtime', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
@@ -71,6 +71,9 @@
                                 href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
                                 <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+                                @if ($menuItem['hasWarning'] ?? false)
+                                    <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
+                                @endif
                             </a>
                             @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
                                 <div class="nav-children hidden flex-col gap-0.5 py-1 xl:flex"

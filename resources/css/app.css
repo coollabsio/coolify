@@ -1931,6 +1931,16 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
 
+.environment-table-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.environment-table-scroll .env-table-grid {
+    min-width: 53rem;
+}
+
 .env-table-grid.env-table-grid-no-type {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
@@ -1940,21 +1950,8 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4.5rem 3rem;
 }
 
-/* Env vars: collapse flag columns on tablet, card layout on phone */
+/* Shared env vars collapse secondary columns on tablet and use cards on phone. */
 @media (max-width: 1100px) {
-    .env-table-grid {
-        grid-template-columns: minmax(0, 1.4fr) 4.8rem 6rem 3rem;
-        gap: 0.75rem;
-    }
-
-    /* Hide Literal / Multiline / Buildtime / Runtime (4–7 of 8) */
-    .env-table-grid > :nth-child(4),
-    .env-table-grid > :nth-child(5),
-    .env-table-grid > :nth-child(6),
-    .env-table-grid > :nth-child(7) {
-        display: none;
-    }
-
     .env-table-grid-shared {
         grid-template-columns: minmax(0, 1.4fr) 6rem minmax(0, 1fr) 3rem;
         gap: 0.75rem;
@@ -1967,10 +1964,6 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 @media (max-width: 900px) {
-    .env-table-grid {
-        grid-template-columns: minmax(0, 1fr) 4.8rem 6rem 3rem;
-    }
-
     .env-table-grid-shared {
         grid-template-columns: minmax(0, 1fr) 6rem 3rem;
     }
@@ -1981,12 +1974,10 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 @media (max-width: 640px) {
-    .data-table-header.env-table-grid,
     .data-table-header.env-table-grid-shared {
         display: none;
     }
 
-    .data-table-row.env-table-grid,
     .data-table-row.env-table-grid-shared {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -2000,39 +1991,30 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     /* Name */
-    .data-table-row.env-table-grid > :nth-child(1),
     .data-table-row.env-table-grid-shared > :nth-child(1) {
         grid-area: name;
         min-width: 0;
         flex-wrap: wrap;
     }
 
-    .data-table-row.env-table-grid > :nth-child(1) .env-key-label,
     .data-table-row.env-table-grid-shared > :nth-child(1) .env-key-label {
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
     }
 
-    /* Managed and Type desktop columns */
-    .data-table-row.env-table-grid > :nth-child(2),
-    .data-table-row.env-table-grid > :nth-child(3),
+    /* Type column */
     .data-table-row.env-table-grid-shared > :nth-child(2) {
         display: none !important;
     }
 
     /* Comment / flags already hidden; keep meta area for optional second line */
-    .data-table-row.env-table-grid > :nth-child(4),
-    .data-table-row.env-table-grid > :nth-child(5),
-    .data-table-row.env-table-grid > :nth-child(6),
-    .data-table-row.env-table-grid > :nth-child(7),
     .data-table-row.env-table-grid-shared > :nth-child(3),
     .data-table-row.env-table-grid-shared > :nth-child(4) {
         display: none !important;
     }
 
     /* Actions */
-    .data-table-row.env-table-grid > :nth-child(8),
     .data-table-row.env-table-grid-shared > :nth-child(5) {
         grid-area: actions;
         align-self: center;
@@ -2043,12 +2025,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .env-managed-desktop {
     display: flex;
-}
-
-@media (max-width: 640px) {
-    .env-type-desktop {
-        display: none !important;
-    }
 }
 
 .domains-table-grid {
