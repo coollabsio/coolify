@@ -1,6 +1,6 @@
 <div x-data="{ raw: true, showNormalTextarea: false }"
     @compose-preview-toggle.window="raw = !raw"
-    @compose-validate.window="$wire.validateCompose()"
+    @compose-validate.window="$wire.validateCompose().finally(() => $dispatch('compose-validate-finished'))"
     @compose-save.window="$wire.saveEditedCompose()"
     class="flex min-h-0 flex-col gap-3">
     <x-callout type="info" title="Volume names">
