@@ -17,6 +17,77 @@
                 instantSave id="includeSourceCommitInBuild" label="Include Source Commit in Build" canGate="update"
                 :canResource="$application" />
 
+            @if ($application->build_pack === 'dockerfile')
+                <form class="flex flex-col gap-3 pt-4" wire:submit.prevent="saveDockerBuildCache">
+                    <div>
+                        <h3>External Build Cache</h3>
+                        <p class="text-sm text-neutral-500 dark:text-neutral-400">
+                            Import and export BuildKit cache through a registry or an advanced raw cache backend.
+                        </p>
+                    </div>
+                    <x-forms.checkbox live id="dockerBuildCacheEnabled" label="Enable External Build Cache"
+                        helper="The existing local Docker layer cache remains available. Force rebuild skips cache import but still exports a fresh cache. Disable Build Cache overrides this setting."
+                        canGate="update" :canResource="$application" />
+
+                    @if ($dockerBuildCacheEnabled)
+                        <x-forms.select wire:model.live="dockerBuildCacheMode" id="dockerBuildCacheMode"
+                            label="Configuration Mode" canGate="update" :canResource="$application">
+                            <option value="registry">Registry</option>
+                            <option value="raw">Advanced Raw</option>
+                        </x-forms.select>
+                        <x-forms.input id="dockerBuildCacheFrom" label="Cache Source" required
+                            placeholder="{{ $dockerBuildCacheMode === 'registry' ? 'registry.example.com/team/app:buildcache' : 'type=local,src=/cache' }}"
+                            helper="{{ $dockerBuildCacheMode === 'registry' ? 'Enter the registry cache reference to import.' : 'Enter the complete BuildKit --cache-from value.' }}"
+                            canGate="update" :canResource="$application" />
+                        <x-forms.input id="dockerBuildCacheTo" label="Cache Destination" required
+                            placeholder="{{ $dockerBuildCacheMode === 'registry' ? 'registry.example.com/team/app:buildcache' : 'type=local,dest=/cache,mode=max' }}"
+                            helper="{{ $dockerBuildCacheMode === 'registry' ? 'Enter the registry cache reference to export. Registry exports use mode=max.' : 'Enter the complete BuildKit --cache-to value.' }}"
+                            canGate="update" :canResource="$application" />
+                        <x-forms.select id="dockerBuildCacheFailurePolicy" label="Cache Failure Policy"
+                            canGate="update" :canResource="$application">
+                            <option value="continue">Warn and continue</option>
+                            <option value="fail">Fail deployment</option>
+                        </x-forms.select>
+                    @endif
+
+                    <div class="pt-2">
+                        <h4>Preview Deployments</h4>
+                        <p class="text-sm text-neutral-500 dark:text-neutral-400">
+                            Preview deployments inherit the production cache unless you override or disable it.
+                        </p>
+                    </div>
+                    <x-forms.select wire:model.live="previewDockerBuildCacheMode" id="previewDockerBuildCacheMode"
+                        label="Preview Cache" canGate="update" :canResource="$application">
+                        <option value="inherit">Inherit production</option>
+                        <option value="disabled">Disabled</option>
+                        <option value="override">Override</option>
+                    </x-forms.select>
+
+                    @if ($previewDockerBuildCacheMode === 'override')
+                        <x-forms.select wire:model.live="previewDockerBuildCacheType" id="previewDockerBuildCacheType"
+                            label="Preview Configuration Mode" canGate="update" :canResource="$application">
+                            <option value="registry">Registry</option>
+                            <option value="raw">Advanced Raw</option>
+                        </x-forms.select>
+                        <x-forms.input id="previewDockerBuildCacheFrom" label="Preview Cache Source" required
+                            placeholder="{{ $previewDockerBuildCacheType === 'registry' ? 'registry.example.com/team/app:preview-buildcache' : 'type=local,src=/cache/previews' }}"
+                            canGate="update" :canResource="$application" />
+                        <x-forms.input id="previewDockerBuildCacheTo" label="Preview Cache Destination" required
+                            placeholder="{{ $previewDockerBuildCacheType === 'registry' ? 'registry.example.com/team/app:preview-buildcache' : 'type=local,dest=/cache/previews,mode=max' }}"
+                            canGate="update" :canResource="$application" />
+                        <x-forms.select id="previewDockerBuildCacheFailurePolicy" label="Preview Cache Failure Policy"
+                            canGate="update" :canResource="$application">
+                            <option value="continue">Warn and continue</option>
+                            <option value="fail">Fail deployment</option>
+                        </x-forms.select>
+                    @endif
+
+                    <div>
+                        <x-forms.button type="submit" canGate="update" :canResource="$application">Save Cache Settings</x-forms.button>
+                    </div>
+                </form>
+            @endif
+
             <h3 class="pt-4">Container</h3>
             <x-forms.checkbox
                 helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold dark:text-warning'>You will lose the rolling update feature!</span>"

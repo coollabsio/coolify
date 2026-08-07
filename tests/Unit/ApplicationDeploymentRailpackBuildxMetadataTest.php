@@ -7,5 +7,5 @@ it('persists buildx metadata between the helper container and host cleanup', fun
         ->toContain('mkdir -p {$this->serverUserHomeDir}/.docker/buildx')
         ->toContain('-v {$this->serverUserHomeDir}/.docker/buildx:/root/.docker/buildx');
 
-    expect(substr_count($sourceFile, '{$buildxMetadataVolume} -v /var/run/docker.sock:/var/run/docker.sock'))->toBe(3);
+    expect(substr_count($sourceFile, '{$buildxMetadataVolume}{$dockerBuildCacheVolume} -v /var/run/docker.sock:/var/run/docker.sock'))->toBe(3);
 });

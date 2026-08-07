@@ -4,6 +4,7 @@ use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
 use App\Models\Environment;
+use App\Rules\ValidDockerBuildCacheConfiguration;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
@@ -122,6 +123,8 @@ function sharedDataApplications()
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
         'disable_build_cache' => 'boolean',
+        'docker_build_cache' => ['nullable', new ValidDockerBuildCacheConfiguration],
+        'preview_docker_build_cache' => ['nullable', new ValidDockerBuildCacheConfiguration],
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
@@ -302,6 +305,8 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_git_lfs_enabled');
     $request->offsetUnset('is_git_shallow_clone_enabled');
     $request->offsetUnset('disable_build_cache');
+    $request->offsetUnset('docker_build_cache');
+    $request->offsetUnset('preview_docker_build_cache');
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');
     $request->offsetUnset('is_pr_deployments_public_enabled');
