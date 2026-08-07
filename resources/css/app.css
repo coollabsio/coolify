@@ -1430,8 +1430,10 @@ html[data-theme="custom"] textarea:disabled {
 /* Inputs & selects: recessed fill + line border (surface hierarchy) */
 .application-settings-workspace .input,
 .application-settings-workspace .select,
+.application-settings-workspace .listbox-trigger,
 .application-settings-form .input,
-.application-settings-form .select {
+.application-settings-form .select,
+.application-settings-form .listbox-trigger {
     height: 2rem;
     border-radius: 8px;
     border-color: var(--coollabs-line);
@@ -1741,7 +1743,7 @@ html[data-theme="custom"] textarea:disabled {
     gap: 0.5rem;
     width: 100%;
     min-width: 0;
-    height: 2rem;
+    height: 2.25rem;
     padding: 0 0.625rem 0 0.75rem;
     overflow: hidden;
     border-radius: 8px;
