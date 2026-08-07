@@ -3,6 +3,8 @@
     selectedCloneDestination: null,
     selectedCloneProject: null,
     selectedCloneEnvironment: null,
+    selectedMigrateServer: null,
+    selectedMigrateDestination: null,
     selectedMoveProject: null,
     selectedMoveEnvironment: null,
     currentProjectId: {{ $resource->environment->project->id }},
@@ -15,6 +17,7 @@
                 'id' => $server->id,
                 'name' => $server->name,
                 'ip' => $server->ip,
+                'is_functional' => $server->isFunctional(),
                 'destinations' => $server->destinations()->map(
                     fn ($destination) => [
                         'id' => $destination->id,
@@ -45,6 +48,15 @@
         if (this.selectedCloneServer === null || this.selectedCloneServer === '') return [];
         const server = this.servers.find(server => server.id == this.selectedCloneServer);
         return server ? server.destinations : [];
+    },
+    get availableMigrateDestinations() {
+        if (this.selectedMigrateServer === null || this.selectedMigrateServer === '') return [];
+        const server = this.servers.find(server => server.id == this.selectedMigrateServer);
+        if (!server) return [];
+        return server.destinations.filter(destination => destination.uuid !== this.currentDestinationUuid);
+    },
+    get isCrossServerMigration() {
+        return this.selectedMigrateServer && this.selectedMigrateServer != this.currentServerId;
     },
     get availableCloneEnvironments() {
         if (this.selectedCloneProject === null || this.selectedCloneProject === '') return [];
@@ -88,6 +100,20 @@
             label: destination.name + (destination.uuid == this.currentDestinationUuid ? ' (current)' : ''),
         }));
     },
+    get migrateServerOptions() {
+        return this.servers
+            .filter(server => server.is_functional && server.id != this.currentServerId)
+            .map(server => ({
+                value: server.id,
+                label: `${server.name} (${server.ip})`,
+            }));
+    },
+    get migrateDestinationOptions() {
+        return this.availableMigrateDestinations.map(destination => ({
+            value: destination.uuid,
+            label: destination.name,
+        }));
+    },
     get cloneProjectOptions() {
         return this.projects.map(project => ({
             value: project.id,
@@ -117,8 +143,11 @@
     selectedCloneDestination = null;
     selectedCloneProject = null;
     selectedCloneEnvironment = null;
+    selectedMigrateServer = null;
+    selectedMigrateDestination = null;
     $watch('selectedCloneServer', () => selectedCloneDestination = null);
     $watch('selectedCloneProject', () => selectedCloneEnvironment = null);
+    $watch('selectedMigrateServer', () => selectedMigrateDestination = null);
     $watch('selectedMoveProject', () => selectedMoveEnvironment = null);
 " class="flex flex-col gap-6">
     @can('update', $resource)
@@ -151,6 +180,51 @@
                 </x-forms.button>
             </div>
         </x-application.settings-section>
+
+        @if (isDev())
+            <x-application.settings-section id="migrate-destination-section" title="Migrate to another server"
+                helper="Move this resource to a different validated and reachable server. The resource is stopped and persistent volumes can be transferred.">
+                <x-slot:actions>
+                    <x-status-badge status="Dev" type="warning" />
+                </x-slot:actions>
+                <x-callout type="warning" title="Downtime">
+                    Migration stops the resource on the source server. After volume transfer finishes, redeploy on
+                    the target server. Source volumes are left in place for safety — clean them up manually when you
+                    confirm the migration succeeded. Only other servers that are validated and reachable are listed.
+                </x-callout>
+
+                <div class="mt-4 grid gap-4 md:grid-cols-2">
+                    <x-forms.listbox id="migrate-resource-server" label="Target server" :wire="false"
+                        x-model="selectedMigrateServer" x-effect="options = migrateServerOptions"
+                        placeholder="Choose a server…"
+                        emptyText="No other validated and reachable servers are available." />
+
+                    <x-forms.listbox id="migrate-resource-destination" label="Network destination" :wire="false"
+                        x-model="selectedMigrateDestination" x-effect="options = migrateDestinationOptions"
+                        x-bind:disabled="selectedMigrateServer === null || selectedMigrateServer === ''"
+                        placeholder="Choose a destination…"
+                        emptyText="No network destinations are available on this server." />
+                </div>
+
+                <div x-show="selectedMigrateDestination" x-cloak class="mt-4">
+                    <x-forms.checkbox id="migrateVolumeData" live label="Migrate persistent volume data"
+                        helper="Named Docker volumes and bind-mount host paths are transferred when both servers are managed by Coolify." />
+                </div>
+
+                <div x-show="selectedMigrateDestination" x-cloak
+                    class="mt-4 flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
+                    <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                        The resource keeps the same UUID and configuration. Only the hosting server and network
+                        destination change.
+                    </p>
+                    <x-forms.button
+                        wire:confirm="Migrate this resource? It will be stopped on the source server. Redeploy after migration completes."
+                        @click="$wire.migrateTo(selectedMigrateDestination)">
+                        Migrate resource
+                    </x-forms.button>
+                </div>
+            </x-application.settings-section>
+        @endif
 
         <x-application.settings-section id="clone-environment-section" title="Clone to another environment"
             helper="Create the clone in another project environment while keeping the current server and network.">
