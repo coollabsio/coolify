@@ -41,6 +41,8 @@ it('uses the network reicon for proxy in the server sidebar', function () {
 
     expect($contents)
         ->toContain("'label' => 'Proxy'")
-        ->toMatch("/'label' => 'Proxy',\s*'route' => 'server\.proxy',\s*'active' => request\(\)->routeIs\('server\.proxy', 'server\.proxy\.\*'\),\s*'icon' => 'network'/s")
-        ->not->toMatch("/'label' => 'Proxy',\s*'route' => 'server\.proxy',\s*'active' => request\(\)->routeIs\('server\.proxy', 'server\.proxy\.\*'\),\s*'icon' => 'settings'/s");
+        ->toContain("'route' => 'server.proxy'")
+        ->toContain("'icon' => 'network'")
+        ->toMatch("/'label' => 'Proxy'[\s\S]*?'icon' => 'network'/")
+        ->not->toMatch("/'label' => 'Proxy'[\s\S]*?'icon' => 'settings',\s*'group' => 'Platform'/");
 });

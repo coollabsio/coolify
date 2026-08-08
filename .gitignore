@@ -48,3 +48,6 @@ ref
 .dev/lima/ssh.config
 .dev/lima/ssh_key
 .dev/lima/hosts
+
+# Multi-instance local Coolify env files (scripts/dev-instances)
+.dev-instances/

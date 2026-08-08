@@ -80,13 +80,35 @@ it('shows the service sidebar on the storage backups page', function () {
         ->toContain('xl:grid-cols-[210px_minmax(0,1fr)]');
 });
 
-it('links compose database backups to the parent service backups page', function () {
+it('combines service database and storage backups in one section', function () {
+    $backups = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect(substr_count($backups, '<x-application.settings-section '))->toBe(1)
+        ->and(substr_count($backups, 'data-table-header backup-table-grid'))->toBe(1)
+        ->and($backups)->toContain('Storage backup')->toContain('Database backup')
+        ->not->toContain('data-table-header scheduled-backups-table-grid')
+        ->not->toContain('>Database backups</h3>')
+        ->not->toContain('>Storage backups</h3>')
+        ->toContain("'application-settings-section-body w-full'")
+        ->toContain('class="data-table w-full overflow-x-auto"')
+        ->toContain('backup-table-grid service-backup-table-grid')
+        ->not->toContain('<span class="text-right">Executions</span>')
+        ->toContain('class="data-table-row backup-table-grid text-[13px]')
+        ->toContain('class="listbox-option justify-start! gap-2.5!"')
+        ->toContain('x-data="{ dropdownOpen: false }"')
+        ->toContain('class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!"')
+        ->not->toContain('<x-dropdown');
+
+    expect($styles)->toContain('.service-backup-table-grid');
+});
+
+it('links compose database backups to the unified service backups page', function () {
     $sidebar = file_get_contents(resource_path('views/components/service-database/sidebar.blade.php'));
 
     expect($sidebar)
         ->toContain("'route' => 'project.service.volume-backups.index'")
         ->toContain("'parameters' => \$serviceParameters")
-        ->toContain("\$item['parameters'] ?? \$parameters")
         ->not->toContain("'route' => 'project.service.database.backups'");
 });
 

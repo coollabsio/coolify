@@ -970,6 +970,12 @@ class ServersController extends Controller
         }
         $this->authorize('update', $server);
 
+        if (! $server->canBeValidated()) {
+            return response()->json([
+                'message' => 'This server was transferred to another Coolify instance and cannot be revalidated here.',
+            ], 422);
+        }
+
         $validator = customApiValidator($request->all(), [
             'install' => 'boolean',
         ]);

@@ -5,27 +5,48 @@
 
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 class="min-w-0 text-[24px]! leading-7! font-semibold! tracking-tight!">Servers</h1>
-        @can('createAnyResource')
-            <a href="{{ route('server.create') }}" {{ wireNavigate() }}
-                class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
-                <x-reicon name="plus" class="size-3.5" />
-                New server
-            </a>
-        @endcan
+        <div class="flex flex-wrap items-center gap-2">
+            @if (isDev())
+                @can('create', App\Models\Server::class)
+                    <a href="{{ route('server.transfer.import') }}" {{ wireNavigate() }}
+                        class="button w-fit shrink-0 whitespace-nowrap">
+                        <x-reicon name="upload" class="size-3.5" />
+                        Import transfer
+                        <x-status-badge label="Dev" />
+                    </a>
+                @endcan
+            @endif
+            @can('createAnyResource')
+                <a href="{{ route('server.create') }}" {{ wireNavigate() }}
+                    class="button w-fit shrink-0 whitespace-nowrap button-highlighted">
+                    <x-reicon name="plus" class="size-3.5" />
+                    New server
+                </a>
+            @endcan
+        </div>
     </div>
 
     @php
         $serverRows = $servers->map(function ($server) {
+            $isTransferredAway = $server->isTransferredAway();
             $isReady = $server->settings->is_reachable
                 && $server->settings->is_usable
-                && ! $server->settings->force_disabled;
+                && ! $server->settings->force_disabled
+                && ! $isTransferredAway;
+
+            $status = match (true) {
+                $isTransferredAway => 'Transferred away',
+                $server->settings->force_disabled => 'Disabled',
+                $isReady => 'Ready',
+                default => 'Validation required',
+            };
 
             return [
                 'uuid' => $server->uuid,
                 'name' => $server->name,
                 'description' => $server->description ?: 'No description',
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
-                'status' => $isReady ? 'Ready' : ($server->settings->force_disabled ? 'Disabled' : 'Validation required'),
+                'status' => $status,
                 'statusType' => $isReady ? 'success' : 'error',
                 'ready' => $isReady,
             ];

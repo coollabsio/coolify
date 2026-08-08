@@ -26,6 +26,7 @@ use App\Http\Controllers\Api\ServerLogDrainsController;
 use App\Http\Controllers\Api\ServerProxyController;
 use App\Http\Controllers\Api\ServersController;
 use App\Http\Controllers\Api\ServerSentinelController;
+use App\Http\Controllers\Api\ServerTransferController;
 use App\Http\Controllers\Api\ServiceApplicationsController;
 use App\Http\Controllers\Api\ServiceDatabasesController;
 use App\Http\Controllers\Api\ServicesController;
@@ -190,6 +191,12 @@ Route::group([
     Route::post('/servers/{uuid}/proxy/restart', [ServerProxyController::class, 'restart'])->middleware(['api.ability:write']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
+    Route::post('/servers/import', [ServerTransferController::class, 'import'])->middleware(['api.ability:write']);
+    Route::get('/servers/{uuid}/export', [ServerTransferController::class, 'export'])->middleware(['api.ability:read']);
+    Route::post('/servers/{uuid}/export/mailbox', [ServerTransferController::class, 'writeMailbox'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/claim', [ServerTransferController::class, 'claim'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/transfer/complete', [ServerTransferController::class, 'complete'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/migrate', [ServerTransferController::class, 'migrate'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
     Route::delete('/servers/{uuid}', [ServersController::class, 'delete_server'])->middleware(['api.ability:write']);
 
@@ -261,6 +268,7 @@ Route::group([
     Route::delete('/applications/{uuid}/tags/{tag_uuid}', [ApplicationsController::class, 'delete_tag'])->middleware(['api.ability:write']);
 
     Route::post('/applications/{uuid}/move', [ApplicationsController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/migrate', [ApplicationsController::class, 'migrate_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/applications/{uuid}/clone', [ApplicationsController::class, 'clone_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/applications/{uuid}/rollback-images', [ApplicationsController::class, 'rollback_images'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/rollback', [ApplicationsController::class, 'rollback_by_uuid'])->middleware(['api.ability:deploy']);
@@ -334,6 +342,7 @@ Route::group([
     Route::delete('/databases/{uuid}/tags/{tag_uuid}', [DatabasesController::class, 'delete_tag'])->middleware(['api.ability:write']);
 
     Route::post('/databases/{uuid}/move', [DatabasesController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
+    Route::post('/databases/{uuid}/migrate', [DatabasesController::class, 'migrate_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/databases/{uuid}/clone', [DatabasesController::class, 'clone_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/databases/{uuid}/start', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/databases/{uuid}/restart', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
@@ -375,6 +384,7 @@ Route::group([
     Route::delete('/services/{uuid}/tags/{tag_uuid}', [ServicesController::class, 'delete_tag'])->middleware(['api.ability:write']);
 
     Route::post('/services/{uuid}/move', [ServicesController::class, 'move_by_uuid'])->middleware(['api.ability:write']);
+    Route::post('/services/{uuid}/migrate', [ServicesController::class, 'migrate_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/services/{uuid}/clone', [ServicesController::class, 'clone_by_uuid'])->middleware(['api.ability:write']);
     Route::get('/services/{uuid}/start', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/services/{uuid}/restart', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);

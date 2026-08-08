@@ -1,9 +1,12 @@
 <?php
 
+use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
 use App\Models\Environment;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Collection;
@@ -13,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 function getTeamIdFromToken()
 {
@@ -255,6 +259,80 @@ function moveResourceToEnvironment(Request $request, $resource, string $resource
         'uuid' => $resource->uuid,
         'project_uuid' => $newEnvironment->project->uuid,
         'environment_uuid' => $newEnvironment->uuid,
+    ]);
+}
+
+function migrateResourceToDestination(Request $request, $resource, string $resourceType, int $teamId): JsonResponse
+{
+    if (! isDev()) {
+        abort(404);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'destination_uuid' => 'required|string',
+        'migrate_volumes' => 'boolean',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    $allowedFields = ['destination_uuid', 'migrate_volumes'];
+    $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+    if (! empty($extraFields)) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => collect($extraFields)->mapWithKeys(fn ($field) => [$field => 'This field is not allowed.'])->toArray(),
+        ], 422);
+    }
+
+    Gate::authorize('update', $resource);
+
+    $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+
+    if (! $destination || ! $destination->server?->canHostResources()) {
+        return response()->json(['message' => 'Destination not found.'], 404);
+    }
+
+    $sourceDestination = $resource->destination;
+    $migrateVolumes = $request->boolean('migrate_volumes', true);
+
+    try {
+        $result = MigrateResourceToDestination::run(
+            $resource,
+            $destination,
+            $migrateVolumes,
+        );
+    } catch (ValidationException $e) {
+        return response()->json([
+            'message' => collect($e->errors())->flatten()->first() ?? $e->getMessage(),
+            'errors' => $e->errors(),
+        ], 422);
+    }
+
+    auditLog('api.'.str($resourceType)->lower()->value().'.migrated', [
+        'team_id' => $teamId,
+        'resource_uuid' => $resource->uuid,
+        'resource_type' => str($resourceType)->lower()->value(),
+        'from_destination_uuid' => $sourceDestination?->uuid,
+        'to_destination_uuid' => $destination->uuid,
+        'from_server_id' => $sourceDestination?->server_id,
+        'to_server_id' => $destination->server_id,
+        'migrate_volumes' => $migrateVolumes,
+        'async' => $result['async'],
+        'volume_jobs' => $result['volume_jobs'],
+    ]);
+
+    return response()->json([
+        'message' => $result['message'],
+        'uuid' => $resource->uuid,
+        'destination_uuid' => $destination->uuid,
+        'async' => $result['async'],
+        'volume_jobs' => $result['volume_jobs'],
     ]);
 }
 

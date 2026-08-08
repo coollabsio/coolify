@@ -257,7 +257,8 @@ body {
 body {
     /* overflow-x: clip (not hidden) — hidden creates a scroll containment that
        breaks position:sticky on settings sidebars and other in-page pins. */
-    @apply min-h-screen text-sm font-sans antialiased scrollbar overflow-x-clip;
+    min-height: 100dvh;
+    @apply text-sm font-sans antialiased scrollbar overflow-x-clip;
 }
 
 .coolify-monaco-editor {
@@ -981,7 +982,7 @@ html[data-theme="custom"] textarea:disabled {
     min-height: 100dvh;
     display: flex;
     background:
-        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-accent) 9%, transparent), transparent 34rem),
+        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-coollabs) 9%, transparent), transparent 34rem),
         var(--coollabs-canvas);
     color: #171717;
 }
@@ -2235,6 +2236,11 @@ input[type="search"]::-webkit-search-results-decoration {
 .backup-table-grid {
     grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 5rem;
     min-width: 50rem;
+}
+
+.service-backup-table-grid {
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr);
+    min-width: 45rem;
 }
 
 /* Persistent storage volumes: Name | Source | Destination | [PR suffix] | Backup | [Actions] */

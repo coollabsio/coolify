@@ -5,17 +5,23 @@
     filterOpen: false,
     sortOpen: false,
     backups: @js($backups->map(fn ($backup) => [
-        'id' => (string) $backup->id,
+        'id' => 'storage:'.$backup->id,
         'name' => strtolower($backup->targetName()),
         'type' => strtolower($backup->targetType()),
         'frequency' => strtolower($backup->frequency),
         'createdAt' => $backup->created_at?->timestamp ?? 0,
-    ])->values()),
+    ])->concat($databaseBackups->map(fn ($backup) => [
+        'id' => 'database:'.$backup->id,
+        'name' => strtolower($backup->database->human_name ?: $backup->database->name),
+        'type' => 'database',
+        'frequency' => strtolower($backup->frequency),
+        'createdAt' => $backup->created_at?->timestamp ?? 0,
+    ]))->values()),
     filterOptions: @js(collect([['value' => 'all', 'label' => 'All targets']])->merge(
         $backups->map(fn ($backup) => [
             'value' => strtolower($backup->targetType()),
             'label' => $backup->targetType(),
-        ])->unique('value')->values()
+        ])->push(['value' => 'database', 'label' => 'Database'])->unique('value')->values()
     )->values()),
     sortOptions: [
         { value: 'target_asc', label: 'Target A–Z' },
@@ -57,21 +63,48 @@
                 current-route="project.service.volume-backups.index" />
 
             <div class="application-settings-form min-w-0 flex flex-col gap-6">
-        <x-application.settings-section title="Storage backups"
-            helper="Schedule backups for persistent volumes and directory mounts attached to this service.">
+        <x-application.settings-section title="Backups"
+            helper="Manage database, persistent volume, and directory backup schedules for this service.">
             @can('update', $service)
                 <x-slot:actions>
-                    <x-modal-input title="New scheduled backup" :wireIgnore="false">
-                        <x-slot:content>
-                            <button type="button"
-                                class="button button-highlighted">
+                    <div x-data="{ dropdownOpen: false }">
+                        <div class="relative" @click.outside="dropdownOpen = false">
+                            <x-forms.button class="button-highlighted" @click="dropdownOpen = !dropdownOpen"
+                                aria-haspopup="menu" x-bind:aria-expanded="dropdownOpen">
                                 <x-reicon name="plus" class="size-3.5" />
-                                Add
-                            </button>
-                        </x-slot:content>
-                        <livewire:project.service.volume-backup.create :service="$service"
-                            wire:key="create-volume-backup-{{ $service->id }}" />
-                    </x-modal-input>
+                                Add backup
+                                <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                            </x-forms.button>
+
+                            <div x-show="dropdownOpen" x-cloak role="menu" x-transition.origin.top.left
+                                class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!">
+                            <x-modal-input title="New storage backup" :wireIgnore="false">
+                                <x-slot:content>
+                                    <button type="button" role="menuitem" @click="dropdownOpen = false"
+                                        class="listbox-option justify-start! gap-2.5!">
+                                        <x-reicon name="storages" class="size-3.5" />
+                                        Storage backup
+                                    </button>
+                                </x-slot:content>
+                                <livewire:project.service.volume-backup.create :service="$service"
+                                    wire:key="create-volume-backup-{{ $service->id }}" />
+                            </x-modal-input>
+                            @if ($databaseTargets->isNotEmpty())
+                                <x-modal-input title="New database backup" :wireIgnore="false">
+                                    <x-slot:content>
+                                        <button type="button" role="menuitem" @click="dropdownOpen = false"
+                                            class="listbox-option justify-start! gap-2.5!">
+                                            <x-reicon name="database" class="size-3.5" />
+                                            Database backup
+                                        </button>
+                                    </x-slot:content>
+                                    <livewire:project.database.create-scheduled-backup :service="$service"
+                                        wire:key="create-service-database-backup-{{ $service->id }}" />
+                                </x-modal-input>
+                            @endif
+                            </div>
+                        </div>
+                    </div>
                 </x-slot:actions>
             @endcan
 
@@ -79,19 +112,19 @@
                 <div>
                     <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Schedules</p>
                     <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                        {{ $backups->count() }}
+                        {{ $backups->count() + $databaseBackups->count() }}
                     </p>
                 </div>
                 <div>
                     <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Enabled</p>
                     <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                        {{ $backups->where('enabled', true)->count() }}
+                        {{ $backups->where('enabled', true)->count() + $databaseBackups->where('enabled', true)->count() }}
                     </p>
                 </div>
                 <div>
                     <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Total executions</p>
                     <p class="mt-1 text-xl font-semibold tabular-nums text-neutral-950 dark:text-fg">
-                        {{ $backups->sum('executions_count') }}
+                        {{ $backups->sum('executions_count') + $databaseBackups->sum('executions_count') }}
                     </p>
                 </div>
             </div>
@@ -165,24 +198,65 @@
 
         <div @class([
             'application-settings-section-body w-full',
-            'is-flush' => $backups->isNotEmpty(),
+            'is-flush' => $backups->isNotEmpty() || $databaseBackups->isNotEmpty(),
         ])>
             <div x-cloak x-show="backups.length > 0 && filteredBackups.length === 0">
                 <x-empty size="sm" title="No backups found"
                     description="No scheduled backups match your search." />
             </div>
 
-            @if ($backups->isNotEmpty())
+            @if ($backups->isNotEmpty() || $databaseBackups->isNotEmpty())
                 <div class="data-table w-full overflow-x-auto" x-show="filteredBackups.length > 0">
-                    <div class="data-table-header backup-table-grid">
+                    <div class="data-table-header backup-table-grid service-backup-table-grid">
                         <span>Target</span>
                         <span>Type</span>
                         <span>Schedule</span>
                         <span>Status</span>
                         <span>S3</span>
                         <span>Last run</span>
-                        <span class="text-right">Executions</span>
                     </div>
+
+                    @foreach ($databaseBackups as $databaseBackup)
+                        @php
+                            $latestExecution = $databaseBackup->latest_log;
+                            $status = $latestExecution?->status;
+                            $statusLabel = match ($status) {
+                                'running' => 'In progress',
+                                'success' => 'Success',
+                                'failed' => 'Failed',
+                                default => $databaseBackup->enabled ? 'Waiting' : 'Disabled',
+                            };
+                            $statusType = match ($status) {
+                                'running' => 'warning',
+                                'success' => 'success',
+                                'failed' => 'error',
+                                default => 'neutral',
+                            };
+                            $databaseBackupId = 'database:'.$databaseBackup->id;
+                        @endphp
+                        <a wire:key="database-backup-{{ $databaseBackup->uuid }}"
+                            x-show="isVisible(@js($databaseBackupId))"
+                            x-bind:style="{ order: backupOrder(@js($databaseBackupId)) }"
+                            href="{{ route('project.service.database.backup.show', [
+                                ...$parameters,
+                                'stack_service_uuid' => $databaseBackup->database->uuid,
+                                'backup_uuid' => $databaseBackup->uuid,
+                            ]) }}"
+                            {{ wireNavigate() }}
+                            class="data-table-row backup-table-grid text-[13px] text-neutral-700 service-backup-table-grid dark:text-fg-dim">
+                            <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg">
+                                {{ $databaseBackup->database->human_name ?: $databaseBackup->database->name }}
+                            </span>
+                            <span>Database</span>
+                            <span>{{ $databaseBackup->frequency }}</span>
+                            <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
+                            <span>
+                                <x-status-badge :status="$databaseBackup->save_s3 ? ($databaseBackup->s3 ? 'Configured' : 'Unavailable') : 'Not set'"
+                                    :type="$databaseBackup->save_s3 ? ($databaseBackup->s3 ? 'success' : 'error') : 'neutral'" />
+                            </span>
+                            <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
+                        </a>
+                    @endforeach
 
                     @foreach ($backups as $backup)
                         @php
@@ -202,11 +276,11 @@
                             };
                         @endphp
                         <a wire:key="volume-backup-{{ $backup->uuid }}"
-                            x-show="isVisible(@js((string) $backup->id))"
-                            x-bind:style="{ order: backupOrder(@js((string) $backup->id)) }"
+                            x-show="isVisible(@js('storage:'.$backup->id))"
+                            x-bind:style="{ order: backupOrder(@js('storage:'.$backup->id)) }"
                             href="{{ route('project.service.volume-backups.show', [...$parameters, 'backup_uuid' => $backup->uuid]) }}"
                             {{ wireNavigate() }}
-                            class="data-table-row backup-table-grid text-[13px] text-neutral-700 dark:text-fg-dim">
+                            class="data-table-row backup-table-grid text-[13px] text-neutral-700 service-backup-table-grid dark:text-fg-dim">
                             <span class="min-w-0 truncate font-medium text-neutral-950 dark:text-fg"
                                 title="{{ $backup->targetName() }}">
                                 {{ $backup->targetName() }}
@@ -221,15 +295,12 @@
                             <span>
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
                             </span>
-                            <span class="text-right tabular-nums text-neutral-950 dark:text-fg">
-                                {{ $backup->executions_count }}
-                            </span>
                         </a>
                     @endforeach
                 </div>
             @else
                 <x-empty size="sm" title="No scheduled backups"
-                    description="Add a persistent volume or directory backup schedule to protect service data."
+                    description="Add a database, persistent volume, or directory backup schedule to protect service data."
                     icon-name="storages" />
             @endif
         </div>

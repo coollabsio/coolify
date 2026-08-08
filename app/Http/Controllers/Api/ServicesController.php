@@ -1975,6 +1975,54 @@ class ServicesController extends Controller
     }
 
     #[OA\Post(
+        summary: 'Migrate to Server',
+        description: 'Migrate a service to another destination/server owned by the authenticated team. Stops the service, optionally transfers persistent volume data when both servers are managed by Coolify, and updates database records. Redeploy after migration completes.',
+        path: '/services/{uuid}/migrate',
+        operationId: 'migrate-service-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the service.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string', description: 'UUID of the target destination.'),
+                    new OA\Property(property: 'migrate_volumes', type: 'boolean', default: true, description: 'Whether to transfer persistent volume data when migrating across servers.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Service migration started or completed.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function migrate_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('update', $service);
+
+        return migrateResourceToDestination($request, $service, 'Service', $teamId);
+    }
+
+    #[OA\Post(
         summary: 'Start',
         description: 'Start service.',
         path: '/services/{uuid}/start',

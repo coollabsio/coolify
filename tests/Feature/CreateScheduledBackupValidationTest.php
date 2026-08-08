@@ -94,6 +94,36 @@ it('creates a service database backup without S3 and opens its configuration', f
         ->and($backup->s3_storage_id)->toBeNull();
 });
 
+it('selects a service database when creating a backup from the unified backups page', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'primary',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+    $analytics = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'analytics',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+
+    Livewire::test(CreateScheduledBackup::class, ['service' => $service])
+        ->assertSee('Database')
+        ->assertSee('analytics')
+        ->set('selectedDatabaseUuid', $analytics->uuid)
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    expect(ScheduledDatabaseBackup::query()->sole()->database->is($analytics))->toBeTrue();
+});
+
 it('creates a clickhouse backup for its configured database', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
