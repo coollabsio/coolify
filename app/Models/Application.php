@@ -76,6 +76,7 @@ use Symfony\Component\Yaml\Yaml;
         'limits_cpu_shares' => ['type' => 'integer', 'description' => 'CPU shares.'],
         'status' => ['type' => 'string', 'description' => 'Application status.'],
         'preview_url_template' => ['type' => 'string',  'description' => 'Preview URL template.'],
+        'max_restart_count' => ['type' => 'integer', 'description' => 'Maximum container restart count before stopping.'],
         'destination_type' => ['type' => 'string', 'description' => 'Destination type.'],
         'destination_id' => ['type' => 'integer', 'description' => 'Destination identifier.'],
         'source_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Source identifier.'],
@@ -113,7 +114,7 @@ use Symfony\Component\Yaml\Yaml;
         'is_http_basic_auth_enabled' => ['type' => 'boolean', 'description' => 'HTTP Basic Authentication enabled.'],
         'http_basic_auth_username' => ['type' => 'string', 'nullable' => true, 'description' => 'Username for HTTP Basic Authentication'],
         'http_basic_auth_password' => ['type' => 'string', 'nullable' => true, 'description' => 'Password for HTTP Basic Authentication'],
-        'settings' => new OA\Property(ref: '#/components/schemas/ApplicationSetting'),
+        new OA\Property(property: 'settings', ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
 
@@ -183,6 +184,7 @@ class Application extends BaseModel
         'docker_compose',
         'docker_compose_raw',
         'docker_compose_domains',
+        'domain_dns_statuses',
         'docker_compose_custom_start_command',
         'docker_compose_custom_build_command',
         'swarm_replicas',
@@ -235,6 +237,7 @@ class Application extends BaseModel
         'docker_compose',
         'docker_compose_raw',
         'custom_labels',
+        'domain_dns_statuses',
     ];
 
     protected function casts(): array
@@ -246,6 +249,7 @@ class Application extends BaseModel
             'manual_webhook_secret_bitbucket' => 'encrypted',
             'manual_webhook_secret_gitea' => 'encrypted',
             'noindex_domains' => 'array',
+            'domain_dns_statuses' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'last_restart_at' => 'datetime',
@@ -1101,16 +1105,110 @@ class Application extends BaseModel
         return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
     }
 
-    public function deployments(int $skip = 0, int $take = 10, ?string $pullRequestId = null)
-    {
-        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');
+    /**
+     * @param  array<int, string>  $filters
+     * @return array{count: int, deployments: Collection<int, ApplicationDeploymentQueue>}
+     */
+    public function deployments(
+        int $skip = 0,
+        int $take = 10,
+        ?string $pullRequestId = null,
+        ?string $search = null,
+        array $filters = [],
+        string $sort = 'newest',
+    ): array {
+        $deployments = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->id);
 
         if ($pullRequestId) {
-            $deployments = $deployments->where('pull_request_id', $pullRequestId);
+            $deployments->where('pull_request_id', $pullRequestId);
+        }
+
+        $search = trim((string) $search);
+        if ($search !== '') {
+            $normalizedSearch = Str::lower($search);
+            $statusAliases = [
+                'success' => ApplicationDeploymentStatus::FINISHED->value,
+                'in progress' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+                'cancelled' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+            ];
+
+            $deployments->where(function ($query) use ($search, $normalizedSearch, $statusAliases) {
+                $query
+                    ->whereLike('deployment_uuid', "%{$search}%")
+                    ->orWhereLike('commit', "%{$search}%")
+                    ->orWhereLike('commit_message', "%{$search}%")
+                    ->orWhereLike('server_name', "%{$search}%")
+                    ->orWhereLike('status', "%{$search}%");
+
+                if (isset($statusAliases[$normalizedSearch])) {
+                    $query->orWhere('status', $statusAliases[$normalizedSearch]);
+                }
+
+                if (is_numeric($search) && (int) $search > 0) {
+                    $query->orWhere('pull_request_id', (int) $search);
+                }
+
+                match ($normalizedSearch) {
+                    'pull request', 'pull requests', 'pr' => $query->orWhere('pull_request_id', '>', 0),
+                    'webhook', 'webhooks' => $query->orWhere('is_webhook', true),
+                    'rollback', 'rollbacks' => $query->orWhere('rollback', true),
+                    'api' => $query->orWhere('is_api', true),
+                    'manual' => $query->orWhere(function ($sourceQuery) {
+                        $sourceQuery
+                            ->where('pull_request_id', '<=', 0)
+                            ->where('is_webhook', false)
+                            ->where('rollback', false)
+                            ->where('is_api', false);
+                    }),
+                    default => null,
+                };
+            });
+        }
+
+        $statusFilters = collect($filters)
+            ->filter(fn (string $filter) => Str::startsWith($filter, 'status:'))
+            ->map(fn (string $filter) => Str::after($filter, 'status:'));
+        if ($statusFilters->isNotEmpty()) {
+            $deployments->whereIn('status', $statusFilters);
+        }
+
+        $sourceFilters = collect($filters)
+            ->filter(fn (string $filter) => Str::startsWith($filter, 'source:'))
+            ->map(fn (string $filter) => Str::after($filter, 'source:'));
+        if ($sourceFilters->isNotEmpty()) {
+            $deployments->where(function ($query) use ($sourceFilters) {
+                foreach ($sourceFilters as $source) {
+                    $query->orWhere(function ($sourceQuery) use ($source) {
+                        match ($source) {
+                            'pull-request' => $sourceQuery->where('pull_request_id', '>', 0),
+                            'webhook' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', true),
+                            'rollback' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', true),
+                            'api' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', true),
+                            'manual' => $sourceQuery->where('pull_request_id', '<=', 0)->where('is_webhook', false)->where('rollback', false)->where('is_api', false),
+                            default => $sourceQuery->where('id', -1),
+                        };
+                    });
+                }
+            });
+        }
+
+        $serverFilters = collect($filters)
+            ->filter(fn (string $filter) => Str::startsWith($filter, 'server:'))
+            ->map(fn (string $filter) => Str::after($filter, 'server:'))
+            ->filter(fn (string $serverId) => ctype_digit($serverId))
+            ->map(fn (string $serverId) => (int) $serverId);
+        if ($serverFilters->isNotEmpty()) {
+            $deployments->whereIn('server_id', $serverFilters);
         }
 
         $count = $deployments->count();
-        $deployments = $deployments->skip($skip)->take($take)->get();
+        $deployments = $deployments
+            ->orderBy('created_at', $sort === 'oldest' ? 'asc' : 'desc')
+            ->orderBy('id', $sort === 'oldest' ? 'asc' : 'desc')
+            ->skip($skip)
+            ->take($take)
+            ->get();
 
         return [
             'count' => $count,
@@ -1383,11 +1481,11 @@ class Application extends BaseModel
 
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
-            $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
-            $source_html_url_host = $url['host'];
-            $source_html_url_scheme = $url['scheme'];
 
             if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+                $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL)) ?: [];
+                $source_html_url_host = $url['host'] ?? '';
+                $source_html_url_scheme = $url['scheme'] ?? '';
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 if ($this->source->is_public) {
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
@@ -1425,6 +1523,32 @@ class Application extends BaseModel
 
             if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
+
+                if ($gitlabSource->isConnected()) {
+                    $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL)) ?: [];
+                    $source_html_url_host = $this->urlHostWithPort($url);
+                    $source_html_url_scheme = $url['scheme'] ?? '';
+                    $token = generateGitlabCloneToken($gitlabSource);
+                    $encodedToken = rawurlencode($token);
+                    $pathPrefix = rtrim($url['path'] ?? '', '/');
+                    $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
+                    $escapedRepoUrl = escapeshellarg($repoUrl);
+                    $fullRepoUrl = $repoUrl;
+                    $base_command = "{$base_command} {$escapedRepoUrl}";
+
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, $base_command));
+                    } else {
+                        $commands->push($base_command);
+                    }
+
+                    return [
+                        'commands' => $commands->implode(' && '),
+                        'branch' => $branch,
+                        'fullRepoUrl' => $fullRepoUrl,
+                    ];
+                }
+
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
                 if ($private_key) {
@@ -1449,7 +1573,6 @@ class Application extends BaseModel
                     ];
                 }
 
-                // GitLab source without private key — use URL as-is (supports user-embedded basic auth)
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $base_command = "{$base_command} {$escapedCustomRepository}";
@@ -1682,6 +1805,52 @@ class Application extends BaseModel
 
             if ($this->source->getMorphClass() === GitlabApp::class) {
                 $gitlabSource = $this->source;
+
+                if ($gitlabSource->isConnected()) {
+                    $token = generateGitlabCloneToken($gitlabSource);
+                    $encodedToken = rawurlencode($token);
+                    $pathPrefix = rtrim($url['path'] ?? '', '/');
+                    $source_html_url_host = $this->urlHostWithPort($url ?: []);
+
+                    // Rewrite same-host HTTPS submodule URLs to auth with the OAuth token (mirrors the GitHub path) without persisting credentials.
+                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/");
+                    $gitConfigOptions = $this->withGitHttpTransportConfig($gitConfigOption);
+
+                    $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
+                    $escapedRepoUrl = escapeshellarg($repoUrl);
+                    $fullRepoUrl = $repoUrl;
+                    $git_clone_command_base = $this->applyGitConfigOptionsToCloneCommand("{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}", $gitConfigOptions);
+                    if ($only_checkout) {
+                        $git_clone_command = $git_clone_command_base;
+                    } else {
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOptions);
+                    }
+
+                    if ($pull_request_id !== 0) {
+                        $branch = "merge-requests/{$pull_request_id}/head:{$pr_branch_name}";
+                        if ($exec_in_docker) {
+                            $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out {$branch}'"));
+                        } else {
+                            $commands->push("echo 'Checking out {$branch}'");
+                        }
+                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitConfigOptions: $gitConfigOptions);
+                        $escapedPrBranch = escapeshellarg($branch);
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git {$gitConfigOptions} fetch origin {$escapedPrBranch} && {$git_checkout_command}";
+                    }
+
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
+                    } else {
+                        $commands->push($git_clone_command);
+                    }
+
+                    return [
+                        'commands' => $commands->implode(' && '),
+                        'branch' => $branch,
+                        'fullRepoUrl' => $fullRepoUrl,
+                    ];
+                }
+
                 $private_key = data_get($gitlabSource, 'privateKey.private_key');
 
                 if ($private_key) {
@@ -1722,7 +1891,6 @@ class Application extends BaseModel
                     ];
                 }
 
-                // GitLab source without private key — use URL as-is (supports user-embedded basic auth)
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
@@ -2016,34 +2184,7 @@ class Application extends BaseModel
             $this->save();
             $parsedServices = $this->parse();
             if ($this->docker_compose_domains) {
-                $decoded = json_decode($this->docker_compose_domains, true);
-                $json = collect(is_array($decoded) ? $decoded : []);
-                $normalized = collect();
-                foreach ($json as $key => $value) {
-                    $normalizedKey = (string) str($key)->replace('-', '_')->replace('.', '_');
-                    $normalized->put($normalizedKey, $value);
-                }
-                $json = $normalized;
-                $services = collect(data_get($parsedServices, 'services', []));
-                foreach ($services as $name => $service) {
-                    if (str($name)->contains('-') || str($name)->contains('.')) {
-                        $replacedName = str($name)->replace('-', '_')->replace('.', '_');
-                        $services->put((string) $replacedName, $service);
-                        $services->forget((string) $name);
-                    }
-                }
-                $names = collect($services)->keys()->toArray();
-                $jsonNames = $json->keys()->toArray();
-                $diff = array_diff($jsonNames, $names);
-                $json = $json->filter(function ($value, $key) use ($diff) {
-                    return ! in_array($key, $diff);
-                });
-                if ($json) {
-                    $this->docker_compose_domains = json_encode($json);
-                } else {
-                    $this->docker_compose_domains = null;
-                }
-                $this->save();
+                $this->reconcileDockerComposeDomains($parsedServices);
             }
 
             return [
@@ -2058,6 +2199,31 @@ class Application extends BaseModel
 
             throw new RuntimeException("Docker Compose file not found at: $workdir$composeFile (branch: {$this->git_branch})<br><br>Check if you used the right extension (.yaml or .yml) in the compose file name.");
         }
+    }
+
+    private function reconcileDockerComposeDomains(mixed $parsedServices): void
+    {
+        $services = collect(data_get($parsedServices, 'services', []));
+        $serviceNames = $services->keys()->map(fn ($name) => (string) $name)->all();
+
+        if ($serviceNames === []) {
+            return;
+        }
+
+        $decoded = json_decode($this->docker_compose_domains, true);
+        $rekeyed = rekeyComposeDomainsToServiceNames(
+            is_array($decoded) ? $decoded : [],
+            $serviceNames,
+        );
+
+        $domains = collect($rekeyed)->filter(
+            fn ($value, $key) => findComposeServiceName((string) $key, $serviceNames) !== null
+        );
+
+        $this->docker_compose_domains = $domains->isNotEmpty()
+            ? json_encode($domains->all())
+            : null;
+        $this->save();
     }
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)
@@ -2385,6 +2551,14 @@ class Application extends BaseModel
             'limits_cpuset' => $this->limits_cpuset,
             'limits_cpu_shares' => $this->limits_cpu_shares,
         ];
+    }
+
+    private function urlHostWithPort(array $url): string
+    {
+        $host = $url['host'] ?? '';
+        $port = isset($url['port']) ? ":{$url['port']}" : '';
+
+        return "{$host}{$port}";
     }
 
     public function generateConfig($is_json = false)

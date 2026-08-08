@@ -11,6 +11,7 @@ use App\Enums\NewDatabaseTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\VolumeCloneJob;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -18,11 +19,14 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\SwarmDocker;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
@@ -850,6 +854,12 @@ class DatabasesController extends Controller
 
         $this->authorize('manageBackups', $database);
 
+        if (! $database->isBackupSolutionAvailable()) {
+            return response()->json([
+                'message' => 'Scheduled backups are not supported for this database type.',
+            ], 422);
+        }
+
         // Validate frequency is a valid cron expression
         $isValid = validate_cron_expression($request->frequency);
         if (! $isValid) {
@@ -915,6 +925,8 @@ class DatabasesController extends Controller
                 $backupData['databases_to_backup'] = $database->mysql_database;
             } elseif ($database->type() === 'standalone-mariadb') {
                 $backupData['databases_to_backup'] = $database->mariadb_database;
+            } elseif ($database->type() === 'standalone-clickhouse') {
+                $backupData['databases_to_backup'] = $database->clickhouse_db;
             }
         }
 
@@ -1804,6 +1816,12 @@ class DatabasesController extends Controller
         $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
+        }
+        if (! $server->canHostResources()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['server_uuid' => ['The specified server is configured as a build server and cannot host resources.']],
+            ], 422);
         }
         $destinations = $server->destinations();
         if ($destinations->count() == 0) {
@@ -3016,7 +3034,7 @@ class DatabasesController extends Controller
             ),
         ]
     )]
-    public function move_by_uuid(Request $request): \Illuminate\Http\JsonResponse
+    public function move_by_uuid(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -3036,9 +3054,57 @@ class DatabasesController extends Controller
         return moveResourceToEnvironment($request, $database, 'Database', $teamId);
     }
 
-    #[OA\Get(
+    #[OA\Post(
+        summary: 'Migrate to Server',
+        description: 'Migrate a database to another destination/server owned by the authenticated team. Stops the database, optionally transfers persistent volume data when both servers are managed by Coolify, and updates database records. Redeploy after migration completes.',
+        path: '/databases/{uuid}/migrate',
+        operationId: 'migrate-database-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string', description: 'UUID of the target destination.'),
+                    new OA\Property(property: 'migrate_volumes', type: 'boolean', default: true, description: 'Whether to transfer persistent volume data when migrating across servers.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Database migration started or completed.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function migrate_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $database = queryDatabaseByUuidWithinTeam($request->uuid, $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        return migrateResourceToDestination($request, $database, 'Database', $teamId);
+    }
+
+    #[OA\Post(
         summary: 'Start',
-        description: 'Start database. `Post` request is also accepted.',
+        description: 'Start database.',
         path: '/databases/{uuid}/start',
         operationId: 'start-database-by-uuid',
         security: [
@@ -3123,9 +3189,9 @@ class DatabasesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Stop',
-        description: 'Stop database. `Post` request is also accepted.',
+        description: 'Stop database.',
         path: '/databases/{uuid}/stop',
         operationId: 'stop-database-by-uuid',
         security: [
@@ -3222,9 +3288,9 @@ class DatabasesController extends Controller
         );
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Restart',
-        description: 'Restart database. `Post` request is also accepted.',
+        description: 'Restart database.',
         path: '/databases/{uuid}/restart',
         operationId: 'restart-database-by-uuid',
         security: [
@@ -4470,6 +4536,8 @@ class DatabasesController extends Controller
             ], 422);
         }
 
+        $storage->abortIfScheduledBackupsExist();
+
         if ($storage instanceof LocalFileVolume) {
             $storage->deleteStorageOnServer();
         }
@@ -4631,5 +4699,221 @@ class DatabasesController extends Controller
     public function delete_tag(Request $request): JsonResponse
     {
         return $this->deleteTag($request);
+    }
+
+    #[OA\Post(
+        summary: 'Clone',
+        description: 'Clone a database to a destination owned by the authenticated team.',
+        path: '/databases/{uuid}/clone',
+        operationId: 'clone-database-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the database.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string'),
+                    new OA\Property(property: 'name', type: 'string', nullable: true),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Database cloned.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function clone_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'destination_uuid' => 'required|string',
+            'name' => 'string|max:255|nullable',
+            'clone_volumes' => 'boolean',
+        ]);
+        $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $database = queryDatabaseByUuidWithinTeam($request->route('uuid'), $teamId);
+        if (! $database) {
+            return response()->json(['message' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('update', $database);
+
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
+            ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+
+        if (! $destination || ! $destination->server?->canHostResources()) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+
+        $uuid = new_public_id();
+        $name = $request->filled('name')
+            ? $request->string('name')->toString()
+            : $database->name.'-clone-'.$uuid;
+        $cloneVolumeData = $request->boolean('clone_volumes', false);
+
+        $newDatabase = $database->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->fill([
+            'uuid' => $uuid,
+            'name' => $name,
+            'status' => 'exited',
+            'started_at' => null,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+        ]);
+        $newDatabase->save();
+
+        foreach ($database->tags as $tag) {
+            $newDatabase->tags()->attach($tag->id);
+        }
+
+        $newDatabase->persistentStorages()->delete();
+        $pendingVolumeClones = [];
+        $sourceServer = $database->destination?->server;
+        $targetServer = $newDatabase->destination?->server;
+
+        foreach ($database->persistentStorages()->get() as $volume) {
+            $originalName = $volume->name;
+            $newName = match (true) {
+                str_starts_with($originalName, 'postgres-data-') => 'postgres-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'mysql-data-') => 'mysql-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'redis-data-') => 'redis-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'clickhouse-data-') => 'clickhouse-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'mariadb-data-') => 'mariadb-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'mongodb-data-') => 'mongodb-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'keydb-data-') => 'keydb-data-'.$newDatabase->uuid,
+                str_starts_with($originalName, 'dragonfly-data-') => 'dragonfly-data-'.$newDatabase->uuid,
+                str_starts_with($volume->name, $database->uuid) => str($volume->name)->replace($database->uuid, $newDatabase->uuid)->toString(),
+                default => $newDatabase->uuid.'-'.$volume->name,
+            };
+
+            $newPersistentVolume = $volume->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+                'uuid',
+            ])->fill([
+                'name' => $newName,
+                'resource_id' => $newDatabase->id,
+            ]);
+            $newPersistentVolume->save();
+
+            if ($cloneVolumeData) {
+                $pendingVolumeClones[] = [
+                    'source' => $volume->name,
+                    'target' => $newPersistentVolume->name,
+                    'model' => $newPersistentVolume,
+                ];
+            }
+        }
+
+        // Stop once, clone all volumes, then start once — avoids per-volume stop/start races.
+        if ($pendingVolumeClones !== [] && $sourceServer && $targetServer) {
+            try {
+                $chain = [
+                    function () use ($database) {
+                        StopDatabase::run($database);
+                    },
+                ];
+
+                foreach ($pendingVolumeClones as $clone) {
+                    $chain[] = new VolumeCloneJob(
+                        $clone['source'],
+                        $clone['target'],
+                        $sourceServer,
+                        $targetServer,
+                        $clone['model'],
+                    );
+                }
+
+                $chain[] = function () use ($database) {
+                    StartDatabase::run($database);
+                };
+
+                Bus::chain($chain)->onQueue('high')->dispatch();
+            } catch (\Exception $e) {
+                \Log::error('Failed to queue database volume clone for '.$database->uuid.': '.$e->getMessage());
+            }
+        }
+
+        foreach ($database->fileStorages()->get() as $storage) {
+            $storage->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'resource_id' => $newDatabase->id,
+            ])->save();
+        }
+
+        foreach ($database->scheduledBackups()->get() as $backup) {
+            $backup->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'uuid' => new_public_id(),
+                'database_id' => $newDatabase->id,
+                'database_type' => $newDatabase->getMorphClass(),
+                'team_id' => $teamId,
+            ])->save();
+        }
+
+        foreach ($database->environment_variables()->get() as $environmentVariable) {
+            $environmentVariable->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'resourceable_id' => $newDatabase->id,
+                'resourceable_type' => $newDatabase->getMorphClass(),
+            ])->save();
+        }
+
+        auditLog('api.database.cloned', [
+            'team_id' => $teamId,
+            'source_uuid' => $database->uuid,
+            'database_uuid' => $newDatabase->uuid,
+            'database_name' => $newDatabase->name,
+            'destination_uuid' => $destination->uuid,
+            'clone_volumes' => $cloneVolumeData,
+        ]);
+
+        return response()->json([
+            'uuid' => $newDatabase->uuid,
+            'message' => 'Database cloned.',
+        ], 201);
     }
 }

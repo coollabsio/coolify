@@ -16,3 +16,26 @@ it('positions the deployments indicator from the sidebar collapsed state', funct
     expect(strpos($layoutView, '<div x-data="{'))
         ->toBeLessThan(strpos($layoutView, '<livewire:deployments-indicator />'));
 });
+
+it('uses the redesigned elevated surface and status badge patterns', function () {
+    $indicatorView = file_get_contents(resource_path('views/livewire/deployments-indicator.blade.php'));
+
+    expect($indicatorView)
+        ->toContain('var(--coollabs-elevated)')
+        ->toContain('var(--coollabs-line)')
+        ->toContain('var(--shadow-modal)')
+        ->toContain('var(--coollabs-hairline)')
+        ->toContain('<x-status-badge')
+        ->toContain('name="chevron-down"')
+        ->toContain("'In progress'")
+        ->toContain("'Queued'")
+        ->toContain('dark:text-fg')
+        ->toContain('dark:border-white/[0.08]')
+        ->toContain('$this->shouldShow')
+        ->toContain('updateShouldShowFromPath')
+        ->toContain('livewire:navigated')
+        ->not->toContain('dark:bg-coolgray-100')
+        ->not->toContain('dark:bg-coolgray-200')
+        ->not->toContain('text-gray-800')
+        ->not->toContain("str_replace('_', ' ', \$deployment->status)");
+});

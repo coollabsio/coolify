@@ -2,7 +2,7 @@
 
 return [
     'coolify' => [
-        'version' => '4.2.0',
+        'version' => '4.3.0',
         'helper_version' => '1.0.14',
         'realtime_version' => '1.0.16',
         'railpack_version' => '0.23.0',
@@ -27,6 +27,8 @@ return [
     'services' => [
         'official' => 'https://cdn.coollabs.io/coolify/service-templates-latest.json',
         'file_name' => 'service-templates-latest.json',
+        // Shared across HTTP/Horizon nodes when CACHE_DRIVER is redis (default).
+        'cache_key' => 'coolify:service-templates-bundle',
     ],
 
     'terminal' => [

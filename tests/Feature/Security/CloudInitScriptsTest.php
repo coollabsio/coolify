@@ -42,7 +42,7 @@ test('cloud-init script form does not show a cancel button in the modal', functi
         ->assertDontSee('Cancel');
 });
 
-test('cloud-init script cards link to the script detail page without inline actions or created time', function () {
+test('cloud-init script cards open the modal editor without inline actions or created time', function () {
     $script = CloudInitScript::query()->create([
         'team_id' => $this->team->id,
         'name' => 'Docker Host Setup',
@@ -51,10 +51,10 @@ test('cloud-init script cards link to the script detail page without inline acti
 
     Livewire::test(CloudInitScripts::class)
         ->assertSee('Docker Host Setup')
-        ->assertSee(route('security.cloud-init-scripts.show', ['cloud_init_script_uuid' => $script->uuid]), false)
+        ->assertSee('Edit Cloud-Init Script')
+        ->assertDontSee(route('security.cloud-init-scripts.show', ['cloud_init_script_uuid' => $script->uuid]), false)
         ->assertDontSee('Created')
-        ->assertDontSee('Edit')
-        ->assertDontSee('Delete');
+        ->assertSee('Delete');
 });
 
 test('cloud-init script detail page shows editable script fields', function () {

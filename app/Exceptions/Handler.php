@@ -69,8 +69,9 @@ class Handler extends ExceptionHandler
      */
     public function render($request, Throwable $e)
     {
-        // Handle authorization exceptions for API routes
-        if ($e instanceof AuthorizationException) {
+        // Handle authorization exceptions for API routes. Exceptions carrying
+        // an explicit status (e.g. denyAsNotFound) keep it via parent::render.
+        if ($e instanceof AuthorizationException && ! $e->hasStatus()) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 if ($request->is('api/*')) {
                     auditLog('api.auth.policy_denied', [

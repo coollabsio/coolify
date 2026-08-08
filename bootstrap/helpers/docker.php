@@ -11,6 +11,37 @@ use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
+/**
+ * Stable short hash for compose service names used in Traefik router/service IDs.
+ * Keeps api.test vs api-test distinct after label-safe normalization.
+ */
+function traefikServiceNameHash(string $serviceName): string
+{
+    return substr(md5($serviceName), 0, 4);
+}
+
+/**
+ * Label-safe Traefik router/service name segment for a compose service.
+ * Dots (and other non [a-zA-Z0-9-]) break Docker/Traefik label paths; always append a hash
+ * so normalized names like api.test and api-test never collide.
+ */
+function traefikSafeServiceNameSegment(string $serviceName): string
+{
+    $normalized = str($serviceName)
+        ->replace('.', '-')
+        ->replace('_', '-')
+        ->replaceMatches('/[^a-zA-Z0-9-]+/', '-')
+        ->replaceMatches('/-+/', '-')
+        ->trim('-')
+        ->toString();
+
+    if ($normalized === '') {
+        $normalized = 'service';
+    }
+
+    return $normalized.'-'.traefikServiceNameHash($serviceName);
+}
+
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
     $containers = collect([]);
@@ -529,8 +560,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";
             if ($service_name) {
-                $http_label = "http-{$loop}-{$uuid}-{$service_name}";
-                $https_label = "https-{$loop}-{$uuid}-{$service_name}";
+                // Dots in service names split Traefik label paths; hash avoids api.test/api-test collisions.
+                $safeServiceName = traefikSafeServiceNameSegment($service_name);
+                $http_label = "http-{$loop}-{$uuid}-{$safeServiceName}";
+                $https_label = "https-{$loop}-{$uuid}-{$safeServiceName}";
             }
             if (str($image)->contains('ghost')) {
                 $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$path}/(.*)");
@@ -550,12 +583,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $to_non_www_name = "{$loop}-{$uuid}-to-non-www";
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\${1}://\${2}",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\$\${1}://\$\${2}",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\${1}://www.\${2}",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\$\${1}://www.\$\${2}",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
             ];
             if ($schema === 'https') {

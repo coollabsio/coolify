@@ -1,7 +1,8 @@
-<div wire:init="loadRefundEligibility">
+<div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6">
     @if (subscriptionProvider() === 'stripe')
         {{-- Plan Overview --}}
-        <section x-data="{
+        <x-application.settings-section title="Plan overview"
+            description="Review billing status and the number of servers included in this plan." x-data="{
             qty: {{ $quantity }},
             get current() { return $wire.server_limits; },
             activeServers: {{ currentTeam()->servers->count() }},
@@ -33,8 +34,7 @@
                 this.preview = null;
             }
         }" @success.window="preview = null; showModal = false; qty = $wire.server_limits"
-            @keydown.escape.window="if (showModal) { closeAdjust(); }" class="-mt-2">
-            <h3 class="pb-2">Plan Overview</h3>
+            @keydown.escape.window="if (showModal) { closeAdjust(); }">
             <div class="space-y-2">
                 <div class="text-sm">
                     <span class="text-neutral-500">Plan:</span>
@@ -97,28 +97,25 @@
                         x-transition:leave="ease-in duration-100"
                         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                         x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                        class="relative w-full border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
-                        <div class="flex justify-between items-center py-6 px-7 shrink-0">
-                            <h3 class="text-2xl font-bold">Adjust Server Limit</h3>
-                            <button @click="closeAdjust()"
-                                class="flex justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
-                                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                </svg>
+                        class="application-settings-section application-settings-form relative flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col shadow-modal">
+                        <div class="flex min-h-11 shrink-0 items-center justify-between px-4">
+                            <h3 class="text-[13px]! font-semibold!">Adjust server limit</h3>
+                            <button type="button" @click="closeAdjust()"
+                                class="flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                <x-reicon name="x" class="size-3.5" />
                             </button>
                         </div>
-                        <div class="relative w-auto overflow-y-auto px-7 pb-6 space-y-4"
+                        <div class="application-settings-section-body relative w-auto space-y-4 overflow-y-auto p-4"
                             style="-webkit-overflow-scrolling: touch;">
                             {{-- Server count input --}}
                             <div>
-                                <label class="text-xs font-bold text-neutral-500 uppercase tracking-wide">Paid Servers</label>
-                                <div class="flex items-center gap-3 pt-1">
+                                <label class="mb-1.5 block">Paid servers</label>
+                                <div class="flex items-center gap-3">
                                     <input type="number" min="{{ $minServerLimit }}" max="{{ $maxServerLimit }}" step="1"
                                         x-model.number="qty"
                                         @input="preview = null"
                                         @change="qty = Math.min({{ $maxServerLimit }}, Math.max({{ $minServerLimit }}, qty || {{ $minServerLimit }}))"
-                                        class="w-20 px-2 py-1 text-xl font-bold text-center rounded border dark:bg-coolgray-200 dark:border-coolgray-400 border-neutral-200 dark:text-white">
+                                        class="h-8! w-24 rounded-lg! border-neutral-200! bg-white! px-2! py-0! text-center! text-[13px]! font-semibold! shadow-none! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.04]! dark:text-fg!">
                                     <x-forms.button
                                         isHighlighted
                                         x-bind:disabled="!hasChanged || loading"
@@ -197,26 +194,22 @@
                     </div>
                 </div>
             </template>
-        </section>
+        </x-application.settings-section>
 
         {{-- Manage Subscription --}}
-        <section>
-            <h3 class="pb-2">Manage Subscription</h3>
+        <x-application.settings-section title="Billing"
+            description="Open the hosted billing portal to update invoices and payment methods.">
             <div class="flex flex-wrap items-center gap-2">
                 <x-forms.button class="gap-2" wire:click='stripeCustomerPortal'>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24"
-                        stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
-                    </svg>
-                    Manage Billing on Stripe
+                    <x-reicon name="subscription" class="size-3.5" />
+                    Open billing portal
                 </x-forms.button>
             </div>
-        </section>
+        </x-application.settings-section>
 
         {{-- Cancel Subscription --}}
-        <section>
-            <h3 class="pb-2">Cancel Subscription</h3>
+        <x-application.settings-section title="Cancellation"
+            description="End the plan at the next billing date or cancel it immediately.">
             <div class="flex flex-wrap items-center gap-2">
                 @if (currentTeam()->subscription->stripe_cancel_at_period_end)
                     <x-forms.button wire:click="resumeSubscription">Resume Subscription</x-forms.button>
@@ -266,11 +259,11 @@
             @if (currentTeam()->subscription->stripe_cancel_at_period_end)
                 <p class="mt-2 text-sm text-neutral-500">Your subscription is set to cancel at the end of the billing period.</p>
             @endif
-        </section>
+        </x-application.settings-section>
 
         {{-- Refund --}}
-        <section>
-            <h3 class="pb-2">Refund</h3>
+        <x-application.settings-section title="Refund"
+            description="Request a refund when this team is still inside the eligibility window.">
             @if ($refundCheckLoading || $isRefundEligible)
                 <div class="flex flex-wrap items-center gap-2">
                     @if ($refundCheckLoading)
@@ -299,7 +292,7 @@
                     Not eligible for a refund.
                 @endif
             </p>
-        </section>
+        </x-application.settings-section>
 
         <div class="text-sm text-neutral-500">
             Need help? <a class="underline dark:text-white" href="{{ config('constants.urls.contact') }}"

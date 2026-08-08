@@ -4,6 +4,8 @@ namespace App\Services\DeploymentConfiguration;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Services\DeploymentConfiguration\Concerns\SummarizesDiffText;
 use Illuminate\Support\Arr;
 
@@ -46,6 +48,10 @@ class ApplicationConfigurationSnapshot
                 'environment' => [
                     'label' => 'Environment Variables',
                     'items' => $this->environmentItems(),
+                ],
+                'storage' => [
+                    'label' => 'Storage',
+                    'items' => $this->storageItems(),
                 ],
             ],
         ];
@@ -212,6 +218,40 @@ class ApplicationConfigurationSnapshot
             ->values()
             ->map(fn (EnvironmentVariable $environmentVariable): array => $this->environmentItem($environmentVariable))
             ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function storageItems(): array
+    {
+        $volumes = $this->application->persistentStorages()
+            ->orderBy('id')
+            ->get(['id', 'name', 'mount_path', 'host_path'])
+            ->map(function (LocalPersistentVolume $volume): array {
+                $source = $volume->host_path ?: $volume->name;
+
+                return $this->item(
+                    key: 'volume_'.$volume->id,
+                    label: 'Volume mount',
+                    value: ['source' => $source, 'destination' => $volume->mount_path],
+                    impact: 'redeploy',
+                    displayValue: "{$source} → {$volume->mount_path}",
+                );
+            });
+
+        $fileMounts = $this->application->fileStorages()
+            ->orderBy('id')
+            ->get(['id', 'fs_path', 'mount_path', 'is_directory'])
+            ->map(fn (LocalFileVolume $file): array => $this->item(
+                key: 'file_'.$file->id,
+                label: $file->is_directory ? 'Directory mount' : 'File mount',
+                value: ['source' => $file->fs_path, 'destination' => $file->mount_path],
+                impact: 'redeploy',
+                displayValue: "{$file->fs_path} → {$file->mount_path}",
+            ));
+
+        return collect($volumes->all())->merge($fileMounts->all())->values()->all();
     }
 
     /**

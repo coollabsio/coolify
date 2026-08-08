@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -17,16 +18,28 @@ class DatabaseBackups extends Component
 
     public array $parameters;
 
+    public array $backupParameters = [];
+
     public array $query;
 
     public bool $isImportSupported = false;
+
+    public ?ScheduledDatabaseBackup $backup = null;
+
+    public string $section = 'index';
+
+    public $s3s;
 
     protected $listeners = ['refreshScheduledBackups' => '$refresh'];
 
     public function mount()
     {
         try {
-            $this->parameters = get_route_parameters();
+            $this->parameters = array_filter(
+                get_route_parameters(),
+                fn (string $key): bool => $key !== 'backup_uuid',
+                ARRAY_FILTER_USE_KEY,
+            );
             $this->query = request()->query();
             $project = currentTeam()
                 ->projects()
@@ -58,6 +71,21 @@ class DatabaseBackups extends Component
             $dbType = $this->serviceDatabase->databaseType();
             $supportedTypes = ['mysql', 'mariadb', 'postgres', 'mongo'];
             $this->isImportSupported = collect($supportedTypes)->contains(fn ($type) => str_contains($dbType, $type));
+
+            if (request()->route('backup_uuid')) {
+                $this->backup = $this->serviceDatabase->scheduledBackups()
+                    ->where('uuid', request()->route('backup_uuid'))
+                    ->firstOrFail();
+                $this->s3s = currentTeam()->s3s;
+                $this->backupParameters = [...$this->parameters, 'backup_uuid' => $this->backup->uuid];
+                $this->section = match (request()->route()?->getName()) {
+                    'project.service.database.backup.s3' => 's3',
+                    'project.service.database.backup.retention' => 'retention',
+                    'project.service.database.backup.executions' => 'executions',
+                    'project.service.database.backup.danger' => 'danger',
+                    default => 'general',
+                };
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

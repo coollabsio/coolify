@@ -18,9 +18,17 @@ Docker Compose-based dev setup with services: coolify (app), postgres, redis, so
 # Start dev environment (uses docker-compose.dev.yml)
 spin up                          # or: docker compose -f docker-compose.dev.yml up -d
 spin down                        # stop services
+
+# Two local Coolify instances (isolated stacks; server transfer / multi-control-plane)
+./scripts/dev-instances up                   # a:8000 + b:8001 (uses npm run build for CSS/JS)
+./scripts/dev-instances up a --with vite     # HMR only when starting a single instance
+./scripts/dev-instances urls
+./scripts/dev-instances down
+# Compose: docker-compose.dev-multi.yml  Env: .dev-instances/{a,b}.env (gitignored)
+# Note: dual Vite HMR is unsupported (shared public/hot); multi-instance always uses public/build.
 ```
 
-The app runs at `localhost:8000` by default. Vite dev server on port 5173.
+The app runs at `localhost:8000` by default. Instance **b** is on `8001` (db `5433`, redis `6380`, …); see `./scripts/dev-instances`.
 
 ## Common Commands
 
@@ -167,7 +175,6 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/boost (BOOST) - v2
 - laravel/dusk (DUSK) - v8
 - laravel/pint (PINT) - v1
-- laravel/telescope (TELESCOPE) - v5
 - pestphp/pest (PEST) - v4
 - phpunit/phpunit (PHPUNIT) - v12
 - rector/rector (RECTOR) - v2

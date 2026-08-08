@@ -77,7 +77,6 @@ class EditCompose extends Component
     {
         try {
             $this->authorize('update', $this->service);
-            $this->dispatch('info', 'Saving new docker compose...');
             $this->dispatch('saveCompose', $this->dockerComposeRaw);
             $this->dispatch('refreshStorages');
         } catch (\Throwable $e) {

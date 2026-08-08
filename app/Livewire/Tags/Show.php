@@ -40,14 +40,26 @@ class Show extends Component
     public function mount()
     {
         try {
-            $this->tags = Tag::ownedByCurrentTeam()->get()->unique('name')->sortBy('name');
+            $this->tags = Tag::ownedByCurrentTeam()
+                ->withCount(['applications', 'services'])
+                ->get()
+                ->unique('name')
+                ->sortBy('name')
+                ->values();
+
             if (str($this->tagName)->isNotEmpty()) {
                 $tag = $this->tags->where('name', $this->tagName)->first();
+                if (! $tag) {
+                    return redirect()->route('tags.show');
+                }
+
                 $this->webhook = generateTagDeployWebhook($tag->name);
                 $this->applications = $tag->applications()->get();
                 $this->services = $tag->services()->get();
                 $this->tag = $tag;
                 $this->getDeployments();
+            } else {
+                $this->deploymentsPerTagPerServer = [];
             }
         } catch (\Exception $e) {
             return handleError($e, $this);
@@ -57,6 +69,12 @@ class Show extends Component
     public function getDeployments()
     {
         try {
+            if (! $this->applications) {
+                $this->deploymentsPerTagPerServer = [];
+
+                return;
+            }
+
             $resource_ids = $this->applications->pluck('id');
             $this->deploymentsPerTagPerServer = ApplicationDeploymentQueue::whereIn('status', ['in_progress', 'queued'])->whereIn('application_id', $resource_ids)->get([
                 'id',
@@ -99,6 +117,20 @@ class Show extends Component
 
     public function render()
     {
-        return view('livewire.tags.show');
+        return view('livewire.tags.show', [
+            'tagsJs' => ($this->tags ?? collect())->map(function (Tag $tag): array {
+                $applicationsCount = (int) data_get($tag, 'applications_count', 0);
+                $servicesCount = (int) data_get($tag, 'services_count', 0);
+
+                return [
+                    'id' => $tag->id,
+                    'name' => $tag->name,
+                    'href' => route('tags.show', ['tagName' => $tag->name]),
+                    'applicationsCount' => $applicationsCount,
+                    'servicesCount' => $servicesCount,
+                    'resourceCount' => $applicationsCount + $servicesCount,
+                ];
+            })->values()->toArray(),
+        ]);
     }
 }

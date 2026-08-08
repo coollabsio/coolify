@@ -32,6 +32,8 @@ class Navbar extends Component
 
     public bool $restartInitiated = false;
 
+    public array $serverSwitcherOptions = [];
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -49,6 +51,29 @@ class Navbar extends Component
         $this->currentRoute = request()->route()->getName();
         $this->serverIp = $this->server->id === 0 ? base_ip() : $this->server->ip;
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $routeParameters = request()->route()?->parameters() ?? [];
+        $routeName = request()->route()?->getName();
+        $this->serverSwitcherOptions = auth()->user()->currentTeam()->servers()
+            ->orderBy('name')
+            ->get()
+            ->map(function (Server $server) use ($routeName, $routeParameters): array {
+                $parameters = [...$routeParameters, 'server_uuid' => $server->uuid];
+
+                try {
+                    $href = $routeName ? route($routeName, $parameters) : route('server.show', $server->uuid);
+                } catch (\Throwable) {
+                    $href = route('server.show', $server->uuid);
+                }
+
+                return [
+                    'uuid' => $server->uuid,
+                    'name' => $server->name,
+                    'href' => $href,
+                    'functional' => $server->isFunctional(),
+                ];
+            })
+            ->values()
+            ->all();
         $this->loadProxyConfiguration();
     }
 

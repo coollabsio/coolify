@@ -5,6 +5,7 @@ use App\Livewire\Project\Service\Heading;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -138,4 +139,101 @@ test('owner can still hydrate service heading with own service', function () {
         ],
     ])
         ->assertOk();
+});
+
+test('service database backup schedules use dedicated general retention and executions urls', function () {
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->teamA->id,
+        'frequency' => 'daily',
+        'database_id' => $this->ownServiceDatabase->id,
+        'database_type' => $this->ownServiceDatabase->getMorphClass(),
+        'save_s3' => true,
+    ]);
+    $listUrl = route('project.service.database.backups', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+    ]);
+    $generalUrl = $listUrl.'/'.$backup->uuid;
+
+    $this->get($listUrl)
+        ->assertOk()
+        ->assertSee('href="'.$generalUrl.'"', false);
+
+    $this->get($generalUrl)
+        ->assertOk()
+        ->assertSee('Frequency')
+        ->assertDontSee('S3 Enabled')
+        ->assertDontSee('Number of backups to keep')
+        ->assertDontSee('Cleanup Failed Backups')
+        ->assertDontSee('Delete Backups and Schedule');
+
+    $this->get($generalUrl.'/s3')
+        ->assertOk()
+        ->assertSee('S3 Storage')
+        ->assertDontSee('S3 Storage Retention')
+        ->assertDontSee('Local Backup Retention')
+        ->assertDontSee('Frequency')
+        ->assertDontSee('Cleanup Failed Backups');
+
+    $this->get($generalUrl.'/retention')
+        ->assertOk()
+        ->assertSee('Local Backup Retention')
+        ->assertSee('S3 Storage Retention')
+        ->assertSee('Number of backups to keep')
+        ->assertDontSee('Frequency')
+        ->assertDontSee('Cleanup Failed Backups');
+
+    $this->get($generalUrl.'/executions')
+        ->assertOk()
+        ->assertSee('<h2 class="py-0">Executions</h2>', false)
+        ->assertDontSee('Executions <span', false)
+        ->assertSee('Cleanup Failed Backups')
+        ->assertDontSee('Frequency')
+        ->assertDontSee('Number of backups to keep');
+
+    $this->get($generalUrl.'/danger')
+        ->assertOk()
+        ->assertSee('Danger Zone')
+        ->assertSee('Delete Scheduled Backup')
+        ->assertSee('Delete Backups and Schedule')
+        ->assertDontSee('Frequency')
+        ->assertDontSee('Number of backups to keep')
+        ->assertDontSee('Cleanup Failed Backups');
+});
+
+test('service storage backups page includes schedules from all compose databases', function () {
+    $secondDatabase = ServiceDatabase::create([
+        'service_id' => $this->ownService->id,
+        'name' => 'analytics-db',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+
+    foreach ([$this->ownServiceDatabase, $secondDatabase] as $database) {
+        ScheduledDatabaseBackup::create([
+            'team_id' => $this->teamA->id,
+            'description' => $database->name.' backup',
+            'frequency' => 'daily',
+            'database_id' => $database->id,
+            'database_type' => $database->getMorphClass(),
+        ]);
+    }
+
+    $this->get(route('project.service.volume-backups.index', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]))
+        ->assertOk()
+        ->assertSee('>Database</span>', false)
+        ->assertSee('own-db')
+        ->assertSee('analytics-db')
+        ->assertSee(route('project.service.database.backups', [
+            'project_uuid' => $this->projectA->uuid,
+            'environment_uuid' => $this->environmentA->uuid,
+            'service_uuid' => $this->ownService->uuid,
+            'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+        ]), false);
 });

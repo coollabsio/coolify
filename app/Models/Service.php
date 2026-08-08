@@ -1641,16 +1641,16 @@ class Service extends BaseModel
     protected function isDeployable(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $envs = $this->environment_variables()->where('is_required', true)->get();
-                foreach ($envs as $env) {
-                    if ($env->is_really_required) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
+            get: fn (): bool => $this->missingRequiredEnvironmentVariables()->isEmpty()
         );
+    }
+
+    public function missingRequiredEnvironmentVariables(): Collection
+    {
+        return $this->environment_variables()
+            ->where('is_required', true)
+            ->get()
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)
+            ->values();
     }
 }
