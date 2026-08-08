@@ -121,12 +121,14 @@
                                 class="listbox-panel top-full! right-0! left-auto! z-[90]! mt-1! w-56! min-w-56!"
                                 role="menu">
                                 @if (!$previewIsStopped && filled(data_get($preview, 'fqdn')))
-                                    <a target="_blank" title="Open preview in a new tab"
-                                        class="listbox-option justify-start! gap-2.5!"
-                                        href="{{ data_get($preview, 'fqdn') }}" @click="open = false" role="menuitem">
-                                        <x-reicon name="external-link" class="size-3.5 opacity-70" />
-                                        <span class="min-w-0 truncate">Open preview</span>
-                                    </a>
+                                    @foreach (str(data_get($preview, 'fqdn'))->explode(',')->map(fn($domain) => trim($domain))->filter() as $previewUrl)
+                                        <a target="_blank" title="Open preview in a new tab"
+                                            class="listbox-option justify-start! gap-2.5!"
+                                            href="{{ $previewUrl }}" @click="open = false" role="menuitem">
+                                            <x-reicon name="external-link" class="size-3.5 opacity-70" />
+                                            <span class="min-w-0 truncate">{{ $loop->count > 1 ? getFqdnWithoutPort($previewUrl) : 'Open preview' }}</span>
+                                        </a>
+                                    @endforeach
                                 @endif
                                 @if (filled(data_get($preview, 'pull_request_html_url')))
                                     <a target="_blank" title="Open pull request in a new tab"
@@ -255,7 +257,7 @@
                         @if (collect(json_decode($preview->docker_compose_domains))->count() === 0)
                             <form wire:submit="save_preview('{{ $preview->id }}')"
                                 class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                                <x-forms.input label="Domain" helper="One domain per preview."
+                                <x-forms.input label="Domain" helper="You can specify one domain, or multiple as a comma separated list."
                                     id="previewFqdns.{{ $previewName }}" canGate="update"
                                     :canResource="$application"
                                     wire:change="save_preview('{{ $preview->id }}')" />
@@ -279,7 +281,7 @@
                             class="grid gap-3 {{ $application->build_pack === 'dockerimage'
                                 ? 'md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]'
                                 : 'md:grid-cols-[minmax(0,1fr)_auto]' }} md:items-end">
-                            <x-forms.input label="Domain" helper="One domain per preview."
+                            <x-forms.input label="Domain" helper="You can specify one domain, or multiple as a comma separated list."
                                 id="previewFqdns.{{ $previewName }}" canGate="update"
                                 :canResource="$application"
                                 wire:change="save_preview('{{ $preview->id }}')" />
