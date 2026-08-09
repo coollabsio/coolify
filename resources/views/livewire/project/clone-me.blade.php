@@ -1,107 +1,147 @@
-<form>
-    <x-slot:title>
-        {{ data_get_str($project, 'name')->limit(10) }} > Clone | Coolify
-    </x-slot>
-    <div class="flex flex-col">
-        <h1>Clone</h1>
-        <div class="subtitle ">Quickly clone all resources to a new project or environment.</div>
-    </div>
-    <x-forms.input required id="newName" label="New Name" />
-    <h3 class="pt-8 ">Destination Server</h3>
-    <div class="pb-2">Choose the server and network to clone the resources to.</div>
-    <div class="flex flex-col">
-        <div class="flex flex-col">
-            <div class="overflow-x-auto">
-                <div class="inline-block min-w-full">
-                    <div class="overflow-hidden">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Server</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Network</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($servers->sortBy('id') as $server)
-                                    @foreach ($server->destinations() as $destination)
-                                        <tr class="cursor-pointer hover:bg-coolgray-50 dark:hover:bg-coolgray-200"
-                                            wire:click="selectServer('{{ $server->id }}', '{{ $destination->uuid }}')">
-                                            <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white"
-                                                :class="'{{ $selectedDestination === $destination->uuid }}' ?
-                                                'bg-coollabs text-white' : 'dark:bg-coolgray-100 bg-white'">
-                                                {{ $server->name }}</td>
-                                            <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white "
-                                                :class="'{{ $selectedDestination === $destination->uuid }}' ?
-                                                'bg-coollabs text-white' : 'dark:bg-coolgray-100 bg-white'">
-                                                {{ $destination->name }}
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+<div>
+    <x-slot:title>{{ data_get_str($project, 'name')->limit(10) }} > Clone | Coolify</x-slot>
+    <x-project.navbar :project="$project" :environment="$environment" />
 
-    <h3 class="pt-8">Resources</h3>
-    <div class="pb-2">These will be cloned to the new project</div>
-    <div class="flex flex-col pt-4">
-        <div class="flex flex-col">
-            <div class="overflow-x-auto">
-                <div class="inline-block min-w-full">
-                    <div class="overflow-hidden">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Type</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach ($environment->applications->sortBy('name') as $application)
-                                    <tr>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap font-bold dark:text-white">
-                                            {{ $application->name }}</td>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white">Application</td>
-                                        <td class="px-5 py-4 text-sm dark:text-white">
-                                            {{ $application->description ?: '-' }}</td>
-                                    </tr>
-                                @endforeach
-                                @foreach ($environment->databases()->sortBy('name') as $database)
-                                    <tr>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap font-bold dark:text-white">
-                                            {{ $database->name }}
-                                        </td>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white">Database</td>
-                                        <td class="px-5 py-4 text-sm dark:text-white">
-                                            {{ $database->description ?: '-' }}</td>
-                                    </tr>
-                                @endforeach
-                                @foreach ($environment->services->sortBy('name') as $service)
-                                    <tr>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap font-bold dark:text-white">
-                                            {{ $service->name }}
-                                        </td>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap dark:text-white">Service</td>
-                                        <td class="px-5 py-4 text-sm dark:text-white">
-                                            {{ $service->description ?: '-' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Clone environment</h2>
+                    <p>Copy every resource from {{ $environment->name }} to a new project or environment.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body">
+                <div class="max-w-md">
+                    <x-forms.input required id="newName" label="New name" />
+                </div>
+            </div>
+        </section>
+
+        <section class="application-settings-section">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Destination</h2>
+                    <p>Choose the server and Docker network that will receive the cloned resources.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body p-0!">
+                @php
+                    $destinationCount = $servers->sum(
+                        fn ($server) => $server->destinations()->count()
+                    );
+                @endphp
+                <div class="data-table">
+                    <div class="data-table-header clone-destinations-table-grid">
+                        <span><span class="sr-only">Selected</span></span>
+                        <span>Server</span>
+                        <span>Network</span>
+                    </div>
+                    @foreach ($servers->sortBy('id') as $server)
+                        @foreach ($server->destinations() as $destination)
+                            <button type="button"
+                                wire:click="selectServer('{{ $server->id }}', '{{ $destination->uuid }}')"
+                                @class([
+                                    'data-table-row clone-destinations-table-grid w-full border-b border-neutral-200 text-left last:border-b-0 dark:border-white/[0.06]',
+                                    'bg-coollabs/5 dark:bg-warning/[0.06]' => $selectedDestination === $destination->uuid,
+                                ])>
+                                <span @class([
+                                    'flex size-4 items-center justify-center rounded-full border',
+                                    'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selectedDestination === $destination->uuid,
+                                    'border-neutral-300 dark:border-white/[0.15]' => $selectedDestination !== $destination->uuid,
+                                ])>
+                                    @if ($selectedDestination === $destination->uuid)
+                                        <span class="size-1.5 rounded-full bg-current"></span>
+                                    @endif
+                                </span>
+                                <span class="truncate text-[12px] font-semibold text-black dark:text-fg">
+                                    {{ $server->name }}
+                                </span>
+                                <span class="truncate font-mono text-[11px] text-neutral-600 dark:text-fg-dim">
+                                    {{ $destination->name }}
+                                </span>
+                            </button>
+                        @endforeach
+                    @endforeach
+                    <div
+                        class="flex min-h-11 items-center border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
+                        {{ $destinationCount }} {{ Str::plural('destination', $destinationCount) }}
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
+
+        <section class="application-settings-section">
+            @php
+                $resourceCount = $environment->applications->count()
+                    + $environment->databases()->count()
+                    + $environment->services->count();
+            @endphp
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Resources</h2>
+                    <p>{{ $resourceCount }} {{ Str::plural('resource', $resourceCount) }} will be cloned.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body p-0!">
+                <div class="data-table">
+                    <div class="data-table-header clone-resources-table-grid">
+                        <span>Name</span>
+                        <span>Type</span>
+                        <span>Description</span>
+                    </div>
+                    @foreach ($environment->applications->sortBy('name') as $application)
+                        <div
+                            class="data-table-row clone-resources-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
+                            <div class="truncate text-[12px] font-semibold text-black dark:text-fg">
+                                {{ $application->name }}
+                            </div>
+                            <div><x-status-badge status="Application" type="neutral" /></div>
+                            <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
+                                {{ $application->description ?: '-' }}
+                            </div>
+                        </div>
+                    @endforeach
+                    @foreach ($environment->databases()->sortBy('name') as $database)
+                        <div
+                            class="data-table-row clone-resources-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
+                            <div class="truncate text-[12px] font-semibold text-black dark:text-fg">
+                                {{ $database->name }}
+                            </div>
+                            <div><x-status-badge status="Database" type="neutral" /></div>
+                            <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
+                                {{ $database->description ?: '-' }}
+                            </div>
+                        </div>
+                    @endforeach
+                    @foreach ($environment->services->sortBy('name') as $service)
+                        <div
+                            class="data-table-row clone-resources-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
+                            <div class="truncate text-[12px] font-semibold text-black dark:text-fg">
+                                {{ $service->name }}
+                            </div>
+                            <div><x-status-badge status="Service" type="neutral" /></div>
+                            <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
+                                {{ $service->description ?: '-' }}
+                            </div>
+                        </div>
+                    @endforeach
+                    <div
+                        class="flex min-h-11 items-center border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
+                        {{ $resourceCount }} {{ Str::plural('resource', $resourceCount) }}
+                    </div>
+                </div>
+                <div
+                    class="flex flex-col gap-2 border-t border-neutral-200 p-4 sm:flex-row sm:justify-end dark:border-white/[0.06]">
+                    <x-forms.button isHighlighted wire:click="clone('environment')"
+                        :disabled="! filled($selectedDestination)">
+                        Clone to environment
+                    </x-forms.button>
+                    <x-forms.button isHighlighted wire:click="clone('project')"
+                        :disabled="! filled($selectedDestination)">
+                        Clone to project
+                    </x-forms.button>
+                </div>
+            </div>
+        </section>
     </div>
-    <div class="flex gap-4 pt-4 w-full">
-        <x-forms.button isHighlighted class="w-full" wire:click="clone('project')" :disabled="!filled($selectedDestination)">Clone to new
-            Project</x-forms.button>
-        <x-forms.button isHighlighted class="w-full" wire:click="clone('environment')" :disabled="!filled($selectedDestination)">Clone to new
-            Environment</x-forms.button>
-    </div>
-</form>
+</div>

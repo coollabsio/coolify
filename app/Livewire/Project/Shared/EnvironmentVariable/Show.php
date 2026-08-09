@@ -19,6 +19,8 @@ use Livewire\Component;
 
 class Show extends Component
 {
+    public bool $showEnvironmentType = true;
+
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
 
     public $parameters;
@@ -34,6 +36,10 @@ class Show extends Component
     public bool $isSharedVariable = false;
 
     public string $type;
+
+    public int $tableAlphabeticalOrder = 0;
+
+    public int $tableCreationOrder = 0;
 
     public string $key;
 
@@ -62,6 +68,18 @@ class Show extends Component
     public bool $is_redis_credential = false;
 
     public bool $isValueHidden = false;
+
+    /**
+     * Decrypted value / real_value are only needed in the edit modal (or after save).
+     * Keeping them unloaded for table rows avoids decrypting every visible env on each page change.
+     */
+    public bool $valuesLoaded = false;
+
+    /**
+     * Entangled with the edit modal open state so the modal stays open across the
+     * async loadValues() re-render (open immediately, decrypt after).
+     */
+    public bool $editorOpen = false;
 
     public array $problematicVariables = [];
 
@@ -116,8 +134,31 @@ class Show extends Component
         if (! $this->env->exists || ! $this->env->fresh()) {
             return;
         }
+        $this->valuesLoaded = false;
         $this->syncData();
         $this->checkEnvs();
+    }
+
+    /**
+     * Decrypt and resolve values only when the edit modal is opened.
+     */
+    public function loadValues(): void
+    {
+        if ($this->valuesLoaded) {
+            return;
+        }
+
+        // List queries omit the encrypted value column; refresh so edit has a full model.
+        if ($this->env->exists) {
+            $fresh = $this->env->fresh();
+            if ($fresh) {
+                $fresh->setAppends([]);
+                $this->env = $fresh;
+            }
+        }
+
+        $this->hydrateValueFields();
+        $this->valuesLoaded = true;
     }
 
     public function syncData(bool $toModel = false)
@@ -149,27 +190,53 @@ class Show extends Component
             $this->env->is_literal = $this->is_literal;
             $this->env->is_shown_once = $this->is_shown_once;
             $this->env->save();
+            $this->valuesLoaded = true;
         } else {
+            // Table metadata only — never decrypt here. Values load via loadValues().
+            $this->env->setAppends([]);
             $this->key = $this->env->key;
-            $this->value = $this->env->value;
             $this->comment = $this->env->comment;
-            $this->is_multiline = $this->env->is_multiline;
-            $this->is_literal = $this->env->is_literal;
-            $this->is_shown_once = $this->env->is_shown_once;
-            $this->is_runtime = $this->env->is_runtime ?? true;
-            $this->is_buildtime = $this->env->is_buildtime ?? true;
-            $this->is_required = $this->env->is_required ?? false;
-            $this->is_really_required = $this->env->is_really_required ?? false;
-            $this->is_shared = $this->env->is_shared ?? false;
-            $this->real_value = $this->env->real_value;
+            $this->is_multiline = (bool) $this->env->is_multiline;
+            $this->is_literal = (bool) $this->env->is_literal;
+            $this->is_shown_once = (bool) $this->env->is_shown_once;
+            $this->is_runtime = (bool) ($this->env->is_runtime ?? true);
+            $this->is_buildtime = (bool) ($this->env->is_buildtime ?? true);
+            $this->is_required = (bool) ($this->env->is_required ?? false);
+            // Use the stored column, not the value-based accessor (that decrypts).
+            $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
+            $this->isValueHidden = auth()->user()?->isMember() ?? false;
 
-            if ($this->env->is_shown_once || auth()->user()?->isMember()) {
+            if ($this->valuesLoaded) {
+                $this->hydrateValueFields();
+            } else {
                 $this->value = null;
                 $this->real_value = null;
+                // Required badge: without decrypting, show when flagged required.
+                // Exact empty-value state is refined when the edit modal opens.
+                $this->is_really_required = $this->is_required;
             }
-
-            $this->isValueHidden = auth()->user()?->isMember() ?? false;
         }
+    }
+
+    private function hydrateValueFields(): void
+    {
+        $this->value = $this->env->value;
+        $this->is_shared = (bool) ($this->env->is_shared ?? false);
+
+        if ($this->is_shared) {
+            $this->real_value = $this->env->real_value;
+            $this->is_really_required = $this->is_required && blank($this->real_value);
+        } else {
+            $this->real_value = null;
+            $this->is_really_required = $this->is_required && blank($this->value);
+        }
+
+        if ($this->env->is_shown_once || auth()->user()?->isMember()) {
+            $this->value = null;
+            $this->real_value = null;
+        }
+
+        $this->isValueHidden = auth()->user()?->isMember() ?? false;
     }
 
     public function checkEnvs()
@@ -215,6 +282,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->env);
+            $this->loadValues();
 
             if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
@@ -238,7 +306,23 @@ class Show extends Component
     #[Computed]
     public function availableSharedVariables(): array
     {
+        // Shared across all Show row components in the same request (edit modals).
+        static $requestCache = [];
+
         $team = currentTeam();
+        $cacheKey = implode('|', [
+            $team?->id ?? 'none',
+            data_get($this->parameters, 'project_uuid', ''),
+            data_get($this->parameters, 'environment_uuid', ''),
+            data_get($this->parameters, 'server_uuid', ''),
+            data_get($this->parameters, 'application_uuid', ''),
+            data_get($this->parameters, 'service_uuid', ''),
+        ]);
+
+        if (array_key_exists($cacheKey, $requestCache)) {
+            return $requestCache[$cacheKey];
+        }
+
         $result = [
             'team' => [],
             'project' => [],
@@ -248,7 +332,7 @@ class Show extends Component
 
         // Early return if no team
         if (! $team) {
-            return $result;
+            return $requestCache[$cacheKey] = $result;
         }
 
         // Check if user can view team variables
@@ -359,7 +443,7 @@ class Show extends Component
             }
         }
 
-        return $result;
+        return $requestCache[$cacheKey] = $result;
     }
 
     public function delete()

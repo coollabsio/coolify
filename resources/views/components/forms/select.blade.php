@@ -1,14 +1,16 @@
 <div class="w-full">
     @if ($label)
-        <label
-            class="flex gap-1 items-center mb-1 text-sm font-medium {{ $disabled ? 'text-neutral-600' : '' }}">{{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label
+                class="mb-0! flex items-center gap-1 text-sm font-medium leading-4 {{ $disabled ? 'text-neutral-600' : '' }}">{{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @endif
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-        </label>
+        </div>
     @endif
     <select {{ $attributes->merge(['class' => $defaultClass]) }} @disabled($disabled) @required($required)
         wire:loading.attr="disabled" name={{ $modelBinding }} id="{{ $htmlId }}"

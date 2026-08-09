@@ -1,6 +1,35 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\ConfigurationServiceProvider;
+use App\Providers\EventServiceProvider;
+use App\Providers\FortifyServiceProvider;
+use App\Providers\HorizonServiceProvider;
+use App\Providers\RouteServiceProvider;
+use Illuminate\Auth\AuthServiceProvider;
+use Illuminate\Auth\Passwords\PasswordResetServiceProvider;
+use Illuminate\Broadcasting\BroadcastServiceProvider;
+use Illuminate\Bus\BusServiceProvider;
+use Illuminate\Cache\CacheServiceProvider;
+use Illuminate\Cookie\CookieServiceProvider;
+use Illuminate\Database\DatabaseServiceProvider;
+use Illuminate\Encryption\EncryptionServiceProvider;
+use Illuminate\Filesystem\FilesystemServiceProvider;
+use Illuminate\Foundation\Providers\ConsoleSupportServiceProvider;
+use Illuminate\Foundation\Providers\FoundationServiceProvider;
+use Illuminate\Hashing\HashServiceProvider;
+use Illuminate\Mail\MailServiceProvider;
+use Illuminate\Notifications\NotificationServiceProvider;
+use Illuminate\Pagination\PaginationServiceProvider;
+use Illuminate\Pipeline\PipelineServiceProvider;
+use Illuminate\Queue\QueueServiceProvider;
+use Illuminate\Redis\RedisServiceProvider;
+use Illuminate\Session\SessionServiceProvider;
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Translation\TranslationServiceProvider;
+use Illuminate\Validation\ValidationServiceProvider;
+use Illuminate\View\ViewServiceProvider;
+use SocialiteProviders\Manager\ServiceProvider;
 
 return [
 
@@ -44,6 +73,29 @@ return [
     */
 
     'debug' => (bool) env('APP_DEBUG', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Server-Timing Headers + on-screen HUD
+    |--------------------------------------------------------------------------
+    |
+    | When true: W3C Server-Timing + X-Debug-* headers, and an on-screen HUD
+    | on full HTML responses (request log, AI-ready copy dump).
+    |
+    | Default: on only when APP_ENV=local (SERVER_TIMING_ENABLED unset).
+    | Override anywhere (including production) with:
+    |   SERVER_TIMING_ENABLED=true   # force on
+    |   SERVER_TIMING_ENABLED=false  # force off (even in local)
+    |
+    | Production note: this exposes timing, query counts, memory, HTML size,
+    | and a visible debug HUD to clients. Enable only temporarily for debugging,
+    | then set false or remove the variable and reload config if cached.
+    |
+    */
+
+    'server_timing' => env('SERVER_TIMING_ENABLED') !== null
+        ? filter_var(env('SERVER_TIMING_ENABLED'), FILTER_VALIDATE_BOOLEAN)
+        : env('APP_ENV', 'production') === 'local',
 
     /*
     |--------------------------------------------------------------------------
@@ -161,45 +213,45 @@ return [
         /*
          * Laravel Framework Service Providers...
          */
-        Illuminate\Auth\AuthServiceProvider::class,
-        Illuminate\Broadcasting\BroadcastServiceProvider::class,
-        Illuminate\Bus\BusServiceProvider::class,
-        Illuminate\Cache\CacheServiceProvider::class,
-        Illuminate\Foundation\Providers\ConsoleSupportServiceProvider::class,
-        Illuminate\Cookie\CookieServiceProvider::class,
-        Illuminate\Database\DatabaseServiceProvider::class,
-        Illuminate\Encryption\EncryptionServiceProvider::class,
-        Illuminate\Filesystem\FilesystemServiceProvider::class,
-        Illuminate\Foundation\Providers\FoundationServiceProvider::class,
-        Illuminate\Hashing\HashServiceProvider::class,
-        Illuminate\Mail\MailServiceProvider::class,
-        Illuminate\Notifications\NotificationServiceProvider::class,
-        Illuminate\Pagination\PaginationServiceProvider::class,
-        Illuminate\Pipeline\PipelineServiceProvider::class,
-        Illuminate\Queue\QueueServiceProvider::class,
-        Illuminate\Redis\RedisServiceProvider::class,
-        Illuminate\Auth\Passwords\PasswordResetServiceProvider::class,
-        Illuminate\Session\SessionServiceProvider::class,
-        Illuminate\Translation\TranslationServiceProvider::class,
-        Illuminate\Validation\ValidationServiceProvider::class,
-        Illuminate\View\ViewServiceProvider::class,
+        AuthServiceProvider::class,
+        BroadcastServiceProvider::class,
+        BusServiceProvider::class,
+        CacheServiceProvider::class,
+        ConsoleSupportServiceProvider::class,
+        CookieServiceProvider::class,
+        DatabaseServiceProvider::class,
+        EncryptionServiceProvider::class,
+        FilesystemServiceProvider::class,
+        FoundationServiceProvider::class,
+        HashServiceProvider::class,
+        MailServiceProvider::class,
+        NotificationServiceProvider::class,
+        PaginationServiceProvider::class,
+        PipelineServiceProvider::class,
+        QueueServiceProvider::class,
+        RedisServiceProvider::class,
+        PasswordResetServiceProvider::class,
+        SessionServiceProvider::class,
+        TranslationServiceProvider::class,
+        ValidationServiceProvider::class,
+        ViewServiceProvider::class,
 
         /*
          * Package Service Providers...
          */
-        \SocialiteProviders\Manager\ServiceProvider::class,
+        ServiceProvider::class,
 
         /*
          * Application Service Providers...
          */
-        App\Providers\AppServiceProvider::class,
-        App\Providers\FortifyServiceProvider::class,
+        AppServiceProvider::class,
+        FortifyServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
         App\Providers\BroadcastServiceProvider::class,
-        App\Providers\EventServiceProvider::class,
-        App\Providers\HorizonServiceProvider::class,
-        App\Providers\RouteServiceProvider::class,
-        App\Providers\ConfigurationServiceProvider::class,
+        EventServiceProvider::class,
+        HorizonServiceProvider::class,
+        RouteServiceProvider::class,
+        ConfigurationServiceProvider::class,
     ],
 
     /*

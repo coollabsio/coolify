@@ -67,6 +67,26 @@ test('cloneTo allows destination belonging to own team', function () {
     expect(Application::count())->toBe(2);
 });
 
+test('cloneTo can place the cloned resource in another environment', function () {
+    $targetEnvironment = Environment::factory()->create(['project_id' => $this->projectA->id]);
+
+    Livewire::test(ResourceOperations::class, ['resource' => $this->applicationA])
+        ->call('cloneTo', $this->destinationA->uuid, $targetEnvironment->id)
+        ->assertRedirect();
+
+    $clone = Application::whereKeyNot($this->applicationA->id)->firstOrFail();
+
+    expect($clone->environment_id)->toBe($targetEnvironment->id);
+});
+
+test('cloneTo rejects an environment belonging to another team', function () {
+    Livewire::test(ResourceOperations::class, ['resource' => $this->applicationA])
+        ->call('cloneTo', $this->destinationA->uuid, $this->environmentB->id)
+        ->assertHasErrors('environment_id');
+
+    expect(Application::count())->toBe(1);
+});
+
 test('moveTo rejects environment belonging to another team', function () {
     Livewire::test(ResourceOperations::class, ['resource' => $this->applicationA])
         ->call('moveTo', $this->environmentB->id);

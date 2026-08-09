@@ -252,9 +252,17 @@ class BackupEdit extends Component
                 ]);
             }
 
+            // Instance databases (e.g. coolify-db) have no project/environment.
+            // Stay on the current page (settings.backup) instead of redirecting.
+            $project = $database->project();
+            $environment = $database->environment;
+            if (! $project || ! $environment) {
+                return null;
+            }
+
             return redirect()->route('project.database.backup.executions', [
-                'project_uuid' => $database->project()->uuid,
-                'environment_uuid' => $database->environment->uuid,
+                'project_uuid' => $project->uuid,
+                'environment_uuid' => $environment->uuid,
                 'database_uuid' => $database->uuid,
                 'backup_uuid' => $this->backup->uuid,
             ]);

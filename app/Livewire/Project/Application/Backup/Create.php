@@ -38,6 +38,32 @@ class Create extends Component
     public function mount(): void
     {
         $this->authorize('view', $this->application);
+        $this->targetLocked = $this->selectedTargetKey !== null;
+        $this->targetKey = $this->selectedTargetKey;
+
+        // When opened from a volume row the target is fixed — skip listing every volume/directory.
+        if ($this->targetLocked && is_string($this->selectedTargetKey)) {
+            $target = $this->selectedTarget();
+            if ($target instanceof LocalPersistentVolume) {
+                $this->targets = collect([[
+                    'key' => 'volume:'.$target->id,
+                    'type' => 'Volume',
+                    'name' => $target->name,
+                ]]);
+            } elseif ($target instanceof LocalFileVolume) {
+                $this->targets = collect([[
+                    'key' => 'directory:'.$target->id,
+                    'type' => 'Directory',
+                    'name' => $target->fs_path,
+                ]]);
+            } else {
+                $this->targets = collect();
+            }
+            $this->loadSelectedBackup();
+
+            return;
+        }
+
         $volumes = $this->application->persistentStorages()
             ->orderBy('name')
             ->get()
@@ -57,7 +83,6 @@ class Create extends Component
                 'name' => $directory->fs_path,
             ]);
         $this->targets = $volumes->concat($directories)->values();
-        $this->targetLocked = $this->selectedTargetKey !== null;
         $this->targetKey = $this->selectedTargetKey ?? data_get($this->targets->first(), 'key');
         $this->loadSelectedBackup();
     }

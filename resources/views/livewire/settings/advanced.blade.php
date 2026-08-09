@@ -1,138 +1,152 @@
 <div>
     <x-slot:title>
         Advanced Settings | Coolify
-        </x-slot>
-        <x-settings.navbar />
-        <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }"
-            class="flex flex-col h-full gap-8 sm:flex-row">
-            <x-settings.sidebar activeMenu="advanced" />
-            <form wire:submit='submit' class="flex flex-col w-full">
-                <div class="flex items-center gap-2">
-                    <h2>Advanced</h2>
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
+    </x-slot>
+
+    <x-settings.layout>
+        <form wire:submit="submit" class="application-settings-form flex min-w-0 flex-col gap-6">
+            {{-- Scope dirty tracking to fields that need an explicit Save. Instant-save
+                 listboxes (API, MCP, telemetry, …) update the snapshot on the server
+                 immediately; without wire:target they briefly flash this bar. --}}
+            <x-unsaved-bar action="submit"
+                targets="custom_dns_servers,allowed_ips,webhook_allowed_internal_hosts,webhook_allow_localhost,domain_connect_private_key" />
+
+            <x-application.settings-section id="access-section" title="Access">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox id="is_registration_enabled" label="Registration"
+                        helper="Allow users to create their own account. When disabled, only administrators can create accounts."
+                        onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Anyone can register'],
+                            ['value' => false, 'label' => 'Registration disabled'],
+                        ]" />
+                    <x-forms.listbox id="disable_two_step_confirmation" label="Destructive action confirmation"
+                        helper="Choose whether destructive actions require password and text confirmation."
+                        onChange="instantSave" :options="[
+                            ['value' => false, 'label' => 'Require two-step confirmation'],
+                            ['value' => true, 'label' => 'Skip two-step confirmation'],
+                        ]" />
                 </div>
-                <div class="pb-4">Advanced settings for your Coolify instance.</div>
+            </x-application.settings-section>
 
-                <div class="flex flex-col gap-1">
-                    @if ($is_registration_enabled)
-                        <div class="md:w-96" wire:key="registration-enabled">
-                            <x-forms.checkbox instantSave id="is_registration_enabled"
-                                helper="Allow users to self-register. If disabled, only administrators can create accounts."
-                                label="Registration Allowed" />
-                        </div>
-                    @else
-                        <div class="flex items-center justify-between gap-2 md:w-96"
-                            wire:key="registration-disabled">
-                            <label class="flex items-center gap-2">
-                                Registration Allowed
-                                <x-helper
-                                    helper="Allow users to self-register. If disabled, only administrators can create accounts.">
-                                </x-helper>
-                            </label>
-                            <x-modal-confirmation title="Enable Registration?" buttonTitle="Enable" isErrorButton
-                                submitAction="toggleRegistration" :actions="[
-                                    'Enables registration for everyone',
-                                ]"
-                                warningMessage="Enabling registration allows anyone to create an account on this instance. Make sure you understand the implications before proceeding."
-                                confirmationText="ENABLE REGISTRATION"
-                                confirmationLabel="Please type the confirmation text to enable registration."
-                                shortConfirmationLabel="Confirmation text" />
-                        </div>
-                    @endif
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="do_not_track"
-                            helper="Opt out of anonymous usage tracking. When enabled, this instance will not report to coolify.io's installation count and will not send error reports to help improve Coolify."
-                            label="Do Not Track" />
-                    </div>
-                    <h4 class="pt-4">DNS Settings</h4>
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_dns_validation_enabled"
-                            helper="Verify that custom domains are correctly configured in DNS before deployment. Prevents deployment failures from DNS misconfigurations."
-                            label="DNS Validation" />
-                    </div>
+            <x-application.settings-section id="dns-section" title="DNS validation">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox id="is_dns_validation_enabled" label="DNS validation"
+                        helper="Validate custom domains before deployment." onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                    <x-forms.input id="custom_dns_servers" label="Custom DNS servers"
+                        helper="Comma-separated resolvers. Leave empty to use system defaults."
+                        placeholder="1.1.1.1, 8.8.8.8" />
+                </div>
+            </x-application.settings-section>
 
-                    <x-forms.input id="custom_dns_servers" label="Custom DNS Servers"
-                        helper="Custom DNS servers for domain validation. Comma-separated list (e.g., 1.1.1.1,8.8.8.8). Leave empty to use system defaults."
-                        placeholder="1.1.1.1,8.8.8.8" />
-                    <h4 class="pt-4">API Settings</h4>
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_api_enabled" label="API Access"
-                            helper="If enabled, authenticated requests to Coolify's REST API will be allowed. Configure API tokens in Security > API Tokens." />
+            @if (isCloud())
+                <x-application.settings-section id="domain-connect-section" title="Domain Connect"
+                    helper="Optional RSA private key used to sign Cloudflare Domain Connect apply URLs on Coolify Cloud. Leave blank to keep the existing key.">
+                    <div class="grid gap-4">
+                        <x-forms.input id="domain_connect_private_key" type="password" allowToPeak
+                            label="Domain Connect private key (PEM)"
+                            helper="Paste a PEM private key to set or rotate. Public key must be published at domainconnect.coolify.io. Env DOMAIN_CONNECT_PRIVATE_KEY is used as a fallback when this is empty."
+                            placeholder="-----BEGIN PRIVATE KEY-----" />
+                        @if (filled(data_get($settings, 'domain_connect_private_key')))
+                            <div class="flex flex-wrap items-center gap-2">
+                                <x-status-badge status="Key configured" type="success" />
+                                <x-forms.button type="button" wire:click="clearDomainConnectPrivateKey" isError>
+                                    Remove key
+                                </x-forms.button>
+                            </div>
+                        @elseif (filled(config('services.domain_connect.private_key')))
+                            <x-status-badge status="Using DOMAIN_CONNECT_PRIVATE_KEY from environment" type="neutral" />
+                        @else
+                            <x-callout type="info" title="Not configured">
+                                Automated Cloudflare DNS (Domain Connect) stays hidden until a private key is set.
+                            </x-callout>
+                        @endif
                     </div>
-                    <x-forms.input id="allowed_ips" label="Allowed IPs for API Access"
-                        helper="Allowed IP addresses or subnets for API access.<br>Supports single IPs (192.168.1.100) and CIDR notation (192.168.1.0/24).<br>Use comma to separate multiple entries.<br>Use 0.0.0.0 or leave empty to allow from anywhere."
-                        placeholder="192.168.1.100,10.0.0.0/8,203.0.113.0/24" />
-                    @if (empty($allowed_ips) || in_array('0.0.0.0', array_map('trim', explode(',', $allowed_ips ?? ''))))
-                        <x-callout type="warning" title="Warning" class="mt-2">
-                            Using 0.0.0.0 (or empty) allows API access from anywhere. This is not recommended for production
-                            environments!
-                        </x-callout>
-                    @endif
-                    <h4 class="pt-4">Webhook/S3 Endpoint Controls</h4>
+                </x-application.settings-section>
+            @endif
+
+            <x-application.settings-section id="api-section" title="API and MCP">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox id="is_api_enabled" label="API access"
+                        helper="Allow authenticated requests to the Coolify REST API." onChange="instantSave"
+                        :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                    <x-forms.listbox id="is_mcp_server_enabled" label="MCP server"
+                        helper="Expose the authenticated Streamable HTTP endpoint at /mcp." onChange="instantSave"
+                        :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                    <div class="lg:col-span-2">
+                        <x-forms.input id="allowed_ips" label="Allowed API IPs"
+                            helper="Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
+                            placeholder="192.168.1.100, 10.0.0.0/8" />
+                    </div>
+                </div>
+                @if ($is_api_enabled && (empty($allowed_ips) || in_array('0.0.0.0', array_map('trim', explode(',', $allowed_ips ?? '')))))
+                    <x-callout type="warning" title="API access is open to every source" class="mt-4">
+                        Restrict the allowlist before using API access on a public production instance.
+                    </x-callout>
+                @endif
+                @if ($is_mcp_server_enabled)
+                    <x-callout type="info" title="MCP endpoint" class="mt-4">
+                        <code>{{ url('/mcp') }}</code> uses Sanctum bearer tokens from Security → API Tokens.
+                    </x-callout>
+                @endif
+            </x-application.settings-section>
+
+            <x-application.settings-section id="endpoint-section" title="Outbound endpoints">
+                <div class="flex flex-col gap-4">
                     <x-forms.textarea id="webhook_allowed_internal_hosts" rows="4"
-                        label="Allowed Internal Webhook/S3 Targets"
-                        helper="Optional instance-level allowlist for webhook and S3 endpoint destinations. Supports exact hostnames, IPs, and CIDR ranges separated by commas or new lines."
-                        placeholder="hooks.company.local, 10.50.0.0/16, 192.168.10.20" />
-                    <div class="md:w-96">
-                        <x-forms.checkbox id="webhook_allow_localhost" label="Allow Localhost Webhook/S3 Targets"
-                            helper="Allows localhost/loopback targets only when they are also listed above. Use only for local development or trusted single-instance setups." />
-                    </div>
-                    <h4 class="pt-4">MCP Server</h4>
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_mcp_server_enabled" label="Enable MCP Server Instance-wide"
-                            helper="Exposes a Streamable HTTP Model Context Protocol endpoint at /mcp for AI clients (Claude Desktop, Cursor, etc.). Authenticates via Sanctum API tokens (Security > API Tokens). Requires API Access to be enabled." />
-                    </div>
-                    @if ($is_mcp_server_enabled)
-                        <x-callout type="info" title="MCP Endpoint" class="mt-2">
-                            Endpoint: <code>{{ url('/mcp') }}</code><br>
-                            Authenticate with <code>Authorization: Bearer &lt;token&gt;</code> using a token created in Security &raquo; API Tokens.
-                        </x-callout>
-                    @endif
-                    <h4 class="pt-4">UI Settings</h4>
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_wire_navigate_enabled" label="SPA Navigation"
-                            helper="Enable single-page application (SPA) style navigation with prefetching on hover. When enabled, page transitions are smoother without full page reloads and pages are prefetched when hovering over links. Disable if you experience navigation issues." />
-                    </div>
-                    <h4 class="pt-4">Confirmation Settings</h4>
-                    <div class="md:w-96">
-                        <x-forms.checkbox instantSave id="is_sponsorship_popup_enabled" label="Show Sponsorship Popup"
-                            helper="Show monthly sponsorship reminders to support Coolify development. Disable to hide these messages permanently." />
+                        label="Allowed internal targets"
+                        helper="Hostnames, IPs, or CIDR ranges separated by commas or new lines."
+                        placeholder="hooks.company.local, 10.50.0.0/16" />
+                    <div class="max-w-md">
+                        <x-forms.listbox id="webhook_allow_localhost" label="Localhost targets"
+                            helper="Loopback targets must also be present in the allowlist." :options="[
+                                ['value' => true, 'label' => 'Allowed'],
+                                ['value' => false, 'label' => 'Blocked'],
+                            ]" />
                     </div>
                 </div>
-                <div class="flex flex-col gap-1">
-                    @if ($disable_two_step_confirmation)
-                        <div class="pb-4 md:w-96" wire:key="two-step-confirmation-enabled">
-                            <x-forms.checkbox instantSave id="disable_two_step_confirmation"
-                                label="Disable Two Step Confirmation"
-                                helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers." />
-                        </div>
-                    @else
-                                    <div class="pb-4 flex items-center justify-between gap-2 md:w-96"
-                                        wire:key="two-step-confirmation-disabled">
-                                        <label class="flex items-center gap-2">
-                                            Disable Two Step Confirmation
-                                            <x-helper
-                                                helper="When disabled, you will not need to confirm actions with a text and user password. This significantly reduces security and may lead to accidental deletions or unwanted changes. Use with extreme caution, especially on production servers.">
-                                            </x-helper>
-                                        </label>
-                                        <x-modal-confirmation title="Disable Two Step Confirmation?" buttonTitle="Disable" isErrorButton
-                                            submitAction="toggleTwoStepConfirmation" :actions="[
-                            'Two Step confirmation will be disabled globally.',
-                            'Disabling two step confirmation reduces security (as anyone can easily delete anything).',
-                            'The risk of accidental actions will increase.',
-                        ]"
-                                            confirmationText="DISABLE TWO STEP CONFIRMATION"
-                                            confirmationLabel="Please type the confirmation text to disable two step confirmation."
-                                            shortConfirmationLabel="Confirmation text" />
-                                    </div>
-                                    <x-callout type="danger" title="Warning!" class="mb-4">
-                                        Disabling two step confirmation reduces security (as anyone can easily delete anything) and
-                                        increases the risk of accidental actions. This is not recommended for production servers.
-                                    </x-callout>
-                    @endif
+            </x-application.settings-section>
+
+            <x-application.settings-section id="interface-section" title="Interface and telemetry">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox id="is_wire_navigate_enabled" label="Navigation"
+                        helper="Prefetch pages and navigate without full reloads." onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'SPA navigation'],
+                            ['value' => false, 'label' => 'Full page navigation'],
+                        ]" />
+                    <x-forms.listbox id="do_not_track" label="Anonymous telemetry"
+                        helper="Control installation counting and error reports." onChange="instantSave" :options="[
+                            ['value' => false, 'label' => 'Enabled'],
+                            ['value' => true, 'label' => 'Disabled'],
+                        ]" />
+                    <x-forms.listbox id="is_sponsorship_popup_enabled" label="Sponsorship reminders"
+                        helper="Show the monthly project sponsorship reminder." onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
                 </div>
-            </form>
-        </div>
+            </x-application.settings-section>
+
+            <x-application.settings-section id="avatar-storage-section" title="Profile picture storage"
+                helper="Choose where compressed user profile pictures are stored. Use S3 for multi-instance or cloud deployments so every application replica can access the same files.">
+                <div class="max-w-md">
+                    <x-forms.listbox id="avatar_storage" label="Storage destination" onChange="instantSave"
+                        :options="$avatar_storage_options" />
+                </div>
+                @if (count($avatar_storage_options) === 1)
+                    <x-callout type="info" title="No usable S3 storage configured" class="mt-4">
+                        Add and test an S3-compatible storage under Storages before selecting it here.
+                    </x-callout>
+                @endif
+            </x-application.settings-section>
+        </form>
+    </x-settings.layout>
 </div>

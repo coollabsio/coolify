@@ -202,3 +202,38 @@ test('service database backup schedules use dedicated general retention and exec
         ->assertDontSee('Number of backups to keep')
         ->assertDontSee('Cleanup Failed Backups');
 });
+
+test('service storage backups page includes schedules from all compose databases', function () {
+    $secondDatabase = ServiceDatabase::create([
+        'service_id' => $this->ownService->id,
+        'name' => 'analytics-db',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+
+    foreach ([$this->ownServiceDatabase, $secondDatabase] as $database) {
+        ScheduledDatabaseBackup::create([
+            'team_id' => $this->teamA->id,
+            'description' => $database->name.' backup',
+            'frequency' => 'daily',
+            'database_id' => $database->id,
+            'database_type' => $database->getMorphClass(),
+        ]);
+    }
+
+    $this->get(route('project.service.volume-backups.index', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]))
+        ->assertOk()
+        ->assertSee('>Database</span>', false)
+        ->assertSee('own-db')
+        ->assertSee('analytics-db')
+        ->assertSee(route('project.service.database.backups', [
+            'project_uuid' => $this->projectA->uuid,
+            'environment_uuid' => $this->environmentA->uuid,
+            'service_uuid' => $this->ownService->uuid,
+            'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+        ]), false);
+});

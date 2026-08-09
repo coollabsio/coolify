@@ -7,7 +7,7 @@ it('uses Alpine entangle to switch add value field immediately when multiline is
         ->toContain('x-data="{ isMultiline: $wire.entangle(\'is_multiline\') }"')
         ->toContain('<template x-if="isMultiline">')
         ->toContain('<template x-if="!isMultiline">')
-        ->toContain('x-model="isMultiline"')
+        ->toContain('id="is_multiline"')
         ->toContain('<x-forms.textarea id="value" label="Value" required class="font-sans" spellcheck />')
         ->toContain('wire:key="env-value-textarea"')
         ->toContain('wire:key="env-value-input"');
@@ -21,18 +21,20 @@ it('uses distinct keyed branches for the edit value field modes', function () {
         ->toContain('wire:key="env-show-value-input-{{ $env->id }}"');
 });
 
+it('lazy-loads decrypted values only when opening the edit modal', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show.blade.php'));
+
+    expect($view)
+        ->toContain('wire:click="loadValues"')
+        ->toContain('wireOpen="editorOpen"')
+        ->toContain('$valuesLoaded')
+        ->toContain('Loading value...');
+});
+
 it('keeps the environment variable delete button compact', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show.blade.php'));
 
     expect($view)->not->toContain('buttonFullWidth="true"');
-});
-
-it('aligns environment variable settings and actions in a responsive row', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show.blade.php'));
-
-    expect($view)
-        ->toContain('class="flex w-full flex-col gap-3 lg:flex-row lg:items-start lg:justify-between"')
-        ->toContain('class="flex w-full justify-end gap-2 lg:w-auto lg:shrink-0"');
 });
 
 it('uses sans font for the developer bulk environment variable editor', function () {
@@ -44,27 +46,27 @@ it('uses sans font for the developer bulk environment variable editor', function
         ->not->toContain('wire:model="variablesPreview" monospace');
 });
 
-it('renders the environment variable search field above the production title', function () {
+it('loads environment variables asynchronously after first paint', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/all.blade.php'));
 
-    expect(strpos($view, 'aria-label="Search environment variables"'))
-        ->toBeLessThan(strpos($view, '<h3>Production Environment Variables</h3>'));
+    expect($view)
+        ->toContain('wire:init="loadEnvironmentVariables"')
+        ->toContain('Loading environment variables...');
 });
 
 it('renders a single no results message for empty environment variable searches', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/all.blade.php'));
 
     expect($view)
-        ->toContain('@if ($this->isSearchActive && ! $this->hasEnvironmentVariables)')
-        ->toContain('<div>No environment variables found.</div>')
-        ->toContain('@else');
+        ->toContain('@if ($this->isSearchActive && $totalRows === 0)')
+        ->toContain('No environment variables found');
 });
 
-it('only renders the production section when production variables are visible', function () {
+it('paginates a unified environment variable table instead of loading every row', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/all.blade.php'));
 
     expect($view)
-        ->toContain('@if ($this->environmentVariables->isNotEmpty() || $this->hardcodedEnvironmentVariables->isNotEmpty())')
-        ->not->toContain('@forelse ($this->environmentVariables as $env)')
-        ->not->toContain('@empty');
+        ->toContain('$this->environmentVariablePageRows')
+        ->toContain('nextEnvironmentVariablePage')
+        ->not->toContain('@forelse ($this->environmentVariables as $env)');
 });

@@ -1,5 +1,18 @@
 <?php
 
+it('uses the themed warning color for resource action icons', function () {
+    foreach ([
+        'application',
+        'database',
+        'service',
+    ] as $resource) {
+        $heading = file_get_contents(resource_path("views/livewire/project/{$resource}/heading.blade.php"));
+
+        expect(substr_count($heading, 'name="play-circle" class="size-3.5 text-warning"'))
+            ->toBeGreaterThanOrEqual(2);
+    }
+});
+
 it('uses native mobile menus for databases and services', function () {
     $applicationHeading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
@@ -19,9 +32,12 @@ it('uses native mobile menus for databases and services', function () {
         ->toContain("value.startsWith('location|')")
         ->toContain('window.location.href = url')
         ->toContain('application-mobile-stop-trigger')
-        ->toContain('application-mobile-deploy-trigger')
         ->toContain('application-mobile-restart-trigger')
-        ->toContain('application-mobile-force-deploy-trigger')
+        ->toContain('wire:click="deploy"')
+        ->toContain('wire:click="force_deploy_without_cache"')
+        ->not->toContain('application-mobile-deploy-trigger')
+        ->not->toContain('application-mobile-force-deploy-trigger')
+        ->not->toContain('Confirm Application Deployment?')
         ->not->toContain('<optgroup label="Actions">');
 
     expect($applicationMobileActions)
@@ -51,7 +67,9 @@ it('uses native mobile menus for databases and services', function () {
         ->toContain('x-model="selected"')
         ->toContain('database-restart-trigger')
         ->toContain('database-stop-trigger')
-        ->toContain('database-start-trigger')
+        ->toContain("\$wire.dispatch('startEvent')")
+        ->not->toContain('database-start-trigger')
+        ->not->toContain('Confirm Database Start?')
         ->toContain('scrollbar hidden min-h-10')
         ->not->toContain('<optgroup label="Links">')
         ->not->toContain('<optgroup label="Actions">')
@@ -86,8 +104,13 @@ it('uses native mobile menus for databases and services', function () {
         ->toContain('x-model="selected"')
         ->toContain('service-restart-trigger')
         ->toContain('service-stop-trigger')
-        ->toContain('service-forceDeploy-trigger')
+        ->toContain("\$wire.dispatch('startEvent')")
+        ->toContain("\$wire.dispatch('forceDeployEvent')")
         ->toContain('service-pullAndRestart-trigger')
+        ->not->toContain('service-start-trigger')
+        ->not->toContain('service-forceDeploy-trigger')
+        ->not->toContain('Confirm Service Deployment?')
+        ->not->toContain('Confirm Service Force Deployment?')
         ->toContain('scrollbar hidden min-h-10')
         ->toContain('mb-4 w-full md:mb-0 md:hidden')
         ->toContain('hidden flex-wrap items-center gap-2 md:flex')

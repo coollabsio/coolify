@@ -17,6 +17,8 @@ class ServiceApplication extends BaseModel
         'human_name',
         'description',
         'fqdn',
+        'redirect',
+        'domain_dns_statuses',
         'ports',
         'exposes',
         'status',
@@ -30,6 +32,22 @@ class ServiceApplication extends BaseModel
         'last_online_at',
         'is_migrated',
     ];
+
+    /**
+     * Internal DNS check cache — not part of the public API surface.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'domain_dns_statuses',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'domain_dns_statuses' => 'array',
+        ];
+    }
 
     protected static function booted()
     {

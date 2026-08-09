@@ -40,6 +40,7 @@ CHANGELOG.md
 /.workspaces
 tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
+ref
 
 # Local generated Lima configs
 .dev/bin/
@@ -47,3 +48,6 @@ tests/v4/Browser/Screenshots
 .dev/lima/ssh.config
 .dev/lima/ssh_key
 .dev/lima/hosts
+
+# Multi-instance local Coolify env files (scripts/dev-instances)
+.dev-instances/

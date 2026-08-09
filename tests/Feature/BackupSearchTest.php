@@ -49,11 +49,20 @@ it('renders frontend-only application backup search data for volume names and fr
     $this->get(route('project.application.backup.index', [...$parameters, 'search' => 'cache']))
         ->assertOk()
         ->assertSee('Cache-Data')
-        ->assertSee('Volume: app-data')
+        ->assertSee('app-data')
         ->assertSee("search: 'cache'", false)
         ->assertSee('x-model="search"', false)
         ->assertSee('x-show=', false)
-        ->assertSee('No scheduled backups match your search.');
+        ->assertSee('No scheduled backups match your search.')
+        ->assertSee('Filter')
+        ->assertSee('Sort')
+        ->assertSee('All targets')
+        ->assertSee('Target A–Z')
+        ->assertSee('filterOpen')
+        ->assertSee('sortOpen')
+        ->assertDontSee('class="font-mono text-xs">daily', false)
+        ->assertDontSee('backup-type-filter-trigger', false)
+        ->assertDontSee('backup-sort-trigger', false);
 });
 
 it('renders frontend-only database backup search data for database names and frequencies', function () {
@@ -100,15 +109,15 @@ it('renders frontend-only database backup search data for database names and fre
 
     $this->get(route('project.database.backup.index', [...$parameters, 'search' => '0 3']))
         ->assertOk()
-        ->assertSee('<h3 class="font-semibold">0 3 * * 1</h3>', false)
-        ->assertSee('<h3 class="font-semibold">daily</h3>', false)
-        ->assertSee('S3: Archive-Bucket')
+        ->assertSee('0 3 * * 1')
+        ->assertSee('daily')
+        ->assertSee('Archive-Bucket')
         ->assertSee('archive-bucket', false)
         ->assertSee('backup.s3_storage.includes(query)', false)
-        ->assertSee('Search by database name, frequency, or S3 storage...')
+        ->assertSee('Search backup schedules')
         ->assertSee('x-model="search"', false)
         ->assertSee('x-show=', false)
-        ->assertSee('No scheduled backups match your search.');
+        ->assertSee('No matching backup schedules');
 });
 
 it('renders unavailable S3 storage only for S3-enabled database backups', function () {
@@ -147,9 +156,11 @@ it('renders unavailable S3 storage only for S3-enabled database backups', functi
 
     $response = $this->get(route('project.database.backup.index', $parameters))
         ->assertOk()
-        ->assertSee('S3: Storage unavailable');
+        ->assertSee('Unavailable')
+        ->assertSee('Local only');
 
-    expect(substr_count($response->getContent(), 'S3:'))->toBe(1);
+    // Only the S3-enabled schedule without a linked storage shows "Unavailable".
+    expect(substr_count($response->getContent(), 'Unavailable'))->toBe(1);
 });
 
 function createBackupSearchApplication(Team $team): Application
