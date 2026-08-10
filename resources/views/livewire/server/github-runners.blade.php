@@ -8,6 +8,7 @@
         <div class="w-full">
             <div class="flex items-center gap-2">
                 <h2>GitHub Actions Runners</h2>
+                <x-forms.button type="submit" form="github-runner-config-form" canGate="update" :canResource="$server">Save</x-forms.button>
                 @if ($this->config)
                     <x-forms.button wire:click="toggleEnabled" canGate="update" :canResource="$server">
                         {{ $this->config->is_enabled ? 'Disable' : 'Enable' }}
@@ -96,7 +97,7 @@
             @endif
 
             {{-- Configuration Form --}}
-            <form wire:submit="submit">
+            <form id="github-runner-config-form" wire:submit="submit">
                 <div class="flex flex-col gap-4">
                     <div>
                         <label for="selectedGithubAppId" class="block text-sm font-medium">GitHub App</label>
@@ -153,16 +154,15 @@
                             helper="Pin to a specific runner version (e.g. 2.321.0). Leave empty for latest." />
                     </div>
 
-                    <div class="flex items-center gap-2 mt-2">
-                        <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
-                        @if ($this->config)
+                    @if ($this->config)
+                        <div class="flex items-center gap-2 mt-2">
                             <x-modal-confirmation title="Delete Runner Configuration?" buttonTitle="Delete Configuration"
                                 submitAction="deleteConfig"
                                 :actions="['This will remove the runner configuration from this server.', 'Active runners will not be affected until they complete.']"
                                 :confirmWithText="false" :confirmWithPassword="false"
                                 step2ButtonText="Delete Configuration" />
-                        @endif
-                    </div>
+                        </div>
+                    @endif
                 </div>
             </form>
 
