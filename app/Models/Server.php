@@ -934,6 +934,11 @@ $schema://$host {
         return $this->settings->is_metrics_enabled;
     }
 
+    public function isTrafficAnalyticsEnabled(): bool
+    {
+        return (bool) data_get($this, 'settings.is_traffic_analytics_enabled', false);
+    }
+
     public function isServerApiEnabled()
     {
         return $this->settings->is_sentinel_enabled;

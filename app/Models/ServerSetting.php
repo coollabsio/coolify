@@ -26,6 +26,7 @@ use OpenApi\Attributes as OA;
         'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
+        'is_traffic_analytics_enabled' => ['type' => 'boolean'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -100,6 +101,8 @@ class ServerSetting extends Model
         'deployment_queue_limit',
         'disable_application_image_retention',
         'connection_timeout',
+        'is_traffic_analytics_enabled',
+        'geoip_maxmind_license_key',
     ];
 
     protected $casts = [
@@ -113,6 +116,8 @@ class ServerSetting extends Model
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
+        'is_traffic_analytics_enabled' => 'boolean',
+        'geoip_maxmind_license_key' => 'encrypted',
     ];
 
     /**
@@ -127,6 +132,7 @@ class ServerSetting extends Model
         'logdrain_axiom_api_key',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
+        'geoip_maxmind_license_key',
     ];
 
     protected static function booted()
