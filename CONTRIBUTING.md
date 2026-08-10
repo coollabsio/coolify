@@ -1,246 +1,231 @@
 # Contributing to Coolify
+We’re happy that you’re interested in contributing to Coolify!
 
-> "First, thanks for considering contributing to my project. It really means a lot!" - [@andrasbacsai](https://github.com/andrasbacsai)
+There are many ways to help:
+- Answer questions in GitHub Discussions or Discord
+- Report reproducible bugs
+- Submit pull requests to fix issues
+- Add new one-click services
+- Improve documentation
 
-You can ask for guidance anytime on our [Discord server](https://coollabs.io/discord) in the `#contribute` channel.
+Coolify is a PaaS used by 400,000+ people worldwide and maintained by two active maintainers. Contributions are welcome — but **alignment matters more than quantity**.
 
-To understand the tech stack, please refer to the [Tech Stack](TECH_STACK.md) document.
-
-## Table of Contents
-
-1. [Setup Development Environment](#1-setup-development-environment)
-2. [Verify Installation](#2-verify-installation-optional)
-3. [Fork and Setup Local Repository](#3-fork-and-setup-local-repository)
-4. [Set up Environment Variables](#4-set-up-environment-variables)
-5. [Start Coolify](#5-start-coolify)
-6. [Start Development](#6-start-development)
-7. [Create a Pull Request](#7-create-a-pull-request)
-8. [Development Notes](#development-notes)
-9. [Resetting Development Environment](#resetting-development-environment)
-10. [Additional Contribution Guidelines](#additional-contribution-guidelines)
-
-## 1. Setup Development Environment
-
-Follow the steps below for your operating system:
-
-<details>
-<summary><strong>Windows</strong></summary>
-
-1. Install `docker-ce`, Docker Desktop (or similar):
-   - Docker CE (recommended):
-     - Install Windows Subsystem for Linux v2 (WSL2) by following this guide: [Install WSL](https://learn.microsoft.com/en-us/windows/wsl/install?ref=coolify)
-     - After installing WSL2, install Docker CE for your Linux distribution by following this guide: [Install Docker Engine](https://docs.docker.com/engine/install/?ref=coolify)
-     - Make sure to choose the appropriate Linux distribution (e.g., Ubuntu) when following the Docker installation guide
-   - Install Docker Desktop (easier):
-     - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/?ref=coolify)
-     - Ensure WSL2 backend is enabled in Docker Desktop settings
-
-2. Install Spin:
-   - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#download-and-install-spin-into-wsl2?ref=coolify)
-
-</details>
-
-<details>
-<summary><strong>MacOS</strong></summary>
-
-1. Install Orbstack, Docker Desktop (or similar):
-   - Orbstack (recommended, as it is a faster and lighter alternative to Docker Desktop):
-     - Download and install [Orbstack](https://docs.orbstack.dev/quick-start#installation?ref=coolify)
-   - Docker Desktop:
-     - Download and install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/?ref=coolify)
-
-2. Install Spin:
-   - Follow the instructions to install Spin on MacOS from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-macos/#download-and-install-spin?ref=coolify)
-
-</details>
-
-<details>
-<summary><strong>Linux</strong></summary>
-
-1. Install Docker Engine, Docker Desktop (or similar):
-   - Docker Engine (recommended, as there is no VM overhead):
-     - Follow the official [Docker Engine installation guide](https://docs.docker.com/engine/install/?ref=coolify) for your Linux distribution
-   - Docker Desktop:
-     - If you want a GUI, you can use [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/?ref=coolify)
-
-2. Install Spin:
-   - Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux#configure-docker-permissions?ref=coolify)
-
-</details>
-
-## 2. Verify Installation (Optional)
-
-After installing Docker (or Orbstack) and Spin, verify the installation:
-
-1. Open a terminal or command prompt
-2. Run the following commands:
-   ```bash
-   docker --version
-   spin --version
-   ```
-   You should see version information for both Docker and Spin.
-
-## 3. Fork and Setup Local Repository
-
-1. Fork the [Coolify](https://github.com/coollabsio/coolify) repository to your GitHub account.
-
-2. Install a code editor on your machine (choose one):
-
-   | Editor | Platform | Download Link |
-   |--------|----------|---------------|
-   | Visual Studio Code (recommended free) | Windows/macOS/Linux | [Download](https://code.visualstudio.com/download?ref=coolify) |
-   | Cursor (recommended but paid) | Windows/macOS/Linux | [Download](https://www.cursor.com/?ref=coolify) |
-   | Zed (very fast) | macOS/Linux | [Download](https://zed.dev/download?ref=coolify) |
-
-3. Clone the Coolify Repository from your fork to your local machine
-   - Use `git clone` in the command line, or
-   - Use GitHub Desktop (recommended):
-     - Download and install from [https://desktop.github.com/](https://desktop.github.com/?ref=coolify)
-     - Open GitHub Desktop and login with your GitHub account
-     - Click on `File` -> `Clone Repository` select `github.com` as the repository location, then select your forked Coolify repository, choose the local path and then click `Clone`
-
-4. Open the cloned Coolify Repository in your chosen code editor.
-
-## 4. Set up Environment Variables
-
-1. In the Code Editor, locate the `.env.development.example` file in the root directory of your local Coolify repository.
-2. Duplicate the `.env.development.example` file and rename the copy to `.env`.
-3. Open the new `.env` file and review its contents. Adjust any environment variables as needed for your development setup.
-4. If you encounter errors during database migrations, update the database connection settings in your `.env` file. Use the IP address or hostname of your PostgreSQL database container. You can find this information by running `docker ps` after executing `spin up`.
-5. Save the changes to your `.env` file.
-
-## 5. Start Coolify
-
-1. Open a terminal in the local Coolify directory.
-2. Run the following command in the terminal (leave that terminal open):
-   ```bash
-   spin up
-   ```
-
-> [!NOTE]
-> You may see some errors, but don't worry; this is expected.
-
-3. If you encounter permission errors, especially on macOS, use:
-   ```bash
-   sudo spin up
-   ```
-
-> [!NOTE]
-> If you change environment variables afterwards or anything seems broken, press Ctrl + C to stop the process and run `spin up` again.
-
-## 6. Start Development
-
-1. Access your Coolify instance:
-   - URL: `http://localhost:8000`
-   - Login: `test@example.com`
-   - Password: `password`
-
-2. Additional development tools:
-
-   | Tool | URL | Note |
-   |------|-----|------|
-   | Laravel Horizon (scheduler) | `http://localhost:8000/horizon` | Only accessible when logged in as root user |
-   | Mailpit (email catcher) | `http://localhost:8025` | |
-   | Telescope (debugging tool) | `http://localhost:8000/telescope` | Disabled by default |
-
-> [!NOTE]
-> To enable Telescope, add the following to your `.env` file:
-> ```env
-> TELESCOPE_ENABLED=true
-> ```
-
-## 7. Create a Pull Request
-
-1. After making changes or adding a new service:
-   - Commit your changes to your forked repository.
-   - Push the changes to your GitHub account.
-
-2. Creating the Pull Request (PR):
-   - Navigate to the main Coolify repository on GitHub.
-   - Click the "Pull requests" tab.
-   - Click the green "New pull request" button.
-   - Choose your fork and branch as the compare branch.
-   - Click "Create pull request".
-
-3. Filling out the PR details:
-   - Give your PR a descriptive title.
-   - Use the Pull Request Template provided and fill in the details.
+This guide explains **what kind of contributions are likely to be accepted** and how to submit them properly. Following it saves time for both you and the maintainers.
 
 > [!IMPORTANT]
-> Always set the base branch for your PR to the `next` branch of the Coolify repository, not the `main` branch.
+> These guidelines may feel stricter than in many open-source projects. That is intentional.
+> Clear structure and boundaries prevent maintainer burnout and keep the project sustainable long-term.
 
-4. Submit your PR:
-   - Review your changes one last time.
-   - Click "Create pull request" to submit.
 
-> [!NOTE]
-> Make sure your PR is out of draft mode as soon as it's ready for review. PRs that are in draft mode for a long time may be closed by maintainers.
+## High-Level Expectations
+- Coolify has a clear product direction.
+- Ownership and decisions are centralized.
+- Review capacity is limited.
+- Not every contribution will be accepted — even if technically correct.
 
-After submission, maintainers will review your PR and may request changes or provide feedback.
+This is normal for a two-maintainer project.
 
-## Development Notes
 
-When working on Coolify, keep the following in mind:
+## State of the Project
+Coolify is currently at v4. While v4 is stable, it has some limitations, including:
+- Limited scaling support
+- A more complex user experience
+- Other smaller issues that need refinement
 
-1. **Database Migrations**: After switching branches or making changes to the database structure, always run migrations:
-   ```bash
-   docker exec -it coolify php artisan migrate
-   ```
+These limitations will be addressed in Coolify v5, which is in the planning stage. Because of this, major features, architectural changes, or significant UI changes will not be accepted for v4 at this stage.
 
-2. **Resetting Development Setup**: To reset your development setup to a clean database with default values:
-   ```bash
-   docker exec -it coolify php artisan migrate:fresh --seed
-   ```
+We welcome contributions that help stabilize v4 for a bug free experience.
 
-3. **Troubleshooting**: If you encounter unexpected behavior, ensure your database is up-to-date with the latest migrations and if possible reset the development setup to eliminate any environment-specific issues.
 
-> [!IMPORTANT]
-> Forgetting to migrate the database can cause problems, so make it a habit to run migrations after pulling changes or switching branches.
+## What Makes a Strong Contribution
+The following types of contributions are most likely to be accepted:
 
-## Resetting Development Environment
+#### Code Quality and Testing
+All contributions must adhere to the highest standards of code quality and testing:
 
-If you encounter issues or break your database or something else, follow these steps to start from a clean slate (works since `v4.0.0-beta.342`):
+If your change is small and obvious (typo fix, small bug, minor docs update), you may open a pull request directly.
 
-1. Stop all running containers `ctrl + c`.
 
-2. Remove all Coolify containers:
-   ```bash
-   docker rm coolify coolify-db coolify-redis coolify-realtime coolify-testing-host coolify-minio coolify-vite-1 coolify-mail
-   ```
+If you are fixing a bug in `file.yaml`, do not:
+- Reformat unrelated files
+- Refactor unrelated code
+- Fix style issues elsewhere
+- Combine multiple unrelated changes
 
-3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on your machine, in that case remove the prefix from the command):
-   ```bash
-   docker volume rm coolify_dev_backups_data coolify_dev_postgres_data coolify_dev_redis_data coolify_dev_coolify_data coolify_dev_minio_data
-   ```
+Even “improvements” increase review complexity.
 
-4. Remove unused images:
-   ```bash
-   docker image prune -a
-   ```
+**One pull request = one logical change.**
 
-5. Start Coolify again:
-   ```bash
-   spin up
-   ```
+If you want to refactor or clean up code, discuss it first and submit it separately.
 
-6. Run database migrations and seeders:
-   ```bash
-   docker exec -it coolify php artisan migrate:fresh --seed
-   ```
 
-After completing these steps, you'll have a fresh development setup.
+## Discussion Is Required for Larger Changes
+For anything beyond a small fix, you must discuss it before opening a pull request.
 
-> [!IMPORTANT]
-> Always run database migrations and seeders after switching branches or pulling updates to ensure your local database structure matches the current codebase and includes necessary seed data.
+This includes:
+- New features
+- UI/UX changes
+- Changes to default behavior
+- Refactors or cleanup work
+- Performance rewrites
+- Architectural changes
+- Changes touching many files
 
-## Additional Contribution Guidelines
+Discussion happens in GitHub Discussions: https://github.com/coollabsio/coolify/discussions/categories/general
 
-### Contributing a New Service
+Pull requests introducing major changes without prior discussion will be closed without review.
 
-To add a new service to Coolify, please refer to our documentation:
-[Adding a New Service](https://coolify.io/docs/get-started/contribute/service)
+This ensures alignment before significant work is done.
 
-### Contributing to Documentation
 
-To contribute to the Coolify documentation, please refer to this guide:
-[Contributing to the Coolify Documentation](https://github.com/coollabsio/documentation-coolify/blob/main/readme.md)
+## What This Project Is Not
+To set clear expectations:
+- Coolify is not optimized for first-time open-source contributors
+- We do not provide beginner-focused mentorship issues
+- Large unsolicited changes are unlikely to be accepted
+- Broad refactors or style rewrites are not helpful
+- Low-effort AI-generated pull requests will be closed
+
+AI usage is allowed. However, contributors must fully understand what their changes do and why.
+
+Clear expectations help everyone use their time effectively.
+
+
+# Ways to Contribute
+## 1. Support Contributions
+We use Discord for most support requests and GitHub Discussions for help.
+
+### Requesting Support
+If you need help:
+- Provide complete and detailed information
+- Include logs, screenshots, and steps to reproduce
+- Be respectful — support is voluntary
+
+Do not ping people for attention. They respond when available.
+
+### Providing Support
+If you help others:
+- Verify your information before sharing
+- Be patient and respectful
+- Remember that not everyone has the same experience level
+
+
+## 2. Bug Report Contributions
+Create a GitHub issue **only** if:
+- The bug is reproducible
+- You have confirmed no existing issue already covers it
+
+For questions or general help, use GitHub Discussions or the Discord support channel.
+
+Bug reports must include:
+- Clear reproduction steps
+- Expected result
+- Actual result
+
+Incomplete reports and reports generated using AI may be closed.
+
+
+## 3. Code Contributions
+Maintainers may close pull requests at their discretion, without explanation.
+
+### Issue Requirement
+Every pull request should reference and close an Issue or Discussion.
+
+If none exists, create one first.
+
+Pull requests without linked issue or discussions may not be reviewed and can be closed at any time.
+
+
+## Commit Message Format
+All commits must start with an action and category:
+- `fix(ui):` — UI-related fixes
+- `feat(api):` — API-related changes
+- `feat(service):` — One-click service changes
+
+Examples:
+- `fix(api): version endpoint returns wrong data`
+- `feat(service): add supabase`
+
+Use the commit description only for concise context.
+
+Walls of text listing every change in description will be rejected.
+
+
+## Pull Request Title Format
+Pull request titles follow the same format:
+- `fix(ui):`
+- `feat(api):`
+- `feat(service):`
+
+Examples:
+- `fix(api): version endpoint returns wrong data`
+- `feat(service): add supabase`
+
+
+## AI Usage Disclosure
+If AI tools were used at any stage, mention it in the pull request description.
+
+AI is allowed.
+
+However:
+- You must understand every change
+- You must verify correctness
+- You must ensure it follows project patterns
+
+AI-generated pull requests without clear understanding will be closed.
+
+
+## Test Before Submitting
+Before submitting a pull request:
+- Manually test your changes thoroughly
+- Verify they work in a clean environment
+- Provide detailed testing steps in the PR description
+
+If maintainers cannot reproduce working behavior, the PR will be closed without further review.
+
+
+## Submitting a Pull Request
+- GitHub will auto-populate the PR template
+- The contributor agreement in PR description must remain intact
+- Pull requests without the contributor agreement will be closed
+- All pull requests must target the `next` branch
+- PRs targeting other branches will be closed without review
+
+
+## FAQ
+**Q: Should I ask before fixing a typo or a small bug?**  
+A: No, small, obvious fixes like typos or narrowly-scoped bug fixes can be submitted as a PR directly.
+
+**Q: I have an idea for a new feature.**  
+A: Awesome! Discuss it first in GitHub Discussions or Discord. **Do not** open a PR for new features without prior alignment.
+
+**Q: My PR was closed without detailed feedback.**  
+A: This usually means it didn’t align with the project’s direction, required more review bandwidth than available, or targeted major changes not allowed in v4. 
+
+**Q: Can I work on an open issue?**  
+A: Comment on the issue first to confirm it’s still relevant and that no one else is actively working on it. For anything beyond a small fix, discuss your approach before implementing.
+
+**Q: I noticed code that could be cleaned up while working on my change.**  
+A: Focus only on your stated goal. Cleanups or refactors should be submitted as separate PRs after discussion.
+
+**Q: Can I use AI to help with my PR?**  
+A: Yes, AI-assisted contributions are allowed. But you must fully understand and verify the changes. PRs that appear to be generated by AI without context understanding will be closed.
+
+**Q: My PR was closed without review. Can I submit a new one?**  
+A: Yes, but keep in mind a PR closure is feedback, not a rejection of your effort. It usually means the PR didn’t match the project goals or guidelines. Address these issues first — repeating the same approach may hurt your standing with maintainers.
+
+
+# Development Guides
+## Local Development
+To build and run Coolify locally, see: [Development](./DEVELOPMENT.md)
+
+### macOS Development with Lima
+Mac users can use [Lima](https://lima-vm.io/) to run a lightweight Linux virtual machine for local Coolify development. This is useful if you prefer a Linux-based Docker environment on macOS.
+
+After creating and starting a Lima VM, run the normal local development commands from inside the VM as described in [Development](./DEVELOPMENT.md).
+
+## Adding a New Service
+To add a new one-click service, follow: https://coolify.io/docs/get-started/contribute/service
+
+## Contributing to Documentation
+To contribute to documentation, see: https://coolify.io/docs/get-started/contribute/documentation

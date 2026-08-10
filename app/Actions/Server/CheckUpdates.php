@@ -13,6 +13,9 @@ class CheckUpdates
 
     public function handle(Server $server)
     {
+        $osId = 'unknown';
+        $packageManager = null;
+
         try {
             if ($server->serverStatus() === false) {
                 return [
@@ -90,6 +93,16 @@ class CheckUpdates
                     $output = instant_remote_process(['LANG=C apt list --upgradable 2>/dev/null'], $server);
 
                     $out = $this->parseAptOutput($output);
+                    $out['osId'] = $osId;
+                    $out['package_manager'] = $packageManager;
+
+                    return $out;
+                case 'pacman':
+                    // Sync database first, then check for updates
+                    // Using -Sy to refresh package database before querying available updates
+                    instant_remote_process(['pacman -Sy'], $server);
+                    $output = instant_remote_process(['pacman -Qu 2>/dev/null'], $server);
+                    $out = $this->parsePacmanOutput($output);
                     $out['osId'] = $osId;
                     $out['package_manager'] = $packageManager;
 
@@ -218,5 +231,46 @@ class CheckUpdates
             'total_updates' => count($updates),
             'updates' => $updates,
         ];
+    }
+
+    private function parsePacmanOutput(string $output): array
+    {
+        $updates = [];
+        $unparsedLines = [];
+        $lines = explode("\n", $output);
+
+        foreach ($lines as $line) {
+            if (empty($line)) {
+                continue;
+            }
+            // Format: package current_version -> new_version
+            if (preg_match('/^(\S+)\s+(\S+)\s+->\s+(\S+)$/', $line, $matches)) {
+                $updates[] = [
+                    'package' => $matches[1],
+                    'current_version' => $matches[2],
+                    'new_version' => $matches[3],
+                    'architecture' => 'unknown',
+                    'repository' => 'unknown',
+                ];
+            } else {
+                // Log unmatched lines for debugging purposes
+                $unparsedLines[] = $line;
+            }
+        }
+
+        $result = [
+            'total_updates' => count($updates),
+            'updates' => $updates,
+        ];
+
+        // Include unparsed lines in the result for debugging if any exist
+        if (! empty($unparsedLines)) {
+            $result['unparsed_lines'] = $unparsedLines;
+            \Illuminate\Support\Facades\Log::debug('Pacman output contained unparsed lines', [
+                'unparsed_lines' => $unparsedLines,
+            ]);
+        }
+
+        return $result;
     }
 }

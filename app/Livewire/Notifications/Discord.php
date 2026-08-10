@@ -2,16 +2,18 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\DiscordNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Discord extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     public Team $team;
 
@@ -20,7 +22,7 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $discordEnabled = false;
 
-    #[Validate(['url', 'nullable'])]
+    #[Validate(['nullable', new SafeWebhookUrl])]
     public ?string $discordWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -63,6 +65,9 @@ class Discord extends Component
     public bool $serverPatchDiscordNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $traefikOutdatedDiscordNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $discordPingEnabled = true;
 
     public function mount()
@@ -98,6 +103,7 @@ class Discord extends Component
             $this->settings->server_reachable_discord_notifications = $this->serverReachableDiscordNotifications;
             $this->settings->server_unreachable_discord_notifications = $this->serverUnreachableDiscordNotifications;
             $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
+            $this->settings->traefik_outdated_discord_notifications = $this->traefikOutdatedDiscordNotifications;
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
 
@@ -105,7 +111,9 @@ class Discord extends Component
             refreshSession();
         } else {
             $this->discordEnabled = $this->settings->discord_enabled;
-            $this->discordWebhookUrl = $this->settings->discord_webhook_url;
+            $this->discordWebhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->discord_webhook_url
+                : null;
 
             $this->deploymentSuccessDiscordNotifications = $this->settings->deployment_success_discord_notifications;
             $this->deploymentFailureDiscordNotifications = $this->settings->deployment_failure_discord_notifications;
@@ -120,6 +128,7 @@ class Discord extends Component
             $this->serverReachableDiscordNotifications = $this->settings->server_reachable_discord_notifications;
             $this->serverUnreachableDiscordNotifications = $this->settings->server_unreachable_discord_notifications;
             $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
+            $this->traefikOutdatedDiscordNotifications = $this->settings->traefik_outdated_discord_notifications;
 
             $this->discordPingEnabled = $this->settings->discord_ping_enabled;
         }

@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->bigInteger('hetzner_server_id')->nullable()->after('id');
-        });
+        if (! Schema::hasColumn('servers', 'hetzner_server_id')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->bigInteger('hetzner_server_id')->nullable()->after('id');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('servers', function (Blueprint $table) {
-            $table->dropColumn('hetzner_server_id');
-        });
+        if (Schema::hasColumn('servers', 'hetzner_server_id')) {
+            Schema::table('servers', function (Blueprint $table) {
+                $table->dropColumn('hetzner_server_id');
+            });
+        }
     }
 };

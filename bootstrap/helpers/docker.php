@@ -5,11 +5,42 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
+
+/**
+ * Stable short hash for compose service names used in Traefik router/service IDs.
+ * Keeps api.test vs api-test distinct after label-safe normalization.
+ */
+function traefikServiceNameHash(string $serviceName): string
+{
+    return substr(md5($serviceName), 0, 4);
+}
+
+/**
+ * Label-safe Traefik router/service name segment for a compose service.
+ * Dots (and other non [a-zA-Z0-9-]) break Docker/Traefik label paths; always append a hash
+ * so normalized names like api.test and api-test never collide.
+ */
+function traefikSafeServiceNameSegment(string $serviceName): string
+{
+    $normalized = str($serviceName)
+        ->replace('.', '-')
+        ->replace('_', '-')
+        ->replaceMatches('/[^a-zA-Z0-9-]+/', '-')
+        ->replaceMatches('/-+/', '-')
+        ->trim('-')
+        ->toString();
+
+    if ($normalized === '') {
+        $normalized = 'service';
+    }
+
+    return $normalized.'-'.traefikServiceNameHash($serviceName);
+}
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
@@ -17,24 +48,44 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
     if (! $server->isSwarm()) {
         $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
         $containers = format_docker_command_output_to_json($containers);
+
         $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {
             $labels = data_get($container, 'Labels');
-            if (! str($labels)->contains('coolify.pullRequestId=')) {
-                data_set($container, 'Labels', $labels.",coolify.pullRequestId={$pullRequestId}");
+            $containerName = data_get($container, 'Names');
+            $hasPrLabel = str($labels)->contains('coolify.pullRequestId=');
+            $prLabelValue = null;
 
+            if ($hasPrLabel) {
+                preg_match('/coolify\.pullRequestId=(\d+)/', $labels, $matches);
+                $prLabelValue = $matches[1] ?? null;
+            }
+
+            // Treat pullRequestId=0 or missing label as base deployment (convention: 0 = no PR)
+            $isBaseDeploy = ! $hasPrLabel || (int) $prLabelValue === 0;
+
+            // If we're looking for a specific PR and this is a base deployment, exclude it
+            if ($pullRequestId !== null && $pullRequestId !== 0 && $isBaseDeploy) {
+                return null;
+            }
+
+            // If this is a base deployment, include it when not filtering for PRs
+            if ($isBaseDeploy) {
                 return $container;
             }
+
             if ($includePullrequests) {
                 return $container;
             }
-            if (str($labels)->contains("coolify.pullRequestId=$pullRequestId")) {
+            if ($pullRequestId !== null && $pullRequestId !== 0 && str($labels)->contains("coolify.pullRequestId={$pullRequestId}")) {
                 return $container;
             }
 
             return null;
         });
 
-        return $containers->filter();
+        $filtered = $containers->filter();
+
+        return $filtered;
     }
 
     return $containers;
@@ -53,6 +104,36 @@ function getCurrentServiceContainerStatus(Server $server, int $id): Collection
     return $containers;
 }
 
+function getCurrentDatabaseContainerStatus(Server $server, int $id): Collection
+{
+    $containers = collect([]);
+    if (! $server->isSwarm()) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.databaseId={$id}' --format '{{json .}}' "], $server);
+        $containers = format_docker_command_output_to_json($containers);
+
+        return $containers->filter();
+    }
+
+    return $containers;
+}
+
+function getCurrentServiceSubContainerStatus(Server $server, int $id, string $name): Collection
+{
+    return filterServiceSubContainersByName(getCurrentServiceContainerStatus($server, $id), $name);
+}
+
+function filterServiceSubContainersByName(Collection $containers, string $name): Collection
+{
+    return $containers->filter(function ($container) use ($name) {
+        $labels = data_get($container, 'Labels', []);
+        if (is_string($labels)) {
+            $labels = format_docker_labels_to_json($labels);
+        }
+
+        return collect($labels)->get('coolify.name') === $name;
+    })->values();
+}
+
 function format_docker_command_output_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);
@@ -66,7 +147,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         return $outputLines
             ->reject(fn ($line) => empty($line))
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return collect([]);
     }
 }
@@ -103,33 +184,44 @@ function format_docker_envs_to_json($rawOutput)
 
             return [$env[0] => $env[1]];
         });
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return collect([]);
     }
 }
 function checkMinimumDockerEngineVersion($dockerVersion)
 {
-    $majorDockerVersion = str($dockerVersion)->before('.')->value();
-    $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.')->value();
+    $majorDockerVersion = (int) str($dockerVersion)->before('.')->value();
+    $requiredDockerVersion = (int) str(config('constants.docker.minimum_required_version'))->before('.')->value();
     if ($majorDockerVersion < $requiredDockerVersion) {
         $dockerVersion = null;
     }
 
     return $dockerVersion;
 }
+function escapeShellValue(string $value): string
+{
+    return "'".str_replace("'", "'\\''", $value)."'";
+}
+
 function executeInDocker(string $containerId, string $command)
 {
-    return "docker exec {$containerId} bash -c '{$command}'";
-    // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
+    $escapedCommand = str_replace("'", "'\\''", $command);
+
+    return "docker exec {$containerId} bash -c '{$escapedCommand}'";
+}
+
+function buildContainerStatusCommand(Server $server, string $container_id): string
+{
+    if ($server->isSwarm()) {
+        return 'docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ";
+    }
+
+    return "docker inspect --format '{{json .}}' ".escapeshellarg($container_id);
 }
 
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
-    if ($server->isSwarm()) {
-        $container = instant_remote_process(["docker service ls --filter 'name={$container_id}' --format '{{json .}}' "], $server, $throwError);
-    } else {
-        $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
-    }
+    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError);
     if (! $container) {
         return 'exited';
     }
@@ -211,7 +303,7 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, st
     $labels->push('coolify.version='.config('constants.coolify.version'));
     $labels->push('coolify.'.$type.'Id='.$id);
     $labels->push("coolify.type=$type");
-    $labels->push('coolify.name='.$name);
+    $labels->push('coolify.name='.Str::slug($name));
     $labels->push('coolify.resourceName='.Str::slug($resourceName));
     $labels->push('coolify.projectName='.Str::slug($projectName));
     $labels->push('coolify.serviceName='.Str::slug($subName ?? $resourceName));
@@ -229,12 +321,12 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, st
 
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
-    if ($resource->getMorphClass() === \App\Models\ServiceApplication::class) {
+    if ($resource->getMorphClass() === ServiceApplication::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'service.server');
         $environment_variables = data_get($resource, 'service.environment_variables');
         $type = $resource->serviceType();
-    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
+    } elseif ($resource->getMorphClass() === Application::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'destination.server');
         $environment_variables = data_get($resource, 'environment_variables');
@@ -292,12 +384,56 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
                 $LOGTO_ADMIN_ENDPOINT->value.':3002',
             ]);
             break;
+        case $type?->contains('garage'):
+            $GARAGE_S3_API_URL = $variables->where('key', 'GARAGE_S3_API_URL')->first();
+            $GARAGE_WEB_URL = $variables->where('key', 'GARAGE_WEB_URL')->first();
+            $GARAGE_ADMIN_URL = $variables->where('key', 'GARAGE_ADMIN_URL')->first();
+
+            if (is_null($GARAGE_S3_API_URL) || is_null($GARAGE_WEB_URL) || is_null($GARAGE_ADMIN_URL)) {
+                return collect([]);
+            }
+
+            if (str($GARAGE_S3_API_URL->value ?? '')->isEmpty()) {
+                $GARAGE_S3_API_URL->update([
+                    'value' => generateUrl(server: $server, random: 's3-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_WEB_URL->value ?? '')->isEmpty()) {
+                $GARAGE_WEB_URL->update([
+                    'value' => generateUrl(server: $server, random: 'web-'.$uuid, forceHttps: true),
+                ]);
+            }
+            if (str($GARAGE_ADMIN_URL->value ?? '')->isEmpty()) {
+                $GARAGE_ADMIN_URL->update([
+                    'value' => generateUrl(server: $server, random: 'admin-'.$uuid, forceHttps: true),
+                ]);
+            }
+            $payload = collect([
+                $GARAGE_S3_API_URL->value.':3900',
+                $GARAGE_WEB_URL->value.':3902',
+                $GARAGE_ADMIN_URL->value.':3903',
+            ]);
+            break;
     }
 
     return $payload;
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+/**
+ * @param  Collection<int, string>|null  $noindex_domains
+ */
+function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
+{
+    if (blank($noindex_domains)) {
+        return false;
+    }
+
+    return $noindex_domains
+        ->map(fn (string $noindex_domain) => ValidationPatterns::normalizeApplicationDomainUrl($noindex_domain))
+        ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
+}
+
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -329,7 +465,14 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
             $port = $predefinedPort;
         }
         $labels->push("caddy_{$loop}={$schema}://{$host}");
-        $labels->push("caddy_{$loop}.header=-Server");
+        if (isNoindexDomain($domain, $noindex_domains)) {
+            // Caddy's header directive takes either inline arguments or a block,
+            // never both, so -Server has to move into the block alongside it.
+            $labels->push("caddy_{$loop}.header.0_-Server=");
+            $labels->push("caddy_{$loop}.header.1_X-Robots-Tag=\"noindex, nofollow\"");
+        } else {
+            $labels->push("caddy_{$loop}.header=-Server");
+        }
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
         if ($port) {
@@ -355,7 +498,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -403,7 +546,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
-                $uuid = new Cuid2;
+                $uuid = new_public_id();
             }
 
             $url = Url::fromString($domain);
@@ -417,8 +560,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";
             if ($service_name) {
-                $http_label = "http-{$loop}-{$uuid}-{$service_name}";
-                $https_label = "https-{$loop}-{$uuid}-{$service_name}";
+                // Dots in service names split Traefik label paths; hash avoids api.test/api-test collisions.
+                $safeServiceName = traefikSafeServiceNameSegment($service_name);
+                $http_label = "http-{$loop}-{$uuid}-{$safeServiceName}";
+                $https_label = "https-{$loop}-{$uuid}-{$safeServiceName}";
             }
             if (str($image)->contains('ghost')) {
                 $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$path}/(.*)");
@@ -428,16 +573,22 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.replacement=/$1");
             }
 
+            $noindex_name = "{$loop}-{$uuid}-noindex";
+            $is_noindex = isNoindexDomain($domain, $noindex_domains);
+            if ($is_noindex) {
+                $labels->push("traefik.http.middlewares.{$noindex_name}.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow");
+            }
+
             $to_www_name = "{$loop}-{$uuid}-to-www";
             $to_non_www_name = "{$loop}-{$uuid}-to-non-www";
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\${1}://\${2}",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\$\${1}://\$\${2}",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\${1}://www.\${2}",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\$\${1}://www.\$\${2}",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
             ];
             if ($schema === 'https') {
@@ -472,6 +623,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -498,6 +652,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -516,8 +673,15 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
+                $middlewares = collect([]);
+                if ($is_noindex) {
+                    $middlewares->push($noindex_name);
+                }
                 if ($is_force_https_enabled) {
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+                    $middlewares->push('redirect-to-https');
+                }
+                if ($middlewares->isNotEmpty()) {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares->join(',')}");
                 }
             } else {
                 // Set labels for http
@@ -550,6 +714,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -576,6 +743,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -585,7 +755,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             continue;
         }
     }
@@ -608,6 +778,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
+            $noindexDomains = $application->noindexDomains();
             $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
             if ($shouldGenerateLabelsExactly) {
                 switch ($application->destination->server->proxyType()) {
@@ -623,6 +794,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            noindex_domains: $noindexDomains,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -638,6 +810,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            noindex_domains: $noindexDomains,
                         ));
                         break;
                 }
@@ -653,6 +826,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    noindex_domains: $noindexDomains,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -666,6 +840,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    noindex_domains: $noindexDomains,
                 ));
             }
         }
@@ -675,6 +850,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         } else {
             $domains = collect([]);
         }
+        // Previews are ephemeral: every domain is noindex.
+        $noindexDomains = $domains;
         $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
         if ($shouldGenerateLabelsExactly) {
             switch ($application->destination->server->proxyType()) {
@@ -689,6 +866,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        noindex_domains: $noindexDomains,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -703,6 +881,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        noindex_domains: $noindexDomains,
                     ));
                     break;
             }
@@ -717,6 +896,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                noindex_domains: $noindexDomains,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -729,6 +909,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                noindex_domains: $noindexDomains,
             ));
         }
     }
@@ -750,10 +931,26 @@ function isDatabaseImage(?string $image = null, ?array $serviceConfig = null)
     }
     $imageName = $image->before(':');
 
-    // First check if it's a known database image
+    // Extract base image name (ignore registry prefix)
+    // Examples:
+    //   docker.io/library/postgres -> postgres
+    //   ghcr.io/postgrest/postgrest -> postgrest
+    //   postgres -> postgres
+    //   postgrest/postgrest -> postgrest
+    $baseImageName = $imageName;
+    if (str($imageName)->contains('/')) {
+        $baseImageName = str($imageName)->afterLast('/');
+    }
+
+    // Check if base image name exactly matches a known database image
     $isKnownDatabase = false;
     foreach (DATABASE_DOCKER_IMAGES as $database_docker_image) {
-        if (str($imageName)->contains($database_docker_image)) {
+        // Extract base name from database pattern for comparison
+        $databaseBaseName = str($database_docker_image)->contains('/')
+            ? str($database_docker_image)->afterLast('/')
+            : $database_docker_image;
+
+        if ($baseImageName == $databaseBaseName) {
             $isKnownDatabase = true;
             break;
         }
@@ -928,6 +1125,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit',
         '--device',
         '--shm-size',
+        '--dns',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
@@ -939,9 +1137,12 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
         '--ip' => 'ip',
+        '--ip6' => 'ip6',
         '--shm-size' => 'shm_size',
+        '--dns' => 'dns',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
+        '--entrypoint' => 'entrypoint',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
@@ -961,6 +1162,38 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
                 $options[$option][] = $value;
                 $options[$option] = array_unique($options[$option]);
             }
+        }
+        if ($option === '--entrypoint') {
+            $value = null;
+            // Match --entrypoint=value or --entrypoint value
+            // Handle quoted strings with escaped quotes: --entrypoint "python -c \"print('hi')\""
+            // Pattern matches: double-quoted (with escapes), single-quoted (with escapes), or unquoted values
+            if (preg_match(
+                '/--entrypoint(?:=|\s+)(?<raw>"(?:\\\\.|[^"])*"|\'(?:\\\\.|[^\'])*\'|[^\s]+)/',
+                $custom_docker_run_options,
+                $entrypoint_matches
+            )) {
+                $rawValue = $entrypoint_matches['raw'];
+                // Handle double-quoted strings: strip quotes and unescape special characters
+                if (str_starts_with($rawValue, '"') && str_ends_with($rawValue, '"')) {
+                    $inner = substr($rawValue, 1, -1);
+                    // Unescape backslash sequences: \" \$ \` \\
+                    $value = preg_replace('/\\\\(["$`\\\\])/', '$1', $inner);
+                } elseif (str_starts_with($rawValue, "'") && str_ends_with($rawValue, "'")) {
+                    // Handle single-quoted strings: just strip quotes (no unescaping per shell rules)
+                    $value = substr($rawValue, 1, -1);
+                } else {
+                    // Handle unquoted values
+                    $value = $rawValue;
+                }
+            }
+
+            if ($value && trim($value) !== '') {
+                $options[$option][] = $value;
+                $options[$option] = array_values(array_unique($options[$option]));
+            }
+
+            continue;
         }
         if (isset($match[2]) && $match[2] !== '') {
             $value = $match[2];
@@ -1000,6 +1233,12 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
             $compose_options->put($mapping[$option], $ulimits);
         } elseif ($option === '--shm-size' || $option === '--hostname') {
             if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                $compose_options->put($mapping[$option], $value[0]);
+            }
+        } elseif ($option === '--entrypoint') {
+            if (! is_null($value) && is_array($value) && count($value) > 0 && ! empty(trim($value[0]))) {
+                // Docker compose accepts entrypoint as either a string or an array
+                // Keep it as a string for simplicity - docker compose will handle it
                 $compose_options->put($mapping[$option], $value[0]);
             }
         } elseif ($option === '--gpus') {
@@ -1063,25 +1302,57 @@ function generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker
     return $docker_compose;
 }
 
+/**
+ * Remove Coolify's custom Docker Compose fields from parsed YAML array
+ *
+ * Coolify extends Docker Compose with custom fields that are processed during
+ * parsing and deployment but must be removed before sending to Docker.
+ *
+ * Custom fields:
+ * - exclude_from_hc (service-level): Exclude service from health check monitoring
+ * - content (volume-level): Auto-create file with specified content during init
+ * - isDirectory / is_directory (volume-level): Mark bind mount as directory
+ *
+ * @param  array  $yamlCompose  Parsed Docker Compose array
+ * @return array Cleaned Docker Compose array with custom fields removed
+ */
+function stripCoolifyCustomFields(array $yamlCompose): array
+{
+    foreach ($yamlCompose['services'] ?? [] as $serviceName => $service) {
+        // Remove service-level custom fields
+        unset($yamlCompose['services'][$serviceName]['exclude_from_hc']);
+
+        // Remove volume-level custom fields (only for long syntax - arrays)
+        if (isset($service['volumes'])) {
+            foreach ($service['volumes'] as $volumeName => $volume) {
+                // Skip if volume is string (short syntax like 'db-data:/var/lib/postgresql/data')
+                if (! is_array($volume)) {
+                    continue;
+                }
+
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['content']);
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['isDirectory']);
+                unset($yamlCompose['services'][$serviceName]['volumes'][$volumeName]['is_directory']);
+            }
+        }
+    }
+
+    return $yamlCompose;
+}
+
 function validateComposeFile(string $compose, int $server_id): string|Throwable
 {
     $uuid = Str::random(18);
     $server = Server::ownedByCurrentTeam()->find($server_id);
     try {
         if (! $server) {
-            throw new \Exception('Server not found');
+            throw new Exception('Server not found');
         }
         $yaml_compose = Yaml::parse($compose);
-        foreach ($yaml_compose['services'] as $service_name => $service) {
-            if (! isset($service['volumes'])) {
-                continue;
-            }
-            foreach ($service['volumes'] as $volume_name => $volume) {
-                if (data_get($volume, 'type') === 'bind' && data_get($volume, 'content')) {
-                    unset($yaml_compose['services'][$service_name]['volumes'][$volume_name]['content']);
-                }
-            }
-        }
+
+        // Remove Coolify's custom fields before Docker validation
+        $yaml_compose = stripCoolifyCustomFields($yaml_compose);
+
         $base64_compose = base64_encode(Yaml::dump($yaml_compose));
         instant_remote_process([
             "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
@@ -1091,7 +1362,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         ], $server);
 
         return 'OK';
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return $e->getMessage();
     } finally {
         if (filled($server)) {
@@ -1102,18 +1373,38 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
-function getContainerLogs(Server $server, string $container_id, int $lines = 100): string
+function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int
 {
-    if ($server->isSwarm()) {
-        $output = instant_remote_process([
-            "docker service logs -n {$lines} {$container_id} 2>&1",
-        ], $server);
-    } else {
-        $output = instant_remote_process([
-            "docker logs -n {$lines} {$container_id} 2>&1",
-        ], $server);
+    $lines = filter_var($lines, FILTER_VALIDATE_INT);
+    if ($lines === false || $lines <= 0) {
+        return $default;
     }
 
+    return min($lines, $max);
+}
+
+function parseLogTimestampFlag(mixed $showTimestamps): bool
+{
+    return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+}
+
+function buildContainerLogsCommand(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+{
+    $command = "docker logs -n {$lines}";
+    if ($server->isSwarm()) {
+        $command = "docker service logs -n {$lines}";
+    }
+
+    if ($showTimestamps) {
+        $command .= ' --timestamps';
+    }
+
+    return "{$command} ".escapeshellarg($container_id).' 2>&1';
+}
+
+function getContainerLogs(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+{
+    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
     $output = removeAnsiColors($output);
 
     return $output;
@@ -1207,10 +1498,10 @@ function escapeBashDoubleQuoted(?string $value): string
  * Generate Docker build arguments from environment variables collection
  * Returns only keys (no values) since values are sourced from environment via export
  *
- * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
- * @return \Illuminate\Support\Collection Collection of formatted --build-arg strings (keys only)
+ * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @return Collection Collection of formatted --build-arg strings (keys only)
  */
-function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
+function generateDockerBuildArgs($variables): Collection
 {
     $variables = collect($variables);
 
@@ -1218,14 +1509,14 @@ function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
 
         // Only return the key - Docker will get the value from the environment
-        return "--build-arg {$key}";
+        return '--build-arg '.escapeshellarg((string) $key);
     });
 }
 
 /**
  * Generate Docker environment flags from environment variables collection
  *
- * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
  * @return string Space-separated environment flags
  */
 function generateDockerEnvFlags($variables): string
@@ -1251,4 +1542,96 @@ function generateDockerEnvFlags($variables): string
             return "-e {$key}={$escaped_value}";
         })
         ->implode(' ');
+}
+
+/**
+ * Auto-inject -f and --env-file flags into a docker compose command if not already present
+ *
+ * @param  string  $command  The docker compose command to modify
+ * @param  string  $composeFilePath  The path to the compose file
+ * @param  string  $envFilePath  The path to the .env file
+ * @return string The modified command with injected flags
+ *
+ * @example
+ * Input:  "docker compose build"
+ * Output: "docker compose -f ./docker-compose.yml --env-file .env build"
+ */
+function injectDockerComposeFlags(string $command, string $composeFilePath, string $envFilePath): string
+{
+    $dockerComposeReplacement = 'docker compose';
+
+    // Add -f flag if not present (checks for both -f and --file with various formats)
+    // Detects: -f path, -f=path, -fpath (concatenated with path chars: . / ~), --file path, --file=path
+    // Note: Uses [.~/]|$ instead of \S to prevent false positives with flags like -foo, -from, -feature
+    if (! preg_match('/(?:^|\s)(?:-f(?:[=\s]|[.\/~]|$)|--file(?:=|\s))/', $command)) {
+        $dockerComposeReplacement .= " -f {$composeFilePath}";
+    }
+
+    // Add --env-file flag if not present (checks for --env-file with various formats)
+    // Detects: --env-file path, --env-file=path with any whitespace
+    if (! preg_match('/(?:^|\s)--env-file(?:=|\s)/', $command)) {
+        $dockerComposeReplacement .= " --env-file {$envFilePath}";
+    }
+
+    // Replace only first occurrence to avoid modifying comments/strings/chained commands
+    return preg_replace('/docker\s+compose/', $dockerComposeReplacement, $command, 1);
+}
+
+/**
+ * Inject build arguments right after build-related subcommands in docker/docker compose commands.
+ * This ensures build args are only applied to build operations, not to push, pull, up, etc.
+ *
+ * Supports:
+ * - docker compose build
+ * - docker buildx build
+ * - docker builder build
+ * - docker build (legacy)
+ *
+ * Examples:
+ * - Input:  "docker compose -f file.yml build"
+ *   Output: "docker compose -f file.yml build --build-arg X --build-arg Y"
+ *
+ * - Input:  "docker buildx build --platform linux/amd64"
+ *   Output: "docker buildx build --build-arg X --build-arg Y --platform linux/amd64"
+ *
+ * - Input:  "docker builder build --tag myimage:latest"
+ *   Output: "docker builder build --build-arg X --build-arg Y --tag myimage:latest"
+ *
+ * - Input:  "docker compose build && docker compose push"
+ *   Output: "docker compose build --build-arg X --build-arg Y && docker compose push"
+ *
+ * - Input:  "docker compose push"
+ *   Output: "docker compose push" (unchanged - no build command found)
+ *
+ * @param  string  $command  The docker command
+ * @param  string  $buildArgsString  The build arguments to inject (e.g., "--build-arg X --build-arg Y")
+ * @return string The modified command with build args injected after build subcommand
+ */
+function injectDockerComposeBuildArgs(string $command, string $buildArgsString): string
+{
+    // Early return if no build args to inject
+    if (empty(trim($buildArgsString))) {
+        return $command;
+    }
+
+    // Match build-related commands:
+    // - ' builder build' (docker builder build)
+    // - ' buildx build' (docker buildx build)
+    // - ' build' (docker compose build, docker build)
+    // Followed by either:
+    // - whitespace (allowing service names, flags, or any valid arguments)
+    // - end of string ($)
+    // This regex ensures we match build subcommands, not "build" in other contexts
+    // IMPORTANT: Order matters - check longer patterns first (builder build, buildx build) before ' build'
+    $pattern = '/( builder build| buildx build| build)(?=\s|$)/';
+
+    // Replace the first occurrence of build command with build command + build-args
+    $modifiedCommand = preg_replace(
+        $pattern,
+        '$1 '.$buildArgsString,
+        $command,
+        1  // Only replace first occurrence
+    );
+
+    return $modifiedCommand ?? $command;
 }

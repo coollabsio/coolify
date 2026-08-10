@@ -3,15 +3,11 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Jobs\DeleteResourceJob;
-use App\Models\InstanceSettings;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
@@ -42,16 +38,16 @@ class Danger extends Component
     public function mount()
     {
         $parameters = get_route_parameters();
-        $this->modalId = new Cuid2;
+        $this->modalId = new_public_id();
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
 
         if ($this->resource === null) {
             if (isset($parameters['service_uuid'])) {
-                $this->resource = Service::where('uuid', $parameters['service_uuid'])->first();
+                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $parameters['service_uuid'])->first();
             } elseif (isset($parameters['stack_service_uuid'])) {
-                $this->resource = ServiceApplication::where('uuid', $parameters['stack_service_uuid'])->first()
-                    ?? ServiceDatabase::where('uuid', $parameters['stack_service_uuid'])->first();
+                $this->resource = ServiceApplication::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first()
+                    ?? ServiceDatabase::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first();
             }
         }
 
@@ -91,20 +87,21 @@ class Danger extends Component
         }
     }
 
-    public function delete($password)
+    public function delete($password, $selectedActions = [])
     {
-        if (! data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
-            if (! Hash::check($password, Auth::user()->password)) {
-                $this->addError('password', 'The provided password is incorrect.');
-
-                return;
-            }
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
         }
 
         if (! $this->resource) {
-            $this->addError('resource', 'Resource not found.');
+            return 'Resource not found.';
+        }
 
-            return;
+        if (! empty($selectedActions)) {
+            $this->delete_volumes = in_array('delete_volumes', $selectedActions);
+            $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions);
+            $this->delete_configurations = in_array('delete_configurations', $selectedActions);
+            $this->docker_cleanup = in_array('docker_cleanup', $selectedActions);
         }
 
         try {
@@ -118,7 +115,7 @@ class Danger extends Component
                 $this->docker_cleanup
             );
 
-            return redirect()->route('project.resource.index', [
+            return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->projectUuid,
                 'environment_uuid' => $this->environmentUuid,
             ]);

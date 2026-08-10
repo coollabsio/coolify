@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\V5\Application as V5Application;
+use App\Models\V5\ResourceConnection as V5ResourceConnection;
+use App\Support\V5\V5Feature;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Project model',
@@ -15,24 +19,38 @@ use Visus\Cuid2\Cuid2;
         'uuid' => ['type' => 'string'],
         'name' => ['type' => 'string'],
         'description' => ['type' => 'string'],
-        'environments' => new OA\Property(
-            property: 'environments',
-            type: 'array',
-            items: new OA\Items(ref: '#/components/schemas/Environment'),
-            description: 'The environments of the project.'
-        ),
     ]
 )]
 class Project extends BaseModel
 {
     use ClearsGlobalSearchCache;
+    use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'team_id',
+        'uuid',
+    ];
 
+    /**
+     * Get query builder for projects owned by current team.
+     * If you need all projects without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
     public static function ownedByCurrentTeam()
     {
         return Project::whereTeamId(currentTeam()->id)->orderByRaw('LOWER(name)');
+    }
+
+    /**
+     * Get all projects owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Project::ownedByCurrentTeam()->get();
+        });
     }
 
     protected static function booted()
@@ -44,7 +62,7 @@ class Project extends BaseModel
             Environment::create([
                 'name' => 'production',
                 'project_id' => $project->id,
-                'uuid' => (string) new Cuid2,
+                'uuid' => new_public_id(),
             ]);
         });
         static::deleting(function ($project) {
@@ -59,7 +77,7 @@ class Project extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'project');
     }
 
     public function environments()
@@ -129,7 +147,11 @@ class Project extends BaseModel
 
     public function isEmpty()
     {
-        return $this->applications()->count() == 0 &&
+        return (! V5Feature::enabled() || (
+            ! V5Application::query()->where('project_id', $this->id)->exists() &&
+            ! V5ResourceConnection::query()->where('project_id', $this->id)->exists()
+        )) &&
+            $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
@@ -141,9 +163,16 @@ class Project extends BaseModel
             $this->services()->count() == 0;
     }
 
-    public function databases()
+    public function databases(array $with = []): Collection
     {
-        return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
+        return $this->postgresqls()->with($with)->get()
+            ->merge($this->redis()->with($with)->get())
+            ->merge($this->mongodbs()->with($with)->get())
+            ->merge($this->mysqls()->with($with)->get())
+            ->merge($this->mariadbs()->with($with)->get())
+            ->merge($this->keydbs()->with($with)->get())
+            ->merge($this->dragonflies()->with($with)->get())
+            ->merge($this->clickhouses()->with($with)->get());
     }
 
     public function navigateTo()

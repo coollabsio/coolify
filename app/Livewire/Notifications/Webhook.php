@@ -2,16 +2,18 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\Team;
 use App\Models\WebhookNotificationSettings;
 use App\Notifications\Test;
+use App\Rules\SafeWebhookUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Webhook extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     public Team $team;
 
@@ -20,7 +22,7 @@ class Webhook extends Component
     #[Validate(['boolean'])]
     public bool $webhookEnabled = false;
 
-    #[Validate(['url', 'nullable'])]
+    #[Validate(['nullable', new SafeWebhookUrl])]
     public ?string $webhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -62,6 +64,9 @@ class Webhook extends Component
     #[Validate(['boolean'])]
     public bool $serverPatchWebhookNotifications = false;
 
+    #[Validate(['boolean'])]
+    public bool $traefikOutdatedWebhookNotifications = true;
+
     public function mount()
     {
         try {
@@ -95,12 +100,15 @@ class Webhook extends Component
             $this->settings->server_reachable_webhook_notifications = $this->serverReachableWebhookNotifications;
             $this->settings->server_unreachable_webhook_notifications = $this->serverUnreachableWebhookNotifications;
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
+            $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
 
             $this->settings->save();
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
-            $this->webhookUrl = $this->settings->webhook_url;
+            $this->webhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->webhook_url
+                : null;
 
             $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
             $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;
@@ -115,6 +123,7 @@ class Webhook extends Component
             $this->serverReachableWebhookNotifications = $this->settings->server_reachable_webhook_notifications;
             $this->serverUnreachableWebhookNotifications = $this->settings->server_unreachable_webhook_notifications;
             $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
+            $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
         }
     }
 
@@ -160,13 +169,6 @@ class Webhook extends Component
         $this->syncData(true);
         refreshSession();
 
-        if (isDev()) {
-            ray('Webhook settings saved', [
-                'webhook_enabled' => $this->settings->webhook_enabled,
-                'webhook_url' => $this->settings->webhook_url,
-            ]);
-        }
-
         $this->dispatch('success', 'Settings saved.');
     }
 
@@ -174,13 +176,6 @@ class Webhook extends Component
     {
         try {
             $this->authorize('sendTest', $this->settings);
-
-            if (isDev()) {
-                ray('Sending test webhook notification', [
-                    'team_id' => $this->team->id,
-                    'webhook_url' => $this->settings->webhook_url,
-                ]);
-            }
 
             $this->team->notify(new Test(channel: 'webhook'));
             $this->dispatch('success', 'Test notification sent.');

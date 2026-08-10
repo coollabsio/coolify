@@ -3,42 +3,53 @@
     'w-full' => !$isMultiline,
 ])>
     @if ($label)
-        <label class="flex gap-1 items-center mb-1 text-sm font-medium">{{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        {{--
+            Fixed-height label row (h-4 = helper icon). Helper lives outside <label> so
+            side-by-side fields align whether a field has a helper, required mark, both, or neither.
+            Margin is only on this wrapper — mb-0! beats .application-settings-form label rules.
+        --}}
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @endif
+                @isset($labelSuffix)
+                    {{ $labelSuffix }}
+                @endisset
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-        </label>
+        </div>
     @endif
     @if ($type === 'password')
-        <div class="relative" x-data="{ type: 'password' }">
-            @if ($allowToPeak)
-                <div x-on:click="changePasswordFieldType"
-                    class="flex absolute inset-y-0 right-0 items-center pr-2 cursor-pointer dark:hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
-                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                        <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                        <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
-                    </svg>
-                </div>
-            @endif
+        <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
+                x-bind:type="type"
+                x-bind:class="{ 'truncate': type === 'text' && ! $el.disabled }"
                 {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
-                @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
+                @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
                 wire:loading.attr="disabled"
-                type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
+                @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}"
                 @if ($autofocus) x-ref="autofocusInput" @endif>
+            @if ($allowToPeak)
+                <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
+                    class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
+                    aria-label="Toggle password visibility">
+                    {{-- Eye icon (shown when password is hidden) --}}
+                    <x-reicon name="eye" x-show="type === 'password'" class="size-[18px]" />
+                    {{-- Eye-off2 icon (shown when password is visible) --}}
+                    <x-reicon name="eye-off2" x-cloak x-show="type === 'text'" class="size-[18px]" />
+                </button>
+            @endif
 
         </div>
     @else
         <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
-            @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4" @endif
+            @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
             wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled) min="{{ $attributes->get('min') }}"
             max="{{ $attributes->get('max') }}" minlength="{{ $attributes->get('minlength') }}"

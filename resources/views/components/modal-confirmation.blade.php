@@ -6,6 +6,8 @@
     'buttonFullWidth' => false,
     'customButton' => null,
     'disabled' => false,
+    'disabledTooltip' => null,
+    'authDisabled' => false,
     'dispatchAction' => false,
     'submitAction' => 'delete',
     'content' => null,
@@ -29,17 +31,26 @@
 
 @php
     use App\Models\InstanceSettings;
+    use Illuminate\View\ComponentSlot;
+    // Global setting to disable ALL two-step confirmation (text + password)
     $disableTwoStepConfirmation = data_get(InstanceSettings::get(), 'disable_two_step_confirmation');
+    // Skip ONLY password confirmation for OAuth users (they have no password)
+    $skipPasswordConfirmation = shouldSkipPasswordConfirmation();
     if ($temporaryDisableTwoStepConfirmation) {
         $disableTwoStepConfirmation = false;
+        // Password confirmation requirement is not affected by temporary two-step disable
     }
+    // When password step is skipped, Step 2 becomes final - change button text from "Continue" to "Confirm"
+    $effectiveStep2ButtonText = ($skipPasswordConfirmation && $step2ButtonText === 'Continue') ? 'Confirm' : $step2ButtonText;
+    // Prefer a rich HTML button title when callers pass <x-slot:button-title> (ComponentSlot).
+    $resolvedButtonTitle = $buttonTitle instanceof ComponentSlot ? $buttonTitle : $buttonTitle;
 @endphp
 
 <div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
-    finalStep: {{ $confirmWithPassword && !$disableTwoStepConfirmation ? 3 : 2 }},
+    finalStep: {{ $confirmWithPassword && !$skipPasswordConfirmation ? 3 : 2 }},
     deleteText: '',
     password: '',
     actions: @js($actions),
@@ -50,25 +61,28 @@
     })(),
     userConfirmationText: '',
     confirmWithText: @js($confirmWithText && !$disableTwoStepConfirmation),
-    confirmWithPassword: @js($confirmWithPassword && !$disableTwoStepConfirmation),
+    confirmWithPassword: @js($confirmWithPassword && !$skipPasswordConfirmation),
     submitAction: @js($submitAction),
     dispatchAction: @js($dispatchAction),
+    submitting: false,
     passwordError: '',
     selectedActions: @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all()),
     dispatchEvent: @js($dispatchEvent),
     dispatchEventType: @js($dispatchEventType),
     dispatchEventMessage: @js($dispatchEventMessage),
     disableTwoStepConfirmation: @js($disableTwoStepConfirmation),
+    skipPasswordConfirmation: @js($skipPasswordConfirmation),
     resetModal() {
         this.step = this.initialStep;
         this.deleteText = '';
         this.password = '';
+        this.submitting = false;
         this.userConfirmationText = '';
         this.selectedActions = @js(collect($checkboxes)->pluck('id')->filter(fn($id) => $this->$id)->values()->all());
         $wire.$refresh();
     },
     step1ButtonText: @js($step1ButtonText),
-    step2ButtonText: @js($step2ButtonText),
+    step2ButtonText: @js($effectiveStep2ButtonText),
     step3ButtonText: @js($step3ButtonText),
     validatePassword() {
         if (this.confirmWithPassword && !this.password) {
@@ -85,17 +99,21 @@
         }
         if (this.dispatchAction) {
             $wire.dispatch(this.submitAction);
-            return true;
+            return Promise.resolve(true);
         }
 
         const methodName = this.submitAction.split('(')[0];
         const paramsMatch = this.submitAction.match(/\((.*?)\)/);
         const params = paramsMatch ? paramsMatch[1].split(',').map(param => param.trim()) : [];
 
-        if (this.confirmWithPassword) {
-            params.push(this.password);
+        // Always pass password parameter (empty string if password confirmation is skipped)
+        // This ensures consistent method signature for backend Livewire methods
+        params.push(this.confirmWithPassword ? this.password : '');
+
+        // Only pass selectedActions if there are checkboxes with selections
+        if (this.selectedActions.length > 0) {
+            params.push(this.selectedActions);
         }
-        params.push(this.selectedActions);
         return $wire[methodName](...params)
             .then(result => {
                 if (result === true) {
@@ -115,8 +133,23 @@
     }
 }"
     @keydown.escape.window="if (modalOpen) { modalOpen = false; resetModal(); }" :class="{ 'z-40': modalOpen }"
-    class="relative w-auto h-auto">
-    @if ($customButton)
+    @class([
+        // Default to inline-flex so shells with only a programmatic/hidden trigger
+        // do not paint a full-width empty block above navigation.
+        'relative h-auto max-w-full',
+        'flex w-full' => $buttonFullWidth,
+        'inline-flex w-auto' => ! $buttonFullWidth,
+    ])>
+    @if (isset($trigger))
+        <div @class([
+                'max-w-full',
+                'flex w-full min-w-0' => $buttonFullWidth,
+                'inline-flex' => ! $buttonFullWidth,
+            ])
+            @click="modalOpen=true">
+            {{ $trigger }}
+        </div>
+    @elseif ($customButton)
         @if ($buttonFullWidth)
             <x-forms.button @click="modalOpen=true" class="w-full">
                 {{ $customButton }}
@@ -134,42 +167,42 @@
         @else
             @if ($disabled)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError disabled wire:target>
-                        {{ $buttonTitle }}
+                    <x-forms.button class="w-full" isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError disabled wire:target>
-                        {{ $buttonTitle }}
+                    <x-forms.button isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif ($isErrorButton)
                 @if ($buttonFullWidth)
                     <x-forms.button class="w-full" isError @click="modalOpen=true">
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
                     <x-forms.button isError @click="modalOpen=true">
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @elseif($isHighlightedButton)
                 @if ($buttonFullWidth)
                     <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" isHighlighted wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
                     <x-forms.button @click="modalOpen=true" class="flex gap-2" isHighlighted wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @else
                 @if ($buttonFullWidth)
                     <x-forms.button @click="modalOpen=true" class="flex gap-2 w-full" wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
                     <x-forms.button @click="modalOpen=true" class="flex gap-2" wire:target>
-                        {{ $buttonTitle }}
+                        {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
             @endif
@@ -177,8 +210,8 @@
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4" x-cloak>
-            <div x-show="modalOpen" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs">
+            class="fixed inset-0 z-99 flex min-h-full items-center justify-center overflow-y-auto p-4" x-cloak>
+            <div x-show="modalOpen" class="absolute inset-0 bg-black/50 backdrop-blur-[2px]">
             </div>
             <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
                 x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
@@ -186,18 +219,17 @@
                 x-transition:leave="ease-in duration-100"
                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full border rounded-sm min-w-full lg:min-w-[36rem] max-w-[48rem] max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col">
-                <div class="flex justify-between items-center py-6 px-7 shrink-0">
-                    <h3 class="pr-8 text-2xl font-bold">{{ $title }}</h3>
-                    <button @click="modalOpen = false; resetModal()"
-                        class="flex absolute top-2 right-2 justify-center items-center w-8 h-8 rounded-full dark:text-white hover:bg-coolgray-300">
-                        <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                class="application-settings-form application-settings-section relative flex max-h-[calc(100dvh-2rem)] w-full flex-col lg:min-w-[36rem] lg:max-w-2xl"
+                style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                <header class="flex-nowrap!">
+                    <h3 class="min-w-0 flex-1 truncate">{{ $title }}</h3>
+                    <button type="button" @click="modalOpen = false; resetModal()"
+                        class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                        <x-reicon name="x" class="size-4" />
                     </button>
-                </div>
-                <div class="relative w-auto overflow-y-auto px-7 pb-6" style="-webkit-overflow-scrolling: touch;">
+                </header>
+                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                    style="-webkit-overflow-scrolling: touch;">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
@@ -210,11 +242,7 @@
                                 </div>
                             @endforeach
 
-                            <div class="flex flex-wrap gap-2 justify-between mt-4">
-                                <x-forms.button @click="modalOpen = false; resetModal()"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
-                                    Cancel
-                                </x-forms.button>
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.button @click="step++" class="w-auto" isError>
                                     <span x-text="step1ButtonText"></span>
                                 </x-forms.button>
@@ -227,37 +255,25 @@
                         <x-callout type="danger" title="Warning" class="mb-4">
                             {!! $warningMessage ?: 'This operation is permanent and cannot be undone. Please think again before proceeding!' !!}
                         </x-callout>
-                        <div class="mb-4">The following actions will be performed:</div>
+                        <div class="mb-2 text-[12px] font-medium text-neutral-700 dark:text-fg-dim">The following actions will be performed:</div>
                         <ul class="mb-4 space-y-2">
                             @foreach ($actions as $action)
-                                <li class="flex items-center text-red-500">
-                                    <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
-                                        viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
+                                <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                    <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
                                     <span>{{ $action }}</span>
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
                                 <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
-                                    <li class="flex items-center text-red-500">
-                                        <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
-                                            viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M6 18L18 6M6 6l12 12"></path>
-                                        </svg>
+                                    <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                        <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
                                         <span>{{ $checkbox['label'] }}</span>
                                     </li>
                                 </template>
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
-                                        <li class="flex items-center text-red-500">
-                                            <svg class="shrink-0 mr-2 w-5 h-5" fill="none" stroke="currentColor"
-                                                viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M6 18L18 6M6 6l12 12"></path>
-                                            </svg>
+                                        <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                            <x-reicon name="trash" class="mt-0.5 size-3.5 shrink-0" />
                                             <span>{{ $checkbox['default_warning'] }}</span>
                                         </li>
                                     </template>
@@ -267,8 +283,8 @@
                         @if (!$disableTwoStepConfirmation)
                             @if ($confirmWithText)
                                 <div class="mb-4">
-                                    <h4 class="mb-2 text-lg font-semibold">Confirm Actions</h4>
-                                    <p class="mb-2 text-sm">{{ $confirmationLabel }}</p>
+                                    <h4 class="mb-1 text-[12px] font-semibold">Confirm actions</h4>
+                                    <p class="mb-2 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">{{ $confirmationLabel }}</p>
                                     <div class="relative mb-2" x-data="{ decodedText: confirmationText }">
                                         <div class="relative">
                                             <input type="text" x-model="decodedText" readonly class="input">
@@ -287,50 +303,54 @@
                                     </div>
 
                                     <label for="userConfirmationText"
-                                        class="block mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        class="mt-4 mb-1.5 block text-[12px] font-medium text-neutral-700 dark:text-fg-dim">
                                         {{ $shortConfirmationLabel }}
                                     </label>
-                                    <input type="text" x-model="userConfirmationText"
-                                        class="p-2 mt-1 px-3 w-full  rounded-sm input">
+                                    <input type="text" x-model="userConfirmationText" class="input w-full">
                                 </div>
                             @endif
                         @endif
 
-                        <div class="flex flex-wrap gap-2 justify-between mt-4">
+                        <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                             @if (!empty($checkboxes))
-                                <x-forms.button @click="step--"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                <x-forms.button @click="step--">
                                     Back
                                 </x-forms.button>
                             @else
-                                <x-forms.button @click="modalOpen = false; resetModal()"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                                <x-forms.button @click="modalOpen = false; resetModal()">
                                     Cancel
                                 </x-forms.button>
                             @endif
                             <x-forms.button
-                                x-bind:disabled="!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
-                                    confirmationText"
+                                :showLoadingIndicator="false"
+                                x-bind:disabled="submitting || (!disableTwoStepConfirmation && confirmWithText && userConfirmationText !==
+                                    confirmationText)"
                                 class="w-auto" isError
                                 @click="
                                     if (dispatchEvent) {
                                         $wire.dispatch(dispatchEventType, dispatchEventMessage);
                                     }
-                                    if (confirmWithPassword && !disableTwoStepConfirmation) {
+                                    if (confirmWithPassword && !skipPasswordConfirmation) {
                                         step++;
                                     } else {
-                                        modalOpen = false;
-                                        resetModal();
-                                        submitForm();
+                                        submitting = true;
+                                        submitForm().then((result) => {
+                                            submitting = false;
+                                            modalOpen = false;
+                                            resetModal();
+                                        }).catch(() => {
+                                            submitting = false;
+                                        });
                                     }
                                 ">
+                                <x-loading-on-button x-show="submitting" x-cloak />
                                 <span x-text="step2ButtonText"></span>
                             </x-forms.button>
                         </div>
                     </div>
 
                     <!-- Step 3: Password confirmation -->
-                    @if (!$disableTwoStepConfirmation)
+                    @if (!$skipPasswordConfirmation)
                         <div x-show="step === 3 && confirmWithPassword">
                             <x-callout type="danger" title="Final Confirmation" class="mb-4">
                                 Please enter your password to confirm this destructive action.
@@ -357,26 +377,31 @@
                                 @enderror
                             </div>
 
-                            <div class="flex flex-wrap gap-2 justify-between mt-4">
-                                <x-forms.button @click="step--"
-                                    class="w-24 dark:bg-coolgray-200 dark:hover:bg-coolgray-300">
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                <x-forms.button @click="step--">
                                     Back
                                 </x-forms.button>
-                                <x-forms.button x-bind:disabled="!password" class="w-auto" isError
+                                <x-forms.button :showLoadingIndicator="false"
+                                    x-bind:disabled="!password || submitting" class="w-auto" isError
                                     @click="
                                     if (dispatchEvent) {
                                         $wire.dispatch(dispatchEventType, dispatchEventMessage);
                                     }
+                                    submitting = true;
                                     submitForm().then((result) => {
+                                        submitting = false;
                                         if (result === true) {
                                             modalOpen = false;
                                             resetModal();
                                         } else {
                                             passwordError = result;
-                                            password = ''; // Clear the password field
+                                            password = '';
                                         }
+                                    }).catch(() => {
+                                        submitting = false;
                                     });
                                     ">
+                                    <x-loading-on-button x-show="submitting" x-cloak />
                                     <span x-text="step3ButtonText"></span>
                                 </x-forms.button>
                             </div>

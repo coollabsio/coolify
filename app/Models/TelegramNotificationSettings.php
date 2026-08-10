@@ -25,11 +25,13 @@ class TelegramNotificationSettings extends Model
         'backup_failure_telegram_notifications',
         'scheduled_task_success_telegram_notifications',
         'scheduled_task_failure_telegram_notifications',
-        'docker_cleanup_telegram_notifications',
+        'docker_cleanup_success_telegram_notifications',
+        'docker_cleanup_failure_telegram_notifications',
         'server_disk_usage_telegram_notifications',
         'server_reachable_telegram_notifications',
         'server_unreachable_telegram_notifications',
         'server_patch_telegram_notifications',
+        'traefik_outdated_telegram_notifications',
 
         'telegram_notifications_deployment_success_thread_id',
         'telegram_notifications_deployment_failure_thread_id',
@@ -38,11 +40,32 @@ class TelegramNotificationSettings extends Model
         'telegram_notifications_backup_failure_thread_id',
         'telegram_notifications_scheduled_task_success_thread_id',
         'telegram_notifications_scheduled_task_failure_thread_id',
-        'telegram_notifications_docker_cleanup_thread_id',
+        'telegram_notifications_docker_cleanup_success_thread_id',
+        'telegram_notifications_docker_cleanup_failure_thread_id',
         'telegram_notifications_server_disk_usage_thread_id',
         'telegram_notifications_server_reachable_thread_id',
         'telegram_notifications_server_unreachable_thread_id',
         'telegram_notifications_server_patch_thread_id',
+        'telegram_notifications_traefik_outdated_thread_id',
+    ];
+
+    protected $hidden = [
+        'telegram_token',
+        'telegram_chat_id',
+        'telegram_notifications_deployment_success_thread_id',
+        'telegram_notifications_deployment_failure_thread_id',
+        'telegram_notifications_status_change_thread_id',
+        'telegram_notifications_backup_success_thread_id',
+        'telegram_notifications_backup_failure_thread_id',
+        'telegram_notifications_scheduled_task_success_thread_id',
+        'telegram_notifications_scheduled_task_failure_thread_id',
+        'telegram_notifications_docker_cleanup_success_thread_id',
+        'telegram_notifications_docker_cleanup_failure_thread_id',
+        'telegram_notifications_server_disk_usage_thread_id',
+        'telegram_notifications_server_reachable_thread_id',
+        'telegram_notifications_server_unreachable_thread_id',
+        'telegram_notifications_server_patch_thread_id',
+        'telegram_notifications_traefik_outdated_thread_id',
     ];
 
     protected $casts = [
@@ -62,6 +85,7 @@ class TelegramNotificationSettings extends Model
         'server_reachable_telegram_notifications' => 'boolean',
         'server_unreachable_telegram_notifications' => 'boolean',
         'server_patch_telegram_notifications' => 'boolean',
+        'traefik_outdated_telegram_notifications' => 'boolean',
 
         'telegram_notifications_deployment_success_thread_id' => 'encrypted',
         'telegram_notifications_deployment_failure_thread_id' => 'encrypted',
@@ -70,11 +94,13 @@ class TelegramNotificationSettings extends Model
         'telegram_notifications_backup_failure_thread_id' => 'encrypted',
         'telegram_notifications_scheduled_task_success_thread_id' => 'encrypted',
         'telegram_notifications_scheduled_task_failure_thread_id' => 'encrypted',
-        'telegram_notifications_docker_cleanup_thread_id' => 'encrypted',
+        'telegram_notifications_docker_cleanup_success_thread_id' => 'encrypted',
+        'telegram_notifications_docker_cleanup_failure_thread_id' => 'encrypted',
         'telegram_notifications_server_disk_usage_thread_id' => 'encrypted',
         'telegram_notifications_server_reachable_thread_id' => 'encrypted',
         'telegram_notifications_server_unreachable_thread_id' => 'encrypted',
         'telegram_notifications_server_patch_thread_id' => 'encrypted',
+        'telegram_notifications_traefik_outdated_thread_id' => 'encrypted',
     ];
 
     public function team()

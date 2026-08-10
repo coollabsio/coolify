@@ -1,53 +1,302 @@
-<div>
+<div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6">
     @if (subscriptionProvider() === 'stripe')
-        <div class="pt-4">
-            <h2>Your current plan</h2>
-            <div class="pb-4">Tier: <strong class="dark:text-warning">
-                    @if (data_get(currentTeam(), 'subscription')->type() == 'dynamic')
-                        Pay-as-you-go
+        {{-- Plan Overview --}}
+        <x-application.settings-section title="Plan overview"
+            description="Review billing status and the number of servers included in this plan." x-data="{
+            qty: {{ $quantity }},
+            get current() { return $wire.server_limits; },
+            activeServers: {{ currentTeam()->servers->count() }},
+            preview: @js($pricePreview),
+            loading: false,
+            showModal: false,
+            async fetchPreview() {
+                if (this.qty < 2 || this.qty > 100 || this.qty === this.current) { return; }
+                this.loading = true;
+                this.preview = null;
+                await $wire.loadPricePreview(this.qty);
+                this.preview = $wire.pricePreview;
+                this.loading = false;
+            },
+            fmt(cents) {
+                if (!this.preview) return '';
+                const c = this.preview.currency;
+                return c === 'USD' ? '$' + (cents / 100).toFixed(2) : (cents / 100).toFixed(2) + ' ' + c;
+            },
+            get isReduction() { return this.qty < this.activeServers; },
+            get hasChanged() { return this.qty !== this.current; },
+            get hasPreview() { return this.preview !== null; },
+            openAdjust() {
+                this.showModal = true;
+            },
+            closeAdjust() {
+                this.showModal = false;
+                this.qty = this.current;
+                this.preview = null;
+            }
+        }" @success.window="preview = null; showModal = false; qty = $wire.server_limits"
+            @keydown.escape.window="if (showModal) { closeAdjust(); }">
+            <div class="space-y-2">
+                <div class="text-sm">
+                    <span class="text-neutral-500">Plan:</span>
+                    <span class="dark:text-warning font-medium">
+                        @if (data_get(currentTeam(), 'subscription')->type() == 'dynamic')
+                            Pay-as-you-go
+                        @else
+                            {{ data_get(currentTeam(), 'subscription')->type() }}
+                        @endif
+                    </span>
+                    <span class="text-neutral-500">&middot; {{ $billingInterval === 'yearly' ? 'Yearly' : 'Monthly' }}</span>
+                    <span class="text-neutral-500">&middot;</span>
+                    @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                        <span class="text-red-500 font-medium">Cancelling at end of period</span>
                     @else
-                        {{ data_get(currentTeam(), 'subscription')->type() }}
+                        <span class="text-green-500 font-medium">Active</span>
                     @endif
-
-                </strong></div>
-
-            @if (currentTeam()->subscription->stripe_cancel_at_period_end)
-                <div class="pb-2">Subscription is active but on cancel period.</div>
-            @else
-                <div class="pb-2">Subscription is active. Last invoice is
-                    {{ currentTeam()->subscription->stripe_invoice_paid ? 'paid' : 'not paid' }}.</div>
-            @endif
-            <div class="flex items-center gap-2">
-                <div class="w-48">Number of paid servers:</div>
-                <div class="text-xl font-bold dark:text-white">{{ $server_limits }}</div>
+                </div>
+                <div class="text-sm flex items-center gap-2 flex-wrap">
+                    <span>
+                        <span class="text-neutral-500">Active servers:</span>
+                        <span class="font-medium {{ currentTeam()->serverOverflow() ? 'text-red-500' : 'dark:text-white' }}">{{ currentTeam()->servers->count() }}</span>
+                        <span class="text-neutral-500">/</span>
+                        <span class="font-medium dark:text-white" x-text="current"></span>
+                        <span class="text-neutral-500">paid</span>
+                    </span>
+                    <x-forms.button isHighlighted @click="openAdjust()">Adjust</x-forms.button>
+                </div>
+                <div class="text-sm text-neutral-500">
+                    @if ($refundCheckLoading)
+                        <x-loading text="Loading..." />
+                    @elseif ($nextBillingDate)
+                        @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                            Cancels on <span class="dark:text-white font-medium">{{ $nextBillingDate }}</span>
+                        @else
+                            Next billing <span class="dark:text-white font-medium">{{ $nextBillingDate }}</span>
+                        @endif
+                    @endif
+                </div>
             </div>
-            <div class="flex items-center gap-2">
-                <div class="w-48">Currently active servers:</div>
-                <div class="text-xl font-bold dark:text-white">{{ currentTeam()->servers->count() }}</div>
-            </div>
+
             @if (currentTeam()->serverOverflow())
-                <x-callout type="danger" title="WARNING" class="my-4">
-                    You must delete {{ currentTeam()->servers->count() - $server_limits }} servers,
-                    or upgrade your subscription. {{ currentTeam()->servers->count() - $server_limits }} servers will be
-                    deactivated.
+                <x-callout type="danger" title="Server limit exceeded" class="mt-4">
+                    You must delete {{ currentTeam()->servers->count() - $server_limits }} servers or upgrade your
+                    subscription. Excess servers will be deactivated.
                 </x-callout>
             @endif
-            <x-forms.button class="gap-2" wire:click='stripeCustomerPortal'>Change Server Quantity
-            </x-forms.button>
-            <h2 class="pt-4">Manage your subscription</h2>
-            <div class="pb-4">Cancel, upgrade or downgrade your subscription.</div>
-            <div class="flex gap-2">
-                <x-forms.button class="gap-2" wire:click='stripeCustomerPortal'>Go to <svg
-                        xmlns="http://www.w3.org/2000/svg" class="w-12 " viewBox="0 0 512 214">
-                        <path fill="#635BFF"
-                            d="M512 110.08c0-36.409-17.636-65.138-51.342-65.138c-33.85 0-54.33 28.73-54.33 64.854c0 42.808 24.179 64.426 58.88 64.426c16.925 0 29.725-3.84 39.396-9.244v-28.445c-9.67 4.836-20.764 7.823-34.844 7.823c-13.796 0-26.027-4.836-27.591-21.618h69.547c0-1.85.284-9.245.284-12.658Zm-70.258-13.511c0-16.071 9.814-22.756 18.774-22.756c8.675 0 17.92 6.685 17.92 22.756h-36.694Zm-90.31-51.627c-13.939 0-22.899 6.542-27.876 11.094l-1.85-8.818h-31.288v165.83l35.555-7.537l.143-40.249c5.12 3.698 12.657 8.96 25.173 8.96c25.458 0 48.64-20.48 48.64-65.564c-.142-41.245-23.609-63.716-48.498-63.716Zm-8.534 97.991c-8.391 0-13.37-2.986-16.782-6.684l-.143-52.765c3.698-4.124 8.818-6.968 16.925-6.968c12.942 0 21.902 14.506 21.902 33.137c0 19.058-8.818 33.28-21.902 33.28ZM241.493 36.551l35.698-7.68V0l-35.698 7.538V36.55Zm0 10.809h35.698v124.444h-35.698V47.36Zm-38.257 10.524L200.96 47.36h-30.72v124.444h35.556V87.467c8.39-10.951 22.613-8.96 27.022-7.396V47.36c-4.551-1.707-21.191-4.836-29.582 10.524Zm-71.112-41.386l-34.702 7.395l-.142 113.92c0 21.05 15.787 36.551 36.836 36.551c11.662 0 20.195-2.133 24.888-4.693V140.8c-4.55 1.849-27.022 8.391-27.022-12.658V77.653h27.022V47.36h-27.022l.142-30.862ZM35.982 83.484c0-5.546 4.551-7.68 12.09-7.68c10.808 0 24.461 3.272 35.27 9.103V51.484c-11.804-4.693-23.466-6.542-35.27-6.542C19.2 44.942 0 60.018 0 85.192c0 39.252 54.044 32.995 54.044 49.92c0 6.541-5.688 8.675-13.653 8.675c-11.804 0-26.88-4.836-38.827-11.378v33.849c13.227 5.689 26.596 8.106 38.827 8.106c29.582 0 49.92-14.648 49.92-40.106c-.142-42.382-54.329-34.845-54.329-50.774Z" />
-                    </svg>
+
+            {{-- Adjust Server Limit Modal --}}
+            <template x-teleport="body">
+                <div x-show="showModal"
+                    class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4" x-cloak>
+                    <div x-show="showModal" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"
+                        @click="closeAdjust()">
+                    </div>
+                    <div x-show="showModal" x-trap.inert.noscroll="showModal"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="application-settings-section application-settings-form relative flex max-h-[calc(100vh-2rem)] w-full max-w-xl flex-col shadow-modal">
+                        <div class="flex min-h-11 shrink-0 items-center justify-between px-4">
+                            <h3 class="text-[13px]! font-semibold!">Adjust server limit</h3>
+                            <button type="button" @click="closeAdjust()"
+                                class="flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                                <x-reicon name="x" class="size-3.5" />
+                            </button>
+                        </div>
+                        <div class="application-settings-section-body relative w-auto space-y-4 overflow-y-auto p-4"
+                            style="-webkit-overflow-scrolling: touch;">
+                            {{-- Server count input --}}
+                            <div>
+                                <label class="mb-1.5 block">Paid servers</label>
+                                <div class="flex items-center gap-3">
+                                    <input type="number" min="{{ $minServerLimit }}" max="{{ $maxServerLimit }}" step="1"
+                                        x-model.number="qty"
+                                        @input="preview = null"
+                                        @change="qty = Math.min({{ $maxServerLimit }}, Math.max({{ $minServerLimit }}, qty || {{ $minServerLimit }}))"
+                                        class="h-8! w-24 rounded-lg! border-neutral-200! bg-white! px-2! py-0! text-center! text-[13px]! font-semibold! shadow-none! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.04]! dark:text-fg!">
+                                    <x-forms.button
+                                        isHighlighted
+                                        x-bind:disabled="!hasChanged || loading"
+                                        @click="fetchPreview()">
+                                        Calculate Price
+                                    </x-forms.button>
+                                </div>
+                            </div>
+
+                            {{-- Loading --}}
+                            <div x-show="loading" x-cloak>
+                                <x-loading text="Loading price preview..." />
+                            </div>
+
+                            {{-- Price Preview --}}
+                            <div class="space-y-4" x-show="!loading && hasPreview" x-cloak>
+                                <div>
+                                    <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1.5">Due now</div>
+                                    <div class="flex justify-between gap-6 text-sm font-bold">
+                                        <span class="dark:text-white">Prorated charge</span>
+                                        <span class="dark:text-warning" x-text="fmt(preview?.due_now)"></span>
+                                    </div>
+                                    <p class="text-xs text-neutral-500 pt-1">Charged immediately to your payment method.</p>
+                                </div>
+                                <div>
+                                    <div class="text-xs font-bold text-neutral-500 uppercase tracking-wide pb-1.5">
+                                        Next billing cycle
+                                        @if ($nextBillingDate)
+                                            <span class="normal-case font-normal">&middot; {{ $nextBillingDate }}</span>
+                                        @endif
+                                    </div>
+                                    <div class="space-y-1.5">
+                                        <div class="flex justify-between gap-6 text-sm">
+                                            <span class="text-neutral-500" x-text="preview?.quantity + ' servers × ' + fmt(preview?.unit_price)"></span>
+                                            <span class="dark:text-white" x-text="fmt(preview?.recurring_subtotal)"></span>
+                                        </div>
+                                        <div class="flex justify-between gap-6 text-sm" x-show="preview?.tax_description" x-cloak>
+                                            <span class="text-neutral-500" x-text="preview?.tax_description"></span>
+                                            <span class="dark:text-white" x-text="fmt(preview?.recurring_tax)"></span>
+                                        </div>
+                                        <div class="flex justify-between gap-6 text-sm font-bold pt-1.5 border-t dark:border-coolgray-400 border-neutral-200">
+                                            <span class="dark:text-white">Total / <span x-text="preview?.billing_interval === 'year' ? 'year' : 'month'">month</span></span>
+                                            <span class="dark:text-white" x-text="fmt(preview?.recurring_total)"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Update Button with Confirmation --}}
+                                <x-modal-confirmation
+                                    title="Confirm Server Limit Update"
+                                    buttonTitle="Update Server Limit"
+                                    submitAction="updateQuantity"
+                                    :confirmWithText="false"
+                                    :confirmWithPassword="false"
+                                    :actions="[
+                                        'Your server limit will be updated immediately.',
+                                        'The prorated amount will be invoiced and charged now.',
+                                    ]"
+                                    warningMessage="This will update your subscription and charge the prorated amount to your payment method."
+                                    step2ButtonText="Confirm & Pay">
+                                    <x-slot:content>
+                                        <x-forms.button class="w-full" @click="$wire.set('quantity', qty)">
+                                            Update Server Limit
+                                        </x-forms.button>
+                                    </x-slot:content>
+                                </x-modal-confirmation>
+                            </div>
+
+                            {{-- Reduction Warning --}}
+                            <div x-show="isReduction" x-cloak>
+                                <x-callout type="danger" title="Warning">
+                                    Reducing below your active server count will deactivate excess servers.
+                                </x-callout>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </x-application.settings-section>
+
+        {{-- Manage Subscription --}}
+        <x-application.settings-section title="Billing"
+            description="Open the hosted billing portal to update invoices and payment methods.">
+            <div class="flex flex-wrap items-center gap-2">
+                <x-forms.button class="gap-2" wire:click='stripeCustomerPortal'>
+                    <x-reicon name="subscription" class="size-3.5" />
+                    Open billing portal
                 </x-forms.button>
             </div>
-        </div>
-        <div class="pt-4">
-            If you have any problems, please <a class="underline dark:text-white" href="{{ config('constants.urls.contact') }}"
-                target="_blank">contact us.</a>
+        </x-application.settings-section>
+
+        {{-- Cancel Subscription --}}
+        <x-application.settings-section title="Cancellation"
+            description="End the plan at the next billing date or cancel it immediately.">
+            <div class="flex flex-wrap items-center gap-2">
+                @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                    <x-forms.button wire:click="resumeSubscription">Resume Subscription</x-forms.button>
+                @else
+                    <x-modal-confirmation title="Cancel at End of Billing Period?"
+                        buttonTitle="Cancel at Period End" submitAction="cancelAtPeriodEnd"
+                        :actions="[
+                            'Your subscription will remain active until the end of the current billing period.',
+                            'No further charges will be made after the current period.',
+                            'You can resubscribe at any time.',
+                        ]" confirmationText="{{ currentTeam()->name }}"
+                        confirmationLabel="Enter your team name to confirm"
+                        shortConfirmationLabel="Team Name" step2ButtonText="Confirm Cancellation" />
+                    @if ($isRefundEligible)
+                        <div wire:key="cancel-immediately-refundable">
+                            <x-modal-confirmation title="Cancel Immediately?" buttonTitle="Cancel Immediately"
+                                isErrorButton submitAction="cancelImmediately"
+                                :checkboxes="[
+                                    [
+                                        'id' => 'refundLatestPayment',
+                                        'label' => 'Refund my latest payment (eligible for '.$refundDaysRemaining.' more days).',
+                                        'default_warning' => 'No refund will be issued for the remaining period.',
+                                    ],
+                                ]"
+                                :actions="[
+                                    'Your subscription will be cancelled immediately.',
+                                    'All servers will be deactivated.',
+                                ]" confirmationText="{{ currentTeam()->name }}"
+                                confirmationLabel="Enter your team name to confirm"
+                                shortConfirmationLabel="Team Name" step2ButtonText="Permanently Cancel" />
+                        </div>
+                    @else
+                        <div wire:key="cancel-immediately-standard">
+                            <x-modal-confirmation title="Cancel Immediately?" buttonTitle="Cancel Immediately"
+                                isErrorButton submitAction="cancelImmediately"
+                                :actions="[
+                                    'Your subscription will be cancelled immediately.',
+                                    'All servers will be deactivated.',
+                                    'No refund will be issued for the remaining period.',
+                                ]" confirmationText="{{ currentTeam()->name }}"
+                                confirmationLabel="Enter your team name to confirm"
+                                shortConfirmationLabel="Team Name" step2ButtonText="Permanently Cancel" />
+                        </div>
+                    @endif
+                @endif
+            </div>
+            @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                <p class="mt-2 text-sm text-neutral-500">Your subscription is set to cancel at the end of the billing period.</p>
+            @endif
+        </x-application.settings-section>
+
+        {{-- Refund --}}
+        <x-application.settings-section title="Refund"
+            description="Request a refund when this team is still inside the eligibility window.">
+            @if ($refundCheckLoading || $isRefundEligible)
+                <div class="flex flex-wrap items-center gap-2">
+                    @if ($refundCheckLoading)
+                        <x-forms.button disabled>Request Full Refund</x-forms.button>
+                    @else
+                        <x-modal-confirmation title="Request Full Refund?" buttonTitle="Request Full Refund"
+                            isErrorButton submitAction="refundSubscription"
+                            :actions="[
+                                'Your latest payment will be fully refunded.',
+                                'Your subscription will be cancelled immediately.',
+                                'All servers will be deactivated.',
+                            ]" confirmationText="{{ currentTeam()->name }}"
+                            confirmationLabel="Enter your team name to confirm" shortConfirmationLabel="Team Name"
+                            step2ButtonText="Confirm Refund & Cancel" />
+                    @endif
+                </div>
+            @endif
+            <p class="mt-2 text-sm text-neutral-500">
+                @if ($refundCheckLoading)
+                    Checking refund eligibility...
+                @elseif ($isRefundEligible)
+                    Eligible for a full refund &mdash; <strong class="dark:text-warning">{{ $refundDaysRemaining }}</strong> days remaining.
+                @elseif ($refundAlreadyUsed)
+                    Refund already processed. Each team is eligible for one refund only.
+                @else
+                    Not eligible for a refund.
+                @endif
+            </p>
+        </x-application.settings-section>
+
+        <div class="text-sm text-neutral-500">
+            Need help? <a class="underline dark:text-white" href="{{ config('constants.urls.contact') }}"
+                target="_blank">Contact us.</a>
         </div>
     @endif
 </div>

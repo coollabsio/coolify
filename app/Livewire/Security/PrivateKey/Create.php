@@ -43,22 +43,6 @@ class Create extends Component
         );
     }
 
-    public function generateNewRSAKey()
-    {
-        $this->generateNewKey('rsa');
-    }
-
-    public function generateNewEDKey()
-    {
-        $this->generateNewKey('ed25519');
-    }
-
-    private function generateNewKey($type)
-    {
-        $keyData = PrivateKey::generateNewKeyPair($type);
-        $this->setKeyData($keyData);
-    }
-
     public function updated($property)
     {
         if ($property === 'value') {
@@ -93,14 +77,6 @@ class Create extends Component
         }
     }
 
-    private function setKeyData(array $keyData)
-    {
-        $this->name = $keyData['name'];
-        $this->description = $keyData['description'];
-        $this->value = $keyData['private_key'];
-        $this->publicKey = $keyData['public_key'];
-    }
-
     private function validatePrivateKey()
     {
         $validationResult = PrivateKey::validateAndExtractPublicKey($this->value);
@@ -114,7 +90,7 @@ class Create extends Component
     private function redirectAfterCreation(PrivateKey $privateKey)
     {
         return $this->from === 'server'
-            ? redirect()->route('dashboard')
-            : redirect()->route('security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
+            ? redirectRoute($this, 'dashboard')
+            : redirectRoute($this, 'security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
     }
 }

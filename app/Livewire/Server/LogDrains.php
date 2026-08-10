@@ -24,16 +24,16 @@ class LogDrains extends Component
     #[Validate(['boolean'])]
     public bool $isLogDrainAxiomEnabled = false;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['string', 'nullable', 'regex:/^[a-zA-Z0-9_\-\.]+$/'])]
     public ?string $logDrainNewRelicLicenseKey = null;
 
     #[Validate(['url', 'nullable'])]
     public ?string $logDrainNewRelicBaseUri = null;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['string', 'nullable', 'regex:/^[a-zA-Z0-9_\-\.]+$/'])]
     public ?string $logDrainAxiomDatasetName = null;
 
-    #[Validate(['string', 'nullable'])]
+    #[Validate(['string', 'nullable', 'regex:/^[a-zA-Z0-9_\-\.]+$/'])]
     public ?string $logDrainAxiomApiKey = null;
 
     #[Validate(['string', 'nullable'])]
@@ -127,7 +127,7 @@ class LogDrains extends Component
         if ($this->isLogDrainNewRelicEnabled) {
             try {
                 $this->validate([
-                    'logDrainNewRelicLicenseKey' => ['required'],
+                    'logDrainNewRelicLicenseKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
                     'logDrainNewRelicBaseUri' => ['required', 'url'],
                 ]);
             } catch (\Throwable $e) {
@@ -138,8 +138,8 @@ class LogDrains extends Component
         } elseif ($this->isLogDrainAxiomEnabled) {
             try {
                 $this->validate([
-                    'logDrainAxiomDatasetName' => ['required'],
-                    'logDrainAxiomApiKey' => ['required'],
+                    'logDrainAxiomDatasetName' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                    'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
                 ]);
             } catch (\Throwable $e) {
                 $this->isLogDrainAxiomEnabled = false;
@@ -177,11 +177,11 @@ class LogDrains extends Component
         }
     }
 
-    public function submit(string $type)
+    public function submit()
     {
         try {
             $this->authorize('update', $this->server);
-            $this->syncData(true, $type);
+            $this->syncData(true);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

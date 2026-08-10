@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\Server;
+use Illuminate\Support\Once;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -10,7 +14,62 @@
 | need to change it using the "uses()" function to bind a different classes or traits.
 |
 */
-uses(Tests\TestCase::class)->in('Feature');
+uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
+
+/*
+|--------------------------------------------------------------------------
+| Shared Helpers
+|--------------------------------------------------------------------------
+|
+| Helper functions shared across multiple test files.
+|
+*/
+
+require_once __DIR__.'/Support/V5TestHelpers.php';
+require_once __DIR__.'/Support/BrowserTestHelpers.php';
+
+/*
+|--------------------------------------------------------------------------
+| Test Hooks
+|--------------------------------------------------------------------------
+|
+| Global hooks that run before/after each test.
+|
+*/
+beforeEach(function () {
+    // Flush the Once memoization cache to ensure tests get fresh data
+    Once::flush();
+
+    // Flush the Server identity map cache to ensure tests get fresh data
+    Server::flushIdentityMap();
+
+    // Browser Livewire actions often dispatch events; the Soketi host is not
+    // resolvable from host-side Pest runs (docker DNS name coolify-realtime).
+    config(['broadcasting.default' => 'null']);
+});
+
+function loginAndSkipBoarding(string $email = 'test@example.com', string $password = 'password'): mixed
+{
+    $page = visit('/login')
+        ->fill('email', $email)
+        ->fill('password', $password)
+        ->click('Login')
+        ->wait(1.5);
+
+    // First-login root users land on onboarding; skip when the control exists.
+    $page->script(<<<'JS'
+        (() => {
+            const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+            const skip = candidates.find((el) => (el.textContent || '').trim().toLowerCase() === 'skip setup');
+            if (skip) {
+                skip.click();
+            }
+        })()
+    JS);
+    $page->wait(1.5);
+
+    return $page;
+}
 
 /*
 |--------------------------------------------------------------------------

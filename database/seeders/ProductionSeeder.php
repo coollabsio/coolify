@@ -32,6 +32,16 @@ class ProductionSeeder extends Seeder
             echo "  Running in self-hosted mode.\n";
         }
 
+        if (Team::find(0) === null) {
+            (new Team)->forceFill([
+                'id' => 0,
+                'name' => 'Root Team',
+                'description' => 'The root team',
+                'personal_team' => true,
+                'show_boarding' => true,
+            ])->save();
+        }
+
         if (User::find(0) !== null && Team::find(0) !== null) {
             if (DB::table('team_user')->where('user_id', 0)->first() === null) {
                 DB::table('team_user')->insert([
@@ -113,6 +123,8 @@ class ProductionSeeder extends Seeder
                 $server_details['proxy'] = ServerMetadata::from([
                     'type' => ProxyTypes::TRAEFIK->value,
                     'status' => ProxyStatus::EXITED->value,
+                    'last_saved_settings' => null,
+                    'last_applied_settings' => null,
                 ]);
                 $server = Server::create($server_details);
                 $server->settings->is_reachable = true;
@@ -177,6 +189,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 $server_details['proxy'] = ServerMetadata::from([
                     'type' => ProxyTypes::TRAEFIK->value,
                     'status' => ProxyStatus::EXITED->value,
+                    'last_saved_settings' => null,
+                    'last_applied_settings' => null,
                 ]);
                 $server = Server::create($server_details);
                 $server->settings->is_reachable = true;

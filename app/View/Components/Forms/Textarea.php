@@ -5,8 +5,8 @@ namespace App\View\Components\Forms;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\View\Component;
-use Visus\Cuid2\Cuid2;
 
 class Textarea extends Component
 {
@@ -32,10 +32,11 @@ class Textarea extends Component
         public bool $allowTab = false,
         public bool $spellcheck = false,
         public bool $autofocus = false,
+        public bool $monospace = false,
         public ?string $helper = null,
         public bool $realtimeValidation = false,
         public bool $allowToPeak = true,
-        public string $defaultClass = 'input scrollbar font-mono',
+        public string $defaultClass = 'input scrollbar',
         public string $defaultClassInput = 'input',
         public ?int $minlength = null,
         public ?int $maxlength = null,
@@ -62,7 +63,7 @@ class Textarea extends Component
         $this->modelBinding = $this->id;
 
         if (is_null($this->id)) {
-            $this->id = new Cuid2;
+            $this->id = new_public_id();
             // Don't create wire:model binding for auto-generated IDs
             $this->modelBinding = 'null';
         }
@@ -71,7 +72,7 @@ class Textarea extends Component
         // This prevents duplicate IDs when multiple forms are on the same page
         if ($this->modelBinding && $this->modelBinding !== 'null') {
             // Use original ID with random suffix for uniqueness
-            $uniqueSuffix = new Cuid2;
+            $uniqueSuffix = new_public_id();
             $this->htmlId = $this->modelBinding.'-'.$uniqueSuffix;
         } else {
             $this->htmlId = (string) $this->id;
@@ -79,6 +80,10 @@ class Textarea extends Component
 
         if (is_null($this->name)) {
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
+        }
+
+        if ($this->monospace) {
+            $this->defaultClass .= ' font-mono';
         }
 
         // $this->label = Str::title($this->label);

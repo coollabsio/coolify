@@ -2,14 +2,68 @@
 
 namespace App\Models;
 
-use App\Jobs\PullHelperImageJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Once;
 use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'public_ipv4',
+        'public_ipv6',
+        'fqdn',
+        'public_port_min',
+        'public_port_max',
+        'do_not_track',
+        'is_auto_update_enabled',
+        'is_registration_enabled',
+        'next_channel',
+        'smtp_enabled',
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_port',
+        'smtp_encryption',
+        'smtp_username',
+        'smtp_password',
+        'smtp_timeout',
+        'resend_enabled',
+        'resend_api_key',
+        'is_dns_validation_enabled',
+        'custom_dns_servers',
+        'domain_connect_private_key',
+        'instance_name',
+        'is_api_enabled',
+        'allowed_ips',
+        'auto_update_frequency',
+        'update_check_frequency',
+        'new_version_available',
+        'instance_timezone',
+        'helper_version',
+        'disable_two_step_confirmation',
+        'is_sponsorship_popup_enabled',
+        'dev_helper_version',
+        'is_wire_navigate_enabled',
+        'is_mcp_server_enabled',
+        'webhook_allowed_internal_hosts',
+        'webhook_allow_localhost',
+        'avatar_storage_type',
+        'avatar_s3_storage_id',
+    ];
+
+    protected $hidden = [
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_username',
+        'smtp_password',
+        'resend_api_key',
+        'domain_connect_private_key',
+        'sentinel_token',
+    ];
 
     protected $casts = [
         'smtp_enabled' => 'boolean',
@@ -24,24 +78,28 @@ class InstanceSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'domain_connect_private_key' => 'encrypted',
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
+        'is_wire_navigate_enabled' => 'boolean',
+        'is_mcp_server_enabled' => 'boolean',
+        'webhook_allowed_internal_hosts' => 'array',
+        'webhook_allow_localhost' => 'boolean',
     ];
 
     protected static function booted(): void
     {
+        static::created(function () {
+            Once::flush();
+        });
+
         static::updated(function ($settings) {
-            if ($settings->wasChanged('helper_version')) {
-                Server::chunkById(100, function ($servers) {
-                    foreach ($servers as $server) {
-                        PullHelperImageJob::dispatch($server);
-                    }
-                });
-            }
+            // Clear once() cache so subsequent calls get fresh data
+            Once::flush();
 
             // Clear trusted hosts cache when FQDN changes
             if ($settings->wasChanged('fqdn')) {
@@ -90,7 +148,7 @@ class InstanceSettings extends Model
 
     public static function get()
     {
-        return InstanceSettings::findOrFail(0);
+        return once(fn () => InstanceSettings::findOrFail(0));
     }
 
     // public function getRecipients($notification)

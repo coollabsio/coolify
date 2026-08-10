@@ -3,14 +3,15 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
+use Livewire\Features\SupportEvents\Event;
 
 class General extends Component
 {
@@ -22,136 +23,98 @@ class General extends Component
 
     public Collection $services;
 
-    #[Validate('required|regex:/^[a-zA-Z0-9\s\-_.\/:()]+$/')]
     public string $name;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $description = null;
 
-    #[Validate(['nullable'])]
     public ?string $fqdn = null;
 
-    #[Validate(['required'])]
     public string $gitRepository;
 
-    #[Validate(['required'])]
     public string $gitBranch;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $gitCommitSha = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $installCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $buildCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $startCommand = null;
 
-    #[Validate(['required'])]
     public string $buildPack;
 
-    #[Validate(['required'])]
     public string $staticImage;
 
-    #[Validate(['required'])]
     public string $baseDirectory;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $publishDirectory = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $portsExposes = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $portsMappings = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $customNetworkAliases = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerfile = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerfileLocation = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerfileTargetBuild = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerRegistryImageName = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerRegistryImageTag = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeLocation = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerCompose = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeRaw = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeCustomStartCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $dockerComposeCustomBuildCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $customDockerRunOptions = null;
 
-    #[Validate(['string', 'nullable'])]
+    // Security: pre/post deployment commands are intentionally arbitrary shell — users need full
+    // flexibility (e.g. "php artisan migrate"). Access is gated by team authentication/authorization.
+    // Commands execute inside the application's own container, not on the host.
     public ?string $preDeploymentCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $preDeploymentCommandContainer = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $postDeploymentCommand = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $postDeploymentCommandContainer = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $customNginxConfiguration = null;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isStatic = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isSpa = false;
 
-    #[Validate(['boolean', 'required'])]
+    /** UI-only aggregate of isStatic/isSpa: dynamic | static | spa */
+    public string $siteType = 'dynamic';
+
     public bool $isBuildServerEnabled = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isPreserveRepositoryEnabled = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isContainerLabelEscapeEnabled = true;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isContainerLabelReadonlyEnabled = false;
 
-    #[Validate(['boolean', 'required'])]
     public bool $isHttpBasicAuthEnabled = false;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $httpBasicAuthUsername = null;
 
-    #[Validate(['string', 'nullable'])]
     public ?string $httpBasicAuthPassword = null;
 
-    #[Validate(['nullable'])]
     public ?string $watchPaths = null;
 
-    #[Validate(['string', 'required'])]
     public string $redirect;
 
-    #[Validate(['nullable'])]
     public $customLabels;
 
     public bool $labelsChanged = false;
@@ -181,36 +144,37 @@ class General extends Component
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
-            'fqdn' => 'nullable',
+            'fqdn' => ValidationPatterns::applicationDomainRules(),
+            'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
             'gitRepository' => 'required',
-            'gitBranch' => 'required',
-            'gitCommitSha' => 'nullable',
-            'installCommand' => 'nullable',
-            'buildCommand' => 'nullable',
-            'startCommand' => 'nullable',
+            'gitBranch' => ['required', 'string', new ValidGitBranch],
+            'gitCommitSha' => ['nullable', 'string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
+            'installCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'buildCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'startCommand' => ValidationPatterns::shellSafeCommandRules(),
             'buildPack' => 'required',
             'staticImage' => 'required',
-            'baseDirectory' => 'required',
-            'publishDirectory' => 'nullable',
-            'portsExposes' => 'required',
-            'portsMappings' => 'nullable',
+            'baseDirectory' => array_merge(['required'], array_slice(ValidationPatterns::directoryPathRules(), 1)),
+            'publishDirectory' => ValidationPatterns::directoryPathRules(),
+            'portsExposes' => ['nullable', 'string', 'regex:/^(\d+)(,\d+)*$/'],
+            'portsMappings' => ValidationPatterns::portMappingRules(),
             'customNetworkAliases' => 'nullable',
             'dockerfile' => 'nullable',
-            'dockerRegistryImageName' => 'nullable',
-            'dockerRegistryImageTag' => 'nullable',
-            'dockerfileLocation' => 'nullable',
-            'dockerComposeLocation' => 'nullable',
+            'dockerRegistryImageName' => ValidationPatterns::dockerImageNameRules(),
+            'dockerRegistryImageTag' => ValidationPatterns::dockerImageTagRules(),
+            'dockerfileLocation' => ValidationPatterns::filePathRules(),
+            'dockerComposeLocation' => ValidationPatterns::filePathRules(),
             'dockerCompose' => 'nullable',
             'dockerComposeRaw' => 'nullable',
-            'dockerfileTargetBuild' => 'nullable',
-            'dockerComposeCustomStartCommand' => 'nullable',
-            'dockerComposeCustomBuildCommand' => 'nullable',
+            'dockerfileTargetBuild' => ValidationPatterns::dockerTargetRules(),
+            'dockerComposeCustomStartCommand' => ValidationPatterns::shellSafeCommandRules(),
+            'dockerComposeCustomBuildCommand' => ValidationPatterns::shellSafeCommandRules(),
             'customLabels' => 'nullable',
-            'customDockerRunOptions' => 'nullable',
+            'customDockerRunOptions' => ValidationPatterns::shellSafeCommandRules(2000),
             'preDeploymentCommand' => 'nullable',
-            'preDeploymentCommandContainer' => 'nullable',
+            'preDeploymentCommandContainer' => ['nullable', ...ValidationPatterns::containerNameRules()],
             'postDeploymentCommand' => 'nullable',
-            'postDeploymentCommandContainer' => 'nullable',
+            'postDeploymentCommandContainer' => ['nullable', ...ValidationPatterns::containerNameRules()],
             'customNginxConfiguration' => 'nullable',
             'isStatic' => 'boolean|required',
             'isSpa' => 'boolean|required',
@@ -231,15 +195,27 @@ class General extends Component
         return array_merge(
             ValidationPatterns::combinedMessages(),
             [
+                ...ValidationPatterns::filePathMessages('dockerfileLocation', 'Dockerfile'),
+                ...ValidationPatterns::filePathMessages('dockerComposeLocation', 'Docker Compose'),
+                'baseDirectory.regex' => 'The base directory must be a valid path starting with / and containing only safe characters.',
+                'publishDirectory.regex' => 'The publish directory must be a valid path starting with / and containing only safe characters.',
+                'dockerfileTargetBuild.regex' => 'The Dockerfile target build must contain only alphanumeric characters, dots, hyphens, and underscores.',
+                'dockerComposeCustomStartCommand.regex' => 'The Docker Compose start command contains invalid characters. Allowed: alphanumerics, && / || chaining, balanced quotes, globs (*, ?), !, and safe path/arg chars. Blocked: bare &, bare |, ;, $, backtick, (, ), <, >, \\, newlines.',
+                'dockerComposeCustomBuildCommand.regex' => 'The Docker Compose build command contains invalid characters. Allowed: alphanumerics, && / || chaining, balanced quotes, globs (*, ?), !, and safe path/arg chars. Blocked: bare &, bare |, ;, $, backtick, (, ), <, >, \\, newlines.',
+                'customDockerRunOptions.regex' => 'The custom Docker run options contain invalid characters. Allowed: alphanumerics, && / || chaining, balanced quotes, globs (*, ?), !, and safe path/arg chars. Blocked: bare &, bare |, ;, $, backtick, (, ), <, >, \\, newlines.',
+                'installCommand.regex' => 'The install command contains invalid characters. Allowed: alphanumerics, && / || chaining, balanced quotes, globs (*, ?), !, and safe path/arg chars. Blocked: bare &, bare |, ;, $, backtick, (, ), <, >, \\, newlines.',
+                'buildCommand.regex' => 'The build command contains invalid characters. Allowed: alphanumerics, && / || chaining, balanced quotes, globs (*, ?), !, and safe path/arg chars. Blocked: bare &, bare |, ;, $, backtick, (, ), <, >, \\, newlines.',
+                'startCommand.regex' => 'The start command contains invalid characters. Allowed: alphanumerics, && / || chaining, balanced quotes, globs (*, ?), !, and safe path/arg chars. Blocked: bare &, bare |, ;, $, backtick, (, ), <, >, \\, newlines.',
+                'preDeploymentCommandContainer.regex' => 'The pre-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
+                'postDeploymentCommandContainer.regex' => 'The post-deployment command container name must contain only alphanumeric characters, dots, hyphens, and underscores.',
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'gitRepository.required' => 'The Git Repository field is required.',
                 'gitBranch.required' => 'The Git Branch field is required.',
                 'buildPack.required' => 'The Build Pack field is required.',
                 'staticImage.required' => 'The Static Image field is required.',
                 'baseDirectory.required' => 'The Base Directory field is required.',
-                'portsExposes.required' => 'The Exposed Ports field is required.',
+                'portsExposes.regex' => 'Ports exposes must be a comma-separated list of port numbers (e.g. 3000,3001).',
+                ...ValidationPatterns::portMappingMessages(),
                 'isStatic.required' => 'The Static setting is required.',
                 'isStatic.boolean' => 'The Static setting must be true or false.',
                 'isSpa.required' => 'The SPA setting is required.',
@@ -322,18 +298,13 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
             }
         }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
         // Convert service names with dots and dashes to use underscores for HTML form binding
-        $sanitizedDomains = [];
-        foreach ($this->parsedServiceDomains as $serviceName => $domain) {
-            $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
-            $sanitizedDomains[$sanitizedKey] = $domain;
-        }
-        $this->parsedServiceDomains = $sanitizedDomains;
+        $this->parsedServiceDomains = $this->sanitizeParsedServiceDomainsForForm($this->parsedServiceDomains);
 
         $this->customLabels = $this->application->parseContainerLabels();
         if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && $this->application->settings->is_container_label_readonly_enabled === true) {
@@ -343,7 +314,7 @@ class General extends Component
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just use existing labels
                 // $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
             }
@@ -355,7 +326,7 @@ class General extends Component
                 $this->authorize('update', $this->application);
                 $this->initLoadingCompose = true;
                 $this->dispatch('info', 'Loading docker compose file.');
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, skip loading compose file
             }
         }
@@ -469,11 +440,19 @@ class General extends Component
             // Application settings properties
             $this->isStatic = $this->application->settings->is_static;
             $this->isSpa = $this->application->settings->is_spa;
+            $this->siteType = $this->isStatic ? ($this->isSpa ? 'spa' : 'static') : 'dynamic';
             $this->isBuildServerEnabled = $this->application->settings->is_build_server_enabled;
             $this->isPreserveRepositoryEnabled = $this->application->settings->is_preserve_repository_enabled;
             $this->isContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $this->isContainerLabelReadonlyEnabled = $this->application->settings->is_container_label_readonly_enabled;
         }
+    }
+
+    public function setSiteType(): void
+    {
+        $this->isStatic = $this->siteType !== 'dynamic';
+        $this->isSpa = $this->siteType === 'spa';
+        $this->instantSave();
     }
 
     public function instantSave()
@@ -516,12 +495,13 @@ class General extends Component
             if ($this->isContainerLabelReadonlyEnabled) {
                 $this->resetDefaultLabels(false);
             }
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function loadComposeFile($isInit = false, $showToast = true)
+    public function loadComposeFile($isInit = false, $showToast = true, ?string $restoreBaseDirectory = null, ?string $restoreDockerComposeLocation = null)
     {
         try {
             $this->authorize('update', $this->application);
@@ -530,7 +510,7 @@ class General extends Component
                 return;
             }
 
-            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit, $restoreBaseDirectory, $restoreDockerComposeLocation);
             if (is_null($this->parsedServices)) {
                 $showToast && $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
 
@@ -546,20 +526,18 @@ class General extends Component
 
             $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
             // Convert service names with dots and dashes to use underscores for HTML form binding
-            $sanitizedDomains = [];
-            foreach ($this->parsedServiceDomains as $serviceName => $domain) {
-                $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
-                $sanitizedDomains[$sanitizedKey] = $domain;
-            }
-            $this->parsedServiceDomains = $sanitizedDomains;
+            $this->parsedServiceDomains = $this->sanitizeParsedServiceDomainsForForm($this->parsedServiceDomains);
 
             $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
             $this->dispatch('refreshStorages');
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
-            $this->application->docker_compose_location = $this->initialDockerComposeLocation;
-            $this->application->save();
+            // Refresh model to get restored values from Application::loadComposeFile
+            $this->application->refresh();
+            // Sync restored values back to component properties for UI update
+
+            $this->syncData();
 
             return handleError($e, $this);
         } finally {
@@ -572,24 +550,16 @@ class General extends Component
         try {
             $this->authorize('update', $this->application);
 
-            $uuid = new Cuid2;
+            $uuid = new_public_id();
             $domain = generateUrl(server: $this->application->destination->server, random: $uuid);
-            $sanitizedKey = str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
+            $sanitizedKey = normalizeComposeServiceName($serviceName);
             $this->parsedServiceDomains[$sanitizedKey]['domain'] = $domain;
 
             // Convert back to original service names for storage
             $originalDomains = [];
+            $composeServiceNames = collect(data_get($this->parsedServices, 'services', []))->keys()->map(fn ($name) => (string) $name)->values()->all();
             foreach ($this->parsedServiceDomains as $key => $value) {
-                // Find the original service name by checking parsed services
-                $originalServiceName = $key;
-                if (isset($this->parsedServices['services'])) {
-                    foreach ($this->parsedServices['services'] as $originalName => $service) {
-                        if (str($originalName)->replace('-', '_')->replace('.', '_')->toString() === $key) {
-                            $originalServiceName = $originalName;
-                            break;
-                        }
-                    }
-                }
+                $originalServiceName = findComposeServiceName((string) $key, $composeServiceNames) ?? (string) $key;
                 $originalDomains[$originalServiceName] = $value;
             }
 
@@ -606,13 +576,6 @@ class General extends Component
         }
     }
 
-    public function updatedBaseDirectory()
-    {
-        if ($this->buildPack === 'dockercompose') {
-            $this->loadComposeFile();
-        }
-    }
-
     public function updatedIsStatic($value)
     {
         if ($value) {
@@ -625,7 +588,7 @@ class General extends Component
         // Check if user has permission to update
         try {
             $this->authorize('update', $this->application);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             // User doesn't have permission, revert the change and return
             $this->application->refresh();
             $this->syncData();
@@ -636,13 +599,11 @@ class General extends Component
         // Sync property to model before checking/modifying
         $this->syncData(toModel: true);
 
-        if ($this->buildPack !== 'nixpacks') {
+        if ($this->buildPack !== 'nixpacks' && $this->buildPack !== 'railpack') {
             $this->isStatic = false;
             $this->application->settings->is_static = false;
             $this->application->settings->save();
         } else {
-            $this->portsExposes = '3000';
-            $this->application->ports_exposes = '3000';
             $this->resetDefaultLabels(false);
         }
         if ($this->buildPack === 'dockercompose') {
@@ -652,20 +613,8 @@ class General extends Component
                 $this->fqdn = null;
                 $this->application->fqdn = null;
                 $this->application->settings->save();
-            } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            } catch (AuthorizationException $e) {
                 // User doesn't have update permission, just continue without saving
-            }
-        } else {
-            // Clear Docker Compose specific data when switching away from dockercompose
-            if ($this->application->getOriginal('build_pack') === 'dockercompose') {
-                $this->application->docker_compose_domains = null;
-                $this->application->docker_compose_raw = null;
-
-                // Remove SERVICE_FQDN_* and SERVICE_URL_* environment variables
-                $this->application->environment_variables()->where('key', 'LIKE', 'SERVICE_FQDN_%')->delete();
-                $this->application->environment_variables()->where('key', 'LIKE', 'SERVICE_URL_%')->delete();
-                $this->application->environment_variables_preview()->where('key', 'LIKE', 'SERVICE_FQDN_%')->delete();
-                $this->application->environment_variables_preview()->where('key', 'LIKE', 'SERVICE_URL_%')->delete();
             }
         }
         if ($this->buildPack === 'static') {
@@ -742,7 +691,10 @@ class General extends Component
             if ($this->application->additional_servers->count() === 0) {
                 foreach ($domains as $domain) {
                     if (! validateDNSEntry($domain, $this->application->destination->server)) {
-                        $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                        $server = $this->application->destination->server;
+                        $target = serverDnsTargetIp($server) ?? $server->ip;
+                        $guidance = dnsMismatchGuidanceMessage($target, $target);
+                        $showToaster && $this->dispatch('error', 'Validating DNS failed.', "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     }
                 }
             }
@@ -781,9 +733,13 @@ class General extends Component
         $this->authorize('update', $this->application);
 
         try {
+            $this->application->redirect = $this->redirect;
             $has_www = collect($this->application->fqdns)->filter(fn ($fqdn) => str($fqdn)->contains('www.'))->count();
             if ($has_www === 0 && $this->application->redirect === 'www') {
-                $this->dispatch('error', 'You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list and as an A DNS record (if applicable).');
+                $server = $this->application->destination?->server;
+                $target = $server ? (serverDnsTargetIp($server) ?? $server->ip) : null;
+                $dnsHint = dnsMismatchGuidanceMessage($target, $target);
+                $this->dispatch('error', "You want to redirect to www, but you do not have a www domain set.<br><br>Please add www to your domain list ({$dnsHint}).");
 
                 return;
             }
@@ -800,23 +756,22 @@ class General extends Component
         try {
             $this->authorize('update', $this->application);
 
+            $this->resetErrorBag();
+
+            $this->portsExposes = str($this->portsExposes)->replace(' ', '')->trim()->toString() ?: null;
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
+            }
+
             $this->validate();
 
             $oldPortsExposes = $this->application->ports_exposes;
             $oldIsContainerLabelEscapeEnabled = $this->application->settings->is_container_label_escape_enabled;
             $oldDockerComposeLocation = $this->initialDockerComposeLocation;
+            $oldBaseDirectory = $this->application->base_directory;
 
             // Process FQDN with intermediate variable to avoid Collection/string confusion
-            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
-            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
-            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
-                $domain = trim($domain);
-                Url::fromString($domain, ['http', 'https']);
-
-                return str($domain)->lower();
-            });
-
-            $this->fqdn = $domains->unique()->implode(',');
+            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));
@@ -835,6 +790,42 @@ class General extends Component
                 return; // Stop if there are conflicts and user hasn't confirmed
             }
 
+            // Normalize paths BEFORE validation
+            if ($this->baseDirectory && $this->baseDirectory !== '/') {
+                $this->baseDirectory = rtrim($this->baseDirectory, '/');
+                $this->application->base_directory = $this->baseDirectory;
+            }
+            if ($this->publishDirectory && $this->publishDirectory !== '/') {
+                $this->publishDirectory = rtrim($this->publishDirectory, '/');
+                $this->application->publish_directory = $this->publishDirectory;
+            }
+
+            // Validate docker compose file path BEFORE saving to database
+            // This prevents invalid paths from being persisted when validation fails
+            if ($this->buildPack === 'dockercompose' &&
+                ($oldDockerComposeLocation !== $this->dockerComposeLocation ||
+                 $oldBaseDirectory !== $this->baseDirectory)) {
+                // Pass original values to loadComposeFile so it can restore them on failure
+                // The finally block in Application::loadComposeFile will save these original
+                // values if validation fails, preventing invalid paths from being persisted
+                $compose_return = $this->loadComposeFile(
+                    isInit: false,
+                    showToast: false,
+                    restoreBaseDirectory: $oldBaseDirectory,
+                    restoreDockerComposeLocation: $oldDockerComposeLocation
+                );
+                if ($compose_return instanceof Event) {
+                    // Validation failed - restore original values to component properties
+                    $this->baseDirectory = $oldBaseDirectory;
+                    $this->dockerComposeLocation = $oldDockerComposeLocation;
+                    // The model was saved by loadComposeFile's finally block with original values
+                    // Refresh to sync component with database state
+                    $this->application->refresh();
+
+                    return;
+                }
+            }
+
             $this->application->save();
             if (! $this->customLabels && $this->application->destination->server->proxyType() !== 'NONE' && ! $this->application->settings->is_container_label_readonly_enabled) {
                 $this->customLabels = str(implode('|coolify|', generateLabelsApplication($this->application)))->replace('|coolify|', "\n");
@@ -842,19 +833,12 @@ class General extends Component
                 $this->application->save();
             }
 
-            if ($this->buildPack === 'dockercompose' && $oldDockerComposeLocation !== $this->dockerComposeLocation) {
-                $compose_return = $this->loadComposeFile(showToast: false);
-                if ($compose_return instanceof \Livewire\Features\SupportEvents\Event) {
-                    return;
-                }
-            }
-
             if ($oldPortsExposes !== $this->portsExposes || $oldIsContainerLabelEscapeEnabled !== $this->isContainerLabelEscapeEnabled) {
                 $this->resetDefaultLabels();
             }
             if ($this->buildPack === 'dockerimage') {
                 $this->validate([
-                    'dockerRegistryImageName' => 'required',
+                    'dockerRegistryImageName' => ValidationPatterns::dockerImageNameRules(required: true),
                 ]);
             }
 
@@ -869,22 +853,21 @@ class General extends Component
                     $this->application->ports_exposes = $port;
                 }
             }
-            if ($this->baseDirectory && $this->baseDirectory !== '/') {
-                $this->baseDirectory = rtrim($this->baseDirectory, '/');
-                $this->application->base_directory = $this->baseDirectory;
-            }
-            if ($this->publishDirectory && $this->publishDirectory !== '/') {
-                $this->publishDirectory = rtrim($this->publishDirectory, '/');
-                $this->application->publish_directory = $this->publishDirectory;
-            }
             if ($this->buildPack === 'dockercompose') {
-                $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+                foreach ($this->parsedServiceDomains as $serviceName => $service) {
+                    $this->parsedServiceDomains[$serviceName]['domain'] = ValidationPatterns::normalizeApplicationDomains(data_get($service, 'domain'));
+                }
+                $originalDomains = $this->composeDomainsForStorage();
+                $this->application->docker_compose_domains = json_encode($originalDomains);
                 if ($this->application->isDirty('docker_compose_domains')) {
-                    foreach ($this->parsedServiceDomains as $service) {
+                    foreach ($originalDomains as $service) {
                         $domain = data_get($service, 'domain');
                         if ($domain) {
                             if (! validateDNSEntry($domain, $this->application->destination->server)) {
-                                $showToaster && $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$domain->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                                $server = $this->application->destination->server;
+                                $target = serverDnsTargetIp($server) ?? $server->ip;
+                                $guidance = dnsMismatchGuidanceMessage($target, $target);
+                                $showToaster && $this->dispatch('error', 'Validating DNS failed.', "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                             }
                         }
                     }
@@ -934,70 +917,129 @@ class General extends Component
         ]);
     }
 
-    private function updateServiceEnvironmentVariables()
+    public function getDetectedPortInfoProperty(): ?array
     {
-        $domains = collect(json_decode($this->application->docker_compose_domains, true)) ?? collect([]);
+        $detectedPort = $this->application->detectPortFromEnvironment();
 
-        foreach ($domains as $serviceName => $service) {
-            $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
-            $domain = data_get($service, 'domain');
-            // Delete SERVICE_FQDN_ and SERVICE_URL_ variables if domain is removed
-            $this->application->environment_variables()->where('resourceable_type', Application::class)
-                ->where('resourceable_id', $this->application->id)
-                ->where('key', 'LIKE', "SERVICE_FQDN_{$serviceNameFormatted}%")
-                ->delete();
+        if (! $detectedPort) {
+            return null;
+        }
 
-            $this->application->environment_variables()->where('resourceable_type', Application::class)
-                ->where('resourceable_id', $this->application->id)
-                ->where('key', 'LIKE', "SERVICE_URL_{$serviceNameFormatted}%")
-                ->delete();
+        $portsExposesArray = $this->application->ports_exposes_array;
+        $isMatch = in_array($detectedPort, $portsExposesArray);
+        $isEmpty = empty($portsExposesArray);
 
-            if ($domain) {
-                // Create or update SERVICE_FQDN_ and SERVICE_URL_ variables
-                $fqdn = Url::fromString($domain);
-                $port = $fqdn->getPort();
-                $path = $fqdn->getPath();
-                $urlValue = $fqdn->getScheme().'://'.$fqdn->getHost();
-                if ($path !== '/') {
-                    $urlValue = $urlValue.$path;
-                }
-                $fqdnValue = str($domain)->after('://');
-                if ($path !== '/') {
-                    $fqdnValue = $fqdnValue.$path;
-                }
+        return [
+            'port' => $detectedPort,
+            'matches' => $isMatch,
+            'isEmpty' => $isEmpty,
+        ];
+    }
 
-                // Create/update SERVICE_FQDN_
-                $this->application->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_FQDN_{$serviceNameFormatted}",
-                ], [
-                    'value' => $fqdnValue,
-                    'is_preview' => false,
-                ]);
+    public function getDockerComposeBuildCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomBuildCommand) {
+            return '';
+        }
 
-                // Create/update SERVICE_URL_
-                $this->application->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_URL_{$serviceNameFormatted}",
-                ], [
-                    'value' => $urlValue,
-                    'is_preview' => false,
-                ]);
-                // Create/update port-specific variables if port exists
-                if (filled($port)) {
-                    $this->application->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_FQDN_{$serviceNameFormatted}_{$port}",
-                    ], [
-                        'value' => $fqdnValue,
-                        'is_preview' => false,
-                    ]);
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
 
-                    $this->application->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_URL_{$serviceNameFormatted}_{$port}",
-                    ], [
-                        'value' => $urlValue,
-                        'is_preview' => false,
-                    ]);
-                }
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Actual deployment uses absolute path: /artifacts/{deployment_uuid}{base_directory}{docker_compose_location}
+        // Build-time env path references ApplicationDeploymentJob::BUILD_TIME_ENV_PATH as source of truth
+        $command = injectDockerComposeFlags(
+            $this->dockerComposeCustomBuildCommand,
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
+            ApplicationDeploymentJob::BUILD_TIME_ENV_PATH
+        );
+
+        // Inject build args if not using build secrets
+        if (! $this->application->settings->use_build_secrets) {
+            $buildTimeEnvs = $this->application->environment_variables()
+                ->where('is_buildtime', true)
+                ->get();
+
+            if ($buildTimeEnvs->isNotEmpty()) {
+                $buildArgs = generateDockerBuildArgs($buildTimeEnvs);
+                $buildArgsString = $buildArgs->implode(' ');
+
+                $command = injectDockerComposeBuildArgs($command, $buildArgsString);
             }
         }
+
+        return $command;
+    }
+
+    public function getDockerComposeStartCommandPreviewProperty(): string
+    {
+        if (! $this->dockerComposeCustomStartCommand) {
+            return '';
+        }
+
+        // Normalize baseDirectory to prevent double slashes (e.g., when baseDirectory is '/')
+        $normalizedBase = $this->baseDirectory === '/' ? '' : rtrim($this->baseDirectory, '/');
+
+        // Use relative path for clarity in preview (e.g., ./backend/docker-compose.yaml)
+        // Placeholder {workdir}/.env shows it's the workdir .env file (runtime env, not build-time)
+        return injectDockerComposeFlags(
+            $this->dockerComposeCustomStartCommand,
+            ".{$normalizedBase}{$this->dockerComposeLocation}",
+            '{workdir}/.env'
+        );
+    }
+
+    private function composeDomainsForStorage(): array
+    {
+        return rekeyComposeDomainsToServiceNames(
+            $this->parsedServiceDomains,
+            collect(data_get($this->parsedServices, 'services', []))->keys(),
+        );
+    }
+
+    /**
+     * Collapse domain map keys to underscore form keys for Livewire/HTML binding.
+     * When twin keys exist, prefer a filled domain over a blank one.
+     *
+     * @param  array<string, mixed>  $domains
+     * @return array<string, mixed>
+     */
+    private function sanitizeParsedServiceDomainsForForm(array $domains): array
+    {
+        $sanitizedDomains = [];
+
+        foreach ($domains as $serviceName => $domain) {
+            $sanitizedKey = normalizeComposeServiceName((string) $serviceName);
+            if (! array_key_exists($sanitizedKey, $sanitizedDomains)) {
+                $sanitizedDomains[$sanitizedKey] = $domain;
+
+                continue;
+            }
+
+            $existing = $sanitizedDomains[$sanitizedKey];
+            if (is_object($existing)) {
+                $existing = (array) $existing;
+            }
+            if (is_object($domain)) {
+                $domain = (array) $domain;
+            }
+            if (! is_array($existing)) {
+                $existing = ['domain' => $existing];
+            }
+            if (! is_array($domain)) {
+                $domain = ['domain' => $domain];
+            }
+
+            $merged = array_merge($existing, $domain);
+            $merged['domain'] = preferComposeDomainValue(
+                $existing['domain'] ?? null,
+                false,
+                $domain['domain'] ?? null,
+                false,
+            );
+            $sanitizedDomains[$sanitizedKey] = $merged;
+        }
+
+        return $sanitizedDomains;
     }
 }

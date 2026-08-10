@@ -32,11 +32,24 @@
 }
 
 @utility input-sticky {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-1 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 dark:bg-coolgray-100 dark:text-white disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 focus-visible:outline-none;
+    box-shadow: inset 4px 0 0 transparent, inset 0 0 0 1px #e5e5e5;
+
+    &:where(.dark, .dark *) {
+        box-shadow: inset 4px 0 0 transparent, inset 0 0 0 1px #242424;
+    }
+
+    &:focus-visible {
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 1px #e5e5e5;
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 1px #242424;
+    }
 }
 
 @utility input-sticky-active {
-    @apply text-black border-2 border-coollabs dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs;
+    @apply text-black border-2 border-coollabs dark:border-warning dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-warning;
 }
 
 /* Focus */
@@ -46,20 +59,51 @@
 
 /*  input, select before */
 @utility input-select {
-    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 ring-2 ring-inset dark:bg-coolgray-100 dark:text-white ring-neutral-200 dark:ring-coolgray-300 disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 dark:disabled:ring-transparent;
+    @apply block h-9 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-white dark:bg-surface dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
+    box-shadow: none;
+
+    &:where(.dark, .dark *) {
+        box-shadow: none;
+    }
+
+    &:disabled {
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):disabled {
+        box-shadow: none;
+    }
 }
 
 /* Readonly */
 @utility input {
-    @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
+    @apply dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200;
     @apply input-select;
-    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
+    @apply focus-visible:outline-none;
+
+    &:focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 1px var(--color-accent);
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 1px var(--color-accent);
+    }
+
+    &:read-only {
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):read-only {
+        box-shadow: none;
+    }
 }
 
 @utility select {
     @apply w-full;
     @apply input-select;
-    @apply focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning;
+    @apply focus-visible:outline-none;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23000000'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9'/%3e%3c/svg%3e");
     background-position: right 0.5rem center;
     background-repeat: no-repeat;
@@ -69,10 +113,57 @@
     &:where(.dark, .dark *) {
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23ffffff'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9'/%3e%3c/svg%3e");
     }
+
+    &:focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 1px var(--color-accent);
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 1px var(--color-accent);
+    }
 }
 
 @utility button {
-    @apply flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    /* h-9 matches input-select; nowrap + shrink-0 keep side-by-side action rows equal height */
+    @apply inline-flex shrink-0 gap-1.5 justify-center items-center whitespace-nowrap px-2.5 h-9 min-h-9 text-[13px] text-black normal-case rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
+}
+
+@utility button-highlighted {
+    @apply border-coollabs-200 bg-linear-to-b from-coollabs-100 to-coollabs-200 text-white! hover:from-coollabs-100 hover:to-coollabs hover:text-white!;
+}
+
+@utility control-selected {
+    @apply bg-linear-to-b from-coollabs-100 to-coollabs-200 text-white;
+}
+
+@utility loading-indicator {
+    @apply text-coollabs dark:text-coollabs;
+}
+
+/* Compact icon-only control (gear, chevrons, etc.) */
+@utility icon-button {
+    @apply inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-neutral-400 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-35 dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg;
+}
+
+/* Hide static icons while a Livewire loading spinner is shown on the button. */
+.button.is-loading > svg:not(.animate-spin) {
+    display: none;
+}
+
+/* Compact resource tab pill */
+@utility app-tab {
+    @apply inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[13px] font-medium text-neutral-500 dark:text-fg-dim hover:bg-neutral-100 dark:hover:bg-white/[0.05] hover:text-black dark:hover:text-fg transition-colors;
+}
+
+/* Active resource tab (used with aria-current="page") */
+@utility app-tab-active {
+    @apply bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20;
+}
+
+@utility auth-tooltip {
+    @apply fixed z-[99] px-2.5 py-1.5 text-xs font-medium rounded-lg pointer-events-none whitespace-nowrap text-white bg-neutral-900 border border-neutral-700 shadow-lg dark:text-fg dark:bg-raised dark:border-white/10;
 }
 
 @utility alert-success {
@@ -91,8 +182,16 @@
     @apply flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200;
 }
 
+@utility user-menu-item {
+    @apply flex items-center gap-2.5 px-3 h-8 w-full text-[13px] font-medium text-neutral-600 dark:text-fg-dim hover:bg-neutral-100 dark:hover:bg-white/[0.06] hover:text-black dark:hover:text-fg transition-colors cursor-pointer;
+}
+
 @utility dropdown-item {
     @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
+}
+
+@utility dropdown-item-touch {
+    @apply min-h-10 px-3 py-2 text-sm;
 }
 
 @utility dropdown-item-no-padding {
@@ -104,7 +203,7 @@
 }
 
 @utility badge-dashboard {
-    @apply absolute top-0 right-0 w-2.5 h-2.5 rounded-bl-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
+    @apply absolute top-1 right-1 w-2.5 h-2.5 rounded-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
 }
 
 @utility badge-success {
@@ -124,15 +223,49 @@
 }
 
 @utility menu-item {
-    @apply flex gap-3 items-center px-2 py-1 w-full text-sm sm:pr-0 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 min-w-fit sm:min-w-64;
+    @apply relative flex gap-2.5 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-md truncate min-w-0 transition-colors text-nav-text hover:bg-neutral-100 hover:text-nav-active dark:hover:bg-white/[0.05];
+}
+@utility menu-item-icon {
+    @apply shrink-0 size-[18px] opacity-90;
+}
+
+@utility menu-item-label {
+    @apply min-w-0 flex-1 truncate;
 }
 
 @utility menu-item-active {
-    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning bg-neutral-200;
+    /* Solid selected pill only — no accent rail / border. */
+    @apply overflow-hidden rounded-md bg-black/[0.05] text-nav-active hover:bg-black/[0.05] dark:bg-white/[0.06] dark:hover:bg-white/[0.06];
+}
+
+/* Subtle Title-Case section header */
+@utility nav-section {
+    @apply px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none;
+}
+
+/* Indented child rows in a collapsible nav group */
+@utility menu-subitem {
+    /* Label owns text ellipsis; keep this row overflow-visible so the focus ring is not clipped. */
+    @apply relative flex gap-2.5 items-center h-8 pl-3 pr-2.5 w-full text-[13px] font-medium rounded-md min-w-0 transition-colors text-nav-text hover:bg-neutral-100 hover:text-nav-active dark:hover:bg-white/[0.05];
+}
+@utility menu-subitem-active {
+    @apply rounded-md bg-black/[0.05] text-nav-active hover:bg-black/[0.05] dark:bg-white/[0.06] dark:hover:bg-white/[0.06];
+}
+
+@utility sub-menu-wrapper {
+    @apply flex flex-col gap-0.5 w-full md:w-52 shrink-0;
+}
+
+@utility sub-menu-item {
+    @apply relative flex gap-2 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-none truncate min-w-0 transition-colors text-nav-text hover:bg-neutral-100 dark:hover:bg-white/[0.05] hover:text-nav-active;
+}
+
+@utility sub-menu-item-icon {
+    @apply shrink-0 size-4 dark:hover:text-white;
 }
 
 @utility heading-item-active {
-    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning;
+    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-warning;
 }
 
 @utility icon {
@@ -140,7 +273,7 @@
 }
 
 @utility scrollbar {
-    @apply scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-track-coolgray-200 scrollbar-thin;
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-thumb-coollabs-100 dark:scrollbar-track-coolgray-200 scrollbar-thin;
 }
 
 @utility main {
@@ -152,7 +285,7 @@
 }
 
 @utility navbar-main {
-    @apply flex flex-col gap-4 justify-items-start pb-2 border-b-2 border-solid h-fit md:flex-row sm:justify-between dark:border-coolgray-200 border-neutral-200 md:items-center text-neutral-700 dark:text-neutral-400;
+    @apply flex flex-col gap-4 justify-items-start pb-3 border-b border-solid h-fit md:flex-row sm:justify-between dark:border-white/[0.06] border-neutral-200 md:items-center text-neutral-700 dark:text-fg-dim;
 }
 
 @utility loading {
@@ -164,7 +297,7 @@
 }
 
 @utility box {
-    @apply relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 shadow-sm bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-coolgray-300 hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline rounded-sm;
+    @apply relative flex lg:flex-row flex-col p-3 transition-colors cursor-pointer min-h-[4rem] bg-white dark:bg-surface border text-black dark:text-fg hover:text-black border-neutral-200 dark:border-white/[0.06] hover:bg-neutral-50 dark:hover:bg-raised dark:hover:border-white/[0.1] dark:hover:text-fg hover:no-underline rounded-md;
 }
 
 @utility box-boarding {
@@ -179,16 +312,20 @@
     @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
 }
 
+@utility coolbox {
+    @apply relative flex items-center transition-all duration-150 bg-white dark:bg-surface p-4 rounded-2xl border border-neutral-200 dark:border-white/[0.06] hover:border-neutral-300 dark:hover:border-white/[0.12] dark:hover:bg-raised hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)] cursor-pointer min-h-[4.5rem];
+}
+
 @utility on-box {
     @apply rounded-sm hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
 }
 
 @utility box-title {
-    @apply font-bold text-black dark:text-white dark:group-hover:text-white;
+    @apply font-semibold text-black dark:text-white dark:group-hover:text-white;
 }
 
 @utility box-description {
-    @apply text-xs font-bold text-neutral-500 dark:group-hover:text-white group-hover:text-black;
+    @apply text-xs font-medium text-neutral-500 dark:text-fg-faint dark:group-hover:text-fg-dim group-hover:text-black;
 }
 
 @utility description {
@@ -200,15 +337,15 @@
 }
 
 @utility text-helper {
-    @apply inline-block font-bold text-coollabs dark:text-warning;
+    @apply inline-block font-semibold text-coollabs dark:text-warning;
 }
 
 @utility info-helper {
-    @apply cursor-pointer text-coollabs dark:text-warning;
+    @apply cursor-pointer text-neutral-400 transition-colors hover:text-neutral-600 dark:text-fg-faint dark:hover:text-fg-dim;
 }
 
 @utility info-helper-popup {
-    @apply hidden absolute z-40 text-xs rounded-sm text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300 max-w-xs whitespace-normal break-words;
+    @apply rounded-lg border border-neutral-200 bg-white text-neutral-600 shadow-modal whitespace-normal break-words dark:border-white/10 dark:bg-raised dark:text-fg-dim;
 }
 
 @utility buyme {
@@ -237,4 +374,49 @@
 
 @utility xterm {
     @apply p-2;
+}
+
+/* Log line optimization - uses content-visibility for lazy rendering of off-screen log lines */
+@utility log-line {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1.5em;
+}
+
+/* Search highlight styling for logs */
+@utility log-highlight {
+    @apply bg-warning/40 dark:bg-warning/30;
+}
+
+/* Log level color classes */
+@utility log-error {
+    @apply bg-red-500/10 dark:bg-red-500/15;
+}
+
+@utility log-warning {
+    @apply bg-yellow-500/10 dark:bg-yellow-500/15;
+}
+
+@utility log-debug {
+    @apply bg-purple-500/10 dark:bg-purple-500/15;
+}
+
+@utility log-info {
+    @apply bg-blue-500/10 dark:bg-blue-500/15;
+}
+
+@media (min-width: 1024px) {
+    .sidebar-collapsed .menu-item {
+        justify-content: center;
+        width: var(--button-h, 2rem);
+        height: var(--button-h, 2rem);
+        min-height: var(--button-h, 2rem);
+        padding-left: 0;
+        padding-right: 0;
+        gap: 0;
+        margin-inline: auto;
+    }
+
+    .sidebar-collapsed .sidebar-collapsed-label {
+        display: none;
+    }
 }

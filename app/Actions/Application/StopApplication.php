@@ -13,7 +13,7 @@ class StopApplication
 
     public string $jobQueue = 'high';
 
-    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true, bool $resetRestartCount = true)
     {
         $servers = collect([$application->destination->server]);
         if ($application?->additional_servers?->count() > 0) {
@@ -36,10 +36,11 @@ class StopApplication
                     : getCurrentApplicationContainerStatus($server, $application->id, 0);
 
                 $containersToStop = $containers->pluck('Names')->toArray();
+                $timeout = $application->settings->stopGracePeriodSeconds();
 
                 foreach ($containersToStop as $containerName) {
                     instant_remote_process(command: [
-                        "docker stop --time=30 $containerName",
+                        "docker stop --time=$timeout $containerName",
                         "docker rm -f $containerName",
                     ], server: $server, throwError: false);
                 }
@@ -55,6 +56,19 @@ class StopApplication
                 return $e->getMessage();
             }
         }
+
+        if ($resetRestartCount) {
+            $application->update([
+                'restart_count' => 0,
+                'last_restart_at' => null,
+                'last_restart_type' => null,
+            ]);
+        } else {
+            $application->update([
+                'status' => 'exited',
+            ]);
+        }
+
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }
 }

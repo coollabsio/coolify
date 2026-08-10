@@ -18,9 +18,23 @@ class Dashboard extends Component
 
     public function mount()
     {
-        $this->privateKeys = PrivateKey::ownedByCurrentTeam()->get();
-        $this->servers = Server::ownedByCurrentTeam()->get();
-        $this->projects = Project::ownedByCurrentTeam()->get();
+        $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
+        $this->servers = Server::ownedByCurrentTeamCached();
+        $this->projects = Project::ownedByCurrentTeam()
+            ->with(['environments:id,uuid,name,project_id'])
+            ->withCount([
+                'applications',
+                'services',
+                'postgresqls',
+                'redis',
+                'keydbs',
+                'dragonflies',
+                'clickhouses',
+                'mongodbs',
+                'mysqls',
+                'mariadbs',
+            ])
+            ->get();
     }
 
     public function render()

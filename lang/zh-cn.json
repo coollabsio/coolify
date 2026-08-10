@@ -1,5 +1,6 @@
 {
     "auth.login": "登录",
+    "auth.login.authentik": "使用 Authentik 登录",
     "auth.login.azure": "使用 Microsoft 登录",
     "auth.login.bitbucket": "使用 Bitbucket 登录",
     "auth.login.clerk": "使用 Clerk 登录",
@@ -8,6 +9,7 @@
     "auth.login.gitlab": "使用 Gitlab 登录",
     "auth.login.google": "使用 Google 登录",
     "auth.login.infomaniak": "使用 Infomaniak 登录",
+    "auth.login.zitadel": "使用 Zitadel 登录",
     "auth.already_registered": "已经注册？",
     "auth.confirm_password": "确认密码",
     "auth.forgot_password_link": "忘记密码？",
@@ -30,5 +32,13 @@
     "input.code": "验证码",
     "input.recovery_code": "恢复码",
     "button.save": "保存",
-    "repository.url": "<span class='text-helper'>示例</span><br>对于公共代码仓库，请使用 <span class='text-helper'>https://...</span>。<br>对于私有代码仓库，请使用 <span class='text-helper'>git@...</span>。<br><br>https://github.com/coollabsio/coolify-examples <span class='text-helper'>main</span> 分支将被选择<br>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify <span class='text-helper'>nodejs-fastify</span> 分支将被选择。<br>https://gitea.com/sedlav/expressjs.git <span class='text-helper'>main</span> 分支将被选择。<br>https://gitlab.com/andrasbacsai/nodejs-example.git <span class='text-helper'>main</span> 分支将被选择"
+    "repository.url": "<span class='text-helper'>示例</span><br>对于公共代码仓库，请使用 <span class='text-helper'>https://...</span>。<br>对于私有代码仓库，请使用 <span class='text-helper'>git@...</span>。<br><br>https://github.com/coollabsio/coolify-examples <span class='text-helper'>main</span> 分支将被选择<br>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify <span class='text-helper'>nodejs-fastify</span> 分支将被选择。<br>https://gitea.com/sedlav/expressjs.git <span class='text-helper'>main</span> 分支将被选择。<br>https://gitlab.com/andrasbacsai/nodejs-example.git <span class='text-helper'>main</span> 分支将被选择",
+    "service.stop": "此服务将被停止。",
+    "resource.docker_cleanup": "运行 Docker 清理（删除未使用的镜像和构建缓存）。",
+    "resource.non_persistent": "所有非持久性数据将被删除。",
+    "resource.delete_volumes": "永久删除与此资源关联的所有卷。",
+    "resource.delete_connected_networks": "永久删除与此资源关联的所有非预定义网络。",
+    "resource.delete_configurations": "永久删除服务器上的所有配置文件。",
+    "database.delete_backups_locally": "所有备份将从本地存储中永久删除。",
+    "warning.sslipdomain": "您的配置已保存，但不建议将 sslip 域与 https 一起使用，因为 Let's Encrypt 服务器对此公共域有速率限制（SSL 证书验证将失败）。<br><br>请改用您自己的域名。"
 }

@@ -1,216 +1,127 @@
-<div>
-    <div class="flex flex-col gap-2">
-        @if ($database->is_migrated && blank($database->custom_type))
+<div class="flex min-w-0 flex-col gap-3" x-data="{
+    search: '',
+    backups: @js($database->scheduledBackups->map(fn ($backup) => [
+        'name' => strtolower($database->name),
+        'frequency' => strtolower($backup->frequency),
+        's3_storage' => strtolower($backup->s3?->name ?? ''),
+    ])->values()),
+    hasMatches() {
+        const query = this.search.toLowerCase();
+
+        return this.backups.some((backup) =>
+            backup.name.includes(query)
+            || backup.frequency.includes(query)
+            || backup.s3_storage.includes(query)
+        );
+    },
+    matchCount() {
+        const query = this.search.toLowerCase();
+
+        return this.backups.filter((backup) =>
+            backup.name.includes(query)
+            || backup.frequency.includes(query)
+            || backup.s3_storage.includes(query)
+        ).length;
+    },
+}">
+    @if ($database->is_migrated && blank($database->custom_type))
+        <form wire:submit="setCustomType" class="grid gap-4 p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <div>
-                <div>Select the type of
-                    database to enable automated backups.</div>
-                <div class="pb-4"> If your database is not listed, automated backups are not supported.</div>
-                <form wire:submit="setCustomType" class="flex gap-2 items-end">
-                    <div class="w-96">
-                        <x-forms.select label="Type" id="custom_type">
-                            <option selected value="mysql">MySQL</option>
-                            <option value="mariadb">MariaDB</option>
-                            <option value="postgresql">PostgreSQL</option>
-                            <option value="mongodb">MongoDB</option>
-                        </x-forms.select>
-                    </div>
-                    <x-forms.button type="submit">Set</x-forms.button>
-                </form>
+                <x-forms.listbox id="custom_type" label="Database type" :options="[
+                    ['value' => 'mysql', 'label' => 'MySQL'],
+                    ['value' => 'mariadb', 'label' => 'MariaDB'],
+                    ['value' => 'postgresql', 'label' => 'PostgreSQL'],
+                    ['value' => 'mongodb', 'label' => 'MongoDB'],
+                ]" />
+                <p class="mt-2 text-xs text-neutral-500 dark:text-fg-dim">
+                    Select the database engine before enabling automated backups.
+                </p>
             </div>
+            <x-forms.button type="submit">Set database type</x-forms.button>
+        </form>
+    @else
+        @if ($database->scheduledBackups->isNotEmpty())
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="relative max-w-sm">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input type="search" x-model="search" aria-label="Search backups"
+                        class="input h-8! w-full pl-8! text-[13px]!" placeholder="Search backups" />
+                </div>
+            </div>
+        @endif
+
+        @if ($database->scheduledBackups->isEmpty())
+            <x-empty size="sm" title="No scheduled backups"
+                description="Create a schedule to start protecting this database."
+                icon-name="storages" />
         @else
-            @forelse($database->scheduledBackups as $backup)
-                @if ($type == 'database')
-                    <a @class([
-                        'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
-                        'border-blue-500/50 border-dashed' =>
-                            $backup->latest_log &&
-                            data_get($backup->latest_log, 'status') === 'running',
-                        'border-error' =>
-                            $backup->latest_log &&
-                            data_get($backup->latest_log, 'status') === 'failed',
-                        'border-success' =>
-                            $backup->latest_log &&
-                            data_get($backup->latest_log, 'status') === 'success',
-                        'border-gray-200 dark:border-coolgray-300' => !$backup->latest_log,
-                    ])
-                        href="{{ route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
-                        @if ($backup->latest_log && data_get($backup->latest_log, 'status') === 'running')
-                            <div class="absolute top-2 right-2">
+            <div x-cloak x-show="search === '' || hasMatches()" class="data-table overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                <div class="data-table-header scheduled-backups-table-grid">
+                    <span>Schedule</span>
+                    <span>Latest run</span>
+                    <span>S3 storage</span>
+                    <span>Executions</span>
+                    <span class="text-right">Action</span>
+                </div>
+                @foreach ($database->scheduledBackups as $backup)
+                    @php
+                        $latestStatus = data_get($backup->latest_log, 'status');
+                        [$statusLabel, $statusType] = match ($latestStatus) {
+                            'success' => ['Success', 'success'],
+                            'running' => ['In progress', 'warning'],
+                            'failed' => ['Failed', 'error'],
+                            default => ['Never run', 'neutral'],
+                        };
+                        $backupRoute = $type === 'database'
+                            ? route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid])
+                            : route('project.service.database.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
+                        $backupExecutionsRoute = $type === 'database'
+                            ? route('project.database.backup.executions', [...$parameters, 'backup_uuid' => $backup->uuid])
+                            : route('project.service.database.backup.executions', [...$parameters, 'backup_uuid' => $backup->uuid]);
+                    @endphp
+                    <div x-show="search === ''
+                        || @js(strtolower($database->name)).includes(search.toLowerCase())
+                        || @js(strtolower($backup->frequency)).includes(search.toLowerCase())
+                        || @js(strtolower($backup->s3?->name ?? '')).includes(search.toLowerCase())"
+                        class="data-table-row scheduled-backups-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
+                        <div class="min-w-0">
+                            <span class="block truncate text-[12px] font-semibold text-black dark:text-fg">
+                                {{ $backup->frequency }}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <x-status-badge :status="$statusLabel" :type="$statusType" />
+                            @if ($latestStatus === 'running')
                                 <x-loading />
-                            </div>
-                        @endif
-                        <div class="flex items-center gap-2 mb-2">
-                            @if ($backup->latest_log)
-                                <span @class([
-                                    'px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs',
-                                    'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 dark:shadow-blue-900/5' =>
-                                        data_get($backup->latest_log, 'status') === 'running',
-                                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/5' =>
-                                        data_get($backup->latest_log, 'status') === 'failed',
-                                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 dark:shadow-green-900/5' =>
-                                        data_get($backup->latest_log, 'status') === 'success',
-                                ])>
-                                    @php
-                                        $statusText = match (data_get($backup->latest_log, 'status')) {
-                                            'success' => 'Success',
-                                            'running' => 'In Progress',
-                                            'failed' => 'Failed',
-                                            default => ucfirst(data_get($backup->latest_log, 'status')),
-                                        };
-                                    @endphp
-                                    {{ $statusText }}
-                                </span>
-                            @else
-                                <span
-                                    class="px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-gray-200">
-                                    No executions yet
-                                </span>
-                            @endif
-                            <h3 class="font-semibold">{{ $backup->frequency }}</h3>
-                        </div>
-                        <div class="text-gray-600 dark:text-gray-400 text-sm">
-                            @if ($backup->latest_log)
-                                Started:
-                                {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}
-                                @if (data_get($backup->latest_log, 'status') !== 'running')
-                                    <br>Ended:
-                                    {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}
-                                    <br>Duration:
-                                    {{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }}
-                                    <br>Finished
-                                    {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
-                                @endif
-                                @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
-                                @endif
-                                @if (data_get($backup->latest_log, 'status') === 'success')
-                                    @php
-                                        $size = data_get($backup->latest_log, 'size', 0);
-                                        $sizeFormatted =
-                                            $size > 0 ? number_format($size / 1024 / 1024, 2) . ' MB' : 'Unknown';
-                                    @endphp
-                                    <br>Last Backup Size: {{ $sizeFormatted }}
-                                @endif
-                            @else
-                                Last Run: Never
-                                <br>Total Executions: 0
-                                @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
-                                @endif
                             @endif
                         </div>
-                    </a>
-                @else
-                    <div @class([
-                        'flex flex-col border-l-2 transition-colors p-4 cursor-pointer bg-white hover:bg-gray-100 dark:bg-coolgray-100 dark:hover:bg-coolgray-200 text-black dark:text-white',
-                        'bg-gray-200 dark:bg-coolgray-200' =>
-                            data_get($backup, 'id') === data_get($selectedBackup, 'id'),
-                        'border-blue-500/50 border-dashed' =>
-                            $backup->latest_log &&
-                            data_get($backup->latest_log, 'status') === 'running',
-                        'border-error' =>
-                            $backup->latest_log &&
-                            data_get($backup->latest_log, 'status') === 'failed',
-                        'border-success' =>
-                            $backup->latest_log &&
-                            data_get($backup->latest_log, 'status') === 'success',
-                        'border-gray-200 dark:border-coolgray-300' => !$backup->latest_log,
-                        'border-coollabs' =>
-                            data_get($backup, 'id') === data_get($selectedBackup, 'id'),
-                    ]) wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
-                        @if ($backup->latest_log && data_get($backup->latest_log, 'status') === 'running')
-                            <div class="absolute top-2 right-2">
-                                <x-loading />
-                            </div>
-                        @endif
-                        <div class="flex items-center gap-2 mb-2">
-                            @if ($backup->latest_log)
-                                <span @class([
-                                    'px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs',
-                                    'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 dark:shadow-blue-900/5' =>
-                                        data_get($backup->latest_log, 'status') === 'running',
-                                    'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/5' =>
-                                        data_get($backup->latest_log, 'status') === 'failed',
-                                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 dark:shadow-green-900/5' =>
-                                        data_get($backup->latest_log, 'status') === 'success',
-                                ])>
-                                    @php
-                                        $statusText = match (data_get($backup->latest_log, 'status')) {
-                                            'success' => 'Success',
-                                            'running' => 'In Progress',
-                                            'failed' => 'Failed',
-                                            default => ucfirst(data_get($backup->latest_log, 'status')),
-                                        };
-                                    @endphp
-                                    {{ $statusText }}
-                                </span>
-                            @else
-                                <span
-                                    class="px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-gray-200">
-                                    No executions yet
-                                </span>
-                            @endif
-                            <h3 class="font-semibold">{{ $backup->frequency }} Backup</h3>
+                        <div class="truncate text-[11px] text-neutral-600 dark:text-fg-dim">
+                            {{ $backup->save_s3 ? ($backup->s3?->name ?? 'Unavailable') : 'Local only' }}
                         </div>
-                        <div class="text-gray-600 dark:text-gray-400 text-sm">
-                            @if ($backup->latest_log)
-                                Started:
-                                {{ formatDateInServerTimezone(data_get($backup->latest_log, 'created_at'), $backup->server()) }}
-                                @if (data_get($backup->latest_log, 'status') !== 'running')
-                                    <br>Ended:
-                                    {{ formatDateInServerTimezone(data_get($backup->latest_log, 'finished_at'), $backup->server()) }}
-                                    <br>Duration:
-                                    {{ calculateDuration(data_get($backup->latest_log, 'created_at'), data_get($backup->latest_log, 'finished_at')) }}
-                                    <br>Finished
-                                    {{ \Carbon\Carbon::parse(data_get($backup->latest_log, 'finished_at'))->diffForHumans() }}
-                                @endif
-                                <br><br>Total Executions: {{ $backup->executions()->count() }}
-                                @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
-                                @endif
-                                @php
-                                    $successCount = $backup->executions()->where('status', 'success')->count();
-                                    $totalCount = $backup->executions()->count();
-                                    $successRate = $totalCount > 0 ? round(($successCount / $totalCount) * 100) : 0;
-                                @endphp
-                                @if ($totalCount > 0)
-                                    <br>Success Rate: <span @class([
-                                        'font-medium',
-                                        'text-green-600' => $successRate >= 80,
-                                        'text-yellow-600' => $successRate >= 50 && $successRate < 80,
-                                        'text-red-600' => $successRate < 50,
-                                    ])>{{ $successRate }}%</span>
-                                    ({{ $successCount }}/{{ $totalCount }})
-                                @endif
-                                @if (data_get($backup->latest_log, 'status') === 'success')
-                                    @php
-                                        $size = data_get($backup->latest_log, 'size', 0);
-                                        $sizeFormatted =
-                                            $size > 0 ? number_format($size / 1024 / 1024, 2) . ' MB' : 'Unknown';
-                                    @endphp
-                                    <br>Last Backup Size: {{ $sizeFormatted }}
-                                @endif
-                            @else
-                                Last Run: Never
-                                <br>Total Executions: 0
-                                @if ($backup->save_s3)
-                                    <br>S3 Storage: Enabled
-                                @endif
-                            @endif
+                        <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
+                            <a wire:navigate href="{{ $backupExecutionsRoute }}"
+                                class="font-medium hover:underline hover:text-black dark:hover:text-fg">
+                                {{ $backup->executions_count ?? $backup->executions()->count() }}
+                            </a>
+                        </div>
+                        <div class="flex justify-end">
+                            <a class="button" wire:navigate href="{{ $backupRoute }}">Manage</a>
                         </div>
                     </div>
-                @endif
-            @empty
-                <div>No scheduled backups configured.</div>
-            @endforelse
+                @endforeach
+                <div
+                    class="flex min-h-11 items-center border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
+                    <span
+                        x-text="`${search === '' ? backups.length : matchCount()} ${(search === '' ? backups.length : matchCount()) === 1 ? 'schedule' : 'schedules'}`"></span>
+                </div>
+            </div>
         @endif
-    </div>
-    @if ($type === 'service-database' && $selectedBackup)
-        <div class="pt-10">
-            <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
-                :s3s="$s3s" :status="data_get($database, 'status')" />
-            <livewire:project.database.backup-executions wire:key="{{ $selectedBackup->uuid }}" :backup="$selectedBackup"
-                :database="$database" />
+
+        <div x-cloak x-show="search !== '' && backups.length > 0 && !hasMatches()"
+            class="border-t border-neutral-200 dark:border-white/[0.06]">
+            <x-empty size="sm" title="No matching backup schedules"
+                description="Try another database name, frequency, or storage name." />
         </div>
     @endif
 </div>

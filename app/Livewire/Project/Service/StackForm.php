@@ -4,14 +4,20 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class StackForm extends Component
 {
+    use AuthorizesRequests;
+
     public Service $service;
 
     public Collection $fields;
+
+    public bool $isPasswordHiddenForMember = false;
 
     protected $listeners = ['saveCompose'];
 
@@ -22,7 +28,7 @@ class StackForm extends Component
 
     public string $dockerComposeRaw;
 
-    public string $dockerCompose;
+    public ?string $dockerCompose = null;
 
     public ?bool $connectToDockerNetwork = null;
 
@@ -30,7 +36,7 @@ class StackForm extends Component
     {
         $baseRules = [
             'dockerComposeRaw' => 'required',
-            'dockerCompose' => 'required',
+            'dockerCompose' => 'nullable',
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'connectToDockerNetwork' => 'nullable',
@@ -51,8 +57,6 @@ class StackForm extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'dockerComposeRaw.required' => 'The Docker Compose Raw field is required.',
                 'dockerCompose.required' => 'The Docker Compose field is required.',
             ]
@@ -119,39 +123,66 @@ class StackForm extends Component
         })->flatMap(function ($group) {
             return $group;
         });
+
+        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        if ($this->isPasswordHiddenForMember) {
+            $this->fields = $this->fields->map(function ($field) {
+                if (data_get($field, 'isPassword')) {
+                    $field['value'] = null;
+                }
+
+                return $field;
+            });
+        }
     }
 
     public function saveCompose($raw)
     {
         $this->dockerComposeRaw = $raw;
         $this->submit(notify: true);
+        $this->dispatch('compose-save-finished');
     }
 
     public function instantSave()
     {
-        $this->syncData(true);
-        $this->service->save();
-        $this->dispatch('success', 'Service settings saved.');
+        try {
+            $this->authorize('update', $this->service);
+            $this->syncData(true);
+            $this->service->save();
+            $this->dispatch('success', 'Service settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit($notify = true)
     {
         try {
+            $this->authorize('update', $this->service);
             $this->validate();
             $this->syncData(true);
 
-            // Validate for command injection BEFORE saving to database
+            // Validate for command injection BEFORE any database operations
             validateDockerComposeForInjection($this->service->docker_compose_raw);
 
-            $this->service->save();
-            $this->service->saveExtraFields($this->fields);
-            $this->service->parse();
+            // Use transaction to ensure atomicity - if parse fails, save is rolled back
+            DB::transaction(function () {
+                $this->service->save();
+                $this->service->saveExtraFields($this->fields);
+                $this->service->parse();
+            });
+            // Refresh and write files after a successful commit
             $this->service->refresh();
             $this->service->saveComposeConfigs();
+
             $this->dispatch('refreshEnvs');
             $this->dispatch('refreshServices');
             $notify && $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
+            // On error, refresh from database to restore clean state
+            $this->service->refresh();
+            $this->syncData(false);
+
             return handleError($e, $this);
         } finally {
             if (is_null($this->service->config_hash)) {

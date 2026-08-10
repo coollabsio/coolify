@@ -10,12 +10,14 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTaskExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 
 class Init extends Command
@@ -73,7 +75,7 @@ class Init extends Command
         $this->cleanupUnusedNetworkFromCoolifyProxy();
 
         try {
-            $this->call('cleanup:redis', ['--clear-locks' => true]);
+            $this->call('cleanup:redis', ['--restart' => true, '--clear-locks' => true]);
         } catch (\Throwable $e) {
             echo "Error in cleanup:redis command: {$e->getMessage()}\n";
         }
@@ -86,6 +88,7 @@ class Init extends Command
             $this->call('cleanup:stucked-resources');
         } catch (\Throwable $e) {
             echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
+            echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
         }
         try {
             $updatedCount = ApplicationDeploymentQueue::whereIn('status', [
@@ -100,6 +103,34 @@ class Init extends Command
             }
         } catch (\Throwable $e) {
             echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
+        }
+
+        try {
+            $updatedTaskCount = ScheduledTaskExecution::where('status', 'running')->update([
+                'status' => 'failed',
+                'message' => 'Marked as failed during Coolify startup - job was interrupted',
+                'finished_at' => Carbon::now(),
+            ]);
+
+            if ($updatedTaskCount > 0) {
+                echo "Marked {$updatedTaskCount} stuck scheduled task executions as failed\n";
+            }
+        } catch (\Throwable $e) {
+            echo "Could not cleanup stuck scheduled task executions: {$e->getMessage()}\n";
+        }
+
+        try {
+            $updatedBackupCount = ScheduledDatabaseBackupExecution::where('status', 'running')->update([
+                'status' => 'failed',
+                'message' => 'Marked as failed during Coolify startup - job was interrupted',
+                'finished_at' => Carbon::now(),
+            ]);
+
+            if ($updatedBackupCount > 0) {
+                echo "Marked {$updatedBackupCount} stuck database backup executions as failed\n";
+            }
+        } catch (\Throwable $e) {
+            echo "Could not cleanup stuck database backup executions: {$e->getMessage()}\n";
         }
 
         try {
@@ -129,10 +160,12 @@ class Init extends Command
 
     private function pullTemplatesFromCDN()
     {
-        $response = Http::retry(3, 1000)->get(config('constants.services.official'));
+        $response = Http::retry(3, 1000, throw: false)
+            ->timeout(60)
+            ->connectTimeout(10)
+            ->get(config('constants.services.official'));
         if ($response->successful()) {
-            $services = $response->json();
-            File::put(base_path('templates/'.config('constants.services.file_name')), json_encode($services));
+            store_service_templates_bundle($response->body());
         }
     }
 
@@ -180,18 +213,19 @@ class Init extends Command
                 $removeNetworks = $allNetworks->diff($networks);
                 $commands = collect();
                 foreach ($removeNetworks as $network) {
-                    $out = instant_remote_process(["docker network inspect -f json $network | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
+                    $safe = escapeshellarg($network);
+                    $out = instant_remote_process(["docker network inspect -f json {$safe} | jq '.[].Containers | if . == {} then null else . end'"], $server, false);
                     if (empty($out)) {
-                        $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                        $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                        $commands->push("docker network disconnect {$safe} coolify-proxy >/dev/null 2>&1 || true");
+                        $commands->push("docker network rm {$safe} >/dev/null 2>&1 || true");
                     } else {
                         $data = collect(json_decode($out, true));
                         if ($data->count() === 1) {
                             // If only coolify-proxy itself is connected to that network (it should not be possible, but who knows)
                             $isCoolifyProxyItself = data_get($data->first(), 'Name') === 'coolify-proxy';
                             if ($isCoolifyProxyItself) {
-                                $commands->push("docker network disconnect $network coolify-proxy >/dev/null 2>&1 || true");
-                                $commands->push("docker network rm $network >/dev/null 2>&1 || true");
+                                $commands->push("docker network disconnect {$safe} coolify-proxy >/dev/null 2>&1 || true");
+                                $commands->push("docker network rm {$safe} >/dev/null 2>&1 || true");
                             }
                         }
                     }
@@ -220,7 +254,7 @@ class Init extends Command
                             'save_s3' => false,
                             'frequency' => '0 0 * * *',
                             'database_id' => $database->id,
-                            'database_type' => \App\Models\StandalonePostgresql::class,
+                            'database_type' => StandalonePostgresql::class,
                             'team_id' => 0,
                         ]);
                     }

@@ -99,3 +99,23 @@ it('escapes repository URLs in other deployment type', function () {
     // The malicious payload should be escaped (escapeshellarg wraps and escapes quotes)
     expect($command)->toContain("'https://github.com/user/repo.git'\\''");
 });
+
+it('preserves ssh scheme URLs with custom ports in deploy_key commands', function () {
+    $deploymentUuid = 'test-deployment-uuid';
+
+    $application = new Application;
+    $application->git_branch = 'master';
+    $application->git_repository = 'ssh://git@192.168.56.11:22222/User/Repo.git';
+    $application->private_key_id = 1;
+
+    $privateKey = new PrivateKey;
+    $privateKey->private_key = 'fake-private-key';
+    $application->setRelation('private_key', $privateKey);
+
+    $result = $application->generateGitLsRemoteCommands($deploymentUuid, false);
+
+    expect($result['commands'])
+        ->toContain("'ssh://git@192.168.56.11:22222/User/Repo.git'")
+        ->toContain('-p 22222')
+        ->not->toContain('ssh:/git@192.168.56.11:22222/User/Repo.git');
+});

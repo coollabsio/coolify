@@ -1,7 +1,16 @@
 @props(['closeWithX' => false, 'fullScreen' => false])
+{{-- `contents` so event-only shells (no trigger in the default slot) do not leave a
+     ghost layout box above layer-2 tabs. Trigger buttons in the slot still flow
+     into the parent as if unwrapped. --}}
 <div x-data="{
     slideOverOpen: false
-}" {{ $attributes->merge(['class' => 'relative w-auto h-auto']) }}>
+}"
+x-init="$watch('slideOverOpen', value => {
+    if (!value) {
+        $dispatch('slideOverClosed')
+    }
+})"
+{{ $attributes->merge(['class' => 'contents']) }}>
     {{ $slot }}
     <template x-teleport="body">
         <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif
@@ -26,11 +35,12 @@
                                 <div class="px-4 pb-4 sm:px-5">
                                     <div class="flex items-start justify-between pb-1">
                                         <h2 class="text-2xl leading-6" id="slide-over-title">
-                                            {{ $title }}</h2>
+                                            {{ $title }}
+                                        </h2>
                                         <div class="flex items-center h-auto ml-3">
                                             <button @click="slideOverOpen=false"
-                                                class="absolute top-0 right-0 z-30 flex items-center justify-center px-3 py-2 mt-4 mr-2 space-x-1 text-xs font-normal border-none rounded-sm">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none"
+                                                class="absolute cursor-pointer top-0 right-0 z-30 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none"
                                                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round"
                                                         d="M6 18L18 6M6 6l12 12"></path>

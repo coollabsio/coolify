@@ -222,9 +222,14 @@ class CleanupStuckedResources extends Command
         try {
             $scheduled_backups = ScheduledDatabaseBackup::all();
             foreach ($scheduled_backups as $scheduled_backup) {
-                if (! $scheduled_backup->server()) {
-                    echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
-                    $scheduled_backup->delete();
+                try {
+                    $server = $scheduled_backup->server();
+                    if (! $server) {
+                        echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
+                        $scheduled_backup->delete();
+                    }
+                } catch (\Throwable $e) {
+                    echo "Error checking server for scheduledbackup {$scheduled_backup->id}: {$e->getMessage()}\n";
                 }
             }
         } catch (\Throwable $e) {
@@ -416,7 +421,7 @@ class CleanupStuckedResources extends Command
             foreach ($serviceApplications as $service) {
                 if (! data_get($service, 'service')) {
                     echo 'ServiceApplication without service: '.$service->name.'\n';
-                    DeleteResourceJob::dispatch($service);
+                    $service->forceDelete();
 
                     continue;
                 }
@@ -429,7 +434,7 @@ class CleanupStuckedResources extends Command
             foreach ($serviceDatabases as $service) {
                 if (! data_get($service, 'service')) {
                     echo 'ServiceDatabase without service: '.$service->name.'\n';
-                    DeleteResourceJob::dispatch($service);
+                    $service->forceDelete();
 
                     continue;
                 }

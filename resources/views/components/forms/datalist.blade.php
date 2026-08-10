@@ -97,12 +97,20 @@
             }" @click.outside="open = false" class="relative">
 
             {{-- Unified Input Container with Tags Inside --}}
-            <div @click="$refs.searchInput.focus()"
-                class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto scrollbar py-1.5  px-2 w-full text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-text px-1 focus-within:border-l-4 focus-within:border-l-coollabs dark:focus-within:border-l-warning text-black dark:text-white"
+            <div @click="$refs.searchInput.focus()" x-data="{ focused: false }" @focusin="focused = true" @focusout="focused = false"
+                class="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto scrollbar py-1.5  px-2 w-full text-sm rounded-sm border-0 bg-white dark:bg-coolgray-100 cursor-text px-1 text-black dark:text-white"
+                :style="(() => {
+                    const isDark = document.documentElement.classList.contains('dark');
+                    const accent = isDark ? '#fcd452' : '#6b16ed';
+                    const border = isDark ? '#242424' : '#e5e5e5';
+                    return focused
+                        ? 'box-shadow: inset 4px 0 0 ' + accent + ', inset 0 0 0 2px ' + border + ';'
+                        : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px ' + border + ';';
+                })()"
                 :class="{
                         'opacity-50': {{ $disabled ? 'true' : 'false' }}
                     }" wire:loading.class="opacity-50"
-                wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4">
+                wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]">
 
                 {{-- Selected Tags Inside Input --}}
                 <template x-for="value in selected" :key="value">
@@ -136,9 +144,18 @@
                     <div @click="toggleOption(option.value)"
                         class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-3"
                         :class="{ 'bg-neutral-50 dark:bg-coolgray-300': isSelected(option.value) }">
-                        <input type="checkbox" :checked="isSelected(option.value)"
-                            class="w-4 h-4 rounded border-neutral-300 dark:border-neutral-600 bg-white dark:bg-coolgray-100 text-black dark:text-white checked:bg-white dark:checked:bg-coolgray-100 focus:ring-coollabs dark:focus:ring-warning pointer-events-none"
-                            tabindex="-1">
+                        <span class="relative flex size-[18px] shrink-0">
+                            <input type="checkbox" :checked="isSelected(option.value)"
+                                class="peer absolute inset-0 m-0 h-full w-full appearance-none opacity-0"
+                                tabindex="-1">
+                            <span
+                                class="pointer-events-none absolute inset-0 rounded-[5px] border border-neutral-300 bg-white transition-colors peer-checked:border-coollabs peer-checked:bg-coollabs dark:border-white/[0.14] dark:bg-white/[0.045] dark:peer-checked:border-warning dark:peer-checked:bg-warning"></span>
+                            <svg class="pointer-events-none absolute inset-0 m-auto size-3 scale-75 text-white opacity-0 transition-[opacity,transform] peer-checked:scale-100 peer-checked:opacity-100 dark:text-black"
+                                viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </span>
                         <span class="text-sm flex-1" x-text="option.text"></span>
                     </div>
                 </template>
@@ -221,11 +238,19 @@
                 <input type="hidden" :value="selected" @required($required) />
 
                 {{-- Input Container --}}
-                <div @click="openDropdown()"
-                    class="flex items-center gap-2 py-1.5 w-full text-sm rounded-sm border-0 ring-2 ring-inset ring-neutral-200 dark:ring-coolgray-300 bg-white dark:bg-coolgray-100 cursor-text focus-within:border-l-4 focus-within:border-l-coollabs dark:focus-within:border-l-warning text-black dark:text-white"
+                <div @click="openDropdown()" x-data="{ focused: false }" @focusin="focused = true" @focusout="focused = false"
+                    class="flex items-center gap-2 py-1.5 w-full text-sm rounded-sm border-0 bg-white dark:bg-coolgray-100 cursor-text text-black dark:text-white"
+                    :style="(() => {
+                        const isDark = document.documentElement.classList.contains('dark');
+                        const accent = isDark ? '#fcd452' : '#6b16ed';
+                        const border = isDark ? '#242424' : '#e5e5e5';
+                        return focused
+                            ? 'box-shadow: inset 4px 0 0 ' + accent + ', inset 0 0 0 2px ' + border + ';'
+                            : 'box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px ' + border + ';';
+                    })()"
                     :class="{
                     'opacity-50': {{ $disabled ? 'true' : 'false' }}
-                }" wire:loading.class="opacity-50" wire:dirty.class="dark:border-l-warning border-l-coollabs border-l-4">
+                }" wire:loading.class="opacity-50" wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]">
 
                     {{-- Display Selected Value or Search Input --}}
                     <div class="flex-1 flex items-center min-w-0 px-1">

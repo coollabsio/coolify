@@ -123,14 +123,22 @@ return [
             'driver' => 'daily',
             'path' => storage_path('logs/scheduled.log'),
             'level' => 'debug',
-            'days' => 1,
+            'days' => 7,
         ],
 
         'scheduled-errors' => [
             'driver' => 'daily',
             'path' => storage_path('logs/scheduled-errors.log'),
-            'level' => 'debug',
-            'days' => 7,
+            'level' => 'warning',
+            'days' => 14,
+        ],
+
+        'audit' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/audit.log'),
+            'level' => env('LOG_AUDIT_LEVEL', 'info'),
+            'days' => env('LOG_AUDIT_DAYS', 90),
+            'replace_placeholders' => true,
         ],
     ],
 

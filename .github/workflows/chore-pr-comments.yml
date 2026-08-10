@@ -40,7 +40,10 @@ jobs:
           #    This will help ensure that our documentation remains accurate and up-to-date for all users.
     steps:
       - name: Add comment
-        if: github.event.label.name == matrix.label
+        if: >-
+          (github.event.label.name == matrix.label || github.event.label.name == '📑 Waiting for Docs PR')
+          && contains(github.event.pull_request.labels.*.name, matrix.label)
+          && contains(github.event.pull_request.labels.*.name, '📑 Waiting for Docs PR')
         run: gh pr comment "$NUMBER" --body "$BODY"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

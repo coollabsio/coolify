@@ -12,7 +12,7 @@ services:
       - ghost-content-data:/var/lib/ghost/content
     environment:
       - SERVICE_URL_GHOST_2368
-      - url=$SERVICE_URL_GHOST_2368
+      - url=$SERVICE_URL_GHOST
       - database__client=mysql
       - database__connection__host=mysql
       - database__connection__user=$SERVICE_USER_MYSQL

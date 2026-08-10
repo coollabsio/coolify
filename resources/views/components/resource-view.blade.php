@@ -1,27 +1,22 @@
 <div @class([
-    'transition-all duration-150 box-without-bg dark:bg-coolgray-100 bg-white group',
-    'hover:border-l-coollabs cursor-pointer' => !$upgrade,
-    'hover:border-l-red-500 cursor-not-allowed' => $upgrade,
+    'group flex min-w-0 items-center gap-3 rounded-[10px] border border-neutral-200 bg-white p-3 transition-[border-color,background-color,box-shadow] dark:border-white/[0.07] dark:bg-surface',
+    'cursor-not-allowed opacity-60' => $upgrade,
+    'hover:border-neutral-300 hover:bg-neutral-50 hover:shadow-sm dark:hover:border-white/[0.12] dark:hover:bg-white/[0.035]' => ! $upgrade,
 ])>
-    <div class="flex items-center">
-        <div class="w-[4.5rem] h-[4.5rem] flex items-center justify-center text-black dark:text-white shrink-0">
-            {{ $logo }}
-        </div>
-        <div class="flex flex-col pl-2 ">
-            <div class="dark:text-white text-md">
-                {{ $title }}
-            </div>
-            @if ($upgrade)
-                <div>{{ $upgrade }}</div>
-            @else
-                <div class="text-xs font-bold dark:text-neutral-500 dark:group-hover:text-neutral-300">
-                    {{ $description }}
-                </div>
-            @endif
-        </div>
+    <div
+        class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100 text-black dark:bg-white/[0.06] dark:text-fg">
+        {{ $logo }}
     </div>
-    @isset($documentation)
-        <div class="flex-1"></div>
-        {{ $documentation }}
-    @endisset
+    <div class="min-w-0 flex-1">
+        <div class="truncate text-sm font-semibold text-black dark:text-fg">
+            {{ $title }}
+        </div>
+        @if ($upgrade)
+            <div class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">{{ $upgrade }}</div>
+        @else
+            <div class="mt-0.5 line-clamp-2 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                {{ $description }}
+            </div>
+        @endif
+    </div>
 </div>

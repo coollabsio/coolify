@@ -18,6 +18,7 @@ use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Str;
 use Mail;
 
 use function Laravel\Prompts\confirm;
@@ -167,7 +168,7 @@ class Emails extends Command
                     ]);
                 }
                 $output = 'Because of an error, the backup of the database '.$db->name.' failed.';
-                $this->mail = (new BackupFailed($backup, $db, $output))->toMail();
+                $this->mail = (new BackupFailed($backup, $db, $output, $backup->database_name ?? 'unknown'))->toMail();
                 $this->sendEmail();
                 break;
             case 'backup-success':

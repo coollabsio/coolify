@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Jobs\ConnectProxyToNetworksJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -29,8 +30,7 @@ class Destinations extends Component
 
     private function createNetworkAndAttachToProxy()
     {
-        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
+        ConnectProxyToNetworksJob::dispatchSync($this->server);
     }
 
     public function add($name)
@@ -45,7 +45,7 @@ class Destinations extends Component
             } else {
                 SwarmDocker::create([
                     'name' => $this->server->name.'-'.$name,
-                    'network' => $this->name,
+                    'network' => $name,
                     'server_id' => $this->server->id,
                 ]);
             }
@@ -69,6 +69,11 @@ class Destinations extends Component
 
     public function scan()
     {
+        try {
+            $this->authorize('update', $this->server);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
         if ($this->server->isSwarm()) {
             $alreadyAddedNetworks = $this->server->swarmDockers;
         } else {

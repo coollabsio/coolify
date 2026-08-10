@@ -70,7 +70,7 @@ services:
         source: ./clickhouse/clickhouse-config.xml
         target: /etc/clickhouse-server/config.d/logging.xml
         read_only: true
-        content: "<clickhouse><logger><level>warning</level><console>true</console></logger><query_thread_log remove="remove"/><query_log remove="remove"/><text_log remove="remove"/><trace_log remove="remove"/><metric_log remove="remove"/><asynchronous_metric_log remove="remove"/><session_log remove="remove"/><part_log remove="remove"/></clickhouse>"
+        content: '<clickhouse><logger><level>warning</level><console>true</console></logger><query_thread_log remove="remove"/><query_log remove="remove"/><text_log remove="remove"/><trace_log remove="remove"/><metric_log remove="remove"/><asynchronous_metric_log remove="remove"/><session_log remove="remove"/><part_log remove="remove"/></clickhouse>'
       - type: bind
         source: ./clickhouse/clickhouse-user-config.xml
         target: /etc/clickhouse-server/users.d/logging.xml

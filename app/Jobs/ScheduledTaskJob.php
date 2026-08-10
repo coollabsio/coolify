@@ -14,24 +14,46 @@ use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
-class ScheduledTaskJob implements ShouldQueue
+class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public Team $team;
+    /**
+     * The number of times the job may be attempted.
+     */
+    public $tries = 3;
 
-    public Server $server;
+    /**
+     * The maximum number of unhandled exceptions to allow before failing.
+     */
+    public $maxExceptions = 1;
+
+    /**
+     * The number of seconds the job can run before timing out.
+     */
+    public $timeout = 300;
+
+    public ?Team $team = null;
+
+    public ?Server $server = null;
 
     public ScheduledTask $task;
 
-    public Application|Service $resource;
+    public Application|Service|null $resource = null;
 
     public ?ScheduledTaskExecution $task_log = null;
+
+    /**
+     * Store execution ID to survive job serialization for timeout handling.
+     */
+    protected ?int $executionId = null;
 
     public string $task_status = 'failed';
 
@@ -39,22 +61,34 @@ class ScheduledTaskJob implements ShouldQueue
 
     public array $containers = [];
 
-    public string $server_timezone;
+    public string $server_timezone = 'UTC';
 
-    public function __construct($task)
+    public function __construct(ScheduledTask $task)
     {
-        $this->onQueue('high');
+        $this->onQueue(crons_queue());
 
         $this->task = $task;
-        if ($service = $task->service()->first()) {
-            $this->resource = $service;
-        } elseif ($application = $task->application()->first()) {
-            $this->resource = $application;
+        $this->timeout = $this->task->timeout ?? 300;
+    }
+
+    private function initializeExecutionContext(): void
+    {
+        $this->task->loadMissing([
+            'service.destination.server.settings',
+            'application.destination.server.settings',
+        ]);
+
+        if ($this->task->service) {
+            $this->resource = $this->task->service;
+        } elseif ($this->task->application) {
+            $this->resource = $this->task->application;
         } else {
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
-        $this->team = Team::findOrFail($task->team_id);
+
+        $this->team = Team::findOrFail($this->task->team_id);
         $this->server_timezone = $this->getServerTimezone();
+        $this->server = $this->resource->destination->server;
     }
 
     private function getServerTimezone(): string
@@ -70,12 +104,19 @@ class ScheduledTaskJob implements ShouldQueue
 
     public function handle(): void
     {
+        $startTime = Carbon::now();
+
         try {
+            $this->initializeExecutionContext();
+
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
+                'started_at' => $startTime,
+                'retry_count' => $this->attempts() - 1,
             ]);
 
-            $this->server = $this->resource->destination->server;
+            // Store execution ID for timeout handling
+            $this->executionId = $this->task_log->id;
 
             if ($this->resource->type() === 'application') {
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
@@ -108,7 +149,9 @@ class ScheduledTaskJob implements ShouldQueue
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
                     $exec = "docker exec {$containerName} {$cmd}";
-                    $this->task_output = instant_remote_process([$exec], $this->server, true);
+                    // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
+                    // See: https://github.com/coollabsio/coolify/issues/6736
+                    $this->task_output = instant_remote_process([$exec], $this->server, true, false, $this->timeout, disableMultiplexing: true);
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,
@@ -129,15 +172,106 @@ class ScheduledTaskJob implements ShouldQueue
                     'message' => $this->task_output ?? $e->getMessage(),
                 ]);
             }
-            $this->team?->notify(new TaskFailed($this->task, $e->getMessage()));
+
+            // Log the error to the scheduled-errors channel
+            Log::channel('scheduled-errors')->error('ScheduledTask execution failed', [
+                'job' => 'ScheduledTaskJob',
+                'task_id' => $this->task->uuid,
+                'task_name' => $this->task->name,
+                'server' => $this->server?->name ?? 'unknown',
+                'attempt' => $this->attempts(),
+                'error' => $e->getMessage(),
+            ]);
+
+            // Only notify and throw on final failure
+
+            // Re-throw to trigger Laravel's retry mechanism with backoff
             throw $e;
         } finally {
-            ScheduledTaskDone::dispatch($this->team->id);
+            if ($this->team) {
+                ScheduledTaskDone::dispatch($this->team->id);
+            }
+
             if ($this->task_log) {
+                $finishedAt = Carbon::now();
+                $duration = round($startTime->floatDiffInSeconds($finishedAt), 2);
+
                 $this->task_log->update([
-                    'finished_at' => Carbon::now()->toImmutable(),
+                    'finished_at' => $finishedAt->toImmutable(),
+                    'duration' => $duration,
                 ]);
             }
         }
+    }
+
+    /**
+     * Calculate the number of seconds to wait before retrying the job.
+     */
+    public function backoff(): array
+    {
+        return [30, 60, 120]; // 30s, 60s, 120s between retries
+    }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(?\Throwable $exception): void
+    {
+        $this->team ??= Team::find($this->task->team_id);
+
+        Log::channel('scheduled-errors')->error('ScheduledTask permanently failed', [
+            'job' => 'ScheduledTaskJob',
+            'task_id' => $this->task->uuid,
+            'task_name' => $this->task->name,
+            'server' => $this->server?->name ?? 'unknown',
+            'total_attempts' => $this->attempts(),
+            'error' => $exception?->getMessage(),
+            'trace' => $exception?->getTraceAsString(),
+        ]);
+
+        // Reload execution log from database
+        // When a job times out, failed() is called in a fresh process with the original
+        // queue payload, so $executionId will be null. We need to query for the latest execution.
+        $execution = null;
+
+        // Try to find execution using stored ID first (works for non-timeout failures)
+        if ($this->executionId) {
+            $execution = ScheduledTaskExecution::find($this->executionId);
+        }
+
+        // If no stored ID or not found, query for the most recent execution log for this task
+        if (! $execution) {
+            $execution = ScheduledTaskExecution::query()
+                ->where('scheduled_task_id', $this->task->id)
+                ->orderBy('created_at', 'desc')
+                ->first();
+        }
+
+        // Last resort: check task_log property
+        if (! $execution && $this->task_log) {
+            $execution = $this->task_log;
+        }
+
+        if ($execution) {
+            $errorMessage = 'Job permanently failed after '.$this->attempts().' attempts';
+            if ($exception) {
+                $errorMessage .= ': '.$exception->getMessage();
+            }
+
+            $execution->update([
+                'status' => 'failed',
+                'message' => $errorMessage,
+                'error_details' => $exception?->getTraceAsString(),
+                'finished_at' => Carbon::now()->toImmutable(),
+            ]);
+        } else {
+            Log::channel('scheduled-errors')->warning('Could not find execution log to update', [
+                'execution_id' => $this->executionId,
+                'task_id' => $this->task->uuid,
+            ]);
+        }
+
+        // Notify team about permanent failure
+        $this->team?->notify(new TaskFailed($this->task, $exception?->getMessage() ?? 'Unknown error'));
     }
 }

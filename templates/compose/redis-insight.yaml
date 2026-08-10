@@ -23,7 +23,7 @@ services:
         - CMD
         - wget
         - '--spider'
-        - 'http://localhost:5540'
+        - 'http://0.0.0.0:5540/api/health'
       interval: 10s
       retries: 3
       timeout: 10s

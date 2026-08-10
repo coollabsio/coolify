@@ -1,43 +1,54 @@
 <?php
 
 use App\Models\Team;
+use Stripe\BillingPortal\Session;
+use Stripe\Customer;
 use Stripe\Stripe;
 
 function isSubscriptionActive()
 {
-    if (! isCloud()) {
-        return false;
-    }
-    $team = currentTeam();
-    if (! $team) {
-        return false;
-    }
-    $subscription = $team?->subscription;
+    return once(function () {
+        if (! isCloud()) {
+            return false;
+        }
+        $team = currentTeam();
+        if (! $team) {
+            return false;
+        }
+        // Root team (id=0) doesn't require subscription
+        if ($team->id === 0) {
+            return true;
+        }
+        $subscription = $team?->subscription;
 
-    if (is_null($subscription)) {
-        return false;
-    }
-    if (isStripe()) {
-        return $subscription->stripe_invoice_paid === true;
-    }
+        if (is_null($subscription)) {
+            return false;
+        }
+        if (isStripe()) {
+            return $subscription->stripe_invoice_paid === true;
+        }
 
-    return false;
+        return false;
+    });
 }
+
 function isSubscriptionOnGracePeriod()
 {
-    $team = currentTeam();
-    if (! $team) {
-        return false;
-    }
-    $subscription = $team?->subscription;
-    if (! $subscription) {
-        return false;
-    }
-    if (isStripe()) {
-        return $subscription->stripe_cancel_at_period_end;
-    }
+    return once(function () {
+        $team = currentTeam();
+        if (! $team) {
+            return false;
+        }
+        $subscription = $team?->subscription;
+        if (! $subscription) {
+            return false;
+        }
+        if (isStripe()) {
+            return $subscription->stripe_cancel_at_period_end;
+        }
 
-    return false;
+        return false;
+    });
 }
 function subscriptionProvider()
 {
@@ -56,7 +67,7 @@ function getStripeCustomerPortalSession(Team $team)
         return null;
     }
 
-    return \Stripe\BillingPortal\Session::create([
+    return Session::create([
         'customer' => $stripe_customer_id,
         'return_url' => $return_url,
     ]);
@@ -68,8 +79,12 @@ function allowedPathsForUnsubscribedAccounts()
         'login',
         'logout',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
         'admin',
+        // Account basics stay available without a paid plan.
+        'profile',
+        'profile/appearance',
     ];
 }
 function allowedPathsForBoardingAccounts()
@@ -86,6 +101,7 @@ function allowedPathsForInvalidAccounts()
         'logout',
         'verify',
         'force-password-reset',
+        'two-factor-challenge',
         'livewire/update',
     ];
 }
@@ -103,7 +119,7 @@ function updateStripeCustomerEmail(Team $team, string $newEmail): void
 
     Stripe::setApiKey(config('subscription.stripe_api_key'));
 
-    \Stripe\Customer::update(
+    Customer::update(
         $stripe_customer_id,
         ['email' => $newEmail]
     );

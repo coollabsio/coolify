@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://github.com/coollabsio/minio?tab=readme-ov-file#minio-docker-images
 # slogan: MinIO is a high performance object storage server compatible with Amazon S3 APIs.
 # category: storage
