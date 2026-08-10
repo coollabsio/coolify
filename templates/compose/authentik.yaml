@@ -7,7 +7,7 @@
 
 services:
   authentik-server:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.10.3}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.2.1}
     restart: unless-stopped
     command: server
     environment:
@@ -27,13 +27,13 @@ services:
       - AUTHENTIK_EMAIL__TIMEOUT=${AUTHENTIK_EMAIL__TIMEOUT}
       - AUTHENTIK_EMAIL__FROM=${AUTHENTIK_EMAIL__FROM}
     volumes:
-      - ./media:/media
+      - ./data:/data
       - ./custom-templates:/templates
     depends_on:
       postgresql:
         condition: service_healthy
   authentik-worker:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2025.10.3}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.2.1}
     restart: unless-stopped
     command: worker
     environment:
@@ -60,7 +60,7 @@ services:
     user: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./media:/media
+      - ./data:/data
       - ./certs:/certs
       - ./custom-templates:/templates
     depends_on:
