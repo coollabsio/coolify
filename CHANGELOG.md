@@ -1668,6 +1668,7 @@ All notable changes to this project will be documented in this file.
 - *(dev)* Support configurable hosts and light-mode surfaces
 - *(service)* Use the correct health check path for firefly (#10475)
 - *(terminal)* New function name of cookie package
+- *(installer)* Minor grammatical error (#9209)
 
 ### 💼 Other
 
@@ -1959,6 +1960,7 @@ All notable changes to this project will be documented in this file.
 - Remove coold VM dev setup and container roles sections from README
 - *(release)* Document SHA image promotion workflow
 - *(release)* Clarify branch strategy and SHA build flow
+- Update changelog
 
 ### ⚡ Performance
 
