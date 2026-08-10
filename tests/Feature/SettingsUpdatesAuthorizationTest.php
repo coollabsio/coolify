@@ -26,7 +26,7 @@ test('non-admin user is redirected from settings updates page', function () {
 test('instance admin can access settings updates page', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
-    InstanceSettings::create(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
     Once::flush();
 
     $user = User::factory()->create();
@@ -38,4 +38,25 @@ test('instance admin can access settings updates page', function () {
     Livewire::test(Updates::class)
         ->assertOk()
         ->assertNoRedirect();
+});
+
+test('instance admin cannot save an invalid docker registry url', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    $settings = InstanceSettings::forceCreate(['id' => 0]);
+    Once::flush();
+
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::test(Updates::class)
+        ->set('docker_registry_url', 'docker.io; touch /tmp/pwned')
+        ->call('instantSave')
+        ->assertHasErrors(['docker_registry_url' => 'in']);
+
+    expect($settings->fresh()->docker_registry_url)->toBe('docker.io');
 });

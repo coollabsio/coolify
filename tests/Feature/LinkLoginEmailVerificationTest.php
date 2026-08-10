@@ -4,8 +4,10 @@ use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Once;
@@ -15,6 +17,10 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->withoutMiddleware([DecideWhatToDoWithUser::class, CheckForcePasswordReset::class]);
     Once::flush();
+    Config::set('app.maintenance.driver', 'file');
+    Config::set('cache.default', 'array');
+    Config::set('session.driver', 'array');
+
     if (! InstanceSettings::find(0)) {
         $settings = new InstanceSettings;
         $settings->id = 0;
@@ -33,7 +39,16 @@ describe('invitation link login', function () {
         ]);
         $user->teams()->attach($team->id, ['role' => 'member']);
 
-        $token = Crypt::encryptString("{$user->email}@@@{$password}");
+        $uuid = 'email-verification-test-invitation';
+        $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");
+        TeamInvitation::create([
+            'team_id' => $team->id,
+            'uuid' => $uuid,
+            'email' => $user->email,
+            'role' => 'member',
+            'link' => route('auth.link', ['token' => $token]),
+            'via' => 'link',
+        ]);
 
         $this->get(route('auth.link', ['token' => $token]));
 
@@ -51,9 +66,19 @@ describe('invitation link login', function () {
         ]);
         $user->teams()->attach($team->id, ['role' => 'member']);
 
-        $token = Crypt::encryptString("{$user->email}@@@{$password}");
+        $uuid = 'email-verification-login-test-invitation';
+        $token = Crypt::encryptString("{$user->email}@@@{$uuid}@@@{$password}");
+        TeamInvitation::create([
+            'team_id' => $team->id,
+            'uuid' => $uuid,
+            'email' => $user->email,
+            'role' => 'member',
+            'link' => route('auth.link', ['token' => $token]),
+            'via' => 'link',
+        ]);
 
-        $this->get(route('auth.link', ['token' => $token]));
+        $this->get(route('auth.link', ['token' => $token]))
+            ->assertRedirect(route('dashboard'));
 
         expect(auth()->id())->toBe($user->id);
     });

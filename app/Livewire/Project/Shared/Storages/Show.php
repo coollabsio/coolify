@@ -2,9 +2,12 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Models\Application;
 use App\Models\LocalPersistentVolume;
+use App\Models\ScheduledVolumeBackup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Show extends Component
@@ -23,6 +26,8 @@ class Show extends Component
 
     public ?string $startedAt = null;
 
+    public bool $supportsPreviewSuffix = false;
+
     // Explicit properties
     public string $name;
 
@@ -31,6 +36,18 @@ class Show extends Component
     public ?string $hostPath = null;
 
     public bool $isPreviewSuffixEnabled = true;
+
+    public bool $hasEnabledBackup = false;
+
+    public ?string $backupUrl = null;
+
+    /**
+     * When true, parent already batched badge/url data — skip per-row queries on mount.
+     */
+    public bool $backupMetaHydrated = false;
+
+    /** When true, the Backup Configure Livewire modal is mounted (lazy). */
+    public bool $showBackupModal = false;
 
     protected $validationAttributes = [
         'name' => 'name',
@@ -81,10 +98,62 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(): void
     {
         $this->syncData(false);
         $this->isReadOnly = $this->storage->shouldBeReadOnlyInUI();
+        // PR deployment volume suffixes only apply to git-based applications.
+        $this->supportsPreviewSuffix = $this->resource instanceof Application
+            && $this->resource->git_based()
+            && ! $this->isService;
+        // Parent All batches badge/url; isolated embeds still hydrate themselves.
+        if (! $this->backupMetaHydrated) {
+            $this->refreshBackupStatus();
+        }
+    }
+
+    #[On('refreshVolumeBackups')]
+    public function refreshBackupStatus(): void
+    {
+        $backup = $this->storage->scheduledBackups()->first();
+
+        $this->hasEnabledBackup = $backup?->enabled ?? false;
+        $this->backupUrl = null;
+
+        if (! $this->hasEnabledBackup || ! $this->resource instanceof Application) {
+            return;
+        }
+
+        $this->resource->loadMissing('environment.project');
+
+        $parameters = [
+            'project_uuid' => $this->resource->project()->uuid,
+            'environment_uuid' => $this->resource->environment->uuid,
+            'application_uuid' => $this->resource->uuid,
+        ];
+        $hasOtherBackups = ScheduledVolumeBackup::query()
+            ->forApplication($this->resource)
+            ->where('id', '!=', $backup->id)
+            ->exists();
+
+        $this->backupUrl = $hasOtherBackups
+            ? route('project.application.backup.index', [...$parameters, 'search' => $this->storage->name])
+            : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
+    }
+
+    public function openBackupModal(): void
+    {
+        $this->authorize('update', $this->resource);
+        $this->showBackupModal = true;
+    }
+
+    #[On('modalClosed')]
+    public function onModalClosed(): void
+    {
+        // Drop the nested Create component from the DOM after close to free snapshot weight.
+        if ($this->showBackupModal) {
+            $this->showBackupModal = false;
+        }
     }
 
     public function instantSave(): void
@@ -115,8 +184,15 @@ class Show extends Component
             return 'The provided password is incorrect.';
         }
 
+        if ($this->storage->scheduledBackups()->exists()) {
+            $this->dispatch('error', 'Delete this volume backup schedule and its archives before deleting the volume.');
+
+            return false;
+        }
+
         $this->storage->delete();
         $this->dispatch('refreshStorages');
+        $this->dispatch('configurationChanged');
 
         return true;
     }

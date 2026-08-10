@@ -11,6 +11,7 @@ services:
     environment:
       - SECRET_ENCRYPTION_KEY=$SERVICE_HEX_64_ENCRYPTION
       - SERVICE_URL_HOMARR_7575
+      - 'SECRET_ENCRYPTION_KEY=${SERVICE_HEX_64_HOMARR}'
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./homarr/appdata:/appdata

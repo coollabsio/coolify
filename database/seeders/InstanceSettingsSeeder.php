@@ -23,23 +23,25 @@ class InstanceSettingsSeeder extends Seeder
             'smtp_from_address' => 'hi@localhost.com',
             'smtp_from_name' => 'Coolify',
         ]);
-        try {
-            $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();
-            $ipv4 = trim($ipv4);
-            $ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
-            $settings = instanceSettings();
-            if (is_null($settings->public_ipv4) && $ipv4) {
-                $settings->update(['public_ipv4' => $ipv4]);
+        if (! isDev()) {
+            try {
+                $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();
+                $ipv4 = trim($ipv4);
+                $ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
+                $settings = instanceSettings();
+                if (is_null($settings->public_ipv4) && $ipv4) {
+                    $settings->update(['public_ipv4' => $ipv4]);
+                }
+                $ipv6 = Process::run('curl -6s https://ifconfig.io')->output();
+                $ipv6 = trim($ipv6);
+                $ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+                $settings = instanceSettings();
+                if (is_null($settings->public_ipv6) && $ipv6) {
+                    $settings->update(['public_ipv6' => $ipv6]);
+                }
+            } catch (\Throwable $e) {
+                echo "Error: {$e->getMessage()}\n";
             }
-            $ipv6 = Process::run('curl -6s https://ifconfig.io')->output();
-            $ipv6 = trim($ipv6);
-            $ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
-            $settings = instanceSettings();
-            if (is_null($settings->public_ipv6) && $ipv6) {
-                $settings->update(['public_ipv6' => $ipv6]);
-            }
-        } catch (\Throwable $e) {
-            echo "Error: {$e->getMessage()}\n";
         }
     }
 }

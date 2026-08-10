@@ -4,6 +4,7 @@ namespace App\Livewire\Security\PrivateKey;
 
 use App\Models\PrivateKey;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -12,6 +13,8 @@ class Show extends Component
     use AuthorizesRequests;
 
     public PrivateKey $private_key;
+
+    public bool $modalMode = false;
 
     // Explicit properties
     public string $name;
@@ -22,7 +25,11 @@ class Show extends Component
 
     public bool $isGitRelated = false;
 
+    public bool $isInUse = false;
+
     public $public_key = 'Loading...';
+
+    public string $deleteDisabledReason = 'This private key is currently used by a server, application, or Git app and cannot be deleted.';
 
     protected function rules(): array
     {
@@ -74,16 +81,18 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(?string $private_key_uuid = null, bool $modalMode = false)
     {
+        $this->modalMode = $modalMode;
         try {
-            $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related', 'team_id'])->whereUuid(request()->private_key_uuid)->firstOrFail();
+            $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related', 'team_id'])->whereUuid($private_key_uuid ?? request()->private_key_uuid)->firstOrFail();
 
             // Explicit authorization check - will throw 403 if not authorized
             $this->authorize('view', $this->private_key);
 
             $this->syncData(false);
-        } catch (\Illuminate\Auth\Access\AuthorizationException $e) {
+            $this->isInUse = $this->private_key->isInUse();
+        } catch (AuthorizationException $e) {
             abort(403, 'You do not have permission to view this private key.');
         } catch (\Throwable) {
             abort(404);
@@ -102,8 +111,23 @@ class Show extends Component
     {
         try {
             $this->authorize('delete', $this->private_key);
-            $this->private_key->safeDelete();
+
+            if ($this->private_key->isInUse()) {
+                $this->isInUse = true;
+                $this->dispatch('error', $this->deleteDisabledReason);
+
+                return;
+            }
+
+            $this->private_key->delete();
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
+
+            if ($this->modalMode) {
+                $this->dispatch('securityResourceChanged');
+                $this->dispatch('close-modal');
+
+                return null;
+            }
 
             return redirectRoute($this, 'security.private-key.index');
         } catch (\Exception $e) {
@@ -126,6 +150,7 @@ class Show extends Component
             ]);
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
+            $this->dispatch('securityResourceChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

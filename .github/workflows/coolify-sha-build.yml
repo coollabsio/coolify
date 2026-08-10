@@ -1,0 +1,110 @@
+name: Build Coolify (SHA)
+
+on:
+  push:
+    branches: ["v4.x", "main"]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  GITHUB_REGISTRY: ghcr.io
+  DOCKER_REGISTRY: docker.io
+  IMAGE_NAME: "coollabsio/coolify"
+
+jobs:
+  build-push:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Image (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.arch }}
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.arch }}
+
+  merge-manifest:
+    runs-on: ubuntu-24.04
+    needs: build-push
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to ${{ env.GITHUB_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GITHUB_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+
+      - name: Login to ${{ env.DOCKER_REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.GITHUB_REGISTRY }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          TAG_ARGS=(--tag "${IMAGE}:sha-${SHA}")
+          # Moving tag for the latest production-line SHA image (v4.x only).
+          if [ "${BRANCH}" = "v4.x" ]; then
+            TAG_ARGS+=(--tag "${IMAGE}:edge")
+          fi
+          docker buildx imagetools create \
+            "${IMAGE}:sha-${SHA}-amd64" \
+            "${IMAGE}:sha-${SHA}-aarch64" \
+            "${TAG_ARGS[@]}"
+
+      - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
+        env:
+          REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          TAG_ARGS=(--tag "${IMAGE}:sha-${SHA}")
+          # Moving tag for the latest production-line SHA image (v4.x only).
+          if [ "${BRANCH}" = "v4.x" ]; then
+            TAG_ARGS+=(--tag "${IMAGE}:edge")
+          fi
+          docker buildx imagetools create \
+            "${IMAGE}:sha-${SHA}-amd64" \
+            "${IMAGE}:sha-${SHA}-aarch64" \
+            "${TAG_ARGS[@]}"

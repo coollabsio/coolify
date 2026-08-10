@@ -4,12 +4,15 @@ namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use AuthorizesRequests;
+
     public InstanceSettings $settings;
 
     public ?Server $server = null;
@@ -43,8 +46,6 @@ class Index extends Component
     public bool $showDomainConflictModal = false;
 
     public bool $forceSaveDomains = false;
-
-    public $buildActivityId = null;
 
     protected array $messages = [
         'fqdn.url' => 'Invalid instance URL.',
@@ -87,6 +88,7 @@ class Index extends Component
 
     public function instantSave($isSave = true)
     {
+        $this->authorize('update', $this->settings);
         $this->validate();
         $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
         $this->settings->public_port_min = $this->public_port_min;
@@ -104,6 +106,7 @@ class Index extends Component
 
     public function confirmDomainUsage()
     {
+        $this->authorize('update', $this->settings);
         $this->forceSaveDomains = true;
         $this->showDomainConflictModal = false;
         $this->submit();
@@ -112,6 +115,7 @@ class Index extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->settings);
             $error_show = false;
             $this->resetErrorBag();
 
@@ -137,7 +141,9 @@ class Index extends Component
 
             if ($this->settings->is_dns_validation_enabled && $this->fqdn && $this->server) {
                 if (! validateDNSEntry($this->fqdn, $this->server)) {
-                    $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                    $target = serverDnsTargetIp($this->server) ?? $this->server->ip;
+                    $guidance = dnsMismatchGuidanceMessage($target, $target);
+                    $this->dispatch('error', "Validating DNS failed.<br><br>{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $error_show = true;
                 }
             }
@@ -173,6 +179,7 @@ class Index extends Component
     public function buildHelperImage()
     {
         try {
+            $this->authorize('update', $this->settings);
             if (! isDev()) {
                 $this->dispatch('error', 'Building helper image is only available in development mode.');
 

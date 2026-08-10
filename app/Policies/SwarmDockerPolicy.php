@@ -28,8 +28,7 @@ class SwarmDockerPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -37,7 +36,7 @@ class SwarmDockerPolicy
      */
     public function update(User $user, SwarmDocker $swarmDocker): bool
     {
-        return $user->teams->contains('id', $swarmDocker->server->team_id);
+        return $user->isAdminOfTeam($swarmDocker->server->team_id);
     }
 
     /**
@@ -45,7 +44,7 @@ class SwarmDockerPolicy
      */
     public function delete(User $user, SwarmDocker $swarmDocker): bool
     {
-        return $user->teams->contains('id', $swarmDocker->server->team_id);
+        return $user->isAdminOfTeam($swarmDocker->server->team_id);
     }
 
     /**

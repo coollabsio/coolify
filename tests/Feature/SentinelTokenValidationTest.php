@@ -1,13 +1,18 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Once;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    DB::table('instance_settings')->insert(['id' => 0]);
     $user = User::factory()->create();
     $this->team = $user->teams()->first();
 
@@ -78,8 +83,102 @@ describe('ServerSetting::isValidSentinelToken', function () {
         expect(ServerSetting::isValidSentinelToken(''))->toBeFalse();
     });
 
+    it('returns false for null sentinel token', function () {
+        expect(ServerSetting::isValidSentinelToken(null))->toBeFalse();
+    });
+
     it('rejects the reported PoC payload', function () {
         expect(ServerSetting::isValidSentinelToken('abc" ; id >/tmp/coolify_poc_sentinel ; echo "'))->toBeFalse();
+    });
+});
+
+describe('ServerSetting::ensureValidSentinelToken', function () {
+    it('regenerates empty sentinel token via ensureValidSentinelToken', function () {
+        $settings = $this->server->settings;
+        DB::table('server_settings')->where('id', $settings->id)->update(['sentinel_token' => '']);
+
+        $settings->refresh();
+        $token = $settings->ensureValidSentinelToken();
+
+        expect($token)->not->toBeEmpty();
+        expect(ServerSetting::isValidSentinelToken($token))->toBeTrue();
+        expect($settings->fresh()->sentinel_token)->toBe($token);
+    });
+
+    it('regenerates token when stored value cannot be decrypted', function () {
+        $settings = $this->server->settings;
+        DB::table('server_settings')->where('id', $settings->id)->update(['sentinel_token' => 'not-encrypted-junk']);
+
+        $settings->refresh();
+        $token = $settings->ensureValidSentinelToken();
+
+        expect(ServerSetting::isValidSentinelToken($token))->toBeTrue();
+        expect($settings->fresh()->sentinel_token)->toBe($token);
+    });
+
+    it('returns existing valid token without regenerating', function () {
+        $settings = $this->server->settings;
+        $original = $settings->sentinel_token;
+
+        $token = $settings->ensureValidSentinelToken();
+
+        expect($token)->toBe($original);
+    });
+
+    it('throws RuntimeException only when regeneration also fails', function () {
+        $settings = $this->server->settings;
+        DB::table('server_settings')->where('id', $settings->id)->update(['sentinel_token' => '']);
+
+        $stub = new class extends ServerSetting
+        {
+            protected $table = 'server_settings';
+
+            public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false): string
+            {
+                DB::table('server_settings')->where('id', $this->id)->update([
+                    'sentinel_token' => encrypt('invalid token with spaces!'),
+                ]);
+
+                return '';
+            }
+        };
+        $stub->setRawAttributes($settings->fresh()->getAttributes(), true);
+        $stub->exists = true;
+
+        expect(fn () => $stub->ensureValidSentinelToken())
+            ->toThrow(RuntimeException::class, 'Sentinel token invalid after regeneration');
+    });
+});
+
+describe('ServerSetting::ensureSentinelUrl', function () {
+    it('uses the current private instance URL when no public address is configured', function () {
+        InstanceSettings::query()->whereKey(0)->update([
+            'fqdn' => null,
+            'public_ipv4' => null,
+            'public_ipv6' => null,
+        ]);
+        Once::flush();
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update(['sentinel_custom_url' => null]);
+        app()->instance('request', Request::create('http://192.168.1.50:8000/server'));
+
+        $url = $this->server->settings->fresh()->ensureSentinelUrl();
+
+        expect($url)->toBe('http://192.168.1.50:8000')
+            ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
+    });
+
+    it('does not use a loopback request URL for a remote server', function () {
+        InstanceSettings::query()->whereKey(0)->update([
+            'fqdn' => null,
+            'public_ipv4' => null,
+            'public_ipv6' => null,
+        ]);
+        Once::flush();
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update(['sentinel_custom_url' => null]);
+        app()->instance('request', Request::create('http://localhost:8000/server'));
+
+        expect(fn () => $this->server->settings->fresh()->ensureSentinelUrl())
+            ->toThrow(RuntimeException::class, 'Set an instance FQDN, public IP, or reachable Coolify URL before enabling Sentinel.');
     });
 });
 
@@ -91,5 +190,12 @@ describe('generated sentinel tokens are valid', function () {
 
         expect($token)->not->toBeEmpty();
         expect(ServerSetting::isValidSentinelToken($token))->toBeTrue();
+    });
+
+    it('returns the same value the cast reads back', function () {
+        $settings = $this->server->settings;
+        $returned = $settings->generateSentinelToken(save: true, ignoreEvent: true);
+
+        expect($settings->fresh()->sentinel_token)->toBe($returned);
     });
 });

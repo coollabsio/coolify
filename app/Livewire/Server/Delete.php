@@ -16,6 +16,10 @@ class Delete extends Component
 
     public bool $delete_from_hetzner = false;
 
+    public bool $delete_from_vultr = false;
+
+    public bool $delete_from_digitalocean = false;
+
     public bool $force_delete_resources = false;
 
     public function mount(string $server_uuid)
@@ -35,10 +39,17 @@ class Delete extends Component
 
         if (! empty($selectedActions)) {
             $this->delete_from_hetzner = in_array('delete_from_hetzner', $selectedActions);
+            $this->delete_from_vultr = in_array('delete_from_vultr', $selectedActions);
+            $this->delete_from_digitalocean = in_array('delete_from_digitalocean', $selectedActions);
             $this->force_delete_resources = in_array('force_delete_resources', $selectedActions);
         }
         try {
             $this->authorize('delete', $this->server);
+            if ($this->server->is_coolify_host) {
+                $this->dispatch('error', 'The Coolify host server cannot be deleted.');
+
+                return;
+            }
             if ($this->server->hasDefinedResources() && ! $this->force_delete_resources) {
                 $this->dispatch('error', 'Server has defined resources. Please delete them first or select "Delete all resources".');
 
@@ -57,7 +68,11 @@ class Delete extends Component
                 $this->delete_from_hetzner,
                 $this->server->hetzner_server_id,
                 $this->server->cloud_provider_token_id,
-                $this->server->team_id
+                $this->server->team_id,
+                $this->delete_from_vultr,
+                $this->server->vultr_instance_id,
+                $this->delete_from_digitalocean,
+                $this->server->digitalocean_droplet_id
             );
 
             return redirectRoute($this, 'server.index');
@@ -84,6 +99,22 @@ class Delete extends Component
                 'id' => 'delete_from_hetzner',
                 'label' => 'Also delete server from Hetzner Cloud',
                 'default_warning' => 'The actual server on Hetzner Cloud will NOT be deleted.',
+            ];
+        }
+
+        if ($this->server->vultr_instance_id) {
+            $checkboxes[] = [
+                'id' => 'delete_from_vultr',
+                'label' => 'Also delete server from Vultr',
+                'default_warning' => 'The actual server on Vultr will NOT be deleted.',
+            ];
+        }
+
+        if ($this->server->digitalocean_droplet_id) {
+            $checkboxes[] = [
+                'id' => 'delete_from_digitalocean',
+                'label' => 'Also delete droplet from DigitalOcean',
+                'default_warning' => 'The actual droplet on DigitalOcean will NOT be deleted.',
             ];
         }
 

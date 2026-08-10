@@ -12,7 +12,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Horizon\Contracts\Silenced;
 
 class ApiTokenExpirationWarningJob implements ShouldBeEncrypted, ShouldQueue, Silenced
@@ -29,20 +28,36 @@ class ApiTokenExpirationWarningJob implements ShouldBeEncrypted, ShouldQueue, Si
             ->whereNotNull('expires_at')
             ->where('expires_at', '>', now())
             ->where('expires_at', '<=', now()->addDay())
+            ->whereNull('api_token_expiration_warning_sent_at')
             ->where('tokenable_type', User::class)
             ->chunkById(100, function ($tokens) {
                 foreach ($tokens as $token) {
                     if (! $token->team_id) {
                         continue;
                     }
-                    RateLimiter::attempt(
-                        'api-token-expiring:'.$token->id,
-                        $maxAttempts = 0,
-                        function () use ($token) {
-                            Team::find($token->team_id)?->notify(new ApiTokenExpiringNotification($token));
-                        },
-                        $decaySeconds = 7 * 24 * 3600,
-                    );
+
+                    $team = Team::find($token->team_id);
+                    if (! $team) {
+                        continue;
+                    }
+
+                    $warningSentAt = now();
+
+                    $team->notify(new ApiTokenExpiringNotification($token));
+
+                    $markedAsSent = PersonalAccessToken::query()
+                        ->whereKey($token->getKey())
+                        ->whereNotNull('expires_at')
+                        ->where('expires_at', '>', now())
+                        ->where('expires_at', '<=', now()->addDay())
+                        ->whereNull('api_token_expiration_warning_sent_at')
+                        ->update(['api_token_expiration_warning_sent_at' => $warningSentAt]);
+
+                    if ($markedAsSent !== 1) {
+                        continue;
+                    }
+
+                    $token->forceFill(['api_token_expiration_warning_sent_at' => $warningSentAt]);
                 }
             });
     }

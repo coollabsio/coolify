@@ -130,6 +130,20 @@ describe('GetLogs Livewire action validation', function () {
     });
 });
 
+describe('GetLogs stream polling', function () {
+    test('streaming logs polls when log panel is not collapsible', function () {
+        Livewire::test(GetLogs::class, [
+            'server' => $this->server,
+            'resource' => $this->application,
+            'container' => 'coolify-sentinel',
+            'collapsible' => false,
+        ])
+            ->assertDontSeeHtml('wire:poll.2000ms="getLogs(true)"')
+            ->call('toggleStreamLogs')
+            ->assertSeeHtml('wire:poll.2000ms="getLogs(true)"');
+    });
+});
+
 describe('GetLogs container name injection payloads are blocked by validation', function () {
     test('newline injection payload is rejected', function () {
         // The exact PoC payload from the advisory

@@ -11,6 +11,8 @@ class SettingsDropdown extends Component
 {
     public $showWhatsNewModal = false;
 
+    public string $trigger = 'preferences';
+
     public function getUnreadCountProperty()
     {
         return Auth::user()->getUnreadChangelogCount();

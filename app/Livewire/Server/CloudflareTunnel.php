@@ -72,12 +72,16 @@ class CloudflareTunnel extends Component
 
     public function manualCloudflareConfig()
     {
-        $this->authorize('update', $this->server);
-        $this->isCloudflareTunnelsEnabled = true;
-        $this->server->settings->is_cloudflare_tunnel = true;
-        $this->server->settings->save();
-        $this->server->refresh();
-        $this->dispatch('success', 'Cloudflare Tunnel enabled.');
+        try {
+            $this->authorize('update', $this->server);
+            $this->isCloudflareTunnelsEnabled = true;
+            $this->server->settings->is_cloudflare_tunnel = true;
+            $this->server->settings->save();
+            $this->server->refresh();
+            $this->dispatch('success', 'Cloudflare Tunnel enabled.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function automatedCloudflareConfig()
