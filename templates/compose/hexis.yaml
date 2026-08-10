@@ -1,0 +1,52 @@
+# documentation: https://github.com/Bevel-Software/Hexis
+# slogan: Self-hosted, git-backed workspace for AI agent skills, tools and knowledge, served to any MCP-capable agent.
+# category: ai
+# tags: ai,agents,mcp,skills,knowledge-base,git,claude,chatgpt,cursor
+# logo: svgs/hexis.svg
+# port: 3001
+
+services:
+  hexis:
+    image: ghcr.io/bevel-software/hexis:latest
+    environment:
+      - SERVICE_FQDN_HEXIS_3001
+      - NODE_ENV=production
+      - PORT=3001
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=$SERVICE_PASSWORD_HEXISADMIN
+      - JWT_SECRET=$SERVICE_HEX_64_JWTSECRET
+      - SECRETS_ENC_KEY=$SERVICE_HEX_64_SECRETSENC
+      - PUBLIC_BACKEND_URL=$SERVICE_FQDN_HEXIS
+      - PUBLIC_FRONTEND_URL=$SERVICE_FQDN_HEXIS
+      - TRUST_PROXY=1
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-hexis}
+    volumes:
+      - hexis-workspaces:/app/apps/server/workspaces
+      - hexis-backups:/app/apps/server/backups
+      - hexis-spills:/app/apps/server/tool-chain-spills
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-hexis}
+    volumes:
+      - hexis-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
