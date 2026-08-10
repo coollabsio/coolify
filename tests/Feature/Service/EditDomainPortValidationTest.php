@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Project\Service\Domains;
 use App\Livewire\Project\Service\EditDomain;
 use App\Models\Environment;
 use App\Models\Project;
@@ -77,9 +78,8 @@ it('loads the EditDomain component with required port', function () {
 it('marks noindex changes as pending configuration', function () {
     $this->service->isConfigurationChanged(save: true);
 
-    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
-        ->set('noindexDomains', ['http://example.com:8000'])
-        ->call('updateNoindexDomains')
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('toggleNoindexDomain', $this->serviceApplication->id, 'http://example.com:8000', true)
         ->assertDispatched('configurationChanged');
 
     expect($this->service->refresh()->isConfigurationChanged())->toBeTrue();

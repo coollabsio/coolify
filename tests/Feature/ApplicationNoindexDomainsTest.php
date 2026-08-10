@@ -1,6 +1,6 @@
 <?php
 
-use App\Livewire\Project\Application\General;
+use App\Livewire\Project\Application\Domains;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -84,7 +84,7 @@ describe('Application noindex domains', function () {
         expect($application->isDomainNoindexed('https://prod.example.com'))->toBeFalse();
     });
 
-    test('the Livewire toggle persists the flag', function () {
+    test('the domains view toggle persists the flag', function () {
         InstanceSettings::unguarded(function () {
             InstanceSettings::updateOrCreate(['id' => 0], []);
         });
@@ -107,10 +107,9 @@ describe('Application noindex domains', function () {
             'redirect' => 'no',
         ]);
 
-        Livewire::test(General::class, ['application' => $application])
+        Livewire::test(Domains::class, ['application' => $application])
             ->assertSuccessful()
-            ->set('noindexDomains', ['https://staging.example.com'])
-            ->call('updateNoindexDomains')
+            ->call('toggleNoindexDomain', 'https://staging.example.com', true)
             ->assertDispatched('success');
 
         expect($application->refresh()->noindexDomains()->all())

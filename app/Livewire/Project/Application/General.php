@@ -29,9 +29,6 @@ class General extends Component
 
     public ?string $fqdn = null;
 
-    /** @var array<int, string> */
-    public array $noindexDomains = [];
-
     public string $gitRepository;
 
     public string $gitBranch;
@@ -148,8 +145,6 @@ class General extends Component
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'fqdn' => ValidationPatterns::applicationDomainRules(),
-            'noindexDomains' => 'array',
-            'noindexDomains.*' => 'string',
             'parsedServiceDomains.*.domain' => ValidationPatterns::applicationDomainRules(),
             'gitRepository' => 'required',
             'gitBranch' => ['required', 'string', new ValidGitBranch],
@@ -354,7 +349,6 @@ class General extends Component
             $this->application->name = $this->name;
             $this->application->description = $this->description;
             $this->application->fqdn = $this->fqdn;
-            $this->application->setNoindexDomains($this->noindexDomains);
             $this->application->git_repository = $this->gitRepository;
             $this->application->git_branch = $this->gitBranch;
             $this->application->git_commit_sha = $this->gitCommitSha;
@@ -407,7 +401,6 @@ class General extends Component
             $this->name = $this->application->name;
             $this->description = $this->application->description;
             $this->fqdn = $this->application->fqdn;
-            $this->noindexDomains = $this->application->noindexDomains()->all();
             $this->gitRepository = $this->application->git_repository;
             $this->gitBranch = $this->application->git_branch;
             $this->gitCommitSha = $this->application->git_commit_sha;
@@ -733,26 +726,6 @@ class General extends Component
         $this->forceSaveDomains = true;
         $this->showDomainConflictModal = false;
         $this->submit();
-    }
-
-    public function getConfiguredDomainsProperty(): array
-    {
-        return ValidationPatterns::applicationDomainList($this->application->fqdn);
-    }
-
-    public function updateNoindexDomains()
-    {
-        $this->authorize('update', $this->application);
-
-        try {
-            $this->application->setNoindexDomains($this->noindexDomains);
-            $this->application->save();
-            $this->noindexDomains = $this->application->noindexDomains()->all();
-            $this->resetDefaultLabels();
-            $this->dispatch('success', 'Search engine indexing updated.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
     }
 
     public function setRedirect()

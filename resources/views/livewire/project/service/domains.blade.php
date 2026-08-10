@@ -22,11 +22,15 @@
         localEditingIndex: @js($editingIndex),
         localEditingDomain: @js($editingDomain),
         localEditingServiceApplicationId: @js($editingServiceApplicationId),
-        openEditDomain(index, url, serviceApplicationId, serviceLabel) {
+        localDirection: 'both',
+        localIndexing: 'index',
+        openEditDomain(index, url, serviceApplicationId, serviceLabel, direction, indexing) {
             this.localEditingIndex = index;
             this.localEditingDomain = url;
             this.localEditingServiceApplicationId = serviceApplicationId;
             this.editingServiceLabel = serviceLabel || '';
+            this.localDirection = direction || 'both';
+            this.localIndexing = indexing || 'index';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
         },
@@ -41,6 +45,8 @@
             $wire.editingIndex = this.localEditingIndex;
             $wire.editingDomain = this.localEditingDomain;
             $wire.editingServiceApplicationId = this.localEditingServiceApplicationId;
+            $wire.editingDirection = this.localDirection;
+            $wire.editingIndexing = this.localIndexing;
             $wire.showEditDomainModal = true;
         },
         matchesDomainSearch(value) {
@@ -50,7 +56,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel)"
+    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel, $event.detail.direction, $event.detail.indexing)"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="service-domains-section" title="Domains">
         @can('update', $service)
@@ -94,7 +100,9 @@
             @endif
             @can('update', $service)
                 @if ($serviceAppCount > 0)
-                    @include('livewire.project.shared.cloudflare-autoconfigure')
+                    <div class="relative shrink-0">
+                        @include('livewire.project.shared.cloudflare-autoconfigure')
+                    </div>
                     <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                         canGate="update" :canResource="$service">
                         <x-slot:content>
@@ -177,31 +185,12 @@
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
                     $heading = \Illuminate\Support\Str::headline($app['name'] ?? $rows->first()['service_name'] ?? 'Service');
-                    $redirect = $serviceRedirects[$appId] ?? 'both';
-                    $redirectLabel = match ($redirect) {
-                        'www' => 'Redirect to www',
-                        'non-www' => 'Redirect to non-www',
-                        default => 'Allow both',
-                    };
                 @endphp
                 <section id="service-domain-group-{{ $appId }}" wire:key="service-domain-group-{{ $appId }}"
                     x-show="matchesDomainSearch(@js($heading.' '.$rows->pluck('url')->implode(' ')))"
                     class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
-                    <div class="flex w-full items-center gap-3 px-4 py-3">
+                    <div class="flex w-full items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
-                        @can('update', $service)
-                            <div class="w-52 shrink-0"
-                                wire:loading.class="opacity-50" wire:target="serviceRedirects.{{ $appId }}">
-                                <x-forms.listbox id="serviceRedirects.{{ $appId }}"
-                                    htmlId="service-domain-redirect-{{ $appId }}" live :options="[
-                                        ['value' => 'both', 'label' => 'Allow www & non-www'],
-                                        ['value' => 'www', 'label' => 'Redirect to www'],
-                                        ['value' => 'non-www', 'label' => 'Redirect to non-www'],
-                                    ]" />
-                            </div>
-                        @else
-                            <span class="shrink-0 text-sm text-neutral-600 dark:text-fg-dim">{{ $redirectLabel }}</span>
-                        @endcan
                     </div>
 
                     <div wire:key="service-domain-rows-{{ $appId }}-{{ md5(serialize($rows->all())) }}">
@@ -210,7 +199,7 @@
                             'domainRows' => $domainRows,
                             'service' => $service,
                             'showServiceColumn' => false,
-                            'showHeader' => false,
+                            'showHeader' => true,
                         ])
                     </div>
                 </section>
@@ -277,6 +266,20 @@
                                     @error('editingDomain')
                                         <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
                                     @enderror
+                                </div>
+
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <x-forms.listbox id="edit-service-domain-direction" label="Direction"
+                                        :wire="false" value="both" x-model="localDirection" portal :options="[
+                                            ['value' => 'both', 'label' => 'Allow www & non-www'],
+                                            ['value' => 'www', 'label' => 'Redirect to www'],
+                                            ['value' => 'non-www', 'label' => 'Redirect to non-www'],
+                                        ]" />
+                                    <x-forms.listbox id="edit-service-domain-indexing" label="Search engine indexing"
+                                        :wire="false" value="index" x-model="localIndexing" portal :options="[
+                                            ['value' => 'index', 'label' => 'Indexable'],
+                                            ['value' => 'noindex', 'label' => 'Noindex'],
+                                        ]" />
                                 </div>
 
                                 @if ($editDomainDnsFailed)

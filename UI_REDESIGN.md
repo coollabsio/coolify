@@ -24,6 +24,8 @@ compact divided list, not legacy green check SVGs or fixed-width status rows.
 > - Build frontend assets in the Vitee container with
 >   `docker exec coolify-vite npm run build`.
 > - Use existing components before adding another styling abstraction.
+> - Use `<x-forms.listbox>` for dropdown controls. Never add a native
+>   `<select>` to a redesigned view, including compact table-row controls.
 
 ---
 

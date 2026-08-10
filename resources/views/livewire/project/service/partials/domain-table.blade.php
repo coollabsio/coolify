@@ -131,9 +131,11 @@
                                 @click="$dispatch('open-edit-domain', {
                                     index: {{ $index }},
                                     url: @js($row['url']),
-                                    serviceApplicationId: {{ (int) ($row['service_application_id'] ?? 0) }},
-                                    serviceLabel: @js($serviceLabel),
-                                })"
+                                serviceApplicationId: {{ (int) ($row['service_application_id'] ?? 0) }},
+                                serviceLabel: @js($serviceLabel),
+                                direction: @js($serviceRedirects[$row['service_application_id']] ?? 'both'),
+                                indexing: @js($service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']) ? 'noindex' : 'index'),
+                            })"
                                 class="icon-button shrink-0" title="Edit domain" aria-label="Edit domain">
                                 <x-reicon name="settings" class="size-3.5" />
                             </button>

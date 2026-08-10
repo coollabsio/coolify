@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
+use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
 use App\Support\ValidationPatterns;
@@ -37,6 +38,8 @@ class Domains extends Component
     public ?int $editingIndex = null;
 
     public string $editingDomain = '';
+
+    public string $editingIndexing = 'index';
 
     public ?string $editingService = null;
 
@@ -96,6 +99,7 @@ class Domains extends Component
         return [
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
+            'editingIndexing' => 'string|in:index,noindex',
             'redirect' => 'string|required|in:both,www,non-www',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
@@ -124,6 +128,22 @@ class Domains extends Component
     public function refreshDomains(): void
     {
         $this->loadDomainState();
+    }
+
+    public function toggleNoindexDomain(string $domain, string|bool $indexing): void
+    {
+        $this->authorize('update', $this->application);
+
+        $noindex = $indexing === true || $indexing === 'noindex';
+        $domains = $this->application->noindexDomains();
+        $domains = $noindex ? $domains->push($domain) : $domains->reject(fn (string $item) => $item === $domain);
+
+        $this->application->setNoindexDomains($domains);
+        $this->application->save();
+        $this->application->refresh();
+        $this->resetDefaultLabels();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Search engine indexing updated.');
     }
 
     public function loadDomainState(): void
@@ -887,6 +907,7 @@ class Domains extends Component
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
         $this->editingService = $this->domainRows[$index]['service'];
+        $this->editingIndexing = $this->application->isDomainNoindexed($this->editingDomain) ? 'noindex' : 'index';
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
@@ -969,6 +990,7 @@ class Domains extends Component
         $this->editingIndex = null;
         $this->editingDomain = '';
         $this->editingService = null;
+        $this->editingIndexing = 'index';
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         if ($this->pendingAction === 'update') {
@@ -1035,6 +1057,14 @@ class Domains extends Component
             if (! $this->saveDomainList($updated, $service)) {
                 return;
             }
+
+            $noindexDomains = $this->application->noindexDomains()->reject(fn (string $domain) => $domain === $oldUrl);
+            if ($this->editingIndexing === 'noindex') {
+                $noindexDomains->push($newUrl);
+            }
+            $this->application->setNoindexDomains($noindexDomains);
+            $this->application->save();
+            $this->resetDefaultLabels();
 
             $this->forceSaveDomains = false;
             $this->pendingAction = null;
@@ -1162,13 +1192,16 @@ class Domains extends Component
             // www / non-www redirects need both hosts configured as real domains so the
             // proxy can serve the canonical host and redirect the other. Auto-add missing
             // counterparts instead of leaving them as optional suggestions.
+            $addedDomains = [];
             if (in_array($this->redirect, ['www', 'non-www'], true)) {
+                $domainsBeforePairing = $this->currentDomainList();
                 if (! $this->ensureWwwNonWwwPairsConfigured(null)) {
                     return;
                 }
 
                 $this->application->refresh();
                 $this->application->redirect = $this->redirect;
+                $addedDomains = $this->currentDomainList()->diff($domainsBeforePairing)->values()->all();
             }
 
             $domains = collect($this->application->fqdns);
@@ -1183,6 +1216,7 @@ class Domains extends Component
             $this->resetDefaultLabels();
             $this->dispatch('success', 'Redirect updated.');
             $this->refreshDomains();
+            $this->checkUrlsDns($addedDomains);
             $this->pruneDomainDnsStatusesToCurrentDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -1229,12 +1263,15 @@ class Domains extends Component
             $this->pendingRedirectService = $serviceName;
 
             // Promote the optional www/non-www suggestion to a real domain for redirects.
+            $addedDomains = [];
             if (in_array($redirect, ['www', 'non-www'], true)) {
+                $domainsBeforePairing = $this->currentDomainList($serviceName);
                 if (! $this->ensureWwwNonWwwPairsConfigured($serviceName)) {
                     return;
                 }
                 // Ensure we re-read domains after pair save before writing redirect.
                 $this->application->refresh();
+                $addedDomains = $this->currentDomainList($serviceName)->diff($domainsBeforePairing)->values()->all();
             }
 
             $allDomains = $this->application->docker_compose_domains
@@ -1268,6 +1305,7 @@ class Domains extends Component
             $this->resetDefaultLabels();
             $this->dispatch('success', "Redirect updated for {$serviceName}.");
             $this->refreshDomains();
+            $this->checkUrlsDns($addedDomains, $serviceName);
             $this->pruneDomainDnsStatusesToCurrentDomains();
         } catch (\Throwable $e) {
             handleError($e, $this);

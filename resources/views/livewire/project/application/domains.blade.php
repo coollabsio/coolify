@@ -15,15 +15,16 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: @js($editingService ?? ''),
-        // Local-only until Save — never touch $wire on open/close (avoids Livewire toJSON proxy bugs).
         localEditingIndex: @js($editingIndex),
         localEditingDomain: @js($editingDomain),
         localEditingService: @js($editingService),
-        openEditDomain(index, url, service) {
+        localIndexing: 'index',
+        openEditDomain(index, url, service, indexing) {
             this.localEditingIndex = index;
             this.localEditingDomain = url;
             this.localEditingService = service;
             this.editingServiceLabel = service || '';
+            this.localIndexing = indexing || 'index';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
         },
@@ -39,6 +40,7 @@
             $wire.editingIndex = this.localEditingIndex;
             $wire.editingDomain = this.localEditingDomain;
             $wire.editingService = this.localEditingService;
+            $wire.editingIndexing = this.localIndexing;
             $wire.showEditDomainModal = true;
         },
         matchesDomainSearch(value) {
@@ -48,7 +50,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service)"
+    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service, $event.detail.indexing)"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="domains-section" title="Domains" :helper="$helperText">
         @can('update', $application)
@@ -81,16 +83,11 @@
 
         @if (! $isCompose)
             @if ($labelsAreWritable)
-                @if ($application->redirect === 'both')
-                    <x-forms.input label="Direction" value="Allow www & non-www" readonly
-                        helper="Readonly labels are disabled. You can set the direction in the labels section." />
-                @elseif ($application->redirect === 'www')
-                    <x-forms.input label="Direction" value="Redirect to www" readonly
-                        helper="Readonly labels are disabled. You can set the direction in the labels section." />
-                @elseif ($application->redirect === 'non-www')
-                    <x-forms.input label="Direction" value="Redirect to non-www" readonly
-                        helper="Readonly labels are disabled. You can set the direction in the labels section." />
-                @endif
+                <x-forms.input label="Direction" value="{{ match ($application->redirect) {
+                    'www' => 'Redirect to www',
+                    'non-www' => 'Redirect to non-www',
+                    default => 'Allow www & non-www',
+                } }}" readonly helper="Readonly labels are disabled. You can set the direction in the labels section." />
             @else
                 <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-end">
                     <div class="min-w-0 flex-1">
@@ -115,9 +112,10 @@
             @endif
         @elseif (! $labelsAreWritable && count($composeServices) > 0 && $composeDomainGroups->isNotEmpty())
             <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                Per-service www/non-www redirects are available next to each service group in the table below.
+                Per-service www/non-www redirects are available next to each service group below.
             </p>
         @endif
+
     </x-application.settings-section>
 
     {{-- Toolbar --}}
@@ -140,7 +138,9 @@
                 </div>
             @endif
             @can('update', $application)
-                @include('livewire.project.shared.cloudflare-autoconfigure')
+                <div class="relative shrink-0">
+                    @include('livewire.project.shared.cloudflare-autoconfigure')
+                </div>
                 @unless ($labelsAreWritable)
                     @if (! $isCompose || count($composeServices) > 0)
                         <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
@@ -236,8 +236,7 @@
                     @php
                         $rows = $grouped->get($serviceName, collect());
                         $redirectWireKey = $this->serviceRedirectWireKey($serviceName);
-                        $redirect = $serviceRedirects[$redirectWireKey] ?? 'both';
-                        $redirectLabel = match ($redirect) {
+                        $redirectLabel = match ($serviceRedirects[$redirectWireKey] ?? 'both') {
                             'www' => 'Redirect to www',
                             'non-www' => 'Redirect to non-www',
                             default => 'Allow both',
@@ -253,26 +252,14 @@
                             </span>
                             @unless ($labelsAreWritable)
                                 @can('update', $application)
-                                    <div class="relative flex shrink-0 items-center gap-2 px-1 py-1 text-sm text-neutral-600 dark:text-fg-dim"
-                                        wire:loading.class="opacity-50"
-                                        wire:target="serviceRedirects.{{ $redirectWireKey }}">
-                                        <span>{{ $redirectLabel }}</span>
-                                        <x-reicon name="chevron-down" class="size-4 shrink-0"
-                                            wire:loading.remove
-                                            wire:target="serviceRedirects.{{ $redirectWireKey }}" />
-                                        <x-loading-on-button wire:loading.delay
-                                            wire:target="serviceRedirects.{{ $redirectWireKey }}" />
-                                        <select id="application-compose-domain-redirect-{{ $redirectWireKey }}"
-                                            wire:model.change="serviceRedirects.{{ $redirectWireKey }}"
-                                            wire:change="setServiceRedirect(@js($serviceName))"
-                                            wire:loading.attr="disabled"
-                                            wire:target="serviceRedirects.{{ $redirectWireKey }}"
-                                            class="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-wait"
-                                            aria-label="Redirect direction for {{ $serviceName }}">
-                                            <option value="both">Allow www & non-www</option>
-                                            <option value="www">Redirect to www</option>
-                                            <option value="non-www">Redirect to non-www</option>
-                                        </select>
+                                    <div class="w-52 shrink-0">
+                                        <x-forms.listbox id="serviceRedirects.{{ $redirectWireKey }}"
+                                            htmlId="application-compose-domain-redirect-{{ $redirectWireKey }}"
+                                            live :options="[
+                                                ['value' => 'both', 'label' => 'Allow www & non-www'],
+                                                ['value' => 'www', 'label' => 'Redirect to www'],
+                                                ['value' => 'non-www', 'label' => 'Redirect to non-www'],
+                                            ]" wire:change="setServiceRedirect(@js($serviceName))" />
                                     </div>
                                 @else
                                     <span class="shrink-0 text-sm text-neutral-600 dark:text-fg-dim">{{ $redirectLabel }}</span>
@@ -383,6 +370,14 @@
                                         <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
                                     @enderror
                                 </div>
+
+                                @unless ($labelsAreWritable)
+                                    <x-forms.listbox id="edit-domain-indexing" label="Search engine indexing"
+                                        :wire="false" value="index" x-model="localIndexing" portal :options="[
+                                            ['value' => 'index', 'label' => 'Indexable'],
+                                            ['value' => 'noindex', 'label' => 'Noindex'],
+                                        ]" />
+                                @endunless
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
