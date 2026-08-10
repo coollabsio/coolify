@@ -25,12 +25,18 @@ class PushoverNotificationSettings extends Model
         'backup_failure_pushover_notifications',
         'scheduled_task_success_pushover_notifications',
         'scheduled_task_failure_pushover_notifications',
-        'docker_cleanup_pushover_notifications',
+        'docker_cleanup_success_pushover_notifications',
+        'docker_cleanup_failure_pushover_notifications',
         'server_disk_usage_pushover_notifications',
         'server_reachable_pushover_notifications',
         'server_unreachable_pushover_notifications',
         'server_patch_pushover_notifications',
         'traefik_outdated_pushover_notifications',
+    ];
+
+    protected $hidden = [
+        'pushover_user_key',
+        'pushover_api_token',
     ];
 
     protected $casts = [

@@ -6,13 +6,14 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
 {
+    $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $application_id = $application->id;
     $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
     $deployment_url = $deployment_link->getPath();
@@ -46,6 +47,7 @@ function queue_application_deployment(Application $application, string $deployme
     $existing_deployment = ApplicationDeploymentQueue::where('application_id', $application_id)
         ->where('commit', $commit)
         ->where('pull_request_id', $pull_request_id)
+        ->where('docker_registry_image_tag', $docker_registry_image_tag)
         ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])
         ->first();
 
@@ -71,6 +73,7 @@ function queue_application_deployment(Application $application, string $deployme
         'deployment_uuid' => $deployment_uuid,
         'deployment_url' => $deployment_url,
         'pull_request_id' => $pull_request_id,
+        'docker_registry_image_tag' => $docker_registry_image_tag,
         'force_rebuild' => $force_rebuild,
         'is_webhook' => $is_webhook,
         'is_api' => $is_api,
@@ -188,11 +191,11 @@ function next_after_cancel(?Server $server = null)
 
 function clone_application(Application $source, $destination, array $overrides = [], bool $cloneVolumeData = false): Application
 {
-    $uuid = $overrides['uuid'] ?? (string) new Cuid2;
+    $uuid = $overrides['uuid'] ?? new_public_id();
     $server = $destination->server;
 
     if ($server->team_id !== currentTeam()->id) {
-        throw new \RuntimeException('Destination does not belong to the current team.');
+        throw new RuntimeException('Destination does not belong to the current team.');
     }
 
     // Prepare name and URL
@@ -217,6 +220,7 @@ function clone_application(Application $source, $destination, array $overrides =
         'fqdn' => $url,
         'status' => 'exited',
         'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
     ], $overrides));
     $newApplication->save();
 
@@ -238,6 +242,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'application_id' => $newApplication->id,
         ]);
         $newApplicationSettings->save();
+        $newApplication->setRelation('settings', $newApplicationSettings->fresh());
     }
 
     // Clone tags
@@ -254,7 +259,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'uuid' => (string) new Cuid2,
+            'uuid' => new_public_id(),
             'application_id' => $newApplication->id,
             'team_id' => currentTeam()->id,
         ]);
@@ -269,7 +274,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
         ])->fill([
-            'uuid' => (string) new Cuid2,
+            'uuid' => new_public_id(),
             'application_id' => $newApplication->id,
             'status' => 'exited',
             'fqdn' => null,
@@ -299,6 +304,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'id',
             'created_at',
             'updated_at',
+            'uuid',
         ])->fill([
             'name' => $newName,
             'resource_id' => $newApplication->id,
@@ -316,14 +322,14 @@ function clone_application(Application $source, $destination, array $overrides =
                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                 queue_application_deployment(
-                    deployment_uuid: (string) new Cuid2,
+                    deployment_uuid: new_public_id(),
                     application: $source,
                     server: $sourceServer,
                     destination: $source->destination,
                     no_questions_asked: true
                 );
-            } catch (\Exception $e) {
-                \Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
+            } catch (Exception $e) {
+                Log::error('Failed to copy volume data for '.$volume->name.': '.$e->getMessage());
             }
         }
     }
@@ -344,7 +350,7 @@ function clone_application(Application $source, $destination, array $overrides =
     // Clone production environment variables without triggering the created hook
     $environmentVariables = $source->environment_variables()->get();
     foreach ($environmentVariables as $environmentVariable) {
-        \App\Models\EnvironmentVariable::withoutEvents(function () use ($environmentVariable, $newApplication) {
+        EnvironmentVariable::withoutEvents(function () use ($environmentVariable, $newApplication) {
             $newEnvironmentVariable = $environmentVariable->replicate([
                 'id',
                 'created_at',
@@ -361,7 +367,7 @@ function clone_application(Application $source, $destination, array $overrides =
     // Clone preview environment variables
     $previewEnvironmentVariables = $source->environment_variables_preview()->get();
     foreach ($previewEnvironmentVariables as $previewEnvironmentVariable) {
-        \App\Models\EnvironmentVariable::withoutEvents(function () use ($previewEnvironmentVariable, $newApplication) {
+        EnvironmentVariable::withoutEvents(function () use ($previewEnvironmentVariable, $newApplication) {
             $newPreviewEnvironmentVariable = $previewEnvironmentVariable->replicate([
                 'id',
                 'created_at',

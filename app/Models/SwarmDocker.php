@@ -2,9 +2,24 @@
 
 namespace App\Models;
 
+use App\Support\ValidationPatterns;
+
 class SwarmDocker extends BaseModel
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'server_id',
+        'name',
+        'network',
+    ];
+
+    public function setNetworkAttribute(string $value): void
+    {
+        if (! ValidationPatterns::isValidDockerNetwork($value)) {
+            throw new \InvalidArgumentException('Invalid Docker network name. Must start with alphanumeric and contain only alphanumeric characters, dots, hyphens, and underscores.');
+        }
+
+        $this->attributes['network'] = $value;
+    }
 
     public function applications()
     {
@@ -56,6 +71,16 @@ class SwarmDocker extends BaseModel
         return $this->belongsTo(Server::class);
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId(currentTeam()->id));
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId($teamId));
+    }
+
     /**
      * Get the server attribute using identity map caching.
      * This intercepts lazy-loading to use cached Server lookups.
@@ -99,6 +124,6 @@ class SwarmDocker extends BaseModel
 
     public function attachedTo()
     {
-        return $this->applications?->count() > 0 || $this->databases()->count() > 0;
+        return $this->applications()->exists() || $this->databases()->count() > 0 || $this->services()->exists();
     }
 }

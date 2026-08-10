@@ -11,14 +11,19 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Notifications\Container\ContainerRestarted;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 use Symfony\Component\Yaml\Yaml;
 
 class StartDatabaseProxy
 {
     use AsAction;
 
-    public string $jobQueue = 'high';
+    public function configureJob(JobDecorator $job): void
+    {
+        $job->onQueue(deployment_queue());
+    }
 
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
     {
@@ -29,7 +34,7 @@ class StartDatabaseProxy
         $proxyContainerName = "{$database->uuid}-proxy";
         $isSSLEnabled = $database->enable_ssl ?? false;
 
-        if ($database->getMorphClass() === \App\Models\ServiceDatabase::class) {
+        if ($database->getMorphClass() === ServiceDatabase::class) {
             $databaseType = $database->databaseType();
             $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
@@ -132,13 +137,11 @@ class StartDatabaseProxy
                     ?? data_get($database, 'service.environment.project.team');
 
                 $team?->notify(
-                    new \App\Notifications\Container\ContainerRestarted(
+                    new ContainerRestarted(
                         "TCP Proxy for {$database->name} database has been disabled due to error: {$e->getMessage()}",
                         $server,
                     )
                 );
-
-                ray("Database proxy for {$database->name} disabled due to non-transient error: {$e->getMessage()}");
 
                 return;
             }

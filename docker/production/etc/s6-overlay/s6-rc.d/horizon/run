@@ -3,9 +3,9 @@
 cd /var/www/html
 
 if grep -qE '^HORIZON_ENABLED=false' .env 2>/dev/null; then
-    echo "horizon: disabled, sleeping."
+    echo "   INFO  Horizon is disabled, sleeping."
     exec sleep infinity
 fi
 
-echo "horizon: enabled, starting..."
+echo "   INFO  Horizon is enabled, starting..."
 exec php artisan horizon

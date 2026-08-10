@@ -7,19 +7,20 @@
 
 services:
   backend:
-    image: ghcr.io/get-convex/convex-backend:00bd92723422f3bff968230c94ccdeb8c1719832
+    image: ghcr.io/get-convex/convex-backend:a9a760ca10399ed42e1b4bb87c78539a235488c7
     volumes:
       - data:/convex/data
     environment:
       - SERVICE_URL_BACKEND_3210
+      - SERVICE_URL_SITE_3211
       - INSTANCE_NAME=${INSTANCE_NAME:-self-hosted-convex}
-      - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
+      - INSTANCE_SECRET=${SERVICE_HEX_64_SECRET}
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
       - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-}
       # URL of the Convex API as accessed by the client/frontend.
-      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_DASHBOARD}
+      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_BACKEND}
       # URL of Convex HTTP actions as accessed by the client/frontend.
-      - CONVEX_SITE_ORIGIN=${SERVICE_URL_BACKEND}
+      - CONVEX_SITE_ORIGIN=${SERVICE_URL_SITE}
       - DATABASE_URL=${DATABASE_URL:-}
       - DISABLE_BEACON=${DISABLE_BEACON:?false}
       - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:?false}
@@ -47,7 +48,7 @@ services:
       start_period: 10s
 
   dashboard:
-    image: ghcr.io/get-convex/convex-dashboard:33cef775a8a6228cbacee4a09ac2c4073d62ed13
+    image: ghcr.io/get-convex/convex-dashboard:a9a760ca10399ed42e1b4bb87c78539a235488c7
     environment:
       - SERVICE_URL_DASHBOARD_6791
       # URL of the Convex API as accessed by the dashboard (browser).
@@ -56,6 +57,6 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: wget -qO- http://127.0.0.1:6791/
+      test: curl -f http://127.0.0.1:6791/
       interval: 5s
       start_period: 5s

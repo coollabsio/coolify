@@ -1,43 +1,32 @@
 <x-layout-simple>
-    <section class="bg-gray-50 dark:bg-base">
-        <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
-            <div class="w-full max-w-md space-y-8">
-                <div class="text-center space-y-2">
-                    <h1 class="!text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                        Coolify
-                    </h1>
-                </div>
-
-                <div class="space-y-6">
-                    <div class="p-6 rounded-lg border border-neutral-500/20 bg-white/5">
-                        <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Team Invitation</h2>
-
-                        <p class="text-sm text-gray-600 dark:text-neutral-400 mb-2">
-                            You have been invited to join:
-                        </p>
-                        <p class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                            {{ $team->name }}
-                        </p>
-
-                        <p class="text-sm text-gray-600 dark:text-neutral-400 mb-1">
-                            Role: <span class="font-medium text-gray-900 dark:text-white">{{ ucfirst($invitation->role) }}</span>
-                        </p>
-
-                        @if ($alreadyMember)
-                            <div class="mt-4 p-3 bg-warning/10 border border-warning rounded-lg">
-                                <p class="text-sm text-warning">You are already a member of this team.</p>
-                            </div>
-                        @endif
-
-                        <form method="POST" action="{{ route('team.invitation.accept', $invitation->uuid) }}" class="mt-6">
-                            @csrf
-                            <x-forms.button class="w-full justify-center py-3 box-boarding" type="submit" isHighlighted>
-                                {{ $alreadyMember ? 'Dismiss Invitation' : 'Accept Invitation' }}
-                            </x-forms.button>
-                        </form>
-                    </div>
-                </div>
+    <x-auth.shell title="Coolify" description="Review your invitation to join a team.">
+        <div class="flex flex-col gap-4">
+            <div class="auth-guidance">
+                <x-reicon name="teams" class="mt-0.5 size-4 shrink-0" />
+                <p>You have been invited to collaborate on Coolify.</p>
             </div>
+
+            <dl class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 text-sm dark:divide-white/10 dark:border-white/10">
+                <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+                    <dt class="text-neutral-500 dark:text-fg-dim">Team</dt>
+                    <dd class="min-w-0 truncate font-medium text-neutral-900 dark:text-white">{{ $team->name }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-4 px-3 py-2.5">
+                    <dt class="text-neutral-500 dark:text-fg-dim">Role</dt>
+                    <dd class="font-medium text-neutral-900 dark:text-white">{{ ucfirst($invitation->role) }}</dd>
+                </div>
+            </dl>
+
+            @if ($alreadyMember)
+                <x-auth.alert type="warning">You are already a member of this team. Dismiss the invitation to continue.</x-auth.alert>
+            @endif
+
+            <form method="POST" action="{{ route('team.invitation.accept', $invitation->uuid) }}">
+                @csrf
+                <x-forms.button class="w-full justify-center" type="submit" isHighlighted>
+                    {{ $alreadyMember ? 'Dismiss invitation' : 'Accept invitation' }}
+                </x-forms.button>
+            </form>
         </div>
-    </section>
+    </x-auth.shell>
 </x-layout-simple>

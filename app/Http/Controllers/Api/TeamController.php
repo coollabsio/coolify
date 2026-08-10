@@ -14,14 +14,6 @@ class TeamController extends Controller
             'custom_server_limit',
             'pivot',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            $team->makeHidden([
-                'smtp_username',
-                'smtp_password',
-                'resend_api_key',
-                'telegram_token',
-            ]);
-        }
 
         return serializeApiResponse($team);
     }
@@ -118,6 +110,7 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
+        $this->authorize('view', $team);
         $team = $this->removeSensitiveData($team);
 
         return response()->json(
@@ -176,6 +169,7 @@ class TeamController extends Controller
         if (is_null($team)) {
             return response()->json(['message' => 'Team not found.'], 404);
         }
+        $this->authorize('view', $team);
         $members = $team->members;
         $members->makeHidden([
             'pivot',
@@ -190,9 +184,9 @@ class TeamController extends Controller
 
     #[OA\Get(
         summary: 'Authenticated Team',
-        description: 'Get currently authenticated team.',
-        path: '/teams/current',
-        operationId: 'get-current-team',
+        description: 'Get the team bound to the API token.',
+        path: '/team',
+        operationId: 'get-token-team',
         security: [
             ['bearerAuth' => []],
         ],
@@ -200,7 +194,7 @@ class TeamController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Current Team.',
+                description: 'Team bound to the API token.',
                 content: new OA\JsonContent(ref: '#/components/schemas/Team')),
             new OA\Response(
                 response: 401,
@@ -230,9 +224,9 @@ class TeamController extends Controller
 
     #[OA\Get(
         summary: 'Authenticated Team Members',
-        description: 'Get currently authenticated team members.',
-        path: '/teams/current/members',
-        operationId: 'get-current-team-members',
+        description: 'Get members of the team bound to the API token.',
+        path: '/team/members',
+        operationId: 'get-token-team-members',
         security: [
             ['bearerAuth' => []],
         ],
@@ -240,7 +234,7 @@ class TeamController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Currently authenticated team members.',
+                description: 'Members of the team bound to the API token.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',

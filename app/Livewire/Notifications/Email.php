@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -13,7 +14,7 @@ use Livewire\Component;
 
 class Email extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -42,10 +43,10 @@ class Email extends Component
     public ?string $smtpHost = null;
 
     #[Validate(['nullable', 'numeric', 'min:1', 'max:65535'])]
-    public ?int $smtpPort = null;
+    public ?string $smtpPort = null;
 
     #[Validate(['nullable', 'string', 'in:starttls,tls,none'])]
-    public ?string $smtpEncryption = null;
+    public ?string $smtpEncryption = 'starttls';
 
     #[Validate(['nullable', 'string'])]
     public ?string $smtpUsername = null;
@@ -54,7 +55,7 @@ class Email extends Component
     public ?string $smtpPassword = null;
 
     #[Validate(['nullable', 'numeric'])]
-    public ?int $smtpTimeout = null;
+    public ?string $smtpTimeout = null;
 
     #[Validate(['boolean'])]
     public bool $resendEnabled = false;
@@ -170,11 +171,15 @@ class Email extends Component
             $this->smtpPort = $this->settings->smtp_port;
             $this->smtpEncryption = $this->settings->smtp_encryption;
             $this->smtpUsername = $this->settings->smtp_username;
-            $this->smtpPassword = $this->settings->smtp_password;
+            $this->smtpPassword = auth()->user()->can('update', $this->settings)
+                ? $this->settings->smtp_password
+                : null;
             $this->smtpTimeout = $this->settings->smtp_timeout;
 
             $this->resendEnabled = $this->settings->resend_enabled;
-            $this->resendApiKey = $this->settings->resend_api_key;
+            $this->resendApiKey = auth()->user()->can('update', $this->settings)
+                ? $this->settings->resend_api_key
+                : null;
 
             $this->useInstanceEmailSettings = $this->settings->use_instance_email_settings;
 
@@ -242,6 +247,8 @@ class Email extends Component
 
     public function submitSmtp()
     {
+        $this->authorize('update', $this->settings);
+
         try {
             $this->resetErrorBag();
             $this->validate([
@@ -289,6 +296,8 @@ class Email extends Component
 
     public function submitResend()
     {
+        $this->authorize('update', $this->settings);
+
         try {
             $this->resetErrorBag();
             $this->validate([

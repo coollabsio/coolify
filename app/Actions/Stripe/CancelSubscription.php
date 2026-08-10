@@ -5,6 +5,7 @@ namespace App\Actions\Stripe;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\StripeClient;
 
 class CancelSubscription
@@ -21,7 +22,7 @@ class CancelSubscription
         $this->isDryRun = $isDryRun;
 
         if (! $isDryRun && isCloud()) {
-            $this->stripe = new StripeClient(config('subscription.stripe_api_key'));
+            $this->stripe = app(StripeClient::class);
         }
     }
 
@@ -64,7 +65,7 @@ class CancelSubscription
             ];
         }
 
-        $stripe = new StripeClient(config('subscription.stripe_api_key'));
+        $stripe = app(StripeClient::class);
         $subscriptions = $this->getSubscriptionsPreview();
 
         $verified = collect();
@@ -88,7 +89,7 @@ class CancelSubscription
                         'reason' => "Status in Stripe: {$stripeSubscription->status}",
                     ]);
                 }
-            } catch (\Stripe\Exception\InvalidRequestException $e) {
+            } catch (InvalidRequestException $e) {
                 // Subscription doesn't exist in Stripe
                 $notFound->push([
                     'subscription' => $subscription,
@@ -181,7 +182,7 @@ class CancelSubscription
                 return false;
             }
 
-            $stripe = new StripeClient(config('subscription.stripe_api_key'));
+            $stripe = app(StripeClient::class);
             $stripe->subscriptions->cancel($subscriptionId, []);
 
             // Update local record if exists

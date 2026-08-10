@@ -6,7 +6,7 @@ use App\Models\ApplicationSetting;
 describe('Application Rollback', function () {
     beforeEach(function () {
         $this->application = new Application;
-        $this->application->forceFill([
+        $this->application->fill([
             'uuid' => 'test-app-uuid',
             'git_commit_sha' => 'HEAD',
         ]);

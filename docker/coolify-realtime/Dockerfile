@@ -10,9 +10,10 @@ ARG TARGETPLATFORM
 ARG CLOUDFLARED_VERSION
 
 WORKDIR /terminal
-RUN apk add --no-cache openssh-client make g++ python3 curl
-COPY docker/coolify-realtime/package.json ./
-RUN npm i
+RUN apk upgrade --no-cache && \
+    apk add --no-cache openssh-client make g++ python3 curl
+COPY docker/coolify-realtime/package*.json ./
+RUN npm ci
 RUN npm rebuild node-pty --update-binary
 COPY docker/coolify-realtime/soketi-entrypoint.sh /soketi-entrypoint.sh
 COPY docker/coolify-realtime/terminal-server.js /terminal/terminal-server.js

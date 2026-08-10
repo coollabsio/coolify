@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
@@ -49,20 +50,83 @@ use OpenApi\Attributes as OA;
         'updated_at' => ['type' => 'string'],
         'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
         'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
+        'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds.'],
     ]
 )]
 class ServerSetting extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'server_id',
+        'is_swarm_manager',
+        'is_jump_server',
+        'is_build_server',
+        'is_reachable',
+        'is_usable',
+        'wildcard_domain',
+        'is_cloudflare_tunnel',
+        'is_logdrain_newrelic_enabled',
+        'logdrain_newrelic_license_key',
+        'logdrain_newrelic_base_uri',
+        'is_logdrain_highlight_enabled',
+        'logdrain_highlight_project_id',
+        'is_logdrain_axiom_enabled',
+        'logdrain_axiom_dataset_name',
+        'logdrain_axiom_api_key',
+        'is_swarm_worker',
+        'is_logdrain_custom_enabled',
+        'logdrain_custom_config',
+        'logdrain_custom_config_parser',
+        'concurrent_builds',
+        'dynamic_timeout',
+        'force_disabled',
+        'is_metrics_enabled',
+        'generate_exact_labels',
+        'force_docker_cleanup',
+        'docker_cleanup_frequency',
+        'docker_cleanup_threshold',
+        'server_timezone',
+        'delete_unused_volumes',
+        'delete_unused_networks',
+        'is_sentinel_enabled',
+        'sentinel_token',
+        'sentinel_metrics_refresh_rate_seconds',
+        'sentinel_metrics_history_days',
+        'sentinel_push_interval_seconds',
+        'sentinel_custom_url',
+        'server_disk_usage_notification_threshold',
+        'is_sentinel_debug_enabled',
+        'server_disk_usage_check_frequency',
+        'is_terminal_enabled',
+        'deployment_queue_limit',
+        'disable_application_image_retention',
+        'connection_timeout',
+    ];
 
     protected $casts = [
+        'force_disabled' => 'boolean',
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
+        'is_build_server' => 'boolean',
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
+        'connection_timeout' => 'integer',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'sentinel_token',
+        'sentinel_custom_url',
+        'logdrain_newrelic_license_key',
+        'logdrain_axiom_api_key',
+        'logdrain_custom_config',
+        'logdrain_custom_config_parser',
     ];
 
     protected static function booted()
@@ -96,19 +160,54 @@ class ServerSetting extends Model
      * Validate that a sentinel token contains only safe characters.
      * Prevents OS command injection when the token is interpolated into shell commands.
      */
-    public static function isValidSentinelToken(string $token): bool
+    public static function isValidSentinelToken(?string $token): bool
     {
+        if ($token === null) {
+            return false;
+        }
+
         return (bool) preg_match('/\A[a-zA-Z0-9._\-+=\/]+\z/', $token);
     }
 
-    public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false)
+    /**
+     * Returns a valid sentinel token, regenerating it if the stored value is
+     * empty, undecryptable, or otherwise invalid. Throws only when regeneration
+     * still fails to produce a valid token.
+     */
+    public function ensureValidSentinelToken(): string
+    {
+        try {
+            $token = $this->sentinel_token;
+        } catch (DecryptException) {
+            $token = null;
+        }
+
+        if (! self::isValidSentinelToken($token)) {
+            // Clear undecryptable raw value so Eloquent's dirty-check won't try to
+            // decrypt the bad original during save().
+            $attrs = $this->getAttributes();
+            $attrs['sentinel_token'] = null;
+            $this->setRawAttributes($attrs, true);
+
+            $this->generateSentinelToken(save: true, ignoreEvent: true);
+            $this->refresh();
+            $token = $this->sentinel_token;
+        }
+
+        if (! self::isValidSentinelToken($token)) {
+            throw new \RuntimeException('Sentinel token invalid after regeneration. Allowed characters: a-z, A-Z, 0-9, dot, underscore, hyphen, plus, slash, equals.');
+        }
+
+        return $token;
+    }
+
+    public function generateSentinelToken(bool $save = true, bool $ignoreEvent = false): string
     {
         $data = [
             'server_uuid' => $this->server->uuid,
         ];
-        $token = json_encode($data);
-        $encrypted = encrypt($token);
-        $this->sentinel_token = $encrypted;
+        $token = encrypt(json_encode($data));
+        $this->sentinel_token = $token;
         if ($save) {
             if ($ignoreEvent) {
                 $this->saveQuietly();
@@ -120,7 +219,22 @@ class ServerSetting extends Model
         return $token;
     }
 
-    public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false)
+    public function ensureSentinelUrl(): string
+    {
+        $url = $this->sentinel_custom_url;
+
+        if (blank($url)) {
+            $url = $this->generateSentinelUrl(ignoreEvent: true);
+        }
+
+        if (blank($url)) {
+            throw new \RuntimeException('Set an instance FQDN, public IP, or reachable Coolify URL before enabling Sentinel.');
+        }
+
+        return $url;
+    }
+
+    public function generateSentinelUrl(bool $save = true, bool $ignoreEvent = false): ?string
     {
         $domain = null;
         $settings = InstanceSettings::get();
@@ -132,6 +246,8 @@ class ServerSetting extends Model
             $domain = 'http://'.$settings->public_ipv4.':8000';
         } elseif ($settings->public_ipv6) {
             $domain = 'http://'.$settings->public_ipv6.':8000';
+        } else {
+            $domain = $this->sentinelUrlFromCurrentRequest();
         }
         $this->sentinel_custom_url = $domain;
         if ($save) {
@@ -143,6 +259,29 @@ class ServerSetting extends Model
         }
 
         return $domain;
+    }
+
+    private function sentinelUrlFromCurrentRequest(): ?string
+    {
+        if (! app()->bound('request')) {
+            return null;
+        }
+
+        $request = request();
+        $host = strtolower($request->getHost());
+
+        if (
+            $host === 'localhost' ||
+            str_ends_with($host, '.localhost') ||
+            $host === '::1' ||
+            $host === '::' ||
+            $host === '0.0.0.0' ||
+            str_starts_with($host, '127.')
+        ) {
+            return null;
+        }
+
+        return $request->getSchemeAndHttpHost();
     }
 
     public function server()

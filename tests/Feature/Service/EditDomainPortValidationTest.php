@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Project\Service\Domains;
 use App\Livewire\Project\Service\EditDomain;
 use App\Models\Environment;
 use App\Models\Project;
@@ -72,6 +73,16 @@ it('loads the EditDomain component with required port', function () {
         ->assertSet('requiredPort', 8000)
         ->assertSet('fqdn', 'http://example.com:8000')
         ->assertOk();
+});
+
+it('marks noindex changes as pending configuration', function () {
+    $this->service->isConfigurationChanged(save: true);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('toggleNoindexDomain', $this->serviceApplication->id, 'http://example.com:8000', true)
+        ->assertDispatched('configurationChanged');
+
+    expect($this->service->refresh()->isConfigurationChanged())->toBeTrue();
 });
 
 it('shows warning modal when trying to remove required port', function () {

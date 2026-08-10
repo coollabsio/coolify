@@ -2,9 +2,23 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 class CloudProviderToken extends BaseModel
 {
-    protected $guarded = [];
+    use HasFactory;
+
+    protected $fillable = [
+        'team_id',
+        'provider',
+        'token',
+        'name',
+        'description',
+    ];
+
+    protected $hidden = [
+        'token',
+    ];
 
     protected $casts = [
         'token' => 'encrypted',

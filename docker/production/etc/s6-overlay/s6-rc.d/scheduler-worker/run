@@ -3,9 +3,9 @@
 cd /var/www/html
 
 if grep -qE '^SCHEDULER_ENABLED=false' .env 2>/dev/null; then
-    echo "scheduler-worker: disabled, sleeping."
+    echo "   INFO  Scheduler is disabled, sleeping."
     exec sleep infinity
 fi
 
-echo "scheduler-worker: enabled, starting..."
+echo "   INFO  Scheduler is enabled, starting..."
 exec php artisan schedule:work

@@ -52,9 +52,15 @@ class Show extends Component
     #[Locked]
     public string $task_uuid;
 
-    public function mount(string $task_uuid, string $project_uuid, string $environment_uuid, ?string $application_uuid = null, ?string $service_uuid = null)
+    public function mount()
     {
         try {
+            $task_uuid = request()->route('task_uuid');
+            $project_uuid = request()->route('project_uuid');
+            $environment_uuid = request()->route('environment_uuid');
+            $application_uuid = request()->route('application_uuid');
+            $service_uuid = request()->route('service_uuid');
+
             $this->task_uuid = $task_uuid;
             if ($application_uuid) {
                 $this->type = 'application';
@@ -102,6 +108,19 @@ class Show extends Component
             $this->frequency = $this->task->frequency;
             $this->container = $this->task->container;
             $this->timeout = $this->task->timeout ?? 300;
+        }
+    }
+
+    public function toggleEnabled()
+    {
+        try {
+            $this->authorize('update', $this->resource);
+            $this->isEnabled = ! $this->isEnabled;
+            $this->task->enabled = $this->isEnabled;
+            $this->task->save();
+            $this->dispatch('success', $this->isEnabled ? 'Scheduled task enabled.' : 'Scheduled task disabled.');
+        } catch (\Exception $e) {
+            return handleError($e);
         }
     }
 

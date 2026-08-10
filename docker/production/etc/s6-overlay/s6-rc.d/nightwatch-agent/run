@@ -3,9 +3,9 @@
 cd /var/www/html
 
 if grep -qE '^NIGHTWATCH_ENABLED=true' .env 2>/dev/null; then
-    echo "nightwatch-agent: enabled, starting..."
+    echo "   INFO  Nightwatch is enabled, starting..."
     exec php artisan nightwatch:agent
 fi
 
-echo "nightwatch-agent: disabled, sleeping."
+echo "   INFO  Nightwatch is disabled, sleeping."
 exec sleep infinity

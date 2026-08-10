@@ -1,111 +1,221 @@
-<nav wire:poll.10000ms="checkStatus" class="pb-6">
-    <x-resources.breadcrumbs :resource="$database" :parameters="$parameters" />
-    <x-slide-over @startdatabase.window="slideOverOpen = true" closeWithX fullScreen>
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+    @php
+        $databasePageItems = [
+            [
+                'label' => 'Settings',
+                'route' => 'project.database.configuration',
+                'active' => request()->routeIs('project.database.configuration')
+                    || request()->routeIs('project.database.environment-variables')
+                    || request()->routeIs('project.database.servers')
+                    || request()->routeIs('project.database.import-backup')
+                    || request()->routeIs('project.database.persistent-storage')
+                    || request()->routeIs('project.database.healthcheck')
+                    || request()->routeIs('project.database.webhooks')
+                    || request()->routeIs('project.database.resource-limits')
+                    || request()->routeIs('project.database.resource-operations')
+                    || request()->routeIs('project.database.metrics')
+                    || request()->routeIs('project.database.tags')
+                    || request()->routeIs('project.database.danger'),
+            ],
+            [
+                'label' => 'Backups',
+                'route' => 'project.database.backup.index',
+                'active' => request()->routeIs('project.database.backup.*'),
+                'visible' => $database->isBackupSolutionAvailable(),
+            ],
+            [
+                'label' => 'Runtime Logs',
+                'route' => 'project.database.logs',
+                'active' => request()->routeIs('project.database.logs'),
+                'navigate' => false,
+            ],
+            [
+                'label' => 'Terminal',
+                'route' => 'project.database.command',
+                'active' => request()->routeIs('project.database.command'),
+                'navigate' => false,
+                'visible' => auth()->user()?->can('canAccessTerminal'),
+            ],
+        ];
+
+        $databasePageItems = array_values(array_filter(
+            $databasePageItems,
+            fn (array $item): bool => $item['visible'] ?? true,
+        ));
+
+        $databaseStatus = str($database->status ?? 'exited');
+    @endphp
+
+    <livewire:project.shared.configuration-checker :resource="$database" />
+
+    <x-process-dialog @startdatabase.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Database Startup</x-slot:title>
         <x-slot:content>
-            <div wire:ignore>
+            <div wire:ignore class="flex h-full min-h-0 min-w-0 max-w-full flex-col">
                 <livewire:activity-monitor header="Logs" fullHeight />
             </div>
         </x-slot:content>
-    </x-slide-over>
-    <div class="navbar-main">
-        <nav
-            class="flex overflow-x-scroll shrink-0 gap-6 items-center whitespace-nowrap sm:overflow-x-hidden scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('project.database.configuration', $parameters) }}">
-                Configuration
-            </a>
+    </x-process-dialog>
 
-            <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.database.logs', $parameters) }}">
-                Logs
-            </a>
-            @can('canAccessTerminal')
-                <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.database.command', $parameters) }}">
-                    Terminal
-                </a>
-            @endcan
-            @if (
-                $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
-                    $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-                <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                    href="{{ route('project.database.backup.index', $parameters) }}">
-                    Backups
-                </a>
-            @endif
-        </nav>
-        @if ($database->destination->server->isFunctional())
-            <div class="flex flex-wrap gap-2 items-center">
-                @if (!str($database->status)->startsWith('exited'))
-                    <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart" submitAction="restart"
-                        :actions="[
-                            'This database will be unavailable during the restart.',
-                            'If the database is currently in use data could be lost.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
-                        :dispatchEvent="true" dispatchEventType="restartEvent">
-                        <x-slot:button-title>
-                            <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg">
-                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2">
-                                    <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                                    <path d="M20 4v5h-5" />
-                                </g>
-                            </svg>
-                            Restart
-                        </x-slot:button-title>
-                    </x-modal-confirmation>
-                    <x-modal-confirmation title="Confirm Database Stopping?" buttonTitle="Stop" submitAction="stop"
-                        :checkboxes="$checkboxes" :actions="[
-                            'This database will be stopped.',
-                            'If the database is currently in use data could be lost.',
-                            'All non-persistent data of this database (containers, networks, unused images) will be deleted (don\'t worry, no data is lost and you can start the database again).',
-                        ]" :confirmWithText="false" :confirmWithPassword="false"
-                        step1ButtonText="Continue" step2ButtonText="Confirm">
-                        <x-slot:button-title>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                                <path
-                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                            </svg>
-                            Stop
-                        </x-slot:button-title>
-                    </x-modal-confirmation>
-                @else
-                    <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M7 4v16l13 -8z" />
-                        </svg>
-                        Start
-                    </button>
-                @endif
-                @script
-                    <script>
-                        $wire.$on('startEvent', () => {
-                            window.dispatchEvent(new CustomEvent('startdatabase'));
-                            $wire.$call('start');
-                        });
-                        $wire.$on('restartEvent', () => {
-                            $wire.$dispatch('info', 'Restarting database.');
-                            window.dispatchEvent(new CustomEvent('startdatabase'));
-                            $wire.$call('restart');
-                        });
-                    </script>
-                @endscript
+    <div x-data>
+        <div class="mb-3 w-full xl:hidden">
+            <div class="flex min-w-0 flex-col items-start gap-2">
+                <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+                    {{ $database->name }}
+                </h1>
+                <x-status-summary :status="$database->status" title="Database status" />
             </div>
-        @else
-            <div class="text-error">Underlying server is not functional.</div>
-        @endif
+        </div>
+
+        <div class="w-full xl:hidden">
+            @if ($database->destination->server->isFunctional())
+                <div id="database-mobile-actions" class="relative mb-3"
+                    x-data="{ open: false }" @click.outside="open = false"
+                    @keydown.escape.window="open = false">
+                    <button type="button" class="button w-full justify-between" @click="open = !open"
+                        :aria-expanded="open" aria-haspopup="menu">
+                        <span class="inline-flex items-center gap-2">
+                            <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                            Actions
+                        </span>
+                        <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
+                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                        </span>
+                    </button>
+
+                    <div x-cloak x-show="open" x-transition.origin.top.left
+                        class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
+                        @if (! $databaseStatus->startsWith('exited'))
+                            @can('manage', $database)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('database-restart-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    Restart
+                                </button>
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('database-stop-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    Stop
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    Restart
+                                </button>
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 opacity-70" />
+                                    Stop
+                                </button>
+                            @endcan
+                        @else
+                            @can('manage', $database)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; $wire.dispatch('startEvent')" role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    Start
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    Start
+                                </button>
+                            @endcan
+                        @endif
+                    </div>
+                </div>
+            @endif
+
+        </div>
+
+        @teleport('#resource-action-hud-slot')
+        <div class="hidden w-full items-center xl:flex xl:w-auto">
+            <div
+                class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                    @if ($database->destination->server->isFunctional())
+                        @if (! $databaseStatus->startsWith('exited'))
+                            <div id="database-desktop-actions" class="relative" x-data="{ open: false }"
+                                @click.outside="open = false" @keydown.escape.window="open = false">
+                                <button type="button" class="button" @click="open = !open" :aria-expanded="open">
+                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    Actions
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                                </button>
+                                <div x-cloak x-show="open" x-transition.origin.top.right
+                                    class="listbox-panel top-full! right-0! left-auto! mt-1! w-52! min-w-0!" role="menu">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('manage', $database))
+                                        @click="open = false; document.getElementById('database-restart-trigger')?.click()">
+                                        <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                        Restart
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('manage', $database))
+                                        @click="open = false; document.getElementById('database-stop-trigger')?.click()">
+                                        <x-reicon name="stop" class="size-3.5 text-error" />
+                                        Stop
+                                    </button>
+                                </div>
+                            </div>
+                        @else
+                            <x-forms.button canGate="manage" :canResource="$database"
+                                @click="$wire.dispatch('startEvent')">
+                                <x-reicon name="play-circle" class="size-4 opacity-70" />
+                                Start
+                            </x-forms.button>
+                        @endif
+                    @else
+                        <x-status-badge status="Server unavailable" type="error" />
+                    @endif
+                </div>
+            </div>
+        </div>
+        @endteleport
+
     </div>
+
+    @if ($database->destination->server->isFunctional())
+        <div class="hidden" aria-hidden="true">
+            <x-modal-confirmation title="Confirm Database Restart?" buttonTitle="Restart"
+                submitAction="restartEvent" :actions="[
+                    'This database will be unavailable during the restart.',
+                    'If the database is currently in use, data could be lost.',
+                ]" :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Restart Database"
+                :dispatchAction="true">
+                <x-slot:trigger>
+                    <button id="database-restart-trigger" type="button">Restart</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Database Stopping?" buttonTitle="Stop" submitAction="stop"
+                :checkboxes="$checkboxes" :actions="[
+                    'This database will be stopped.',
+                    'If the database is currently in use, data could be lost.',
+                    'Non-persistent containers, networks, and unused images will be removed.',
+                ]" :confirmWithText="false" :confirmWithPassword="false"
+                step1ButtonText="Continue" step2ButtonText="Confirm">
+                <x-slot:trigger>
+                    <button id="database-stop-trigger" type="button">Stop</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+        </div>
+    @endif
+
+    @script
+        <script>
+            $wire.$on('startEvent', () => {
+                window.dispatchEvent(new CustomEvent('startdatabase'));
+                $wire.$call('start');
+            });
+            $wire.$on('restartEvent', () => {
+                $wire.$dispatch('info', 'Restarting database.');
+                window.dispatchEvent(new CustomEvent('startdatabase'));
+                $wire.$call('restart');
+            });
+        </script>
+    @endscript
 </nav>

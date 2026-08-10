@@ -1,139 +1,256 @@
-<div wire:poll.10000ms="checkStatus" class="pb-6">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+    @php
+        $servicePageItems = [
+            [
+                'label' => 'Settings',
+                'route' => 'project.service.configuration',
+                'active' => request()->routeIs('project.service.configuration')
+                    || request()->routeIs('project.service.domains')
+                    || request()->routeIs('project.service.environment-variables')
+                    || request()->routeIs('project.service.storages')
+                    || request()->routeIs('project.service.scheduled-tasks*')
+                    || request()->routeIs('project.service.webhooks')
+                    || request()->routeIs('project.service.resource-operations')
+                    || request()->routeIs('project.service.tags')
+                    || request()->routeIs('project.service.danger')
+                    || request()->routeIs('project.service.index*')
+                    || request()->routeIs('project.service.database.*'),
+            ],
+            [
+                'label' => 'Backups',
+                'route' => 'project.service.volume-backups.index',
+                'active' => request()->routeIs('project.service.volume-backups.*'),
+            ],
+            [
+                'label' => 'Runtime Logs',
+                'route' => 'project.service.logs',
+                'active' => request()->routeIs('project.service.logs'),
+                'navigate' => false,
+            ],
+            [
+                'label' => 'Terminal',
+                'route' => 'project.service.command',
+                'active' => request()->routeIs('project.service.command'),
+                'navigate' => false,
+                'visible' => auth()->user()?->can('canAccessTerminal'),
+            ],
+        ];
+
+        $servicePageItems = array_values(array_filter(
+            $servicePageItems,
+            fn (array $item): bool => $item['visible'] ?? true,
+        ));
+
+        $serviceStatus = str($service->status ?? 'exited');
+        $environmentVariablesUrl = route('project.service.environment-variables', [
+            'project_uuid' => $service->environment->project->uuid,
+            'environment_uuid' => $service->environment->uuid,
+            'service_uuid' => $service->uuid,
+        ]);
+    @endphp
+
     <livewire:project.shared.configuration-checker :resource="$service" />
-    <x-slide-over @startservice.window="slideOverOpen = true" closeWithX fullScreen>
+
+    <x-process-dialog @startservice.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Service Startup</x-slot:title>
         <x-slot:content>
             <livewire:activity-monitor header="Logs" fullHeight />
         </x-slot:content>
-    </x-slide-over>
-    <h1>{{ $title }}</h1>
-    <x-resources.breadcrumbs :resource="$service" :parameters="$parameters" />
-    <div class="navbar-main" x-data">
-        <nav class="flex shrink-0 gap-6 items-center whitespace-nowrap scrollbar min-h-10">
-            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}" {{ wireNavigate() }}
-                href="{{ route('project.service.configuration', $parameters) }}">
-                <button>Configuration</button>
-            </a>
-            <a class="{{ request()->routeIs('project.service.logs') ? 'dark:text-white' : '' }}"
-                href="{{ route('project.service.logs', $parameters) }}">
-                <button>Logs</button>
-            </a>
-            @can('canAccessTerminal')
-                <a class="{{ request()->routeIs('project.service.command') ? 'dark:text-white' : '' }}"
-                    href="{{ route('project.service.command', $parameters) }}">
-                    <button>Terminal</button>
-                </a>
-            @endcan
-            <x-services.links :service="$service" />
-        </nav>
-        @if ($service->isDeployable)
-            <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
-                <x-services.advanced :service="$service" />
-                @if (str($service->status)->contains('running'))
-                    <x-forms.button title="Restart" @click="$wire.dispatch('restartEvent')">
-                        <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2">
-                                <path d="M19.933 13.041 a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                                <path d="M20 4v5h-5" />
-                            </g>
-                        </svg>
-                        Restart
-                    </x-forms.button>
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
-                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
-                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Confirm">
-                        <x-slot:button-title>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                                <path
-                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                            </svg>
-                            Stop
-                        </x-slot:button-title>
-                    </x-modal-confirmation>
-                @elseif (str($service->status)->contains('degraded'))
-                    <x-forms.button title="Restart" @click="$wire.dispatch('restartEvent')">
-                        <svg class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2">
-                                <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                                <path d="M20 4v5h-5" />
-                            </g>
-                        </svg>
-                        Restart
-                    </x-forms.button>
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
-                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
-                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Confirm">
-                        <x-slot:button-title>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                                <path
-                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                            </svg>
-                            Stop
-                        </x-slot:button-title>
-                    </x-modal-confirmation>
-                @elseif (str($service->status)->contains('exited'))
-                    <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M7 4v16l13 -8z" />
-                        </svg>
-                        Deploy
-                    </button>
-                @else
-                    <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop" :dispatchEvent="true"
-                        submitAction="stop" dispatchEventType="stopEvent" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
-                        :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue" step2ButtonText="Confirm">
-                        <x-slot:button-title>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                                stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                                <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                                <path
-                                    d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z">
-                                </path>
-                            </svg>
-                            Stop
-                        </x-slot:button-title>
-                    </x-modal-confirmation>
-                    <button @click="$wire.dispatch('startEvent')" class="gap-2 button">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 dark:text-warning" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M7 4v16l13 -8z" />
-                        </svg>
-                        Deploy
-                    </button>
-                @endif
+    </x-process-dialog>
+
+    <div x-data="{ deploying: false }" @service-deploy-finished.window="deploying = false">
+        <div class="mb-3 w-full xl:hidden">
+            <div class="flex min-w-0 flex-col items-start gap-2">
+                <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
+                    {{ $service->name }}
+                </h1>
+                <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
             </div>
-        @else
-            <div class="flex flex-wrap order-first gap-2 items-center sm:order-last">
-                <div class="text-error">
-                    Unable to deploy. <a class="underline font-bold cursor-pointer" {{ wireNavigate() }}
-                        href="{{ route('project.service.environment-variables', $parameters) }}">
-                        Required environment variables missing.</a>
+        </div>
+
+        <div class="w-full xl:hidden">
+            @if ($service->isDeployable)
+                <div id="service-mobile-actions" class="relative mb-3"
+                    x-data="{ open: false }" @click.outside="open = false"
+                    @keydown.escape.window="open = false">
+                    <button type="button" class="button w-full justify-between" x-bind:disabled="deploying"
+                        @click="open = !open"
+                        :aria-expanded="open" aria-haspopup="menu">
+                        <span class="inline-flex items-center gap-2">
+                            <x-loading-on-button x-show="deploying" x-cloak />
+                            <x-reicon name="play-circle" class="size-3.5 text-warning" x-show="!deploying" />
+                            <span x-text="deploying ? 'Deploying…' : 'Actions'">Actions</span>
+                        </span>
+                        <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
+                            <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                        </span>
+                    </button>
+
+                    <div x-cloak x-show="open" x-transition.origin.top.left
+                        class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
+                        @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
+                            @can('deploy', $service)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('service-restart-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    Restart
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    Restart
+                                </button>
+                            @endcan
+                            @can('stop', $service)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('service-stop-trigger')?.click()"
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    Stop
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="stop" class="size-3.5 opacity-70" />
+                                    Stop
+                                </button>
+                            @endcan
+                            @if ($serviceStatus->contains('running'))
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @disabled(!auth()->user()->can('deploy', $service))
+                                    @click="$wire.dispatch('pullAndRestartEvent'); open = false"
+                                    role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    Pull Latest Images & Restart
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @disabled(!auth()->user()->can('deploy', $service))
+                                    @click="$wire.dispatch('forceDeployEvent'); open = false"
+                                    role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    Force Restart
+                                </button>
+                            @endif
+                        @else
+                            @can('deploy', $service)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; deploying = true; $wire.dispatch('startEvent')" role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    Deploy
+                                </button>
+                            @else
+                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
+                                    role="menuitem">
+                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    Deploy
+                                </button>
+                            @endcan
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @disabled(!auth()->user()->can('deploy', $service))
+                                @click="$wire.dispatch('forceDeployEvent'); open = false" role="menuitem">
+                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                Force Deploy
+                            </button>
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @disabled(!auth()->user()->can('stop', $service))
+                                @click="$wire.dispatch('cleanupEvent'); open = false" role="menuitem">
+                                <x-reicon name="trash" class="size-3.5 opacity-70" />
+                                Force Cleanup Containers
+                            </button>
+                        @endif
+                    </div>
+                </div>
+            @else
+                <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                    class="mb-3 inline-flex" aria-label="Open required environment variables">
+                    <x-status-badge status="Required variables missing" type="error" />
+                </a>
+            @endif
+
+            <div class="resource-heading-menus w-full">
+                <x-services.links :service="$service" full-width />
+            </div>
+        </div>
+
+        @teleport('#resource-action-hud-slot')
+        <div class="hidden w-full items-center xl:flex xl:w-auto">
+            <div
+                class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                    @if ($service->isDeployable)
+                        <x-services.advanced :service="$service" />
+                        <div class="resource-heading-menus shrink-0">
+                            <x-services.links :service="$service" />
+                        </div>
+                        @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
+                            <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
+                                @click.outside="open = false" @keydown.escape.window="open = false">
+                                <button type="button" class="button" @click="open = !open" :aria-expanded="open">
+                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    Actions
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                                </button>
+                                <div x-cloak x-show="open" x-transition.origin.top.right
+                                    class="listbox-panel top-full! right-0! left-auto! mt-1! w-52! min-w-0!" role="menu">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('deploy', $service))
+                                        @click="open = false; document.getElementById('service-restart-trigger')?.click()">
+                                        <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                        Restart
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('stop', $service))
+                                        @click="open = false; document.getElementById('service-stop-trigger')?.click()">
+                                        <x-reicon name="stop" class="size-3.5 text-error" />
+                                        Stop
+                                    </button>
+                                </div>
+                            </div>
+                        @else
+                            <x-forms.button canGate="deploy" :canResource="$service"
+                                x-bind:disabled="deploying"
+                                @click="deploying = true; $wire.dispatch('startEvent')">
+                                <x-loading-on-button x-show="deploying" x-cloak />
+                                <x-reicon name="play-circle" class="size-4 opacity-70" x-show="!deploying" />
+                                <span x-text="deploying ? 'Deploying…' : 'Deploy'">Deploy</span>
+                            </x-forms.button>
+                        @endif
+                    @else
+                        <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                            aria-label="Open required environment variables">
+                            <x-status-badge status="Required variables missing" type="error" />
+                        </a>
+                    @endif
                 </div>
             </div>
-        @endif
+        </div>
+        @endteleport
+
     </div>
+
+    @if ($service->isDeployable)
+        <div class="hidden" aria-hidden="true">
+            <x-modal-confirmation title="Confirm Service Restart?" buttonTitle="Restart"
+                submitAction="restartEvent" :dispatchAction="true" :actions="['This service will be restarted.']"
+                :confirmWithText="false" :confirmWithPassword="false" step2ButtonText="Confirm">
+                <x-slot:trigger>
+                    <button id="service-restart-trigger" type="button">Restart</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+            <x-modal-confirmation title="Confirm Service Stopping?" buttonTitle="Stop"
+                submitAction="stop" :checkboxes="$checkboxes" :actions="[__('service.stop'), __('resource.non_persistent')]"
+                :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
+                step2ButtonText="Confirm">
+                <x-slot:trigger>
+                    <button id="service-stop-trigger" type="button">Stop</button>
+                </x-slot:trigger>
+            </x-modal-confirmation>
+        </div>
+    @endif
+
     @script
         <script>
             $wire.$on('stopEvent', () => {
@@ -142,42 +259,43 @@
                 $wire.$call('stop');
             });
             $wire.$on('startEvent', async () => {
-                const isDeploymentProgress = await $wire.$call('checkDeployments');
-                if (isDeploymentProgress) {
-                    $wire.$dispatch('error',
-                        'There is a deployment in progress.<br><br>You can force deploy in the "Advanced" section.'
-                    );
-                    return;
+                try {
+                    const isDeploymentProgress = await $wire.$call('checkDeployments');
+
+                    if (isDeploymentProgress) {
+                        $wire.$dispatch('error',
+                            'There is a deployment in progress.<br><br>You can force deploy in the Advanced section.');
+                        return;
+                    }
+
+                    await $wire.$call('start');
+                } finally {
+                    window.dispatchEvent(new CustomEvent('service-deploy-finished'));
                 }
-                window.dispatchEvent(new CustomEvent('startservice'));
-                $wire.$call('start');
-            });
-            $wire.$on('forceDeployEvent', () => {
-                window.dispatchEvent(new CustomEvent('startservice'));
-                $wire.$call('forceDeploy');
             });
             $wire.$on('restartEvent', async () => {
                 const isDeploymentProgress = await $wire.$call('checkDeployments');
+
                 if (isDeploymentProgress) {
                     $wire.$dispatch('error',
-                        'There is a deployment in progress.<br><br>You can force deploy in the "Advanced" section.'
-                    );
+                        'There is a deployment in progress.<br><br>You can force deploy in the Advanced section.');
                     return;
                 }
+
                 $wire.$dispatch('info',
                     'Gracefully stopping service.<br/><br/>It could take a while depending on the service.');
-                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('restart');
             });
+            $wire.$on('forceDeployEvent', () => $wire.$call('forceDeploy'));
             $wire.$on('pullAndRestartEvent', () => {
                 $wire.$dispatch('info', 'Pulling new images and restarting service.');
-                window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$call('pullAndRestartEvent');
             });
+            $wire.$on('cleanupEvent', () => $wire.$call('stop', true));
             $wire.on('imagePulled', () => {
                 window.dispatchEvent(new CustomEvent('startservice'));
                 $wire.$dispatch('info', 'Restarting service.');
             });
         </script>
     @endscript
-</div>
+</nav>

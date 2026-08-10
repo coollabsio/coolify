@@ -51,11 +51,14 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(?string $project_uuid = null, ?string $environment_uuid = null)
     {
         $this->parameters = get_route_parameters();
-        $this->project = Project::ownedByCurrentTeam()->where('uuid', request()->route('project_uuid'))->firstOrFail();
-        $this->environment = $this->project->environments()->where('uuid', request()->route('environment_uuid'))->firstOrFail();
+        $projectUuid = $project_uuid ?? request()->route('project_uuid');
+        $environmentUuid = $environment_uuid ?? request()->route('environment_uuid');
+
+        $this->project = Project::ownedByCurrentTeam()->where('uuid', $projectUuid)->firstOrFail();
+        $this->environment = $this->project->environments()->where('uuid', $environmentUuid)->firstOrFail();
         $this->getDevView();
     }
 
@@ -73,7 +76,12 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        return $variables->map(function ($item) {
+        $isMember = auth()->user()?->isMember();
+
+        return $variables->map(function ($item) use ($isMember) {
+            if ($isMember) {
+                return "$item->key=(Hidden, only admins can view)";
+            }
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }

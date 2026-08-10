@@ -43,8 +43,7 @@ class NewDynamicConfiguration extends Component
                 'value' => 'required',
             ]);
 
-            // Additional security validation to prevent command injection
-            validateShellSafePath($this->fileName, 'proxy configuration filename');
+            validateFilenameSafe($this->fileName, 'proxy configuration filename');
 
             if (data_get($this->parameters, 'server_uuid')) {
                 $this->server = Server::ownedByCurrentTeam()->whereUuid(data_get($this->parameters, 'server_uuid'))->first();

@@ -6,6 +6,7 @@ use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -41,9 +42,13 @@ class Proxy extends Component
         ];
     }
 
-    protected $rules = [
-        'generateExactLabels' => 'required|boolean',
-    ];
+    protected function rules()
+    {
+        return [
+            'generateExactLabels' => 'required|boolean',
+            'redirectUrl' => ['nullable', new SafeExternalUrl],
+        ];
+    }
 
     public function mount()
     {
@@ -97,11 +102,15 @@ class Proxy extends Component
 
     public function changeProxy()
     {
-        $this->authorize('update', $this->server);
-        $this->server->proxy = null;
-        $this->server->save();
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy = null;
+            $this->server->save();
 
-        $this->dispatch('reloadWindow');
+            $this->dispatch('reloadWindow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function selectProxy($proxy_type)
@@ -147,6 +156,7 @@ class Proxy extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->validate();
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
             $this->server->save();

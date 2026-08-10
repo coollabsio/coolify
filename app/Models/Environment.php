@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Models\V5\Application as V5Application;
+use App\Models\V5\ResourceConnection as V5ResourceConnection;
+use App\Support\V5\V5Feature;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,7 +28,12 @@ class Environment extends BaseModel
     use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'project_id',
+        'uuid',
+    ];
 
     protected static function booted()
     {
@@ -42,9 +50,18 @@ class Environment extends BaseModel
         return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Environment::whereRelation('project.team', 'id', $teamId)->orderBy('name');
+    }
+
     public function isEmpty()
     {
-        return $this->applications()->count() == 0 &&
+        return (! V5Feature::enabled() || (
+            ! V5Application::query()->where('environment_id', $this->id)->exists() &&
+            ! V5ResourceConnection::query()->where('environment_id', $this->id)->exists()
+        )) &&
+            $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
@@ -58,12 +75,17 @@ class Environment extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'environment');
     }
 
     public function applications()
     {
         return $this->hasMany(Application::class);
+    }
+
+    public function v5Applications()
+    {
+        return $this->hasMany(V5Application::class);
     }
 
     public function postgresqls()
