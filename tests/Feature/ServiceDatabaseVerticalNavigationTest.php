@@ -10,11 +10,11 @@ it('moves service and database page navigation into their sidebars', function ()
         ->and($databaseHeading)->not->toContain('<x-resource-heading-tabs')
         ->and($serviceConfiguration)
         ->toContain("['label' => 'Backups'")
-        ->toContain("['label' => 'Runtime'")
+        ->toContain("['label' => 'Runtime Logs'")
         ->toContain("['label' => 'Terminal'")
         ->and($databaseSidebar)
         ->toContain("['label' => 'Backups'")
-        ->toContain("['label' => 'Runtime'")
+        ->toContain("['label' => 'Runtime Logs'")
         ->toContain("['label' => 'Terminal'");
 });
 
@@ -41,21 +41,38 @@ it('matches application action bar behavior for services and databases', functio
         ->and($database)->toContain('id="database-desktop-actions"');
 });
 
-it('keeps database and service sidebar sections in the application sequence', function () {
+it('groups database and service navigation by user workflow', function () {
     $database = file_get_contents(resource_path('views/components/database/configuration-sidebar.blade.php'));
-    $service = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
+    $serviceSidebars = [
+        file_get_contents(resource_path('views/components/service/configuration-sidebar.blade.php')),
+        file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php')),
+    ];
 
     expect($database)
-        ->toContain("'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Backups', 'Import Backup', 'Servers']")
-        ->toContain("'Automation' => ['Webhooks', 'Healthcheck']")
-        ->toContain("'Logs' => ['Runtime']")
-        ->toContain("'Operations' => ['Terminal', 'Resource Limits', 'Resource Operations', 'Metrics', 'Tags', 'Danger Zone']");
+        ->toContain("'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Deploy' => ['Servers']")
+        ->toContain("'Automation' => ['Webhooks', 'Backups', 'Import Backup']")
+        ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Tags', 'Danger Zone']");
 
-    expect($service)
-        ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Backups']")
-        ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks']")
-        ->toContain("'Logs' => ['Runtime']")
-        ->toContain("'Operations' => ['Terminal', 'Resource Operations', 'Tags', 'Danger Zone']");
+    foreach ($serviceSidebars as $serviceSidebar) {
+        expect($serviceSidebar)
+            ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage']")
+            ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal']")
+            ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
+            ->toContain("'Operations' => ['Resource Operations', 'Tags', 'Danger Zone']");
+    }
+});
+
+it('groups application navigation by user workflow', function () {
+    $application = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
+
+    expect($application)
+        ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Deploy' => ['Git Source', 'Servers', 'Preview Deployments']")
+        ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
+        ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone']");
 });
 
 it('shows the database sidebar on backup pages', function () {
@@ -155,6 +172,6 @@ it('shows the service sidebar on runtime logs and terminal pages', function () {
         ->toContain("in_array(\$type, ['application', 'database', 'service', 'server'], true)")
         ->toContain('<x-service.configuration-sidebar :service="$resource" current-route="project.service.command"')
         ->and($sidebar)
-        ->toContain("'Logs' => ['Runtime']")
-        ->toContain("'Operations' => ['Terminal', 'Resource Operations', 'Tags', 'Danger Zone']");
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Terminal']")
+        ->toContain("'Operations' => ['Resource Operations', 'Tags', 'Danger Zone']");
 });

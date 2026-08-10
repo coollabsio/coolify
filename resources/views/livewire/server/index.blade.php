@@ -94,9 +94,9 @@
                         <span x-text="filteredServers.length === 1 ? 'server' : 'servers'"></span>
                     </span>
                     <div
-                        class="flex h-8 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
                         <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
                                 ? 'control-selected'
                                 : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
@@ -104,7 +104,7 @@
                             <x-reicon name="unordered-list" class="size-3.5" />
                         </button>
                         <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'grid'
                                 ? 'control-selected'
                                 : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"

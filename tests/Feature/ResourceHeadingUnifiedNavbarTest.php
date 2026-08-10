@@ -177,19 +177,20 @@ it('moves application terminal and logs from the top tabs into the settings side
         ->not->toContain("'label' => 'Runtime'")
         ->and($sidebar)
         ->toContain("'label' => 'Terminal'")
-        ->toContain("'label' => 'Deployment'")
-        ->toContain("'label' => 'Runtime'")
-        ->toContain("'Logs' => ['Deployment', 'Runtime']")
-        ->toContain("'Operations' => ['Terminal', 'Rollback', 'Resource Limits'");
+        ->toContain("'label' => 'Deployment Logs'")
+        ->toContain("'label' => 'Runtime Logs'")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback'");
 });
 
 it('groups application automation pages separately from build and deploy', function () {
     $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
 
     expect($sidebar)
-        ->toContain("'Build & deploy' => ['Git Source', 'Servers', 'Healthcheck']")
-        ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Preview Deployments']")
-        ->toContain("'Operations' => ['Terminal', 'Rollback', 'Resource Limits'");
+        ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck']")
+        ->toContain("'Deploy' => ['Git Source', 'Servers', 'Preview Deployments']")
+        ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
+        ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback'");
 });
 
 it('centers the rollback image loading state across the card', function () {
@@ -291,7 +292,7 @@ it('removes desktop top spacing from the deployment log viewer', function () {
 it('uses a distinct runtime log icon in the sidebar', function () {
     $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
 
-    expect($sidebar)->toContain("'Runtime' => 'unordered-list'");
+    expect($sidebar)->toContain("'Runtime Logs' => 'unordered-list'");
 });
 
 it('shows deployment history above the selected deployment logs', function () {

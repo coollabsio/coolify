@@ -52,12 +52,12 @@
                 'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
-                'label' => 'Deployment',
+                'label' => 'Deployment Logs',
                 'route' => 'project.application.deployment.index',
                 'active' => str($currentRoute)->startsWith('project.application.deployment'),
             ],
             [
-                'label' => 'Runtime',
+                'label' => 'Runtime Logs',
                 'route' => 'project.application.logs',
                 'active' => $currentRoute === 'project.application.logs',
             ],
@@ -142,8 +142,8 @@
             'Persistent Storage' => 'storages',
             'Backups' => 'database',
             'Terminal' => 'browser-terminal',
-            'Deployment' => 'time-back',
-            'Runtime' => 'unordered-list',
+            'Deployment Logs' => 'time-back',
+            'Runtime Logs' => 'unordered-list',
             'Git Source' => 'sources',
             'Servers' => 'servers',
             'Scheduled Tasks' => 'calendar',
@@ -160,14 +160,17 @@
 
         // Discord-style groups for the settings sidebar
         $menuGroups = [
-            'Settings' => ['General', 'Domains', 'Advanced', 'Swarm', 'Environment Variables', 'Persistent Storage', 'Backups'],
-            'Build & deploy' => ['Git Source', 'Servers', 'Healthcheck'],
-            'Automation' => ['Scheduled Tasks', 'Webhooks', 'Preview Deployments'],
-            'Logs' => ['Deployment', 'Runtime'],
-            'Operations' => ['Terminal', 'Rollback', 'Resource Limits', 'Resource Operations', 'Metrics', 'Tags', 'Danger Zone'],
+            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics'],
+            'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
+            'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
+            'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone'],
         ];
         $groupedMenuItems = collect($menuGroups)
-            ->map(fn (array $labels) => collect($configurationMenuItems)->whereIn('label', $labels)->values())
+            ->map(fn (array $labels) => collect($labels)
+                ->map(fn (string $label) => collect($configurationMenuItems)->firstWhere('label', $label))
+                ->filter()
+                ->values())
             ->filter(fn ($items) => $items->isNotEmpty());
 
         // In-page sections (cards) shown as sub-items under the active page

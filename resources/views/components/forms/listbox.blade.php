@@ -13,10 +13,12 @@
     'value' => null, // initial value when wire=false
     'disabled' => false,
     'tooltip' => true,
+    'portal' => false,
 ])
 
 @php
     $triggerId = ($htmlId ?? $id).'-trigger';
+    $panelId = ($htmlId ?? $id).'-panel';
 @endphp
 
 <div class="w-full min-w-0">
@@ -41,6 +43,7 @@
     @endif
     <div class="relative min-w-0" x-data="{
         open: false,
+        positioned: false,
         options: @js(array_values($options)),
         value: @if (!$wire) @js($value) @elseif ($live) @entangle($id).live @else @entangle($id) @endif,
         get current() {
@@ -53,11 +56,42 @@
             if (String(option.value) === String(this.value)) return;
             this.value = option.value;
             @if ($onChange) this.$nextTick(() => this.$wire.{{ $onChange }}()); @endif
+        },
+        toggle() {
+            this.open = !this.open;
+            this.positioned = false;
+            if (this.open && @js($portal)) {
+                this.$nextTick(() => requestAnimationFrame(() => this.positionPanel()));
+            }
+        },
+        positionPanel(panel = null) {
+            const trigger = this.$refs.trigger;
+            panel ??= document.getElementById(@js($panelId));
+            if (!trigger || !panel) return;
+
+            const gap = 4;
+            const edge = 12;
+            const triggerRect = trigger.getBoundingClientRect();
+            const panelWidth = Math.max(triggerRect.width, panel.offsetWidth);
+            const panelHeight = Math.min(panel.scrollHeight, 256);
+            const fitsBelow = window.innerHeight - triggerRect.bottom - gap >= panelHeight;
+            const top = fitsBelow
+                ? triggerRect.bottom + gap
+                : Math.max(edge, triggerRect.top - gap - panelHeight);
+            const left = Math.min(
+                Math.max(edge, triggerRect.left),
+                window.innerWidth - panelWidth - edge,
+            );
+
+            panel.style.top = `${top}px`;
+            panel.style.left = `${left}px`;
+            panel.style.minWidth = `${triggerRect.width}px`;
+            this.positioned = true;
         }
     }" x-modelable="value" {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
-        @click.outside="open = false" @keydown.escape="open = false">
-        <button id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="open = !open"
+        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()">
+        <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
             :aria-expanded="open" @if ($tooltip) :title="current" @endif>
             <span class="listbox-trigger-label" x-text="current"></span>
@@ -66,23 +100,48 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
             </svg>
         </button>
-        <div class="listbox-panel" x-show="open" x-cloak role="listbox">
-            <div x-show="options.length === 0"
-                class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
-                {{ $emptyText }}
-            </div>
-            <template x-for="option in options" :key="String(option.value)">
-                <button type="button" class="listbox-option" role="option"
-                    :class="{ 'listbox-option-disabled': option.disabled }"
-                    :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                    <span class="truncate" x-text="option.label"></span>
-                    <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
-                        fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
-                        class="size-3.5 shrink-0">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                    </svg>
-                </button>
+        @if ($portal)
+            <template x-teleport="body">
+                <div id="{{ $panelId }}" class="listbox-panel" style="position: fixed; z-index: 9999" x-show="open"
+                    x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
+                    x-effect="if (open) requestAnimationFrame(() => positionPanel($el))" role="listbox">
+                    <div x-show="options.length === 0"
+                        class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
+                        {{ $emptyText }}
+                    </div>
+                    <template x-for="option in options" :key="String(option.value)">
+                        <button type="button" class="listbox-option" role="option"
+                            :class="{ 'listbox-option-disabled': option.disabled }"
+                            :aria-selected="String(option.value) === String(value)" @click="choose(option)">
+                            <span class="truncate" x-text="option.label"></span>
+                            <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
+                                fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+                                class="size-3.5 shrink-0">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                        </button>
+                    </template>
+                </div>
             </template>
-        </div>
+        @else
+            <div x-ref="panel" class="listbox-panel" x-show="open" x-cloak role="listbox">
+                <div x-show="options.length === 0"
+                    class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
+                    {{ $emptyText }}
+                </div>
+                <template x-for="option in options" :key="String(option.value)">
+                    <button type="button" class="listbox-option" role="option"
+                        :class="{ 'listbox-option-disabled': option.disabled }"
+                        :aria-selected="String(option.value) === String(value)" @click="choose(option)">
+                        <span class="truncate" x-text="option.label"></span>
+                        <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
+                            fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+                            class="size-3.5 shrink-0">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                        </svg>
+                    </button>
+                </template>
+            </div>
+        @endif
     </div>
 </div>
