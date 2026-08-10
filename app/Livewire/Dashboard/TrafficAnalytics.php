@@ -91,6 +91,17 @@ class TrafficAnalytics extends Component
             }
         }
 
+        if (empty($overviews)) {
+            // Every server's fetch failed; don't present an all-zero KPI panel as if it were real data.
+            $this->overview = null;
+            $this->latencyApproximate = false;
+            $this->uniquesApproximate = false;
+            $this->topApps = [];
+            $this->topCountries = [];
+
+            return;
+        }
+
         $result = TrafficAnalyticsAggregator::sumOverviews($overviews);
 
         $this->overview = $result['overview']->toArray();

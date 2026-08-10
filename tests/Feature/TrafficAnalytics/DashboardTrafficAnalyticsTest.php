@@ -27,6 +27,14 @@ class FakeDashboardTrafficClient extends SentinelTrafficClient
     }
 }
 
+class FailingDashboardTrafficClient extends SentinelTrafficClient
+{
+    protected function raw(string $url): string
+    {
+        throw new RuntimeException('Server unreachable');
+    }
+}
+
 function fakeDashboardTrafficResponses(int $requests = 1000): array
 {
     return [
@@ -98,6 +106,32 @@ it('renders the team traffic summary aggregated across servers with an approxima
         ->assertSee('1,500')
         ->assertSee('Unique visitors')
         ->assertSee('approximate');
+});
+
+it('shows a failure empty-state instead of an all-zero KPI panel when every server fetch fails', function () {
+    $serverOne = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $serverOne->settings->is_traffic_analytics_enabled = true;
+    $serverOne->settings->save();
+
+    $serverTwo = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $serverTwo->settings->is_traffic_analytics_enabled = true;
+    $serverTwo->settings->save();
+
+    app()->bind(SentinelTrafficClient::class, function ($app, $params) {
+        return new FailingDashboardTrafficClient($params['server']);
+    });
+
+    Livewire::test(TrafficAnalytics::class)
+        ->assertOk()
+        ->assertSee('No analytics data yet')
+        ->assertDontSee('Unique visitors')
+        ->assertDontSee('Error rate');
 });
 
 it('shows an empty state when no server in the team has traffic analytics enabled', function () {
