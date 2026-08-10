@@ -99,7 +99,7 @@ Route::group([
     Route::post('/servers/{server_uuid}/destinations', [DestinationsController::class, 'create'])->middleware(['api.ability:write']);
 
     Route::get('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
-    Route::post('/servers/{uuid}/exec', [ServersController::class, 'execute_command'])->middleware(['api.ability:terminal', 'throttle:terminal-api-exec']);
+    Route::post('/servers/{uuid}/exec', [ServersController::class, 'execute_command'])->middleware(['api.ability:terminal', 'terminal.team.enabled', 'throttle:terminal-api-exec']);
 
     Route::post('/servers', [ServersController::class, 'create_server'])->middleware(['api.ability:write']);
     Route::patch('/servers/{uuid}', [ServersController::class, 'update_server'])->middleware(['api.ability:write']);
@@ -145,7 +145,7 @@ Route::group([
     Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:write']);
-    Route::post('/applications/{uuid}/exec', [ApplicationsController::class, 'execute_command'])->middleware(['api.ability:terminal', 'throttle:terminal-api-exec']);
+    Route::post('/applications/{uuid}/exec', [ApplicationsController::class, 'execute_command'])->middleware(['api.ability:terminal', 'terminal.team.enabled', 'throttle:terminal-api-exec']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/storages', [ApplicationsController::class, 'storages'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);

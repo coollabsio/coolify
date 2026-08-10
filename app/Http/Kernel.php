@@ -13,6 +13,7 @@ use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
 use App\Http\Middleware\EnsureTeamMcpEnabled;
+use App\Http\Middleware\EnsureTeamTerminalApiEnabled;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -112,5 +113,6 @@ class Kernel extends HttpKernel
         'can.access.terminal' => CanAccessTerminal::class,
         'mcp.enabled' => EnsureMcpEnabled::class,
         'mcp.team.enabled' => EnsureTeamMcpEnabled::class,
+        'terminal.team.enabled' => EnsureTeamTerminalApiEnabled::class,
     ];
 }

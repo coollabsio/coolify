@@ -102,6 +102,8 @@ class PersonalAccessTokenSeeder extends Seeder
                 'token' => hash('sha256', $plainTextToken),
                 'abilities' => $tokenData['abilities'],
                 'team_id' => $team->id,
+                // Terminal tokens are forced to expire; mirror that rule for the dev seed token.
+                'expires_at' => in_array('terminal', $tokenData['abilities'], true) ? now()->addDays(90) : null,
             ]);
 
             $this->command->info("Created token '{$tokenData['name']}' with Bearer token: {$plainTextToken}");

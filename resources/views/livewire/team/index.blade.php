@@ -15,6 +15,8 @@
             <x-forms.input id="description" label="Description" canGate="update" :canResource="$team" />
             <x-forms.checkbox id="is_mcp_server_enabled" label="Enable MCP Server" canGate="update" :canResource="$team"
                 helper="Allows this team's API tokens to use the instance MCP endpoint when MCP is enabled instance-wide." />
+            <x-forms.checkbox id="is_terminal_api_enabled" label="Enable Terminal API" canGate="update" :canResource="$team"
+                helper="Allows this team's terminal API tokens to execute commands on servers and application containers via the API." />
             @can('update', $team)
                 <x-forms.button type="submit">
                     Save

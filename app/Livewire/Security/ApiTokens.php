@@ -150,7 +150,16 @@ class ApiTokens extends Component
                 'description' => 'required|min:3|max:255',
                 'expiresInDays' => 'nullable|integer|in:7,30,60,90,365',
             ]);
+
             $expiresAt = $this->expiresInDays ? now()->addDays($this->expiresInDays) : null;
+
+            // Terminal tokens grant remote command execution — never allow them to live forever.
+            if (in_array('terminal', $this->permissions, true)) {
+                $maxTerminalExpiry = now()->addDays(90);
+                if ($expiresAt === null || $expiresAt->greaterThan($maxTerminalExpiry)) {
+                    $expiresAt = $maxTerminalExpiry;
+                }
+            }
             $token = auth()->user()->createToken($this->description, array_values($this->permissions), $expiresAt);
             $this->getTokens();
             // Do NOT strip the numeric prefix (e.g. "69|...") — Sanctum uses it to index and look up tokens.

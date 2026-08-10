@@ -26,12 +26,15 @@ class Index extends Component
 
     public bool $is_mcp_server_enabled = true;
 
+    public bool $is_terminal_api_enabled = true;
+
     protected function rules(): array
     {
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
             'is_mcp_server_enabled' => 'boolean',
+            'is_terminal_api_enabled' => 'boolean',
         ];
     }
 
@@ -62,11 +65,13 @@ class Index extends Component
             $this->team->name = $this->name;
             $this->team->description = $this->description;
             $this->team->is_mcp_server_enabled = $this->is_mcp_server_enabled;
+            $this->team->is_terminal_api_enabled = $this->is_terminal_api_enabled;
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->team->name;
             $this->description = $this->team->description;
             $this->is_mcp_server_enabled = $this->team->is_mcp_server_enabled;
+            $this->is_terminal_api_enabled = $this->team->is_terminal_api_enabled;
         }
     }
 

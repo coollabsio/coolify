@@ -67,7 +67,7 @@
                     @endif
                     @if ($canUseTerminalPermissions)
                         <x-forms.checkbox label="terminal" wire:model.live="permissions" domValue="terminal"
-                            helper="Can execute one-shot terminal commands through the API." :checked="in_array('terminal', $permissions)"></x-forms.checkbox>
+                            helper="Can execute one-shot terminal commands through the API. Terminal tokens always expire after at most 90 days." :checked="in_array('terminal', $permissions)"></x-forms.checkbox>
                     @else
                         <x-forms.checkbox label="terminal (admin/owner only)" disabled domValue="terminal"
                             helper="Terminal access requires admin or owner role" :checked="false"></x-forms.checkbox>

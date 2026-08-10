@@ -36,7 +36,7 @@ class ApiAbility extends CheckForAnyAbility
                 }
             }
 
-            if ($request->user()->tokenCan('root')) {
+            if (! in_array('terminal', $abilities, true) && $request->user()->tokenCan('root')) {
                 return $next($request);
             }
 

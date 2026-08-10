@@ -30,5 +30,6 @@ it('creates a terminal scoped development token', function () {
         ->not->toBeNull()
         ->and($token->token)->toBe(hash('sha256', 'terminal'))
         ->and($token->abilities)->toBe(['terminal'])
-        ->and($token->team_id)->toBe((string) $rootTeam->id);
+        ->and($token->team_id)->toBe((string) $rootTeam->id)
+        ->and($token->expires_at)->not->toBeNull();
 });

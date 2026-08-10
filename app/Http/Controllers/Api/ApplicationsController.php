@@ -7,6 +7,7 @@ use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
 use App\Helpers\SshMultiplexingHelper;
+use App\Http\Controllers\Api\Concerns\HandlesTerminalApi;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
@@ -25,9 +26,8 @@ use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
@@ -36,26 +36,8 @@ use Symfony\Component\Yaml\Yaml;
 
 class ApplicationsController extends Controller
 {
-    private const TERMINAL_SERVER_RATE_LIMIT = 20;
-
-    private const TERMINAL_COMMAND_TIMEOUT = 10;
-
-    private function enforceTerminalServerRateLimit(Server $server, int $teamId): ?JsonResponse
-    {
-        $key = "terminal-api-exec:server:{$teamId}:{$server->uuid}";
-
-        if (RateLimiter::tooManyAttempts($key, self::TERMINAL_SERVER_RATE_LIMIT)) {
-            return response()->json([
-                'message' => 'Too many terminal commands for this server. Please retry in '.RateLimiter::availableIn($key).' seconds.',
-            ], 429);
-        }
-
-        RateLimiter::hit($key, 60);
-
-        return null;
-    }
-
     use Concerns\HandlesTagsApi;
+    use HandlesTerminalApi;
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
     {
@@ -151,7 +133,12 @@ class ApplicationsController extends Controller
                     'State' => 'running',
                 ]]);
             } else {
-                $containers = getCurrentApplicationContainerStatus($server, $application->id, $pullRequestId, includePullrequests: true);
+                $containers = getCurrentApplicationContainerStatus(
+                    $server,
+                    $application->id,
+                    $pullRequestId,
+                    includePullrequests: $pullRequestId === null,
+                );
             }
 
             $containers
@@ -173,12 +160,25 @@ class ApplicationsController extends Controller
         }
 
         if ($requestedContainer) {
-            $target = $runningContainers->firstWhere('container', $requestedContainer);
-            if (! $target) {
+            $matchingTargets = $runningContainers
+                ->where('container', $requestedContainer)
+                ->values();
+
+            if ($matchingTargets->isEmpty()) {
                 return response()->json(['message' => 'Container not found for this application.'], 404);
             }
 
-            return $target;
+            if ($matchingTargets->count() > 1) {
+                return response()->json([
+                    'message' => 'Multiple servers contain this container. Specify a server_uuid.',
+                    'containers' => $matchingTargets->map(fn ($target) => [
+                        'server_uuid' => $target['server']->uuid,
+                        'container' => $target['container'],
+                    ]),
+                ], 422);
+            }
+
+            return $matchingTargets->first();
         }
 
         if ($runningContainers->count() > 1) {
@@ -2196,10 +2196,10 @@ class ApplicationsController extends Controller
                 ],
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Terminal access is disabled on the target server.'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on the target server or the terminal API is disabled for the team.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
-            new OA\Response(response: 429, description: 'Too many terminal command requests.'),
+            new OA\Response(response: 429, description: 'Terminal command rate or concurrency limit exceeded.'),
         ]
     )]
     public function execute_command(Request $request)
@@ -2258,8 +2258,25 @@ class ApplicationsController extends Controller
 
         $dockerCommand = $this->applicationDockerExecCommand($server, $target['container'], $request->command);
         $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
-        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand, disableMultiplexing: true);
-        $process = Process::timeout($timeout)->run($sshCommand);
+        $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $dockerCommand, disableMultiplexing: true, commandTimeout: $timeout);
+        try {
+            $process = $this->runConcurrentTerminalProcess($server, $teamId, $sshCommand, $timeout);
+        } catch (ProcessTimedOutException) {
+            auditLog('api.application.command.executed', [
+                'team_id' => $teamId,
+                'application_uuid' => $application->uuid,
+                'application_name' => $application->name,
+                'server_uuid' => $server->uuid,
+                'container' => $target['container'],
+                'exit_code' => 124,
+            ]);
+
+            return $this->terminalTimedOutResponse($timeout);
+        }
+
+        if ($process instanceof JsonResponse) {
+            return $process;
+        }
 
         auditLog('api.application.command.executed', [
             'team_id' => $teamId,
@@ -2272,8 +2289,8 @@ class ApplicationsController extends Controller
 
         return response()->json([
             'exit_code' => $process->exitCode(),
-            'stdout' => rtrim(sanitize_utf8_text($process->output()), "\r\n"),
-            'stderr' => rtrim(sanitize_utf8_text($process->errorOutput()), "\r\n"),
+            'stdout' => $this->formatTerminalCommandOutput($process->output()),
+            'stderr' => $this->formatTerminalCommandOutput($process->errorOutput()),
         ]);
     }
 

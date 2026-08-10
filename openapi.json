@@ -2223,7 +2223,7 @@
                         "$ref": "#\/components\/responses\/401"
                     },
                     "403": {
-                        "description": "Terminal access is disabled on the target server."
+                        "description": "Terminal access is disabled on the target server or the terminal API is disabled for the team."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -2232,7 +2232,7 @@
                         "$ref": "#\/components\/responses\/422"
                     },
                     "429": {
-                        "description": "Too many terminal command requests."
+                        "description": "Terminal command rate or concurrency limit exceeded."
                     }
                 },
                 "security": [
@@ -11944,10 +11944,6 @@
                                     "timeout": {
                                         "type": "integer",
                                         "description": "Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds."
-                                    },
-                                    "no_sudo": {
-                                        "type": "boolean",
-                                        "description": "Do not add sudo for non-root server users."
                                     }
                                 },
                                 "type": "object"
@@ -11981,7 +11977,7 @@
                         "$ref": "#\/components\/responses\/401"
                     },
                     "403": {
-                        "description": "Terminal access is disabled on this server."
+                        "description": "Terminal access is disabled on this server or the terminal API is disabled for the team."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -11990,7 +11986,7 @@
                         "$ref": "#\/components\/responses\/422"
                     },
                     "429": {
-                        "description": "Too many terminal command requests."
+                        "description": "Terminal command rate or concurrency limit exceeded."
                     }
                 },
                 "security": [

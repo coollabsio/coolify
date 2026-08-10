@@ -139,6 +139,23 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
 
         expect($this->owner->tokens()->count())->toBe(1);
         expect($this->owner->tokens()->first()->abilities)->toBe(['terminal']);
+        expect($this->owner->tokens()->first()->expires_at)->not->toBeNull();
+    });
+
+    test('terminal token expiry is clamped to 90 days', function () {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('description', 'my-terminal-token')
+            ->set('permissions', ['terminal'])
+            ->set('expiresInDays', 365)
+            ->call('addNewToken')
+            ->assertNotDispatched('error');
+
+        $token = $this->owner->tokens()->first();
+        expect($token->expires_at)->not->toBeNull()
+            ->and($token->expires_at->lessThanOrEqualTo(now()->addDays(90)->addMinute()))->toBeTrue();
     });
 });
 
