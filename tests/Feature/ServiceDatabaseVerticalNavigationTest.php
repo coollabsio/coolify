@@ -69,7 +69,7 @@ it('groups application navigation by user workflow', function () {
 
     expect($application)
         ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck']")
-        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics']")
         ->toContain("'Deploy' => ['Git Source', 'Servers', 'Preview Deployments']")
         ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
         ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone']");

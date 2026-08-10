@@ -179,7 +179,7 @@ it('moves application terminal and logs from the top tabs into the settings side
         ->toContain("'label' => 'Terminal'")
         ->toContain("'label' => 'Deployment Logs'")
         ->toContain("'label' => 'Runtime Logs'")
-        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics']")
         ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback'");
 });
 

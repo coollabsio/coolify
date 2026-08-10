@@ -116,6 +116,11 @@
                 'active' => $currentRoute === 'project.application.metrics',
             ],
             [
+                'label' => 'Analytics',
+                'route' => 'project.application.analytics',
+                'active' => $currentRoute === 'project.application.analytics',
+            ],
+            [
                 'label' => 'Tags',
                 'route' => 'project.application.tags',
                 'active' => $currentRoute === 'project.application.tags',
@@ -154,6 +159,7 @@
             'Resource Limits' => 'cpu',
             'Resource Operations' => 'server-update',
             'Metrics' => 'graph',
+            'Analytics' => 'network',
             'Tags' => 'tags',
             'Danger Zone' => 'shield-alert',
         ];
@@ -161,7 +167,7 @@
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics', 'Analytics'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
             'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone'],
