@@ -3,15 +3,16 @@
 # tags: backup, database, monitoring,open-source
 # logo: svgs/portabase.svg
 # port: 80
+
 services:
   portabase:
-    image: 'portabase/portabase:1.27' # Jul 31 2026
+    image: portabase/portabase:1.28.1
     restart: always
     environment:
       - SERVICE_URL_PORTABASE_80
       - 'PROJECT_URL=$SERVICE_URL_PORTABASE'
       - PROJECT_SECRET=$SERVICE_PASSWORD_64_PORTABASE
-      - 'DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@db:5432/${POSTGRES_DB:-portabase}?schema=public'
+      - 'DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-portabase}?schema=public'
       - PROJECT_NAME=${PROJECT_NAME:-Portabase}
       - TZ=${TZ:-Europe/Paris}
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -30,9 +31,9 @@ services:
       - SMTP_FROM=${SMTP_FROM}
       - SMTP_SECURE=${SMTP_SECURE:-false}
     volumes:
-      - 'portabase-data:/data'
+      - portabase-data:/data
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
     healthcheck:
       test:
@@ -42,19 +43,19 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
-  db:
-    image: 'postgres:17-alpine'
-    restart: always
+
+  postgres:
+    image: 'postgres:18-alpine'
     volumes:
-      - 'postgres-data:/var/lib/postgresql/data'
+      - 'postgres-data:/var/lib/postgresql'
     environment:
-      - 'POSTGRES_DB=${POSTGRES_DB:-portabase}'
+      - POSTGRES_DB=${POSTGRES_DB:-portabase}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES
       - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
     healthcheck:
       test:
         - CMD-SHELL
-        - 'pg_isready -U $SERVICE_USER_POSTGRES -d ${POSTGRES_DB:-portabase}'
+        - 'pg_isready -U $POSTGRES_USER -d ${POSTGRES_DB}'
       interval: 10s
       timeout: 5s
       retries: 5
