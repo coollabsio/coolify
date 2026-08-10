@@ -862,8 +862,29 @@ $schema://$host {
         return $this->settings->force_disabled;
     }
 
+    /**
+     * Server was migrated away from this Coolify instance (source side).
+     * Must not be revalidated or re-enabled as a live managed host.
+     */
+    public function isTransferredAway(): bool
+    {
+        return data_get($this->server_metadata, 'transfer.status') === 'transferred';
+    }
+
+    /**
+     * Whether this server may be validated / installed against from this instance.
+     */
+    public function canBeValidated(): bool
+    {
+        return ! $this->isTransferredAway();
+    }
+
     public function forceEnableServer()
     {
+        if ($this->isTransferredAway()) {
+            return;
+        }
+
         $this->settings->force_disabled = false;
         $this->settings->save();
     }

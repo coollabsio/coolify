@@ -17,6 +17,10 @@ class Terminal extends Component
 
     public bool $isTerminalConnected = false;
 
+    public bool $autoStart = false;
+
+    public string $variant = 'default';
+
     private function checkShellAvailability(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);

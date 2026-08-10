@@ -1,24 +1,24 @@
 <div>
-    <div class="flex flex-col gap-4 p-4 bg-white border dark:bg-base dark:border-coolgray-300 border-neutral-200">
+    <div class="flex flex-col gap-4">
         @if ($fileStorage->is_too_large)
-            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+            <x-callout type="warning" title="File too large">
                 File on server exceeds 5 MB and cannot be edited from the UI. Edit it directly on the server.
-            </div>
+            </x-callout>
         @elseif ($fileStorage->is_host_file)
-            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+            <x-callout type="info" title="Host-managed file">
                 This host file mount is bind-only. Coolify will not create, edit, load, chmod, or delete the source file.
-            </div>
+            </x-callout>
         @elseif ($isReadOnly)
-            <div class="w-full p-2 text-sm rounded bg-warning/10 text-warning">
+            <x-callout type="info" title="Read-only mount">
                 @if ($fileStorage->is_directory)
                     This directory is mounted as read-only and cannot be modified from the UI.
                 @else
                     This file is mounted as read-only and cannot be modified from the UI.
                 @endif
-            </div>
+            </x-callout>
         @endif
         <div class="flex flex-col justify-center text-sm select-text">
-            <div class="flex gap-2  md:flex-row flex-col">
+            <div class="grid gap-4 md:grid-cols-2">
                 <x-forms.input label="Source Path" :value="$fileStorage->fs_path" readonly>
                     <x-slot:labelSuffix>
                         @if ($hasEnabledBackup)
@@ -31,19 +31,23 @@
                 <x-forms.input label="Destination Path" :value="$fileStorage->mount_path" readonly />
             </div>
         </div>
-        @if ($resource instanceof \App\Models\Application)
+        @if ($resource instanceof \App\Models\Application && $resource->git_based())
             @can('update', $resource)
                 <div class="w-full sm:w-96">
-                    <x-forms.checkbox instantSave canGate="update" :canResource="$resource" label="Add suffix for PR deployments"
-                        id="isPreviewSuffixEnabled"
-                        helper="When enabled, a -pr-N suffix is added to this volume's path for preview deployments (e.g. ./scripts becomes ./scripts-pr-1). Disable this for volumes that contain shared config or scripts from your repository."></x-forms.checkbox>
+                    <x-forms.listbox id="isPreviewSuffixEnabled" label="PR deployment suffix"
+                        helper="Choose whether preview deployments receive an isolated -pr-N path suffix."
+                        onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Add suffix'],
+                            ['value' => false, 'label' => 'Share path'],
+                        ]" />
                 </div>
             @endcan
         @endif
-        <form wire:submit='submit' class="flex flex-col gap-2">
+        <form wire:submit='submit' class="flex flex-col gap-4">
+            <x-unsaved-bar action="submit" />
             @if (!$isReadOnly)
                 @can('update', $resource)
-                    <div class="flex gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         @if ($fileStorage->is_host_file)
                             <x-modal-confirmation :ignoreWire="false" title="Confirm Host File Mount Removal?"
                                 buttonTitle="Delete" isErrorButton submitAction="delete" :checkboxes="$hostFileDeletionCheckboxes"
@@ -108,9 +112,6 @@
                             helper="The content shown may be outdated. Click 'Load from server' to fetch the latest version."
                             rows="20" id="content"
                             readonly="{{ $fileStorage->is_based_on_git || $fileStorage->is_binary || $fileStorage->is_too_large }}"></x-forms.textarea>
-                        @if (!$fileStorage->is_based_on_git && !$fileStorage->is_binary && !$fileStorage->is_too_large)
-                            <x-forms.button class="w-full" type="submit">Save</x-forms.button>
-                        @endif
                     @else
                         @if (data_get($resource, 'settings.is_preserve_repository_enabled'))
                             <div class="w-full sm:w-96">

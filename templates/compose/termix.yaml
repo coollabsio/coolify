@@ -1,0 +1,23 @@
+# documentation: https://docs.termix.site/install/server/docker
+# slogan: All-in-One SSH & Remote Desktop management app.
+# category: developer-tools
+# tags: ssh,terminal,remote-desktop,rdp,vnc,server-management,remote-access
+# logo: svgs/termix.svg
+# port: 8080
+
+services:
+  termix:
+    image: ghcr.io/lukegus/termix:2.6.1
+    environment:
+      - SERVICE_URL_TERMIX_8080
+      - PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - GUACD_HOST=guacd
+      - GUACD_RECORDING_PATH=/termix-data/session_recordings/guacamole
+    depends_on:
+      - guacd
+    volumes:
+      - termix-data:/app/data
+
+  guacd:
+    image: guacamole/guacd:1.6.0

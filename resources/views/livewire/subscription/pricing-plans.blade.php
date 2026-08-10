@@ -1,123 +1,73 @@
 <div x-data="{ selected: 'monthly' }" class="w-full">
-    {{-- Frequency Toggle --}}
-    <div class="flex justify-center mb-8">
-        <fieldset
-            class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded-sm dark:text-white gap-x-1 dark:bg-white/5 bg-black/5">
-            <legend class="sr-only">Payment frequency</legend>
-            <label
-                :class="selected === 'monthly' ?
-                    'dark:bg-coollabs-100 bg-warning dark:text-white cursor-pointer rounded-sm px-2.5 py-1' :
-                    'cursor-pointer rounded-sm px-2.5 py-1'">
-                <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
-                    class="sr-only">
-                <span :class="selected === 'monthly' ? 'dark:text-white' : ''">Monthly</span>
-            </label>
-            <label
-                :class="selected === 'yearly' ?
-                    'dark:bg-coollabs-100 bg-warning dark:text-white cursor-pointer rounded-sm px-2.5 py-1' :
-                    'cursor-pointer rounded-sm px-2.5 py-1'">
-                <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
-                    class="sr-only">
-                <span :class="selected === 'yearly' ? 'dark:text-white' : ''">Annually <span
-                        class="text-xs dark:text-warning text-coollabs">(save ~20%)</span></span>
-            </label>
-        </fieldset>
-    </div>
+    <x-application.settings-section title="Pay as you go"
+        description="Dynamic pricing based on the number of servers connected to your team.">
+        <x-slot:actions>
+            <div
+                class="flex h-8 items-center rounded-lg border border-neutral-200 bg-neutral-100 p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                <button type="button" x-on:click="selected = 'monthly'"
+                    class="app-tab h-6! px-2.5!"
+                    :class="selected === 'monthly'
+                        ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'
+                        : ''">
+                    Monthly
+                </button>
+                <button type="button" x-on:click="selected = 'yearly'"
+                    class="app-tab h-6! px-2.5!"
+                    :class="selected === 'yearly'
+                        ? 'bg-coollabs/10 text-coollabs ring-1 ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'
+                        : ''">
+                    Yearly
+                </button>
+            </div>
+        </x-slot:actions>
 
-    <div class="max-w-xl mx-auto">
-        {{-- Plan Header + Pricing --}}
-        <h3 id="tier-dynamic" class="text-2xl font-bold dark:text-white">Pay-as-you-go</h3>
-        <p class="mt-1 text-sm dark:text-neutral-400">Dynamic pricing based on the number of servers you connect.</p>
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
+            <div
+                class="rounded-[10px] border border-neutral-200 bg-neutral-50 p-4 dark:border-white/[0.08] dark:bg-white/[0.025]">
+                <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Base price</p>
+                <div class="mt-2 flex items-end gap-1.5">
+                    <span x-show="selected === 'monthly'" x-cloak
+                        class="text-2xl font-semibold tracking-tight">$5</span>
+                    <span x-show="selected === 'yearly'" x-cloak
+                        class="text-2xl font-semibold tracking-tight">$4</span>
+                    <span class="pb-0.5 text-[12px] text-neutral-500 dark:text-fg-dim">per month</span>
+                </div>
+                <p class="mt-2 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
+                    <span x-show="selected === 'monthly'" x-cloak>$3 per additional server, billed monthly.</span>
+                    <span x-show="selected === 'yearly'" x-cloak>$2.70 per additional server, billed annually.</span>
+                </p>
 
-        <div class="mt-4 flex items-baseline gap-x-1">
-            <span x-show="selected === 'monthly'" x-cloak>
-                <span class="text-4xl font-bold tracking-tight dark:text-white">$5</span>
-                <span class="text-sm dark:text-neutral-400">/ mo base</span>
-            </span>
-            <span x-show="selected === 'yearly'" x-cloak>
-                <span class="text-4xl font-bold tracking-tight dark:text-white">$4</span>
-                <span class="text-sm dark:text-neutral-400">/ mo base</span>
-            </span>
+                <div class="mt-4">
+                    <x-forms.button x-show="selected === 'monthly'" x-cloak class="w-full justify-center"
+                        wire:click="subscribeStripe('dynamic-monthly')" isHighlighted>
+                        Subscribe monthly
+                    </x-forms.button>
+                    <x-forms.button x-show="selected === 'yearly'" x-cloak class="w-full justify-center"
+                        wire:click="subscribeStripe('dynamic-yearly')" isHighlighted>
+                        Subscribe yearly
+                    </x-forms.button>
+                </div>
+            </div>
+
+            <div class="divide-y divide-neutral-200 dark:divide-white/[0.07]">
+                @foreach ([
+                    'Connect unlimited servers',
+                    'Deploy unlimited resources per server',
+                    'Transactional email notifications',
+                    'Support by email',
+                    'All upcoming platform features',
+                ] as $feature)
+                    <div class="flex min-h-10 items-center gap-2.5 py-2 text-[12px]">
+                        <x-reicon name="check-circle" class="size-4 shrink-0 text-emerald-500" />
+                        <span>{{ $feature }}</span>
+                    </div>
+                @endforeach
+            </div>
         </div>
-        <p class="mt-1 text-sm dark:text-neutral-400">
-            <span x-show="selected === 'monthly'" x-cloak>
-                + <span class="font-semibold dark:text-white">$3</span> per additional server, billed monthly (+VAT)
-            </span>
-            <span x-show="selected === 'yearly'" x-cloak>
-                + <span class="font-semibold dark:text-white">$2.7</span> per additional server, billed annually (+VAT)
-            </span>
+
+        <p class="mt-5 text-[11px] leading-5 text-neutral-500 dark:text-fg-faint">
+            Bring your own servers from any cloud provider or supported Linux machine. Prices exclude applicable
+            taxes.
         </p>
-
-        {{-- Subscribe Button --}}
-        <div class="flex mt-6">
-            <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-dynamic"
-                class="w-full" wire:click="subscribeStripe('dynamic-monthly')">
-                Subscribe
-            </x-forms.button>
-            <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-dynamic"
-                class="w-full" wire:click="subscribeStripe('dynamic-yearly')">
-                Subscribe
-            </x-forms.button>
-        </div>
-
-        {{-- Features --}}
-        <div class="mt-8 pt-6 border-t dark:border-coolgray-400 border-neutral-200">
-            <ul role="list" class="space-y-2.5 text-sm">
-                <li class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 shrink-0 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
-                        aria-hidden="true">
-                        <path fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    <span class="dark:text-neutral-300">Connect <span
-                            class="font-bold dark:text-white">unlimited</span> servers</span>
-                </li>
-                <li class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 shrink-0 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
-                        aria-hidden="true">
-                        <path fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    <span class="dark:text-neutral-300">Deploy <span
-                            class="font-bold dark:text-white">unlimited</span> applications per server</span>
-                </li>
-                <li class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 shrink-0 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
-                        aria-hidden="true">
-                        <path fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    <span class="dark:text-neutral-300">Free email notifications</span>
-                </li>
-                <li class="flex items-center gap-2.5">
-                    <svg class="w-4 h-4 shrink-0 dark:text-warning" viewBox="0 0 20 20" fill="currentColor"
-                        aria-hidden="true">
-                        <path fill-rule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                            clip-rule="evenodd" />
-                    </svg>
-                    <span class="dark:text-neutral-300">Support by email</span>
-                </li>
-                <li class="flex items-center gap-2.5 font-bold dark:text-white">
-                    <svg class="w-4 h-4 shrink-0 text-green-500" viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"
-                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
-                        <path
-                            d="M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3-5a9 9 0 0 0 6-8a3 3 0 0 0-3-3a9 9 0 0 0-8 6a6 6 0 0 0-5 3" />
-                        <path d="M7 14a6 6 0 0 0-3 6a6 6 0 0 0 6-3m4-8a1 1 0 1 0 2 0a1 1 0 1 0-2 0" />
-                    </svg>
-                    + All Upcoming Features
-                </li>
-            </ul>
-        </div>
-
-        {{-- BYOS Notice + Support --}}
-        <div class="mt-6 pt-6 border-t dark:border-coolgray-400 border-neutral-200 text-sm dark:text-neutral-400">
-            <p>You need to bring your own servers from any cloud provider (<a class="underline" href="https://coolify.io/hetzner" target="_blank">Hetzner</a>, DigitalOcean, AWS, etc.) or connect any device running a <a class="underline" href="https://coolify.io/docs/installation#supported-operating-systems" target="_blank">supported OS</a>.</p>
-            <p class="mt-3">Need official support for your self-hosted instance? <a class="underline dark:text-white" href="https://coolify.io/docs/contact" target="_blank">Contact Us</a></p>
-        </div>
-    </div>
+    </x-application.settings-section>
 </div>

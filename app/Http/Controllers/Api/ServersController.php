@@ -663,7 +663,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout', 'is_terminal_enabled'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -690,6 +690,7 @@ class ServersController extends Controller
             'server_disk_usage_notification_threshold' => 'integer|min:1|max:100',
             'server_disk_usage_check_frequency' => 'string',
             'connection_timeout' => 'integer|min:1|max:300',
+            'is_terminal_enabled' => 'boolean|nullable',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
         ]);
@@ -748,6 +749,12 @@ class ServersController extends Controller
         if ($request->has('is_build_server')) {
             $server->settings()->update([
                 'is_build_server' => $request->boolean('is_build_server'),
+            ]);
+        }
+
+        if ($request->has('is_terminal_enabled')) {
+            $server->settings()->update([
+                'is_terminal_enabled' => $request->boolean('is_terminal_enabled'),
             ]);
         }
 
@@ -851,7 +858,7 @@ class ServersController extends Controller
         if ($server->definedResources()->count() > 0 && ! $force) {
             return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
-        if ($server->isLocalhost()) {
+        if ($server->is_coolify_host) {
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
 
@@ -962,6 +969,12 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $this->authorize('update', $server);
+
+        if (! $server->canBeValidated()) {
+            return response()->json([
+                'message' => 'This server was transferred to another Coolify instance and cannot be revalidated here.',
+            ], 422);
+        }
 
         $validator = customApiValidator($request->all(), [
             'install' => 'boolean',

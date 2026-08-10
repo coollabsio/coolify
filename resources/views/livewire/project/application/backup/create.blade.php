@@ -1,18 +1,24 @@
-<form class="flex flex-col w-full gap-4 rounded-sm" wire:submit="submit">
+<form class="application-settings-form flex w-full flex-col gap-4" wire:submit="submit">
     @if ($targets->isEmpty())
-        <div class="text-warning">Add a persistent volume or directory mount before configuring a backup.</div>
+        <x-empty size="sm" title="No backup targets"
+            description="Add a persistent volume or directory mount before configuring a backup."
+            icon-name="storages" />
     @else
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <x-forms.select id="targetKey" label="Backup Target" required :disabled="$targetLocked">
-                @foreach ($targets as $target)
-                    <option value="{{ $target['key'] }}">{{ $target['type'] }}: {{ $target['name'] }}</option>
-                @endforeach
-            </x-forms.select>
-            <x-forms.input id="frequency" placeholder="0 0 * * * or daily"
+        <div class="grid gap-4 sm:grid-cols-2">
+            <x-forms.listbox id="targetKey" label="Backup target" required :options="$targets->map(fn ($target) => [
+                'value' => $target['key'],
+                'label' => $target['type'] . ': ' . $target['name'],
+            ])->all()" x-bind:disabled="{{ $targetLocked ? 'true' : 'false' }}" />
+            <x-forms.input id="frequency" placeholder="daily or 0 0 * * *"
                 helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression."
                 label="Frequency" required />
         </div>
 
-        <x-forms.button type="submit">Save</x-forms.button>
+        <div class="mt-2 flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+            <x-forms.button type="submit"
+                class="button-highlighted">
+                Create schedule
+            </x-forms.button>
+        </div>
     @endif
 </form>

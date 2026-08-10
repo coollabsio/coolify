@@ -27,8 +27,27 @@ class EnsureTokenBelongsToCurrentTeamMember
         }
 
         $role = $team->pivot?->role;
-        if (($token->can('root') || $token->can('write') || $token->can('write:sensitive'))
-            && ! in_array($role, ['admin', 'owner'], true)) {
+        // Match ApiAbility::MEMBER_DISALLOWED_ABILITIES — members are read-only.
+        $elevated = $token->can('root')
+            || $token->can('write')
+            || $token->can('write:sensitive')
+            || $token->can('deploy')
+            || $token->can('read:sensitive');
+
+        if ($elevated && ! in_array($role, ['admin', 'owner'], true)) {
+            // MCP clients expect JSON-RPC envelopes (often only parsed on HTTP 200).
+            // Keep REST API clients on plain 403 JSON.
+            if ($request->is('mcp') || $request->is('mcp/*')) {
+                return response()->json([
+                    'jsonrpc' => '2.0',
+                    'id' => $request->input('id'),
+                    'error' => [
+                        'code' => -32003,
+                        'message' => 'Missing required team role.',
+                    ],
+                ]);
+            }
+
             return response()->json(['message' => 'Missing required team role.'], 403);
         }
 

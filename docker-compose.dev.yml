@@ -8,14 +8,26 @@ services:
       args:
         - USER_ID=${USERID:-1000}
         - GROUP_ID=${GROUPID:-1000}
+        - COOLIFY_FLUX_VERSION=${COOLIFY_FLUX_VERSION:-nightly}
+        - COOLIFY_FLUX_CHECKSUM=${COOLIFY_FLUX_CHECKSUM:-unknown}
+        - COOLIFY_CLI_VERSION=${COOLIFY_CLI_VERSION:-nightly}
+        - COOLIFY_CLI_CHECKSUM=${COOLIFY_CLI_CHECKSUM:-unknown}
     ports:
-      - "${APP_PORT:-8000}:8080"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:${APP_PORT:-8000}:8080"
+      - "${FORWARD_FLUX_PORT:-6443}:6443"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       AUTORUN_ENABLED: false
-      PUSHER_HOST: "${PUSHER_HOST}"
-      PUSHER_PORT: "${PUSHER_PORT}"
+      COOLIFY_CONTAINER_ROLE: "${COOLIFY_CONTAINER_ROLE:-all}"
+      COOLIFY_COOLD_VERSION: "${COOLIFY_COOLD_VERSION:-nightly}"
+      COOLIFY_FLUX_VERSION: "${COOLIFY_FLUX_VERSION:-nightly}"
+      COOLIFY_FLUX_REQUIRE_HOST_BINDING: "${COOLIFY_FLUX_REQUIRE_HOST_BINDING:-0}"
+      COOLIFY_CLI_VERSION: "${COOLIFY_CLI_VERSION:-nightly}"
+      COOLIFY_CLI_SSH_USER: "${COOLIFY_CLI_SSH_USER:-}"
+      COOLIFY_CORROSION_VERSION: "${COOLIFY_CORROSION_VERSION:-v1.0.0}"
+      PUSHER_HOST: "${PUSHER_HOST:-}"
+      PUSHER_PORT: "${PUSHER_PORT:-}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"
       PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
       PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
@@ -70,8 +82,8 @@ services:
     env_file:
       - .env
     ports:
-      - "${FORWARD_SOKETI_PORT:-6001}:6001"
-      - "6002:6002"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:6002:6002"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -99,8 +111,9 @@ services:
       # Set VITE_HOST in .env to a browser-reachable IP/hostname for LAN/Tailscale access
       VITE_HOST: "${VITE_HOST:-localhost}"
       VITE_PORT: "${VITE_PORT:-5173}"
+      VITE_PROTOCOL: "${VITE_PROTOCOL:-http}"
     ports:
-      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html/:cached
     command: sh -c "npm install && npm run dev"

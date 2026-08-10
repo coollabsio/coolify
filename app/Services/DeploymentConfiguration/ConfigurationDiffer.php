@@ -22,7 +22,7 @@ class ConfigurationDiffer
      * stored. Older snapshots omitted these keys, which should not make an
      * unchanged default look like a pending configuration change.
      *
-     * @var array<string, bool|array<int, bool>>
+     * @var array<string, mixed>
      */
     private const INTRODUCED_DEFAULTS = [
         'build.is_static' => false,
@@ -37,6 +37,7 @@ class ConfigurationDiffer
         'runtime.is_log_drain_enabled' => false,
         'runtime.is_swarm_only_worker_nodes' => true,
         'runtime.is_preserve_repository_enabled' => false,
+        'domains.noindex_domains' => [],
     ];
 
     /**
@@ -61,7 +62,7 @@ class ConfigurationDiffer
             if (
                 $previous === null
                 && array_key_exists($key, self::INTRODUCED_DEFAULTS)
-                && in_array((bool) data_get($current, 'compare_value'), (array) self::INTRODUCED_DEFAULTS[$key], true)
+                && $this->matchesIntroducedDefault($key, data_get($current, 'compare_value'))
             ) {
                 continue;
             }
@@ -124,6 +125,17 @@ class ConfigurationDiffer
         }
 
         return ConfigurationDiff::fromChanges($changes);
+    }
+
+    private function matchesIntroducedDefault(string $key, mixed $value): bool
+    {
+        $default = self::INTRODUCED_DEFAULTS[$key];
+
+        if (is_array($default) && $default !== [] && array_is_list($default)) {
+            return in_array($value, $default, true);
+        }
+
+        return $value === $default;
     }
 
     /**
