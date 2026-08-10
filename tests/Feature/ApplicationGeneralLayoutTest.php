@@ -18,7 +18,22 @@ test('docker compose heading separates its title and action', function () {
 
     expect($view)
         ->toContain('<div x-data="{ showRaw: true }" class="mt-5">')
-        ->toContain('<div class="flex items-center justify-between gap-4">');
+        ->toContain('<div class="mb-2 flex items-center justify-between gap-4">');
+});
+
+test('unsaved changes ignore compose initialization state', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+    $unsavedBar = str($view)
+        ->after('<x-unsaved-bar action="submit"')
+        ->before('/>')
+        ->toString();
+
+    expect($unsavedBar)
+        ->toContain('targets="')
+        ->toContain('name,description')
+        ->not->toContain('initLoadingCompose')
+        ->not->toContain('dockerComposeRaw')
+        ->not->toContain('dockerCompose,');
 });
 
 test('onboarding uses the reusable advanced settings component', function () {

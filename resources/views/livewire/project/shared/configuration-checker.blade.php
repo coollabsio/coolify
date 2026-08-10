@@ -35,7 +35,8 @@
                 : md5((string) $resource->config_hash);
             $compactStorageKey = $compactStoragePrefix.$currentConfigurationHash;
         @endphp
-        <div x-data="{ configurationDiffModalOpen: false, expandedRows: {} }">
+        <div wire:key="configuration-warning-{{ $currentConfigurationHash }}"
+            x-data="{ configurationDiffModalOpen: false, expandedRows: {} }">
             <x-popup-small :compact-after="5000" :compact-storage-key="$compactStorageKey"
                 :compact-storage-prefix="$compactStoragePrefix">
                 <x-slot:title>

@@ -6,10 +6,10 @@ test('server creation keeps private key actions together and advanced options co
     expect($view)
         ->toContain('class="flex items-end gap-3"')
         ->toContain('<x-forms.collapsible class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]"')
-        ->toContain('<x-forms.select id="is_build_server"')
+        ->toContain('<x-forms.listbox id="is_build_server"')
         ->toContain('label="Use as a dedicated build server"')
-        ->toContain('<option value="0">No</option>')
-        ->toContain('<option value="1">Yes</option>')
+        ->toContain("['value' => false, 'label' => 'No']")
+        ->toContain("['value' => true, 'label' => 'Yes']")
         ->not->toContain('<x-forms.checkbox id="is_build_server"')
         ->toContain('helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."');
 });

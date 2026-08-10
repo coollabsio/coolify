@@ -38,11 +38,11 @@
         this.visible = true;
         const rect = target.getBoundingClientRect();
         this.below = rect.top < 48;
-        this.x = rect.left + rect.width / 2;
+        this.x = rect.left;
         this.y = this.below ? rect.bottom + 8 : rect.top - 8;
         this.$nextTick(() => {
             const width = this.$refs.tooltip?.offsetWidth || 0;
-            this.x = Math.max(width / 2 + 8, Math.min(window.innerWidth - width / 2 - 8, this.x));
+            this.x = Math.max(8, Math.min(window.innerWidth - width - 8, this.x));
             this.$nextTick(() => this.positioned = true);
         });
     },
@@ -71,6 +71,6 @@
     <div x-ref="tooltip" x-show="visible" x-cloak role="tooltip" x-text="text"
         :style="`left: ${x}px; top: ${y}px;`"
         :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible']"
-        class="pointer-events-none fixed z-[100] -translate-x-1/2 whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-lg dark:border-white/10 dark:bg-raised">
+        class="pointer-events-none fixed z-[100] whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-lg dark:border-white/10 dark:bg-raised">
     </div>
 </div>

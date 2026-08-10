@@ -126,9 +126,10 @@ test('Server-Timing HUD docks into navbar slots and floats only as fallback', fu
         ->toContain('server-timing-hud-slot-mobile')
         ->toContain("matchMedia('(min-width: 1024px)')")
         ->toContain('floats bottom-left only if no navbar slot is available')
-        // Mobile pill is compact (app ms only); full "ST · db · q" breakdown stays desktop/float.
-        ->toContain("parentElement.id === 'server-timing-hud-slot-mobile'")
-        ->toContain('compactSummary');
+        // Both navbar pills stay compact (app ms only); the full breakdown lives in the panel/float fallback.
+        ->toContain("root.getAttribute('data-sth-mode') === 'docked'")
+        ->toContain('compactSummary')
+        ->not->toContain("compactSummary = root.getAttribute('data-sth-mode') === 'docked'\n            && root.parentElement");
 });
 
 test('Server-Timing HUD follows the application color mode', function () {
