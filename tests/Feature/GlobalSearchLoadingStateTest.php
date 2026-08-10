@@ -33,6 +33,16 @@ it('skips hidden command palette results during keyboard navigation', function (
         ->toContain('filter(item => item.offsetParent !== null)');
 });
 
+it('preselects the first result in every resource selection step', function () {
+    $view = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
+
+    expect($view)
+        ->toContain('preselectFirstResult()')
+        ->toContain("this.selectedIndex = 0;")
+        ->toContain("results[0].focus();")
+        ->and(substr_count($view, 'x-init="preselectFirstResult()"'))->toBe(4);
+});
+
 it('opens the command palette without changing page scrollbar visibility', function () {
     $view = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
 

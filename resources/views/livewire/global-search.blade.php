@@ -127,6 +127,21 @@
             this.isPaletteTransitioning = false;
         });
     },
+    preselectFirstResult() {
+        this.$nextTick(() => {
+            const results = Array.from(this.$el.querySelectorAll('.search-result-item'))
+                .filter(item => item.offsetParent !== null);
+
+            if (results.length === 0) {
+                this.selectedIndex = -1;
+                return;
+            }
+
+            this.selectedIndex = 0;
+            results[0].focus();
+            results[0].scrollIntoView({ block: 'nearest' });
+        });
+    },
     navigateResults(direction) {
         const results = Array.from(this.$el.querySelectorAll('.search-result-item'))
             .filter(item => item.offsetParent !== null);
@@ -366,7 +381,7 @@
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
                                 wire:target="selectServer,selectDestination,selectProject,selectEnvironment">
                             @if ($selectedServerId === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
@@ -413,7 +428,7 @@
                             @endif
 
                             @if ($selectedServerId !== null && $selectedDestinationUuid === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
@@ -461,7 +476,7 @@
                             @endif
 
                             @if ($selectedDestinationUuid !== null && $selectedProjectUuid === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
@@ -509,7 +524,7 @@
                             @endif
 
                             @if ($selectedProjectUuid !== null && $selectedEnvironmentUuid === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">

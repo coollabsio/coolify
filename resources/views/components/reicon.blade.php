@@ -4,7 +4,7 @@
     // Icon glyphs from the reicon pack (OUTLINE group), converted to
     // currentColor so they inherit the surrounding text color. To add more:
     // copy the inner markup from the reicon Outline weight and swap
-    // #000000 -> currentColor. See UI_REDESIGN.md.
+    // #000000 -> currentColor. See DESIGN.md.
     $icons = [
         'cloud' => '<path d="M7.5 19.25h9.75a4.5 4.5 0 0 0 .62-8.96A6.25 6.25 0 0 0 5.8 8.65 5.25 5.25 0 0 0 7.5 19.25Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
         'code' => '<path d="m8.5 7-5 5 5 5M15.5 7l5 5-5 5M13.5 4l-3 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',

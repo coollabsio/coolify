@@ -46,7 +46,7 @@
     --color-coolgray-500: #323232;
 
     /* Graphite design language (ported from ref/frontend). Layered neutral
-       surfaces + translucent hairlines. See UI_REDESIGN.md. */
+       surfaces + translucent hairlines. See DESIGN.md. */
     --color-app: #0c0c0d;
     /* Canvas: neutral near-black (oklch), not pure black */
     --color-panel: oklch(10% 0 0);

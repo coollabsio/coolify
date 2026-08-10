@@ -8,7 +8,7 @@ Coolify is an open-source, self-hostable PaaS (alternative to Heroku/Netlify/Ver
 
 ## Design Reference
 
-For UI/UX design specifications, principles, and visual standards, consult `DESIGN.md` in the [coollabsio/architecture](https://github.com/coollabsio/architecture) repo.
+For UI/UX design specifications, principles, and visual standards, consult the local [`DESIGN.md`](DESIGN.md). It is the source of truth for frontend design work in this repository.
 
 ## Development Environment
 
