@@ -47,6 +47,25 @@ test('unsaved bar saves with enter and shows the shortcut on the save button', f
         ->toContain('Enter</kbd>');
 });
 
+test('unsaved bar keyboard shortcut remains visible in light mode', function () {
+    $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+
+    expect($contents)
+        ->toContain('border-coollabs/20 bg-coollabs/10')
+        ->toContain('text-coollabs-200')
+        ->toContain('dark:border-white/20 dark:bg-white/10 dark:text-white/75');
+});
+
+test('unsaved bar uses a light surface in light mode', function () {
+    $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+
+    expect($contents)
+        ->toContain('border-neutral-200 bg-white')
+        ->toContain('text-neutral-800 dark:text-fg')
+        ->toContain('bg-neutral-100')
+        ->toContain('dark:bg-white/[0.07]');
+});
+
 test('unsaved bar stays above floating notifications so save actions remain accessible', function () {
     $unsavedBar = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
     $popup = file_get_contents(resource_path('views/components/popup-small.blade.php'));

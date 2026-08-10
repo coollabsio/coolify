@@ -117,6 +117,8 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('.logs-viewer-actions')
         ->toContain('.logs-viewer-deployment-actions')
         ->toContain('.logs-settings-section')
+        ->toContain('padding: 0.5rem 0.75rem 2rem;')
+        ->toContain('padding: 0.5rem 1rem 2rem;')
         ->toContain('flex-direction: column')
         ->toContain('@media (min-width: 640px)');
 

@@ -2673,6 +2673,16 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Shared logs viewer (deployment + runtime) — mobile-first toolbar
    Mobile stacks: search → meta → full-width actions (no side-by-side overlap). */
+.logs-viewer {
+    background: #fff;
+    color: #262626;
+}
+
+.dark .logs-viewer {
+    background: var(--color-log);
+    color: #f5f5f5;
+}
+
 .logs-viewer-toolbar {
     flex-shrink: 0;
     border-bottom: 1px solid var(--color-neutral-200);
@@ -2934,7 +2944,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .logs-viewer-viewport {
     min-width: 0;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.75rem 2rem;
 }
 
 .logs-viewer-line {
@@ -3024,7 +3034,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     }
 
     .logs-viewer-viewport {
-        padding: 0.5rem 1rem;
+        padding: 0.5rem 1rem 2rem;
     }
 
     .logs-viewer-line {

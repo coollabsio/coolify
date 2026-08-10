@@ -56,18 +56,18 @@
         }
     "
     @if ($targets) wire:target="{{ $targets }}" @endif
-    class="pointer-events-none fixed inset-x-3 bottom-[calc(var(--keyboard-inset,0px)+max(1.5rem,env(safe-area-inset-bottom,0px)+0.75rem))] z-[1000] flex max-w-full translate-y-6 flex-col items-stretch gap-2 rounded-2xl border border-white/10 bg-surface py-2.5 pr-2.5 pl-4 opacity-0 shadow-modal transition-[opacity,transform] duration-200 ease-out delay-0 [&.is-dirty]:pointer-events-auto [&.is-dirty]:translate-y-0 [&.is-dirty]:opacity-100 [&.is-dirty]:delay-300 sm:inset-x-auto sm:left-1/2 sm:bottom-6 sm:w-max sm:max-w-none sm:-translate-x-1/2 sm:flex-row sm:items-center sm:gap-8 sm:py-2 sm:pl-5 sm:pr-2">
-    <span class="text-[13px] font-semibold leading-snug text-fg sm:whitespace-nowrap">{{ $label }}</span>
+    class="pointer-events-none fixed inset-x-3 bottom-[calc(var(--keyboard-inset,0px)+max(1.5rem,env(safe-area-inset-bottom,0px)+0.75rem))] z-[1000] flex max-w-full translate-y-6 flex-col items-stretch gap-2 rounded-2xl border border-neutral-200 bg-white py-2.5 pr-2.5 pl-4 opacity-0 shadow-modal transition-[opacity,transform] duration-200 ease-out delay-0 dark:border-white/10 dark:bg-surface [&.is-dirty]:pointer-events-auto [&.is-dirty]:translate-y-0 [&.is-dirty]:opacity-100 [&.is-dirty]:delay-300 sm:inset-x-auto sm:left-1/2 sm:bottom-6 sm:w-max sm:max-w-none sm:-translate-x-1/2 sm:flex-row sm:items-center sm:gap-8 sm:py-2 sm:pl-5 sm:pr-2">
+    <span class="text-[13px] font-semibold leading-snug text-neutral-800 dark:text-fg sm:whitespace-nowrap">{{ $label }}</span>
     <div class="flex shrink-0 items-center justify-end gap-2">
         <button type="button" onclick="window.location.reload()"
-            class="h-8 rounded-lg bg-white/[0.07] px-3.5 text-[13px] font-medium text-fg transition-colors hover:bg-white/[0.12]">
+            class="h-8 rounded-lg bg-neutral-100 px-3.5 text-[13px] font-medium text-neutral-700 transition-colors hover:bg-neutral-200 dark:bg-white/[0.07] dark:text-fg dark:hover:bg-white/[0.12]">
             Reset
         </button>
         <button type="button" wire:click="{{ $action }}" wire:loading.attr="disabled"
             class="button-highlighted flex h-8 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition-[transform,background-color] active:scale-[0.98]">
             <span>Save changes</span>
             <kbd
-                class="rounded border border-white/20 bg-white/10 px-1.5 py-0.5 text-[10px] leading-none font-medium text-white/75">Enter</kbd>
+                class="rounded border border-coollabs/20 bg-coollabs/10 px-1.5 py-0.5 text-[10px] leading-none font-medium text-coollabs-200 dark:border-white/20 dark:bg-white/10 dark:text-white/75">Enter</kbd>
         </button>
     </div>
 </div>
