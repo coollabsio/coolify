@@ -120,12 +120,6 @@
         this.searchQuery = '';
         this.allSearchableItems = [];
         this.isPaletteTransitioning = false;
-        // Ensure scroll is restored
-        document.body.style.overflow = '';
-        // Use $wire instead of @this for SPA navigation compatibility
-        if ($wire) {
-            $wire.closeSearchModal();
-        }
     },
     runPaletteTransition(callback) {
         this.isPaletteTransitioning = true;
@@ -299,16 +293,16 @@
 }">
 
     <!-- Command palette -->
-    <div x-show="modalOpen" x-cloak
+    <div x-cloak :class="modalOpen ? 'pointer-events-auto' : 'pointer-events-none'"
         class="fixed inset-0 z-99 flex items-start justify-center px-4 pt-[12vh]">
-            <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]">
+            <div x-show="modalOpen" @click="closeModal()"
+                x-transition:enter="animate-in fade-in-0 duration-150"
+                x-transition:leave="animate-out fade-out-0 duration-100"
+                class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]">
             </div>
             <div x-show="modalOpen" x-trap.inert="modalOpen"
-                x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })"
-                x-transition:enter="ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-2 scale-[0.98]"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100" x-transition:leave="ease-in duration-100"
-                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-2 scale-[0.98]"
+                x-transition:enter="animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-150"
+                x-transition:leave="animate-out fade-out-0 zoom-out-95 slide-out-to-top-2 duration-100"
                 class="command-palette relative mx-auto"
                 @click.stop>
 

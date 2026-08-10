@@ -155,6 +155,19 @@ it('starts the global terminal only once when a target is selected', function ()
         ->toMatch('/public function updatedSelectedUuid\(\).*?\$this->connectToContainer\(\);/s');
 });
 
+it('groups global terminal targets by type with labelled sections', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    expect($view)
+        ->toContain('get filteredTargetGroups()')
+        ->toContain("label: 'Servers'")
+        ->toContain("label: 'Containers'")
+        ->toContain('x-for="group in filteredTargetGroups"')
+        ->toContain('x-text="group.label"')
+        ->toContain('x-for="target in group.targets"')
+        ->not->toContain('x-for="target in filteredTargets"');
+});
+
 it('uses the redesigned terminal canvas and controls on resource terminal pages', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
 

@@ -14,7 +14,7 @@
         ['label' => 'Backups', 'route' => 'project.database.backup.index', 'icon' => 'database', 'visible' => $database->isBackupSolutionAvailable()],
         ['label' => 'Import Backup', 'route' => 'project.database.import-backup', 'icon' => 'upload', 'navigate' => false, 'visible' => auth()->user()?->can('update', $database)],
         ['label' => 'Servers', 'route' => 'project.database.servers', 'icon' => 'servers'],
-        ['label' => 'Runtime', 'route' => 'project.database.logs', 'icon' => 'unordered-list', 'navigate' => false],
+        ['label' => 'Runtime Logs', 'route' => 'project.database.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.database.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
         ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
@@ -32,14 +32,18 @@
         ]);
 
     $menuGroups = [
-        'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Backups', 'Import Backup', 'Servers'],
-        'Automation' => ['Webhooks', 'Healthcheck'],
-        'Logs' => ['Runtime'],
-        'Operations' => ['Terminal', 'Resource Limits', 'Resource Operations', 'Metrics', 'Tags', 'Danger Zone'],
+        'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Metrics'],
+        'Deploy' => ['Servers'],
+        'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
+        'Operations' => ['Resource Operations', 'Resource Limits', 'Tags', 'Danger Zone'],
     ];
 
     $groupedItems = collect($menuGroups)
-        ->map(fn (array $labels) => $configurationItems->whereIn('label', $labels)->values())
+        ->map(fn (array $labels) => collect($labels)
+            ->map(fn (string $label) => $configurationItems->firstWhere('label', $label))
+            ->filter()
+            ->values())
         ->filter(fn ($items) => $items->isNotEmpty());
 
     $pageSections = $database->type() === 'standalone-postgresql'

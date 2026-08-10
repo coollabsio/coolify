@@ -95,7 +95,11 @@
                         Select where to deploy your applications and databases. You can add more servers later.
                     </x-slot:question>
                     <x-slot:actions>
-                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 w-full">
+                        <div class="w-full space-y-6">
+                            <section>
+                                <h3 class="text-base font-semibold">Add a server</h3>
+                                <p class="mb-3 text-sm text-neutral-500 dark:text-neutral-400">Use this machine or connect a server you already manage.</p>
+                                <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
                             <button
                                 class="group relative cursor-pointer min-h-36 rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]"
                                 wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">
@@ -134,26 +138,29 @@
                                             d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" />
                                     </svg>
                                     <div>
-                                        <h3 class="mb-1 text-[14px] font-semibold">Remote server</h3>
+                                        <h3 class="mb-1 text-[14px] font-semibold">IP address or domain</h3>
                                         <p class="text-sm dark:text-neutral-400">
-                                            Connect via SSH to any server: cloud VPS, bare metal, or home infrastructure.
+                                            Connect via SSH using a server IP address or domain.
                                         </p>
                                     </div>
                                 </div>
                             </button>
+                                </div>
+                            </section>
+
                             @can('viewAny', App\Models\CloudProviderToken::class)
+                                <section>
+                                    <h3 class="text-base font-semibold">Provision a server</h3>
+                                    <p class="mb-3 text-sm text-neutral-500 dark:text-neutral-400">Create a server with a cloud provider.</p>
+                                    <div class="grid w-full grid-cols-1 gap-4 lg:grid-cols-2">
                                 @if ($currentState === 'select-server-type')
                                     <x-modal-input title="Connect a Hetzner Server" isFullWidth>
                                         <x-slot:content>
                                             <div
                                                 class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                                 <div class="flex h-full flex-col gap-4 text-left">
-                                                    <svg class="size-10 shrink-0" viewBox="0 0 200 200"
-                                                        xmlns="http://www.w3.org/2000/svg">
-                                                        <rect width="200" height="200" fill="#D50C2D" rx="8" />
-                                                        <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z"
-                                                            fill="white" />
-                                                    </svg>
+                                                    <img src="{{ asset('svgs/hetzner.svg') }}" alt="Hetzner"
+                                                        class="size-10 shrink-0">
                                                     <div class="min-h-0 flex-1">
                                                         <h3 class="mb-1 text-[14px] font-semibold">Hetzner Cloud</h3>
                                                         <p class="text-sm dark:text-neutral-400">
@@ -170,12 +177,8 @@
                                             <div
                                                 class="group relative cursor-pointer flex h-full min-h-36 flex-col rounded-[10px] border border-neutral-200 bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                                 <div class="flex h-full flex-col gap-4 text-left">
-                                                    <svg class="size-10 shrink-0" viewBox="0 0 200 200"
-                                                        xmlns="http://www.w3.org/2000/svg">
-                                                        <rect width="200" height="200" fill="#007BFC" rx="8" />
-                                                        <path d="M42 46 H73 L100 127 L127 46 H158 L114 154 H86 Z"
-                                                            fill="white" />
-                                                    </svg>
+                                                    <img src="https://www.vultr.com/media/logo_ondark.svg" alt="Vultr"
+                                                        class="h-10 w-28 shrink-0 object-contain object-left">
                                                     <div class="min-h-0 flex-1">
                                                         <h3 class="mb-1 text-[14px] font-semibold">Vultr Cloud</h3>
                                                         <p class="text-sm dark:text-neutral-400">
@@ -205,6 +208,8 @@
                                         <livewire:server.new.by-digital-ocean :limit_reached="false" :from_onboarding="true" />
                                     </x-modal-input>
                                 @endif
+                                    </div>
+                                </section>
                             @endcan
                         </div>
 
@@ -421,19 +426,13 @@
                             <x-forms.input placeholder="Optional: Note what this server hosts" label="Description"
                                 id="remoteServerDescription" wire:model="remoteServerDescription" />
 
-                            <x-forms.collapsible title="Advanced Connection Settings"
+                            <x-forms.collapsible title="Advanced Settings"
                                 content-class="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                 <x-forms.input placeholder="Default: 22" label="SSH Port" type="number"
                                     id="remoteServerPort" wire:model="remoteServerPort" />
                                 <div>
                                     <x-forms.input placeholder="Default: root" label="SSH User" id="remoteServerUser"
                                         wire:model="remoteServerUser" />
-                                    <p class="mt-1 text-xs text-black dark:text-white">
-                                        Non-root user support is experimental.
-                                        <a class="font-bold underline hover:text-coollabs" target="_blank"
-                                            href="https://coolify.io/docs/knowledge-base/server/non-root-user">Learn
-                                            more</a>
-                                    </p>
                                 </div>
                             </x-forms.collapsible>
                             <x-forms.button type="submit" class="w-full lg:w-auto">Validate Connection</x-forms.button>

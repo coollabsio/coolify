@@ -70,11 +70,16 @@
             themeAccents: @js($consoleThemeAccents),
             consoleTheme: 'system',
             themeOpen: false,
-            get filteredTargets() {
+            get filteredTargetGroups() {
                 const query = this.targetSearch.trim().toLowerCase();
-                return query
+                const targets = query
                     ? this.targets.filter((target) => target.label.toLowerCase().includes(query))
                     : this.targets;
+
+                return [
+                    { type: 'server', label: 'Servers', targets: targets.filter((target) => target.type === 'server') },
+                    { type: 'container', label: 'Containers', targets: targets.filter((target) => target.type === 'container') },
+                ].filter((group) => group.targets.length > 0);
             },
             init() {
                 const savedTheme = localStorage.getItem('coolify-console-theme');
@@ -139,19 +144,27 @@
                                 <div class="mt-1 text-xs text-white/45">Connect a reachable server and enable terminal access.</div>
                             </div>
                         @else
-                            <template x-for="target in filteredTargets" :key="target.value">
-                                <button type="button"
-                                    class="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-white/70 transition-colors hover:bg-white/[0.07] hover:text-white"
-                                    x-on:click="selectTarget(target)">
-                                    <x-reicon name="servers" x-show="target.type === 'server'"
-                                        class="size-4 shrink-0 text-white/40" />
-                                    <x-reicon name="layers" x-show="target.type === 'container'"
-                                        class="size-4 shrink-0 text-white/40" />
-                                    <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
-                                    <x-reicon name="arrow-right" class="size-3.5 shrink-0 text-white/35" />
-                                </button>
+                            <template x-for="group in filteredTargetGroups" :key="group.type">
+                                <section class="not-last:mb-2">
+                                    <div class="px-3 py-2 text-[10px] font-semibold tracking-wider text-white/40 uppercase"
+                                        x-text="group.label"></div>
+                                    <template x-for="target in group.targets" :key="target.value">
+                                        <button type="button"
+                                            class="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-white/70 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                            x-on:click="selectTarget(target)">
+                                            <x-reicon name="servers" x-show="target.type === 'server'"
+                                                class="size-4 shrink-0 text-white/40" />
+                                            <x-reicon name="layers" x-show="target.type === 'container'"
+                                                class="size-4 shrink-0 text-white/40" />
+                                            <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
+                                            <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/40"
+                                                x-text="target.type"></span>
+                                            <x-reicon name="arrow-right" class="size-3.5 shrink-0 text-white/35" />
+                                        </button>
+                                    </template>
+                                </section>
                             </template>
-                            <div x-show="filteredTargets.length === 0"
+                            <div x-show="filteredTargetGroups.length === 0"
                                 class="px-3 py-8 text-center text-sm text-white/50">
                                 No matching targets
                             </div>
@@ -211,25 +224,33 @@
                                 </div>
                             </div>
                             <div class="terminal-target-list max-h-72 overflow-y-auto p-1">
-                                <template x-for="target in filteredTargets" :key="target.value">
-                                    <button type="button"
-                                        class="flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
-                                        x-on:click="selectTarget(target)">
-                                        <x-reicon name="servers" x-cloak x-show="target.type === 'server'"
-                                            class="size-3.5 shrink-0 text-white/35" />
-                                        <x-reicon name="layers" x-cloak x-show="target.type === 'container'"
-                                            class="size-3.5 shrink-0 text-white/35" />
-                                        <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
-                                        <svg x-show="$wire.selected_uuid === target.value"
-                                            class="size-3 text-[#fcd452]" viewBox="0 0 12 12" fill="none"
-                                            aria-hidden="true">
-                                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
-                                                stroke-width="1.4" stroke-linecap="round"
-                                                stroke-linejoin="round" />
-                                        </svg>
-                                    </button>
+                                <template x-for="group in filteredTargetGroups" :key="group.type">
+                                    <section class="not-last:mb-1">
+                                        <div class="px-2 py-1.5 text-[9px] font-semibold tracking-wider text-white/35 uppercase"
+                                            x-text="group.label"></div>
+                                        <template x-for="target in group.targets" :key="target.value">
+                                            <button type="button"
+                                                class="flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                                x-on:click="selectTarget(target)">
+                                                <x-reicon name="servers" x-cloak x-show="target.type === 'server'"
+                                                    class="size-3.5 shrink-0 text-white/35" />
+                                                <x-reicon name="layers" x-cloak x-show="target.type === 'container'"
+                                                    class="size-3.5 shrink-0 text-white/35" />
+                                                <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
+                                                <span class="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/35"
+                                                    x-text="target.type"></span>
+                                                <svg x-show="$wire.selected_uuid === target.value"
+                                                    class="size-3 text-[#fcd452]" viewBox="0 0 12 12" fill="none"
+                                                    aria-hidden="true">
+                                                    <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
+                                                        stroke-width="1.4" stroke-linecap="round"
+                                                        stroke-linejoin="round" />
+                                                </svg>
+                                            </button>
+                                        </template>
+                                    </section>
                                 </template>
-                                <div x-show="filteredTargets.length === 0"
+                                <div x-show="filteredTargetGroups.length === 0"
                                     class="px-2 py-5 text-center text-[11px] text-white/35">
                                     No matching targets
                                 </div>
@@ -281,18 +302,26 @@
                                 </div>
                             </div>
                             <div class="max-h-72 overflow-y-auto p-1">
-                                <template x-for="target in filteredTargets" :key="target.value">
-                                    <button type="button"
-                                        class="flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
-                                        x-on:click="selectTarget(target)">
-                                        <x-reicon name="servers" x-show="target.type === 'server'"
-                                            class="size-3.5 shrink-0 text-white/35" />
-                                        <x-reicon name="layers" x-show="target.type === 'container'"
-                                            class="size-3.5 shrink-0 text-white/35" />
-                                        <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
-                                    </button>
+                                <template x-for="group in filteredTargetGroups" :key="group.type">
+                                    <section class="not-last:mb-1">
+                                        <div class="px-2 py-1.5 text-[9px] font-semibold tracking-wider text-white/35 uppercase"
+                                            x-text="group.label"></div>
+                                        <template x-for="target in group.targets" :key="target.value">
+                                            <button type="button"
+                                                class="flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                                x-on:click="selectTarget(target)">
+                                                <x-reicon name="servers" x-show="target.type === 'server'"
+                                                    class="size-3.5 shrink-0 text-white/35" />
+                                                <x-reicon name="layers" x-show="target.type === 'container'"
+                                                    class="size-3.5 shrink-0 text-white/35" />
+                                                <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
+                                                <span class="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/35"
+                                                    x-text="target.type"></span>
+                                            </button>
+                                        </template>
+                                    </section>
                                 </template>
-                                <div x-show="filteredTargets.length === 0"
+                                <div x-show="filteredTargetGroups.length === 0"
                                     class="px-2 py-5 text-center text-[11px] text-white/35">
                                     No matching targets
                                 </div>

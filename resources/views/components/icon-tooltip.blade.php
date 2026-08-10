@@ -1,5 +1,6 @@
 <div x-data="{
     visible: false,
+    positioned: false,
     text: '',
     x: 0,
     y: 0,
@@ -7,7 +8,10 @@
     activeTarget: null,
     isIconAction(target) {
         if (target.matches('[data-icon-tooltip-ignore]')) return false;
-        return target.matches('[data-tooltip], .icon-button') || target.querySelector('svg');
+        if (target.matches('[data-tooltip], .icon-button')) return true;
+        return target.hasAttribute('aria-label')
+            && target.childElementCount === 1
+            && target.firstElementChild?.matches('svg');
     },
     prepare(root) {
         root.querySelectorAll?.('button[title], a[title], [data-tooltip]').forEach((target) => {
@@ -25,10 +29,12 @@
     show(event) {
         const target = this.findTarget(event);
         if (!target) return;
+        if (target === this.activeTarget && this.visible) return;
         const text = target.dataset.tooltip || target.dataset.iconTooltip || target.getAttribute('aria-label');
         if (!text) return;
         this.activeTarget = target;
         this.text = text;
+        this.positioned = false;
         this.visible = true;
         const rect = target.getBoundingClientRect();
         this.below = rect.top < 48;
@@ -37,11 +43,13 @@
         this.$nextTick(() => {
             const width = this.$refs.tooltip?.offsetWidth || 0;
             this.x = Math.max(width / 2 + 8, Math.min(window.innerWidth - width / 2 - 8, this.x));
+            this.$nextTick(() => this.positioned = true);
         });
     },
     hide(event) {
         if (event?.relatedTarget && this.activeTarget?.contains(event.relatedTarget)) return;
         this.visible = false;
+        this.positioned = false;
         this.activeTarget = null;
     },
     init() {
@@ -62,7 +70,7 @@
 }" class="contents">
     <div x-ref="tooltip" x-show="visible" x-cloak role="tooltip" x-text="text"
         :style="`left: ${x}px; top: ${y}px;`"
-        :class="below ? '' : '-translate-y-full'"
+        :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible']"
         class="pointer-events-none fixed z-[100] -translate-x-1/2 whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-lg dark:border-white/10 dark:bg-raised">
     </div>
 </div>

@@ -1,7 +1,7 @@
 import { WebSocketServer } from 'ws';
 import http from 'http';
 import pty from 'node-pty';
-import cookie from 'cookie';
+import { parseCookie } from 'cookie';
 import 'dotenv/config';
 import {
     extractHereDocContent,
@@ -96,7 +96,7 @@ const server = http.createServer((req, res) => {
 });
 
 const getSessionCookie = (req) => {
-    const cookies = cookie.parse(req.headers.cookie || '');
+    const cookies = parseCookie(req.headers.cookie || '');
     const xsrfToken = cookies['XSRF-TOKEN'];
     const appName = process.env.APP_NAME || 'laravel';
     const sessionCookieName = `${appName.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()}_session`;

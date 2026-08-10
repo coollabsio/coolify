@@ -1,7 +1,7 @@
 <div x-data="{ search: '' }" class="application-settings-form">
     <x-application.settings-section title="Backup schedules"
         description="Schedules currently writing backup data to this storage." flush>
-        @if ($groupedBackups->count() === 0)
+        @if ($groupedBackups->count() === 0 && $volumeBackups->count() === 0)
             <x-empty title="No backup schedules use this storage"
                 description="Select this storage from a database or volume backup schedule to see it here."
                 icon-name="storages" size="sm" />
@@ -18,7 +18,7 @@
             <div class="overflow-x-auto">
                 <div
                     class="grid min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(15rem,1.2fr)] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
-                    <div>Database</div>
+                    <div>Backup target</div>
                     <div>Frequency</div>
                     <div>Status</div>
                     <div>Storage</div>
@@ -93,10 +93,13 @@
                                     <span class="text-neutral-500 dark:text-fg-dim">{{ $backup->frequency }}</span>
                                 @endif
                             </div>
-                            <x-status-badge :status="$backup->enabled ? 'Enabled' : 'Disabled'"
-                                :type="$backup->enabled ? 'success' : 'warning'" />
+                            <div class="flex items-center">
+                                <x-status-badge :status="$backup->enabled ? 'Enabled' : 'Disabled'"
+                                    :type="$backup->enabled ? 'success' : 'warning'" />
+                            </div>
                             <div class="flex items-end gap-2">
-                                <x-forms.listbox id="selectedStorages.{{ $backup->id }}" :options="$storageOptions" />
+                                <x-forms.listbox id="selectedStorages.{{ $backup->id }}" :options="$storageOptions"
+                                    portal />
                                 <button type="button" class="button shrink-0"
                                     wire:click="moveBackup({{ $backup->id }})">Move</button>
                                 <button type="button" class="button shrink-0 text-error"
@@ -107,6 +110,45 @@
                             </div>
                         </div>
                     @endforeach
+                @endforeach
+                @foreach ($volumeBackups as $backup)
+                    @php
+                        $targetName = $backup->targetName();
+                        $targetType = $backup->targetType();
+                        $resource = $backup->targetResource();
+                        $resourceName = $resource?->human_name ?? $resource?->name;
+                        $storageOptions = $allStorages->map(fn ($s3) => [
+                            'value' => $s3->id,
+                            'label' => $s3->name.($s3->is_usable ? '' : ' (unusable)'),
+                            'disabled' => ! $s3->is_usable,
+                        ])->values()->all();
+                    @endphp
+                    <div
+                        class="grid min-h-14 min-w-[780px] grid-cols-[minmax(12rem,1fr)_9rem_7rem_minmax(15rem,1.2fr)] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] last:border-b-0 dark:border-white/[0.07]"
+                        x-show="search === '' || '{{ strtolower(addslashes($targetName)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($targetType)) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($resourceName ?? '')) }}'.includes(search.toLowerCase()) || '{{ strtolower(addslashes($backup->frequency)) }}'.includes(search.toLowerCase())">
+                        <div class="min-w-0">
+                            <div class="truncate font-medium text-black dark:text-fg">{{ $targetName }}</div>
+                            <div class="truncate text-neutral-500 dark:text-fg-dim">
+                                {{ $targetType }}@if ($resourceName) · {{ $resourceName }} @endif
+                            </div>
+                        </div>
+                        <div class="text-neutral-500 dark:text-fg-dim">{{ $backup->frequency }}</div>
+                        <div class="flex items-center">
+                            <x-status-badge :status="$backup->enabled ? 'Enabled' : 'Disabled'"
+                                :type="$backup->enabled ? 'success' : 'warning'" />
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <x-forms.listbox id="selectedVolumeStorages.{{ $backup->id }}" :options="$storageOptions"
+                                portal />
+                            <button type="button" class="button shrink-0"
+                                wire:click="moveVolumeBackup({{ $backup->id }})">Move</button>
+                            <button type="button" class="button shrink-0 text-error"
+                                wire:click="disableVolumeS3({{ $backup->id }})"
+                                wire:confirm="Are you sure you want to disable S3 for this backup schedule?">
+                                Disable
+                            </button>
+                        </div>
+                    </div>
                 @endforeach
             </div>
         @endif

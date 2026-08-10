@@ -13,6 +13,7 @@
     appearanceOpen: false,
     theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
     themeColor: localStorage.getItem('themeColor') || '#6b16ed',
+    themeColorFrame: null,
     avatarUrl: @js($user?->avatar_path ? route('profile.avatar', ['v' => $user->updated_at->timestamp]) : null),
     setTheme(type, closeMenu = true) {
         this.theme = type;
@@ -31,9 +32,29 @@
         document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
         document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
     },
-    setThemeColor() {
-        localStorage.setItem('themeColor', this.themeColor);
-        this.setTheme('custom', false);
+    previewThemeColor(color) {
+        this.themeColor = color;
+
+        if (this.theme !== 'custom') {
+            this.theme = 'custom';
+            document.documentElement.classList.add('dark');
+            document.documentElement.dataset.theme = 'custom';
+        }
+
+        if (this.themeColorFrame) {
+            return;
+        }
+
+        this.themeColorFrame = requestAnimationFrame(() => {
+            document.documentElement.style.setProperty('--theme-base-color', this.themeColor);
+            document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
+            this.themeColorFrame = null;
+        });
+    },
+    saveThemeColor(color) {
+        this.previewThemeColor(color);
+        localStorage.setItem('themeColor', color);
+        localStorage.setItem('theme', 'custom');
     },
 }" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="open = false; appearanceOpen = false"
     @click.outside="open = false; appearanceOpen = false">
@@ -62,9 +83,11 @@
 
     <template x-if="open">
         <div @class([
-                'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
+                'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
                 'right-0! left-auto!' => ! $sidebar,
                 'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
+                'origin-bottom-left' => $sidebar,
+                'origin-top-right' => ! $sidebar,
             ])>
         <div class="min-w-0 px-2 py-1.5">
             <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
@@ -110,7 +133,8 @@
                             <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
                                 stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
-                        <input type="color" x-model="themeColor" @input="setThemeColor()"
+                        <input type="color" :value="themeColor" @input="previewThemeColor($event.target.value)"
+                            @change="saveThemeColor($event.target.value)"
                             aria-label="Custom theme color"
                             class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
                     </div>

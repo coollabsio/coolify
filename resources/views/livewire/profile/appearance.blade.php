@@ -3,6 +3,7 @@
     <div x-data="{
         theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
         themeColor: localStorage.getItem('themeColor') || '#6b16ed',
+        themeColorFrame: null,
         init() {
             localStorage.setItem('theme', this.theme);
             this.applyTheme();
@@ -12,9 +13,29 @@
             localStorage.setItem('theme', type);
             this.applyTheme();
         },
-        setThemeColor() {
-            localStorage.setItem('themeColor', this.themeColor);
-            this.setTheme('custom');
+        previewThemeColor(color) {
+            this.themeColor = color;
+
+            if (this.theme !== 'custom') {
+                this.theme = 'custom';
+                document.documentElement.classList.add('dark');
+                document.documentElement.dataset.theme = 'custom';
+            }
+
+            if (this.themeColorFrame) {
+                return;
+            }
+
+            this.themeColorFrame = requestAnimationFrame(() => {
+                document.documentElement.style.setProperty('--theme-base-color', this.themeColor);
+                document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
+                this.themeColorFrame = null;
+            });
+        },
+        saveThemeColor(color) {
+            this.previewThemeColor(color);
+            localStorage.setItem('themeColor', color);
+            localStorage.setItem('theme', 'custom');
         },
         applyTheme() {
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -76,7 +97,8 @@
                             </p>
                         </div>
                         @if ($option['value'] === 'custom')
-                            <input type="color" x-model="themeColor" @input="setThemeColor()"
+                            <input type="color" :value="themeColor" @input="previewThemeColor($event.target.value)"
+                                @change="saveThemeColor($event.target.value)"
                                 aria-label="Custom theme color"
                                 class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
                         @endif
