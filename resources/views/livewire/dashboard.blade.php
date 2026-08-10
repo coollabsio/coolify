@@ -187,8 +187,13 @@
                             @endif
 
                             <div class="pointer-events-none relative z-10 flex min-w-0 items-start gap-3">
-                                <div
-                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <div title="{{ $serverStatus }}" aria-label="Server status: {{ $serverStatus }}"
+                                    @class([
+                                        'flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.04] dark:text-fg-dim',
+                                        'border-emerald-500/70' => $serverStatusType === 'success',
+                                        'border-amber-500/70' => $serverStatusType === 'warning',
+                                        'border-red-500/70' => $serverStatusType === 'error',
+                                    ])>
                                     <x-reicon name="servers" class="size-4" />
                                 </div>
                                 <div class="min-w-0 flex-1">
@@ -201,12 +206,6 @@
                                     </p>
                                 </div>
                             </div>
-
-                            @unless ($server->isMetricsEnabled())
-                                <div class="pointer-events-none relative z-10 mt-auto flex items-center pt-4">
-                                    <x-status-badge :status="$serverStatus" :type="$serverStatusType" />
-                                </div>
-                            @endunless
                         </a>
                     @endforeach
                 </div>

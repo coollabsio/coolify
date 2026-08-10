@@ -1,6 +1,37 @@
 <div
     class="absolute right-0 bottom-0 h-2/3 w-full rounded-b-xl [&_.apexcharts-svg]:overflow-hidden [&_.apexcharts-svg]:rounded-b-xl [&_.apexcharts-tooltip]:z-30!"
-    x-init="$wire.loadData()">
+    x-data="{
+        hiddenAt: null,
+        refreshInterval: null,
+        visibilityHandler: null,
+        init() {
+            this.visibilityHandler = () => {
+                if (document.hidden) {
+                    this.hiddenAt = Date.now();
+                    return;
+                }
+
+                if (this.hiddenAt && Date.now() - this.hiddenAt >= 60000) {
+                    $wire.loadData();
+                }
+
+                this.hiddenAt = null;
+            };
+
+            document.addEventListener('visibilitychange', this.visibilityHandler);
+            this.refreshInterval = window.setInterval(() => {
+                if (!document.hidden) {
+                    $wire.loadData();
+                }
+            }, 60000);
+
+            $wire.loadData();
+        },
+        destroy() {
+            window.clearInterval(this.refreshInterval);
+            document.removeEventListener('visibilitychange', this.visibilityHandler);
+        },
+    }">
     <div wire:ignore id="dashboard-server-metrics-{{ $server->uuid }}" class="h-full w-full"></div>
 
     @script

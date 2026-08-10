@@ -65,6 +65,20 @@ it('configures the dashboard chart as a ten minute cpu and memory sparkline with
         ->toContain('labels: { show: false }');
 });
 
+it('refreshes dashboard metrics every minute while visible and after returning from the background', function () {
+    $chart = file_get_contents(resource_path('views/livewire/dashboard/server-metrics-chart.blade.php'));
+
+    expect($chart)
+        ->toContain('window.setInterval')
+        ->toContain('60000')
+        ->toContain('document.hidden')
+        ->toContain("document.addEventListener('visibilitychange'")
+        ->toContain('Date.now() - this.hiddenAt >= 60000')
+        ->toContain('$wire.loadData()')
+        ->toContain('window.clearInterval')
+        ->toContain("document.removeEventListener('visibilitychange'");
+});
+
 it('keeps the status badge only on server cards without metrics', function () {
     $dashboard = file_get_contents(resource_path('views/livewire/dashboard.blade.php'));
 
