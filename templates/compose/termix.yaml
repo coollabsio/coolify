@@ -7,7 +7,7 @@
 
 services:
   termix:
-    image: ghcr.io/lukegus/termix:2.6.0 # Jul 27 2026
+    image: ghcr.io/lukegus/termix:2.6.1
     environment:
       - SERVICE_URL_TERMIX_8080
       - PORT=8080
