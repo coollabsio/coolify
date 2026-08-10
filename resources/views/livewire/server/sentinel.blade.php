@@ -6,7 +6,7 @@
                  `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
                  flashes this bar on every page open. --}}
             <x-unsaved-bar action="submit"
-                targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
+                targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds,geoipMaxmindLicenseKey" />
         @endif
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
@@ -90,6 +90,28 @@
                         id="sentinelPushIntervalSeconds" label="Push interval" required
                         helper="Seconds between health reports sent to Coolify." />
                 </div>
+            </x-application.settings-section>
+
+            <x-application.settings-section id="server-sentinel-traffic-analytics-section" title="Traffic analytics"
+                helper="Collect proxy access logs and geolocate visitor traffic for applications on this server.">
+                <x-slot:actions>
+                    <x-forms.button canGate="update" :canResource="$server" wire:click="toggleTrafficAnalytics"
+                        wire:confirm="{{ $isTrafficAnalyticsEnabled ? 'Disable' : 'Enable' }} traffic analytics? The proxy and Sentinel will restart, causing a brief connectivity blip for all applications on this server.">
+                        {{ $isTrafficAnalyticsEnabled ? 'Disable' : 'Enable' }} traffic analytics
+                    </x-forms.button>
+                </x-slot:actions>
+
+                @if ($isTrafficAnalyticsEnabled)
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$server" type="password"
+                            id="geoipMaxmindLicenseKey" label="MaxMind GeoIP license key" placeholder="Optional"
+                            helper="Used to download the GeoLite2 database for visitor geolocation. Leave empty to disable geolocation." />
+                    </div>
+                @else
+                    <x-empty size="sm" title="Traffic analytics is disabled"
+                        description="Enable traffic analytics to collect proxy access logs and geolocate visitor traffic."
+                        icon-name="dashboard" />
+                @endif
             </x-application.settings-section>
 
             @if (isDev())

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Server\ConfigureTrafficAnalytics;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopSentinel;
 use App\Models\Server;
@@ -40,6 +41,11 @@ class Sentinel extends Component
 
     public ?string $sentinelCustomDockerImage = null;
 
+    public bool $isTrafficAnalyticsEnabled;
+
+    #[Validate(['nullable', 'string', 'max:255'])]
+    public ?string $geoipMaxmindLicenseKey = null;
+
     public function getListeners()
     {
         $teamId = $this->server->team_id ?? auth()->user()->currentTeam()->id;
@@ -67,6 +73,7 @@ class Sentinel extends Component
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_enabled = $this->isSentinelEnabled;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
+            $this->server->settings->geoip_maxmind_license_key = $this->geoipMaxmindLicenseKey;
             $this->server->settings->save();
         } else {
             $this->isMetricsEnabled = $this->server->settings->is_metrics_enabled;
@@ -78,6 +85,8 @@ class Sentinel extends Component
             $this->isSentinelEnabled = $this->server->settings->is_sentinel_enabled;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
+            $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
+            $this->geoipMaxmindLicenseKey = $this->server->settings->geoip_maxmind_license_key;
         }
     }
 
@@ -126,6 +135,22 @@ class Sentinel extends Component
             }
             $this->submit();
             $this->dispatch('refreshServerShow');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function toggleTrafficAnalytics(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $enable = ! $this->server->isTrafficAnalyticsEnabled();
+            ConfigureTrafficAnalytics::run($this->server, $enable);
+            $this->server->refresh();
+            $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
+            $this->dispatch('success', $enable
+                ? 'Traffic analytics enabled. Restarting proxy and Sentinel.'
+                : 'Traffic analytics disabled. Restarting proxy and Sentinel.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
