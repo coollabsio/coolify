@@ -56,11 +56,12 @@ function createDashboardDeployment(array $overrides = []): ApplicationDeployment
 it('shows a visible yellow inset focus state on deployment rows', function () {
     $view = file_get_contents(resource_path('views/livewire/dashboard/active-deployments.blade.php'));
 
-    expect(substr_count($view, 'focus-visible:bg-warning/[0.06]'))->toBe(4)
+    expect(substr_count($view, 'focus-visible:bg-warning/10'))->toBe(4)
+        ->and(substr_count($view, 'focus-visible:ring-1'))->toBe(2)
         ->and(substr_count($view, 'focus-visible:ring-inset'))->toBe(2)
-        ->and(substr_count($view, 'focus-visible:ring-warning/70'))->toBe(2)
+        ->and(substr_count($view, 'focus-visible:ring-warning'))->toBe(2)
         ->and(substr_count($view, 'focus-visible:ring-offset-0'))->toBe(2)
-        ->and(substr_count($view, 'dark:focus-visible:bg-warning/[0.06]'))->toBe(2);
+        ->and(substr_count($view, 'dark:focus-visible:bg-warning/10'))->toBe(2);
 });
 
 it('hides the deployments section when there is nothing to show', function () {
