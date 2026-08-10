@@ -2,134 +2,117 @@
     @if ($limit_reached)
         <x-limit-reached name="servers" />
     @elseif ($current_step === 1)
-        <div class="flex flex-col w-full gap-4">
-            <div class="text-sm text-neutral-500 dark:text-neutral-400">
-                Manage your Hostinger API tokens in <a href="https://hpanel.hostinger.com/profile/api" target="_blank"
-                    class="underline dark:text-white">hPanel</a>.
-            </div>
-            @if ($available_tokens->isNotEmpty())
-                <div class="grid gap-3 md:grid-cols-2">
-                    @foreach ($available_tokens as $token)
-                        <a class="coolbox group text-left" wire:key="hostinger-token-{{ $token->id }}"
-                            href="{{ route('server.create.token', ['type' => 'hostinger', 'token_uuid' => $token->uuid]) }}"
-                            {{ wireNavigate() }}>
-                            <div class="flex flex-col justify-center mx-6">
-                                <div class="box-title">{{ $token->name ?? 'Hostinger Token' }}</div>
-                                <div class="box-description">Use this token to purchase and create a Hostinger VPS.</div>
-                            </div>
-                        </a>
-                    @endforeach
-                </div>
-            @else
-                <div class="w-full max-w-2xl">
-                    <x-modal-input title="Add Hostinger Token">
-                        <x-slot:content>
-                            <div class="coolbox group cursor-pointer">
-                                <div class="flex items-center gap-4 mx-6">
-                                    <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-coollabs/10 text-coollabs dark:bg-warning/20 dark:text-warning">
-                                        <svg class="size-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="1.5" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                        </svg>
-                                    </div>
-                                    <div class="flex flex-col justify-center">
-                                        <div class="box-title">Add a new token</div>
-                                        <div class="box-description">Add a Hostinger API token to create VPS instances.</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </x-slot:content>
-                        <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hostinger"
-                            wire:key="new-server-empty-token-hostinger" />
-                    </x-modal-input>
-                </div>
-            @endif
+        <div class="flex flex-col gap-6">
+            <x-server.provider-token-picker provider="hostinger" providerLabel="Hostinger"
+                :tokens="$available_tokens" />
+            <p class="text-[11px] text-neutral-500 dark:text-fg-faint">
+                New to Hostinger?
+                <a href="https://www.hostinger.com/vps/coolify-hosting?ref=coolify.io" target="_blank"
+                    rel="noopener noreferrer"
+                    class="font-medium text-coollabs hover:underline dark:text-warning">Create an account</a>
+                through Coolify's affiliate link.
+            </p>
         </div>
-    @else
+    @elseif ($current_step === 2)
         <div wire:init="loadHostingerData">
             @if ($loading_data)
-                <div class="flex items-center justify-center py-8">
-                    <x-loading text="Loading Hostinger data..." />
-                </div>
+                <x-application.settings-section title="Loading Hostinger"
+                    description="Fetching data centers, plans, billing periods, and operating systems.">
+                    <div class="flex min-h-40 items-center justify-center">
+                        <x-loading text="Loading Hostinger data..." />
+                    </div>
+                </x-application.settings-section>
             @elseif ($provider_data_error)
-                <div class="flex flex-col gap-4 rounded-lg border border-error bg-error/10 p-4">
-                    <div>
-                        <h3>Unable to load Hostinger details</h3>
-                        <p class="text-sm text-neutral-700 dark:text-neutral-300">
-                            Coolify could not fetch Hostinger data with the selected token.
-                        </p>
+                <x-application.settings-section title="Unable to load Hostinger"
+                    description="The selected token could not access the provider API.">
+                    <x-callout type="error" title="Provider request failed">
+                        <pre class="mt-2 whitespace-pre-wrap break-words text-[11px]">{{ $provider_data_error }}</pre>
+                    </x-callout>
+                    <div class="mt-4">
+                        <a class="button" href="{{ route('server.create.type', ['type' => 'hostinger']) }}"
+                            {{ wireNavigate() }}>Select another token</a>
                     </div>
-                    <pre class="whitespace-pre-wrap break-words text-sm text-error">{{ $provider_data_error }}</pre>
-                    <div>
-                        <a class="button" href="{{ route('server.create.type', ['type' => 'hostinger']) }}" {{ wireNavigate() }}>
-                            Select another token
-                        </a>
-                    </div>
-                </div>
+                </x-application.settings-section>
             @else
-                <form class="flex flex-col w-full gap-2" wire:submit="submit">
-                    <x-forms.input id="server_name" label="Server Name" helper="A valid hostname for your VPS." />
+                @php
+                    $dataCenterOptions = collect($data_centers)->map(fn ($dataCenter) => [
+                        'value' => $dataCenter['id'],
+                        'label' => ($dataCenter['city'] ?? $dataCenter['name'])
+                            . (!empty($dataCenter['location']) ? ' · ' . strtoupper($dataCenter['location']) : ''),
+                    ])->values()->all();
+                    $priceOptions = collect($this->priceOptions)->map(fn ($price) => [
+                        'value' => $price['id'],
+                        'label' => $this->priceLabel($price),
+                    ])->values()->all();
+                    $templateOptions = collect($templates)->map(fn ($template) => [
+                        'value' => $template['id'],
+                        'label' => $template['name'] ?? $template['description'],
+                    ])->values()->all();
+                    $privateKeyOptions = $private_keys->map(fn ($key) => [
+                        'value' => $key->id,
+                        'label' => $key->name,
+                    ])->values()->all();
+                @endphp
 
-                    <x-forms.select label="Data Center" id="selected_data_center_id" required>
-                        <option value="">Select a data center...</option>
-                        @foreach ($data_centers as $dataCenter)
-                            <option value="{{ $dataCenter['id'] }}">
-                                {{ $dataCenter['city'] ?? $dataCenter['name'] }}@if (!empty($dataCenter['location']))
-                                    ({{ strtoupper($dataCenter['location']) }})
-                                @endif
-                            </option>
-                        @endforeach
-                    </x-forms.select>
+                <form wire:submit="submit" class="flex flex-col gap-6">
+                    <x-application.settings-section title="Hostinger server"
+                        description="Choose the data center, plan, operating system, and Coolify SSH key.">
+                        <x-slot:actions>
+                            <button type="submit" class="button button-highlighted"
+                                wire:loading.attr="disabled" wire:target="submit"
+                                @disabled(!$private_key_id)>
+                                Buy and create
+                                <x-loading-on-button wire:loading wire:target="submit" />
+                            </button>
+                        </x-slot:actions>
 
-                    <x-forms.select label="Plan & Billing Period" id="selected_price_id" wire:model.live="selected_price_id" required>
-                        <option value="">Select a plan...</option>
-                        @foreach ($this->priceOptions as $price)
-                            <option value="{{ $price['id'] }}">{{ $this->priceLabel($price) }}</option>
-                        @endforeach
-                    </x-forms.select>
-
-                    <x-forms.select label="Operating System" id="selected_template_id" required>
-                        <option value="">Select an operating system...</option>
-                        @foreach ($templates as $template)
-                            <option value="{{ $template['id'] }}">{{ $template['name'] ?? $template['description'] }}</option>
-                        @endforeach
-                    </x-forms.select>
-
-                    <div>
-                        @if ($private_keys->isEmpty())
-                            <div class="flex flex-col gap-2 rounded border border-warning-500 bg-warning-50 p-4 dark:border-warning-600 dark:bg-warning-900/10">
-                                <p class="text-sm text-neutral-700 dark:text-neutral-300">
-                                    Create a private key before purchasing the VPS.
-                                </p>
-                                <x-modal-input buttonTitle="Create New Private Key" title="New Private Key" isHighlightedButton>
-                                    <livewire:security.private-key.create :modal_mode="true" from="server" />
-                                </x-modal-input>
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <div class="lg:col-span-2">
+                                <x-forms.input id="server_name" label="Server name"
+                                    helper="A friendly name shown in Coolify and used as the VPS hostname." />
                             </div>
-                        @else
-                            <x-forms.select label="Private Key" id="private_key_id" required>
-                                <option value="">Select a private key...</option>
-                                @foreach ($private_keys as $key)
-                                    <option value="{{ $key->id }}">{{ $key->name }}</option>
-                                @endforeach
-                            </x-forms.select>
-                            <p class="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                                This public key will be installed during Hostinger VPS setup.
-                            </p>
-                        @endif
-                    </div>
+                            <x-forms.listbox id="selected_data_center_id" label="Data center" required live
+                                placeholder="Select a data center" :options="$dataCenterOptions" />
+                            <x-forms.listbox id="selected_price_id" label="Plan and billing period" required live
+                                :disabled="!$selected_data_center_id" placeholder="Select a plan"
+                                :options="$priceOptions" />
+                            <x-forms.listbox id="selected_template_id" label="Operating system" required
+                                :disabled="!$selected_price_id" placeholder="Select an operating system"
+                                :options="$templateOptions" />
+                            @if ($private_keys->isEmpty())
+                                <div>
+                                    <label class="mb-1.5 flex w-fit items-center gap-1.5">Private key
+                                        <x-highlighted text="*" />
+                                    </label>
+                                    <div
+                                        class="flex min-h-8 items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2">
+                                        <span class="text-[11px] text-neutral-600 dark:text-fg-dim">A private key is required.</span>
+                                        <x-modal-input title="New Private Key">
+                                            <x-slot:content>
+                                                <button type="button" class="button">Create key</button>
+                                            </x-slot:content>
+                                            <livewire:security.private-key.create :modal_mode="true" from="server" />
+                                        </x-modal-input>
+                                    </div>
+                                </div>
+                            @else
+                                <x-forms.listbox id="private_key_id" label="Private key" required
+                                    placeholder="Select a private key" :options="$privateKeyOptions"
+                                    helper="This key is added to the Hostinger VPS automatically." />
+                            @endif
+                        </div>
+                    </x-application.settings-section>
 
-                    <x-forms.checkbox id="enable_backups" label="Enable weekly Hostinger backups" />
-
-                    <div class="my-2 rounded border border-warning/40 bg-warning/10 p-3 text-sm">
-                        This action purchases a paid Hostinger VPS using your account's default payment method.
-                        Review the plan and billing period before continuing.
-                    </div>
-
-                    <x-forms.button type="submit" class="w-full" :disabled="$private_keys->isEmpty()" :showLoadingIndicator="false"
-                        wire:loading.attr="disabled" wire:target="submit">
-                        Buy & Create Server
-                        <x-loading-on-button wire:loading wire:target="submit" />
-                    </x-forms.button>
+                    <x-application.settings-section title="Advanced options"
+                        description="Provider backups and purchase details.">
+                        <div class="flex flex-col gap-4">
+                            <x-forms.checkbox id="enable_backups" label="Enable weekly Hostinger backups" fullWidth />
+                            <x-callout type="warning" title="This purchase is billed by Hostinger">
+                                The VPS is purchased with your Hostinger account's default payment method. Review the
+                                selected plan and billing period before continuing.
+                            </x-callout>
+                        </div>
+                    </x-application.settings-section>
                 </form>
             @endif
         </div>
