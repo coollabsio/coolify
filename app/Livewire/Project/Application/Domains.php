@@ -16,6 +16,8 @@ class Domains extends Component
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
 
+    protected bool $notifyRedirectUpdate = true;
+
     public Application $application;
 
     public string $redirect = 'both';
@@ -40,6 +42,8 @@ class Domains extends Component
     public string $editingDomain = '';
 
     public string $editingIndexing = 'index';
+
+    public string $editingDirection = 'both';
 
     public ?string $editingService = null;
 
@@ -100,6 +104,7 @@ class Domains extends Component
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
             'editingIndexing' => 'string|in:index,noindex',
+            'editingDirection' => 'string|in:both,www,non-www',
             'redirect' => 'string|required|in:both,www,non-www',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
@@ -907,6 +912,7 @@ class Domains extends Component
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
         $this->editingService = $this->domainRows[$index]['service'];
+        $this->editingDirection = $this->serviceRedirectFor($this->editingService);
         $this->editingIndexing = $this->application->isDomainNoindexed($this->editingDomain) ? 'noindex' : 'index';
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
@@ -990,6 +996,7 @@ class Domains extends Component
         $this->editingIndex = null;
         $this->editingDomain = '';
         $this->editingService = null;
+        $this->editingDirection = 'both';
         $this->editingIndexing = 'index';
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
@@ -1065,6 +1072,13 @@ class Domains extends Component
             $this->application->setNoindexDomains($noindexDomains);
             $this->application->save();
             $this->resetDefaultLabels();
+
+            if ($this->isCompose && filled($service) && $this->editingDirection !== $this->savedRedirectForService($service)) {
+                $this->serviceRedirects[$this->serviceRedirectWireKey($service)] = $this->editingDirection;
+                $this->notifyRedirectUpdate = false;
+                $this->setServiceRedirect($service);
+                $this->notifyRedirectUpdate = true;
+            }
 
             $this->forceSaveDomains = false;
             $this->pendingAction = null;
@@ -1303,7 +1317,9 @@ class Domains extends Component
             $this->pendingRedirectService = null;
             $this->forceSaveDomains = false;
             $this->resetDefaultLabels();
-            $this->dispatch('success', "Redirect updated for {$serviceName}.");
+            if ($this->notifyRedirectUpdate) {
+                $this->dispatch('success', "Redirect updated for {$serviceName}.");
+            }
             $this->refreshDomains();
             $this->checkUrlsDns($addedDomains, $serviceName);
             $this->pruneDomainDnsStatusesToCurrentDomains();

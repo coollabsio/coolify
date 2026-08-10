@@ -18,12 +18,14 @@
         localEditingIndex: @js($editingIndex),
         localEditingDomain: @js($editingDomain),
         localEditingService: @js($editingService),
+        localDirection: 'both',
         localIndexing: 'index',
-        openEditDomain(index, url, service, indexing) {
+        openEditDomain(index, url, service, indexing, direction) {
             this.localEditingIndex = index;
             this.localEditingDomain = url;
             this.localEditingService = service;
             this.editingServiceLabel = service || '';
+            this.localDirection = direction || 'both';
             this.localIndexing = indexing || 'index';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
@@ -40,6 +42,7 @@
             $wire.editingIndex = this.localEditingIndex;
             $wire.editingDomain = this.localEditingDomain;
             $wire.editingService = this.localEditingService;
+            $wire.editingDirection = this.localDirection;
             $wire.editingIndexing = this.localIndexing;
             $wire.showEditDomainModal = true;
         },
@@ -50,7 +53,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service, $event.detail.indexing)"
+    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service, $event.detail.indexing, $event.detail.direction)"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="domains-section" title="Domains" :helper="$helperText">
         @can('update', $application)
@@ -110,10 +113,6 @@
                     @endcan
                 </div>
             @endif
-        @elseif (! $labelsAreWritable && count($composeServices) > 0 && $composeDomainGroups->isNotEmpty())
-            <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                Per-service www/non-www redirects are available next to each service group below.
-            </p>
         @endif
 
     </x-application.settings-section>
@@ -231,44 +230,30 @@
                     ->map(fn ($serviceName) => $serviceName.' '.$grouped->get($serviceName, collect())->pluck('url')->implode(' '))
                     ->values();
             @endphp
-            <div class="overflow-hidden">
+            <div>
                 @foreach ($serviceOrder as $serviceName)
                     @php
                         $rows = $grouped->get($serviceName, collect());
                         $redirectWireKey = $this->serviceRedirectWireKey($serviceName);
-                        $redirectLabel = match ($serviceRedirects[$redirectWireKey] ?? 'both') {
-                            'www' => 'Redirect to www',
-                            'non-www' => 'Redirect to non-www',
-                            default => 'Allow both',
-                        };
                     @endphp
                     <section id="application-compose-domain-group-{{ $redirectWireKey }}"
                         wire:key="application-compose-domain-group-{{ $redirectWireKey }}"
                         x-show="matchesDomainSearch(@js($serviceName.' '.$rows->pluck('url')->implode(' ')))"
                         class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
-                        <div class="flex w-full items-center gap-3 px-4 py-3">
+                        <div class="flex w-full items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                             <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">
                                 {{ $serviceName }}
                             </span>
-                            @unless ($labelsAreWritable)
-                                @can('update', $application)
-                                    <div class="w-52 shrink-0">
-                                        <x-forms.listbox id="serviceRedirects.{{ $redirectWireKey }}"
-                                            htmlId="application-compose-domain-redirect-{{ $redirectWireKey }}"
-                                            live :options="[
-                                                ['value' => 'both', 'label' => 'Allow www & non-www'],
-                                                ['value' => 'www', 'label' => 'Redirect to www'],
-                                                ['value' => 'non-www', 'label' => 'Redirect to non-www'],
-                                            ]" wire:change="setServiceRedirect(@js($serviceName))" />
-                                    </div>
-                                @else
-                                    <span class="shrink-0 text-sm text-neutral-600 dark:text-fg-dim">{{ $redirectLabel }}</span>
-                                @endcan
-                            @endunless
                         </div>
 
                         <div wire:key="application-compose-domain-rows-{{ $redirectWireKey }}-{{ md5(serialize($rows->all())) }}"
                             class="data-table w-full">
+                            <div class="data-table-header domains-table-grid">
+                                <span>Domain</span>
+                                <span>DNS</span>
+                                <span>Last checked</span>
+                                <span></span>
+                            </div>
                             @foreach ($rows as $row)
                                 @php
                                     $index = collect($domainRows)->search(
@@ -283,6 +268,7 @@
                                     'application' => $application,
                                     'labelsAreWritable' => $labelsAreWritable,
                                     'isCompose' => false,
+                                    'domainDirection' => $serviceRedirects[$redirectWireKey] ?? 'both',
                                 ])
                             @endforeach
                         </div>
@@ -372,11 +358,21 @@
                                 </div>
 
                                 @unless ($labelsAreWritable)
-                                    <x-forms.listbox id="edit-domain-indexing" label="Search engine indexing"
-                                        :wire="false" value="index" x-model="localIndexing" portal :options="[
-                                            ['value' => 'index', 'label' => 'Indexable'],
-                                            ['value' => 'noindex', 'label' => 'Noindex'],
-                                        ]" />
+                                    <div class="grid gap-4 {{ $isCompose ? 'sm:grid-cols-2' : '' }}">
+                                        @if ($isCompose)
+                                            <x-forms.listbox id="edit-domain-direction" label="Direction"
+                                                :wire="false" value="both" x-model="localDirection" portal :options="[
+                                                    ['value' => 'both', 'label' => 'Allow www & non-www'],
+                                                    ['value' => 'www', 'label' => 'Redirect to www'],
+                                                    ['value' => 'non-www', 'label' => 'Redirect to non-www'],
+                                                ]" />
+                                        @endif
+                                        <x-forms.listbox id="edit-domain-indexing" label="Search engine indexing"
+                                            :wire="false" value="index" x-model="localIndexing" portal :options="[
+                                                ['value' => 'index', 'label' => 'Indexable'],
+                                                ['value' => 'noindex', 'label' => 'Noindex'],
+                                            ]" />
+                                    </div>
                                 @endunless
 
                                 @if ($editDomainDnsFailed)

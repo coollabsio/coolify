@@ -108,6 +108,7 @@
                                 url: @js($row['url']),
                                 service: @js($row['service'] ?? null),
                                 indexing: @js($application->isDomainNoindexed($row['url']) ? 'noindex' : 'index'),
+                                direction: @js($domainDirection ?? $redirect),
                             })"
                             class="icon-button shrink-0"
                             title="Edit domain" aria-label="Edit domain">

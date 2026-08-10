@@ -1219,9 +1219,37 @@ it('uses the compact service domains layout for compose applications', function 
     expect($view)
         ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
         ->toContain('class="application-settings-section-body mt-1 scroll-mt-28')
-        ->toContain('htmlId="application-compose-domain-redirect-{{ $redirectWireKey }}"')
+        ->toContain('bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]')
+        ->toContain('class="data-table-header domains-table-grid"')
+        ->toContain('id="edit-domain-direction"')
+        ->not->toContain('htmlId="application-compose-domain-redirect-{{ $redirectWireKey }}"')
         ->not->toContain('aria-label="Redirect direction for {{ $serviceName }}"')
         ->not->toContain('title="No domains for this service"');
+});
+
+it('updates a compose service redirect from the edit domain modal', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['web'])
+        ->call('startEdit', 0)
+        ->assertSet('editingDirection', 'both')
+        ->set('editingDirection', 'www')
+        ->call('updateDomain')
+        ->assertDispatched('success');
+
+    $domains = json_decode($this->application->fresh()->docker_compose_domains, true);
+
+    expect(data_get($domains, 'web.redirect'))->toBe('www')
+        ->and(data_get($domains, 'web.domain'))->toContain('https://www.web.example.com');
 });
 
 it('provides client-side search for compose service domains', function () {
