@@ -159,6 +159,26 @@ it('shows domain changes when the domain page dispatches a configuration change'
         ->assertSee('https://changed.example.com');
 });
 
+it('shows noindex changes when the domains page dispatches a configuration change', function () {
+    $application = configurationCheckerApplication($this->environment, [
+        'fqdn' => 'https://example.com,https://staging.example.com',
+    ]);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
+        ->assertSet('isConfigurationChanged', false);
+
+    $application->setNoindexDomains(['https://staging.example.com']);
+    $application->save();
+
+    $component
+        ->dispatch('configurationChanged')
+        ->assertSet('isConfigurationChanged', true)
+        ->assertSee('The latest configuration has not been applied')
+        ->assertSee('Search engine indexing')
+        ->assertSee('Redeploy to apply.');
+});
+
 it('shows an unapplied configuration warning after a directory mount is added', function () {
     $application = configurationCheckerApplication($this->environment);
     markConfigurationCheckerApplicationDeployed($application);

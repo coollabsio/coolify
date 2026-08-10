@@ -271,6 +271,8 @@ it('updates a domain in place via modal', function () {
         ->call('startEdit', 0)
         ->assertSet('showEditDomainModal', true)
         ->assertSet('editingDomain', 'https://old.example.com')
+        ->assertSee('Direction')
+        ->assertSee('Search engine indexing')
         ->set('editingDomain', 'https://new.example.com')
         ->call('updateDomain')
         ->assertHasNoErrors()
@@ -375,7 +377,8 @@ it('auto-adds missing www counterpart as a normal domain when setting www redire
         ->assertSet('domainRows.0.is_suggested', false)
         ->assertSet('domainRows.1.is_suggested', false)
         ->assertSet('domainRows.0.url', 'https://example.com')
-        ->assertSet('domainRows.1.url', 'https://www.example.com');
+        ->assertSet('domainRows.1.url', 'https://www.example.com')
+        ->assertSet('domainRows.1.checked_at', fn (?string $checkedAt): bool => filled($checkedAt));
 
     $this->application->refresh();
 
@@ -1216,10 +1219,37 @@ it('uses the compact service domains layout for compose applications', function 
     expect($view)
         ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
         ->toContain('class="application-settings-section-body mt-1 scroll-mt-28')
-        ->toContain('aria-label="Redirect direction for {{ $serviceName }}"')
-        ->toContain('wire:target="serviceRedirects.{{ $redirectWireKey }}"')
-        ->not->toContain('wire:target="serviceRedirects.{{ $redirectWireKey }},setServiceRedirect"')
+        ->toContain('bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]')
+        ->toContain('class="data-table-header domains-table-grid"')
+        ->toContain('id="edit-domain-direction"')
+        ->not->toContain('htmlId="application-compose-domain-redirect-{{ $redirectWireKey }}"')
+        ->not->toContain('aria-label="Redirect direction for {{ $serviceName }}"')
         ->not->toContain('title="No domains for this service"');
+});
+
+it('updates a compose service redirect from the edit domain modal', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('isCompose', true)
+        ->set('composeServices', ['web'])
+        ->call('startEdit', 0)
+        ->assertSet('editingDirection', 'both')
+        ->set('editingDirection', 'www')
+        ->call('updateDomain')
+        ->assertDispatched('success');
+
+    $domains = json_decode($this->application->fresh()->docker_compose_domains, true);
+
+    expect(data_get($domains, 'web.redirect'))->toBe('www')
+        ->and(data_get($domains, 'web.domain'))->toContain('https://www.web.example.com');
 });
 
 it('provides client-side search for compose service domains', function () {
@@ -1227,6 +1257,8 @@ it('provides client-side search for compose service domains', function () {
 
     expect($view)
         ->toContain('x-model="domainSearch"')
+        ->toContain('class="ml-auto flex flex-wrap items-center gap-2"')
+        ->toContain('<div class="relative shrink-0">')
         ->toContain('placeholder="Search services or domains"')
         ->toContain('x-show="matchesDomainSearch(')
         ->toContain('title="No domains found"')
@@ -1325,4 +1357,21 @@ it('uses compose service redirect for suggested domain messaging when direction 
     expect($suggested)->not->toBeNull()
         ->and($suggested['suggestion_role'] ?? null)->toBe('pair')
         ->and($suggested['url'] ?? null)->toBe('https://www.web.example.com');
+});
+
+it('updates search engine indexing from the domains view', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com,https://staging.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Noindex')
+        ->assertSee('Indexable')
+        ->assertSee('x-model="localIndexing"', false)
+        ->assertDontSee('@change="$wire.toggleNoindexDomain', false)
+        ->assertDontSee('@js(', false)
+        ->call('toggleNoindexDomain', 'https://staging.example.com', 'noindex')
+        ->assertDispatched('configurationChanged')
+        ->assertDispatched('success');
+
+    expect($this->application->refresh()->noindexDomains()->all())
+        ->toBe(['https://staging.example.com']);
 });

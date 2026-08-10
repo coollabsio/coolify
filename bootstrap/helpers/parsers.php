@@ -1340,6 +1340,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             if ($isPullRequest) {
                 $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
             }
+            $noindexDomains = $isPullRequest ? $fqdns : $originalResource->noindexDomains();
             $domainServiceName = findComposeServiceName((string) $serviceName, $domains->keys());
             $composeRedirect = data_get($domains->get($domainServiceName), 'redirect');
             $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
@@ -1357,6 +1358,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
                         break;
@@ -1372,6 +1374,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             service_name: $serviceName,
                             image: $image,
                             predefinedPort: $predefinedPort,
+                            noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
                         break;
@@ -1386,6 +1389,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
@@ -1399,6 +1403,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     service_name: $serviceName,
                     image: $image,
                     predefinedPort: $predefinedPort,
+                    noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
             }
@@ -2545,6 +2550,10 @@ function serviceParser(Service $resource): Collection
         } else {
             $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
         }
+        // Flags live on the ServiceApplication; a ServiceDatabase has no domains.
+        $noindexDomains = $savedService instanceof ServiceApplication
+            ? $savedService->noindexDomains()
+            : collect([]);
 
         $defaultLabels = defaultLabels(
             id: $resource->id,
@@ -2623,6 +2632,7 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
                         break;
@@ -2638,6 +2648,7 @@ function serviceParser(Service $resource): Collection
                             service_name: $serviceName,
                             image: $image,
                             predefinedPort: $predefinedPort,
+                            noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
                         break;
@@ -2652,6 +2663,7 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
@@ -2665,6 +2677,7 @@ function serviceParser(Service $resource): Collection
                     service_name: $serviceName,
                     image: $image,
                     predefinedPort: $predefinedPort,
+                    noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
             }

@@ -3023,6 +3023,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
+                $noindexDomains = $savedService instanceof ServiceApplication
+                    ? $savedService->noindexDomains()
+                    : collect([]);
                 $defaultLabels = defaultLabels(
                     id: $resource->id,
                     name: $containerName,
@@ -3053,6 +3056,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
+                                        noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection
                                     ));
                                     break;
@@ -3067,6 +3071,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
+                                        noindex_domains: $noindexDomains,
                                         redirect_direction: $redirectDirection
                                     ));
                                     break;
@@ -3081,6 +3086,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
+                                noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
@@ -3093,6 +3099,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
+                                noindex_domains: $noindexDomains,
                                 redirect_direction: $redirectDirection
                             ));
                         }
@@ -3819,6 +3826,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 });
                             }
                         }
+                        $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
                         $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
                         $composeRedirect = data_get($domains, "$serviceName.redirect");
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
@@ -3837,6 +3845,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                         )
                                     );
@@ -3852,6 +3861,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                         )
                                     );
@@ -3868,6 +3878,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                 )
                             );
@@ -3881,6 +3892,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                 )
                             );

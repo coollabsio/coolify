@@ -302,6 +302,7 @@ class ApplicationsController extends Controller
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -496,6 +497,7 @@ class ApplicationsController extends Controller
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -689,6 +691,7 @@ class ApplicationsController extends Controller
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -880,6 +883,7 @@ class ApplicationsController extends Controller
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
                             'ports_mappings' => ['type' => 'string', 'description' => 'The ports mappings.'],
@@ -1043,6 +1047,7 @@ class ApplicationsController extends Controller
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'ports_mappings' => ['type' => 'string', 'description' => 'The ports mappings.'],
                             'health_check_enabled' => ['type' => 'boolean', 'description' => 'Health check enabled.'],
                             'health_check_path' => ['type' => 'string', 'description' => 'Health check path.'],
@@ -1186,7 +1191,7 @@ class ApplicationsController extends Controller
         if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -2610,6 +2615,7 @@ class ApplicationsController extends Controller
                             'name' => ['type' => 'string', 'description' => 'The application name.'],
                             'description' => ['type' => 'string', 'description' => 'The application description.'],
                             'domains' => ['type' => 'string', 'description' => 'The application URLs in a comma-separated list.'],
+                            'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored.'],
                             'git_commit_sha' => ['type' => 'string', 'description' => 'The git commit SHA.'],
                             'docker_registry_image_name' => ['type' => 'string', 'description' => 'The docker registry image name.'],
                             'docker_registry_image_tag' => ['type' => 'string', 'description' => 'The docker registry image tag.'],
@@ -2787,7 +2793,7 @@ class ApplicationsController extends Controller
         $this->authorize('update', $application);
 
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => 'string|max:255',
@@ -3106,8 +3112,14 @@ class ApplicationsController extends Controller
         if ($dockerComposeDomainsJson->count() > 0) {
             data_set($data, 'docker_compose_domains', json_encode($dockerComposeDomainsJson));
         }
+        $requestHasNoindexDomains = $request->has('noindex_domains');
+        data_forget($data, 'noindex_domains');
         $application->fill($data);
-        if ($application->settings->is_container_label_readonly_enabled && $requestHasDomains && $server->isProxyShouldRun()) {
+        if ($requestHasNoindexDomains) {
+            // Must run after fqdn is filled: flags are kept only for domains the app still has.
+            $application->setNoindexDomains($request->input('noindex_domains') ?? []);
+        }
+        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains) && $server->isProxyShouldRun()) {
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
         $application->save();

@@ -137,6 +137,13 @@
                                         "type": "string",
                                         "description": "The application URLs in a comma-separated list."
                                     },
+                                    "noindex_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored."
+                                    },
                                     "git_commit_sha": {
                                         "type": "string",
                                         "description": "The git commit SHA."
@@ -715,6 +722,13 @@
                                     "domains": {
                                         "type": "string",
                                         "description": "The application URLs in a comma-separated list."
+                                    },
+                                    "noindex_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored."
                                     },
                                     "git_commit_sha": {
                                         "type": "string",
@@ -1295,6 +1309,13 @@
                                         "type": "string",
                                         "description": "The application URLs in a comma-separated list."
                                     },
+                                    "noindex_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored."
+                                    },
                                     "git_commit_sha": {
                                         "type": "string",
                                         "description": "The git commit SHA."
@@ -1859,6 +1880,13 @@
                                         "type": "string",
                                         "description": "The application URLs in a comma-separated list."
                                     },
+                                    "noindex_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored."
+                                    },
                                     "docker_registry_image_name": {
                                         "type": "string",
                                         "description": "The docker registry image name."
@@ -2324,6 +2352,13 @@
                                     "domains": {
                                         "type": "string",
                                         "description": "The application URLs in a comma-separated list."
+                                    },
+                                    "noindex_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored."
                                     },
                                     "ports_mappings": {
                                         "type": "string",
@@ -2929,6 +2964,13 @@
                                     "domains": {
                                         "type": "string",
                                         "description": "The application URLs in a comma-separated list."
+                                    },
+                                    "noindex_domains": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the application domains are ignored."
                                     },
                                     "git_commit_sha": {
                                         "type": "string",
@@ -16723,6 +16765,16 @@
                                             "null"
                                         ]
                                     },
+                                    "noindex_domains": {
+                                        "description": "The subset of the service application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the domains are ignored.",
+                                        "type": [
+                                            "array",
+                                            "null"
+                                        ],
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
                                     "human_name": {
                                         "type": [
                                             "string",
@@ -21542,6 +21594,14 @@
                         "type": "string",
                         "nullable": true,
                         "description": "The application domains."
+                    },
+                    "noindex_domains": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true,
+                        "description": "The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header."
                     },
                     "config_hash": {
                         "type": "string",

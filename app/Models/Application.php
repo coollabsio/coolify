@@ -10,6 +10,7 @@ use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
+use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -34,6 +35,7 @@ use Symfony\Component\Yaml\Yaml;
         'uuid' => ['type' => 'string', 'description' => 'The application UUID.'],
         'name' => ['type' => 'string', 'description' => 'The application name.'],
         'fqdn' => ['type' => 'string', 'nullable' => true, 'description' => 'The application domains.'],
+        'noindex_domains' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'The subset of the application domains served with an X-Robots-Tag: noindex, nofollow response header.'],
         'config_hash' => ['type' => 'string', 'description' => 'Configuration hash.'],
         'git_repository' => ['type' => 'string', 'description' => 'Git repository URL.'],
         'git_branch' => ['type' => 'string', 'description' => 'Git branch.'],
@@ -118,7 +120,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -126,6 +128,7 @@ class Application extends BaseModel
         'name',
         'description',
         'fqdn',
+        'noindex_domains',
         'git_repository',
         'git_branch',
         'git_commit_sha',
@@ -245,6 +248,7 @@ class Application extends BaseModel
             'manual_webhook_secret_gitlab' => 'encrypted',
             'manual_webhook_secret_bitbucket' => 'encrypted',
             'manual_webhook_secret_gitea' => 'encrypted',
+            'noindex_domains' => 'array',
             'domain_dns_statuses' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
@@ -273,6 +277,7 @@ class Application extends BaseModel
                     $application->fqdn = null;
                 }
                 $payload['fqdn'] = $application->fqdn;
+                $application->syncNoindexDomains();
             }
             if ($application->isDirty('install_command')) {
                 $payload['install_command'] = str($application->install_command)->trim();
@@ -1378,7 +1383,7 @@ class Application extends BaseModel
 
     private function legacyConfigurationHash(): string
     {
-        $newConfigHash = base64_encode($this->fqdn.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
+        $newConfigHash = base64_encode($this->fqdn.json_encode($this->noindexDomains()->all()).$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->makeVisible('value')->sort());
         } else {

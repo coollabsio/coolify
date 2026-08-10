@@ -9,6 +9,7 @@
     'emptyText' => 'No options available.',
     'live' => false,
     'onChange' => null, // optional $wire method to call after a selection
+    'onChangeArgs' => null, // optional arguments followed by the selected value
     'wire' => true, // false = purely client-side value (no Livewire binding)
     'value' => null, // initial value when wire=false
     'disabled' => false,
@@ -55,7 +56,12 @@
             this.open = false;
             if (String(option.value) === String(this.value)) return;
             this.value = option.value;
-            @if ($onChange) this.$nextTick(() => this.$wire.{{ $onChange }}()); @endif
+            this.$dispatch('listbox-change', { value: option.value });
+            @if ($onChange && is_array($onChangeArgs))
+                this.$nextTick(() => this.$wire.{{ $onChange }}(...@js($onChangeArgs), option.value));
+            @elseif ($onChange)
+                this.$nextTick(() => this.$wire.{{ $onChange }}());
+            @endif
         },
         toggle() {
             this.open = !this.open;
@@ -102,8 +108,15 @@
         </button>
         @if ($portal)
             <template x-teleport="body">
-                <div id="{{ $panelId }}" class="listbox-panel" style="position: fixed; z-index: 9999" x-show="open"
+                <div id="{{ $panelId }}" class="listbox-panel"
+                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open && positioned"
                     x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+                    x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                    x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
                     x-effect="if (open) requestAnimationFrame(() => positionPanel($el))" role="listbox">
                     <div x-show="options.length === 0"
                         class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
@@ -124,7 +137,13 @@
                 </div>
             </template>
         @else
-            <div x-ref="panel" class="listbox-panel" x-show="open" x-cloak role="listbox">
+            <div x-ref="panel" class="listbox-panel" x-show="open" x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]" role="listbox">
                 <div x-show="options.length === 0"
                     class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
                     {{ $emptyText }}
