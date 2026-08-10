@@ -7,6 +7,7 @@ use App\Data\Traffic\TrafficOverviewData;
 use App\Data\Traffic\TrafficPathData;
 use App\Models\Server;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class SentinelTrafficClient
 {
@@ -63,13 +64,22 @@ class SentinelTrafficClient
 
     protected function raw(string $url): string
     {
+        return Cache::remember('traffic:'.$this->server->uuid.':'.md5($url), 60, fn () => $this->guard($this->remoteFetch($url)));
+    }
+
+    protected function remoteFetch(string $url): string
+    {
         $token = $this->server->settings->ensureValidSentinelToken();
-        $response = instant_remote_process(
+
+        return instant_remote_process(
             ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" {$url}'"],
             $this->server,
             false
         );
+    }
 
+    private function guard(string $response): string
+    {
         if (str($response)->contains('"error"')) {
             $error = data_get(json_decode($response, true), 'error', 'Traffic analytics request failed.');
             throw new \Exception($error);
