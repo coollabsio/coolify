@@ -7,7 +7,7 @@
 
 services:
   authentik-server:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.2.1}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.5.6}
     restart: unless-stopped
     command: server
     environment:
@@ -33,7 +33,7 @@ services:
       postgresql:
         condition: service_healthy
   authentik-worker:
-    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.2.1}
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-2026.5.6}
     restart: unless-stopped
     command: worker
     environment:
