@@ -408,6 +408,7 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                         "{$proxy_path}/dynamic:/dynamic",
                         "{$proxy_path}/config:/config",
                         "{$proxy_path}/data:/data",
+                        "{$proxy_path}:/traffic",
                     ],
                 ],
             ],
