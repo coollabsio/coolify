@@ -8,6 +8,24 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
 
+function traefikAccessLogCommands(bool $enabled): array
+{
+    if (! $enabled) {
+        return [];
+    }
+
+    return [
+        '--accesslog=true',
+        '--accesslog.filepath=/traefik/access.log',
+        '--accesslog.format=json',
+        '--accesslog.fields.headers.names.Cf-Connecting-Ip=keep',
+        '--accesslog.fields.headers.names.Cf-Ipcountry=keep',
+        '--accesslog.fields.headers.names.Cf-Cache-Status=keep',
+        '--accesslog.fields.headers.names.Cf-Verified-Bot=keep',
+        '--accesslog.fields.headers.names.Cf-Ray=keep',
+    ];
+}
+
 /**
  * Check if a network name is a Docker predefined system network.
  * These networks cannot be created, modified, or managed by docker network commands.
@@ -330,6 +348,9 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         } else {
             $config['services']['traefik']['command'][] = '--api.insecure=false';
             $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
+            foreach (traefikAccessLogCommands($server->isTrafficAnalyticsEnabled()) as $cmd) {
+                $config['services']['traefik']['command'][] = $cmd;
+            }
         }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
