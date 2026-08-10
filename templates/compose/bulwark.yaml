@@ -1,0 +1,21 @@
+# documentation: https://bulwarkmail.org/docs
+# slogan: Modern webmail platform
+# category: Mail
+# tags: mail,webmail,jmap,email,messaging
+# logo: svgs/bulwark.svg
+# port: 3000
+
+services:
+  bulwark:
+    image: 'ghcr.io/bulwarkmail/webmail:v1.8.1'
+    ports:
+      - '3000:3000'
+    environment:
+      - SERVICE_URL_BULWARK_3000
+      - JMAP_SERVER_URL='${JMAP_SERVER_URL:?}'
+      - SESSION_SECRET='${SERVICE_HEX_64_BULWARK}'
+    volumes:
+      - 'bulwark-config:/app/data/admin'
+      - 'bulwark-state:/app/data/admin-state'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
