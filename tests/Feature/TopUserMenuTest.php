@@ -19,6 +19,18 @@ it('still shows the user name and email inside the dropdown panel', function () 
         ->toContain('{{ $userEmail }}');
 });
 
+it('animates the dropdown panel when the user menu opens', function () {
+    $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
+    $stylesheet = file_get_contents(resource_path('css/app.css'));
+
+    expect($menu)
+        ->toContain('animate-in fade-in zoom-in-95 duration-150')
+        ->toContain("'origin-bottom-left' => \$sidebar")
+        ->toContain("'origin-top-right' => ! \$sidebar");
+
+    expect($stylesheet)->toContain('@import "tw-animate-css";');
+});
+
 it('changes appearance from a submenu instead of navigating to a separate page', function () {
     $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
 

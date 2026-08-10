@@ -67,7 +67,7 @@
         </div>
     @endif
 
-    <ul role="list" class="flex min-h-0 flex-1 flex-col gap-y-0.5 overflow-y-auto pb-2 scrollbar">
+    <ul role="list" class="-mx-1 flex min-h-0 flex-1 flex-col gap-y-0.5 overflow-y-auto px-1 pb-2 scrollbar">
         @if (isSubscribed() || !isCloud())
             {{-- Workspace --}}
             <li class="nav-section" :class="collapsed && 'lg:hidden'">Workspace</li>

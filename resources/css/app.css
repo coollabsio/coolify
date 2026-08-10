@@ -1,6 +1,7 @@
 @import "./fonts.css" layer(base);
 
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @import "./utilities.css";
 
@@ -307,7 +308,7 @@ a {
 
 button:focus-visible,
 a:focus-visible {
-    @apply outline-none ring-2 ring-coollabs dark:ring-warning ring-offset-2 dark:ring-offset-coolgray-100;
+    @apply outline-none ring-2 ring-coollabs dark:ring-warning/70 ring-offset-2 dark:ring-offset-coolgray-100;
 }
 
 label {
@@ -366,24 +367,24 @@ tr td:first-child {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
-/* Loading feedback uses the yellow brand accent consistently in dark mode. */
+/* Loading feedback uses the Coolify brand accent consistently in dark mode. */
 .dark .animate-spin {
-    color: var(--color-warning) !important;
+    color: var(--color-coollabs) !important;
 }
 
 .dark #nprogress .bar {
-    background: var(--color-warning) !important;
+    background: var(--color-coollabs) !important;
 }
 
 .dark #nprogress .peg {
     box-shadow:
-        0 0 10px var(--color-warning),
-        0 0 5px var(--color-warning) !important;
+        0 0 10px var(--color-coollabs),
+        0 0 5px var(--color-coollabs) !important;
 }
 
 .dark #nprogress .spinner-icon {
-    border-top-color: var(--color-warning) !important;
-    border-left-color: var(--color-warning) !important;
+    border-top-color: var(--color-coollabs) !important;
+    border-left-color: var(--color-coollabs) !important;
 }
 
 html[data-theme="custom"] .loading-indicator,

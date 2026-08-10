@@ -118,7 +118,7 @@
     --warning: #fcd452;
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
-    --ring: var(--warning);
+    --ring: color-mix(in srgb, var(--warning) 70%, transparent);
     --chart-1: oklch(0.871 0.006 286.286);
     --chart-2: oklch(0.552 0.016 285.938);
     --chart-3: oklch(0.442 0.017 285.786);
