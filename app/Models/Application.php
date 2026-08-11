@@ -2130,7 +2130,7 @@ class Application extends BaseModel
 
                 return $paths;
             })->flatten()->unique()->values();
-            $commands = collect([
+            $prepCommands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
@@ -2139,10 +2139,9 @@ class Application extends BaseModel
                 'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
             ]);
         } else {
-            $commands = collect([
+            $prepCommands = collect([
                 "rm -rf /tmp/{$uuid}",
                 "mkdir -p /tmp/{$uuid}",
                 "cd /tmp/{$uuid}",
@@ -2151,11 +2150,24 @@ class Application extends BaseModel
                 'git sparse-checkout init --cone',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
             ]);
         }
+
+        // Read the compose file in a separate SSH invocation from the
+        // clone/sparse-checkout step. With some multi-server topologies
+        // (ssh -> bash -se heredoc -> sudo -> docker exec helper
+        // -> bash -c '...'), git's stderr progress lines (e.g.
+        // "Cloning into '.'...") leak into the stdout that
+        // `instant_remote_process` returns, and they would be prepended
+        // to `$composeFileContent` and persisted to `docker_compose_raw`.
+        // Splitting `cat` into its own call guarantees the captured
+        // payload is exactly the compose file content, regardless of how
+        // intermediate shells route earlier commands' stderr.
+        $readCommand = collect(["cat /tmp/{$uuid}/.{$workdir}{$composeFile}"]);
+
         try {
-            $composeFileContent = instant_remote_process($commands, $this->destination->server);
+            instant_remote_process($prepCommands, $this->destination->server);
+            $composeFileContent = instant_remote_process($readCommand, $this->destination->server);
         } catch (\Exception $e) {
             // Restore original values on failure only
             $this->docker_compose_location = $initialDockerComposeLocation;
