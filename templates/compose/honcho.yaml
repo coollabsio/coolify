@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   deriver:
-    image: ghcr.io/plastic-labs/honcho:latest
+    image: ghcr.io/plastic-labs/honcho:v3.0.12
     entrypoint: ["/app/.venv/bin/python", "-m", "src.deriver"]
     environment:
       - DB_CONNECTION_URI=postgresql+psycopg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database:5432/postgres
