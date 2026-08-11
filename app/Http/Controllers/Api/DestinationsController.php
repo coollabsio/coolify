@@ -327,6 +327,7 @@ class DestinationsController extends Controller
                 || (method_exists($destination, 'keydbs') && $destination->keydbs()->exists())
                 || (method_exists($destination, 'dragonflies') && $destination->dragonflies()->exists())
                 || (method_exists($destination, 'clickhouses') && $destination->clickhouses()->exists())
+                || (method_exists($destination, 'cassandras') && $destination->cassandras()->exists())
                 || (method_exists($destination, 'services') && $destination->services()->exists());
             if ($hasAttached) {
                 return response()->json(['message' => 'Destination has attached resources, detach first.'], 409);

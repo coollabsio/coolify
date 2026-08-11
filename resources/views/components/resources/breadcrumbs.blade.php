@@ -24,6 +24,7 @@
             'keydbs:id,uuid,name,environment_id',
             'dragonflies:id,uuid,name,environment_id',
             'clickhouses:id,uuid,name,environment_id',
+            'cassandras:id,uuid,name,environment_id',
         ])
         ->get();
     $currentProjectUuid = data_get($resource, 'environment.project.uuid');
@@ -139,7 +140,8 @@
                                     ->merge($environment->mariadbs ?? collect())
                                     ->merge($environment->keydbs ?? collect())
                                     ->merge($environment->dragonflies ?? collect())
-                                    ->merge($environment->clickhouses ?? collect());
+                                    ->merge($environment->clickhouses ?? collect())
+                                    ->merge($environment->cassandras ?? collect());
                                 $envResources = collect()
                                     ->merge($environment->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
                                     ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
@@ -189,7 +191,8 @@
                                 ->merge($environment->mariadbs ?? collect())
                                 ->merge($environment->keydbs ?? collect())
                                 ->merge($environment->dragonflies ?? collect())
-                                ->merge($environment->clickhouses ?? collect());
+                                ->merge($environment->clickhouses ?? collect())
+                                ->merge($environment->cassandras ?? collect());
                             $envResources = collect()
                                 ->merge($environment->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
                                 ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))

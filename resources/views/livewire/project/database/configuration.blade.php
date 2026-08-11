@@ -52,6 +52,8 @@
                     <livewire:project.database.dragonfly.general :database="$database" />
                 @elseif ($database->type() === 'standalone-clickhouse')
                     <livewire:project.database.clickhouse.general :database="$database" />
+                @elseif ($database->type() === 'standalone-cassandra')
+                    <livewire:project.database.cassandra.general :database="$database" />
                 @endif
             @elseif ($currentRoute === 'project.database.environment-variables')
                 <livewire:project.shared.environment-variable.all :resource="$database" />

@@ -127,6 +127,11 @@ class Project extends BaseModel
         return $this->hasManyThrough(StandaloneClickhouse::class, Environment::class);
     }
 
+    public function cassandras()
+    {
+        return $this->hasManyThrough(StandaloneCassandra::class, Environment::class);
+    }
+
     public function mongodbs()
     {
         return $this->hasManyThrough(StandaloneMongodb::class, Environment::class);
@@ -151,6 +156,7 @@ class Project extends BaseModel
             $this->keydbs()->count() == 0 &&
             $this->dragonflies()->count() == 0 &&
             $this->clickhouses()->count() == 0 &&
+            $this->cassandras()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
             $this->services()->count() == 0;
@@ -165,7 +171,8 @@ class Project extends BaseModel
             ->merge($this->mariadbs()->with($with)->get())
             ->merge($this->keydbs()->with($with)->get())
             ->merge($this->dragonflies()->with($with)->get())
-            ->merge($this->clickhouses()->with($with)->get());
+            ->merge($this->clickhouses()->with($with)->get())
+            ->merge($this->cassandras()->with($with)->get());
     }
 
     public function navigateTo()

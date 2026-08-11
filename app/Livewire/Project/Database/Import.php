@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -131,7 +132,8 @@ class Import extends Component
             $resource instanceof StandaloneRedis ||
             $resource instanceof StandaloneKeydb ||
             $resource instanceof StandaloneDragonfly ||
-            $resource instanceof StandaloneClickhouse
+            $resource instanceof StandaloneClickhouse ||
+            $resource instanceof StandaloneCassandra
         ) {
             return true;
         }

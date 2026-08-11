@@ -1,0 +1,371 @@
+<?php
+
+namespace App\Models;
+
+use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasMetrics;
+use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class StandaloneCassandra extends BaseModel
+{
+    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'cassandra_admin_user',
+        'cassandra_admin_password',
+        'is_log_drain_enabled',
+        'status',
+        'image',
+        'is_public',
+        'public_port',
+        'ports_mappings',
+        'limits_memory',
+        'limits_memory_swap',
+        'limits_memory_swappiness',
+        'limits_memory_reservation',
+        'limits_cpus',
+        'limits_cpuset',
+        'limits_cpu_shares',
+        'started_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'last_online_at',
+        'public_port_timeout',
+        'custom_docker_run_options',
+        'destination_type',
+        'destination_id',
+        'environment_id',
+        'health_check_enabled',
+        'health_check_interval',
+        'health_check_timeout',
+        'health_check_retries',
+        'health_check_start_period',
+    ];
+
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'cassandra_admin_password',
+        'internal_db_url',
+        'external_db_url',
+    ];
+
+    protected $casts = [
+        'health_check_enabled' => 'boolean',
+        'health_check_interval' => 'integer',
+        'health_check_timeout' => 'integer',
+        'health_check_retries' => 'integer',
+        'health_check_start_period' => 'integer',
+        'cassandra_admin_password' => 'encrypted',
+        'public_port_timeout' => 'integer',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
+    ];
+
+    protected static function booted()
+    {
+        static::created(function ($database) {
+            LocalPersistentVolume::create([
+                'name' => 'cassandra-data-'.$database->uuid,
+                'mount_path' => '/var/lib/cassandra',
+                'host_path' => null,
+                'resource_id' => $database->id,
+                'resource_type' => $database->getMorphClass(),
+            ]);
+        });
+        static::forceDeleting(function ($database) {
+            $database->persistentStorages()->delete();
+            $database->scheduledBackups()->delete();
+            $database->environment_variables()->delete();
+            $database->tags()->detach();
+        });
+        static::saving(function ($database) {
+            if ($database->isDirty('status')) {
+                $database->last_online_at = now();
+            }
+        });
+    }
+
+    /**
+     * Get query builder for Cassandra databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
+    public static function ownedByCurrentTeam()
+    {
+        return StandaloneCassandra::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all Cassandra databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneCassandra::ownedByCurrentTeam()->get();
+        });
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination->server->isFunctional();
+            }
+        );
+    }
+
+    public function isConfigurationChanged(bool $save = false)
+    {
+        $newConfigHash = $this->image.$this->ports_mappings;
+        $newConfigHash .= $this->healthCheckConfigurationHash();
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
+        $newConfigHash = md5($newConfigHash);
+        $oldConfigHash = data_get($this, 'config_hash');
+        if ($oldConfigHash === null) {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
+
+            return true;
+        }
+        if ($oldConfigHash === $newConfigHash) {
+            return false;
+        } else {
+            if ($save) {
+                $this->config_hash = $newConfigHash;
+                $this->save();
+            }
+
+            return true;
+        }
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
+    public function isExited()
+    {
+        return (bool) str($this->status)->startsWith('exited');
+    }
+
+    public function workdir()
+    {
+        return database_configuration_dir()."/{$this->uuid}";
+    }
+
+    public function deleteConfigurations()
+    {
+        $server = data_get($this, 'destination.server');
+        $workdir = $this->workdir();
+        if (str($workdir)->endsWith($this->uuid)) {
+            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+        }
+    }
+
+    public function deleteVolumes()
+    {
+        $persistentStorages = $this->persistentStorages()->get() ?? collect();
+        if ($persistentStorages->count() === 0) {
+            return;
+        }
+        $server = data_get($this, 'destination.server');
+        foreach ($persistentStorages as $storage) {
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
+        }
+    }
+
+    public function realStatus()
+    {
+        return $this->getRawOriginal('status');
+    }
+
+    public function status(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } elseif (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+
+                return "$status:$health";
+            },
+            get: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } elseif (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+
+                return "$status:$health";
+            },
+        );
+    }
+
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
+    }
+
+    public function project()
+    {
+        return data_get($this, 'environment.project');
+    }
+
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
+    public function link()
+    {
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.database.configuration', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
+                'database_uuid' => data_get($this, 'uuid'),
+            ]);
+        }
+
+        return null;
+    }
+
+    public function isLogDrainEnabled()
+    {
+        return data_get($this, 'is_log_drain_enabled', false);
+    }
+
+    public function portsMappings(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value === '' ? null : $value,
+        );
+    }
+
+    public function portsMappingsArray(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->ports_mappings)
+                ? []
+                : explode(',', $this->ports_mappings),
+
+        );
+    }
+
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
+
+    public function databaseType(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->type(),
+        );
+    }
+
+    public function type(): string
+    {
+        return 'standalone-cassandra';
+    }
+
+    protected function internalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $encodedUser = rawurlencode($this->cassandra_admin_user);
+                $encodedPass = rawurlencode($this->cassandra_admin_password);
+
+                return "cassandra://{$encodedUser}:{$encodedPass}@{$this->uuid}:9042";
+            },
+        );
+    }
+
+    protected function externalDbUrl(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                if ($this->is_public && $this->public_port) {
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
+                    $encodedUser = rawurlencode($this->cassandra_admin_user);
+                    $encodedPass = rawurlencode($this->cassandra_admin_password);
+
+                    return "cassandra://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}";
+                }
+
+                return null;
+            }
+        );
+    }
+
+    public function environment()
+    {
+        return $this->belongsTo(Environment::class);
+    }
+
+    public function fileStorages()
+    {
+        return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
+    public function destination()
+    {
+        return $this->morphTo();
+    }
+
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
+    public function runtime_environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
+    }
+
+    public function persistentStorages()
+    {
+        return $this->morphMany(LocalPersistentVolume::class, 'resource');
+    }
+
+    public function scheduledBackups()
+    {
+        return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
+    public function isBackupSolutionAvailable()
+    {
+        return false;
+    }
+}

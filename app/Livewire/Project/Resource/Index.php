@@ -37,11 +37,13 @@ class Index extends Component
 
     protected Collection $clickhouses;
 
+    protected Collection $cassandras;
+
     protected Collection $services;
 
     public function mount(): void
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
+        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->cassandras = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -70,6 +72,7 @@ class Index extends Component
                 'keydbs:id,uuid,name,environment_id',
                 'dragonflies:id,uuid,name,environment_id',
                 'clickhouses:id,uuid,name,environment_id',
+                'cassandras:id,uuid,name,environment_id',
             ])
             ->get();
 
@@ -81,6 +84,7 @@ class Index extends Component
             'keydbs',
             'dragonflies',
             'clickhouses',
+            'cassandras',
             'mariadbs',
             'mongodbs',
             'services',
@@ -114,6 +118,7 @@ class Index extends Component
             'keydbs' => 'keydbs',
             'dragonflies' => 'dragonflies',
             'clickhouses' => 'clickhouses',
+            'cassandras' => 'cassandras',
         ];
 
         foreach ($databaseTypes as $property => $relation) {
@@ -160,6 +165,7 @@ class Index extends Component
             'keydbs' => $this->keydbs,
             'dragonflies' => $this->dragonflies,
             'clickhouses' => $this->clickhouses,
+            'cassandras' => $this->cassandras,
             'services' => $this->services,
             'applicationsJs' => $this->toSearchableArray($this->applications),
             'postgresqlsJs' => $this->toSearchableArray($this->postgresqls),
@@ -170,6 +176,7 @@ class Index extends Component
             'keydbsJs' => $this->toSearchableArray($this->keydbs),
             'dragonfliesJs' => $this->toSearchableArray($this->dragonflies),
             'clickhousesJs' => $this->toSearchableArray($this->clickhouses),
+            'cassandrasJs' => $this->toSearchableArray($this->cassandras),
             'servicesJs' => $this->toSearchableArray($this->services),
         ]);
     }

@@ -252,6 +252,12 @@ class Select extends Component
                 'description' => 'ClickHouse is a column-oriented database that supports real-time analytics, business intelligence, observability, ML and GenAI, and more.',
                 'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg width="215" height="90" viewBox="0 0 100 43" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><g clip-path="url(#clip0_378_10860)"><rect x="2.70837" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="7.2085" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="11.7086" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="16.2076" y="2.875" width="2.24992" height="20.2493" rx="0.236664" fill="currentColor"/><rect x="20.7087" y="10.7502" width="2.24992" height="4.49985" rx="0.236664" fill="currentColor"/></g></svg></div>',
             ],
+            [
+                'id' => 'cassandra',
+                'name' => 'Cassandra',
+                'description' => 'Cassandra is a distributed wide-column NoSQL database designed to handle large amounts of data across many commodity servers.',
+                'logo' => '<div class="w-[4.5rem] h-[4.5rem] p-2 transition-all duration-200 bg-black/10 dark:bg-white/10"><svg width="120" height="90" viewBox="0 0 128 96" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M17.99 61.53c.8 2.23 2.1 3.35 3.9 3.35 1.7 0 2.94-1.02 3.7-3.06l16.87-45.4h6.34L27.3 64.87c-1.3 3.62-4.01 5.44-8.11 5.44-4.03 0-6.68-1.82-7.96-5.44L-4.79 16.42h6.34l16.44 45.11zM43.76 42.25c-.16 10.44 5.03 18.43 14.52 18.43 9.25 0 14.99-7.73 15.6-18.43-.61-10.76-6.36-18.35-15.6-18.35-9.49 0-14.68 8.11-14.52 18.35zm19.45.32c-.14 7.42-3.7 11.49-8.23 11.49-4.48 0-8.21-4.07-8.07-11.49-.14-7.16 3.59-11.4 8.07-11.4 4.53 0 8.09 4.24 8.23 11.4zM74.07 16.42h5.67v10.79h.17c2.09-8.67 7.68-12.15 13.95-12.15 6.53 0 12.3 4.16 14.29 13.08h.23c2.09-8.92 7.98-13.08 14.52-13.08 5.73 0 10.22 3.34 11.44 9.1 1.14 5.19 1.02 11.64 1.02 17.3l.05 29.36h-5.73V44.89c0-7.62.51-13.9-.85-18.51-1.08-3.51-3.82-5.36-7.11-5.36-6.58 0-12.18 7.39-12.18 22.38l-.05 21.53h-5.73V45.46c0-5.07-.29-9.86-1.06-13.86-1.25-6.08-3.99-8.9-7.51-8.9-6.22 0-12.06 8.07-12.06 21.24l-.05 21.07h-5.73V16.42z"/></svg></div>',
+            ],
 
         ];
 
@@ -365,6 +371,7 @@ class Select extends Component
             case 'keydb':
             case 'dragonfly':
             case 'clickhouse':
+            case 'cassandra':
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;

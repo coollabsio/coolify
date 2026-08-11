@@ -4,6 +4,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -17,10 +18,8 @@ use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use RuntimeException;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Throwable;
 
 function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
 {
@@ -172,6 +171,25 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     $database->uuid = new_public_id();
     $database->name = 'clickhouse-database-'.$database->uuid;
     $database->clickhouse_admin_password = Str::password(length: 64, symbols: false);
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+}
+
+function create_standalone_cassandra($environment_id, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'cassandra:5.0'): StandaloneCassandra
+{
+    $database = new StandaloneCassandra;
+    $database->uuid = new_public_id();
+    $database->name = 'cassandra-database-'.$database->uuid;
+    $database->image = $databaseImage;
+    $database->cassandra_admin_user = 'cassandra';
+    $database->cassandra_admin_password = Str::password(length: 64, symbols: false);
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();

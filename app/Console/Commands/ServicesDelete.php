@@ -6,6 +6,7 @@ use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -168,6 +169,13 @@ class ServicesDelete extends Command
             $key = "clickhouse_{$db->id}";
             $allDatabases->put($key, $db);
             $databaseOptions->put($key, "{$db->name} (ClickHouse)");
+        }
+
+        // Add Cassandra databases
+        foreach (StandaloneCassandra::all() as $db) {
+            $key = "cassandra_{$db->id}";
+            $allDatabases->put($key, $db);
+            $databaseOptions->put($key, "{$db->name} (Cassandra)");
         }
 
         if ($allDatabases->count() === 0) {

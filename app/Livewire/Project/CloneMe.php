@@ -174,6 +174,8 @@ class CloneMe extends Component
                         $newName = 'redis-data-'.$newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                         $newName = 'clickhouse-data-'.$newDatabase->uuid;
+                    } elseif (str_starts_with($originalName, 'cassandra-data-')) {
+                        $newName = 'cassandra-data-'.$newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                         $newName = 'mariadb-data-'.$newDatabase->uuid;
                     } elseif (str_starts_with($originalName, 'mongodb-data-')) {

@@ -88,7 +88,8 @@
                                             ->merge($env->mariadbs ?? collect())
                                             ->merge($env->keydbs ?? collect())
                                             ->merge($env->dragonflies ?? collect())
-                                            ->merge($env->clickhouses ?? collect());
+                                            ->merge($env->clickhouses ?? collect())
+                                            ->merge($env->cassandras ?? collect());
                                         $envResources = collect()
                                             ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
                                             ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
@@ -137,7 +138,8 @@
                                         ->merge($env->mariadbs ?? collect())
                                         ->merge($env->keydbs ?? collect())
                                         ->merge($env->dragonflies ?? collect())
-                                        ->merge($env->clickhouses ?? collect());
+                                        ->merge($env->clickhouses ?? collect())
+                                        ->merge($env->cassandras ?? collect());
                                     $envResources = collect()
                                         ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
                                         ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
@@ -404,6 +406,7 @@
             keydbs: @js($keydbsJs),
             dragonflies: @js($dragonfliesJs),
             clickhouses: @js($clickhousesJs),
+            cassandras: @js($cassandrasJs),
             services: @js($servicesJs),
             filterAndSort(items) {
                 if (this.search === '') {
@@ -430,6 +433,7 @@
                     this.keydbs,
                     this.dragonflies,
                     this.clickhouses,
+                    this.cassandras,
                 ].flatMap((items) => this.filterAndSort(items))
             },
             get filteredServices() {
