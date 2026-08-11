@@ -1,0 +1,82 @@
+# documentation: https://honcho.dev/docs/v3/contributing/self-hosting
+# slogan: Honcho is a developer tool to build personalized AI agents with production-ready memory, dialectic reasoning, and stateful dialogue.
+# category: ai
+# tags: ai, memory, llm, agents, rag, postgres, pgvector, redis
+# logo: svgs/honcho.svg
+# port: 8000
+
+services:
+  api:
+    image: ghcr.io/plastic-labs/honcho:latest
+    entrypoint: ["sh", "docker/entrypoint.sh"]
+    environment:
+      - SERVICE_FQDN_API_8000
+      - DB_CONNECTION_URI=postgresql+psycopg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database:5432/postgres
+      - CACHE_URL=redis://redis:6379/0?suppress=true
+      - CACHE_ENABLED=true
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AUTH_USE_AUTH=false
+      - LLM_OPENAI_API_KEY=${LLM_OPENAI_API_KEY}
+      - VECTOR_STORE_TYPE=pgvector
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  deriver:
+    image: ghcr.io/plastic-labs/honcho:latest
+    entrypoint: ["/app/.venv/bin/python", "-m", "src.deriver"]
+    environment:
+      - DB_CONNECTION_URI=postgresql+psycopg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database:5432/postgres
+      - CACHE_URL=redis://redis:6379/0?suppress=true
+      - CACHE_ENABLED=true
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - AUTH_USE_AUTH=false
+      - LLM_OPENAI_API_KEY=${LLM_OPENAI_API_KEY}
+      - VECTOR_STORE_TYPE=pgvector
+    depends_on:
+      api:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  database:
+    image: pgvector/pgvector:pg15
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - honcho_pgdata:/var/lib/postgresql/data/
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:8.2
+    volumes:
+      - honcho_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  honcho_pgdata:
+  honcho_redis_data:
