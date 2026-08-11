@@ -158,9 +158,11 @@ class InstallDocker
 
     private function getAlpineDockerInstallCommand(): string
     {
-        return "echo 'Installing Prerequisites...' && ".
-            'apk update && '.
-            'apk add docker';
+        return 'apk update && '.
+            'apk add docker docker-cli-compose && '.
+            'mkdir -p /etc/docker && '.
+            'rc-update add docker default && '.
+            'service docker start';
     }
 
     private function getGenericDockerInstallCommand(): string
