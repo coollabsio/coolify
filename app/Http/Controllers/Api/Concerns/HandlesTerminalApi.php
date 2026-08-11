@@ -26,9 +26,12 @@ trait HandlesTerminalApi
         $key = "terminal-api-exec:server:{$teamId}:{$server->uuid}";
 
         if (RateLimiter::tooManyAttempts($key, self::TERMINAL_SERVER_RATE_LIMIT)) {
+            $retryAfter = RateLimiter::availableIn($key);
+
             return response()->json([
-                'message' => 'Too many terminal commands for this server. Please retry in '.RateLimiter::availableIn($key).' seconds.',
-            ], 429);
+                'message' => 'Too many terminal commands for this server. Please retry in '.$retryAfter.' seconds.',
+                'retry_after' => $retryAfter,
+            ], 429, ['Retry-After' => $retryAfter]);
         }
 
         RateLimiter::hit($key, 60);
@@ -80,6 +83,8 @@ trait HandlesTerminalApi
             return $output;
         }
 
-        return substr($output, 0, self::TERMINAL_COMMAND_OUTPUT_LIMIT - strlen($truncationMarker)).$truncationMarker;
+        // mb_strcut cuts on the byte budget without splitting a multibyte character, which would
+        // reintroduce invalid UTF-8 after sanitization and make the JSON response fail to encode.
+        return mb_strcut($output, 0, self::TERMINAL_COMMAND_OUTPUT_LIMIT - strlen($truncationMarker), 'UTF-8').$truncationMarker;
     }
 }

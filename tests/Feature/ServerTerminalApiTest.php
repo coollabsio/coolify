@@ -246,7 +246,9 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
                 'command' => 'whoami',
             ])
             ->assertStatus(429)
-            ->assertJsonPath('message', fn (string $message) => str($message)->startsWith('Too many terminal commands for this server.'));
+            ->assertHeader('Retry-After')
+            ->assertJsonPath('message', fn (string $message) => str($message)->startsWith('Too many terminal commands for this server.'))
+            ->assertJsonPath('retry_after', fn (int $retryAfter) => $retryAfter > 0);
     });
 
     test('rate limits terminal commands per token and team', function () {
