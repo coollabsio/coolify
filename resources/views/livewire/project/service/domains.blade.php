@@ -22,15 +22,11 @@
         localEditingIndex: @js($editingIndex),
         localEditingDomain: @js($editingDomain),
         localEditingServiceApplicationId: @js($editingServiceApplicationId),
-        localDirection: 'both',
-        localIndexing: 'index',
-        openEditDomain(index, url, serviceApplicationId, serviceLabel, direction, indexing) {
+        openEditDomain(index, url, serviceApplicationId, serviceLabel) {
             this.localEditingIndex = index;
             this.localEditingDomain = url;
             this.localEditingServiceApplicationId = serviceApplicationId;
             this.editingServiceLabel = serviceLabel || '';
-            this.localDirection = direction || 'both';
-            this.localIndexing = indexing || 'index';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
         },
@@ -45,8 +41,6 @@
             $wire.editingIndex = this.localEditingIndex;
             $wire.editingDomain = this.localEditingDomain;
             $wire.editingServiceApplicationId = this.localEditingServiceApplicationId;
-            $wire.editingDirection = this.localDirection;
-            $wire.editingIndexing = this.localIndexing;
             $wire.showEditDomainModal = true;
         },
         matchesDomainSearch(value) {
@@ -56,7 +50,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel, $event.detail.direction, $event.detail.indexing)"
+    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel)"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="service-domains-section" title="Domains">
         @can('update', $service)
@@ -114,20 +108,15 @@
                         </x-slot:content>
                         <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
                             {{-- Always show which service receives the domain --}}
-                            <x-forms.select canGate="update" :canResource="$service" label="Service application"
-                                id="newServiceApplicationId" required
-                                helper="Domain will be assigned to this compose service application.">
-                                @foreach ($serviceApps as $app)
-                                    <option value="{{ $app['id'] }}">
-                                        {{ $app['name'] }}{{ filled($app['image'] ?? null) ? ' ('.$app['image'].')' : '' }}
-                                    </option>
-                                @endforeach
-                            </x-forms.select>
+                            <x-forms.listbox label="Service application" id="newServiceApplicationId" required
+                                helper="Domain will be assigned to this compose service application."
+                                :options="collect($serviceApps)->map(fn ($app) => [
+                                    'value' => $app['id'],
+                                    'label' => $app['name'].(filled($app['image'] ?? null) ? ' ('.$app['image'].')' : ''),
+                                ])->values()->all()"
+                                :disabled="! auth()->user()->can('update', $service)" />
 
-                            <x-forms.input canGate="update" :canResource="$service" id="newDomain" label="Domain URL"
-                                placeholder="https://app.example.com"
-                                helper="Full URL including scheme. Optional path and container port are supported.<br><br><span class='text-helper'>Examples</span><br>- https://app.coolify.io<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000<br>- https://app.coolify.io:8080/api"
-                                required />
+                            <x-forms.domain-input id="newDomain" />
 
                             @if ($addDomainDnsFailed)
                                 <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -254,33 +243,8 @@
                                     </p>
                                 </div>
 
-                                <div class="w-full">
-                                    <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
-                                        <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4" for="editingDomainLocal">
-                                            Domain URL <x-highlighted text="*" />
-                                        </label>
-                                    </div>
-                                    <input id="editingDomainLocal" type="url" class="input" required
-                                        placeholder="https://app.example.com"
-                                        x-model="localEditingDomain" />
-                                    @error('editingDomain')
-                                        <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                <div class="grid gap-4 sm:grid-cols-2">
-                                    <x-forms.listbox id="edit-service-domain-direction" label="Direction"
-                                        :wire="false" value="both" x-model="localDirection" portal :options="[
-                                            ['value' => 'both', 'label' => 'Allow www & non-www'],
-                                            ['value' => 'www', 'label' => 'Redirect to www'],
-                                            ['value' => 'non-www', 'label' => 'Redirect to non-www'],
-                                        ]" />
-                                    <x-forms.listbox id="edit-service-domain-indexing" label="Search engine indexing"
-                                        :wire="false" value="index" x-model="localIndexing" portal :options="[
-                                            ['value' => 'index', 'label' => 'Indexable'],
-                                            ['value' => 'noindex', 'label' => 'Noindex'],
-                                        ]" />
-                                </div>
+                                <x-forms.domain-input id="editingDomainLocal" errorId="editingDomain" :wire="false"
+                                    x-model="localEditingDomain" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">

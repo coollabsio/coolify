@@ -7,6 +7,7 @@ use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -45,10 +46,6 @@ class Domains extends Component
     public ?int $editingIndex = null;
 
     public string $editingDomain = '';
-
-    public string $editingDirection = 'both';
-
-    public string $editingIndexing = 'index';
 
     public ?int $editingServiceApplicationId = null;
 
@@ -102,8 +99,6 @@ class Domains extends Component
         return [
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
-            'editingDirection' => 'string|in:both,www,non-www',
-            'editingIndexing' => 'string|in:index,noindex',
             'newServiceApplicationId' => 'nullable|integer',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
@@ -924,9 +919,6 @@ class Domains extends Component
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
         $this->editingServiceApplicationId = (int) $this->domainRows[$index]['service_application_id'];
-        $app = $this->findServiceApp($this->editingServiceApplicationId);
-        $this->editingDirection = $this->normalizeRedirect($app?->redirect);
-        $this->editingIndexing = $app?->isDomainNoindexed($this->editingDomain) ? 'noindex' : 'index';
         $this->editDomainDnsFailed = false;
         $this->editDomainDnsMessage = '';
         $this->forceSaveEditDns = false;
@@ -940,8 +932,6 @@ class Domains extends Component
         $this->editingIndex = null;
         $this->editingDomain = '';
         $this->editingServiceApplicationId = null;
-        $this->editingDirection = 'both';
-        $this->editingIndexing = 'index';
         $this->editDomainDnsFailed = false;
         $this->editDomainDnsMessage = '';
         $this->forceSaveEditDns = false;
@@ -974,6 +964,7 @@ class Domains extends Component
             $newUrl = $this->splitDomains($normalized)[0];
             $oldUrl = $this->domainRows[$this->editingIndex]['url'];
             $current = collect($this->splitDomains($app->fqdn));
+            $wasNoindexed = $app->isDomainNoindexed($oldUrl);
 
             if ($newUrl !== $oldUrl && $current->contains($newUrl)) {
                 $this->addError('editingDomain', "Domain {$newUrl} is already configured for this service.");
@@ -1000,17 +991,11 @@ class Domains extends Component
             }
 
             $noindexDomains = $app->noindexDomains()->reject(fn (string $domain) => $domain === $oldUrl);
-            if ($this->editingIndexing === 'noindex') {
+            if ($wasNoindexed) {
                 $noindexDomains->push($newUrl);
             }
             $app->setNoindexDomains($noindexDomains);
             $app->save();
-
-            if ($this->editingDirection !== $this->normalizeRedirect($app->redirect)) {
-                $this->notifyRedirectUpdate = false;
-                $this->updateServiceRedirect((int) $app->id, $this->editingDirection);
-                $this->notifyRedirectUpdate = true;
-            }
 
             $this->cancelEdit();
             $this->dispatch('edit-domain-saved');
@@ -1140,12 +1125,9 @@ class Domains extends Component
             $domain = generateUrl(server: $server, random: new_public_id());
             $requiredPort = $app->getRequiredPort();
             if ($requiredPort !== null) {
-                $parts = parse_url($domain);
-                if (is_array($parts) && empty($parts['port'])) {
-                    $scheme = $parts['scheme'] ?? 'https';
-                    $host = $parts['host'] ?? '';
-                    $path = $parts['path'] ?? '';
-                    $domain = "{$scheme}://{$host}:{$requiredPort}{$path}";
+                $parts = DomainUrlParts::split($domain);
+                if ($parts['port'] === '') {
+                    $domain = DomainUrlParts::compose($parts['scheme'], $parts['host'], (string) $requiredPort, $parts['path']);
                 }
             }
 

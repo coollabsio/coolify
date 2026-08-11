@@ -2114,17 +2114,21 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .domains-table-grid {
-    grid-template-columns: minmax(0, 1.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem minmax(7rem, 0.9fr) 10rem 11rem 6.5rem;
 }
 
 .domains-table-grid-compose {
-    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem minmax(7rem, 0.9fr) 10rem 11rem 6.5rem;
+}
+
+.domains-mobile-label {
+    display: none;
 }
 
 /* Domains table: collapse secondary columns on tablet/phone */
 @media (max-width: 900px) {
     .domains-table-grid {
-        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 10rem 5.5rem;
         gap: 0.75rem;
     }
 
@@ -2134,7 +2138,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .domains-table-grid-compose {
-        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 10rem 5.5rem;
         gap: 0.75rem;
     }
 
@@ -2145,7 +2149,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .data-table-header.domains-table-grid,
     .data-table-header.domains-table-grid-compose {
         display: none;
@@ -2156,12 +2160,26 @@ input[type="search"]::-webkit-search-results-decoration {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
-            'domain actions'
-            'meta actions';
-        gap: 0.35rem 0.75rem;
+            'domain domain'
+            'meta actions'
+            'indexing indexing'
+            'direction direction';
+        gap: 0.5rem 0.75rem;
         align-items: start;
-        padding: 0.875rem 1rem;
+        padding: 0.75rem;
         min-height: 0;
+    }
+
+    .data-table-row.domains-row-without-direction {
+        grid-template-areas:
+            'domain domain'
+            'meta actions'
+            'indexing indexing';
+    }
+
+    .data-table-row.domains-table-grid.domains-row-without-direction > :nth-child(5),
+    .data-table-row.domains-table-grid-compose.domains-row-without-direction > :nth-child(6) {
+        display: none;
     }
 
     /* Domain cell */
@@ -2178,7 +2196,7 @@ input[type="search"]::-webkit-search-results-decoration {
         word-break: break-word;
     }
 
-    /* Non-compose: 1 Domain, 2 DNS, 3 Last checked, 4 Actions */
+    /* Non-compose: 1 Domain, 2 DNS, 3 Last checked, 4 Indexing, 5 Direction, 6 Actions */
     .data-table-row.domains-table-grid > :nth-child(2) {
         grid-area: meta;
         display: flex !important;
@@ -2192,11 +2210,19 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid > :nth-child(4) {
+        grid-area: indexing;
+    }
+
+    .data-table-row.domains-table-grid > :nth-child(5) {
+        grid-area: direction;
+    }
+
+    .data-table-row.domains-table-grid > :nth-child(6) {
         grid-area: actions;
         align-self: center;
     }
 
-    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Last checked, 5 Actions */
+    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Last checked, 5 Indexing, 6 Direction, 7 Actions */
     .data-table-row.domains-table-grid-compose > :nth-child(2) {
         display: none !important;
     }
@@ -2214,8 +2240,31 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid-compose > :nth-child(5) {
+        grid-area: indexing;
+    }
+
+    .data-table-row.domains-table-grid-compose > :nth-child(6) {
+        grid-area: direction;
+    }
+
+    .data-table-row.domains-table-grid-compose > :nth-child(7) {
         grid-area: actions;
         align-self: center;
+    }
+
+    .domains-mobile-label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.6875rem;
+        font-weight: 500;
+        line-height: 1rem;
+        color: var(--coollabs-subtle);
+    }
+
+    .data-table-row.domains-table-grid .listbox-trigger,
+    .data-table-row.domains-table-grid-compose .listbox-trigger {
+        height: 2rem;
+        font-size: 0.8125rem;
     }
 
     /* Service name as badge under domain on mobile (compose only) */
@@ -2228,7 +2277,7 @@ input[type="search"]::-webkit-search-results-decoration {
     display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .domains-service-desktop {
         display: none !important;
     }

@@ -90,7 +90,7 @@ beforeEach(function () {
     ]);
 });
 
-it('groups configured domains and shows redirect settings in the edit modal', function () {
+it('groups configured domains and shows redirect settings in the table', function () {
     $this->apiApp->update([
         'fqdn' => 'https://api.example.com,https://admin.example.com',
     ]);
@@ -100,13 +100,14 @@ it('groups configured domains and shows redirect settings in the edit modal', fu
         ->assertSee('API')
         ->assertSee('https://api.example.com')
         ->assertSee('https://admin.example.com')
-        ->call('startEdit', 0)
         ->html();
 
     expect($html)
         ->toContain("service-domain-group-{$this->apiApp->id}")
-        ->toContain("id=\"edit-service-domain-redirect-{$this->apiApp->id}-trigger\"")
-        ->toContain("serviceRedirects.{$this->apiApp->id}")
+        ->toContain("id=\"service-domain-direction-{$this->apiApp->id}-0-trigger\"")
+        ->toContain("id=\"service-domain-indexing-{$this->apiApp->id}-0-trigger\"")
+        ->toContain('src="https://api.example.com/favicon.ico"')
+        ->toContain('x-on:error="$el.remove()"')
         ->toContain('class="listbox-trigger"')
         ->toContain('application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-visible')
         ->toContain('dark:bg-white/[0.04]')
@@ -117,6 +118,27 @@ it('groups configured domains and shows redirect settings in the edit modal', fu
         ->and(substr_count($html, '2 domains'))->toBe(1)
         ->and(strpos($html, '>API</span>'))->toBeLessThan(strpos($html, '<span>Domain</span>'))
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
+});
+
+it('shows one redirect control for each www and non-www pair', function () {
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com,https://www.api.example.com,https://admin.example.com,https://www.admin.example.com',
+    ]);
+
+    $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSuccessful()
+        ->html();
+
+    expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(2);
+});
+
+it('uses segmented fields when adding and editing service domains', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
+
+    expect($view)
+        ->toContain('<x-forms.domain-input id="newDomain"')
+        ->toContain('<x-forms.domain-input id="editingDomainLocal"')
+        ->not->toContain('placeholder="https://app.example.com"');
 });
 
 it('shows dns entries control next to Add', function () {
@@ -366,13 +388,11 @@ it('prunes the previous dns status when a service domain is renamed', function (
         ->and($this->apiApp->domain_dns_statuses['https://renamed.example.com']['status'])->toBe('skipped');
 });
 
-it('only shows the domain notification when redirect changes through edit domain', function () {
+it('updates redirect independently from editing a domain', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->call('startEdit', 0)
-        ->set('editingDirection', 'www')
-        ->call('updateDomain')
-        ->assertDispatched('success', 'Domain updated.')
-        ->assertNotDispatched('success', 'Redirect updated.');
+        ->call('updateServiceRedirect', $this->apiApp->id, 'www')
+        ->assertDispatched('success', 'Redirect updated.')
+        ->assertNotDispatched('success', 'Domain updated.');
 });
 
 it('does not restore stale dns status when a removed service domain is re-added', function () {
@@ -532,9 +552,12 @@ it('updates search engine indexing from the service domains view', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSee('Noindex')
         ->assertSee('Indexable')
-        ->assertSee('x-model="localIndexing"', false)
-        ->assertDontSee('@change="$wire.toggleNoindexDomain', false)
-        ->assertDontSee('@change="$wire.updateServiceRedirect', false)
+        ->assertSee('Search engine indexing')
+        ->assertSee('Direction')
+        ->assertSee('toggleNoindexDomain', false)
+        ->assertSee('updateServiceRedirect', false)
+        ->assertDontSee('x-model="localIndexing"', false)
+        ->assertDontSee('x-model="localDirection"', false)
         ->assertDontSee('@js(', false)
         ->call('toggleNoindexDomain', $this->apiApp->id, 'https://api.example.com', 'noindex')
         ->assertDispatched('configurationChanged')

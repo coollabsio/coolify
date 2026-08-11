@@ -76,6 +76,7 @@ it('renders the changed configuration labels without a second backend request', 
     expect($view)
         ->toContain(':compact-after="5000"')
         ->toContain(':compact-storage-key="$compactStorageKey"')
+        ->toContain('wire:key="configuration-warning-{{ $currentConfigurationHash }}"')
         ->toContain('x-on:click="configurationDiffModalOpen = true"')
         ->not->toContain('$wire.refreshConfigurationChanges()');
 });
@@ -93,9 +94,11 @@ it('supports timed compact popup notifications', function () {
         ->toContain('compact = true')
         ->toContain('@click="restore()"')
         ->toContain('@click.stop="minimizeToIcon()"')
+        ->toContain('x-show="iconOnly"')
         ->toContain('x-show="!iconOnly"')
+        ->not->toContain(':class="iconOnly')
         ->toContain('x-show="!compact"')
-        ->toContain("'w-[calc(100%-2rem)] sm:w-auto sm:max-w-[calc(100%-2rem)]'");
+        ->toContain("'w-[calc(100vw-2rem)] cursor-pointer sm:w-auto sm:max-w-[calc(100vw-2rem)]'");
 });
 
 it('warns when a service has missing required environment variables', function () {

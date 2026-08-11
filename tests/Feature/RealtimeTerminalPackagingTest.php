@@ -15,6 +15,13 @@ it('renders the resource terminal shell while containers are discovered', functi
         ->not->toContain('<x-loading text="Loading containers" />');
 });
 
+it('marks stopped services as loaded before the terminal page first renders', function () {
+    $terminalComponent = file_get_contents(app_path('Livewire/Project/Shared/ExecuteContainerCommand.php'));
+
+    expect($terminalComponent)
+        ->toMatch('/elseif \(data_get\(\$this->parameters, \'service_uuid\'\)\).*?if \(! \$this->resource->isRunning\(\)\) \{\s*\$this->containersLoaded = true;\s*\}/s');
+});
+
 it('provides opt-in diagnostics for connected terminal theme changes', function () {
     $terminalClient = file_get_contents(resource_path('js/terminal.js'));
 

@@ -54,10 +54,14 @@ it('opens the command palette without changing page scrollbar visibility', funct
 it('animates the command palette with tw animate utilities', function () {
     $view = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
 
+    // Exit animations need fill-mode-forwards: without it the element snaps
+    // back to full opacity when the keyframe animation ends, one frame before
+    // Alpine applies display:none, which flashes the palette on close.
     expect($view)
         ->toContain('<div x-show="modalOpen" @click="closeModal()"')
         ->toContain('x-transition:enter="animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-150"')
-        ->toContain('x-transition:leave="animate-out fade-out-0 zoom-out-95 slide-out-to-top-2 duration-100"')
+        ->toContain('x-transition:leave="animate-out fade-out-0 zoom-out-95 slide-out-to-top-2 duration-100 fill-mode-forwards"')
+        ->toContain('x-transition:leave="animate-out fade-out-0 duration-100 fill-mode-forwards"')
         ->not->toContain('<div x-show="modalOpen" x-cloak\n        class="fixed inset-0');
 });
 
@@ -67,4 +71,27 @@ it('closes the client-side command palette without a Livewire request', function
     expect($view)
         ->not->toContain('$wire.closeSearchModal()')
         ->not->toContain('closeTimer');
+});
+
+it('keeps palette content intact during the close animation to prevent flicker', function () {
+    $view = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
+
+    // closeModal() must only hide the palette immediately; content resets
+    // (searchQuery, allSearchableItems) are deferred past the 100ms leave
+    // animation so the panel does not collapse while fading out.
+    expect($view)
+        ->toContain('clearTimeout(this.closeResetTimer);')
+        ->toContain("this.closeResetTimer = setTimeout(() => {\n            this.isLoadingInitialData = false;")
+        ->toContain("this.searchQuery = '';\n            this.allSearchableItems = [];");
+});
+
+it('delays the header spinner so fast cached loads do not flash the icon', function () {
+    $view = file_get_contents(resource_path('views/livewire/global-search.blade.php'));
+
+    expect($view)
+        ->toContain('showLoadingSpinner')
+        ->toContain('this.spinnerTimer = setTimeout(')
+        ->toContain('x-show="!showLoadingSpinner"')
+        ->toContain('x-show="showLoadingSpinner"')
+        ->not->toContain(':class="isLoadingInitialData && \'is-loading\'"');
 });

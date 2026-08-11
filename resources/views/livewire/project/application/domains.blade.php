@@ -18,15 +18,11 @@
         localEditingIndex: @js($editingIndex),
         localEditingDomain: @js($editingDomain),
         localEditingService: @js($editingService),
-        localDirection: 'both',
-        localIndexing: 'index',
-        openEditDomain(index, url, service, indexing, direction) {
+        openEditDomain(index, url, service) {
             this.localEditingIndex = index;
             this.localEditingDomain = url;
             this.localEditingService = service;
             this.editingServiceLabel = service || '';
-            this.localDirection = direction || 'both';
-            this.localIndexing = indexing || 'index';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
         },
@@ -42,8 +38,6 @@
             $wire.editingIndex = this.localEditingIndex;
             $wire.editingDomain = this.localEditingDomain;
             $wire.editingService = this.localEditingService;
-            $wire.editingDirection = this.localDirection;
-            $wire.editingIndexing = this.localIndexing;
             $wire.showEditDomainModal = true;
         },
         matchesDomainSearch(value) {
@@ -53,7 +47,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service, $event.detail.indexing, $event.detail.direction)"
+    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service)"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="domains-section" title="Domains" :helper="$helperText">
         @can('update', $application)
@@ -83,37 +77,6 @@
                 You don't have permission to manage domains. Contact your team administrator for access.
             </x-callout>
         @endcannot
-
-        @if (! $isCompose)
-            @if ($labelsAreWritable)
-                <x-forms.input label="Direction" value="{{ match ($application->redirect) {
-                    'www' => 'Redirect to www',
-                    'non-www' => 'Redirect to non-www',
-                    default => 'Allow www & non-www',
-                } }}" readonly helper="Readonly labels are disabled. You can set the direction in the labels section." />
-            @else
-                <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-end">
-                    <div class="min-w-0 flex-1">
-                        <x-forms.listbox id="redirect" label="Direction" required :options="[
-                            ['value' => 'both', 'label' => 'Allow www & non-www'],
-                            ['value' => 'www', 'label' => 'Redirect to www'],
-                            ['value' => 'non-www', 'label' => 'Redirect to non-www'],
-                        ]" helper="Add <strong>both</strong> www and non-www in Coolify. Both hostnames must resolve to this server so the proxy can serve or redirect them. Do not use a DNS-provider URL redirect record for the non-canonical host; Coolify handles the HTTP redirect. Changes apply when you click Set direction."
-                            :disabled="! auth()->user()?->can('update', $application)" />
-                    </div>
-                    @can('update', $application)
-                        <div class="w-full shrink-0 sm:w-auto">
-                            <x-modal-confirmation title="Confirm redirection setting?" buttonTitle="Set direction"
-                                submitAction="setRedirect" :actions="['All traffic will be redirected to the selected direction.']"
-                                confirmationText="{{ ($application->fqdn ?: 'domains') . '/' }}"
-                                confirmationLabel="Please confirm the execution of the action by entering the Application URL below"
-                                shortConfirmationLabel="Application URL" :confirmWithPassword="false"
-                                step2ButtonText="Set direction" canGate="update" :canResource="$application" />
-                        </div>
-                    @endcan
-                </div>
-            @endif
-        @endif
 
     </x-application.settings-section>
 
@@ -153,16 +116,15 @@
                             </x-slot:content>
                             <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
                                 @if ($isCompose && count($composeServices) > 0)
-                                    <x-forms.select label="Service" id="newDomainService" required>
-                                        @foreach ($composeServices as $serviceName)
-                                            <option value="{{ $serviceName }}">{{ $serviceName }}</option>
-                                        @endforeach
-                                    </x-forms.select>
+                                    <x-forms.listbox label="Service" id="newDomainService" required
+                                        :options="collect($composeServices)->map(fn ($serviceName) => [
+                                            'value' => $serviceName,
+                                            'label' => $serviceName,
+                                        ])->values()->all()"
+                                        :disabled="! auth()->user()->can('update', $application)" />
                                 @endif
 
-                                <x-forms.input id="newDomain" label="Domain URL" placeholder="https://app.example.com"
-                                    helper="Full URL including scheme. Optional path and container port are supported.<br><br><span class='text-helper'>Examples</span><br>- https://app.coolify.io<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000<br>- https://app.coolify.io:8080/api"
-                                    required />
+                                <x-forms.domain-input id="newDomain" />
 
                                 @if ($addDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -252,6 +214,8 @@
                                 <span>Domain</span>
                                 <span>DNS</span>
                                 <span>Last checked</span>
+                                <span>Search engine indexing</span>
+                                <span>Direction</span>
                                 <span></span>
                             </div>
                             @foreach ($rows as $row)
@@ -287,6 +251,8 @@
                     <span>Domain</span>
                     <span>DNS Check</span>
                     <span>Last checked</span>
+                    <span>Search engine indexing</span>
+                    <span>Direction</span>
                     <span></span>
                 </div>
                 @foreach ($domainRows as $index => $row)
@@ -340,40 +306,8 @@
                                     <input type="text" class="input" readonly x-bind:value="editingServiceLabel" />
                                 </div>
 
-                                <div class="w-full">
-                                    <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
-                                        <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4" for="editingDomainLocal">
-                                            Domain URL <x-highlighted text="*" />
-                                        </label>
-                                    </div>
-                                    <input id="editingDomainLocal" type="url" class="input" required
-                                        placeholder="https://app.example.com"
-                                        x-model="localEditingDomain" />
-                                    <p class="mt-1 text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
-                                        Full URL including scheme. Optional path and container port are supported.
-                                    </p>
-                                    @error('editingDomain')
-                                        <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
-                                    @enderror
-                                </div>
-
-                                @unless ($labelsAreWritable)
-                                    <div class="grid gap-4 {{ $isCompose ? 'sm:grid-cols-2' : '' }}">
-                                        @if ($isCompose)
-                                            <x-forms.listbox id="edit-domain-direction" label="Direction"
-                                                :wire="false" value="both" x-model="localDirection" portal :options="[
-                                                    ['value' => 'both', 'label' => 'Allow www & non-www'],
-                                                    ['value' => 'www', 'label' => 'Redirect to www'],
-                                                    ['value' => 'non-www', 'label' => 'Redirect to non-www'],
-                                                ]" />
-                                        @endif
-                                        <x-forms.listbox id="edit-domain-indexing" label="Search engine indexing"
-                                            :wire="false" value="index" x-model="localIndexing" portal :options="[
-                                                ['value' => 'index', 'label' => 'Indexable'],
-                                                ['value' => 'noindex', 'label' => 'Noindex'],
-                                            ]" />
-                                    </div>
-                                @endunless
+                                <x-forms.domain-input id="editingDomainLocal" errorId="editingDomain" :wire="false"
+                                    x-model="localEditingDomain" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
