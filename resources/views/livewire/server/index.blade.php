@@ -33,18 +33,22 @@
                 && $server->settings->is_usable
                 && ! $server->settings->force_disabled
                 && ! $isTransferredAway;
+            $proxyNeedsAttention = $isReady && $server->proxySet() && $server->proxy->status !== 'running';
+            $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && ! $server->isSentinelLive();
 
             $status = match (true) {
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
+                $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',
                 $isReady => 'Ready',
                 default => 'Validation required',
             };
 
             $statusType = match (true) {
+                $proxyNeedsAttention || $sentinelNeedsAttention => 'warning',
                 $isReady => 'success',
                 $isTransferredAway || $server->settings->force_disabled => 'error',
-                default => 'warning',
+                default => 'error',
             };
 
             return [

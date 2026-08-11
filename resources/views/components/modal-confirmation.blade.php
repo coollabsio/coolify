@@ -328,7 +328,8 @@
                                 class="w-auto" isError
                                 @click="
                                     if (dispatchEvent) {
-                                        $wire.dispatch(dispatchEventType, dispatchEventMessage);
+                                        modalOpen = false;
+                                        $nextTick(() => $wire.dispatch(dispatchEventType, dispatchEventMessage));
                                     }
                                     if (confirmWithPassword && !skipPasswordConfirmation) {
                                         step++;

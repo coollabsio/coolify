@@ -63,7 +63,7 @@
             [
                 'label' => 'Terminal',
                 'route' => 'server.command',
-                'active' => request()->routeIs('server.command'),
+                'active' => $currentRoute === 'server.command',
                 'navigate' => false,
                 'visible' => auth()->user()?->can('canAccessTerminal'),
             ],

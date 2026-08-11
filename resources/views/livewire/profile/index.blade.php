@@ -52,9 +52,25 @@
                     const blob = await new Promise((resolve, reject) => {
                         canvas.toBlob(value => value ? resolve(value) : reject(new Error('JPEG compression failed')), 'image/jpeg', 0.8);
                     });
-                    this.preview = URL.createObjectURL(blob);
+                    const previewUrl = URL.createObjectURL(blob);
                     const compressed = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-                    this.$wire.upload('avatar', compressed, () => this.processing = false, () => {
+                    this.$wire.upload('avatar', compressed, async () => {
+                        try {
+                            const uploaded = await this.$wire.uploadAvatar();
+                            if (uploaded) {
+                                if (this.preview) URL.revokeObjectURL(this.preview);
+                                this.preview = previewUrl;
+                            } else {
+                                URL.revokeObjectURL(previewUrl);
+                            }
+                        } catch (error) {
+                            URL.revokeObjectURL(previewUrl);
+                            this.uploadError = 'The image could not be uploaded.';
+                        } finally {
+                            this.processing = false;
+                        }
+                    }, () => {
+                        URL.revokeObjectURL(previewUrl);
                         this.processing = false;
                         this.uploadError = 'The image could not be uploaded.';
                     });
@@ -84,22 +100,22 @@
                     @endif
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-3">
-                    <input type="file" x-on:change="prepareAvatar($event)" accept="image/jpeg,image/png,image/webp"
-                        class="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-200 file:px-3 file:py-2 file:text-xs file:font-medium file:text-neutral-800 hover:file:bg-neutral-300 dark:text-fg-dim dark:file:bg-white/[0.08] dark:file:text-fg dark:hover:file:bg-white/[0.12]">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input x-ref="avatarInput" type="file" x-on:change="prepareAvatar($event)"
+                            accept="image/jpeg,image/png,image/webp" class="hidden">
+                        <x-forms.button type="button" x-on:click="$refs.avatarInput.click()"
+                            x-bind:disabled="processing">
+                            <span x-text="processing ? 'Uploading…' : 'Browse…'"></span>
+                        </x-forms.button>
+                        @if (auth()->user()->avatar_path)
+                            <x-forms.button type="button" wire:click="removeAvatar" x-bind:disabled="processing"
+                                isError>Remove</x-forms.button>
+                        @endif
+                    </div>
                     <p x-cloak x-show="uploadError" x-text="uploadError" class="text-xs text-red-500"></p>
                     @error('avatar')
                         <p class="text-xs text-red-500">{{ $message }}</p>
                     @enderror
-                    <div class="flex flex-wrap gap-2">
-                        <x-forms.button type="button" wire:click="uploadAvatar" wire:loading.attr="disabled"
-                            wire:target="avatar,uploadAvatar" x-bind:disabled="processing || !preview" isHighlighted>
-                            <span wire:loading.remove wire:target="uploadAvatar">Upload picture</span>
-                            <span wire:loading wire:target="uploadAvatar">Compressing…</span>
-                        </x-forms.button>
-                        @if (auth()->user()->avatar_path)
-                            <x-forms.button type="button" wire:click="removeAvatar" isError>Remove</x-forms.button>
-                        @endif
-                    </div>
                 </div>
             </div>
         </section>

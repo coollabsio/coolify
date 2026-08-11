@@ -78,7 +78,13 @@
 
 @layer components {
     .terminal-mobile-key {
-        @apply min-h-10 rounded-md border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white shadow-inner active:bg-white/25;
+        @apply min-h-8 shrink-0 rounded-full border bg-transparent px-3 py-1 text-sm font-medium text-neutral-300 active:text-white;
+        border-color: color-mix(in srgb, var(--terminal-scrollbar, #fff) 24%, transparent);
+    }
+
+    .terminal-key-row {
+        border: 1px solid color-mix(in srgb, var(--terminal-scrollbar, #fff) 22%, transparent);
+        background: transparent;
     }
 
     /* Active state is a solid fill only (no accent rail / border). */
@@ -711,17 +717,6 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-loading-label {
-    color: #52525b;
-}
-
-.terminal-session-expiry {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: rgb(255 255 255 / 0.6);
-}
-
-html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-expiry,
-html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-expiry {
     color: #52525b;
 }
 
@@ -2455,6 +2450,16 @@ input[type="search"]::-webkit-search-results-decoration {
 .deployment-table-grid {
     min-width: 59rem;
     grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr);
+}
+
+@media (min-width: 1024px) {
+    .deployment-table-scroll {
+        overflow-x: visible;
+    }
+
+    .deployment-table-grid {
+        min-width: 0;
+    }
 }
 
 .dashboard-deployment-table-grid {

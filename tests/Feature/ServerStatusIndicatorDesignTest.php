@@ -14,14 +14,26 @@ test('server cards use icon borders instead of ready badges', function () {
 
     expect(substr_count($serverIndex, '<x-status-badge'))->toBe(1)
         ->and($serverIndex)
+        ->toContain("\$proxyNeedsAttention = \$isReady && \$server->proxySet() && \$server->proxy->status !== 'running'")
+        ->toContain('$sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && ! $server->isSentinelLive()')
+        ->toContain("\$proxyNeedsAttention || \$sentinelNeedsAttention => 'warning'")
         ->toContain("\$isReady => 'success'")
         ->toContain("\$isTransferredAway || \$server->settings->force_disabled => 'error'")
-        ->toContain("default => 'warning'")
+        ->toContain("default => 'error'")
         ->toContain("server.statusType === 'success' ? 'border-emerald-500/70'")
         ->toContain("server.statusType === 'warning' ? 'border-amber-500/70'")
         ->toContain("'border-red-500/70'")
         ->toContain(':title="server.status"')
         ->toContain(':aria-label="`Server status: ${server.status}`"');
+});
+
+test('dashboard server cards warn when proxy or sentinel needs attention', function () {
+    $dashboard = file_get_contents(resource_path('views/livewire/dashboard.blade.php'));
+
+    expect($dashboard)
+        ->toContain("\$proxyNeedsAttention = \$server->proxySet() && \$server->proxy->status !== 'running'")
+        ->toContain('$sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive()')
+        ->toContain("\$proxyNeedsAttention || \$sentinelNeedsAttention => ['Attention required', 'warning']");
 });
 
 test('server table keeps status text without a badge', function () {

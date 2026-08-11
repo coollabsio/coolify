@@ -186,17 +186,11 @@ it('uses the redesigned terminal canvas and controls on resource terminal pages'
         ->not->toContain('application-console-header flex h-[30px]');
 });
 
-it('uses a readable theme-aware terminal session expiry label', function () {
+it('does not overlay the session expiry label on the application terminal', function () {
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
-    $styles = file_get_contents(resource_path('css/app.css'));
 
     expect($terminalView)
-        ->toContain('terminal-session-expiry')
-        ->and($styles)
-        ->toContain('.terminal-session-expiry')
-        ->toContain('font-size: 0.75rem;')
-        ->toContain('color: rgb(255 255 255 / 0.6);')
-        ->toContain('.terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-expiry');
+        ->not->toContain('terminal-session-expiry');
 });
 
 it('copies the realtime terminal utilities into the container image', function () {
@@ -329,27 +323,52 @@ it('preserves terminal scrollback across transient reconnects', function () {
         ->not->toContain("this.term.reset();\n                    this.term.clear();");
 });
 
-it('renders a compact mobile terminal toolbar with shell control keys', function () {
+it('renders a horizontally scrollable mobile terminal key row', function () {
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
     $appCss = file_get_contents(resource_path('css/app.css'));
 
     expect($terminalView)
-        ->toContain('Terminal keys')
-        ->toContain('sm:hidden')
-        ->toContain("sendTerminalControl('arrowUp')")
-        ->toContain("sendTerminalControl('arrowDown')")
-        ->toContain("sendTerminalControl('arrowLeft')")
-        ->toContain("sendTerminalControl('arrowRight')")
+        ->not->toContain('class="sm:hidden" data-terminal-mobile-toolbar')
+        ->toContain('overflow-x-auto')
+        ->toContain('whitespace-nowrap')
+        ->toContain('pasteFromClipboard()')
+        ->toContain('copyTerminalSelection()')
         ->toContain("sendTerminalControl('tab')")
         ->toContain("sendTerminalControl('escape')")
-        ->not->toContain("sendTerminalControl('ctrlC')")
-        ->not->toContain('pasteFromClipboard()')
-        ->not->toContain('copyTerminalSelection()')
-        ->toContain('mobileToolbarCollapsed')
-        ->toContain("fullscreen ? 'absolute inset-x-0 bottom-0 z-[2] px-2 pb-2' : 'relative mt-2 shrink-0'")
+        ->toContain('sendTerminalControl(\'escape\')">ESC</button>')
+        ->toContain("toggleTerminalModifier('ctrl')")
+        ->toContain("toggleTerminalModifier('alt')")
+        ->toContain("sendTerminalKey('/')")
+        ->toContain("sendTerminalKey('|')")
+        ->toContain("sendTerminalKey('~')")
+        ->toContain("sendTerminalKey('-')")
+        ->toContain("sendTerminalControl('ctrlC')")
+        ->toContain("sendTerminalControl('ctrlBackslash')")
+        ->toContain("sendTerminalControl('ctrlS')")
+        ->toContain("sendTerminalControl('ctrlZ')")
+        ->not->toContain("sendTerminalControl('arrowUp')")
+        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : 'relative z-[2] mt-2 shrink-0'")
         ->toContain('data-terminal-mobile-toolbar')
         ->and($appCss)
-        ->toContain('.terminal-mobile-key');
+        ->toContain('.terminal-mobile-key')
+        ->toContain('min-h-8')
+        ->toContain('rounded-full')
+        ->toContain('.terminal-key-row')
+        ->toContain('background: transparent;')
+        ->toContain('var(--terminal-scrollbar');
+});
+
+it('shows the terminal key row outside fullscreen mode', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($terminalView)
+        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : 'relative z-[2] mt-2 shrink-0'")
+        ->not->toContain('class="sm:hidden" data-terminal-mobile-toolbar')
+        ->toContain(':style="!fullscreen && keyboardInset > 0 ? `top: ${keyboardAnchorTop}px; transform: translateY(-100%)` : \'\'"')
+        ->and($terminalClient)
+        ->toContain("this.\$refs.terminalWrapper.style.removeProperty('display')")
+        ->not->toContain("this.\$refs.terminalWrapper.style.display = 'block'");
 });
 
 it('sends terminal mobile toolbar controls through the websocket', function () {
@@ -365,8 +384,15 @@ it('sends terminal mobile toolbar controls through the websocket', function () {
         ->toContain("tab: '\\t'")
         ->toContain("escape: '\\x1b'")
         ->toContain("ctrlC: '\\x03'")
+        ->toContain("ctrlBackslash: '\\x1c'")
+        ->toContain("ctrlS: '\\x13'")
+        ->toContain("ctrlZ: '\\x1a'")
+        ->toContain('toggleTerminalModifier(modifier)')
+        ->toContain('sendTerminalKey(key)')
         ->toContain('navigator.clipboard.readText()')
-        ->toContain('navigator.clipboard.writeText(selection)');
+        ->toContain('navigator.clipboard.writeText(selection)')
+        ->toContain("sendTerminalInput(data) {\n                if (!this.term || !this.terminalActive) {\n                    return;\n                }\n\n                this.sendMessage({ message: data });")
+        ->not->toContain("sendTerminalInput(data) {\n                if (!this.term || !this.terminalActive) {\n                    return;\n                }\n\n                this.term.focus();");
 });
 
 it('uses terminal host dimensions when resizing so mobile controls do not cover terminal rows', function () {
@@ -379,24 +405,40 @@ it('uses terminal host dimensions when resizing so mobile controls do not cover 
         ->not->toContain('const wrapperHeight = this.$refs.terminalWrapper.clientHeight;');
 });
 
-it('uses simple fullscreen bottom margin based on mobile toolbar visibility', function () {
+it('keeps the fullscreen mobile toolbar above the software keyboard', function () {
     $terminalClient = file_get_contents(resource_path('js/terminal.js'));
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
 
     expect($terminalClient)
-        ->not->toContain('updateFullscreenLayout()')
-        ->not->toContain('terminalFullscreenHeight')
-        ->not->toContain('window.visualViewport?.height')
+        ->toContain('keyboardInset: 0')
+        ->toContain('keyboardAnchorTop: 0')
+        ->toContain('keyboardViewportHeight: 0')
+        ->toContain('updateKeyboardInset()')
+        ->toContain('window.visualViewport')
+        ->toContain('viewport.height + viewport.offsetTop')
+        ->toContain('this.keyboardViewportHeight - visualBottom')
+        ->toContain('this.keyboardAnchorTop = Math.round(visualBottom)')
+        ->toContain('syncFullscreenShellWithKeyboard(viewport)')
+        ->toContain("wrapper.style.setProperty('bottom', 'auto', 'important')")
+        ->toContain("window.visualViewport?.addEventListener('resize', this.syncKeyboardInset)")
+        ->toContain("window.visualViewport?.addEventListener('scroll', this.syncKeyboardInset)")
+        ->toContain("window.addEventListener('resize', this.syncKeyboardInset)")
+        ->toContain("window.visualViewport?.removeEventListener('resize', this.syncKeyboardInset)")
+        ->toContain("window.visualViewport?.removeEventListener('scroll', this.syncKeyboardInset)")
+        ->toContain("window.removeEventListener('resize', this.syncKeyboardInset)")
         ->and($terminalView)
-        ->toContain("mobileToolbarCollapsed\n                    ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-14'\n                    : 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-24'")
-        ->toContain("fullscreen ? 'absolute inset-x-0 bottom-0 z-[2] px-2 pb-2'");
+        ->toContain("'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent'")
+        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2'")
+        ->toContain(':style="!fullscreen && keyboardInset > 0 ? `top: ${keyboardAnchorTop}px; transform: translateY(-100%)` : \'\'"')
+        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : (keyboardInset > 0 ? 'fixed inset-x-0 z-[100002] px-2 pb-2'");
 });
 
-it('resizes after toggling the mobile terminal toolbar', function () {
-    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+it('resizes after the mobile keyboard viewport changes', function () {
+    $terminalClient = file_get_contents(resource_path('js/terminal.js'));
 
-    expect($terminalView)
-        ->toContain('$nextTick(() => resizeTerminal())');
+    expect($terminalClient)
+        ->toContain('window.visualViewport')
+        ->toContain('this.$nextTick(() => this.resizeTerminal())');
 });
 
 it('uses fixed viewport positioning for fullscreen terminal instead of inherited container size', function () {
@@ -436,6 +478,13 @@ it('keeps enter and exit fullscreen controls the same size and chrome', function
         ->toContain('color: var(--terminal-scrollbar')
         ->toContain('background: transparent;')
         ->toContain('color-mix(in srgb, var(--terminal-scrollbar');
+});
+
+it('keeps the application terminal fullscreen control visible on mobile', function () {
+    $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+
+    expect($terminalView)
+        ->toContain('opacity-100 sm:opacity-0 sm:group-hover/terminal:opacity-100 sm:focus-visible:opacity-100');
 });
 
 it('lets the selected theme show through the active terminal panel', function () {
