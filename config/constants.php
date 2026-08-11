@@ -2,9 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => '4.2.0',
+        'version' => '4.3.0',
         'helper_version' => '1.0.14',
-        'realtime_version' => '1.0.16',
+        'realtime_version' => '1.0.17',
         'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
@@ -99,6 +99,7 @@ return [
     ],
 
     'sentinel' => [
+        'dev_url' => env('DEV_SENTINEL_URL'),
         // How often (seconds) PushServerUpdateJob is force-dispatched even when
         // the container state hash is unchanged. Keeps exited-detection and
         // storage checks from going stale without writing every resource row on

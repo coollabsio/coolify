@@ -4,6 +4,7 @@ namespace App\Livewire\Storage;
 
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledVolumeBackup;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -14,6 +15,8 @@ class Resources extends Component
     public S3Storage $storage;
 
     public array $selectedStorages = [];
+
+    public array $selectedVolumeStorages = [];
 
     public function mount(): void
     {
@@ -26,6 +29,13 @@ class Resources extends Component
         foreach ($backups as $backup) {
             $this->selectedStorages[$backup->id] = $this->storage->id;
         }
+
+        ScheduledVolumeBackup::query()
+            ->where('s3_storage_id', $this->storage->id)
+            ->where('save_s3', true)
+            ->each(function (ScheduledVolumeBackup $backup): void {
+                $this->selectedVolumeStorages[$backup->id] = $this->storage->id;
+            });
     }
 
     public function disableS3(int $backupId): void
@@ -80,6 +90,61 @@ class Resources extends Component
         $this->dispatch('success', 'Backup moved.', "Moved to {$newStorage->name}.");
     }
 
+    public function disableVolumeS3(int $backupId): void
+    {
+        $this->authorize('update', $this->storage);
+
+        $backup = ScheduledVolumeBackup::query()
+            ->where('id', $backupId)
+            ->where('s3_storage_id', $this->storage->id)
+            ->firstOrFail();
+
+        $backup->update([
+            'save_s3' => false,
+            's3_storage_id' => null,
+        ]);
+
+        unset($this->selectedVolumeStorages[$backupId]);
+
+        $this->dispatch('success', 'S3 disabled.', 'S3 backup has been disabled for this schedule.');
+    }
+
+    public function moveVolumeBackup(int $backupId): void
+    {
+        $this->authorize('update', $this->storage);
+
+        $backup = ScheduledVolumeBackup::query()
+            ->where('id', $backupId)
+            ->where('s3_storage_id', $this->storage->id)
+            ->firstOrFail();
+        $newStorageId = $this->selectedVolumeStorages[$backupId] ?? null;
+
+        if (! $newStorageId || (int) $newStorageId === $this->storage->id) {
+            $this->dispatch('error', 'No change.', 'The backup is already using this storage.');
+
+            return;
+        }
+
+        $newStorage = S3Storage::query()
+            ->where('id', $newStorageId)
+            ->where('team_id', $this->storage->team_id)
+            ->first();
+
+        if (! $newStorage) {
+            $this->dispatch('error', 'Storage not found.');
+
+            return;
+        }
+
+        $this->authorize('update', $newStorage);
+
+        $backup->update(['s3_storage_id' => $newStorage->id]);
+
+        unset($this->selectedVolumeStorages[$backupId]);
+
+        $this->dispatch('success', 'Backup moved.', "Moved to {$newStorage->name}.");
+    }
+
     public function render()
     {
         $backups = ScheduledDatabaseBackup::where('s3_storage_id', $this->storage->id)
@@ -92,8 +157,15 @@ class Resources extends Component
             ->orderBy('name')
             ->get(['id', 'name', 'is_usable']);
 
+        $volumeBackups = ScheduledVolumeBackup::query()
+            ->where('s3_storage_id', $this->storage->id)
+            ->where('save_s3', true)
+            ->with('backupable.resource')
+            ->get();
+
         return view('livewire.storage.resources', [
             'groupedBackups' => $backups,
+            'volumeBackups' => $volumeBackups,
             'allStorages' => $allStorages,
         ]);
     }

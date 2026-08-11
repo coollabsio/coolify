@@ -37,8 +37,26 @@ it('refreshes configuration changes after health check saves', function (string 
 
 it('refreshes configuration changes after environment variable settings are saved', function () {
     Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
+        ->call('loadEnvironmentVariables')
         ->set('use_build_secrets', true)
         ->call('instantSave')
         ->assertHasNoErrors()
         ->assertDispatched('configurationChanged');
+});
+
+it('persists environment variable order as an application setting', function () {
+    expect($this->application->settings->is_env_sorting_enabled)->toBeFalse();
+
+    Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
+        ->assertSee('Environment variable order')
+        ->assertSee('Build secrets')
+        ->assertDontSeeHtml('>Sort</button>')
+        ->call('loadEnvironmentVariables')
+        ->set('is_env_sorting_enabled', true)
+        ->call('instantSave')
+        ->assertHasNoErrors()
+        ->assertDispatched('configurationChanged')
+        ->assertSet('is_env_sorting_enabled', true);
+
+    expect($this->application->settings->fresh()->is_env_sorting_enabled)->toBeTrue();
 });

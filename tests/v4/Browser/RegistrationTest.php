@@ -1,21 +1,21 @@
 <?php
 
-use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0, 'is_sponsorship_popup_enabled' => false]);
+    seedBrowserInstanceSettings();
 });
 
 it('shows registration page when no users exist', function () {
     $page = visit('/register');
 
-    $page->assertSee('Root User Setup')
-        ->assertSee('Create Account')
-        ->screenshot();
+    $page->assertSee('Create the root account for this instance.')
+        ->assertSee('Full instance access')
+        ->assertSee('Create account')
+        ->screenshot(filename: 'registration-root-setup');
 });
 
 it('can register a new root user', function () {
@@ -25,9 +25,9 @@ it('can register a new root user', function () {
         ->fill('email', 'root@example.com')
         ->fill('password', 'Password1!@')
         ->fill('password_confirmation', 'Password1!@')
-        ->click('Create Account')
+        ->click('Create account')
         ->assertPathIs('/onboarding')
-        ->screenshot();
+        ->screenshot(filename: 'registration-success-onboarding');
 
     expect(User::where('email', 'root@example.com')->exists())->toBeTrue();
 });
@@ -39,9 +39,9 @@ it('fails registration with mismatched passwords', function () {
         ->fill('email', 'root@example.com')
         ->fill('password', 'Password1!@')
         ->fill('password_confirmation', 'DifferentPass1!@')
-        ->click('Create Account')
+        ->click('Create account')
         ->assertSee('password')
-        ->screenshot();
+        ->screenshot(filename: 'registration-password-mismatch');
 });
 
 it('fails registration with weak password', function () {
@@ -51,17 +51,17 @@ it('fails registration with weak password', function () {
         ->fill('email', 'root@example.com')
         ->fill('password', 'short')
         ->fill('password_confirmation', 'short')
-        ->click('Create Account')
+        ->click('Create account')
         ->assertSee('password')
-        ->screenshot();
+        ->screenshot(filename: 'registration-weak-password');
 });
 
 it('shows login link when a user already exists', function () {
-    User::factory()->create(['id' => 0]);
+    createBrowserRootUser();
 
     $page = visit('/register');
 
-    $page->assertSee('Already registered?')
-        ->assertDontSee('Root User Setup')
-        ->screenshot();
+    $page->assertSee('Already have an account?')
+        ->assertDontSee('Full instance access')
+        ->screenshot(filename: 'registration-existing-user');
 });

@@ -56,6 +56,21 @@ it('keeps the volume backup script inside the Livewire root element', function (
     expect(strrpos($view, '@endscript'))->toBeLessThan(strrpos($view, '</div>'));
 });
 
+it('shows the S3 configuration state in application and service backup tables', function () {
+    $views = [
+        resource_path('views/livewire/project/application/backup/index.blade.php'),
+        resource_path('views/livewire/project/service/volume-backup/index.blade.php'),
+    ];
+
+    foreach ($views as $view) {
+        expect(file_get_contents($view))
+            ->toContain('<span>S3</span>')
+            ->toContain("'Configured'")
+            ->toContain("'Unavailable'")
+            ->toContain("'Not set'");
+    }
+});
+
 it('targets named volumes and application directory mounts through one backup relation', function () {
     $team = Team::factory()->create();
     [$application, $volume] = createVolumeBackupApplication($team);
@@ -318,7 +333,7 @@ it('splits scheduled backup settings and executions across dedicated urls', func
 
     $this->get($generalUrl.'/s3')
         ->assertOk()
-        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertSeeText('No validated S3 storage')
         ->assertDontSee('Disable Local Backup')
         ->assertDontSee('Enable S3')
         ->assertDontSee('Disable S3')
@@ -366,14 +381,16 @@ it('shows the configure backup modal trigger inside the volume card instead of i
         'resource' => $application,
     ])
         ->set('isReadOnly', true)
-        ->assertSee('Configure Backup')
+        ->assertSee('Backup')
         ->assertDontSee('Backups made while the application is writing');
 
     $html = $component->html();
 
-    expect(strpos($html, 'Configure Backup'))
-        ->toBeGreaterThan(strpos($html, '<form'))
-        ->toBeLessThan(strpos($html, '</form>'));
+    // Read-only volume rows are table cells (no form); backup action still renders in the row.
+    expect($html)
+        ->toContain('Configure Volume Backup')
+        ->toContain('data-table-row')
+        ->toContain('Backup');
 });
 
 it('only shows the backup enabled badge for an enabled volume backup', function () {
@@ -391,7 +408,7 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
     $component = Livewire::test(Show::class, [
         'storage' => $volume,
         'resource' => $application,
-    ])->assertDontSee('Backup enabled');
+    ])->assertDontSee('table-badge-success', false);
 
     $backup->update(['enabled' => true]);
 
@@ -404,14 +421,17 @@ it('only shows the backup enabled badge for an enabled volume backup', function 
 
     $component
         ->dispatch('refreshVolumeBackups')
-        ->assertSeeInOrder(['Volume Name', 'Backup enabled'])
+        ->assertSee('table-badge-success', false)
+        ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 
     Livewire::test(Show::class, [
         'storage' => $volume,
         'resource' => $application,
         'isFirst' => false,
-    ])->assertSeeInOrder(['Volume Name', 'Backup enabled']);
+    ])
+        ->assertSee('table-badge-success', false)
+        ->assertSee('Volume backup is enabled');
 });
 
 it('links the backup enabled badge to a filtered backup list when the application has multiple schedules', function () {
@@ -441,7 +461,8 @@ it('links the backup enabled badge to a filtered backup list when the applicatio
         'storage' => $volume,
         'resource' => $application,
     ])
-        ->assertSee('Backup enabled')
+        ->assertSee('table-badge-success', false)
+        ->assertSee('Volume backup is enabled')
         ->assertSee('href="'.$backupUrl.'"', false);
 });
 
@@ -820,6 +841,7 @@ it('enables and disables volume S3 backups from the S3 title action', function (
         'section' => 's3',
     ])
         ->assertSee('Enable S3')
+        ->assertDontSee('You do not have permission to perform this action.')
         ->call('toggleS3')
         ->assertSet('saveToS3', true)
         ->assertSee('Disable S3');
@@ -857,6 +879,22 @@ it('shows and saves volume S3 retention while S3 backups are disabled', function
         ->and($backup->retention_amount_s3)->toBe(12)
         ->and($backup->retention_days_s3)->toBe(30)
         ->and($backup->retention_max_storage_s3)->toBe(4.5);
+});
+
+it('allows team owners to edit volume backup retention settings', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+    ]);
+
+    Livewire::test(VolumeBackups::class, [
+        'storage' => $volume,
+        'resource' => $application,
+        'section' => 'retention',
+    ])->assertDontSee('You do not have permission to perform this action.');
 });
 
 it('only updates S3 fields when toggling volume S3 backups', function () {
@@ -1143,13 +1181,12 @@ it('allows volume S3 backups to be disabled when no usable storage remains', fun
         'section' => 's3',
     ])
         ->assertSet('saveToS3', true)
-        ->assertSeeHtml('<h2>S3</h2>')
-        ->assertSeeText('No validated S3 available. Configure one here.')
+        ->assertSeeHtml('<h2>S3 storage</h2>')
+        ->assertSeeText('No validated S3 storage')
         ->assertSeeHtml('href="'.route('storage.index').'"')
-        ->assertSeeHtml('>here</a>')
+        ->assertSeeText('Open S3 storage')
         ->assertDontSee('Save')
         ->assertDontSee('Disable S3')
-        ->assertDontSee('S3 Storage')
         ->assertDontSee('Disable Local Backup')
         ->call('toggleS3')
         ->assertDispatched('success')

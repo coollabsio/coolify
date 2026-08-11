@@ -1,0 +1,24 @@
+# documentation: https://celld.dev/docs
+# slogan: Self-hosted, distributed Durable Objects powered by Deno.
+# category: backend
+# tags: deno, durable-objects, workers, sqlite, distributed, backend, serverless
+# logo: svgs/denoKV.svg
+# port: 8080
+
+services:
+  celld:
+    image: 'ghcr.io/denoland/celld:${CELLD_VERSION:-latest}'
+    environment:
+      - SERVICE_URL_CELLD_8080
+      - CELLD_BUCKET=${CELLD_BUCKET:?}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:?}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:?}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+      - CELLD_ADDR=0.0.0.0:8080
+      - CELLD_ADVERTISE=celld:8080
+      - CELLD_WATCH=/var/lib/celld/state
+      - RUST_LOG=${RUST_LOG:-info}
+    volumes:
+      - celld-data:/var/lib/celld

@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\Project;
+use App\Models\Service;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -59,7 +60,7 @@ it('does not render the notification for preview deployment toggles', function (
         ->assertSet('isConfigurationChanged', false);
 });
 
-it('renders the changed configuration labels', function () {
+it('renders the changed configuration labels without a second backend request', function () {
     $application = configurationCheckerApplication($this->environment);
     markConfigurationCheckerApplicationDeployed($application);
 
@@ -67,8 +68,69 @@ it('renders the changed configuration labels', function () {
 
     Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
         ->assertSee('The latest configuration has not been applied')
-        ->assertSee('Build command')
-        ->assertSee('A rebuild is required.');
+        ->assertSee('Rebuild required.')
+        ->assertSee('Build command');
+
+    $view = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
+
+    expect($view)
+        ->toContain(':compact-after="5000"')
+        ->toContain('position="top-right"')
+        ->toContain(':compact-storage-key="$compactStorageKey"')
+        ->toContain('wire:key="configuration-warning-{{ $currentConfigurationHash }}"')
+        ->toContain('x-on:click="configurationDiffModalOpen = true"')
+        ->not->toContain('$wire.refreshConfigurationChanges()');
+});
+
+it('supports timed compact popup notifications', function () {
+    $view = file_get_contents(resource_path('views/components/popup-small.blade.php'));
+
+    expect($view)
+        ->toContain("\$position === 'top-right' ? 'top-16' : 'bottom-4'")
+        ->toContain('compactAfter')
+        ->toContain('compactStorageKey')
+        ->toContain("localStorage.setItem(this.storageKey, 'compact')")
+        ->toContain("localStorage.setItem(this.storageKey, 'icon')")
+        ->toContain('localStorage.removeItem(key)')
+        ->not->toContain('<template x-teleport="body">')
+        ->toContain('compact = true')
+        ->toContain('@click="restore()"')
+        ->toContain('@click.stop="minimizeToIcon()"')
+        ->toContain('<template x-if="iconOnly">')
+        ->toContain('<template x-if="!iconOnly">')
+        ->not->toContain('<button x-show="iconOnly"')
+        ->not->toContain('<div x-show="!iconOnly"')
+        ->not->toContain(':class="iconOnly')
+        ->toContain('x-show="!compact"')
+        ->toContain("'w-[calc(100vw-2rem)] cursor-pointer sm:w-auto sm:max-w-[calc(100vw-2rem)]'");
+});
+
+it('warns when a service has missing required environment variables', function () {
+    $service = Service::factory()->create(['environment_id' => $this->environment->id]);
+    $service->environment_variables()->create([
+        'key' => 'PLUNK_API_KEY',
+        'value' => '',
+        'is_required' => true,
+    ]);
+
+    Livewire::test(ConfigurationChecker::class, ['resource' => $service])
+        ->assertSet('missingRequiredEnvironmentVariableCount', 1)
+        ->assertSee('Required environment variable missing')
+        ->assertSee('PLUNK_API_KEY')
+        ->assertSee('Open environment variables');
+
+});
+
+it('marks the service environment variables menu when required values are missing', function () {
+    $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
+    $sidebar = file_get_contents(resource_path('views/components/service/configuration-sidebar.blade.php'));
+
+    expect($configuration)
+        ->toContain("'hasWarning' => ! \$service->isDeployable")
+        ->toContain('title="Required environment variables missing"')
+        ->and($sidebar)
+        ->toContain("'hasWarning' => ! \$service->isDeployable")
+        ->toContain('title="Required environment variables missing"');
 });
 
 it('refreshes configuration changes when the event is received', function () {
@@ -86,6 +148,42 @@ it('refreshes configuration changes when the event is received', function () {
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('The latest configuration has not been applied')
         ->assertSee('Build command');
+});
+
+it('shows domain changes when the domain page dispatches a configuration change', function () {
+    $application = configurationCheckerApplication($this->environment);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
+        ->assertSet('isConfigurationChanged', false);
+
+    $application->update(['fqdn' => 'https://changed.example.com']);
+
+    $component
+        ->dispatch('configurationChanged')
+        ->assertSet('isConfigurationChanged', true)
+        ->assertSee('Domains')
+        ->assertSee('https://changed.example.com');
+});
+
+it('shows noindex changes when the domains page dispatches a configuration change', function () {
+    $application = configurationCheckerApplication($this->environment, [
+        'fqdn' => 'https://example.com,https://staging.example.com',
+    ]);
+    markConfigurationCheckerApplicationDeployed($application);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
+        ->assertSet('isConfigurationChanged', false);
+
+    $application->setNoindexDomains(['https://staging.example.com']);
+    $application->save();
+
+    $component
+        ->dispatch('configurationChanged')
+        ->assertSet('isConfigurationChanged', true)
+        ->assertSee('The latest configuration has not been applied')
+        ->assertSee('Search engine indexing')
+        ->assertSee('Redeploy to apply.');
 });
 
 it('shows an unapplied configuration warning after a directory mount is added', function () {
@@ -108,8 +206,8 @@ it('shows an unapplied configuration warning after a directory mount is added', 
         ->dispatch('configurationChanged')
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('The latest configuration has not been applied')
-        ->assertSee('Directory mount')
-        ->assertSee('Please redeploy to apply the new configuration.');
+        ->assertSee('Redeploy to apply.')
+        ->assertSee('Directory mount');
 });
 
 it('refreshes stale modal configuration diff before opening changes', function () {
@@ -128,13 +226,30 @@ it('refreshes stale modal configuration diff before opening changes', function (
     ]);
 
     $component
-        ->call('refreshConfigurationChanges')
+        ->dispatch('configurationChanged')
         ->assertSet('isConfigurationChanged', true)
         ->assertSee('Start command')
         ->assertDontSee('Build command');
 });
 
-it('does not render environment variable secret values', function () {
+it('includes full configuration change rows in the initial Livewire snapshot', function () {
+    $application = configurationCheckerApplication($this->environment);
+    markConfigurationCheckerApplicationDeployed($application);
+    $application->update(['build_command' => 'pnpm build']);
+
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
+
+    expect($component->get('isConfigurationChanged'))->toBeTrue()
+        ->and($component->get('configurationDiff'))->toHaveKey('changes')
+        ->and(data_get($component->get('configurationDiff'), 'changes'))->not->toBeEmpty();
+});
+
+it('redacts unlocked environment values for team members in the change list', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
     $application = configurationCheckerApplication($this->environment);
     EnvironmentVariable::create([
         'key' => 'API_TOKEN',
@@ -149,15 +264,25 @@ it('does not render environment variable secret values', function () {
 
     $application->environment_variables()->where('key', 'API_TOKEN')->first()->update(['value' => 'new-secret']);
 
-    Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
-        ->assertSee('API_TOKEN')
-        ->assertSee('••••••••')
-        ->assertDontSee('Hidden')
-        ->assertDontSee('old-secret')
-        ->assertDontSee('new-secret');
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()]);
+
+    $envChange = collect(data_get($component->get('configurationDiff'), 'changes', []))
+        ->first(fn (array $change): bool => str_contains((string) data_get($change, 'key'), 'API_TOKEN')
+            || str_contains((string) data_get($change, 'label'), 'API_TOKEN'));
+
+    expect($envChange)->not->toBeNull()
+        ->and(data_get($envChange, 'old_display_value'))->toBe('••••••••')
+        ->and(data_get($envChange, 'new_display_value'))->toBe('••••••••')
+        ->and(data_get($envChange, 'old_full_value'))->toBeNull()
+        ->and(data_get($envChange, 'new_full_value'))->toBeNull();
 });
 
-it('renders added environment variables as set without exposing secret values', function () {
+it('redacts newly added environment values for team members', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
     $application = configurationCheckerApplication($this->environment);
     markConfigurationCheckerApplicationDeployed($application);
 
@@ -171,12 +296,17 @@ it('renders added environment variables as set without exposing secret values', 
         'resourceable_id' => $application->id,
     ]);
 
-    Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
+    $component = Livewire::test(ConfigurationChecker::class, ['resource' => $application->refresh()])
         ->assertSee('API_TOKEN')
-        ->assertSee('From')
-        ->assertSee('-')
-        ->assertSee('To')
-        ->assertSee('••••••••')
-        ->assertDontSee('Hidden')
-        ->assertDontSee('new-secret');
+        ->assertSee('Current')
+        ->assertSee('New');
+
+    $envChange = collect(data_get($component->get('configurationDiff'), 'changes', []))
+        ->first(fn (array $change): bool => str_contains((string) data_get($change, 'key'), 'API_TOKEN')
+            || str_contains((string) data_get($change, 'label'), 'API_TOKEN'));
+
+    expect($envChange)->not->toBeNull()
+        ->and(data_get($envChange, 'old_display_value'))->toBe('-')
+        ->and(data_get($envChange, 'new_display_value'))->toBe('••••••••')
+        ->and(data_get($envChange, 'type'))->toBe('added');
 });

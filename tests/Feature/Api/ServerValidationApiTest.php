@@ -17,6 +17,7 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+    session(['currentTeam' => $this->team]);
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
     $this->token = $this->user->createToken('server-validation', ['write'])->plainTextToken;
 

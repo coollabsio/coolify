@@ -177,11 +177,11 @@ class LogDrains extends Component
         }
     }
 
-    public function submit(string $type)
+    public function submit()
     {
         try {
             $this->authorize('update', $this->server);
-            $this->syncData(true, $type);
+            $this->syncData(true);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

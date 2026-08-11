@@ -307,7 +307,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $s3->testConnection(shouldSave: true);
         $containerName = 'volume-upload-'.$this->execution->uuid;
         $image = coolifyHelperImage().':'.getHelperVersion();
-        $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($s3->endpoint))
+        $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($s3->endpoint, $s3->trustedInternalHosts()))
             ->map(fn (string $option): string => '--resolve '.escapeshellarg($option))
             ->implode(' ');
         $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;

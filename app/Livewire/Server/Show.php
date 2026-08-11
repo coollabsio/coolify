@@ -327,6 +327,15 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if (! $this->server->canBeValidated()) {
+                $this->dispatch(
+                    'error',
+                    'Cannot revalidate',
+                    'This server was transferred to another Coolify instance. Manage it from the target instance instead.'
+                );
+
+                return;
+            }
             if ($this->server->vultr_instance_id) {
                 $status = $this->server->refreshVultrState();
                 $this->server->refresh();

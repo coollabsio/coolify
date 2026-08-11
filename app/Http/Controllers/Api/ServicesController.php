@@ -7,17 +7,21 @@ use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\VolumeCloneJob;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Yaml\Yaml;
@@ -1971,6 +1975,54 @@ class ServicesController extends Controller
     }
 
     #[OA\Post(
+        summary: 'Migrate to Server',
+        description: 'Migrate a service to another destination/server owned by the authenticated team. Stops the service, optionally transfers persistent volume data when both servers are managed by Coolify, and updates database records. Redeploy after migration completes.',
+        path: '/services/{uuid}/migrate',
+        operationId: 'migrate-service-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the service.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string', description: 'UUID of the target destination.'),
+                    new OA\Property(property: 'migrate_volumes', type: 'boolean', default: true, description: 'Whether to transfer persistent volume data when migrating across servers.'),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Service migration started or completed.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function migrate_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('update', $service);
+
+        return migrateResourceToDestination($request, $service, 'Service', $teamId);
+    }
+
+    #[OA\Post(
         summary: 'Start',
         description: 'Start service.',
         path: '/services/{uuid}/start',
@@ -3074,5 +3126,242 @@ class ServicesController extends Controller
     public function delete_tag(Request $request): JsonResponse
     {
         return $this->deleteTag($request);
+    }
+
+    #[OA\Post(
+        summary: 'Clone',
+        description: 'Clone a service to a destination owned by the authenticated team.',
+        path: '/services/{uuid}/clone',
+        operationId: 'clone-service-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the service.', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['destination_uuid'],
+                properties: [
+                    new OA\Property(property: 'destination_uuid', type: 'string'),
+                    new OA\Property(property: 'name', type: 'string', nullable: true),
+                    new OA\Property(property: 'clone_volumes', type: 'boolean', default: false),
+                ]
+            )
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Service cloned.'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function clone_by_uuid(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'destination_uuid' => 'required|string',
+            'name' => 'string|max:255|nullable',
+            'clone_volumes' => 'boolean',
+        ]);
+        $allowedFields = ['destination_uuid', 'name', 'clone_volumes'];
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($request->route('uuid'))->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('update', $service);
+
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
+            ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+
+        if (! $destination || ! $destination->server?->canHostResources()) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+
+        $uuid = new_public_id();
+        $name = $request->filled('name')
+            ? $request->string('name')->toString()
+            : $service->name.'-clone-'.$uuid;
+        $cloneVolumeData = $request->boolean('clone_volumes', false);
+
+        $newService = $service->replicate([
+            'id',
+            'created_at',
+            'updated_at',
+        ])->fill([
+            'uuid' => $uuid,
+            'name' => $name,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+            'server_id' => $destination->server_id,
+        ]);
+        $newService->save();
+
+        foreach ($service->tags as $tag) {
+            $newService->tags()->attach($tag->id);
+        }
+
+        foreach ($service->scheduled_tasks()->get() as $task) {
+            $task->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'uuid' => new_public_id(),
+                'service_id' => $newService->id,
+                'team_id' => $teamId,
+            ])->save();
+        }
+
+        foreach ($service->environment_variables()->get() as $environmentVariable) {
+            $environmentVariable->replicate([
+                'id',
+                'created_at',
+                'updated_at',
+            ])->fill([
+                'resourceable_id' => $newService->id,
+                'resourceable_type' => $newService->getMorphClass(),
+            ])->save();
+        }
+
+        // Create applications/databases (and their volumes) for the clone first.
+        // Child rows are not copied by Service::replicate().
+        $newService->parse();
+        $newService->refresh();
+
+        $sourceApplicationsByName = $service->applications()->get()->keyBy('name');
+        $sourceDatabasesByName = $service->databases()->get()->keyBy('name');
+        $pendingVolumeClones = [];
+        $sourceServer = $service->destination?->server;
+        $targetServer = $newService->destination?->server;
+
+        foreach ($newService->applications()->get() as $application) {
+            $application->fill(['status' => 'exited'])->save();
+
+            $sourceApplication = $sourceApplicationsByName->get($application->name);
+            if (! $sourceApplication) {
+                continue;
+            }
+
+            if ($cloneVolumeData) {
+                $targetVolumesByMount = $application->persistentStorages()->get()->keyBy('mount_path');
+                foreach ($sourceApplication->persistentStorages()->get() as $sourceVolume) {
+                    $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
+                    if (! $targetVolume) {
+                        continue;
+                    }
+
+                    $pendingVolumeClones[] = [
+                        'source' => $sourceVolume->name,
+                        'target' => $targetVolume->name,
+                        'model' => $targetVolume,
+                    ];
+                }
+            }
+        }
+
+        foreach ($newService->databases()->get() as $database) {
+            $database->fill(['status' => 'exited'])->save();
+
+            $sourceDatabase = $sourceDatabasesByName->get($database->name);
+            if (! $sourceDatabase) {
+                continue;
+            }
+
+            if ($cloneVolumeData) {
+                $targetVolumesByMount = $database->persistentStorages()->get()->keyBy('mount_path');
+                foreach ($sourceDatabase->persistentStorages()->get() as $sourceVolume) {
+                    $targetVolume = $targetVolumesByMount->get($sourceVolume->mount_path);
+                    if (! $targetVolume) {
+                        continue;
+                    }
+
+                    $pendingVolumeClones[] = [
+                        'source' => $sourceVolume->name,
+                        'target' => $targetVolume->name,
+                        'model' => $targetVolume,
+                    ];
+                }
+            }
+
+            foreach ($sourceDatabase->scheduledBackups()->get() as $backup) {
+                $backup->replicate([
+                    'id',
+                    'created_at',
+                    'updated_at',
+                ])->fill([
+                    'uuid' => new_public_id(),
+                    'database_id' => $database->id,
+                    'database_type' => $database->getMorphClass(),
+                    'team_id' => $teamId,
+                ])->save();
+            }
+        }
+
+        if ($cloneVolumeData && $pendingVolumeClones !== [] && $sourceServer && $targetServer) {
+            try {
+                $chain = [
+                    function () use ($service) {
+                        StopService::run($service);
+                    },
+                ];
+
+                foreach ($pendingVolumeClones as $clone) {
+                    $chain[] = new VolumeCloneJob(
+                        $clone['source'],
+                        $clone['target'],
+                        $sourceServer,
+                        $targetServer,
+                        $clone['model'],
+                    );
+                }
+
+                $chain[] = function () use ($service) {
+                    StartService::run($service);
+                };
+
+                Bus::chain($chain)->onQueue('high')->dispatch();
+            } catch (\Exception $e) {
+                \Log::error('Failed to queue service volume clone for '.$service->uuid.': '.$e->getMessage());
+            }
+        }
+
+        auditLog('api.service.cloned', [
+            'team_id' => $teamId,
+            'source_uuid' => $service->uuid,
+            'service_uuid' => $newService->uuid,
+            'service_name' => $newService->name,
+            'destination_uuid' => $destination->uuid,
+            'clone_volumes' => $cloneVolumeData,
+        ]);
+
+        return response()->json([
+            'uuid' => $newService->uuid,
+            'message' => 'Service cloned.',
+        ], 201);
     }
 }

@@ -67,6 +67,43 @@ class ScheduledVolumeBackup extends BaseModel
         });
     }
 
+    public function scopeForService(Builder $query, Service $service): Builder
+    {
+        $resources = $service->applications()->get()->concat($service->databases()->get());
+        if ($resources->isEmpty()) {
+            return $query->whereRaw('1 = 0');
+        }
+        $resourceIdsByType = $resources->groupBy(fn (Model $resource): string => $resource->getMorphClass());
+
+        $volumeIds = LocalPersistentVolume::query()
+            ->where(function (Builder $query) use ($resourceIdsByType): void {
+                foreach ($resourceIdsByType as $type => $resources) {
+                    $query->orWhere(fn (Builder $query) => $query
+                        ->where('resource_type', $type)
+                        ->whereIn('resource_id', $resources->pluck('id')));
+                }
+            })->pluck('id');
+        $directoryIds = LocalFileVolume::query()
+            ->where('is_directory', true)
+            ->where('is_host_file', false)
+            ->where(function (Builder $query) use ($resourceIdsByType): void {
+                foreach ($resourceIdsByType as $type => $resources) {
+                    $query->orWhere(fn (Builder $query) => $query
+                        ->where('resource_type', $type)
+                        ->whereIn('resource_id', $resources->pluck('id')));
+                }
+            })->pluck('id');
+
+        return $query->where(function (Builder $query) use ($volumeIds, $directoryIds): void {
+            $query->where(fn (Builder $query) => $query
+                ->where('backupable_type', (new LocalPersistentVolume)->getMorphClass())
+                ->whereIn('backupable_id', $volumeIds))
+                ->orWhere(fn (Builder $query) => $query
+                    ->where('backupable_type', (new LocalFileVolume)->getMorphClass())
+                    ->whereIn('backupable_id', $directoryIds));
+        });
+    }
+
     public function backupable(): MorphTo
     {
         return $this->morphTo();

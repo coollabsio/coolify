@@ -1,35 +1,36 @@
-<form wire:submit='submit' class="flex flex-col">
-    <div class="flex items-center gap-2">
-        <h2>Healthcheck</h2>
-        <x-forms.button canGate="update" :canResource="$database" type="submit">Save</x-forms.button>
-        @if (!$healthCheckEnabled)
-            <x-modal-confirmation title="Confirm Healthcheck Enable?" buttonTitle="Enable Healthcheck"
-                submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this database.']"
-                warningMessage="If the health check fails, this database will be marked unhealthy. Please review the <a href='https://coolify.io/docs/knowledge-base/health-checks' target='_blank' class='underline text-white'>Health Checks</a> guide before proceeding!"
-                step2ButtonText="Enable Healthcheck" :confirmWithText="false" :confirmWithPassword="false"
-                isHighlightedButton>
-            </x-modal-confirmation>
-        @else
-            <x-forms.button canGate="update" :canResource="$database" wire:click="toggleHealthcheck">Disable Healthcheck</x-forms.button>
-        @endif
-    </div>
-    <div class="mt-1 pb-4">Define how your resource's health should be checked.</div>
-    <div class="flex flex-col gap-4">
+<form wire:submit="submit" class="application-settings-form flex flex-col gap-6">
+    <x-unsaved-bar action="submit" />
+
+    <x-application.settings-section title="Healthcheck"
+        description="Define how Docker checks this database and reports its health.">
+        <x-slot:actions>
+            @if (!$healthCheckEnabled)
+                <x-modal-confirmation title="Enable healthcheck?" buttonTitle="Enable healthcheck"
+                    submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this database.']"
+                    warningMessage="A failing probe marks the database unhealthy. Review the health check guide before enabling it."
+                    step2ButtonText="Enable healthcheck" :confirmWithText="false" :confirmWithPassword="false"
+                    isHighlightedButton />
+            @else
+                <x-forms.button canGate="update" :canResource="$database"
+                    wire:click="toggleHealthcheck" type="button">Disable healthcheck</x-forms.button>
+            @endif
+        </x-slot:actions>
+
         @if (!$healthCheckEnabled)
             <x-callout type="warning" title="Healthcheck disabled">
-                <p>Docker runs no healthcheck probe for this database and Coolify can no longer report a healthy/unhealthy state.</p>
+                Docker is not running a healthcheck probe, so Coolify cannot report a healthy or unhealthy state.
             </x-callout>
         @endif
 
-        <div class="flex gap-2">
-            <x-forms.input canGate="update" :canResource="$database" min="1" type="number" id="healthCheckInterval"
-                placeholder="15" label="Interval (s)" required />
-            <x-forms.input canGate="update" :canResource="$database" min="1" type="number" id="healthCheckTimeout"
-                placeholder="5" label="Timeout (s)" required />
-            <x-forms.input canGate="update" :canResource="$database" min="1" type="number" id="healthCheckRetries"
-                placeholder="5" label="Retries" required />
+        <div class="{{ !$healthCheckEnabled ? 'mt-4 ' : '' }}grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <x-forms.input canGate="update" :canResource="$database" min="1" type="number"
+                id="healthCheckInterval" placeholder="15" label="Interval (seconds)" required />
+            <x-forms.input canGate="update" :canResource="$database" min="1" type="number"
+                id="healthCheckTimeout" placeholder="5" label="Timeout (seconds)" required />
+            <x-forms.input canGate="update" :canResource="$database" min="1" type="number"
+                id="healthCheckRetries" placeholder="5" label="Retries" required />
             <x-forms.input canGate="update" :canResource="$database" min="0" type="number"
-                id="healthCheckStartPeriod" placeholder="5" label="Start Period (s)" required />
+                id="healthCheckStartPeriod" placeholder="5" label="Start period (seconds)" required />
         </div>
-    </div>
+    </x-application.settings-section>
 </form>

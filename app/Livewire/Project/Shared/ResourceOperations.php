@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Actions\Shared\MigrateResourceToDestination;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\Environment;
@@ -19,6 +20,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class ResourceOperations extends Component
@@ -39,6 +41,8 @@ class ResourceOperations extends Component
 
     public bool $cloneVolumeData = false;
 
+    public bool $migrateVolumeData = true;
+
     public function mount()
     {
         $parameters = get_route_parameters();
@@ -55,10 +59,23 @@ class ResourceOperations extends Component
         $this->cloneVolumeData = $value;
     }
 
-    public function cloneTo($destination_uuid)
+    public function toggleVolumeMigration(bool $value): void
+    {
+        $this->migrateVolumeData = $value;
+    }
+
+    public function cloneTo($destination_uuid, $environment_id = null)
     {
         try {
             $this->authorize('update', $this->resource);
+
+            $new_environment = $this->resource->environment;
+            if ($environment_id !== null) {
+                $new_environment = Environment::ownedByCurrentTeam()->find($environment_id);
+                if (! $new_environment) {
+                    return $this->addError('environment_id', 'Environment not found.');
+                }
+            }
 
             $new_destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $new_destination) {
@@ -71,11 +88,14 @@ class ResourceOperations extends Component
             }
 
             if ($this->resource->getMorphClass() === Application::class) {
-                $new_resource = clone_application($this->resource, $new_destination, ['uuid' => $uuid], $this->cloneVolumeData);
+                $new_resource = clone_application($this->resource, $new_destination, [
+                    'uuid' => $uuid,
+                    'environment_id' => $new_environment->id,
+                ], $this->cloneVolumeData);
 
                 $route = route('project.application.configuration', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
+                    'project_uuid' => $new_environment->project->uuid,
+                    'environment_uuid' => $new_environment->uuid,
                     'application_uuid' => $new_resource->uuid,
                 ]).'#resource-operations';
 
@@ -100,6 +120,7 @@ class ResourceOperations extends Component
                     'name' => $this->resource->name.'-clone-'.$uuid,
                     'status' => 'exited',
                     'started_at' => null,
+                    'environment_id' => $new_environment->id,
                     'destination_id' => $new_destination->id,
                     'destination_type' => $new_destination->getMorphClass(),
                 ]);
@@ -211,8 +232,8 @@ class ResourceOperations extends Component
                 }
 
                 $route = route('project.database.configuration', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
+                    'project_uuid' => $new_environment->project->uuid,
+                    'environment_uuid' => $new_environment->uuid,
                     'database_uuid' => $new_resource->uuid,
                 ]).'#resource-operations';
 
@@ -226,6 +247,7 @@ class ResourceOperations extends Component
                 ])->fill([
                     'uuid' => $uuid,
                     'name' => $this->resource->name.'-clone-'.$uuid,
+                    'environment_id' => $new_environment->id,
                     'destination_id' => $new_destination->id,
                     'destination_type' => $new_destination->getMorphClass(),
                     'server_id' => $new_destination->server_id,
@@ -354,8 +376,8 @@ class ResourceOperations extends Component
                 $new_resource->parse();
 
                 $route = route('project.service.configuration', [
-                    'project_uuid' => $this->projectUuid,
-                    'environment_uuid' => $this->environmentUuid,
+                    'project_uuid' => $new_environment->project->uuid,
+                    'environment_uuid' => $new_environment->uuid,
                     'service_uuid' => $new_resource->uuid,
                 ]).'#resource-operations';
 
@@ -399,6 +421,64 @@ class ResourceOperations extends Component
 
                 return redirect()->to($route);
             }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function migrateTo(string $destination_uuid)
+    {
+        try {
+            $this->authorize('update', $this->resource);
+
+            $new_destination = find_resource_destination_for_current_team($destination_uuid);
+            if (! $new_destination) {
+                return $this->addError('destination_id', 'Destination not found.');
+            }
+
+            $result = MigrateResourceToDestination::run(
+                $this->resource,
+                $new_destination,
+                $this->migrateVolumeData,
+            );
+
+            $this->dispatch('success', $result['message']);
+
+            $this->resource->loadMissing('environment.project');
+            $projectUuid = $this->projectUuid ?? $this->resource->environment?->project?->uuid;
+            $environmentUuid = $this->environmentUuid ?? $this->resource->environment?->uuid;
+
+            if (! $projectUuid || ! $environmentUuid) {
+                return null;
+            }
+
+            if ($this->resource->type() === 'application') {
+                $route = route('project.application.configuration', [
+                    'project_uuid' => $projectUuid,
+                    'environment_uuid' => $environmentUuid,
+                    'application_uuid' => $this->resource->uuid,
+                ]).'#resource-operations';
+            } elseif (str($this->resource->type())->startsWith('standalone-')) {
+                $route = route('project.database.configuration', [
+                    'project_uuid' => $projectUuid,
+                    'environment_uuid' => $environmentUuid,
+                    'database_uuid' => $this->resource->uuid,
+                ]).'#resource-operations';
+            } elseif ($this->resource->type() === 'service') {
+                $route = route('project.service.configuration', [
+                    'project_uuid' => $projectUuid,
+                    'environment_uuid' => $environmentUuid,
+                    'service_uuid' => $this->resource->uuid,
+                ]).'#resource-operations';
+            } else {
+                return null;
+            }
+
+            return redirect()->to($route);
+        } catch (ValidationException $e) {
+            $message = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+
+            return $this->addError('destination_id', $message);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
