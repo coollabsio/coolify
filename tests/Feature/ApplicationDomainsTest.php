@@ -108,10 +108,37 @@ it('lists existing domains as individual rows', function () {
         ->assertSee('https://example.com')
         ->assertSee('https://www.example.com')
         ->assertSee('https://example.com/favicon.ico', false)
+        ->assertSee('class="relative size-4 shrink-0"', false)
+        ->assertSee('domain-favicon-fallback', false)
+        ->assertSee('class="invisible absolute inset-0 size-4 rounded-sm"', false)
+        ->assertSee('$el.previousElementSibling.classList.add(\'hidden\')', false)
         ->assertSee('x-on:error="$el.remove()"', false)
+        ->assertSee('class="min-w-0 flex-1 text-[13px]', false)
         ->html();
 
     expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(2);
+});
+
+it('shows one redirect direction control in each compose service header', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  api:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'api' => [
+                'domain' => 'https://api.example.com,https://www.api.example.com',
+                'redirect' => 'www',
+            ],
+        ]),
+    ]);
+
+    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSuccessful()
+        ->assertSee('api')
+        ->html();
+
+    expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(1)
+        ->and(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0)
+        ->and(substr_count($html, 'domain-direction-service-api'))->toBeGreaterThan(0);
 });
 
 it('shows dns entries control next to Add', function () {
@@ -1225,13 +1252,23 @@ it('uses the compact service domains layout for compose applications', function 
         ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
         ->toContain('class="application-settings-section-body mt-1 scroll-mt-28')
         ->toContain('bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]')
-        ->toContain('class="data-table-header domains-table-grid"')
+        ->toContain('class="data-table-header domains-table-grid-service"')
         ->toContain('<span>Direction</span>')
         ->toContain('<span>Search engine indexing</span>')
+        ->not->toContain('<span>Last checked</span>')
         ->not->toContain('id="edit-domain-direction"')
-        ->not->toContain('htmlId="application-compose-domain-redirect-{{ $redirectWireKey }}"')
-        ->not->toContain('aria-label="Redirect direction for {{ $serviceName }}"')
+        ->toContain('id="domain-direction-service-{{ $redirectWireKey }}"')
+        ->toContain('onChange="updateServiceRedirect"')
+        ->toContain("'showDirectionControl' => false")
         ->not->toContain('title="No domains for this service"');
+});
+
+it('does not render a last checked column in the domains table', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+    $row = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
+
+    expect($view)->not->toContain('<span>Last checked</span>')
+        ->and($row)->not->toContain('$checkedAt');
 });
 
 it('uses compact labeled domain cards on mobile', function () {
@@ -1407,6 +1444,7 @@ it('updates search engine indexing from the domains view', function () {
         ->assertSee('Direction')
         ->assertSee('toggleNoindexDomain', false)
         ->assertSee('updateRedirect', false)
+        ->assertSee('wire:ignore', false)
         ->assertDontSee('x-model="localIndexing"', false)
         ->assertDontSee('x-model="localDirection"', false)
         ->assertDontSee('@js(', false)

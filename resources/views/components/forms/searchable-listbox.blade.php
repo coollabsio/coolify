@@ -37,8 +37,9 @@
     <div class="relative min-w-0" x-data="{
         open: false,
         query: '',
+        saving: false,
         options: @js(array_values($options)),
-        value: @if (!$wire) @js($value) @elseif ($live) @entangle($id).live @else @entangle($id) @endif,
+        value: @if (!$wire) @js($value) @elseif ($live && ! $onChange) @entangle($id).live @else @entangle($id) @endif,
         get current() {
             const found = this.options.find((option) => String(option.value) === String(this.value));
             return found ? found.label : @js($placeholder);
@@ -72,8 +73,8 @@
             this.open = false;
             this.query = '';
         },
-        choose(option) {
-            if (option.disabled) {
+        async choose(option) {
+            if (this.saving || option.disabled) {
                 return;
             }
 
@@ -83,9 +84,17 @@
             }
 
             this.value = option.value;
-            @if ($onChange) this.$nextTick(() => this.$wire.{{ $onChange }}()); @endif
+            @if ($onChange)
+                this.saving = true;
+                try {
+                    await this.$wire.{{ $onChange }}();
+                } finally {
+                    this.saving = false;
+                }
+            @endif
         }
-    }" x-modelable="value" {{ $attributes->whereStartsWith('x-model') }}
+    }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
+        {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
         @click.outside="close()" @keydown.escape.window="open && close()">
         <button id="{{ $id }}-trigger" type="button" class="listbox-trigger" @click="toggle()"

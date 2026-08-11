@@ -2109,11 +2109,15 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .domains-table-grid {
-    grid-template-columns: minmax(0, 1.8fr) 8.5rem minmax(7rem, 0.9fr) 10rem 11rem 6.5rem;
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 11rem 6.5rem;
+}
+
+.domains-table-grid-service {
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 6.5rem;
 }
 
 .domains-table-grid-compose {
-    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem minmax(7rem, 0.9fr) 10rem 11rem 6.5rem;
+    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem 10rem 11rem 6.5rem;
 }
 
 .domains-mobile-label {
@@ -2127,9 +2131,9 @@ input[type="search"]::-webkit-search-results-decoration {
         gap: 0.75rem;
     }
 
-    /* Hide "Last checked" (3rd of 4) */
-    .domains-table-grid > :nth-child(3) {
-        display: none;
+    .domains-table-grid-service {
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 5.5rem;
+        gap: 0.75rem;
     }
 
     .domains-table-grid-compose {
@@ -2137,20 +2141,21 @@ input[type="search"]::-webkit-search-results-decoration {
         gap: 0.75rem;
     }
 
-    /* Hide "Service" (2) and "Last checked" (4) of 5 */
-    .domains-table-grid-compose > :nth-child(2),
-    .domains-table-grid-compose > :nth-child(4) {
+    /* Hide "Service" */
+    .domains-table-grid-compose > :nth-child(2) {
         display: none;
     }
 }
 
 @media (max-width: 768px) {
     .data-table-header.domains-table-grid,
+    .data-table-header.domains-table-grid-service,
     .data-table-header.domains-table-grid-compose {
         display: none;
     }
 
     .data-table-row.domains-table-grid,
+    .data-table-row.domains-table-grid-service,
     .data-table-row.domains-table-grid-compose {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -2172,26 +2177,28 @@ input[type="search"]::-webkit-search-results-decoration {
             'indexing indexing';
     }
 
-    .data-table-row.domains-table-grid.domains-row-without-direction > :nth-child(5),
-    .data-table-row.domains-table-grid-compose.domains-row-without-direction > :nth-child(6) {
+    .data-table-row.domains-table-grid.domains-row-without-direction > :nth-child(4),
+    .data-table-row.domains-table-grid-compose.domains-row-without-direction > :nth-child(5) {
         display: none;
     }
 
     /* Domain cell */
     .data-table-row.domains-table-grid > :nth-child(1),
+    .data-table-row.domains-table-grid-service > :nth-child(1),
     .data-table-row.domains-table-grid-compose > :nth-child(1) {
         grid-area: domain;
         min-width: 0;
     }
 
     .data-table-row.domains-table-grid > :nth-child(1) a,
+    .data-table-row.domains-table-grid-service > :nth-child(1) a,
     .data-table-row.domains-table-grid-compose > :nth-child(1) a {
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
     }
 
-    /* Non-compose: 1 Domain, 2 DNS, 3 Last checked, 4 Indexing, 5 Direction, 6 Actions */
+    /* Non-compose: 1 Domain, 2 DNS, 3 Indexing, 4 Direction, 5 Actions */
     .data-table-row.domains-table-grid > :nth-child(2) {
         grid-area: meta;
         display: flex !important;
@@ -2201,23 +2208,37 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid > :nth-child(3) {
-        display: none !important;
-    }
-
-    .data-table-row.domains-table-grid > :nth-child(4) {
         grid-area: indexing;
     }
 
-    .data-table-row.domains-table-grid > :nth-child(5) {
+    .data-table-row.domains-table-grid > :nth-child(4) {
         grid-area: direction;
     }
 
-    .data-table-row.domains-table-grid > :nth-child(6) {
+    .data-table-row.domains-table-grid > :nth-child(5) {
         grid-area: actions;
         align-self: center;
     }
 
-    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Last checked, 5 Indexing, 6 Direction, 7 Actions */
+    /* Compose service group: 1 Domain, 2 DNS, 3 Indexing, 4 Actions */
+    .data-table-row.domains-table-grid-service > :nth-child(2) {
+        grid-area: meta;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(3) {
+        grid-area: indexing;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(4) {
+        grid-area: actions;
+        align-self: center;
+    }
+
+    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Indexing, 5 Direction, 6 Actions */
     .data-table-row.domains-table-grid-compose > :nth-child(2) {
         display: none !important;
     }
@@ -2231,18 +2252,14 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid-compose > :nth-child(4) {
-        display: none !important;
-    }
-
-    .data-table-row.domains-table-grid-compose > :nth-child(5) {
         grid-area: indexing;
     }
 
-    .data-table-row.domains-table-grid-compose > :nth-child(6) {
+    .data-table-row.domains-table-grid-compose > :nth-child(5) {
         grid-area: direction;
     }
 
-    .data-table-row.domains-table-grid-compose > :nth-child(7) {
+    .data-table-row.domains-table-grid-compose > :nth-child(6) {
         grid-area: actions;
         align-self: center;
     }

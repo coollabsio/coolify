@@ -130,6 +130,7 @@ class Domains extends Component
         $application->setNoindexDomains($domains);
         $application->save();
         $this->service->parse();
+        $this->refreshDomains();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Search engine indexing updated.');
     }

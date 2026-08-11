@@ -171,33 +171,43 @@
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('server-mobile-restart-proxy-trigger')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                    <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="restart" class="size-3.5 text-orange-500 dark:text-warning" />
+                                    </span>
                                     Restart Proxy
                                 </button>
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('server-mobile-stop-proxy-trigger')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    <span class="flex size-4 shrink-0 items-center justify-center">
+                                        <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                    </span>
                                     Stop Proxy
                                 </button>
                                 @if ($traefikDashboardAvailable)
                                     <a class="listbox-option justify-start! gap-2.5!" target="_blank"
                                         href="http://{{ $serverIp }}:8080" @click="open = false" role="menuitem">
-                                        <x-reicon name="external-link" class="size-3.5 opacity-70" />
+                                        <span class="flex size-4 shrink-0 items-center justify-center">
+                                        <x-reicon name="external-link" class="size-3! opacity-70" />
+                                        </span>
                                         Traefik Dashboard
                                     </a>
                                 @endif
                             @else
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; $wire.dispatch('checkProxyEvent')" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                    </span>
                                     Start Proxy
                                 </button>
                             @endif
                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                 wire:click="checkProxyStatus" wire:loading.attr="disabled"
                                 @click="open = false" role="menuitem">
-                                <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                <span class="flex size-4 shrink-0 items-center justify-center">
+                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                </span>
                                 Refresh Proxy Status
                             </button>
                         </div>
@@ -276,55 +286,65 @@
 
                 @if ($server->proxySet())
                     @can('manageProxy', $server)
-                        <div
-                            class="resource-heading-actions flex shrink-0 items-center gap-0.5">
-                            @if ($proxyCanBeStopped)
-                                <div class="mt-1" wire:loading wire:target="loadProxyConfiguration">
-                                    <x-loading text="Checking Traefik dashboard" />
-                                </div>
-                                @if ($traefikDashboardAvailable)
-                                    <a class="button" target="_blank" href="http://{{ $serverIp }}:8080">
-                                        Traefik Dashboard
-                                        <x-external-link />
-                                    </a>
+                        <div id="server-desktop-actions" class="resource-heading-actions relative shrink-0"
+                            x-data="{ open: false }" @click.outside="open = false"
+                            @keydown.escape.window="open = false">
+                            <button type="button" class="button" @click="open = !open" :aria-expanded="open"
+                                aria-haspopup="menu" wire:loading.attr="disabled" wire:loading.class="is-loading"
+                                wire:target="checkProxy,startProxy">
+                                <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                Actions
+                                <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                            </button>
+
+                            <div x-cloak x-show="open" x-transition.origin.top.right
+                                class="listbox-panel top-full! right-0! left-auto! mt-1! w-60! min-w-0!" role="menu">
+                                @if ($proxyCanBeStopped)
+                                    @if ($traefikDashboardAvailable)
+                                        <a class="listbox-option justify-start! gap-2.5!" target="_blank"
+                                            href="http://{{ $serverIp }}:8080" @click="open = false" role="menuitem">
+                                            <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="external-link" class="size-3! opacity-70" />
+                                    </span>
+                                            Traefik Dashboard
+                                        </a>
+                                    @endif
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @click="open = false; document.getElementById('server-mobile-restart-proxy-trigger')?.click()"
+                                        role="menuitem">
+                                        <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                        </span>
+                                        Restart Proxy
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @click="open = false; document.getElementById('server-mobile-stop-proxy-trigger')?.click()"
+                                        role="menuitem">
+                                        <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                        </span>
+                                        Stop Proxy
+                                    </button>
+                                @else
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @click="open = false; $wire.dispatch('checkProxyEvent')" role="menuitem">
+                                        <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                        </span>
+                                        Start Proxy
+                                    </button>
                                 @endif
-                                <x-modal-confirmation title="Confirm Proxy Restart?" buttonTitle="Restart Proxy"
-                                    submitAction="restart" :actions="[
-                                        'This proxy will be stopped and started again.',
-                                        'All resources hosted on Coolify will be unavailable during the restart.',
-                                    ]" :confirmWithText="false" :confirmWithPassword="false"
-                                    step2ButtonText="Restart Proxy" :dispatchEvent="true"
-                                    dispatchEventType="restartEvent">
-                                    <x-slot:content>
-                                        <x-forms.button title="Restart proxy">
-                                            <x-reicon name="restart"
-                                                class="size-4 text-orange-500 dark:text-warning" />
-                                            Restart Proxy
-                                        </x-forms.button>
-                                    </x-slot:content>
-                                </x-modal-confirmation>
-                                <x-modal-confirmation title="Confirm Proxy Stopping?" buttonTitle="Stop Proxy"
-                                    submitAction="stop(true)" :actions="[
-                                        'The Coolify proxy will be stopped.',
-                                        'All resources hosted on Coolify will be unavailable.',
-                                    ]" :confirmWithText="false" :confirmWithPassword="false"
-                                    step2ButtonText="Stop Proxy" :dispatchEvent="true"
-                                    dispatchEventType="stopEvent">
-                                    <x-slot:content>
-                                        <x-forms.button isError title="Stop proxy">
-                                            <x-reicon name="stop" class="size-4 text-error" />
-                                            Stop Proxy
-                                        </x-forms.button>
-                                    </x-slot:content>
-                                </x-modal-confirmation>
-                            @else
-                                <x-forms.button @click="$wire.dispatch('checkProxyEvent')"
-                                    wire:target="checkProxy,startProxy">
-                                    <x-reicon name="play-circle"
-                                        class="size-4 text-coollabs dark:text-warning" />
-                                    Start Proxy
-                                </x-forms.button>
-                            @endif
+                                <div class="my-1 border-t border-coolgray-200 dark:border-coolgray-300"
+                                    role="separator"></div>
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    wire:click="checkProxyStatus" wire:loading.attr="disabled"
+                                    @click="open = false" role="menuitem">
+                                    <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                    </span>
+                                    Refresh Proxy Status
+                                </button>
+                            </div>
                         </div>
                     @endcan
                 @endif

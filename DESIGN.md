@@ -399,6 +399,34 @@ do not create an unnecessarily wide menu.
 Toolbar filter and sort buttons keep static labels (`Filter`, `Sort`). The
 selected option is indicated inside the menu, not repeated on the trigger.
 
+#### Livewire dropdown state synchronization
+
+Instant-save listboxes must not flash back to an older value while Livewire is
+saving or morphing the DOM. Treat the Alpine selection as the current visual
+state until its request finishes:
+
+- await the Livewire change handler and prevent overlapping selections while
+  it is running;
+- when a client-managed listbox can be rerendered by an unrelated or stale
+  Livewire response, use the listbox's `preserveValue` option so the morph does
+  not replace its newer Alpine value;
+- scope `preserveValue` to controls whose value is owned by that interaction;
+  do not use it when external server events must replace the displayed value;
+- after saving through a related model, refresh the parent component's loaded
+  relationship before rendering the response. A database write alone does not
+  update an already-loaded Eloquent collection;
+- use stable `wire:key` values for rows containing listboxes. Do not include the
+  selected value in the key, because recreating the Alpine component causes a
+  visible reset;
+- remember that a portalled options panel is teleported outside its visual
+  wrapper. Guard selection in the Alpine handler itself rather than relying
+  only on `pointer-events` or a disabled wrapper.
+
+The failure mode to avoid is: selection B is shown optimistically, selection A
+is chosen next, the response for B morphs the listbox back to B, then the later
+response finally shows A. The control should remain on the newest accepted
+selection throughout the save sequence.
+
 #### Multi-select filter dropdowns
 
 Toolbar filters that can combine criteria use one multi-select listbox rather

@@ -15,6 +15,7 @@
     'disabled' => false,
     'tooltip' => true,
     'portal' => false,
+    'preserveValue' => false,
 ])
 
 @php
@@ -45,22 +46,33 @@
     <div class="relative min-w-0" x-data="{
         open: false,
         positioned: false,
+        saving: false,
         options: @js(array_values($options)),
-        value: @if (!$wire) @js($value) @elseif ($live) @entangle($id).live @else @entangle($id) @endif,
+        value: @if (!$wire) @js($value) @elseif ($live && ! $onChange) @entangle($id).live @else @entangle($id) @endif,
         get current() {
             const found = this.options.find((option) => String(option.value) === String(this.value));
             return found ? found.label : @js($placeholder);
         },
-        choose(option) {
-            if (option.disabled) return;
+        async choose(option) {
+            if (this.saving || option.disabled) return;
             this.open = false;
             if (String(option.value) === String(this.value)) return;
             this.value = option.value;
             this.$dispatch('listbox-change', { value: option.value });
             @if ($onChange && is_array($onChangeArgs))
-                this.$nextTick(() => this.$wire.{{ $onChange }}(...@js($onChangeArgs), option.value));
+                this.saving = true;
+                try {
+                    await this.$wire.{{ $onChange }}(...@js($onChangeArgs), option.value);
+                } finally {
+                    this.saving = false;
+                }
             @elseif ($onChange)
-                this.$nextTick(() => this.$wire.{{ $onChange }}());
+                this.saving = true;
+                try {
+                    await this.$wire.{{ $onChange }}();
+                } finally {
+                    this.saving = false;
+                }
             @endif
         },
         toggle() {
@@ -94,8 +106,10 @@
             panel.style.minWidth = `${triggerRect.width}px`;
             this.positioned = true;
         }
-    }" x-modelable="value" {{ $attributes->whereStartsWith('x-model') }}
+    }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
+        {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
+        @if ($preserveValue) wire:ignore @endif
         @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()">
         <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"

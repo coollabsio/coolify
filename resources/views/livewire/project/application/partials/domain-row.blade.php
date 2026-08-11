@@ -13,10 +13,7 @@
         'pending' => 'DNS pending',
         default => 'DNS unknown',
     };
-    $checkedAt = ! empty($row['checked_at'])
-        ? \Illuminate\Support\Carbon::parse($row['checked_at'])->diffForHumans()
-        : null;
-    $gridClass = ($isCompose ?? false) ? 'domains-table-grid-compose' : 'domains-table-grid';
+    $gridClass = $domainGridClass ?? (($isCompose ?? false) ? 'domains-table-grid-compose' : 'domains-table-grid');
     $domainParts = $isSuggested ? null : parse_url($row['url']);
     $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
         ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
@@ -38,7 +35,7 @@
         ->filter(fn ($item) => $redirectPairKey($item['url']) === $pairKey)
         ->keys()
         ->first();
-    $showDirection = ! $isSuggested && $firstPairRowIndex === $index;
+    $showDirection = ($showDirectionControl ?? true) && ! $isSuggested && $firstPairRowIndex === $index;
 @endphp
 
 <div wire:key="domain-row-{{ $index }}-{{ md5(($isSuggested ? 's:' : '') . $row['url'] . '|' . ($row['service'] ?? '')) }}"
@@ -59,12 +56,19 @@
                     </span>
                 @else
                     @if ($faviconUrl)
-                        <img src="{{ $faviconUrl }}" alt="" loading="lazy" decoding="async"
-                            referrerpolicy="no-referrer" x-on:error="$el.remove()"
-                            class="size-4 shrink-0 rounded-sm" />
+                        <span class="relative size-4 shrink-0" aria-hidden="true">
+                            <x-reicon name="globe"
+                                class="domain-favicon-fallback size-4 text-neutral-400 dark:text-fg-faint" />
+                            <img src="{{ $faviconUrl }}" alt="" loading="lazy" decoding="async"
+                                referrerpolicy="no-referrer"
+                                x-init="if ($el.complete && $el.naturalWidth > 0) { $el.previousElementSibling.classList.add('hidden'); $el.classList.remove('invisible') }"
+                                x-on:load="$el.previousElementSibling.classList.add('hidden'); $el.classList.remove('invisible')"
+                                x-on:error="$el.remove()"
+                                class="invisible absolute inset-0 size-4 rounded-sm" />
+                        </span>
                     @endif
                     <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank"
-                        class="min-w-0 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                        class="min-w-0 flex-1 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
                         title="{{ $row['url'] }}">
                         {{ $row['url'] }}
                     </a>
@@ -101,11 +105,6 @@
             @endif
         </div>
 
-        <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim"
-            title="{{ $checkedAt ?? '' }}">
-            {{ $checkedAt ?: '-' }}
-        </div>
-
         <div class="min-w-0" title="Search engine indexing">
             @unless ($isSuggested)
                 <span class="domains-mobile-label">Search engine indexing</span>
@@ -114,6 +113,7 @@
                 <span class="text-[13px] text-neutral-500 dark:text-fg-dim">-</span>
             @elseif (auth()->user()?->can('update', $application) && ! $labelsAreWritable)
                 <x-forms.listbox id="domain-indexing-{{ $index }}" :wire="false"
+                    preserveValue
                     :value="$application->isDomainNoindexed($row['url']) ? 'noindex' : 'index'"
                     onChange="toggleNoindexDomain" :onChangeArgs="[$row['url']]" portal :options="[
                         ['value' => 'index', 'label' => 'Indexable'],
@@ -126,6 +126,7 @@
             @endif
         </div>
 
+        @if ($showDirectionControl ?? true)
         <div class="min-w-0" title="Direction">
             @php
                 $rowDirection = $domainDirection ?? $redirect;
@@ -140,6 +141,7 @@
             @endif
             @if ($showDirection && auth()->user()?->can('update', $application) && ! $labelsAreWritable)
                 <x-forms.listbox id="domain-direction-{{ $index }}" :wire="false" :value="$rowDirection"
+                    preserveValue
                     :onChange="$isCompose ? 'updateServiceRedirect' : 'updateRedirect'"
                     :onChangeArgs="$isCompose ? [$row['service']] : []" portal :options="[
                         ['value' => 'both', 'label' => 'Allow www & non-www'],
@@ -150,6 +152,7 @@
                 <span class="text-[13px] text-neutral-500 dark:text-fg-dim">{{ $directionLabel }}</span>
             @endif
         </div>
+        @endif
 
         <div class="flex items-center justify-end gap-1">
             @can('update', $application)
