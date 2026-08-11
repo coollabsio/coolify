@@ -261,19 +261,16 @@
                     </div>
                 @elseif (request()->user()->two_factor_confirmed_at)
                     <div class="flex flex-col gap-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <x-status-badge status="Enabled" type="success" />
-                            <div class="flex flex-wrap items-center gap-2">
-                                <form action="/user/two-factor-recovery-codes" method="POST">
-                                    @csrf
-                                    <x-forms.button type="submit">Regenerate recovery codes</x-forms.button>
-                                </form>
-                                <form action="/user/two-factor-authentication" method="POST">
-                                    @csrf
-                                    @method('DELETE')
-                                    <x-forms.button type="submit" isError>Disable 2FA</x-forms.button>
-                                </form>
-                            </div>
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <form action="/user/two-factor-recovery-codes" method="POST">
+                                @csrf
+                                <x-forms.button type="submit">Regenerate recovery codes</x-forms.button>
+                            </form>
+                            <form action="/user/two-factor-authentication" method="POST">
+                                @csrf
+                                @method('DELETE')
+                                <x-forms.button type="submit" isError>Disable 2FA</x-forms.button>
+                            </form>
                         </div>
                         @if (session('status') === 'two-factor-authentication-confirmed'
                                 || session('status') === 'recovery-codes-generated')
