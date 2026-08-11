@@ -1,8 +1,12 @@
 <?php
 
 use App\Livewire\Dashboard\TrafficAnalytics;
+use App\Models\Application;
+use App\Models\Environment;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelTrafficClient;
@@ -106,6 +110,39 @@ it('renders the team traffic summary aggregated across servers with an approxima
         ->assertSee('1,500')
         ->assertSee('Unique visitors')
         ->assertSee('approximate');
+});
+
+it('does not disclose another team application name in the top apps list', function () {
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDestination = StandaloneDocker::factory()->create(['server_id' => $otherServer->id, 'network' => 'other-team-test']);
+
+    $otherTeamApplication = Application::factory()->create([
+        'name' => 'Secret Other Team App',
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    $fake = new FakeDashboardTrafficClient($server);
+    $fake->responses = fakeDashboardTrafficResponses(1000);
+    $fake->responses['/traffic/apps'] = json_encode([$otherTeamApplication->uuid]);
+
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    Livewire::test(TrafficAnalytics::class)
+        ->assertOk()
+        ->assertDontSee('Secret Other Team App')
+        ->assertSee($otherTeamApplication->uuid);
 });
 
 it('shows a failure empty-state instead of an all-zero KPI panel when every server fetch fails', function () {

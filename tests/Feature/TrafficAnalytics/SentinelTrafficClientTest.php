@@ -48,3 +48,57 @@ it('builds server-wide overview url when appKey is null', function () {
     $client->overview(null, 'a', 'b');
     expect($client->captured[0])->toContain('/api/traffic/overview')->not->toContain('/app/');
 });
+
+it('rejects a malicious app key that would break out of the shell quoting', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+
+    expect(fn () => $client->overview("x'; touch /tmp/pwned; '", 'a', 'b'))
+        ->toThrow(InvalidArgumentException::class);
+    expect(fn () => $client->breakdown('foo bar', 'country', 'a', 'b'))
+        ->toThrow(InvalidArgumentException::class);
+    expect($client->captured)->toBeEmpty();
+});
+
+it('rejects a dimension outside the known fixed set', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+
+    expect(fn () => $client->breakdown(null, "status'; touch /tmp/pwned; '", 'a', 'b'))
+        ->toThrow(InvalidArgumentException::class);
+    expect($client->captured)->toBeEmpty();
+});
+
+it('accepts a CUID2-like app key and builds the url', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+    $client->response = json_encode(['requests' => 0]);
+
+    $client->overview('cm2abc123xyz456uuid', 'a', 'b');
+
+    expect($client->captured[0])->toContain('/api/app/cm2abc123xyz456uuid/traffic/overview');
+});
+
+it('accepts a hostname-shaped app key and builds the url', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+    $client->response = json_encode(['requests' => 0]);
+
+    $client->overview('app.example.com', 'a', 'b');
+
+    expect($client->captured[0])->toContain('/api/app/app.example.com/traffic/overview');
+});
+
+it('accepts every known dimension and rejects unknown ones', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+    $client->response = json_encode([]);
+
+    foreach (['status', 'method', 'country', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot'] as $dimension) {
+        $client->breakdown(null, $dimension, 'a', 'b');
+    }
+    expect($client->captured)->toHaveCount(12);
+
+    expect(fn () => $client->breakdown(null, 'not-a-real-dimension', 'a', 'b'))
+        ->toThrow(InvalidArgumentException::class);
+});

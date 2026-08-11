@@ -129,7 +129,7 @@ class Analytics extends Component
 
             $rows[] = [
                 'uuid' => $uuid,
-                'name' => Application::whereUuid($uuid)->first()?->name ?? $uuid,
+                'name' => Application::ownedByCurrentTeam()->whereUuid($uuid)->first()?->name ?? $uuid,
                 'requests' => (int) ($overview['requests'] ?? 0),
                 'bandwidth' => (int) ($overview['bytesIn'] ?? 0) + (int) ($overview['bytesOut'] ?? 0),
             ];

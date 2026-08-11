@@ -121,6 +121,37 @@ it('renders server-wide analytics with a per-app leaderboard when enabled', func
         ->assertSee('Leaderboard App');
 });
 
+it('does not disclose another team application name for a sentinel-reported uuid', function () {
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+    ]);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->save();
+
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+    $otherDestination = StandaloneDocker::factory()->create(['server_id' => $otherServer->id, 'network' => 'other-team-test']);
+
+    $otherTeamApplication = Application::factory()->create([
+        'name' => 'Secret Other Team App',
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $otherDestination->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    $fake = new FakeServerAnalyticsTrafficClient($server);
+    $fake->responses = fakeServerAnalyticsResponses([$otherTeamApplication->uuid]);
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    Livewire::test(Analytics::class, ['server_uuid' => $server->uuid])
+        ->assertOk()
+        ->assertDontSee('Secret Other Team App')
+        ->assertSee($otherTeamApplication->uuid);
+});
+
 it('shows an empty state when traffic analytics is disabled for the server', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,

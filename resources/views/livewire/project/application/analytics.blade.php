@@ -10,19 +10,21 @@ $dimensionLabels = [
     'os' => 'Operating systems',
     'device' => 'Devices',
 ];
+$analyticsServerUuid = $application->destination?->server?->uuid;
 ?>
 <div class="flex flex-col gap-6">
     @if (! $enabled)
         <x-application.settings-section id="analytics-section" title="Analytics"
             helper="Inspect Cloudflare-style traffic statistics reported by Sentinel.">
-            <x-slot:actions>
-                <a class="button"
-                    href="{{ route('server.sentinel', ['server_uuid' => $application->destination->server->uuid]) }}"
-                    {{ wireNavigate() }}>
-                    Server settings
-                    <x-external-link />
-                </a>
-            </x-slot:actions>
+            @if ($analyticsServerUuid)
+                <x-slot:actions>
+                    <a class="button" href="{{ route('server.sentinel', ['server_uuid' => $analyticsServerUuid]) }}"
+                        {{ wireNavigate() }}>
+                        Server settings
+                        <x-external-link />
+                    </a>
+                </x-slot:actions>
+            @endif
             <x-empty size="sm" title="Traffic analytics is not enabled"
                 description="Enable Sentinel traffic analytics for this server to start collecting request analytics."
                 icon-name="network" />

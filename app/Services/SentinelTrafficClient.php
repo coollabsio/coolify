@@ -13,12 +13,20 @@ class SentinelTrafficClient
 {
     private string $base = 'http://localhost:8888/api';
 
+    /** @var array<int, string> */
+    private const ALLOWED_DIMENSIONS = [
+        'status', 'method', 'country', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot',
+    ];
+
     public function __construct(protected Server $server) {}
 
     // NOTE: Sentinel's traffic API expects `from`/`to` as ISO-8601 Zulu strings
     // (e.g. "2024-01-14T10:00:00Z"), confirmed against sentinel/API.md.
     public function overview(?string $appKey, string $from, string $to): TrafficOverviewData
     {
+        if ($appKey !== null) {
+            $this->assertSafeKey($appKey);
+        }
         $path = $appKey ? "/app/{$appKey}/traffic/overview" : '/traffic/overview';
         $json = json_decode($this->raw($this->url($path, ['from' => $from, 'to' => $to])), true) ?? [];
 
@@ -27,16 +35,23 @@ class SentinelTrafficClient
 
     public function paths(?string $appKey, string $from, string $to, int $limit = 50): Collection
     {
+        if ($appKey !== null) {
+            $this->assertSafeKey($appKey);
+        }
         $path = $appKey ? "/app/{$appKey}/traffic/paths" : '/traffic/paths';
-        $rows = json_decode($this->raw($this->url($path, ['from' => $from, 'to' => $to, 'limit' => $limit])), true) ?? [];
+        $rows = json_decode($this->raw($this->url($path, ['from' => $from, 'to' => $to, 'limit' => (int) $limit])), true) ?? [];
 
         return collect($rows)->map(fn ($r) => TrafficPathData::fromSentinel($r));
     }
 
     public function breakdown(?string $appKey, string $dimension, string $from, string $to, int $limit = 50): Collection
     {
+        if ($appKey !== null) {
+            $this->assertSafeKey($appKey);
+        }
+        $this->assertSafeDimension($dimension);
         $path = $appKey ? "/app/{$appKey}/traffic/breakdown/{$dimension}" : "/traffic/breakdown/{$dimension}";
-        $rows = json_decode($this->raw($this->url($path, ['from' => $from, 'to' => $to, 'limit' => $limit])), true) ?? [];
+        $rows = json_decode($this->raw($this->url($path, ['from' => $from, 'to' => $to, 'limit' => (int) $limit])), true) ?? [];
 
         return collect($rows)->map(fn ($r) => TrafficBreakdownData::fromSentinel($r));
     }
@@ -51,6 +66,25 @@ class SentinelTrafficClient
         $json = json_decode($this->raw($this->url('/traffic/attribution')), true) ?? [];
 
         return data_get($json, 'attribution');
+    }
+
+    /**
+     * Reject anything that isn't a bare CUID2/UUID or hostname before it is
+     * interpolated into a shell-quoted `docker exec ... curl` command
+     * (see remoteFetch()). No quotes, spaces, slashes, or shell metacharacters.
+     */
+    private function assertSafeKey(string $value): void
+    {
+        if ($value === '' || ! preg_match('/\A[A-Za-z0-9._:-]+\z/', $value)) {
+            throw new \InvalidArgumentException('Invalid traffic analytics app key.');
+        }
+    }
+
+    private function assertSafeDimension(string $dimension): void
+    {
+        if (! in_array($dimension, self::ALLOWED_DIMENSIONS, true)) {
+            throw new \InvalidArgumentException('Invalid traffic analytics dimension.');
+        }
     }
 
     private function url(string $path, array $query = []): string

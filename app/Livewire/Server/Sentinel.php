@@ -144,6 +144,11 @@ class Sentinel extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            if ($this->server->isSwarm() || $this->server->isBuildServer()) {
+                $this->dispatch('error', 'Traffic analytics is not supported on Swarm/Build servers.');
+
+                return;
+            }
             $enable = ! $this->server->isTrafficAnalyticsEnabled();
             ConfigureTrafficAnalytics::run($this->server, $enable);
             $this->server->refresh();

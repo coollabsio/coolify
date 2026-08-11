@@ -132,3 +132,18 @@ it('shows an empty state when traffic analytics is disabled for the server', fun
         ->assertSee('Analytics')
         ->assertDontSee('Unique visitors');
 });
+
+it('renders the disabled empty-state without crashing when the application has no destination', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => null,
+        'destination_type' => null,
+    ]);
+
+    expect($application->destination)->toBeNull();
+
+    Livewire::test(Analytics::class, ['application' => $application])
+        ->assertOk()
+        ->assertSee('Analytics')
+        ->assertDontSee('Server settings');
+});

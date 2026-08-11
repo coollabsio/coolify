@@ -71,7 +71,7 @@ class TrafficAnalytics extends Component
 
                     $appRows[] = [
                         'uuid' => $uuid,
-                        'name' => Application::whereUuid($uuid)->first()?->name ?? $uuid,
+                        'name' => Application::ownedByCurrentTeam()->whereUuid($uuid)->first()?->name ?? $uuid,
                         'requests' => (int) ($appOverview['requests'] ?? 0),
                         'bandwidth' => (int) ($appOverview['bytesIn'] ?? 0) + (int) ($appOverview['bytesOut'] ?? 0),
                     ];
