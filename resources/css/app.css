@@ -2487,6 +2487,10 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem minmax(10rem, 0.9fr);
 }
 
+.team-members-table-grid-2fa {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem 4rem minmax(10rem, 0.9fr);
+}
+
 .admin-users-table-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) 5rem;
 }
@@ -2551,6 +2555,10 @@ input[type="search"]::-webkit-search-results-decoration {
         grid-template-columns: minmax(0, 1fr) 7rem 7rem;
     }
 
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 7rem 4rem 7rem;
+    }
+
     .team-members-table-grid > :nth-child(2) {
         display: none;
     }
@@ -2600,6 +2608,10 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .team-members-table-grid {
         grid-template-columns: minmax(0, 1fr) 6.5rem;
+    }
+
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 4rem 6.5rem;
     }
 
     .team-members-table-grid > :nth-child(3) {
