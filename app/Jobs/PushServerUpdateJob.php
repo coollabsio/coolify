@@ -452,6 +452,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneCassandra::class,
         ])->flatMap(function (string $databaseClass) use ($databaseColumns, $standaloneDockerIds, $swarmDockerIds) {
             return $databaseClass::query()
                 ->select($databaseColumns)

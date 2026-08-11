@@ -304,6 +304,8 @@ Route::group([
     Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware(['api.ability:write']);
     Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware(['api.ability:write']);
     Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
+
+    Route::post('/databases/cassandra', [DatabasesController::class, 'create_database_cassandra'])->middleware(['api.ability:write']);
     Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
     Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
 

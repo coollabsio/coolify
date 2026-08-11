@@ -27,6 +27,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\SlackNotificationSettings;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
@@ -104,6 +105,7 @@ class AuthServiceProvider extends ServiceProvider
         StandaloneKeydb::class => DatabasePolicy::class,
         StandaloneDragonfly::class => DatabasePolicy::class,
         StandaloneClickhouse::class => DatabasePolicy::class,
+        StandaloneCassandra::class => DatabasePolicy::class,
 
         // Notification policies - all use the shared NotificationPolicy
         EmailNotificationSettings::class => NotificationPolicy::class,

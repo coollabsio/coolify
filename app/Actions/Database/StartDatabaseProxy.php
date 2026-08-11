@@ -3,6 +3,7 @@
 namespace App\Actions\Database;
 
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -25,7 +26,7 @@ class StartDatabaseProxy
         $job->onQueue(deployment_queue());
     }
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|ServiceDatabase $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneCassandra|ServiceDatabase $database)
     {
         $databaseType = $database->database_type;
         $network = data_get($database, 'destination.network');
@@ -45,6 +46,7 @@ class StartDatabaseProxy
             'standalone-postgresql', 'standalone-supabase/postgres' => 5432,
             'standalone-redis', 'standalone-keydb', 'standalone-dragonfly' => 6379,
             'standalone-clickhouse' => 9000,
+            'standalone-cassandra' => 9042,
             'standalone-mongodb' => 27017,
             default => throw new \Exception("Unsupported database type: $databaseType"),
         };

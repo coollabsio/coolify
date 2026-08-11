@@ -11,6 +11,7 @@ use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -116,7 +117,8 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneRedis::class ||
                 $this->resource->getMorphClass() === StandaloneKeydb::class ||
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
-                $this->resource->getMorphClass() === StandaloneClickhouse::class
+                $this->resource->getMorphClass() === StandaloneClickhouse::class ||
+                $this->resource->getMorphClass() === StandaloneCassandra::class
             ) {
                 $uuid = new_public_id();
                 $new_resource = $this->resource->replicate([
@@ -153,6 +155,8 @@ class ResourceOperations extends Component
                         $newName = 'redis-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                         $newName = 'clickhouse-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'cassandra-data-')) {
+                        $newName = 'cassandra-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                         $newName = 'mariadb-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mongodb-data-')) {
