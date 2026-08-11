@@ -44,12 +44,10 @@ it('requires a reviewed draft release before building a stable version', functio
         ->not->toContain('generate-notes');
 });
 
-it('runs production support workflows only from v4.x', function (string $workflowFile) {
+it('keeps support image workflows ready for the production branch rename', function (string $workflowFile) {
     $workflow = file_get_contents(dirname(__DIR__, 2)."/.github/workflows/{$workflowFile}");
 
-    expect($workflow)
-        ->toContain('branches: [ "v4.x" ]')
-        ->not->toContain('"main"');
+    expect($workflow)->toContain('branches: [ "v4.x", "main" ]');
 })->with([
     'helper' => 'coolify-helper.yml',
     'realtime' => 'coolify-realtime.yml',
