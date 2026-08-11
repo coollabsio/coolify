@@ -4,6 +4,7 @@
     'compactAfter' => null,
     'compactStorageKey' => null,
     'compactStoragePrefix' => null,
+    'position' => 'bottom-right',
 ])
 
 <div x-data="{
@@ -50,19 +51,21 @@
     x-transition:leave="transition ease-in duration-150"
     x-transition:leave-start="translate-y-0 opacity-100"
     x-transition:leave-end="translate-y-3 opacity-0"
-    class="fixed bottom-4 right-4 z-999">
-    <button x-show="iconOnly" type="button" @click="restore()" aria-label="Restore warning"
-        class="flex rounded-lg p-2"
-        style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);">
-        @isset($icon)
-            <span
-                class="flex size-7 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning">
-                {{ $icon }}
-            </span>
-        @endisset
-    </button>
+    class="fixed right-4 z-999 {{ $position === 'top-right' ? 'top-16' : 'bottom-4' }}">
+    <template x-if="iconOnly">
+        <button type="button" @click="restore()" aria-label="Restore warning" class="flex rounded-lg p-2"
+            style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);">
+            @isset($icon)
+                <span
+                    class="flex size-7 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning">
+                    {{ $icon }}
+                </span>
+            @endisset
+        </button>
+    </template>
 
-    <div x-show="!iconOnly" class="relative flex items-start gap-2.5 rounded-lg p-3 pr-10"
+    <template x-if="!iconOnly">
+    <div class="relative flex items-start gap-2.5 rounded-lg p-3 pr-10"
         :class="compact
             ? 'w-[calc(100vw-2rem)] cursor-pointer sm:w-auto sm:max-w-[calc(100vw-2rem)]'
             : 'w-[calc(100vw-2rem)] max-w-sm'"
@@ -90,4 +93,5 @@
             <x-reicon name="x" class="size-3.5" />
         </button>
     </div>
+    </template>
 </div>

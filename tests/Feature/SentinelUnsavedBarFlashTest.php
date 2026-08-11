@@ -31,9 +31,34 @@ test('unsaved bar delays show and hides while loading to avoid instant-save flas
 
     expect($contents)
         ->toContain('wire:dirty.class="is-dirty"')
-        ->toContain('wire:loading.class="!opacity-0 !translate-y-6 !pointer-events-none"')
+        ->toContain('wire:loading.class="is-saving"')
         ->toContain('[&.is-dirty]:delay-300')
         ->toContain('delay-0');
+});
+
+test('unsaved bar uses a stable transition for its entrance', function () {
+    $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+
+    expect($contents)
+        ->toContain('scale-95')
+        ->toContain('transition-[opacity,transform,scale]')
+        ->toContain('duration-300')
+        ->toContain('ease-[cubic-bezier(0.16,1,0.3,1)]')
+        ->toContain('[&.is-dirty]:scale-100')
+        ->not->toContain('[&.is-dirty]:animate-in');
+});
+
+test('unsaved bar transitions out without restarting its entrance animation', function () {
+    $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+
+    expect($contents)
+        ->toContain('[&.is-saving]:translate-y-6')
+        ->toContain('[&.is-saving]:scale-95')
+        ->toContain('[&.is-saving]:opacity-0')
+        ->toContain('[&.is-saving]:duration-200')
+        ->toContain('[&.is-saving]:ease-in')
+        ->toContain('[&.is-saving]:pointer-events-none')
+        ->not->toContain('[&.is-saving]:animate-out');
 });
 
 test('unsaved bar saves with enter and shows the shortcut on the save button', function () {

@@ -1301,6 +1301,10 @@ it('uses segmented fields when adding and editing application domains', function
         ->toContain("scheme: 'https'")
         ->toContain('<x-forms.listbox id="{{ $id }}-protocol"')
         ->not->toContain('<select id="{{ $id }}-protocol"')
+        ->toContain("['value' => 'https', 'label' => 'https']")
+        ->toContain("['value' => 'http', 'label' => 'http']")
+        ->toContain('class="mb-1.5 flex h-4 w-full items-center gap-1.5"')
+        ->not->toContain('class="mb-1.5 block text-sm font-medium"')
         ->toContain('min="1"')
         ->toContain('max="65535"');
 });

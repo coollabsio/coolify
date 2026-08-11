@@ -37,7 +37,7 @@
         @endphp
         <div wire:key="configuration-warning-{{ $currentConfigurationHash }}"
             x-data="{ configurationDiffModalOpen: false, expandedRows: {} }">
-            <x-popup-small :compact-after="5000" :compact-storage-key="$compactStorageKey"
+            <x-popup-small position="top-right" :compact-after="5000" :compact-storage-key="$compactStorageKey"
                 :compact-storage-prefix="$compactStoragePrefix">
                 <x-slot:title>
                     The latest configuration has not been applied

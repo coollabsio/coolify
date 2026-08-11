@@ -71,6 +71,6 @@
     <div x-ref="tooltip" x-show="visible" x-cloak role="tooltip" x-text="text"
         :style="`left: ${x}px; top: ${y}px;`"
         :class="[below ? '' : '-translate-y-full', positioned ? 'visible' : 'invisible']"
-        class="pointer-events-none fixed z-[100] whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-lg dark:border-white/10 dark:bg-raised">
+        class="pointer-events-none fixed z-[10000] whitespace-nowrap rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs font-medium text-white shadow-lg dark:border-white/10 dark:bg-raised">
     </div>
 </div>

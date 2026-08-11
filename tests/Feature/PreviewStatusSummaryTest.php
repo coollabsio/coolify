@@ -12,6 +12,7 @@ it('aggregates preview container and health check status', function () {
         ->toContain('Health check')
         ->toContain('Not configured')
         ->toContain('aria-label="About unconfigured health checks"')
+        ->toContain('class="relative inline-flex align-middle"')
         ->toContain('Traffic can still be routed to the container')
         ->toContain('aria-haspopup="menu"')
         ->toContain('right-auto! left-0!')
