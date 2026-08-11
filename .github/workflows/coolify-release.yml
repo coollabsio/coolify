@@ -1,4 +1,4 @@
-name: Release Coolify Fix
+name: Release Coolify Stable
 
 on:
   workflow_dispatch:
