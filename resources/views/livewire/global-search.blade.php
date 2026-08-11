@@ -705,7 +705,10 @@
                                                 <div class="flex items-center gap-3 flex-1 min-w-0">
                                                     @if (! empty($item['logo']))
                                                         <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
-                                                            <img src="{{ asset($item['logo']) }}" alt="{{ $item['name'] }}" class="w-8 h-8 object-contain">
+                                                            @php
+                                                                $logoSrc = (str_starts_with($item['logo'], 'http://') || str_starts_with($item['logo'], 'https://') || str_starts_with($item['logo'], '//') || str_starts_with($item['logo'], '/')) ? $item['logo'] : '/'.$item['logo'];
+                                                            @endphp
+                                                            <img src="{{ $logoSrc }}" alt="{{ $item['name'] }}" class="w-8 h-8 object-contain">
                                                         </div>
                                                     @else
                                                         <div
