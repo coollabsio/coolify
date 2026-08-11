@@ -495,6 +495,13 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         }
         if ($is_traffic_analytics_enabled) {
             $labels->push("caddy_{$loop}.log.output=file /traffic/access.log");
+            // Explicit lumberjack roll options so the access log doesn't grow unbounded
+            // (Caddy's defaults are undocumented). caddy-docker-proxy renders these dotted
+            // keys as a nested block: output file /traffic/access.log { roll_size 20MiB; roll_keep 5; roll_keep_for 168h }.
+            // Rotation is rename-based, which is safe for Sentinel's tailer (it reopens on inode change).
+            $labels->push("caddy_{$loop}.log.output.roll_size=20MiB");
+            $labels->push("caddy_{$loop}.log.output.roll_keep=5");
+            $labels->push("caddy_{$loop}.log.output.roll_keep_for=168h");
             $labels->push("caddy_{$loop}.log.format=json");
             $labels->push("caddy_{$loop}.log_append=coolify_app_id {$uuid}");
         }

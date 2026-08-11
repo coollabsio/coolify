@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -11,14 +12,44 @@ beforeEach(function () {
     $this->team = $user->teams()->first();
 });
 
-it('defaults traffic analytics to disabled and exposes a server helper', function () {
+it('defaults traffic analytics to enabled for a normal server and exposes a server helper', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
-    expect($server->settings->is_traffic_analytics_enabled)->toBeFalse();
-    expect($server->isTrafficAnalyticsEnabled())->toBeFalse();
+    expect($server->settings->is_traffic_analytics_enabled)->toBeTrue();
+    expect($server->isTrafficAnalyticsEnabled())->toBeTrue();
 
-    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
-    expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeTrue();
+    expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
+});
+
+it('defaults traffic analytics to disabled for a swarm server', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $setting = ServerSetting::create([
+        'server_id' => $server->id,
+        'is_swarm_manager' => true,
+    ]);
+
+    expect($setting->is_traffic_analytics_enabled)->toBeFalse();
+});
+
+it('defaults traffic analytics to disabled for a build server', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $setting = ServerSetting::create([
+        'server_id' => $server->id,
+        'is_build_server' => true,
+    ]);
+
+    expect($setting->is_traffic_analytics_enabled)->toBeFalse();
+});
+
+it('respects an explicit traffic analytics value on creation', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $setting = ServerSetting::create([
+        'server_id' => $server->id,
+        'is_traffic_analytics_enabled' => false,
+    ]);
+
+    expect($setting->is_traffic_analytics_enabled)->toBeFalse();
 });
 
 it('encrypts the maxmind license key and hides it from array output', function () {

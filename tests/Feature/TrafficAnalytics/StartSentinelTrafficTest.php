@@ -14,7 +14,9 @@ beforeEach(function () {
 
 it('produces no traffic env when disabled', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
-    expect(StartSentinel::sentinelTrafficEnvironment($server))->toBe([]);
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
+    expect(StartSentinel::sentinelTrafficEnvironment($server->fresh()))->toBe([]);
 });
 
 it('produces traffic + geoip env when enabled', function () {

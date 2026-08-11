@@ -172,10 +172,13 @@ it('shows a failure empty-state instead of an all-zero KPI panel when every serv
 });
 
 it('shows an empty state when no server in the team has traffic analytics enabled', function () {
-    Server::factory()->create([
+    $server = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
     ]);
+    // New servers default analytics on; this scenario is the all-disabled team.
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
 
     Livewire::test(TrafficAnalytics::class)
         ->assertOk()

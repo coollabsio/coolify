@@ -23,8 +23,11 @@ it('toggles traffic analytics via the sentinel settings component', function () 
     });
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
+    // New servers default analytics on; start from the disabled state to exercise enabling.
+    $server->settings->is_traffic_analytics_enabled = false;
+    $server->settings->save();
 
-    expect($server->isTrafficAnalyticsEnabled())->toBeFalse();
+    expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 
     Livewire::test(Sentinel::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')
@@ -38,9 +41,10 @@ it('does not enable traffic analytics on a swarm server', function () {
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $server->settings->is_swarm_manager = true;
+    $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
 
-    expect($server->isTrafficAnalyticsEnabled())->toBeFalse();
+    expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 
     Livewire::test(Sentinel::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')
@@ -54,9 +58,10 @@ it('does not enable traffic analytics on a build server', function () {
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $server->settings->is_build_server = true;
+    $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
 
-    expect($server->isTrafficAnalyticsEnabled())->toBeFalse();
+    expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 
     Livewire::test(Sentinel::class, ['server' => $server])
         ->call('toggleTrafficAnalytics')

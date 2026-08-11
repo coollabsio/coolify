@@ -4,7 +4,6 @@ $tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:b
 $tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
 
 $dimensionLabels = [
-    'country' => 'Countries',
     'referer' => 'Referrers',
     'browser' => 'Browsers',
     'os' => 'Operating systems',
@@ -25,7 +24,7 @@ $dimensionLabels = [
         <div class="application-settings-form flex w-full flex-col gap-6">
             @if (! $enabled)
                 <x-application.settings-section id="analytics-section" title="Analytics"
-                    helper="Inspect Cloudflare-style traffic statistics reported by Sentinel across all applications on this server.">
+                    helper="Inspect traffic statistics reported by Sentinel across all applications on this server.">
                     <x-slot:actions>
                         <a class="button" href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}"
                             {{ wireNavigate() }}>
@@ -33,22 +32,53 @@ $dimensionLabels = [
                             <x-external-link />
                         </a>
                     </x-slot:actions>
-                    <x-empty size="sm" title="Traffic analytics is not enabled"
-                        description="Enable Sentinel traffic analytics for this server to start collecting request analytics."
-                        icon-name="network" />
+
+                    <div class="flex flex-col gap-4 px-4 py-4">
+                        <div class="flex flex-col gap-1">
+                            <h3 class="text-[13px] font-semibold text-black dark:text-fg">
+                                Turn on traffic analytics for this server
+                            </h3>
+                            <p class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                                See request volume, status codes, top paths, and visitor geography for every
+                                application on this server. Here's exactly what enabling does:
+                            </p>
+                        </div>
+
+                        @include('livewire.traffic._enable-benefits')
+
+                        @if ($this->isEligibleForTrafficAnalytics())
+                            <div>
+                                <button type="button" wire:click="enableTrafficAnalytics" class="button"
+                                    wire:loading.attr="disabled" wire:target="enableTrafficAnalytics">
+                                    <span wire:loading.remove wire:target="enableTrafficAnalytics">Enable traffic analytics</span>
+                                    <span wire:loading wire:target="enableTrafficAnalytics">Enabling…</span>
+                                </button>
+                            </div>
+                        @else
+                            <p class="text-[12px] font-medium text-amber-600 dark:text-amber-400">
+                                Traffic analytics is not available on Swarm or Build-pack servers.
+                            </p>
+                        @endif
+                    </div>
                 </x-application.settings-section>
             @elseif (! $overview)
                 <x-application.settings-section id="analytics-section" title="Analytics"
-                    helper="Inspect Cloudflare-style traffic statistics reported by Sentinel across all applications on this server.">
+                    helper="Inspect traffic statistics reported by Sentinel across all applications on this server.">
                     <x-empty size="sm" title="No analytics data yet"
                         description="We could not load traffic analytics for the selected range. Try a different range or check back shortly."
                         icon-name="network" />
                 </x-application.settings-section>
             @else
+                @if ($this->isLivePollable())
+                    <div wire:poll.60s="loadData" class="hidden"></div>
+                @endif
+
                 <x-application.settings-section id="analytics-range-section" title="Analytics"
-                    helper="Inspect Cloudflare-style traffic statistics reported by Sentinel across all applications on this server.">
+                    helper="Inspect traffic statistics reported by Sentinel across all applications on this server.">
                     <x-slot:actions>
-                        <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
+                        <div class="flex items-center gap-2">
+                            @include('livewire.traffic._live-toggle')
+                            <div class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
                             <button type="button" wire:click="setRange('24h')"
                                 @class([$tabButtonBase, $range === '24h' ? $tabButtonActive : $tabButtonInactive])>
                                 24 hours
@@ -61,6 +91,7 @@ $dimensionLabels = [
                                 @class([$tabButtonBase, $range === '30d' ? $tabButtonActive : $tabButtonInactive])>
                                 30 days
                             </button>
+                            </div>
                         </div>
                     </x-slot:actions>
 
@@ -97,9 +128,13 @@ $dimensionLabels = [
                         (() => {
                             checkTheme();
 
-                            const statusColorsLight = ['#0ca30c', '#2a78d6', '#fab219', '#d03b3b'];
-                            const statusColorsDark = ['#0ca30c', '#3987e5', '#fab219', '#d03b3b'];
-                            const statusColors = () => theme === 'light' ? statusColorsLight : statusColorsDark;
+                            const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+                            const statusColors = () => [
+                                cssVar('--chart-status-2xx'),
+                                cssVar('--chart-status-3xx'),
+                                cssVar('--chart-status-4xx'),
+                                cssVar('--chart-status-5xx'),
+                            ];
 
                             const statusChart = new ApexCharts(document.getElementById('{!! $chartId !!}-status'), {
                                 chart: {
@@ -189,6 +224,14 @@ $dimensionLabels = [
                     @endforelse
                 </x-application.settings-section>
 
+                <x-application.settings-section id="analytics-country-section" title="Countries"
+                    helper="Request volume by visitor country for the selected range." flush>
+                    @include('livewire.traffic._geo', [
+                        'countries' => data_get($breakdowns, 'country', []),
+                        'attribution' => $attribution,
+                    ])
+                </x-application.settings-section>
+
                 @foreach ($dimensionLabels as $dimension => $label)
                     <x-application.settings-section id="analytics-{{ $dimension }}-section" title="{{ $label }}"
                         helper="Top {{ strtolower($label) }} by request count for the selected range." flush>
@@ -203,12 +246,6 @@ $dimensionLabels = [
                             <x-empty size="sm" title="No data" description="No {{ strtolower($label) }} data for the selected range."
                                 icon-name="network" />
                         @endforelse
-
-                        @if ($dimension === 'country' && $attribution)
-                            <p class="border-t border-neutral-200 px-4 py-2 text-[11px] text-neutral-400 dark:border-white/[0.07] dark:text-fg-faint">
-                                {{ $attribution }}
-                            </p>
-                        @endif
                     </x-application.settings-section>
                 @endforeach
             @endif

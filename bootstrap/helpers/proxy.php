@@ -378,6 +378,24 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                 $config['services']['traefik']['command'][] = $custom_command;
             }
         }
+
+        // Traefik has no native access-log rotation. Add a minimal logrotate sidecar that
+        // rotates /traefik/access.log in copytruncate mode so the file keeps the same inode
+        // and Sentinel keeps its file handle (the tailer handles len < pos by seeking to 0).
+        // Only for the non-swarm, non-dev production path (dev uses a different access-log path).
+        if ($server->isTrafficAnalyticsEnabled() && ! $server->isSwarm() && ! isDev()) {
+            $config['services']['traefik-logrotate'] = [
+                'image' => 'alpine:3.20',
+                'restart' => RESTART_MODE,
+                'volumes' => [
+                    "{$proxy_path}:/traefik",
+                ],
+                'labels' => [
+                    'coolify.managed=true',
+                ],
+                'entrypoint' => 'sh -c \'apk add --no-cache logrotate >/dev/null 2>&1; printf "/traefik/access.log {\n  copytruncate\n  size 20M\n  rotate 5\n  compress\n  missingok\n  notifempty\n}\n" > /etc/logrotate.d/traefik-access; while true; do logrotate -s /traefik/.logrotate.state /etc/logrotate.d/traefik-access; sleep 3600; done\'',
+            ];
+        }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
             'networks' => $array_of_networks->toArray(),

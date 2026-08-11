@@ -68,6 +68,45 @@
 }
 
 /*
+  Traffic-analytics chart tokens (light defaults; dark overrides below).
+  One source of truth shared by ApexCharts donuts, the geo choropleth SVG,
+  and proportional bars — JS reads them at runtime via getComputedStyle.
+  Palette validated with the dataviz skill; contrast ratios are recorded in
+  the PR description. See resources/views/livewire/traffic/_geo.blade.php.
+*/
+:root {
+    /* Categorical HTTP status palette (labelled 2xx/3xx/4xx/5xx in every legend). */
+    --chart-status-2xx: #15803d;
+    --chart-status-3xx: #2563eb;
+    --chart-status-4xx: #d97706;
+    --chart-status-5xx: #dc2626;
+
+    /* Sequential 5-step geo ramp (low -> high traffic) + neutral empty. */
+    --chart-geo-1: #3b82f6;
+    --chart-geo-2: #2563eb;
+    --chart-geo-3: #1d4ed8;
+    --chart-geo-4: #1e40af;
+    --chart-geo-5: #172554;
+    --chart-geo-empty: #e5e7eb;
+    --chart-geo-stroke: #ffffff;
+}
+
+.dark {
+    --chart-status-2xx: #22c55e;
+    --chart-status-3xx: #3b82f6;
+    --chart-status-4xx: #f59e0b;
+    --chart-status-5xx: #ef4444;
+
+    --chart-geo-1: #2563eb;
+    --chart-geo-2: #3b82f6;
+    --chart-geo-3: #60a5fa;
+    --chart-geo-4: #93c5fd;
+    --chart-geo-5: #bfdbfe;
+    --chart-geo-empty: #262626;
+    --chart-geo-stroke: #101010;
+}
+
+/*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
   looks the same as it did with Tailwind CSS v3.

@@ -2,13 +2,17 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Server\ConfigureTrafficAnalytics;
 use App\Models\Application;
 use App\Models\Server;
 use App\Services\SentinelTrafficClient;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Analytics extends Component
 {
+    use AuthorizesRequests;
+
     public Server $server;
 
     public string $chartId = 'server-analytics';
@@ -16,6 +20,11 @@ class Analytics extends Component
     public string $range = '24h';
 
     public bool $enabled = false;
+
+    // Realtime refresh. On by default for the 24h range; the 60s cadence matches the
+    // SentinelTrafficClient cache TTL and Sentinel's per-minute rollups, so polling
+    // faster returns identical data. Auto-paused (control disabled) for 7d/30d.
+    public bool $live = true;
 
     public ?array $overview = null;
 
@@ -51,6 +60,49 @@ class Analytics extends Component
     {
         $this->range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
         $this->loadData();
+    }
+
+    public function toggleLive(): void
+    {
+        if ($this->range !== '24h') {
+            return;
+        }
+        $this->live = ! $this->live;
+    }
+
+    /**
+     * Whether this server can run traffic analytics at all (Swarm/Build cannot).
+     */
+    public function isEligibleForTrafficAnalytics(): bool
+    {
+        return ! $this->server->isSwarm() && ! $this->server->isBuildServer();
+    }
+
+    public function enableTrafficAnalytics(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            if (! $this->isEligibleForTrafficAnalytics()) {
+                $this->dispatch('error', 'Traffic analytics is not supported on Swarm/Build servers.');
+
+                return;
+            }
+            ConfigureTrafficAnalytics::run($this->server, true);
+            $this->server->refresh();
+            $this->enabled = true;
+            $this->dispatch('success', 'Traffic analytics enabled. Restarting proxy and Sentinel.');
+            $this->loadData();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Realtime polling is only armed when the user has it on and the range is 24h.
+     */
+    public function isLivePollable(): bool
+    {
+        return $this->live && $this->range === '24h';
     }
 
     public function loadData(): void

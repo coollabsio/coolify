@@ -33,6 +33,34 @@ class SentinelTrafficClient
         return TrafficOverviewData::fromSentinel($json);
     }
 
+    /**
+     * Convert a UI range key (24h/7d/30d) into ISO-8601 Zulu from/to bounds.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function rangeWindow(string $range): array
+    {
+        $to = now();
+        $from = match ($range) {
+            '7d' => now()->subDays(7),
+            '30d' => now()->subDays(30),
+            default => now()->subDay(),
+        };
+
+        return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+    }
+
+    /**
+     * Slim shared fetch for a single application's overview over a UI range, so the
+     * General-page widget and the full analytics tab don't duplicate window + client calls.
+     */
+    public function appOverview(string $appKey, string $range = '24h'): TrafficOverviewData
+    {
+        [$from, $to] = self::rangeWindow($range);
+
+        return $this->overview($appKey, $from, $to);
+    }
+
     public function paths(?string $appKey, string $from, string $to, int $limit = 50): Collection
     {
         if ($appKey !== null) {

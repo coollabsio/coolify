@@ -27,11 +27,35 @@ class TrafficAnalytics extends Component
     /** @var array<int, array<string, mixed>> */
     public array $topCountries = [];
 
+    /**
+     * Servers that could run traffic analytics but have it off — drives the dashboard nudge.
+     *
+     * @var array<int, array{uuid: string, name: string}>
+     */
+    public array $eligibleDisabledServers = [];
+
+    // Stable key over the eligible-disabled set so a localStorage dismissal sticks until
+    // a new eligible server appears (which changes the key and re-shows the nudge).
+    public string $nudgeKey = '';
+
     public function mount(): void
     {
-        $this->servers = Server::ownedByCurrentTeamCached()
+        $allServers = Server::ownedByCurrentTeamCached();
+
+        $this->servers = $allServers
             ->filter(fn (Server $server) => $server->isTrafficAnalyticsEnabled())
             ->values();
+
+        $eligibleDisabled = $allServers
+            ->filter(fn (Server $server) => ! $server->isTrafficAnalyticsEnabled()
+                && ! $server->isSwarm()
+                && ! $server->isBuildServer())
+            ->values();
+
+        $this->eligibleDisabledServers = $eligibleDisabled
+            ->map(fn (Server $server) => ['uuid' => $server->uuid, 'name' => $server->name])
+            ->all();
+        $this->nudgeKey = substr(md5($eligibleDisabled->pluck('uuid')->sort()->implode(',')), 0, 12);
 
         if ($this->servers->isNotEmpty()) {
             $this->loadData();

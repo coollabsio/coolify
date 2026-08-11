@@ -16,6 +16,11 @@ class Analytics extends Component
 
     public bool $enabled = false;
 
+    // Realtime refresh. On by default for the 24h range; the 60s cadence matches the
+    // SentinelTrafficClient cache TTL and Sentinel's per-minute rollups, so polling
+    // faster returns identical data. Auto-paused (control disabled) for 7d/30d.
+    public bool $live = true;
+
     public ?array $overview = null;
 
     public array $topPaths = [];
@@ -41,6 +46,22 @@ class Analytics extends Component
     {
         $this->range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
         $this->loadData();
+    }
+
+    public function toggleLive(): void
+    {
+        if ($this->range !== '24h') {
+            return;
+        }
+        $this->live = ! $this->live;
+    }
+
+    /**
+     * Realtime polling is only armed when the user has it on and the range is 24h.
+     */
+    public function isLivePollable(): bool
+    {
+        return $this->live && $this->range === '24h';
     }
 
     public function loadData(): void

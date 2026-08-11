@@ -139,6 +139,15 @@ class ServerSetting extends Model
     {
         static::creating(function ($setting) {
             try {
+                // Enable traffic analytics by default for eligible servers, unless the
+                // caller explicitly set a value. Swarm and build servers are ineligible,
+                // mirroring the toggle guard so the flag never contradicts capability.
+                // Runs before sentinel generation, which may throw and be swallowed below.
+                if (! $setting->isDirty('is_traffic_analytics_enabled')) {
+                    $isSwarm = $setting->is_swarm_manager || $setting->is_swarm_worker;
+                    $isBuild = (bool) $setting->is_build_server;
+                    $setting->is_traffic_analytics_enabled = ! $isSwarm && ! $isBuild;
+                }
                 if (str($setting->sentinel_token)->isEmpty()) {
                     $setting->generateSentinelToken(save: false, ignoreEvent: true);
                 }
