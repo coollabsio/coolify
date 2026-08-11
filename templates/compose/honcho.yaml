@@ -7,7 +7,7 @@
 
 services:
   api:
-    image: ghcr.io/plastic-labs/honcho:latest
+    image: ghcr.io/plastic-labs/honcho:v3.0.12
     entrypoint: ["sh", "docker/entrypoint.sh"]
     environment:
       - SERVICE_URL_API_8000
