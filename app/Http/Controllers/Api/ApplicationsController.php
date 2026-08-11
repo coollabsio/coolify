@@ -2199,7 +2199,22 @@ class ApplicationsController extends Controller
             new OA\Response(response: 403, description: 'Terminal access is disabled on the target server or the terminal API is disabled for the team.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
-            new OA\Response(response: 429, description: 'Terminal command rate or concurrency limit exceeded.'),
+            new OA\Response(
+                response: 429,
+                description: 'Terminal command rate or concurrency limit exceeded.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string'],
+                                'retry_after' => ['type' => 'integer', 'description' => 'Seconds to wait before retrying.'],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
         ]
     )]
     public function execute_command(Request $request)

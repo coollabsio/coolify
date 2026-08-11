@@ -2232,7 +2232,23 @@
                         "$ref": "#\/components\/responses\/422"
                     },
                     "429": {
-                        "description": "Terminal command rate or concurrency limit exceeded."
+                        "description": "Terminal command rate or concurrency limit exceeded.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "retry_after": {
+                                            "type": "integer",
+                                            "description": "Seconds to wait before retrying."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -11986,7 +12002,23 @@
                         "$ref": "#\/components\/responses\/422"
                     },
                     "429": {
-                        "description": "Terminal command rate or concurrency limit exceeded."
+                        "description": "Terminal command rate or concurrency limit exceeded.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "retry_after": {
+                                            "type": "integer",
+                                            "description": "Seconds to wait before retrying."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
