@@ -20,7 +20,7 @@ Coolify uses two long-lived branches so production fixes can ship without waitin
 
 | Branch | Role | Docker image tags | How it ships |
 | --- | --- | --- | --- |
-| **`v4.x`** | Production / releasable line | `sha-<commit>` and moving `edge` via **Build Coolify (SHA)** | GitHub release promotes the SHA image to a semantic version (and `latest` for stable releases) |
+| **`v4.x`** | Production / releasable line | Immutable `sha-<commit>` images via **Build Coolify (SHA)** | The manual fix-release workflow rebuilds the selected commit with the stable version and updates `latest` |
 | **`next`** | Development line for features and larger changes | Branch tag (for example `next`) via **Staging Build** | Becomes production only after merge into `v4.x` |
 
 ### Where to merge
@@ -51,7 +51,7 @@ Only commits on **`v4.x`** produce production SHA images and can be tagged for a
 
 1. **Prepare the Release**
    - Land the work on **`v4.x`**: merge a fix PR into `v4.x`, or merge ready work from `next` into `v4.x` for a feature release.
-   - Set the release version in `config/constants.php` and `versions.json` on the commit you will tag. Both values must match the planned Git tag without the `v` prefix (for example, `4.2.0` for tag `v4.2.0`).
+   - Set the upcoming release version in `config/constants.php`. It must match the planned Git tag without the `v` prefix (for example, `4.3.1` for tag `v4.3.1`). Keep `coolify.v4.version` in `versions.json` on the currently published stable version until the CDN update.
    - Verify the changelog and required tests before merging.
    - After the release (or after the fix merges), merge `v4.x` back into `next` if those branches have diverged.
 
@@ -59,23 +59,24 @@ Only commits on **`v4.x`** produce production SHA images and can be tagged for a
    - Merge the release commit into `v4.x` through a pull request.
    - The `Build Coolify (SHA)` workflow builds AMD64 and ARM64 images and publishes them to Docker Hub and GHCR using immutable architecture tags.
    - After both builds complete, the workflow creates the multi-architecture `sha-<commit-sha>` manifest in both registries.
-   - For pushes to **`v4.x`**, the same multi-architecture manifest is also tagged as `edge`, so `coollabsio/coolify:edge` always points at the latest production-line SHA image. Builds from `main` publish only the immutable `sha-<commit-sha>` tags.
+   - The image reports a traceable development version such as `4.3.1-dev.d64cbda3e`.
    - This workflow does not update a semantic version tag or `latest`.
 
-3. **Wait for the SHA Image**
+3. **Prepare the Draft Release**
    - Confirm the complete `Build Coolify (SHA)` workflow, including its `merge-manifest` job, succeeded.
-   - Do not publish the release before the multi-architecture SHA image exists in both registries.
+   - Create a reviewed draft GitHub release with the planned tag, such as `v4.3.1`, targeting `v4.x`.
+   - Add the final release notes, leave the release as a draft, and do not mark a fix release as a prerelease.
 
-4. **Create and Publish the GitHub Release**
-   - Create a GitHub release with a semantic version tag such as `v4.2.0`, targeting the exact commit that produced the SHA image.
-   - Mark beta or other test releases as prereleases. Publish production versions as stable releases.
-   - Publishing the release starts the `Release Coolify` workflow. It verifies that the Git tag matches `config/constants.php`, then promotes the existing SHA image without rebuilding it.
-   - The workflow assigns the semantic version tag in Docker Hub and GHCR. Stable releases also update `latest`; prereleases do not.
+4. **Run the Fix-Release Workflow**
+   - Run `Release Coolify Fix` manually from `v4.x` and enter the existing draft tag.
+   - The workflow validates the draft, its release notes, the version in `config/constants.php`, and the absence of an existing Git tag.
+   - It pins the draft to the selected commit and rebuilds AMD64 and ARM64 images with the exact stable version.
+   - After both builds succeed, it publishes the semantic version and `latest` manifests to Docker Hub and GHCR, then publishes the existing draft release.
 
-5. **Verify the Promotion**
-   - Confirm the `Release Coolify` workflow succeeded.
-   - Verify the semantic version image has the same manifest digest as `sha-<commit-sha>` in Docker Hub and GHCR.
-   - For stable releases, also verify `latest` points to the promoted release manifest.
+5. **Verify the Release**
+   - Confirm the `Release Coolify Fix` workflow succeeded and the reviewed draft is now published.
+   - Verify the semantic version image and `latest` contain AMD64 and ARM64 manifests in Docker Hub and GHCR.
+   - Verify Coolify reports the exact stable version without a development SHA suffix.
 
 6. **Update the CDN**
    - To make a new version available to self-hosted instances, update the version information on the CDN manually.
