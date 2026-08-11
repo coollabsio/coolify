@@ -10,7 +10,7 @@ services:
     image: ghcr.io/plastic-labs/honcho:latest
     entrypoint: ["sh", "docker/entrypoint.sh"]
     environment:
-      - SERVICE_FQDN_API_8000
+      - SERVICE_URL_API_8000
       - DB_CONNECTION_URI=postgresql+psycopg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database:5432/postgres
       - CACHE_URL=redis://redis:6379/0?suppress=true
       - CACHE_ENABLED=true
