@@ -44,8 +44,19 @@ test('admins see the two factor column with the status of every member', functio
 
     Livewire::test(Index::class)
         ->assertSee('2FA')
-        ->assertSee('Enabled')
-        ->assertSee('Disabled');
+        ->assertSee('Two-factor authentication is enabled')
+        ->assertSee('Two-factor authentication is disabled');
+});
+
+test('owners see the two factor column and summary', function () {
+    $owner = createTeamMember($this->team, 'owner', twoFactorEnabled: true);
+    createTeamMember($this->team, 'member');
+
+    actAsTeamMember($owner, $this->team);
+
+    Livewire::test(Index::class)
+        ->assertSee('2FA')
+        ->assertSee('1 of 2 members does not have two-factor authentication enabled');
 });
 
 test('members without member management rights do not see the two factor column', function () {
@@ -56,8 +67,9 @@ test('members without member management rights do not see the two factor column'
 
     Livewire::test(Index::class)
         ->assertDontSee('2FA')
-        ->assertDontSee('Enabled')
-        ->assertDontSee('Disabled');
+        ->assertDontSee('Two-factor authentication is enabled')
+        ->assertDontSee('Two-factor authentication is disabled')
+        ->assertDontSee('two-factor authentication enabled');
 });
 
 test('the member row renders an enabled badge when two factor is confirmed', function () {
@@ -67,8 +79,8 @@ test('the member row renders an enabled badge when two factor is confirmed', fun
     actAsTeamMember($admin, $this->team);
 
     Livewire::test(Member::class, ['member' => $memberWithTwoFactor])
-        ->assertSee('Enabled')
-        ->assertDontSee('Disabled');
+        ->assertSee('Two-factor authentication is enabled')
+        ->assertDontSee('Two-factor authentication is disabled');
 });
 
 test('the member row renders a disabled badge when two factor is not configured', function () {
@@ -78,8 +90,8 @@ test('the member row renders a disabled badge when two factor is not configured'
     actAsTeamMember($admin, $this->team);
 
     Livewire::test(Member::class, ['member' => $memberWithoutTwoFactor])
-        ->assertSee('Disabled')
-        ->assertDontSee('Enabled');
+        ->assertSee('Two-factor authentication is disabled')
+        ->assertDontSee('Two-factor authentication is enabled');
 });
 
 test('admins see the two factor status of every role, including owners and other admins', function (string $role, bool $twoFactorEnabled, string $expectedStatus) {
@@ -91,12 +103,12 @@ test('admins see the two factor status of every role, including owners and other
     Livewire::test(Member::class, ['member' => $otherMember])
         ->assertSee($expectedStatus);
 })->with([
-    'owner with two factor' => ['owner', true, 'Enabled'],
-    'owner without two factor' => ['owner', false, 'Disabled'],
-    'another admin with two factor' => ['admin', true, 'Enabled'],
-    'another admin without two factor' => ['admin', false, 'Disabled'],
-    'member with two factor' => ['member', true, 'Enabled'],
-    'member without two factor' => ['member', false, 'Disabled'],
+    'owner with two factor' => ['owner', true, 'Two-factor authentication is enabled'],
+    'owner without two factor' => ['owner', false, 'Two-factor authentication is disabled'],
+    'another admin with two factor' => ['admin', true, 'Two-factor authentication is enabled'],
+    'another admin without two factor' => ['admin', false, 'Two-factor authentication is disabled'],
+    'member with two factor' => ['member', true, 'Two-factor authentication is enabled'],
+    'member without two factor' => ['member', false, 'Two-factor authentication is disabled'],
 ]);
 
 test('admins see the two factor status on their own row', function () {
@@ -106,7 +118,7 @@ test('admins see the two factor status on their own row', function () {
 
     Livewire::test(Member::class, ['member' => $admin])
         ->assertSee('You')
-        ->assertSee('Enabled');
+        ->assertSee('Two-factor authentication is enabled');
 });
 
 test('the summary counts the members that are missing two factor authentication', function () {
