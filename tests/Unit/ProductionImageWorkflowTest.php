@@ -7,6 +7,8 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
 
     expect($workflow)
         ->toContain('name: Build Coolify (SHA)')
+        ->toContain('branches: ["v4.x"]')
+        ->not->toContain('branches: ["v4.x", "main"]')
         ->toContain('sha-${{ github.sha }}-${{ matrix.arch }}')
         ->toContain('sha-${{ github.sha }}')
         ->toContain('php bootstrap/getVersion.php')
@@ -29,6 +31,7 @@ it('requires a reviewed draft release before building a stable version', functio
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-release.yml');
 
     expect($workflow)
+        ->toContain('name: Release Coolify Stable')
         ->toContain('workflow_dispatch:')
         ->toContain('tag:')
         ->toContain('github.ref_name != \'v4.x\'')
@@ -39,6 +42,33 @@ it('requires a reviewed draft release before building a stable version', functio
         ->toContain('bootstrap/getVersion.php')
         ->toContain('target_commitish: context.sha')
         ->not->toContain('generate-notes');
+});
+
+it('runs production support workflows only from v4.x', function (string $workflowFile) {
+    $workflow = file_get_contents(dirname(__DIR__, 2)."/.github/workflows/{$workflowFile}");
+
+    expect($workflow)
+        ->toContain('branches: [ "v4.x" ]')
+        ->not->toContain('"main"');
+})->with([
+    'helper' => 'coolify-helper.yml',
+    'realtime' => 'coolify-realtime.yml',
+]);
+
+it('generates the production changelog only from v4.x', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/generate-changelog.yml');
+
+    expect($workflow)
+        ->toContain('branches: [ v4.x ]')
+        ->not->toContain('main');
+});
+
+it('excludes only active production branches from staging builds', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-staging-build.yml');
+
+    expect($workflow)
+        ->toContain('      - v4.x')
+        ->not->toContain('      - main');
 });
 
 it('rebuilds stable images and publishes the reviewed draft after both architectures succeed', function () {
@@ -59,25 +89,19 @@ it('rebuilds stable images and publishes the reviewed draft after both architect
         ->not->toContain('SOURCE_TAG="sha-${RELEASE_SHA}"');
 });
 
-it('documents the sha image release process', function () {
+it('documents the production, rc, and hotfix release flows', function () {
     $releaseGuide = file_get_contents(dirname(__DIR__, 2).'/RELEASE.md');
 
     expect($releaseGuide)
-        ->toContain('## Branch Strategy')
-        ->toContain('Fixes and release-ready patches')
-        ->toContain('open PRs against **`v4.x`**')
-        ->toContain('open PRs against **`next`**')
-        ->toContain('merge `v4.x` back into `next`')
-        ->toContain('Merge the release commit into `v4.x`')
-        ->toContain('`Build Coolify (SHA)`')
-        ->toContain('`sha-<commit-sha>`')
-        ->toContain('Create a reviewed draft GitHub release')
-        ->toContain('rebuilds AMD64 and ARM64 images with the exact stable version')
-        ->toContain('publishes the existing draft release')
-        ->toContain('Update the CDN')
-        ->toContain('Only commits on **`v4.x`** produce production SHA images')
+        ->toContain('| `main` | Latest production source |')
+        ->toContain('| `next` | Feature integration and RC releases |')
+        ->toContain('| `hotfix/X.Y.Z` | Production fixes based on `main` |')
+        ->toContain('feature/* → next → RC')
+        ->toContain('next → main → stable release')
+        ->toContain('main → hotfix/X.Y.Z → main → next')
+        ->toContain('reviewed draft GitHub Release')
+        ->toContain('workflows never edit or commit versions')
+        ->toContain('Update the CDN only after the release is approved')
         ->not->toContain('`edge`')
-        ->not->toContain('promotes the existing SHA image')
-        ->not->toContain('Merging to `main`')
-        ->not->toContain('Production Build (v4)');
+        ->not->toContain('promotes the existing SHA image');
 });
