@@ -3,7 +3,6 @@ name: Staging Build
 on:
   push:
     branches-ignore:
-      - v4.x
       - main
       - v3.x
       - '**v5.x**'

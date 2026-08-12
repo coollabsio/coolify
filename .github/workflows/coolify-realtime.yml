@@ -2,7 +2,7 @@ name: Coolify Realtime
 
 on:
   push:
-    branches: [ "v4.x", "main" ]
+    branches: [ "main" ]
     paths:
       - .github/workflows/coolify-realtime.yml
       - docker/coolify-realtime/**

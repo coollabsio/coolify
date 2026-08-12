@@ -7,7 +7,8 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
 
     expect($workflow)
         ->toContain('name: Build Coolify (SHA)')
-        ->toContain('branches: ["v4.x", "main"]')
+        ->toContain('branches: ["main"]')
+        ->not->toContain('v4.x')
         ->toContain('sha-${{ github.sha }}-${{ matrix.arch }}')
         ->toContain('sha-${{ github.sha }}')
         ->toContain('php bootstrap/getVersion.php')
@@ -33,7 +34,7 @@ it('requires a reviewed draft release before building a stable version', functio
         ->toContain('name: Release Coolify Stable')
         ->toContain('workflow_dispatch:')
         ->toContain('tag:')
-        ->toContain('contains(fromJSON(\'["v4.x", "main"]\'), github.ref_name)')
+        ->toContain("github.ref_name != 'main'")
         ->toContain('github.paginate(github.rest.repos.listReleases')
         ->toContain('release.draft')
         ->toContain('release.prerelease')
@@ -46,27 +47,31 @@ it('requires a reviewed draft release before building a stable version', functio
         ->not->toContain('generate-notes');
 });
 
-it('keeps support image workflows ready for the production branch rename', function (string $workflowFile) {
+it('runs support image workflows from main', function (string $workflowFile) {
     $workflow = file_get_contents(dirname(__DIR__, 2)."/.github/workflows/{$workflowFile}");
 
-    expect($workflow)->toContain('branches: [ "v4.x", "main" ]');
+    expect($workflow)
+        ->toContain('branches: [ "main" ]')
+        ->not->toContain('v4.x');
 })->with([
     'helper' => 'coolify-helper.yml',
     'realtime' => 'coolify-realtime.yml',
 ]);
 
-it('generates the production changelog from either production branch during the rename', function () {
+it('generates the production changelog from main', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/generate-changelog.yml');
 
-    expect($workflow)->toContain('branches: [ v4.x, main ]');
+    expect($workflow)
+        ->toContain('branches: [ main ]')
+        ->not->toContain('v4.x');
 });
 
-it('excludes both production branch names from staging builds during the rename', function () {
+it('excludes main from staging builds', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-staging-build.yml');
 
     expect($workflow)
-        ->toContain('      - v4.x')
-        ->toContain('      - main');
+        ->toContain('      - main')
+        ->not->toContain('      - v4.x');
 });
 
 it('rebuilds stable images and publishes the reviewed draft after both architectures succeed', function () {
@@ -102,4 +107,28 @@ it('documents the production, rc, and hotfix release flows', function () {
         ->toContain('Update the CDN only after the release is approved')
         ->not->toContain('`edge`')
         ->not->toContain('promotes the existing SHA image');
+});
+
+it('documents pull request targets for fixes and features', function () {
+    $contributingGuide = file_get_contents(dirname(__DIR__, 2).'/CONTRIBUTING.md');
+
+    expect($contributingGuide)
+        ->toContain('Fixes and small improvements')
+        ->toContain('target `main`')
+        ->toContain('New features and larger changes')
+        ->toContain('target `next`')
+        ->toContain('branch from `main`')
+        ->toContain('branch from `next`')
+        ->not->toContain('All pull requests must target the `next` branch');
+});
+
+it('guides issue authors to the correct contribution branch', function () {
+    $bugReport = file_get_contents(dirname(__DIR__, 2).'/.github/ISSUE_TEMPLATE/01_BUG_REPORT.yml');
+    $issueConfig = file_get_contents(dirname(__DIR__, 2).'/.github/ISSUE_TEMPLATE/config.yml');
+
+    expect($bugReport)
+        ->toContain('branch from `main` and target `main`')
+        ->and($issueConfig)
+        ->toContain('Feature code should branch from `next` and target `next`')
+        ->toContain('Small fixes should target `main`; larger changes should target `next`');
 });

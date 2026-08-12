@@ -146,7 +146,7 @@ function loginAsRoot(): mixed
 
 ## Git Workflow
 
-- Production branch: `main` (`v4.x` during the branch rename)
+- Production branch: `main`
 - Development branch: `next`
 - Fix PRs should target the current production branch; feature PRs should target `next`
 
