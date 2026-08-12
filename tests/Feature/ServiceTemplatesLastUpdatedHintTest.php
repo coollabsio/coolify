@@ -129,11 +129,12 @@ it('renders the service templates last updated hint placeholder', function () {
 
 it('keeps service template keys for service selection and docs links', function () {
     $services = collect((new Select)->loadServices()['services']);
-    $denoKv = $services->firstWhere('id', 'denoKV');
+    $denoKv = $services->firstWhere('id', 'denokv');
 
     expect($denoKv)
         ->not->toBeNull()
-        ->and($denoKv['docsSlug'])->toBe('denokv');
+        ->and($denoKv['docsSlug'])->toBe('denokv')
+        ->and($denoKv['logo'])->toContain('denoKV.svg');
 
     View::share('errors', new ViewErrorBag);
 
@@ -151,7 +152,7 @@ it('preserves one click service key casing when selecting a service template', f
     $component->servers = collect();
     $component->allServers = collect();
 
-    $component->setType('one-click-service-denoKV');
+    $component->setType('one-click-service-denokv');
 
-    expect($component->type)->toBe('one-click-service-denoKV');
+    expect($component->type)->toBe('one-click-service-denokv');
 });

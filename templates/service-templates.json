@@ -913,7 +913,7 @@
         "template_last_updated_at": "2026-02-24T11:25:17+08:00",
         "port": "4005"
     },
-    "denoKV": {
+    "denokv": {
         "documentation": "https://docs.deno.com/deploy/kv/manual/?utm_source=coolify.io",
         "slogan": "The Denoland key-value database",
         "compose": "c2VydmljZXM6CiAgZGVub2t2OgogICAgaW1hZ2U6ICdnaGNyLmlvL2Rlbm9sYW5kL2Rlbm9rdjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnQUNDRVNTX1RPS0VOPSR7U0VSVklDRV9QQVNTV09SRF9ERU5PS1Z9JwogICAgICAtIFNFUlZJQ0VfRlFETl9ERU5PS1ZfNDUxMgogICAgdm9sdW1lczoKICAgICAgLSAnJHtDT09MSUZZX1ZPTFVNRV9BUFB9Oi9kYXRhJwogICAgY29tbWFuZDogJy0tc3FsaXRlLXBhdGggL2RhdGEvZGVub2t2LnNxbGl0ZSBzZXJ2ZSAtLWFjY2Vzcy10b2tlbiAke1NFUlZJQ0VfUEFTU1dPUkRfREVOT0tWfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBuYwogICAgICAgIC0gJy16dicKICAgICAgICAtIDEyNy4wLjAuMQogICAgICAgIC0gJzQ1MTInCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAzCg==",
@@ -924,7 +924,7 @@
             "database"
         ],
         "category": "database",
-        "logo": "svgs/denokv.svg",
+        "logo": "svgs/denoKV.svg",
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "4512"

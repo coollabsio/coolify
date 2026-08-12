@@ -2,7 +2,7 @@
 # slogan: The Denoland key-value database
 # category: database
 # tags: deno, kv, key-value, database
-# logo: svgs/denokv.svg
+# logo: svgs/denoKV.svg
 # port: 4512
 
 services:
