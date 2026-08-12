@@ -4407,6 +4407,28 @@ function formatBytes(?int $bytes, int $precision = 2): string
 }
 
 /**
+ * Compact human-readable count (e.g. 26_360 -> "26.36k", 1_200_000 -> "1.2M").
+ * Trailing zeros are trimmed so round values read cleanly ("1k", not "1.00k").
+ * Used for the dense metric columns in the traffic-analytics lists.
+ */
+function compactNumber(?int $n): string
+{
+    $n = (int) $n;
+
+    if ($n < 1000) {
+        return (string) $n;
+    }
+
+    [$divisor, $suffix] = match (true) {
+        $n >= 1_000_000_000 => [1_000_000_000, 'B'],
+        $n >= 1_000_000 => [1_000_000, 'M'],
+        default => [1000, 'k'],
+    };
+
+    return rtrim(rtrim(number_format($n / $divisor, 2, '.', ''), '0'), '.').$suffix;
+}
+
+/**
  * Validates that a file path is safely within the /tmp/ directory.
  * Protects against unsafe parent directory paths by resolving the real path
  * and verifying it stays within /tmp/.

@@ -70,8 +70,8 @@ function fakeAnalyticsResponses(): array
             ['value' => 'Desktop', 'requests' => 800, 'bytes_out' => 20000],
         ]),
         '/traffic/series' => json_encode([
-            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0],
-            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
+            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytes_in' => 1000, 'bytes_out' => 5000, 'unique_visitors' => 12, 'p95' => 30.0],
+            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytes_in' => 1500, 'bytes_out' => 8000, 'unique_visitors' => 20, 'p95' => 45.0],
         ]),
         '/traffic/attribution' => json_encode(['attribution' => 'GeoIP data by MaxMind']),
     ];
@@ -148,8 +148,8 @@ it('loads the per-app status time series when Sentinel exposes the series endpoi
         ->assertOk()
         ->assertSet('hasSeries', true)
         ->assertSet('series', [
-            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0],
-            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
+            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytesIn' => 1000, 'bytesOut' => 5000, 'uniqueVisitors' => 12, 'p95' => 30.0],
+            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytesIn' => 1500, 'bytesOut' => 8000, 'uniqueVisitors' => 20, 'p95' => 45.0],
         ])
         ->assertDispatched('refreshChartData-application-analytics-status');
 });

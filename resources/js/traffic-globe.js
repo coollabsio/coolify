@@ -9,17 +9,17 @@ const CENTROIDS = {"AD":[42.546245,1.601554],"AE":[23.424076,53.847818],"AF":[33
 const THEMES = {
     dark: {
         dark: 1,
-        baseColor: [0.28, 0.32, 0.4],
-        markerColor: [0.36, 0.55, 1],
-        glowColor: [0.06, 0.09, 0.16],
-        mapBrightness: 5,
+        baseColor: [0.45, 0.5, 0.62],
+        markerColor: [0.36, 0.6, 1],
+        glowColor: [0.12, 0.16, 0.26],
+        mapBrightness: 11,
     },
     light: {
         dark: 0,
-        baseColor: [0.86, 0.88, 0.92],
-        markerColor: [0.15, 0.39, 0.92],
+        baseColor: [0.82, 0.85, 0.9],
+        markerColor: [0.13, 0.36, 0.92],
         glowColor: [1, 1, 1],
-        mapBrightness: 8,
+        mapBrightness: 9,
     },
 };
 
@@ -47,10 +47,31 @@ function buildMarkers(data) {
     }));
 }
 
+const TWO_PI = Math.PI * 2;
+
+// cobe orientation for a lat/lng so the point faces the viewer (cobe's own
+// focus example formula). Returns [phi, theta].
+function locationToAngles(lat, lng) {
+    return [Math.PI - ((lng * Math.PI) / 180 - Math.PI / 2), (lat * Math.PI) / 180];
+}
+
+// Shortest-path angular interpolation, so easing across the 0/2π seam never
+// spins the long way around.
+function lerpAngle(current, target, t) {
+    let delta = ((target - current + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
+
+    return current + delta * t;
+}
+
 /**
  * Mount an interactive, drag-to-rotate dotted globe onto a canvas. Returns a
- * controller with `update(data, dark)` to swap markers/theme and `destroy()`.
- * The globe auto-rotates until the pointer grabs it, then resumes on release.
+ * controller with `update(data, dark)`, `focus(code)`, `resume()` and
+ * `destroy()`. The globe auto-rotates, pauses while grabbed or while a country
+ * is hover-focused, and eases smoothly toward whatever it's pointed at.
+ *
+ * cobe v2 has no internal render loop or `onRender` callback: createGlobe draws
+ * a single frame and returns `{ update, destroy }`. We drive our own rAF loop,
+ * calling `globe.update({...})` each frame for rotation and to swap markers/theme.
  *
  * @param {HTMLCanvasElement} canvas
  * @param {Array<{code: string, requests: number}>} data
@@ -59,32 +80,41 @@ function buildMarkers(data) {
 function mountTrafficGlobe(canvas, data, dark) {
     let globe = null;
     let width = 0;
-    let phi = 0;
-    let theta = 0.25;
-    let pointerInteracting = null;
-    let pointerMovement = 0;
     let destroyed = false;
+    let rafId = 0;
+    let markers = buildMarkers(data);
 
-    const onResize = () => {
-        width = canvas.offsetWidth;
-    };
-    onResize();
-    const resizeObserver = new ResizeObserver(onResize);
-    resizeObserver.observe(canvas);
+    // Ambient spin is decorative; honor reduced-motion by not auto-rotating
+    // (drag + hover-focus still work — those are user-initiated).
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Rotation is a single moving target the loop eases toward each frame.
+    let targetPhi = 0;
+    let currentPhi = 0;
+    let targetTheta = 0.2;
+    let currentTheta = 0.2;
+    let autoRotate = !prefersReduced;
+
+    let dragging = null; // clientX at pointerdown
+    let dragStartPhi = 0;
 
     const onPointerDown = (e) => {
-        pointerInteracting = e.clientX - pointerMovement;
+        dragging = e.clientX;
+        dragStartPhi = targetPhi;
+        autoRotate = false;
         canvas.style.cursor = 'grabbing';
     };
     const onPointerUp = () => {
-        pointerInteracting = null;
+        if (dragging === null) {
+            return;
+        }
+        dragging = null;
+        autoRotate = ! prefersReduced;
         canvas.style.cursor = 'grab';
     };
     const onPointerMove = (e) => {
-        if (pointerInteracting !== null) {
-            const delta = e.clientX - pointerInteracting;
-            pointerMovement = delta;
-            phi = delta / 200;
+        if (dragging !== null) {
+            targetPhi = dragStartPhi + (e.clientX - dragging) / 150;
         }
     };
 
@@ -93,16 +123,15 @@ function mountTrafficGlobe(canvas, data, dark) {
     window.addEventListener('pointermove', onPointerMove);
     canvas.style.cursor = 'grab';
 
-    const create = (rows, isDark) => {
+    const create = (isDark) => {
         const theme = isDark ? THEMES.dark : THEMES.light;
-        let autoRotate = 0;
 
         globe = createGlobe(canvas, {
             devicePixelRatio: 2,
-            width: width * 2,
-            height: width * 2,
-            phi: 0,
-            theta,
+            width: width,
+            height: width,
+            phi: currentPhi,
+            theta: currentTheta,
             diffuse: 1.2,
             mapSamples: 16000,
             mapBrightness: theme.mapBrightness,
@@ -110,34 +139,91 @@ function mountTrafficGlobe(canvas, data, dark) {
             baseColor: theme.baseColor,
             markerColor: theme.markerColor,
             glowColor: theme.glowColor,
-            opacity: 0.9,
-            markers: buildMarkers(rows),
-            onRender: (state) => {
-                if (pointerInteracting === null) {
-                    autoRotate += 0.0025;
-                }
-                state.phi = autoRotate + phi;
-                state.width = width * 2;
-                state.height = width * 2;
-            },
+            opacity: 0.92,
+            markers: markers,
         });
     };
 
-    create(data, dark);
+    // Self-driven animation loop (cobe v2 draws only when we call update()).
+    const tick = () => {
+        if (destroyed) {
+            return;
+        }
+        if (globe && width > 0) {
+            if (autoRotate && dragging === null) {
+                targetPhi += 0.0025;
+            }
+            currentPhi = lerpAngle(currentPhi, targetPhi, 0.12);
+            currentTheta += (targetTheta - currentTheta) * 0.12;
+            globe.update({ phi: currentPhi, theta: currentTheta, width: width, height: width, markers });
+        }
+        rafId = requestAnimationFrame(tick);
+    };
+
+    // cobe needs a non-zero canvas width at creation; inside a freshly-rendered
+    // or momentarily-hidden container offsetWidth can be 0, which yields a blank
+    // globe (only the grab cursor shows). Create once a real width is known.
+    const ensure = () => {
+        const next = canvas.offsetWidth;
+        if (destroyed || next === 0 || globe) {
+            return;
+        }
+        width = next;
+        create(dark);
+        rafId = requestAnimationFrame(tick);
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+        if (globe) {
+            width = canvas.offsetWidth || width;
+        } else {
+            ensure();
+        }
+    });
+    resizeObserver.observe(canvas);
+    requestAnimationFrame(ensure);
 
     return {
         update(newData, isDark) {
             if (destroyed) {
                 return;
             }
-            // cobe fixes markers at creation, so swap by recreating in place.
+            data = newData;
+            dark = isDark;
+            markers = buildMarkers(newData);
             if (globe) {
-                globe.destroy();
+                const theme = isDark ? THEMES.dark : THEMES.light;
+                globe.update({
+                    markers,
+                    dark: theme.dark,
+                    mapBrightness: theme.mapBrightness,
+                    baseColor: theme.baseColor,
+                    markerColor: theme.markerColor,
+                    glowColor: theme.glowColor,
+                });
             }
-            create(newData, isDark);
+        },
+        focus(code) {
+            const c = CENTROIDS[String(code || '').toUpperCase()];
+            if (!c) {
+                return;
+            }
+            const [phi, theta] = locationToAngles(c[0], c[1]);
+            targetPhi = phi;
+            targetTheta = theta;
+            autoRotate = false;
+        },
+        resume() {
+            if (dragging === null) {
+                autoRotate = ! prefersReduced;
+            }
         },
         destroy() {
             destroyed = true;
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+                rafId = 0;
+            }
             resizeObserver.disconnect();
             canvas.removeEventListener('pointerdown', onPointerDown);
             window.removeEventListener('pointerup', onPointerUp);

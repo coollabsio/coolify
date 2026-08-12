@@ -81,6 +81,9 @@
     --chart-status-4xx: #d97706;
     --chart-status-5xx: #dc2626;
 
+    /* KPI sparkline accent for Bandwidth (violet — distinct from the status hues). */
+    --chart-spark-bandwidth: #7c3aed;
+
     /* Sequential 5-step geo ramp (low -> high traffic) + neutral empty. */
     --chart-geo-1: #3b82f6;
     --chart-geo-2: #2563eb;
@@ -96,6 +99,8 @@
     --chart-status-3xx: #3b82f6;
     --chart-status-4xx: #f59e0b;
     --chart-status-5xx: #ef4444;
+
+    --chart-spark-bandwidth: #a78bfa;
 
     --chart-geo-1: #2563eb;
     --chart-geo-2: #3b82f6;

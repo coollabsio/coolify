@@ -1,7 +1,9 @@
 {{--
-    Paginated "top paths" list. Each row shows the request path and links it to its
-    live URL when the owning domain is known (new tab, rel="noopener noreferrer
-    nofollow"). Expects `$paths` in scope; optional `$keyPrefix` to namespace wire:keys.
+    Paginated "top paths" list. Each row shows the request path, a proportional
+    request-volume bar, and right-aligned compact metrics (requests / bytes / p95).
+    The path links to its live URL when the owning domain is known (new tab,
+    rel="noopener noreferrer nofollow"). Expects `$paths` in scope; optional
+    `$keyPrefix` to namespace wire:keys.
 
     @param iterable $paths      path rows: ['path', 'domain'?, 'requests', 'bytesOut', 'p95']
     @param ?string  $keyPrefix  wire:key prefix (default "analytics-path")
@@ -9,6 +11,7 @@
 @php
     $paths = $paths ?? [];
     $keyPrefix = $keyPrefix ?? 'analytics-path';
+    $maxRequests = max(1, (int) collect($paths)->max('requests'));
 @endphp
 @if (empty($paths))
     <x-empty size="sm" title="No path data" description="No requests were recorded for the selected range."
@@ -20,6 +23,8 @@
                 $domain = $path['domain'] ?? null;
                 $pathStr = (string) ($path['path'] ?? '');
                 $href = $domain ? 'https://'.$domain.$pathStr : null;
+                $requests = (int) ($path['requests'] ?? 0);
+                $width = min(100, round(($requests / $maxRequests) * 100, 1));
             @endphp
             <div wire:key="{{ $keyPrefix }}-{{ $loop->index }}"
                 x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
@@ -30,9 +35,14 @@
                 @else
                     <span class="min-w-0 flex-1 truncate font-mono text-[12px] text-black dark:text-fg">{{ $pathStr }}</span>
                 @endif
-                <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ number_format((int) ($path['requests'] ?? 0)) }} req</span>
-                <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ formatBytes((int) ($path['bytesOut'] ?? 0)) }}</span>
-                <span class="hidden shrink-0 text-[12px] text-neutral-500 sm:inline dark:text-fg-dim">p95 {{ number_format((float) ($path['p95'] ?? 0), 1) }} ms</span>
+                <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
+                    <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $width }}%;"></div>
+                </div>
+                <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                    title="{{ number_format($requests) }} requests">{{ compactNumber($requests) }}</span>
+                <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes((int) ($path['bytesOut'] ?? 0)) }}</span>
+                <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 md:inline dark:text-fg-faint"
+                    title="p95 latency">{{ number_format((float) ($path['p95'] ?? 0), 1) }} ms</span>
             </div>
         @endforeach
         @include('livewire.traffic._pager')

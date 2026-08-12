@@ -13,6 +13,7 @@
 @php
     $rows = $rows ?? [];
     $helper = $helper ?? 'Top '.strtolower($label).' by request count for the selected range.';
+    $maxRequests = max(1, (int) collect($rows)->max('requests'));
 @endphp
 <x-application.settings-section id="analytics-{{ $dimension }}-section" :title="$label" :helper="$helper" flush>
     @if (empty($rows))
@@ -32,6 +33,8 @@
                             'referer' => $host ?? 'Direct / none',
                             default => $value !== '' ? $value : 'Unknown',
                         };
+                    $requests = (int) ($row['requests'] ?? 0);
+                    $width = min(100, round(($requests / $maxRequests) * 100, 1));
                 @endphp
                 <div wire:key="analytics-{{ $dimension }}-{{ $loop->index }}"
                     x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
@@ -44,8 +47,12 @@
                     @else
                         <span class="min-w-0 flex-1 truncate text-[12px] text-black dark:text-fg" title="{{ $display }}">{{ $display }}</span>
                     @endif
-                    <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ number_format((int) ($row['requests'] ?? 0)) }} req</span>
-                    <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ formatBytes((int) ($row['bytesOut'] ?? 0)) }}</span>
+                    <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
+                        <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $width }}%;"></div>
+                    </div>
+                    <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                        title="{{ number_format($requests) }} requests">{{ compactNumber($requests) }}</span>
+                    <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes((int) ($row['bytesOut'] ?? 0)) }}</span>
                 </div>
             @endforeach
             @include('livewire.traffic._pager')

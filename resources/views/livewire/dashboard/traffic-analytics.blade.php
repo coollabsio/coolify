@@ -96,45 +96,65 @@ $spark = 'refreshChartData-'.$chartId.'-status';
         {{-- Sparkline KPI cards. Each links through to the full analytics page. --}}
         <div class="grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-neutral-200 sm:grid-cols-2 lg:grid-cols-4 dark:bg-white/[0.07]">
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col gap-2 bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
-                <span class="text-xl font-semibold text-black dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
-                @include('livewire.traffic._sparkline', [
-                    'id' => $chartId.'-spark-requests',
-                    'initial' => $this->requestsSpark(),
-                    'colorVar' => '--chart-status-3xx',
-                    'event' => $spark,
-                    'key' => 'requestsSpark',
-                ])
+                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
+                <div class="mt-auto pt-3">
+                    @include('livewire.traffic._sparkline', [
+                        'id' => $chartId.'-spark-requests',
+                        'initial' => $this->requestsSpark(),
+                        'colorVar' => '--chart-status-3xx',
+                        'event' => $spark,
+                        'key' => 'requestsSpark',
+                    ])
+                </div>
             </a>
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col gap-2 bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
                 <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
                     Unique visitors
                     @if ($uniquesApproximate)
                         {!! $approxBadge('Summed across '.$servers->count().' servers; visitors seen on multiple servers may be double-counted.') !!}
                     @endif
                 </span>
-                <span class="text-xl font-semibold text-black dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
-                <span class="mt-auto h-9"></span>
+                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
+                <div class="mt-auto pt-3">
+                    @include('livewire.traffic._sparkline', [
+                        'id' => $chartId.'-spark-visitors',
+                        'initial' => $this->uniquesSpark(),
+                        'colorVar' => '--chart-status-2xx',
+                        'event' => $spark,
+                        'key' => 'uniquesSpark',
+                    ])
+                </div>
             </a>
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col gap-2 bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Bandwidth</span>
-                <span class="text-xl font-semibold text-black dark:text-fg">{{ formatBytes($this->bandwidthBytes()) }}</span>
-                <span class="mt-auto h-9"></span>
+                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ formatBytes($this->bandwidthBytes()) }}</span>
+                <div class="mt-auto pt-3">
+                    @include('livewire.traffic._sparkline', [
+                        'id' => $chartId.'-spark-bandwidth',
+                        'initial' => $this->bandwidthSpark(),
+                        'colorVar' => '--chart-spark-bandwidth',
+                        'event' => $spark,
+                        'key' => 'bandwidthSpark',
+                    ])
+                </div>
             </a>
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="group flex flex-col gap-2 bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
+                class="group flex flex-col bg-white px-4 py-3 transition-colors hover:bg-neutral-50 dark:bg-base dark:hover:bg-white/[0.03]">
                 <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Error rate</span>
-                <span class="text-xl font-semibold text-black dark:text-fg">{{ $this->errorRate() }}%</span>
-                @include('livewire.traffic._sparkline', [
-                    'id' => $chartId.'-spark-errors',
-                    'initial' => $this->errorsSpark(),
-                    'colorVar' => '--chart-status-5xx',
-                    'event' => $spark,
-                    'key' => 'errorsSpark',
-                ])
+                <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ $this->errorRate() }}%</span>
+                <div class="mt-auto pt-3">
+                    @include('livewire.traffic._sparkline', [
+                        'id' => $chartId.'-spark-errors',
+                        'initial' => $this->errorsSpark(),
+                        'colorVar' => '--chart-status-5xx',
+                        'event' => $spark,
+                        'key' => 'errorsSpark',
+                    ])
+                </div>
             </a>
         </div>
     @endif

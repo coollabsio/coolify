@@ -314,11 +314,17 @@ class Analytics extends Component
                         $data = $bucket->toArray();
                         $ts = (int) ($data['bucket'] ?? 0);
 
-                        $seriesByBucket[$ts] ??= ['bucket' => $ts, 's2xx' => 0, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0];
+                        $seriesByBucket[$ts] ??= ['bucket' => $ts, 's2xx' => 0, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0, 'requests' => 0, 'bytesIn' => 0, 'bytesOut' => 0, 'uniqueVisitors' => 0, 'p95' => 0.0];
                         $seriesByBucket[$ts]['s2xx'] += (int) ($data['s2xx'] ?? 0);
                         $seriesByBucket[$ts]['s3xx'] += (int) ($data['s3xx'] ?? 0);
                         $seriesByBucket[$ts]['s4xx'] += (int) ($data['s4xx'] ?? 0);
                         $seriesByBucket[$ts]['s5xx'] += (int) ($data['s5xx'] ?? 0);
+                        $seriesByBucket[$ts]['requests'] += (int) ($data['requests'] ?? 0);
+                        $seriesByBucket[$ts]['bytesIn'] += (int) ($data['bytesIn'] ?? 0);
+                        $seriesByBucket[$ts]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
+                        // Uniques summed across servers (approximate); p95 takes the worst bucket.
+                        $seriesByBucket[$ts]['uniqueVisitors'] += (int) ($data['uniqueVisitors'] ?? 0);
+                        $seriesByBucket[$ts]['p95'] = max($seriesByBucket[$ts]['p95'], (float) ($data['p95'] ?? 0));
                     }
                 } catch (\Throwable $e) {
                     // Leave this server out of the series; donut fallback covers it.
@@ -405,6 +411,8 @@ class Analytics extends Component
             ],
             'requestsSpark' => $this->requestsSpark(),
             'errorsSpark' => $this->errorsSpark(),
+            'bandwidthSpark' => $this->bandwidthSpark(),
+            'uniquesSpark' => $this->uniquesSpark(),
             'geo' => $this->geoMarkers(),
             'deviceLabels' => $device['labels'],
             'deviceSeries' => $device['series'],

@@ -152,6 +152,8 @@ class Analytics extends Component
             ],
             'requestsSpark' => $this->requestsSpark(),
             'errorsSpark' => $this->errorsSpark(),
+            'bandwidthSpark' => $this->bandwidthSpark(),
+            'uniquesSpark' => $this->uniquesSpark(),
             'geo' => $this->geoMarkers(),
             'deviceLabels' => $device['labels'],
             'deviceSeries' => $device['series'],

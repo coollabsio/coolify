@@ -128,49 +128,72 @@ $appListboxOptions = array_merge(
         <x-application.settings-section id="analytics-overview-section" title="Overview"
             helper="Aggregate request volume for the selected filters and range.">
             <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-5 dark:bg-white/[0.07]">
-                <div class="flex flex-col gap-2 bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
-                    <span class="text-xl font-semibold text-black dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
-                    @include('livewire.traffic._sparkline', [
-                        'id' => $chartId.'-spark-requests',
-                        'initial' => $this->requestsSpark(),
-                        'colorVar' => '--chart-status-3xx',
-                        'event' => 'refreshChartData-'.$chartId.'-status',
-                        'key' => 'requestsSpark',
-                    ])
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
+                    <div class="mt-auto pt-3">
+                        @include('livewire.traffic._sparkline', [
+                            'id' => $chartId.'-spark-requests',
+                            'initial' => $this->requestsSpark(),
+                            'colorVar' => '--chart-status-3xx',
+                            'event' => 'refreshChartData-'.$chartId.'-status',
+                            'key' => 'requestsSpark',
+                        ])
+                    </div>
                 </div>
-                <div class="flex flex-col gap-1 bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
                     <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
                         Unique visitors
                         @if ($uniquesApproximate)
                             {!! $approxBadge('Summed across servers; visitors seen on multiple servers may be double-counted.') !!}
                         @endif
                     </span>
-                    <span class="text-xl font-semibold text-black dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['uniqueVisitors'] ?? 0) }}</span>
+                    <div class="mt-auto pt-3">
+                        @include('livewire.traffic._sparkline', [
+                            'id' => $chartId.'-spark-visitors',
+                            'initial' => $this->uniquesSpark(),
+                            'colorVar' => '--chart-status-2xx',
+                            'event' => 'refreshChartData-'.$chartId.'-status',
+                            'key' => 'uniquesSpark',
+                        ])
+                    </div>
                 </div>
-                <div class="flex flex-col gap-1 bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Bandwidth</span>
-                    <span class="text-xl font-semibold text-black dark:text-fg">{{ formatBytes($this->bandwidthBytes()) }}</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ formatBytes($this->bandwidthBytes()) }}</span>
+                    <div class="mt-auto pt-3">
+                        @include('livewire.traffic._sparkline', [
+                            'id' => $chartId.'-spark-bandwidth',
+                            'initial' => $this->bandwidthSpark(),
+                            'colorVar' => '--chart-spark-bandwidth',
+                            'event' => 'refreshChartData-'.$chartId.'-status',
+                            'key' => 'bandwidthSpark',
+                        ])
+                    </div>
                 </div>
-                <div class="flex flex-col gap-2 bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col bg-white px-4 py-3 dark:bg-base">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Error rate</span>
-                    <span class="text-xl font-semibold text-black dark:text-fg">{{ $this->errorRate() }}%</span>
-                    @include('livewire.traffic._sparkline', [
-                        'id' => $chartId.'-spark-errors',
-                        'initial' => $this->errorsSpark(),
-                        'colorVar' => '--chart-status-5xx',
-                        'event' => 'refreshChartData-'.$chartId.'-status',
-                        'key' => 'errorsSpark',
-                    ])
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ $this->errorRate() }}%</span>
+                    <div class="mt-auto pt-3">
+                        @include('livewire.traffic._sparkline', [
+                            'id' => $chartId.'-spark-errors',
+                            'initial' => $this->errorsSpark(),
+                            'colorVar' => '--chart-status-5xx',
+                            'event' => 'refreshChartData-'.$chartId.'-status',
+                            'key' => 'errorsSpark',
+                        ])
+                    </div>
                 </div>
-                <div class="flex flex-col gap-1 bg-white px-4 py-3 dark:bg-base">
+                <div class="col-span-2 flex flex-col bg-white px-4 py-3 sm:col-span-1 dark:bg-base">
                     <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
                         p95 latency
                         @if ($latencyApproximate)
                             {!! $approxBadge('Highest p95 latency across servers; not a true cross-server percentile.') !!}
                         @endif
                     </span>
-                    <span class="text-xl font-semibold text-black dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
+                    <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
+                    <div class="mt-auto pt-3"><div class="h-9"></div></div>
                 </div>
             </div>
         </x-application.settings-section>
@@ -197,9 +220,13 @@ $appListboxOptions = array_merge(
                             description="No per-application requests were recorded for the selected range."
                             icon-name="unordered-list" />
                     @else
+                        @php $maxAppRequests = max(1, (int) collect($topApps)->max('requests')); @endphp
                         <div x-data="{ page: 0, per: 10, total: {{ count($topApps) }} }">
                             @foreach ($topApps as $row)
-                                @php $appHref = $row['link'] ?? null; @endphp
+                                @php
+                                    $appHref = $row['link'] ?? null;
+                                    $appWidth = min(100, round(($row['requests'] / $maxAppRequests) * 100, 1));
+                                @endphp
                                 <{{ $appHref ? 'a' : 'div' }} wire:key="analytics-app-{{ $row['uuid'] }}"
                                     @if ($appHref) href="{{ $appHref }}" {{ wireNavigate() }} @endif
                                     x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
@@ -213,8 +240,12 @@ $appListboxOptions = array_merge(
                                             <span class="hidden truncate text-[11px] text-neutral-400 sm:inline dark:text-fg-faint">{{ $row['domain'] }}</span>
                                         @endif
                                     </span>
-                                    <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ number_format($row['requests']) }} req</span>
-                                    <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ formatBytes($row['bandwidth']) }}</span>
+                                    <div class="hidden h-1 w-16 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
+                                        <div class="h-full rounded-full bg-[var(--chart-status-3xx)]" style="width: {{ $appWidth }}%;"></div>
+                                    </div>
+                                    <span class="w-12 shrink-0 text-right text-[12px] font-medium tabular-nums text-black dark:text-fg"
+                                        title="{{ number_format($row['requests']) }} requests">{{ compactNumber($row['requests']) }}</span>
+                                    <span class="hidden w-16 shrink-0 text-right text-[11px] tabular-nums text-neutral-400 sm:inline dark:text-fg-faint">{{ formatBytes($row['bandwidth']) }}</span>
                                     @if ($appHref)
                                         <svg class="size-3.5 shrink-0 text-neutral-300 dark:text-fg-faint" viewBox="0 0 24 24"
                                             fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">

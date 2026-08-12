@@ -11,7 +11,9 @@ namespace App\Livewire\Concerns;
 trait BuildsTrafficChartPayload
 {
     /**
-     * Per-bucket total requests (sum of every status class), for the Requests spark.
+     * Per-bucket total requests, for the Requests spark. Derived from the status-class
+     * counts (every request carries a status class), so it always matches real traffic
+     * regardless of whether Sentinel populates the explicit per-bucket `requests` field.
      *
      * @return array<int, int>
      */
@@ -34,6 +36,30 @@ trait BuildsTrafficChartPayload
             fn ($b) => (int) ($b['s4xx'] ?? 0) + (int) ($b['s5xx'] ?? 0),
             $this->series,
         );
+    }
+
+    /**
+     * Per-bucket bandwidth (bytes in + out), for the Bandwidth spark. Empty for
+     * older Sentinel builds that don't emit per-bucket byte counts.
+     *
+     * @return array<int, int>
+     */
+    public function bandwidthSpark(): array
+    {
+        return array_map(
+            fn ($b) => (int) ($b['bytesIn'] ?? 0) + (int) ($b['bytesOut'] ?? 0),
+            $this->series,
+        );
+    }
+
+    /**
+     * Per-bucket unique visitors, for the Visitors spark.
+     *
+     * @return array<int, int>
+     */
+    public function uniquesSpark(): array
+    {
+        return array_map(fn ($b) => (int) ($b['uniqueVisitors'] ?? 0), $this->series);
     }
 
     /**

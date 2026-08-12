@@ -21,7 +21,27 @@
         const el = document.getElementById('{!! $id !!}');
         if (!el) { return; }
 
-        const cssVar = () => getComputedStyle(document.documentElement).getPropertyValue('{!! $colorVar !!}').trim() || '#3b82f6';
+        const readVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        const accent = () => readVar('{!! $colorVar !!}') || '#3b82f6';
+        const muted = () => readVar('--chart-geo-empty') || 'rgba(128,128,128,0.4)';
+
+        // No/all-zero data → draw a flat muted baseline placeholder instead of a blank card.
+        // A constant series with auto-scaling collapses to a degenerate (invisible) range,
+        // so the placeholder pins the y-axis to keep the zero line centered and visible.
+        const isFlat = a => !Array.isArray(a) || a.length === 0 || a.every(v => !Number(v));
+
+        const apply = (values) => {
+            const flat = isFlat(values);
+            const len = Array.isArray(values) && values.length ? values.length : 12;
+            chart.updateOptions({
+                colors: [flat ? muted() : accent()],
+                stroke: { width: flat ? 1 : 1.5, curve: 'smooth' },
+                fill: { type: 'gradient', gradient: { opacityFrom: flat ? 0 : 0.35, opacityTo: 0 } },
+                tooltip: { enabled: !flat },
+                yaxis: flat ? { min: -1, max: 1 } : { min: undefined, max: undefined },
+            }, false, false);
+            chart.updateSeries([{ data: flat ? new Array(len).fill(0) : values }]);
+        };
 
         const chart = new ApexCharts(el, {
             chart: {
@@ -31,13 +51,10 @@
                 animations: { enabled: false },
                 background: 'transparent',
             },
-            series: [{ data: @json($initial) }],
+            series: [{ data: [] }],
             stroke: { width: 1.5, curve: 'smooth' },
-            colors: [cssVar()],
-            fill: {
-                type: 'gradient',
-                gradient: { opacityFrom: 0.35, opacityTo: 0.02 },
-            },
+            colors: [accent()],
+            fill: { type: 'gradient', gradient: { opacityFrom: 0.35, opacityTo: 0.02 } },
             tooltip: {
                 enabled: true,
                 fixed: { enabled: false },
@@ -47,14 +64,13 @@
             },
         });
         chart.render();
+        apply(@json($initial));
 
         @if (! empty($event) && ! empty($key))
             Livewire.on('{!! $event !!}', payload => {
                 const data = Array.isArray(payload) ? payload[0] : payload;
-                const next = data && data['{!! $key !!}'];
-                if (Array.isArray(next)) {
-                    chart.updateOptions({ colors: [cssVar()] });
-                    chart.updateSeries([{ data: next }]);
+                if (data && '{!! $key !!}' in data) {
+                    apply(data['{!! $key !!}']);
                 }
             });
         @endif

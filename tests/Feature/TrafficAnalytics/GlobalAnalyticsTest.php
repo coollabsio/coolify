@@ -81,8 +81,8 @@ function fakeGlobalAnalyticsResponses(array $appUuids = []): array
             ['value' => '200', 'requests' => 900, 'bytes_out' => 22000],
         ]),
         '/traffic/series' => json_encode([
-            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0],
-            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
+            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytes_in' => 1000, 'bytes_out' => 5000, 'unique_visitors' => 12, 'p95' => 30.0],
+            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytes_in' => 1500, 'bytes_out' => 8000, 'unique_visitors' => 20, 'p95' => 45.0],
         ]),
         '/traffic/attribution' => json_encode(['attribution' => 'GeoIP data by MaxMind']),
     ];
@@ -211,8 +211,8 @@ it('builds a stacked status time series when Sentinel exposes the series endpoin
         ->assertOk()
         ->assertSet('hasSeries', true)
         ->assertSet('series', [
-            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0],
-            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
+            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0, 'requests' => 43, 'bytesIn' => 1000, 'bytesOut' => 5000, 'uniqueVisitors' => 12, 'p95' => 30.0],
+            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1, 'requests' => 66, 'bytesIn' => 1500, 'bytesOut' => 8000, 'uniqueVisitors' => 20, 'p95' => 45.0],
         ])
         ->assertDispatched('refreshChartData-global-analytics-status');
 });
@@ -239,9 +239,11 @@ it('derives KPI sparklines, device-donut data, and top hosts for the chart paylo
 
     $instance = Livewire::test(Analytics::class)->assertOk()->instance();
 
-    // Per-bucket totals and errors from the two-bucket status series.
+    // Per-bucket sparkline series derived from Sentinel's enriched buckets.
     expect($instance->requestsSpark())->toBe([43, 66]);
     expect($instance->errorsSpark())->toBe([1, 3]);
+    expect($instance->bandwidthSpark())->toBe([6000, 9500]);
+    expect($instance->uniquesSpark())->toBe([12, 20]);
 
     // Device breakdown folds into donut labels/series.
     $device = $instance->deviceChartData();
