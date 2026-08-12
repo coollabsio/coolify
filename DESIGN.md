@@ -162,6 +162,14 @@ primary action in the page header instead. When tabs are useful, their left edge
 uses the same compact `pl-2` alignment as application navigation rather than
 the content container's wide horizontal padding.
 
+A layer-2 tab must be active on the page that renders it. A bar whose only tab
+points at a different route reads as broken navigation, so project and
+environment pages (`project.show`, `project.edit`, `project.environment.edit`,
+`project.clone-me`) carry a plain page header with a 24px title and a 13px
+muted summary instead of a bar. The environment identity and the way back to
+its resources already live in `x-top-breadcrumb`; do not restate them in a
+sub-header.
+
 The dashboard is a compact overview, not a metrics wall. Use two full-width
 sections that follow the projects-page grid pattern: projects first, then
 servers. Keep one `New` action in the page header and let its modal choose the

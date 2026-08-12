@@ -1,8 +1,14 @@
 <div>
     <x-slot:title>{{ data_get_str($project, 'name')->limit(10) }} > Clone | Coolify</x-slot>
-    <x-project.navbar :project="$project" :environment="$environment" />
+    <div class="w-full max-w-[1180px]">
+        <header class="mb-5">
+            <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $environment->name }}</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                Clone this environment inside {{ $project->name }}
+            </p>
+        </header>
 
-    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+        <div class="flex flex-col gap-6">
         <section class="application-settings-section">
             <div class="application-settings-section-header">
                 <div>
@@ -143,5 +149,6 @@
                 </div>
             </div>
         </section>
+        </div>
     </div>
 </div>
