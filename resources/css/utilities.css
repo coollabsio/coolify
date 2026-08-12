@@ -1,5 +1,5 @@
 @utility apexcharts-tooltip {
-    @apply dark:text-white! dark:border-coolgray-300! dark:bg-coolgray-200! shadow-none!;
+    @apply overflow-visible! rounded-none! border-0! bg-transparent! shadow-none! dark:text-white!;
 }
 
 @utility apexcharts-tooltip-title {
