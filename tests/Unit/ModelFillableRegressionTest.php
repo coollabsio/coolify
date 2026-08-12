@@ -55,7 +55,7 @@ it('keeps required mass-assignment attributes fillable for internal create flows
     [ServerSetting::class, ['server_id']],
     [SwarmDocker::class, ['server_id']],
     [StandaloneDocker::class, ['server_id']],
-    [User::class, ['pending_email', 'email_change_code', 'email_change_code_expires_at']],
+    [User::class, ['oauth_provider', 'pending_email', 'email_change_code', 'email_change_code_expires_at']],
     [Server::class, ['ip_previous']],
     [GithubApp::class, ['team_id', 'private_key_id']],
 

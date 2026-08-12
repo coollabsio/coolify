@@ -48,6 +48,58 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
     expect(User::count())->toBe(1);
 });
 
+it('creates an oauth user when regular registration is disabled but oauth registration is enabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+    instanceSettings()->update([
+        'is_registration_enabled' => false,
+        'is_oauth_registration_enabled' => true,
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'NewUser@example.edu',
+        'name' => 'New OAuth User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/');
+    $user = User::whereEmail('newuser@example.edu')->first();
+    expect($user)->not->toBeNull();
+    expect($user->hasPassword())->toBeFalse()
+        ->and($user->oauth_provider)->toBe('google');
+    $this->assertAuthenticatedAs($user);
+});
+
+it('rejects new oauth users when both regular and oauth registration are disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+    instanceSettings()->update([
+        'is_registration_enabled' => false,
+        'is_oauth_registration_enabled' => false,
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'NewUser@example.edu',
+        'name' => 'New OAuth User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->from('/login')->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/login');
+    expect(User::count())->toBe(0);
+});
+
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
     config()->set('app.maintenance.driver', 'file');
     InstanceSettings::firstOrCreate([

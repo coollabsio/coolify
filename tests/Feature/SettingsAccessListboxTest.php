@@ -21,6 +21,8 @@ test('settings advanced access section always uses listboxes', function () {
 
     expect($contents)
         ->toContain('id="is_registration_enabled"')
+        ->toContain('id="is_oauth_registration_enabled"')
+        ->toContain('id="is_oauth_password_login_disabled"')
         ->toContain('id="disable_two_step_confirmation"')
         ->toContain('onChange="instantSave"')
         ->not->toContain('toggleRegistration')
@@ -55,6 +57,39 @@ test('instance admin can toggle registration via listbox instantSave', function 
         ->assertDispatched('success');
 
     expect((bool) $settings->fresh()->is_registration_enabled)->toBeTrue();
+});
+
+test('instance admin can toggle oauth access options via listbox instantSave', function () {
+    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
+    Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
+    $settings = InstanceSettings::forceCreate([
+        'id' => 0,
+        'is_registration_enabled' => false,
+        'is_oauth_registration_enabled' => false,
+        'is_oauth_password_login_disabled' => false,
+        'disable_two_step_confirmation' => false,
+    ]);
+    Once::flush();
+
+    $user = User::factory()->create();
+    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
+
+    $this->actingAs($user);
+    session(['currentTeam' => ['id' => $rootTeam->id]]);
+
+    Livewire::test(Advanced::class)
+        ->assertSet('is_oauth_registration_enabled', false)
+        ->assertSet('is_oauth_password_login_disabled', false)
+        ->assertSee('OAuth registration')
+        ->assertSee('OAuth password access')
+        ->set('is_oauth_registration_enabled', true)
+        ->set('is_oauth_password_login_disabled', true)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    $freshSettings = $settings->fresh();
+    expect((bool) $freshSettings->is_oauth_registration_enabled)->toBeTrue()
+        ->and((bool) $freshSettings->is_oauth_password_login_disabled)->toBeTrue();
 });
 
 test('instance admin can toggle two-step confirmation via listbox instantSave', function () {

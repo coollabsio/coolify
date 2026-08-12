@@ -19,6 +19,18 @@
                             ['value' => true, 'label' => 'Anyone can register'],
                             ['value' => false, 'label' => 'Registration disabled'],
                         ]" />
+                    <x-forms.listbox id="is_oauth_registration_enabled" label="OAuth registration"
+                        helper="Allow enabled OAuth providers to create new accounts even when regular registration is disabled."
+                        onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Enabled for OAuth'],
+                            ['value' => false, 'label' => 'Use registration setting'],
+                        ]" />
+                    <x-forms.listbox id="is_oauth_password_login_disabled" label="OAuth password access"
+                        helper="Keep passwordless OAuth users from adding or using a local password through password reset."
+                        onChange="instantSave" :options="[
+                            ['value' => false, 'label' => 'Password reset allowed'],
+                            ['value' => true, 'label' => 'OAuth only for passwordless users'],
+                        ]" />
                     <x-forms.listbox id="disable_two_step_confirmation" label="Destructive action confirmation"
                         helper="Choose whether destructive actions require password and text confirmation."
                         onChange="instantSave" :options="[

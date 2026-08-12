@@ -79,6 +79,11 @@ class Controller extends BaseController
                 return response()->json(['message' => 'Transactional emails are not active'], 400);
             }
             $request->validate([Fortify::email() => 'required|email']);
+            $user = User::whereEmail($request->input(Fortify::email()))->first();
+            if (instanceSettings()->is_oauth_password_login_disabled && $user?->isOauthUser()) {
+                return response()->json(['message' => 'Password login is disabled for this OAuth account.'], 400);
+            }
+
             $status = Password::broker(config('fortify.passwords'))->sendResetLink(
                 $request->only(Fortify::email())
             );

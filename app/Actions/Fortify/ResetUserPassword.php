@@ -17,6 +17,10 @@ class ResetUserPassword implements ResetsUserPasswords
      */
     public function reset(User $user, array $input): void
     {
+        if (instanceSettings()->is_oauth_password_login_disabled && $user->isOauthUser()) {
+            abort(403, 'Password login is disabled for this OAuth account.');
+        }
+
         Validator::make($input, [
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();

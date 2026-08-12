@@ -397,6 +397,8 @@ CREATE TABLE IF NOT EXISTS "instance_settings" (
     "do_not_track" INTEGER DEFAULT false NOT NULL,
     "is_auto_update_enabled" INTEGER DEFAULT true NOT NULL,
     "is_registration_enabled" INTEGER DEFAULT true NOT NULL,
+    "is_oauth_registration_enabled" INTEGER DEFAULT false NOT NULL,
+    "is_oauth_password_login_disabled" INTEGER DEFAULT false NOT NULL,
     "created_at" TEXT,
     "updated_at" TEXT,
     "next_channel" INTEGER DEFAULT false NOT NULL,
@@ -1298,6 +1300,7 @@ CREATE TABLE IF NOT EXISTS "users" (
     "email" TEXT NOT NULL,
     "email_verified_at" TEXT,
     "password" TEXT,
+    "oauth_provider" TEXT,
     "remember_token" TEXT,
     "created_at" TEXT,
     "updated_at" TEXT,
@@ -1886,3 +1889,4 @@ INSERT INTO "migrations" ("id", "migration", "batch") VALUES (317, '2026_06_16_1
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (318, '2026_06_19_140000_v5_create_applications_table', 318);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (319, '2026_06_19_142000_v5_create_resource_connections_table', 319);
 INSERT INTO "migrations" ("id", "migration", "batch") VALUES (320, '2026_06_19_182231_create_container_statuses_table', 320);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (321, '2026_08_11_195953_add_oauth_access_settings_to_instance_settings_table', 321);
