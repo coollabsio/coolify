@@ -171,10 +171,10 @@
                 <div
                     class="environment-resource-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                     <div>Resource</div>
-                    <div>Type</div>
+                    <div class="resource-type">Type</div>
                     <div>Status</div>
                     <div class="resource-domain">Domain</div>
-                    <div>Server</div>
+                    <div class="resource-server">Server</div>
                     <div class="resource-tags">Tags</div>
                 </div>
 
@@ -210,10 +210,17 @@
                                 <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                     <span x-show="item.description" x-text="item.description"></span>
                                 </p>
+                                <div class="mobile-resource-domain min-w-0">
+                                    <template x-if="item.fqdn">
+                                        <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
+                                            class="relative z-10 block truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
+                                            x-text="displayDomain(item.fqdn)"></a>
+                                    </template>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                        <div class="resource-type truncate text-[12px] text-neutral-600 dark:text-fg-dim"
                             x-text="item.typeLabel"></div>
 
                         <div>
@@ -233,7 +240,7 @@
                             <span x-show="!item.fqdn" class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
                         </div>
 
-                        <div class="truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                        <div class="resource-server truncate text-[12px] text-neutral-600 dark:text-fg-dim"
                             x-text="item.destination?.server?.name || 'Unknown'"></div>
 
                         <div class="resource-tags flex min-w-0 items-center gap-1 overflow-hidden">

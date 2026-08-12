@@ -3630,6 +3630,10 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     column-gap: 1rem;
 }
 
+.environment-resource-grid .mobile-resource-domain {
+    display: none;
+}
+
 .projects-table-grid {
     display: grid;
     grid-template-columns:
@@ -3743,9 +3747,13 @@ html[data-theme="custom"] .logs-viewer-timestamp {
         column-gap: 0.75rem;
     }
 
-    .environment-resource-grid > :nth-child(2),
-    .environment-resource-grid > :nth-child(5) {
+    .environment-resource-grid .resource-type,
+    .environment-resource-grid .resource-server {
         display: none;
+    }
+
+    .environment-resource-grid .mobile-resource-domain {
+        display: block;
     }
 }
 
