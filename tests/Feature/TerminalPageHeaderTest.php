@@ -39,6 +39,7 @@ it('keeps the pre-session target list scrollable inside the full-width card', fu
 
     expect($view)
         ->toContain('data-terminal-target-picker="page"')
+        ->toContain('aria-label="Filter terminal targets"')
         ->toContain('class="application-settings-workspace flex w-full min-w-0 flex-col"')
         ->toContain('class="terminal-target-card-list"')
         ->and($styles)
