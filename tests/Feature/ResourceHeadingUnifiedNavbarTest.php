@@ -156,6 +156,18 @@ it('groups application lifecycle controls in an actions dropdown', function () {
         ->toContain('Deploy');
 });
 
+it('raises the desktop top bar while the service actions dropdown is open', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+
+    expect($layout)
+        ->toContain('resourceActionsOpen: false')
+        ->toContain("'z-[1000]': resourceActionsOpen")
+        ->toContain('@resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"')
+        ->and($heading)
+        ->toContain("\$dispatch('resource-actions-toggled', { open })");
+});
+
 it('keeps deploy in the actions menu alongside advanced operations', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();

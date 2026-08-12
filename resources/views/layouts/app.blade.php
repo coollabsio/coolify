@@ -27,6 +27,9 @@
 
             {{-- ============ DESKTOP TOP BAR ============ --}}
             <header
+                x-data="{ resourceActionsOpen: false }"
+                @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
+                :class="{ 'z-[1000]': resourceActionsOpen }"
                 class="hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur border-b border-neutral-200 dark:border-white/[0.06]">
                 {{-- Brand (width tracks sidebar) --}}
                 <div class="flex items-center gap-2 h-full shrink-0 border-r border-neutral-200 dark:border-white/[0.06] transition-[width] duration-200"

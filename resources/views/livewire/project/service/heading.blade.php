@@ -185,6 +185,7 @@
                             <x-services.links :service="$service" />
                         </div>
                         <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
+                                x-effect="$dispatch('resource-actions-toggled', { open })"
                                 @click.outside="open = false" @keydown.escape.window="open = false">
                                 <button type="button" class="button" @click="open = !open" :aria-expanded="open">
                                     <x-reicon name="play-circle" class="size-3.5 opacity-70" />
