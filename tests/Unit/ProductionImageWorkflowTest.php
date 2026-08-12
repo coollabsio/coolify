@@ -41,6 +41,9 @@ it('requires a reviewed draft release before building a stable version', functio
         ->toContain('release.body?.trim()')
         ->toContain('bootstrap/getVersion.php')
         ->toContain('target_commitish: context.sha')
+        ->toContain('tag_name: process.env.TAG_NAME')
+        ->toContain('actions/github-script@v8')
+        ->not->toContain('actions/github-script@v7')
         ->not->toContain('generate-notes');
 });
 

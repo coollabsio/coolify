@@ -62,7 +62,7 @@ jobs:
 
       - name: Validate and pin draft release
         id: draft
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           TAG_NAME: ${{ inputs.tag }}
         with:
@@ -107,6 +107,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: release.id,
+              tag_name: process.env.TAG_NAME,
               target_commitish: context.sha,
             });
             core.setOutput('release_id', release.id);
@@ -210,7 +211,7 @@ jobs:
             --tag "${IMAGE}:latest"
 
       - name: Publish reviewed draft release
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         env:
           RELEASE_ID: ${{ needs.validate.outputs.release_id }}
           TAG_NAME: ${{ inputs.tag }}
@@ -252,5 +253,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: Number(process.env.RELEASE_ID),
+              tag_name: process.env.TAG_NAME,
+              target_commitish: context.sha,
               draft: false,
             });
