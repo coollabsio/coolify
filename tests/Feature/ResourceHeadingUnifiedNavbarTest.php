@@ -470,7 +470,6 @@ it('shows application and service Links on mobile headings', function () {
 it('uses overflow scroll arrows on resource heading navbars', function () {
     $files = [
         resource_path('views/livewire/server/navbar.blade.php'),
-        resource_path('views/components/project/navbar.blade.php'),
     ];
 
     foreach ($files as $path) {

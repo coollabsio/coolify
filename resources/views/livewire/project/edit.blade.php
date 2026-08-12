@@ -1,8 +1,12 @@
 <div>
     <x-slot:title>{{ data_get_str($project, 'name')->limit(10) }} > Edit | Coolify</x-slot>
-    <x-project.navbar :project="$project" />
+    <div class="w-full max-w-[1180px]">
+        <header class="mb-5">
+            <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $project->name }}</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Project settings</p>
+        </header>
 
-    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+        <div class="flex flex-col gap-6">
         <form wire:submit="submit">
             <x-unsaved-bar action="submit" />
             <section class="application-settings-section">
@@ -31,5 +35,6 @@
                 <livewire:project.delete-project :disabled="! $project->isEmpty()" :project_id="$project->id" />
             </div>
         </section>
+        </div>
     </div>
 </div>
