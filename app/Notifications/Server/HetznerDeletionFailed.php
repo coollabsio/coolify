@@ -17,8 +17,6 @@ class HetznerDeletionFailed extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        ray('hello');
-        ray($notifiable);
 
         return $notifiable->getEnabledChannels('hetzner_deletion_failed');
     }

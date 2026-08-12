@@ -62,6 +62,9 @@ class Upgrade extends Component
     public function upgrade()
     {
         try {
+            if (! isInstanceAdmin()) {
+                abort(403);
+            }
             if ($this->updateInProgress) {
                 return;
             }

@@ -91,9 +91,7 @@ class Tags extends Component
             $this->authorize('update', $this->resource);
             $this->resource->tags()->detach($id);
             $found_more_tags = Tag::ownedByCurrentTeam()->find($id);
-            if ($found_more_tags && $found_more_tags->applications()->count() == 0 && $found_more_tags->services()->count() == 0) {
-                $found_more_tags->delete();
-            }
+            $found_more_tags?->deleteIfOrphaned();
             $this->refresh();
             $this->dispatch('success', 'Tag deleted.');
         } catch (\Exception $e) {

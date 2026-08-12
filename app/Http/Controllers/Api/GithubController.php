@@ -17,10 +17,17 @@ class GithubController extends Controller
 {
     private function removeSensitiveData($githubApp)
     {
-        $githubApp->makeHidden([
-            'client_secret',
-            'webhook_secret',
-        ]);
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $githubApp->makeVisible([
+                'client_secret',
+                'webhook_secret',
+            ]);
+        } else {
+            $githubApp->makeHidden([
+                'client_secret',
+                'webhook_secret',
+            ]);
+        }
 
         return serializeApiResponse($githubApp);
     }
@@ -129,7 +136,7 @@ class GithubController extends Controller
                             'private_key_uuid' => ['type' => 'string', 'description' => 'UUID of an existing private key for GitHub App authentication.'],
                             'is_system_wide' => ['type' => 'boolean', 'description' => 'Is this app system-wide (cloud only).'],
                         ],
-                        required: ['name', 'api_url', 'html_url', 'app_id', 'installation_id', 'client_id', 'client_secret', 'private_key_uuid'],
+                        required: ['name', 'html_url', 'app_id', 'installation_id', 'client_id', 'client_secret', 'private_key_uuid'],
                     ),
                 ),
             ],
@@ -183,6 +190,7 @@ class GithubController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $this->authorize('create', [GithubApp::class]);
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
@@ -204,10 +212,14 @@ class GithubController extends Controller
             'is_system_wide',
         ];
 
+        $request->merge([
+            'organization' => normalizeGithubOrganization($request->input('organization')),
+        ]);
+
         $validator = customApiValidator($request->all(), [
             'name' => 'required|string|max:255',
-            'organization' => 'nullable|string|max:255',
-            'api_url' => ['required', 'string', 'url', new SafeExternalUrl],
+            'organization' => ['nullable', 'string', 'max:255', 'regex:/\A[^\s\/?#]+\z/'],
+            'api_url' => ['nullable', 'string', 'url', new SafeExternalUrl],
             'html_url' => ['required', 'string', 'url', new SafeExternalUrl],
             'custom_user' => 'nullable|string|max:255',
             'custom_port' => 'nullable|integer|min:1|max:65535',
@@ -251,7 +263,9 @@ class GithubController extends Controller
                 'uuid' => Str::uuid(),
                 'name' => $request->input('name'),
                 'organization' => $request->input('organization'),
-                'api_url' => $request->input('api_url'),
+                'api_url' => filled($request->input('api_url'))
+                    ? $request->input('api_url')
+                    : githubApiUrlFromHtmlUrl($request->input('html_url')),
                 'html_url' => $request->input('html_url'),
                 'custom_user' => $request->input('custom_user', 'git'),
                 'custom_port' => $request->input('custom_port', 22),
@@ -270,6 +284,12 @@ class GithubController extends Controller
             }
 
             $githubApp = GithubApp::create($payload);
+
+            auditLog('api.github_app.created', [
+                'team_id' => $teamId,
+                'github_app_uuid' => $githubApp->uuid,
+                'github_app_name' => $githubApp->name,
+            ]);
 
             return response()->json($githubApp, 201);
         } catch (\Throwable $e) {
@@ -558,6 +578,7 @@ class GithubController extends Controller
             $githubApp = GithubApp::where('id', $github_app_id)
                 ->where('team_id', $teamId)
                 ->firstOrFail();
+            $this->authorize('update', $githubApp);
 
             // Define allowed fields for update
             $allowedFields = [
@@ -581,13 +602,17 @@ class GithubController extends Controller
 
             $payload = $request->only($allowedFields);
 
+            if (array_key_exists('organization', $payload)) {
+                $payload['organization'] = normalizeGithubOrganization($payload['organization']);
+            }
+
             // Validate the request
             $rules = [];
             if (isset($payload['name'])) {
                 $rules['name'] = 'string';
             }
             if (isset($payload['organization'])) {
-                $rules['organization'] = 'nullable|string';
+                $rules['organization'] = ['nullable', 'string', 'regex:/\A[^\s\/?#]+\z/'];
             }
             if (isset($payload['api_url'])) {
                 $rules['api_url'] = ['url', new SafeExternalUrl];
@@ -631,6 +656,13 @@ class GithubController extends Controller
                 ], 422);
             }
 
+            if (array_key_exists('organization', $payload)) {
+                $payload['organization'] = normalizeGithubOrganization($payload['organization']);
+            }
+            if (isset($payload['html_url']) && ! filled($payload['api_url'] ?? null)) {
+                $payload['api_url'] = githubApiUrlFromHtmlUrl($payload['html_url']);
+            }
+
             // Handle private_key_uuid -> private_key_id conversion
             if (isset($payload['private_key_uuid'])) {
                 $privateKey = PrivateKey::where('team_id', $teamId)
@@ -649,6 +681,13 @@ class GithubController extends Controller
 
             // Update the GitHub app
             $githubApp->update($payload);
+
+            auditLog('api.github_app.updated', [
+                'team_id' => $teamId,
+                'github_app_uuid' => $githubApp->uuid,
+                'github_app_name' => $githubApp->name,
+                'changed_fields' => array_values(array_diff($allowedFields, ['client_secret', 'webhook_secret', 'private_key_uuid'])),
+            ]);
 
             return response()->json([
                 'message' => 'GitHub app updated successfully',
@@ -724,6 +763,7 @@ class GithubController extends Controller
             $githubApp = GithubApp::where('id', $github_app_id)
                 ->where('team_id', $teamId)
                 ->firstOrFail();
+            $this->authorize('delete', $githubApp);
 
             // Check if the GitHub app is being used by any applications
             if ($githubApp->applications->isNotEmpty()) {
@@ -734,7 +774,15 @@ class GithubController extends Controller
                 ], 409);
             }
 
+            $deletedUuid = $githubApp->uuid;
+            $deletedName = $githubApp->name;
             $githubApp->delete();
+
+            auditLog('api.github_app.deleted', [
+                'team_id' => $teamId,
+                'github_app_uuid' => $deletedUuid,
+                'github_app_name' => $deletedName,
+            ]);
 
             return response()->json([
                 'message' => 'GitHub app deleted successfully',

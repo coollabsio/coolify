@@ -22,20 +22,16 @@ class Index extends Component
         if (! $database) {
             return redirect()->route('dashboard');
         }
-        // No backups
-        if (
-            $database->getMorphClass() === \App\Models\StandaloneRedis::class ||
-            $database->getMorphClass() === \App\Models\StandaloneKeydb::class ||
-            $database->getMorphClass() === \App\Models\StandaloneDragonfly::class ||
-            $database->getMorphClass() === \App\Models\StandaloneClickhouse::class
-        ) {
+        if (! $database->isBackupSolutionAvailable()) {
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
                 'environment_uuid' => $environment->uuid,
                 'database_uuid' => $database->uuid,
             ]);
         }
-        $this->database = $database;
+        $this->database = $database->load([
+            'scheduledBackups' => fn ($query) => $query->withCount('executions'),
+        ]);
     }
 
     public function render()

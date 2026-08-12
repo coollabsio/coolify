@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Server::query()->chunk(100, function ($servers) {
+        Server::query()->whereHas('team')->chunk(100, function ($servers) {
             foreach ($servers as $server) {
                 $existingKeys = SharedEnvironmentVariable::where('type', 'server')
                     ->where('server_id', $server->id)

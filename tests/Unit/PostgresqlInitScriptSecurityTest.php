@@ -74,3 +74,69 @@ test('postgresql init script accepts legitimate filenames', function () {
     expect(fn () => validateShellSafePath('setup_db.sql', 'init script filename'))
         ->not->toThrow(Exception::class);
 });
+
+// Path traversal — GHSA-mv4c-9x67-rrmv regression tests
+test('postgresql init script rejects path traversal with ../ sequence', function () {
+    expect(fn () => validateFilenameSafe('../../../etc/cron.d/pwn', 'init script filename'))
+        ->toThrow(Exception::class);
+});
+
+test('postgresql init script rejects path traversal targeting /etc/cron.d', function () {
+    expect(fn () => validateFilenameSafe('../../../../../etc/cron.d/k4zrce', 'init script filename'))
+        ->toThrow(Exception::class);
+});
+
+test('postgresql init script rejects absolute path', function () {
+    expect(fn () => validateFilenameSafe('/etc/passwd', 'init script filename'))
+        ->toThrow(Exception::class);
+});
+
+test('postgresql init script rejects filename with forward slash', function () {
+    expect(fn () => validateFilenameSafe('subdir/evil.sql', 'init script filename'))
+        ->toThrow(Exception::class);
+});
+
+test('postgresql init script rejects filename with backslash', function () {
+    expect(fn () => validateFilenameSafe('subdir\\evil.sql', 'init script filename'))
+        ->toThrow(Exception::class);
+});
+
+test('postgresql init script rejects double-dot without slashes', function () {
+    expect(fn () => validateFilenameSafe('..', 'init script filename'))
+        ->toThrow(Exception::class);
+});
+
+test('postgresql init script rejects null byte injection', function () {
+    expect(fn () => validateFilenameSafe("init.sql\0../../etc/passwd", 'init script filename'))
+        ->toThrow(Exception::class);
+});
+
+test('postgresql init script accepts legitimate filenames via validateFilenameSafe', function () {
+    expect(fn () => validateFilenameSafe('init.sql', 'init script filename'))
+        ->not->toThrow(Exception::class);
+
+    expect(fn () => validateFilenameSafe('01_schema.sql', 'init script filename'))
+        ->not->toThrow(Exception::class);
+
+    expect(fn () => validateFilenameSafe('init-script.sh', 'init script filename'))
+        ->not->toThrow(Exception::class);
+});
+
+// Write-site defence — basename() + escapeshellarg() keep legacy/bad rows safe
+test('basename() strips path traversal from legacy filenames at write site', function () {
+    expect(basename('../../../etc/cron.d/pwn'))->toBe('pwn');
+    expect(basename('/etc/passwd'))->toBe('passwd');
+    expect(basename('subdir/evil.sql'))->toBe('evil.sql');
+});
+
+test('escapeshellarg() neutralises shell metacharacters in tee target', function () {
+    // Simulates how StartPostgresql::generate_init_scripts() builds the tee argument
+    $configuration_dir = '/data/coolify/databases/abc123';
+    $legacy_filename = basename('foo bar*.sql;rm -rf /');
+    $target = "$configuration_dir/docker-entrypoint-initdb.d/{$legacy_filename}";
+    $escaped = escapeshellarg($target);
+
+    // Single-quoted in POSIX sh means no expansion / no extra args regardless of contents.
+    expect($escaped)->toStartWith("'")->toEndWith("'");
+    expect($escaped)->toContain('foo bar*.sql;rm -rf');
+});

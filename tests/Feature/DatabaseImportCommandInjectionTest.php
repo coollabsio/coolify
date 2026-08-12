@@ -1,7 +1,8 @@
 <?php
 
-use App\Livewire\Project\Database\Import;
+use App\Livewire\Project\Database\ImportForm;
 use App\Support\ValidationPatterns;
+use Livewire\Attributes\Locked;
 
 describe('container name validation', function () {
     test('isValidContainerName accepts valid container names', function () {
@@ -45,43 +46,43 @@ describe('container name validation', function () {
 
 describe('locked properties', function () {
     test('container property has Locked attribute', function () {
-        $property = new ReflectionProperty(Import::class, 'container');
-        $attributes = $property->getAttributes(\Livewire\Attributes\Locked::class);
+        $property = new ReflectionProperty(ImportForm::class, 'container');
+        $attributes = $property->getAttributes(Locked::class);
 
         expect($attributes)->not->toBeEmpty();
     });
 
     test('serverId property has Locked attribute', function () {
-        $property = new ReflectionProperty(Import::class, 'serverId');
-        $attributes = $property->getAttributes(\Livewire\Attributes\Locked::class);
+        $property = new ReflectionProperty(ImportForm::class, 'serverId');
+        $attributes = $property->getAttributes(Locked::class);
 
         expect($attributes)->not->toBeEmpty();
     });
 
     test('resourceId property has Locked attribute', function () {
-        $property = new ReflectionProperty(Import::class, 'resourceId');
-        $attributes = $property->getAttributes(\Livewire\Attributes\Locked::class);
+        $property = new ReflectionProperty(ImportForm::class, 'resourceId');
+        $attributes = $property->getAttributes(Locked::class);
 
         expect($attributes)->not->toBeEmpty();
     });
 
     test('resourceType property has Locked attribute', function () {
-        $property = new ReflectionProperty(Import::class, 'resourceType');
-        $attributes = $property->getAttributes(\Livewire\Attributes\Locked::class);
+        $property = new ReflectionProperty(ImportForm::class, 'resourceType');
+        $attributes = $property->getAttributes(Locked::class);
 
         expect($attributes)->not->toBeEmpty();
     });
 
     test('resourceUuid property has Locked attribute', function () {
-        $property = new ReflectionProperty(Import::class, 'resourceUuid');
-        $attributes = $property->getAttributes(\Livewire\Attributes\Locked::class);
+        $property = new ReflectionProperty(ImportForm::class, 'resourceUuid');
+        $attributes = $property->getAttributes(Locked::class);
 
         expect($attributes)->not->toBeEmpty();
     });
 
     test('resourceDbType property has Locked attribute', function () {
-        $property = new ReflectionProperty(Import::class, 'resourceDbType');
-        $attributes = $property->getAttributes(\Livewire\Attributes\Locked::class);
+        $property = new ReflectionProperty(ImportForm::class, 'resourceDbType');
+        $attributes = $property->getAttributes(Locked::class);
 
         expect($attributes)->not->toBeEmpty();
     });
@@ -89,7 +90,7 @@ describe('locked properties', function () {
 
 describe('server method uses team scoping', function () {
     test('server computed property calls ownedByCurrentTeam', function () {
-        $method = new ReflectionMethod(Import::class, 'server');
+        $method = new ReflectionMethod(ImportForm::class, 'server');
 
         // Extract the server method body
         $startLine = $method->getStartLine();
@@ -102,9 +103,9 @@ describe('server method uses team scoping', function () {
     });
 });
 
-describe('Import component uses shared ValidationPatterns', function () {
+describe('ImportForm component uses shared ValidationPatterns', function () {
     test('runImport references ValidationPatterns for container validation', function () {
-        $method = new ReflectionMethod(Import::class, 'runImport');
+        $method = new ReflectionMethod(ImportForm::class, 'runImport');
         $startLine = $method->getStartLine();
         $endLine = $method->getEndLine();
         $lines = array_slice(file($method->getFileName()), $startLine - 1, $endLine - $startLine + 1);
@@ -114,7 +115,7 @@ describe('Import component uses shared ValidationPatterns', function () {
     });
 
     test('restoreFromS3 references ValidationPatterns for container validation', function () {
-        $method = new ReflectionMethod(Import::class, 'restoreFromS3');
+        $method = new ReflectionMethod(ImportForm::class, 'restoreFromS3');
         $startLine = $method->getStartLine();
         $endLine = $method->getEndLine();
         $lines = array_slice(file($method->getFileName()), $startLine - 1, $endLine - $startLine + 1);

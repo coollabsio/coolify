@@ -33,6 +33,10 @@ class WebhookNotificationSettings extends Model
         'traefik_outdated_webhook_notifications',
     ];
 
+    protected $hidden = [
+        'webhook_url',
+    ];
+
     protected function casts(): array
     {
         return [

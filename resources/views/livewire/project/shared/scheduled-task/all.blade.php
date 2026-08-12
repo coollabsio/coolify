@@ -1,50 +1,68 @@
 <div>
-    <div class="flex gap-2">
-        <h2>Scheduled Tasks</h2>
-        @can('update', $resource)
-            <x-modal-input buttonTitle="+ Add" title="New Scheduled Task" :closeOutside="false">
-                @if ($resource->type() == 'application')
-                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
-                @elseif ($resource->type() == 'service')
-                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id" :containerNames="$containerNames" />
-                @endif
-            </x-modal-input>
-        @endcan
-    </div>
-    <div class="flex flex-col flex-wrap gap-2 pt-4">
-        @forelse($resource->scheduled_tasks as $task)
-            @if ($resource->type() == 'application')
-                <a class="coolbox" {{ wireNavigate() }}
-                    href="{{ route('project.application.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
-                    <span class="flex flex-col">
-                        <span class="text-lg font-bold">{{ $task->name }}
-                            @if ($task->container)
-                                <span class="text-xs font-normal">({{ $task->container }})</span>
-                            @endif
-                        </span>
+    <x-application.settings-section id="scheduled-tasks-section" title="Scheduled tasks"
+        helper="Run commands inside this resource automatically using a cron schedule." flush>
+        <x-slot:actions>
+            @can('update', $resource)
+                <x-modal-input title="New scheduled task" :closeOutside="false">
+                    <x-slot:content>
+                        <button type="button"
+                            class="button button-highlighted">
+                            <x-reicon name="plus" class="size-3.5" />
+                            Add task
+                        </button>
+                    </x-slot:content>
+                    <livewire:project.shared.scheduled-task.add :type="$resource->type()" :id="$resource->id"
+                        :containerNames="$containerNames" />
+                </x-modal-input>
+            @endcan
+        </x-slot:actions>
 
-                        <span>Frequency: {{ $task->frequency }}</span>
-                        <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
-                        </span>
-                    </span>
-                </a>
-            @elseif ($resource->type() == 'service')
-                <a class="coolbox" {{ wireNavigate() }}
-                    href="{{ route('project.service.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
-                    <span class="flex flex-col">
-                        <span class="text-lg font-bold">{{ $task->name }}
-                            @if ($task->container)
-                                <span class="text-xs font-normal">({{ $task->container }})</span>
-                            @endif
-                        </span>
-                        <span>Frequency: {{ $task->frequency }}</span>
-                        <span>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}
-                        </span>
-                    </span>
-                </a>
-            @endif
+        @forelse($resource->scheduled_tasks as $task)
+            @php
+                $status = data_get($task->latest_log, 'status');
+                $statusType = match ($status) {
+                    'success' => 'success',
+                    'failed' => 'error',
+                    'running' => 'warning',
+                    default => 'neutral',
+                };
+                $statusLabel = match ($status) {
+                    'success' => 'Success',
+                    'failed' => 'Failed',
+                    'running' => 'Running',
+                    default => 'Not run yet',
+                };
+                $taskRoute = $resource->type() === 'application'
+                    ? 'project.application.scheduled-tasks'
+                    : 'project.service.scheduled-tasks';
+            @endphp
+            <a class="group flex items-center gap-3 border-b border-neutral-200 px-4 py-3.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]"
+                {{ wireNavigate() }}
+                href="{{ route($taskRoute, [...$parameters, 'task_uuid' => $task->uuid]) }}">
+                <div
+                    class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200 dark:bg-white/[0.05] dark:text-fg-dim dark:ring-white/[0.07]">
+                    <x-reicon name="browser-terminal" class="size-[18px]" />
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h4 class="truncate text-sm font-semibold text-black dark:text-fg">{{ $task->name }}</h4>
+                        @if ($task->container)
+                            <code
+                                class="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600 dark:bg-white/[0.05] dark:text-fg-dim">{{ $task->container }}</code>
+                        @endif
+                    </div>
+                    <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                        Runs on
+                        <code
+                            class="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-700 dark:bg-white/[0.05] dark:text-fg-dim">{{ $task->frequency }}</code>
+                    </p>
+                </div>
+                <x-status-badge :status="$statusLabel" :type="$statusType" />
+            </a>
         @empty
-            <div>No scheduled tasks configured.</div>
+            <x-empty title="No scheduled tasks"
+                description="Create a task to run maintenance commands, scripts, or recurring jobs automatically."
+                icon-name="browser-terminal" />
         @endforelse
-    </div>
+    </x-application.settings-section>
 </div>

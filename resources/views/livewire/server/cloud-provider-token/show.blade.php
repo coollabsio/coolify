@@ -1,60 +1,75 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($server, 'name')->limit(10) }} > Hetzner Token | Coolify
+        {{ data_get_str($server, 'name')->limit(10) }} > Cloud Token | Coolify
     </x-slot>
+
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
         <x-server.sidebar :server="$server" activeMenu="cloud-provider-token" />
-        <div class="w-full">
-            @if ($server->hetzner_server_id)
-                <div class="flex items-end gap-2">
-                    <h2>Hetzner Token</h2>
-                    @can('create', App\Models\CloudProviderToken::class)
-                        <x-modal-input buttonTitle="+ Add" title="Add Hetzner Token">
-                            <livewire:security.cloud-provider-token-form :modal_mode="true" provider="hetzner" />
-                        </x-modal-input>
-                    @endcan
-                    <x-forms.button canGate="update" :canResource="$server" isHighlighted
-                        wire:click.prevent='validateToken'>
-                        Validate token
-                    </x-forms.button>
-                </div>
-                <div class="pb-4">Change your server's Hetzner token.</div>
-                <div class="grid xl:grid-cols-2 grid-cols-1 gap-2">
+
+        <div class="application-settings-form w-full">
+            @if ($server->hetzner_server_id || $server->vultr_instance_id)
+                <x-application.settings-section id="server-cloud-token-section"
+                    title="{{ $providerName }} token"
+                    helper="Choose the cloud credential used to manage this server." flush>
+                    <x-slot:actions>
+                        <div class="flex items-center gap-2">
+                            <x-forms.button canGate="update" :canResource="$server"
+                                wire:click.prevent="validateToken">
+                                <x-reicon name="refresh" class="size-3.5" />
+                                Validate token
+                            </x-forms.button>
+                            @can('create', App\Models\CloudProviderToken::class)
+                                <x-modal-input buttonTitle="+ Add" title="Add {{ $providerName }} Token">
+                                    <livewire:security.cloud-provider-token-form :modal_mode="true"
+                                        :provider="$provider" />
+                                </x-modal-input>
+                            @endcan
+                        </div>
+                    </x-slot:actions>
+
                     @forelse ($cloudProviderTokens as $token)
                         <div
-                            class="box-without-bg justify-between dark:bg-coolgray-100 bg-white items-center flex flex-col gap-2">
-                            <div class="flex flex-col w-full">
-                                <div class="box-title">{{ $token->name }}</div>
-                                <div class="box-description">
-                                    Created {{ $token->created_at->diffForHumans() }}
+                            class="flex items-center gap-4 border-b border-neutral-200 px-4 py-3 last:border-b-0 dark:border-white/[0.08]">
+                            <div
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                                <x-reicon name="keys" class="size-4" />
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="truncate text-sm font-medium text-neutral-950 dark:text-fg">
+                                        {{ $token->name }}
+                                    </p>
+                                    @if (data_get($server, 'cloudProviderToken.id') === $token->id)
+                                        <x-status-badge status="Active" type="success" />
+                                    @endif
                                 </div>
+                                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">
+                                    {{ $token->description ?: 'Created ' . $token->created_at->diffForHumans() }}
+                                </p>
                             </div>
                             @if (data_get($server, 'cloudProviderToken.id') !== $token->id)
-                                <x-forms.button canGate="update" :canResource="$server" class="w-full"
-                                    wire:click='setCloudProviderToken({{ $token->id }})'>
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    wire:click="setCloudProviderToken({{ $token->id }})">
                                     Use this token
-                                </x-forms.button>
-                            @else
-                                <x-forms.button class="w-full" disabled>
-                                    Currently used
                                 </x-forms.button>
                             @endif
                         </div>
                     @empty
-                        <div>No Hetzner tokens found. </div>
+                        <x-empty size="sm" title="No {{ $providerName }} tokens"
+                            description="Add a token to manage this server through {{ $providerName }}."
+                            icon-name="keys" />
                     @endforelse
-                </div>
+                </x-application.settings-section>
             @else
-                <div class="flex items-end gap-2">
-                    <h2>Hetzner Token</h2>
-                </div>
-                <div class="pb-4">This server was not created through Hetzner Cloud integration.</div>
-                <div class="p-4 border rounded-md dark:border-coolgray-300 dark:bg-coolgray-100">
-                    <p class="dark:text-neutral-400">
-                        Only servers created through Hetzner Cloud can have their tokens managed here.
-                    </p>
-                </div>
+                <x-application.settings-section title="Cloud token"
+                    helper="Cloud credentials are available for servers created through a supported provider.">
+                    <x-empty size="sm" title="No cloud provider integration"
+                        description="This server was not created through Hetzner or Vultr, so it does not require a managed cloud token."
+                        icon-name="keys" />
+                </x-application.settings-section>
             @endif
         </div>
     </div>

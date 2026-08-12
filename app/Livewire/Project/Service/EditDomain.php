@@ -3,10 +3,10 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class EditDomain extends Component
 {
@@ -28,12 +28,15 @@ class EditDomain extends Component
 
     public $requiredPort = null;
 
-    #[Validate(['nullable'])]
+    #[Validate]
     public ?string $fqdn = null;
 
-    protected $rules = [
-        'fqdn' => 'nullable',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'fqdn' => ValidationPatterns::applicationDomainRules(),
+        ];
+    }
 
     public function mount()
     {
@@ -82,15 +85,9 @@ class EditDomain extends Component
     {
         try {
             $this->authorize('update', $this->application);
-            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
-            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
-            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
-                $domain = trim($domain);
-                Url::fromString($domain, ['http', 'https']);
+            $this->validate();
 
-                return str($domain)->lower();
-            });
-            $this->fqdn = $domains->unique()->implode(',');
+            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));

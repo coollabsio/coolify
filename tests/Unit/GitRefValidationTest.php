@@ -4,7 +4,7 @@ use App\Models\Application;
 use App\Models\ApplicationSetting;
 
 /**
- * Security tests for git ref validation (GHSA-mw5w-2vvh-mgf4).
+ * Tests for git ref validation.
  *
  * Ensures that git_commit_sha and related inputs are validated
  * to prevent OS command injection via shell metacharacters.

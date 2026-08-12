@@ -10,14 +10,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('local_persistent_volumes', function (Blueprint $table) {
-            $table->string('uuid')->nullable()->after('id');
-        });
+        if (! Schema::hasColumn('local_persistent_volumes', 'uuid')) {
+            Schema::table('local_persistent_volumes', function (Blueprint $table) {
+                $table->string('uuid')->nullable()->after('id');
+            });
+        }
 
         DB::table('local_persistent_volumes')
             ->whereNull('uuid')
-            ->orderBy('id')
-            ->chunk(1000, function ($volumes) {
+            ->chunkById(1000, function ($volumes) {
                 foreach ($volumes as $volume) {
                     DB::table('local_persistent_volumes')
                         ->where('id', $volume->id)

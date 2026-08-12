@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
+use Stripe\StripeClient;
 
 class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -35,7 +36,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
             $data = data_get($this->event, 'data.object');
             switch ($type) {
                 case 'radar.early_fraud_warning.created':
-                    $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                    $stripe = app(StripeClient::class);
                     $id = data_get($data, 'id');
                     $charge = data_get($data, 'charge');
                     if ($charge) {
@@ -94,12 +95,12 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     }
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
-                        throw new \RuntimeException("No subscription found for customer: {$customerId}");
+                        break;
                     }
 
                     if ($subscription->stripe_subscription_id) {
                         try {
-                            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                            $stripe = app(StripeClient::class);
                             $stripeSubscription = $stripe->subscriptions->retrieve(
                                 $subscription->stripe_subscription_id
                             );
@@ -154,7 +155,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
                         // send_internal_notification('invoice.payment_failed failed but no subscription found in Coolify for customer: '.$customerId);
-                        throw new \RuntimeException("No subscription found for customer: {$customerId}");
+                        break;
                     }
                     $team = data_get($subscription, 'team');
                     if (! $team) {
@@ -165,7 +166,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     // Verify payment status with Stripe API before sending failure notification
                     if ($paymentIntentId) {
                         try {
-                            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                            $stripe = app(StripeClient::class);
                             $paymentIntent = $stripe->paymentIntents->retrieve($paymentIntentId);
 
                             if (in_array($paymentIntent->status, ['processing', 'succeeded', 'requires_action', 'requires_confirmation'])) {
@@ -190,7 +191,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                     if (! $subscription) {
                         // send_internal_notification('payment_intent.payment_failed, no subscription found in Coolify for customer: '.$customerId);
-                        throw new \RuntimeException("No subscription found in Coolify for customer: {$customerId}");
+                        break;
                     }
                     if ($subscription->stripe_invoice_paid) {
                         // send_internal_notification('payment_intent.payment_failed but invoice is active for customer: '.$customerId);
@@ -259,7 +260,10 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                     $comment = data_get($data, 'cancellation_details.comment');
                     $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
                     if (str($lookup_key)->contains('dynamic')) {
-                        $quantity = min((int) data_get($data, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT);
+                        $quantity = max(
+                            UpdateSubscriptionQuantity::MIN_SERVER_LIMIT,
+                            min((int) data_get($data, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT)
+                        );
                         $team = data_get($subscription, 'team');
                         if ($team) {
                             $team->update([
@@ -334,7 +338,7 @@ class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
                         }
                     } else {
                         // send_internal_notification('Subscription deleted but no subscription found in Coolify for customer: '.$customerId);
-                        throw new \RuntimeException("No subscription found in Coolify for customer: {$customerId}");
+                        break;
                     }
                     break;
                 default:

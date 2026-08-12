@@ -23,6 +23,7 @@ class ScheduledDatabaseBackupExecution extends BaseModel
     protected function casts(): array
     {
         return [
+            'size' => 'integer',
             's3_uploaded' => 'boolean',
             'local_storage_deleted' => 'boolean',
             's3_storage_deleted' => 'boolean',

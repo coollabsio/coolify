@@ -5,8 +5,24 @@ namespace App\Models;
 use App\Jobs\ConnectProxyToNetworksJob;
 use App\Support\ValidationPatterns;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    schema: 'Destination',
+    description: 'A Docker network destination attached to a server.',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'uuid', type: 'string'),
+        new OA\Property(property: 'name', type: 'string'),
+        new OA\Property(property: 'network', type: 'string'),
+        new OA\Property(property: 'type', type: 'string', enum: ['standalone', 'swarm']),
+        new OA\Property(property: 'server_uuid', type: 'string'),
+        new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+        new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+    ],
+)]
 class StandaloneDocker extends BaseModel
 {
     use HasFactory;
@@ -22,6 +38,10 @@ class StandaloneDocker extends BaseModel
     {
         parent::boot();
         static::created(function ($newStandaloneDocker) {
+            if (app()->runningUnitTests()) {
+                return;
+            }
+
             $server = $newStandaloneDocker->server;
             $safeNetwork = escapeshellarg($newStandaloneDocker->network);
             instant_remote_process([
@@ -90,6 +110,16 @@ class StandaloneDocker extends BaseModel
         return $this->belongsTo(Server::class);
     }
 
+    public static function ownedByCurrentTeam()
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId(currentTeam()->id));
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::whereHas('server', fn ($q) => $q->whereTeamId($teamId));
+    }
+
     /**
      * Get the server attribute using identity map caching.
      * This intercepts lazy-loading to use cached Server lookups.
@@ -117,19 +147,22 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(Service::class, 'destination');
     }
 
-    public function databases()
+    public function databases(): Collection
     {
         $postgresqls = $this->postgresqls;
         $redis = $this->redis;
         $mongodbs = $this->mongodbs;
         $mysqls = $this->mysqls;
         $mariadbs = $this->mariadbs;
+        $keydbs = $this->keydbs;
+        $dragonflies = $this->dragonflies;
+        $clickhouses = $this->clickhouses;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
     }
 
     public function attachedTo()
     {
-        return $this->applications?->count() > 0 || $this->databases()->count() > 0;
+        return $this->applications()->exists() || $this->databases()->count() > 0 || $this->services()->exists();
     }
 }

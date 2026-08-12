@@ -22,11 +22,19 @@ class CloudInitScripts extends Component
     {
         return [
             'scriptSaved' => 'loadScripts',
+            'securityResourceChanged' => 'loadScripts',
         ];
     }
 
     public function loadScripts()
     {
+        CloudInitScript::ownedByCurrentTeam()
+            ->whereNull('uuid')
+            ->get()
+            ->each(function (CloudInitScript $script): void {
+                $script->forceFill(['uuid' => new_public_id()])->save();
+            });
+
         $this->scripts = CloudInitScript::ownedByCurrentTeam()->orderBy('created_at', 'desc')->get();
     }
 
@@ -36,8 +44,15 @@ class CloudInitScripts extends Component
             $script = CloudInitScript::ownedByCurrentTeam()->findOrFail($scriptId);
             $this->authorize('delete', $script);
 
+            $scriptName = $script->name;
             $script->delete();
             $this->loadScripts();
+
+            auditLog('ui.cloud_init_script.deleted', [
+                'team_id' => currentTeam()->id,
+                'cloud_init_script_id' => $scriptId,
+                'cloud_init_script_name' => $scriptName,
+            ]);
 
             $this->dispatch('success', 'Cloud-init script deleted successfully.');
         } catch (\Throwable $e) {

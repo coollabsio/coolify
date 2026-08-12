@@ -87,6 +87,41 @@ it('renders responsive checkbox classes on the application configuration page', 
 
     $response->assertSuccessful();
     $response->assertSee('Use a Build Server?');
+    $response->assertSee('application-mobile-section');
+    $response->assertSee('Application menu');
+    $response->assertSee('<optgroup label="Application">', false);
+    $response->assertSee('<optgroup label="Configuration">', false);
+    $response->assertSee('<optgroup label="Links">', false);
+    $response->assertSee('application-mobile-actions');
+    $response->assertDontSee('<optgroup label="Actions">', false);
+    $response->assertSee('value="navigate|application|', false);
+    $response->assertSee('value="navigate|configuration|', false);
+    $response->assertSee('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url', false);
+    $response->assertSee('application-mobile-stop-trigger');
+    $response->assertSee('application-mobile-restart-trigger');
+    $response->assertSee('wire:click="deploy"', false);
+    $response->assertSee('Force deploy (without cache)');
+    expect(
+        str_contains($response->getContent(), 'wire:click="force_deploy_without_cache"')
+            || str_contains($response->getContent(), 'wire:click="deploy(true)"')
+    )->toBeTrue();
+    $response->assertDontSee('Confirm Application Deployment?');
+    $response->assertSee('Confirm Application Restart?');
+    $response->assertDontSee('Confirm Application Force Deployment?');
+    $response->assertDontSee('application-mobile-deploy-trigger');
+    $response->assertDontSee('application-mobile-force-deploy-trigger');
+    $response->assertSee('sub-menu-wrapper hidden md:flex', false);
+    $response->assertSee('scrollbar hidden min-h-10', false);
+    $response->assertSee(route('project.application.deployment.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]));
+    $response->assertSee(route('project.application.environment-variables', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]));
     $response->assertSee('form-control flex max-w-full flex-row items-center gap-4 py-1 pr-2', false);
     $response->assertSee('label flex w-full max-w-full min-w-0 items-center gap-4 px-0', false);
     $response->assertSee('flex min-w-0 grow gap-2 break-words', false);

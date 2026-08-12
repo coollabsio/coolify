@@ -52,7 +52,7 @@
 <nav class="pt-2 pb-4 md:pb-10">
     <div class="flex min-w-0 flex-col gap-1 md:hidden">
         <div class="flex min-w-0 items-center text-xs text-neutral-400">
-            <a class="min-w-0 truncate text-neutral-300 hover:text-warning" {{ wireNavigate() }}
+            <a class="min-w-0 truncate" {{ wireNavigate() }}
                 href="{{ $isApplication
                     ? route('project.application.configuration', $routeParams)
                     : ($isService
@@ -64,6 +64,8 @@
         </div>
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
+        @elseif ($isApplication)
+            <x-status-summary :status="$resource->status" />
         @else
             <x-status.index :resource="$resource" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif
@@ -257,6 +259,8 @@
         <!-- Current Section Status -->
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
+        @elseif ($isApplication)
+            <x-status-summary :status="$resource->status" />
         @else
             <x-status.index :resource="$resource" :title="$lastDeploymentInfo" :lastDeploymentLink="$lastDeploymentLink" />
         @endif
