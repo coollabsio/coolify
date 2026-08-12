@@ -11,8 +11,7 @@
             @if ($showServiceColumn)
                 <span>Service</span>
             @endif
-            <span>DNS</span>
-            <span>Last checked</span>
+            <span>DNS Check</span>
             <span>Search engine indexing</span>
             <span>Direction</span>
             <span></span>
@@ -39,9 +38,6 @@
                 'pending' => 'DNS pending',
                 default => 'DNS unknown',
             };
-            $checkedAt = ! empty($row['checked_at'])
-                ? \Illuminate\Support\Carbon::parse($row['checked_at'])->diffForHumans()
-                : null;
             $serviceLabel = filled($row['service_name'] ?? null)
                 ? \Illuminate\Support\Str::headline($row['service_name'])
                 : '-';
@@ -84,12 +80,19 @@
                             </span>
                         @else
                             @if ($faviconUrl)
-                                <img src="{{ $faviconUrl }}" alt="" loading="lazy" decoding="async"
-                                    referrerpolicy="no-referrer" x-on:error="$el.remove()"
-                                    class="size-4 shrink-0 rounded-sm" />
+                                <span class="relative size-4 shrink-0" aria-hidden="true">
+                                    <x-reicon name="globe"
+                                        class="domain-favicon-fallback size-4 text-neutral-400 dark:text-fg-faint" />
+                                    <img src="{{ $faviconUrl }}" alt="" loading="lazy" decoding="async"
+                                        referrerpolicy="no-referrer"
+                                        x-init="if ($el.complete && $el.naturalWidth > 0) { $el.previousElementSibling.classList.add('hidden'); $el.classList.remove('invisible') }"
+                                        x-on:load="$el.previousElementSibling.classList.add('hidden'); $el.classList.remove('invisible')"
+                                        x-on:error="$el.remove()"
+                                        class="invisible absolute inset-0 size-4 rounded-sm" />
+                                </span>
                             @endif
                             <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank"
-                                class="min-w-0 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                                class="min-w-0 flex-1 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
                                 title="{{ $row['url'] }}">
                                 {{ $row['url'] }}
                             </a>
@@ -123,10 +126,6 @@
                     @endif
                 </div>
 
-                <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim">
-                    {{ $checkedAt ?: '-' }}
-                </div>
-
                 <div class="min-w-0">
                     @unless ($isSuggested)
                         <span class="domains-mobile-label">Search engine indexing</span>
@@ -136,6 +135,7 @@
                     @elseif (auth()->user()?->can('update', $service))
                         <x-forms.listbox id="service-domain-indexing-{{ $row['service_application_id'] }}-{{ $index }}"
                             :wire="false"
+                            preserveValue
                             :value="$service->applications->firstWhere('id', $row['service_application_id'])?->isDomainNoindexed($row['url']) ? 'noindex' : 'index'"
                             onChange="toggleNoindexDomain"
                             :onChangeArgs="[(int) $row['service_application_id'], $row['url']]" portal :options="[
@@ -163,7 +163,7 @@
                     @endif
                     @if ($showDirection && auth()->user()?->can('update', $service))
                         <x-forms.listbox id="service-domain-direction-{{ $row['service_application_id'] }}-{{ $index }}"
-                            :wire="false" :value="$rowDirection" onChange="updateServiceRedirect"
+                            :wire="false" :value="$rowDirection" preserveValue onChange="updateServiceRedirect"
                             :onChangeArgs="[(int) $row['service_application_id']]" portal :options="[
                                 ['value' => 'both', 'label' => 'Allow www & non-www'],
                                 ['value' => 'www', 'label' => 'Redirect to www'],

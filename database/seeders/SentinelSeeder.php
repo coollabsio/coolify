@@ -16,6 +16,14 @@ class SentinelSeeder extends Seeder
                     if (str($server->settings->sentinel_token)->isEmpty()) {
                         $server->settings->generateSentinelToken(ignoreEvent: true);
                     }
+                    $developmentUrl = isDev() ? config('constants.sentinel.dev_url') : null;
+                    if (filled($developmentUrl)) {
+                        $server->settings->sentinel_custom_url = $developmentUrl;
+                        $server->settings->saveQuietly();
+
+                        continue;
+                    }
+
                     if (str($server->settings->sentinel_custom_url)->isEmpty()) {
                         $url = $server->settings->generateSentinelUrl(ignoreEvent: true);
                         if (str($url)->isEmpty()) {

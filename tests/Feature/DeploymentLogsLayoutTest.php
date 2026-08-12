@@ -187,6 +187,8 @@ it('keeps deployment history fields and the log status badge accessible on mobil
         ->and($appCss)
         ->toContain(".deployment-table-scroll {\n    overflow-x: auto;")
         ->toContain(".deployment-table-grid {\n    min-width: 59rem;")
+        ->toContain("@media (min-width: 1024px) {\n    .deployment-table-scroll {\n        overflow-x: visible;")
+        ->toContain(".deployment-table-grid {\n        min-width: 0;")
         ->not->toContain('.deployment-table-grid > :nth-child')
         ->toContain(".logs-viewer-primary .logs-viewer-actions {\n    width: auto;\n    flex: 1 1 auto;");
 });

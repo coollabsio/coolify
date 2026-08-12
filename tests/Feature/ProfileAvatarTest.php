@@ -104,14 +104,21 @@ it('falls back cleanly when the avatars S3 storage no longer exists', function (
         ->assertNotFound();
 });
 
-it('renders the profile upload and user menu avatar', function () {
+it('automatically uploads a selected profile picture and keeps the current avatar until it succeeds', function () {
     $profile = file_get_contents(resource_path('views/livewire/profile/index.blade.php'));
     $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
 
     expect($profile)
         ->toContain("this.\$wire.upload('avatar', compressed")
+        ->toContain('await this.$wire.uploadAvatar()')
+        ->toContain('if (uploaded)')
         ->toContain('canvas.toBlob')
-        ->toContain('wire:click="uploadAvatar"')
+        ->toContain('x-ref="avatarInput"')
+        ->toContain('class="hidden"')
+        ->toContain("processing ? 'Uploading…' : 'Browse…'")
+        ->not->toContain('wire:click="uploadAvatar"')
+        ->not->toContain('Upload picture')
+        ->not->toContain('type="file" x-on:change')
         ->and($menu)
         ->toContain("route('profile.avatar',");
 });

@@ -27,6 +27,13 @@ it('opens the email change form without a Livewire request', function () {
         ->not->toContain('wire:click="showEmailChangeForm"');
 });
 
+it('does not show a redundant enabled badge for two-factor authentication', function () {
+    $profileView = file_get_contents(resource_path('views/livewire/profile/index.blade.php'));
+
+    expect($profileView)
+        ->not->toContain('<x-status-badge status="Enabled" type="success" />');
+});
+
 it('keeps color theme preferences on the profile appearance view without page width or density controls', function () {
     $appearanceView = file_get_contents(resource_path('views/livewire/profile/appearance.blade.php'));
 

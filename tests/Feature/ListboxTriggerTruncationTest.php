@@ -88,6 +88,31 @@ test('listbox forwards dynamic disabled state to its trigger', function () {
         ->toContain('x-bind:disabled="!selectedMoveProject || availableEnvironments.length === 0"');
 });
 
+test('listbox waits for change handlers and prevents overlapping selections', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain('saving: false')
+        ->toContain('async choose(option)')
+        ->toContain('await this.$wire.')
+        ->toContain('if (this.saving || option.disabled) return;')
+        ->toContain("'pointer-events-none opacity-70': saving");
+});
+
+test('listbox does not send a second live entangle request when using a change handler', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)->toContain('@elseif ($live && ! $onChange) @entangle($id).live');
+});
+
+test('listbox can preserve its client value across Livewire morphs', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain("'preserveValue' => false")
+        ->toContain('@if ($preserveValue) wire:ignore @endif');
+});
+
 test('notification event multiselect truncates long selected summaries', function () {
     $html = Blade::render(<<<'BLADE'
         <x-notification.event-multiselect id="server-slack-events" label="Servers" :events="[

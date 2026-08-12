@@ -107,13 +107,18 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->toContain("id=\"service-domain-direction-{$this->apiApp->id}-0-trigger\"")
         ->toContain("id=\"service-domain-indexing-{$this->apiApp->id}-0-trigger\"")
         ->toContain('src="https://api.example.com/favicon.ico"')
+        ->toContain('class="relative size-4 shrink-0"')
+        ->toContain('domain-favicon-fallback')
+        ->toContain('class="invisible absolute inset-0 size-4 rounded-sm"')
+        ->toContain('$el.previousElementSibling.classList.add(\'hidden\')')
         ->toContain('x-on:error="$el.remove()"')
+        ->toContain('class="min-w-0 flex-1 text-[13px]')
         ->toContain('class="listbox-trigger"')
         ->toContain('application-settings-section-body is-flush mt-1 w-full scroll-mt-28 overflow-visible')
         ->toContain('dark:bg-white/[0.04]')
         ->toContain('<span>Domain</span>')
-        ->toContain('<span>DNS</span>')
-        ->toContain('<span>Last checked</span>')
+        ->toContain('<span>DNS Check</span>')
+        ->not->toContain('<span>Last checked</span>')
         ->not->toContain("service-domain-group-{$this->webApp->id}")
         ->and(substr_count($html, '2 domains'))->toBe(1)
         ->and(strpos($html, '>API</span>'))->toBeLessThan(strpos($html, '<span>Domain</span>'))
@@ -556,12 +561,16 @@ it('updates search engine indexing from the service domains view', function () {
         ->assertSee('Direction')
         ->assertSee('toggleNoindexDomain', false)
         ->assertSee('updateServiceRedirect', false)
+        ->assertSee('wire:ignore', false)
         ->assertDontSee('x-model="localIndexing"', false)
         ->assertDontSee('x-model="localDirection"', false)
         ->assertDontSee('@js(', false)
         ->call('toggleNoindexDomain', $this->apiApp->id, 'https://api.example.com', 'noindex')
         ->assertDispatched('configurationChanged')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertSet('service', fn (Service $service): bool => $service->applications
+            ->firstWhere('id', $this->apiApp->id)
+            ?->isDomainNoindexed('https://api.example.com') === true);
 
     expect($this->apiApp->refresh()->noindexDomains()->all())
         ->toBe(['https://api.example.com']);
