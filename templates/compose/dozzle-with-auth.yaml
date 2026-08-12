@@ -22,7 +22,7 @@ services:
             admin:
               email: test@email.com
               name: Admin
-              # A sha-256 hash of the password you want to use. Can be computed with "echo -n password | shasum -a 256". Default password is "test".
+              # A bcrypt hash of the password you want to use. Can be computed with "python3 -c 'import bcrypt;print(bcrypt.hashpw(b"your-password",bcrypt.gensalt(11)).decode())' ". Default password is "test".
               password: $2a$11$viucCvFLlHWvBNOOI6uypuVU.D09UWb.zswRxEg0MkDPi1q/bKbdG
 
     healthcheck:
