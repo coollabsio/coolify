@@ -180,7 +180,10 @@
 
                 <template x-for="item in paginatedResources" :key="item.uuid">
                     <div
-                        class="environment-resource-grid group min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        class="environment-resource-grid group relative min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        <a :href="item.hrefLink"
+                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                            {{ wireNavigate() }} class="absolute inset-0" :aria-label="`Open ${item.name}`"></a>
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -199,7 +202,7 @@
                                     <a :href="item.hrefLink"
                                         @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
                                         {{ wireNavigate() }}
-                                        class="block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
+                                        class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                         x-text="item.name"></a>
                                     <span x-show="item.version === 'v5'"
                                         class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
@@ -224,7 +227,7 @@
                         <div class="resource-domain min-w-0">
                             <template x-if="item.fqdn">
                                 <a :href="firstDomain(item.fqdn)" target="_blank"
-                                    class="block truncate text-[12px] text-neutral-600 hover:underline dark:text-fg-dim"
+                                    class="relative inline-block max-w-full truncate align-middle text-[12px] text-neutral-600 hover:underline dark:text-fg-dim"
                                     x-text="displayDomain(item.fqdn)"></a>
                             </template>
                             <span x-show="!item.fqdn" class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
@@ -236,7 +239,7 @@
                         <div class="resource-tags flex min-w-0 items-center gap-1 overflow-hidden">
                             <template x-for="tag in item.tags.slice(0, 2)" :key="tag.id">
                                 <a :href="`/tags/${tag.name}`"
-                                    class="max-w-24 truncate rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-black dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint dark:hover:text-fg"
+                                    class="relative max-w-24 truncate rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-black dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint dark:hover:text-fg"
                                     x-text="tag.name"></a>
                             </template>
                             <span x-show="item.tags.length > 2"
@@ -322,11 +325,17 @@
                                     <span class="truncate" x-text="statusLabel(item)"></span>
                                 </x-status-badge>
                             </div>
-
-                            <div class="mt-auto flex items-center pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
-                                    x-text="displayDomain(item.fqdn) || item.description || item.destination?.server?.name || 'No endpoint'">
+                            <div class="mt-auto flex min-w-0 flex-col gap-0.5 pt-4">
+                                <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    <span x-show="item.description" x-text="item.description"></span>
                                 </p>
+                                <template x-if="item.fqdn">
+                                    <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
+                                        class="relative z-10 max-w-full self-start truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
+                                        :title="displayDomain(item.fqdn)" x-text="displayDomain(item.fqdn)"></a>
+                                </template>
+                                <span x-show="!item.fqdn"
+                                    class="text-[11px] text-neutral-400 dark:text-fg-faint">-</span>
                             </div>
                         </article>
                     </template>
