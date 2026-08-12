@@ -325,11 +325,17 @@
                                     <span class="truncate" x-text="statusLabel(item)"></span>
                                 </x-status-badge>
                             </div>
-
-                            <div class="mt-auto flex items-center pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
-                                    x-text="displayDomain(item.fqdn) || item.description || item.destination?.server?.name || 'No endpoint'">
+                            <div class="mt-auto flex min-w-0 flex-col gap-0.5 pt-4">
+                                <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    <span x-show="item.description" x-text="item.description"></span>
                                 </p>
+                                <template x-if="item.fqdn">
+                                    <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
+                                        class="relative z-10 max-w-full self-start truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
+                                        :title="displayDomain(item.fqdn)" x-text="displayDomain(item.fqdn)"></a>
+                                </template>
+                                <span x-show="!item.fqdn"
+                                    class="text-[11px] text-neutral-400 dark:text-fg-faint">-</span>
                             </div>
                         </article>
                     </template>
