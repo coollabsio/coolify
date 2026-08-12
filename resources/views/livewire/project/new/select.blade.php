@@ -114,8 +114,10 @@
                     <div
                         class="application-settings-section-body grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
                         <template x-for="application in filteredGitBasedApplications" :key="application.name">
-                            <article
-                                class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
+                                @click="setType(application.id)" @keydown.enter.prevent="setType(application.id)"
+                                @keydown.space.prevent="setType(application.id)"
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -146,21 +148,23 @@
                                 <div
                                     class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                     <a class="button" :href="application.documentation" target="_blank"
-                                        rel="noopener noreferrer">
+                                        rel="noopener noreferrer" @click.stop>
                                         Docs
                                     </a>
-                                    <button type="button"
-                                        class="button ml-auto button-highlighted"
-                                        :disabled="selecting" @click="setType(application.id)">
+                                    <span
+                                        class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
                                         Deploy
-                                    </button>
+                                        <x-reicon name="arrow-right" class="size-3.5" />
+                                    </span>
                                 </div>
                             </article>
                         </template>
 
                         <template x-for="application in filteredDockerBasedApplications" :key="application.name">
-                            <article
-                                class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
+                                @click="setType(application.id)" @keydown.enter.prevent="setType(application.id)"
+                                @keydown.space.prevent="setType(application.id)"
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -181,14 +185,14 @@
                                 <div
                                     class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                     <a class="button" :href="application.documentation" target="_blank"
-                                        rel="noopener noreferrer">
+                                        rel="noopener noreferrer" @click.stop>
                                         Docs
                                     </a>
-                                    <button type="button"
-                                        class="button ml-auto button-highlighted"
-                                        :disabled="selecting" @click="setType(application.id)">
+                                    <span
+                                        class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
                                         Deploy
-                                    </button>
+                                        <x-reicon name="arrow-right" class="size-3.5" />
+                                    </span>
                                 </div>
                             </article>
                         </template>
@@ -207,8 +211,10 @@
                     <div
                         class="application-settings-section-body grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
                         <template x-for="database in filteredDatabases" :key="database.id">
-                            <article
-                                class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <article role="button" tabindex="0" :aria-label="'Deploy ' + database.name"
+                                @click="setType(database.id)" @keydown.enter.prevent="setType(database.id)"
+                                @keydown.space.prevent="setType(database.id)"
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-center gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -241,18 +247,18 @@
                                 <div
                                     class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                     <a :href="databaseDocsUrl(database)" target="_blank" rel="noopener noreferrer"
-                                        class="button">
+                                        class="button" @click.stop>
                                         Docs
                                     </a>
                                     <a :href="databaseWebsiteUrl(database)" target="_blank" rel="noopener noreferrer"
-                                        class="button">
+                                        class="button" @click.stop>
                                         Website
                                     </a>
-                                    <button type="button"
-                                        class="button ml-auto button-highlighted"
-                                        :disabled="selecting" @click="setType(database.id)">
+                                    <span
+                                        class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
                                         Deploy
-                                    </button>
+                                        <x-reicon name="arrow-right" class="size-3.5" />
+                                    </span>
                                 </div>
                             </article>
                         </template>
@@ -282,8 +288,11 @@
 
                         <div class="grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
                             <template x-for="service in filteredServices" :key="service.name">
-                                <article
-                                    class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                <article role="button" tabindex="0" :aria-label="'Deploy ' + service.name"
+                                    @click="setType('one-click-service-' + service.id)"
+                                    @keydown.enter.prevent="setType('one-click-service-' + service.id)"
+                                    @keydown.space.prevent="setType('one-click-service-' + service.id)"
+                                    class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                     <div class="flex min-w-0 items-start gap-3">
                                         <div
                                             class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -317,20 +326,19 @@
                                     <div
                                         class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                         <a :href="getDocLink(service) || coolifyDocsUrl(service)" target="_blank"
-                                            rel="noopener noreferrer" @mouseenter="resolveDocLink(service)"
+                                            rel="noopener noreferrer" @mouseenter="resolveDocLink(service)" @click.stop
                                             class="button" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
                                             Docs
                                         </a>
                                         <a x-show="serviceWebsiteUrl(service)" :href="serviceWebsiteUrl(service)"
-                                            target="_blank" rel="noopener noreferrer" class="button">
+                                            target="_blank" rel="noopener noreferrer" class="button" @click.stop>
                                             Website
                                         </a>
-                                        <button type="button"
-                                            class="button ml-auto button-highlighted"
-                                            :disabled="selecting"
-                                            @click="setType('one-click-service-' + service.id)">
+                                        <span
+                                            class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
                                             Deploy
-                                        </button>
+                                            <x-reicon name="arrow-right" class="size-3.5" />
+                                        </span>
                                     </div>
                                 </article>
                             </template>
