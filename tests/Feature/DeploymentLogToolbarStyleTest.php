@@ -23,3 +23,17 @@ test('deployment logs use light surfaces in light mode and dark surfaces in dark
         ->toMatch('/\.logs-viewer\s*\{[^}]*background:\s*#fff;[^}]*color:\s*#262626;/s')
         ->toMatch('/\.dark \.logs-viewer\s*\{[^}]*background:\s*var\(--color-log\);/s');
 });
+
+test('deployment log downloads use the shared runtime log menu', function () {
+    $deploymentView = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
+    $runtimeView = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+    $downloadMenuClasses = 'runtime-log-menu listbox-panel left-0! right-auto! z-[90]! min-w-52!';
+
+    expect($runtimeView)
+        ->toContain($downloadMenuClasses)
+        ->and($deploymentView)
+        ->toContain('logs-viewer-toolbar relative z-20')
+        ->toContain($downloadMenuClasses)
+        ->not->toContain('absolute right-0 z-50 mt-2 w-max origin-top-right')
+        ->not->toContain('listbox-option text-neutral-700!');
+});

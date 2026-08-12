@@ -276,7 +276,7 @@
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-log dark:text-neutral-100"
                     :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border border-neutral-200 shadow-sm dark:border-coolgray-200'">
-                    <div class="logs-viewer-toolbar">
+                    <div class="logs-viewer-toolbar relative z-20">
                         @php
                             $deploymentStatus = data_get($application_deployment_queue, 'status');
                             $deploymentStatusLabel = $deploymentStatus === 'in_progress'
@@ -365,10 +365,10 @@
                                         x-transition:leave="transition ease-in duration-75"
                                         x-transition:leave-start="transform opacity-100 scale-100"
                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                        class="absolute right-0 z-50 mt-2 w-max origin-top-right rounded-lg border border-neutral-200 bg-white p-1 shadow-modal focus:outline-none dark:border-white/[0.1] dark:bg-[#181818]">
+                                        class="runtime-log-menu listbox-panel left-0! right-auto! z-[90]! min-w-52!">
                                         <div>
                                             <button x-on:click="downloadLogs(); downloadMenuOpen = false"
-                                                class="listbox-option text-neutral-700! hover:bg-neutral-100! dark:text-neutral-200! dark:hover:bg-white/[0.07]!">
+                                                class="listbox-option">
                                                 Download displayed logs
                                             </button>
                                             @can('update', $application)
@@ -392,7 +392,7 @@
                                             "
                                                 :disabled="downloadingAllLogs"
                                                 :class="{ 'opacity-50 cursor-not-allowed': downloadingAllLogs }"
-                                                class="listbox-option text-neutral-700! hover:bg-neutral-100! dark:text-neutral-200! dark:hover:bg-white/[0.07]!">
+                                                class="listbox-option">
                                                 <span x-show="!downloadingAllLogs">Download all logs</span>
                                                 <span x-show="downloadingAllLogs" class="flex items-center gap-2">
                                                     <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
