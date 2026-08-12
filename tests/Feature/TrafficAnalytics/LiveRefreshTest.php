@@ -52,24 +52,25 @@ function bootLiveServer(): Server
     return $server;
 }
 
-it('polls for realtime data by default at the 24h range', function () {
+it('is paused by default and does not poll until Live is turned on', function () {
     $server = bootLiveServer();
 
     Livewire::test(Analytics::class)
         ->assertOk()
-        ->assertSet('live', true)
-        ->assertSeeHtml('wire:poll.60s')
-        ->assertSee('Live');
+        ->assertSet('live', false)
+        ->assertDontSeeHtml('wire:poll.60s')
+        ->assertSee('Paused');
 });
 
-it('stops polling when live is toggled off', function () {
+it('starts polling when live is toggled on at the 24h range', function () {
     $server = bootLiveServer();
 
     Livewire::test(Analytics::class)
-        ->assertSeeHtml('wire:poll.60s')
+        ->assertDontSeeHtml('wire:poll.60s')
         ->call('toggleLive')
-        ->assertSet('live', false)
-        ->assertDontSeeHtml('wire:poll.60s');
+        ->assertSet('live', true)
+        ->assertSeeHtml('wire:poll.60s')
+        ->assertSee('Live');
 });
 
 it('disables realtime polling for the 7d and 30d ranges', function () {
@@ -87,10 +88,12 @@ it('disables realtime polling for the 7d and 30d ranges', function () {
     $component->call('setRange', '30d')->assertDontSeeHtml('wire:poll.60s');
 });
 
-it('re-arms polling when returning to the 24h range', function () {
+it('re-arms polling when returning to the 24h range after live was turned on', function () {
     $server = bootLiveServer();
 
     Livewire::test(Analytics::class)
+        ->call('toggleLive')                 // arm live at 24h
+        ->assertSeeHtml('wire:poll.60s')
         ->call('setRange', '7d')
         ->assertDontSeeHtml('wire:poll.60s')
         ->call('setRange', '24h')

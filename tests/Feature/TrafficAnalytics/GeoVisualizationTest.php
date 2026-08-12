@@ -65,7 +65,7 @@ function bootGeoServer(): Server
     return $server;
 }
 
-it('renders resolved country names and the choropleth map when country data is present', function () {
+it('renders resolved country names and the interactive globe when country data is present', function () {
     $server = bootGeoServer();
 
     $fake = new FakeGeoTrafficClient($server);
@@ -80,8 +80,8 @@ it('renders resolved country names and the choropleth map when country data is p
         ->assertSee('Countries')
         ->assertSee('United States')
         ->assertSee('Germany')
-        ->assertSee('World map of request volume by country')
-        ->assertSeeHtml('path#US')
+        // The interactive WebGL globe canvas replaces the old inline SVG choropleth.
+        ->assertSeeHtml('id="global-analytics-globe"')
         ->assertSee('GeoIP data by MaxMind');
 });
 

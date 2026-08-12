@@ -7,7 +7,6 @@ $dimensionLabels = [
     'referer' => 'Referrers',
     'browser' => 'Browsers',
     'os' => 'Operating systems',
-    'device' => 'Devices',
 ];
 
 $approxBadge = fn (string $tooltip) => '<span title="'.e($tooltip).'" class="ml-1.5 inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium tracking-wide text-amber-700 uppercase dark:bg-amber-500/10 dark:text-amber-400">~ approximate</span>';
@@ -129,9 +128,16 @@ $appListboxOptions = array_merge(
         <x-application.settings-section id="analytics-overview-section" title="Overview"
             helper="Aggregate request volume for the selected filters and range.">
             <div class="grid grid-cols-2 gap-px overflow-hidden rounded-lg bg-neutral-200 sm:grid-cols-3 lg:grid-cols-5 dark:bg-white/[0.07]">
-                <div class="flex flex-col gap-1 bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col gap-2 bg-white px-4 py-3 dark:bg-base">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Requests</span>
                     <span class="text-xl font-semibold text-black dark:text-fg">{{ number_format($overview['requests'] ?? 0) }}</span>
+                    @include('livewire.traffic._sparkline', [
+                        'id' => $chartId.'-spark-requests',
+                        'initial' => $this->requestsSpark(),
+                        'colorVar' => '--chart-status-3xx',
+                        'event' => 'refreshChartData-'.$chartId.'-status',
+                        'key' => 'requestsSpark',
+                    ])
                 </div>
                 <div class="flex flex-col gap-1 bg-white px-4 py-3 dark:bg-base">
                     <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
@@ -146,9 +152,16 @@ $appListboxOptions = array_merge(
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Bandwidth</span>
                     <span class="text-xl font-semibold text-black dark:text-fg">{{ formatBytes($this->bandwidthBytes()) }}</span>
                 </div>
-                <div class="flex flex-col gap-1 bg-white px-4 py-3 dark:bg-base">
+                <div class="flex flex-col gap-2 bg-white px-4 py-3 dark:bg-base">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">Error rate</span>
                     <span class="text-xl font-semibold text-black dark:text-fg">{{ $this->errorRate() }}%</span>
+                    @include('livewire.traffic._sparkline', [
+                        'id' => $chartId.'-spark-errors',
+                        'initial' => $this->errorsSpark(),
+                        'colorVar' => '--chart-status-5xx',
+                        'event' => 'refreshChartData-'.$chartId.'-status',
+                        'key' => 'errorsSpark',
+                    ])
                 </div>
                 <div class="flex flex-col gap-1 bg-white px-4 py-3 dark:bg-base">
                     <span class="flex items-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">
@@ -168,9 +181,15 @@ $appListboxOptions = array_merge(
             @include('livewire.traffic._status-chart')
         </x-application.settings-section>
 
-        {{-- Top applications + Top paths side by side (paths span full width when filtered to one app). --}}
+        {{-- Top applications + Top hosts side by side; Top paths spans full width below.
+             When filtered to one app, only Top paths applies. --}}
         <div @class(['grid grid-cols-1 gap-6', 'lg:grid-cols-2' => $appUuid === ''])>
             @if ($appUuid === '')
+                <x-application.settings-section id="analytics-hosts-section" title="Top hosts"
+                    helper="Served hostnames ranked by request volume." flush>
+                    @include('livewire.traffic._hosts-list', ['hosts' => $topHosts])
+                </x-application.settings-section>
+
                 <x-application.settings-section id="analytics-apps-section" title="Top applications"
                     helper="Applications ranked by request volume. Open one for its analytics." flush>
                     @if (empty($topApps))
@@ -209,12 +228,13 @@ $appListboxOptions = array_merge(
                     @endif
                 </x-application.settings-section>
             @endif
-
-            <x-application.settings-section id="analytics-paths-section" title="Top paths"
-                helper="Most requested paths for the selected range." flush>
-                @include('livewire.traffic._paths-list', ['paths' => $topPaths])
-            </x-application.settings-section>
         </div>
+
+        {{-- Top paths (full width). --}}
+        <x-application.settings-section id="analytics-paths-section" title="Top paths"
+            helper="Most requested paths for the selected range." flush>
+            @include('livewire.traffic._paths-list', ['paths' => $topPaths])
+        </x-application.settings-section>
 
         {{-- Countries --}}
         <x-application.settings-section id="analytics-country-section" title="Countries"
@@ -225,7 +245,41 @@ $appListboxOptions = array_merge(
             ])
         </x-application.settings-section>
 
-        {{-- Referrers / browsers / OS / devices / AI agents, two per row. --}}
+        {{-- Requests by device type (donut) + HTTP versions / cache / status. --}}
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <x-application.settings-section id="analytics-device-section" title="Requests by device type"
+                helper="Share of requests by client device class for the selected range.">
+                @php $deviceChart = $this->deviceChartData(); @endphp
+                @include('livewire.traffic._device-chart', [
+                    'labels' => $deviceChart['labels'],
+                    'series' => $deviceChart['series'],
+                ])
+            </x-application.settings-section>
+
+            @include('livewire.traffic._breakdown-section', [
+                'dimension' => 'protocol',
+                'label' => 'Top HTTP versions',
+                'rows' => data_get($breakdowns, 'protocol', []),
+                'helper' => 'Request volume by negotiated HTTP protocol version.',
+            ])
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            @include('livewire.traffic._breakdown-section', [
+                'dimension' => 'cache',
+                'label' => 'Top cache statuses',
+                'rows' => data_get($breakdowns, 'cache', []),
+                'helper' => 'Reverse-proxy cache outcome (hit, miss, bypass, …) by request count.',
+            ])
+            @include('livewire.traffic._breakdown-section', [
+                'dimension' => 'status',
+                'label' => 'Top status codes',
+                'rows' => data_get($breakdowns, 'status', []),
+                'helper' => 'Most frequent HTTP response status codes for the selected range.',
+            ])
+        </div>
+
+        {{-- Referrers / browsers / OS / AI agents / IPs, two per row. --}}
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             @foreach ($dimensionLabels as $dimension => $label)
                 @include('livewire.traffic._breakdown-section', [

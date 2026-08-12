@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Application;
 use App\Services\SentinelTrafficClient;
 use Livewire\Component;
 
 class Analytics extends Component
 {
+    use BuildsTrafficChartPayload;
+
     public Application $application;
 
     public string $chartId = 'application-analytics';
@@ -16,10 +19,10 @@ class Analytics extends Component
 
     public bool $enabled = false;
 
-    // Realtime refresh. On by default for the 24h range; the 60s cadence matches the
-    // SentinelTrafficClient cache TTL and Sentinel's per-minute rollups, so polling
-    // faster returns identical data. Auto-paused (control disabled) for 7d/30d.
-    public bool $live = true;
+    // Realtime refresh. Off by default (click "Live" to arm it). Only meaningful on the
+    // 24h range; the 60s cadence matches the SentinelTrafficClient cache TTL and
+    // Sentinel's per-minute rollups. The control is disabled for 7d/30d.
+    public bool $live = false;
 
     public ?array $overview = null;
 
@@ -41,7 +44,7 @@ class Analytics extends Component
     public bool $hasSeries = false;
 
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'agent', 'ip', 'useragent'];
+    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
 
     public function mount(): void
     {
@@ -129,6 +132,8 @@ class Analytics extends Component
      */
     protected function chartPayload(): array
     {
+        $device = $this->deviceChartData();
+
         return [
             'hasSeries' => $this->hasSeries,
             'range' => $this->range,
@@ -145,6 +150,11 @@ class Analytics extends Component
                 's4xx' => array_column($this->series, 's4xx'),
                 's5xx' => array_column($this->series, 's5xx'),
             ],
+            'requestsSpark' => $this->requestsSpark(),
+            'errorsSpark' => $this->errorsSpark(),
+            'geo' => $this->geoMarkers(),
+            'deviceLabels' => $device['labels'],
+            'deviceSeries' => $device['series'],
         ];
     }
 

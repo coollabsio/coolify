@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Dashboard;
 
-use App\Models\Application;
+use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Server;
 use App\Services\SentinelTrafficClient;
 use App\Services\TrafficAnalyticsAggregator;
@@ -11,6 +11,10 @@ use Livewire\Component;
 
 class TrafficAnalytics extends Component
 {
+    use BuildsTrafficChartPayload;
+
+    public string $chartId = 'dashboard-traffic';
+
     public Collection $servers;
 
     public string $range = '24h';
@@ -21,11 +25,12 @@ class TrafficAnalytics extends Component
 
     public bool $uniquesApproximate = false;
 
-    /** @var array<int, array<string, mixed>> */
-    public array $topApps = [];
-
-    /** @var array<int, array<string, mixed>> */
-    public array $topCountries = [];
+    /**
+     * Per-bucket status-class series, summed across servers; feeds the KPI sparklines.
+     *
+     * @var array<int, array{bucket: int, s2xx: int, s3xx: int, s4xx: int, s5xx: int}>
+     */
+    public array $series = [];
 
     /**
      * Servers that could run traffic analytics but have it off — drives the dashboard nudge.
@@ -77,8 +82,7 @@ class TrafficAnalytics extends Component
         [$from, $to] = $this->window();
 
         $overviews = [];
-        $appRows = [];
-        $countryTotals = [];
+        $seriesByBucket = [];
 
         foreach ($this->servers as $server) {
             try {
@@ -86,28 +90,21 @@ class TrafficAnalytics extends Component
 
                 $overviews[] = $client->overview(null, $from, $to);
 
-                foreach ($client->apps() as $uuid) {
-                    if (! is_string($uuid) || $uuid === '') {
-                        continue;
+                // Per-bucket status series, summed across servers, for the sparklines.
+                // Isolated so a series hiccup (older Sentinel) never drops a server's overview.
+                try {
+                    foreach ($client->series(null, $this->range) as $bucket) {
+                        $data = $bucket->toArray();
+                        $ts = (int) ($data['bucket'] ?? 0);
+
+                        $seriesByBucket[$ts] ??= ['bucket' => $ts, 's2xx' => 0, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0];
+                        $seriesByBucket[$ts]['s2xx'] += (int) ($data['s2xx'] ?? 0);
+                        $seriesByBucket[$ts]['s3xx'] += (int) ($data['s3xx'] ?? 0);
+                        $seriesByBucket[$ts]['s4xx'] += (int) ($data['s4xx'] ?? 0);
+                        $seriesByBucket[$ts]['s5xx'] += (int) ($data['s5xx'] ?? 0);
                     }
-
-                    $appOverview = $client->overview($uuid, $from, $to)->toArray();
-
-                    $appRows[] = [
-                        'uuid' => $uuid,
-                        'name' => Application::ownedByCurrentTeam()->whereUuid($uuid)->first()?->name ?? $uuid,
-                        'requests' => (int) ($appOverview['requests'] ?? 0),
-                        'bandwidth' => (int) ($appOverview['bytesIn'] ?? 0) + (int) ($appOverview['bytesOut'] ?? 0),
-                    ];
-                }
-
-                foreach ($client->breakdown(null, 'country', $from, $to, 20) as $row) {
-                    $data = $row->toArray();
-                    $value = $data['value'] !== '' ? $data['value'] : 'Unknown';
-
-                    $countryTotals[$value] ??= ['value' => $value, 'requests' => 0, 'bytesOut' => 0];
-                    $countryTotals[$value]['requests'] += (int) ($data['requests'] ?? 0);
-                    $countryTotals[$value]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
+                } catch (\Throwable $e) {
+                    // Leave this server out of the sparkline series.
                 }
             } catch (\Throwable $e) {
                 // Skip unreachable/failed servers so one bad server doesn't break the whole summary.
@@ -120,8 +117,7 @@ class TrafficAnalytics extends Component
             $this->overview = null;
             $this->latencyApproximate = false;
             $this->uniquesApproximate = false;
-            $this->topApps = [];
-            $this->topCountries = [];
+            $this->series = [];
 
             return;
         }
@@ -132,12 +128,13 @@ class TrafficAnalytics extends Component
         $this->latencyApproximate = $result['latencyApproximate'];
         $this->uniquesApproximate = $result['uniquesApproximate'];
 
-        usort($appRows, fn ($a, $b) => $b['requests'] <=> $a['requests']);
-        $this->topApps = array_slice($appRows, 0, 10);
+        ksort($seriesByBucket);
+        $this->series = array_values($seriesByBucket);
 
-        $countries = array_values($countryTotals);
-        usort($countries, fn ($a, $b) => $b['requests'] <=> $a['requests']);
-        $this->topCountries = array_slice($countries, 0, 10);
+        $this->dispatch("refreshChartData-{$this->chartId}-status", [
+            'requestsSpark' => $this->requestsSpark(),
+            'errorsSpark' => $this->errorsSpark(),
+        ]);
     }
 
     public function errorRate(): float

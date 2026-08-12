@@ -1,12 +1,13 @@
 {{--
-    Shared geo visualization for traffic analytics: an inline public-domain world
-    choropleth (see _world-map.blade.php) plus a ranked, paginated country list.
-    Driven by the `country` breakdown collection; each row is
-    ['value' => ISO-A2, 'requests', 'bytesOut']. Colors come from the --chart-geo-*
-    tokens (light + dark) so the map, bars, and legend share one source. Consumed by
-    the server, application and global analytics views and the dashboard summary.
+    Shared geo visualization for traffic analytics: a lightweight interactive 3D
+    dotted globe (WebGL, via cobe — see resources/js/traffic-globe.js) with a
+    request-volume marker per country, plus a ranked, paginated country list.
+    Driven by the `country` breakdown; each row is ['value' => ISO-A2, 'requests',
+    'bytesOut']. The globe live-updates from the host's
+    `refreshChartData-{chartId}-status` payload (`geo` key), so `$chartId` must be
+    in scope. Bars/flags in the list reuse the --chart-geo-* tokens.
 
-    @param iterable $countries  country-breakdown rows
+    @param iterable $countries    country-breakdown rows
     @param ?string  $attribution  optional Sentinel attribution note
 --}}
 @php
@@ -24,7 +25,7 @@
         fn ($r) => preg_match('/^[A-Z]{2}$/', $r['value']) && countryName($r['value']) !== 'Unknown'
     );
 
-    // Quantile buckets (1..5) over known countries for the choropleth fills.
+    // Quantile buckets (1..5) over known countries for the list bars.
     $knownSorted = $known->sortBy('requests')->values();
     $bucketCount = $knownSorted->count();
     $bucketMap = [];
@@ -33,15 +34,8 @@
         $bucketMap[$r['value']] = min(5, max(1, $bucket));
     }
 
-    // Per-country payload for the map hover tooltip, keyed by ISO-A2.
-    $geoTip = [];
-    foreach ($known as $r) {
-        $geoTip[$r['value']] = [
-            'name' => countryName($r['value']),
-            'requests' => $r['requests'],
-            'bytesOut' => formatBytes($r['bytesOut']),
-        ];
-    }
+    // Initial marker payload for the globe, keyed by ISO-A2 request volume.
+    $geoInit = $known->map(fn ($r) => ['code' => $r['value'], 'requests' => $r['requests']])->values()->all();
 
     $countryRows = $known->values();
     if ($unknown->isNotEmpty()) {
@@ -55,9 +49,7 @@
     $maxRequests = max(1, (int) $countryRows->max('requests'));
 
     $hasData = $countryRows->isNotEmpty();
-    // Stable id (one geo section per page): the map subtree is wire:ignore'd, so a random
-    // id would desync from the re-rendered <style> after a live-poll and lose the fills.
-    $mapId = 'traffic-geo-map';
+    $globeId = ($chartId ?? 'traffic').'-globe';
 @endphp
 
 <div class="flex flex-col">
@@ -65,72 +57,16 @@
         <x-empty size="sm" title="No data" description="No country data for the selected range."
             icon-name="network" />
     @else
-        {{-- Bucket fills are server-rendered as scoped CSS so theme + range changes stay
-             in sync with no JS; the map subtree is wire:ignore'd to skip morph churn on polls.
-             The :hover rule highlights whichever country is under the cursor. --}}
-        <style>
-            [data-geo-map="{{ $mapId }}"] svg { width: 100%; height: auto; display: block; }
-            [data-geo-map="{{ $mapId }}"] svg path {
-                fill: var(--chart-geo-empty);
-                stroke: var(--chart-geo-stroke);
-                stroke-width: 0.4;
-                stroke-linejoin: round;
-                transition: filter 0.1s ease;
-            }
-            [data-geo-map="{{ $mapId }}"] svg path:hover {
-                filter: brightness(1.25);
-                stroke: var(--chart-geo-stroke);
-                stroke-width: 0.9;
-                cursor: default;
-            }
-            @foreach ($bucketMap as $a2 => $bucket)
-                [data-geo-map="{{ $mapId }}"] svg path#{{ $a2 }} { fill: var(--chart-geo-{{ $bucket }}); }
-            @endforeach
-        </style>
-
-        {{-- Alpine reads the fresh tooltip payload from a morph-updated JSON node on each
-             move (rather than a one-time x-data literal) so it stays in sync after polls. --}}
-        <div class="relative border-b border-neutral-200 px-4 py-3 dark:border-white/[0.07]"
-            x-data="{
-                tip: { show: false, x: 0, y: 0, name: '', requests: '', bytes: '' },
-                move(e) {
-                    const path = e.target.closest('path');
-                    if (!path || !path.id) { this.tip.show = false; return; }
-                    let data = {};
-                    try { data = JSON.parse(this.$refs.geodata.textContent || '{}'); } catch (_) {}
-                    const d = data[path.id];
-                    this.tip.name = d ? d.name : path.id;
-                    this.tip.requests = d ? Number(d.requests).toLocaleString() : null;
-                    this.tip.bytes = d ? d.bytesOut : null;
-                    this.tip.x = e.clientX;
-                    this.tip.y = e.clientY;
-                    this.tip.show = true;
-                },
-            }" @mousemove="move($event)" @mouseleave="tip.show = false">
-            <script type="application/json" x-ref="geodata">{!! json_encode($geoTip, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}</script>
-
-            <div data-geo-map="{{ $mapId }}" wire:ignore
-                class="w-full overflow-hidden rounded-lg bg-neutral-50 dark:bg-white/[0.02]">
-                @include('livewire.traffic._world-map')
+        <div class="grid grid-cols-1 gap-4 border-b border-neutral-200 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] dark:border-white/[0.07]">
+            {{-- Interactive dotted globe. wire:ignore so live-poll morphs never tear down the WebGL canvas. --}}
+            <div wire:ignore class="relative mx-auto flex aspect-square w-full max-w-[360px] items-center justify-center">
+                <canvas id="{!! $globeId !!}"
+                    class="h-full w-full [contain:layout_paint_size] [touch-action:none]"
+                    style="width: 100%; height: 100%;"></canvas>
             </div>
 
-            <div x-show="tip.show" x-cloak x-transition.opacity.duration.100ms
-                :style="`left: ${tip.x + 14}px; top: ${tip.y + 14}px;`"
-                class="pointer-events-none fixed z-[100] rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 text-white shadow-lg dark:border-white/10 dark:bg-raised">
-                <div class="text-[12px] font-medium" x-text="tip.name"></div>
-                <template x-if="tip.requests !== null">
-                    <div class="mt-0.5 text-[11px] text-neutral-300 dark:text-fg-dim">
-                        <span x-text="tip.requests"></span> req · <span x-text="tip.bytes"></span>
-                    </div>
-                </template>
-                <template x-if="tip.requests === null">
-                    <div class="mt-0.5 text-[11px] text-neutral-400 dark:text-fg-faint">No requests in range</div>
-                </template>
-            </div>
-        </div>
-
-        <div x-data="{ page: 0, per: 10, total: {{ $countryRows->count() }} }">
-            <div>
+            {{-- Ranked country list (updates via morph on range/live refresh). --}}
+            <div class="min-w-0 self-center" x-data="{ page: 0, per: 10, total: {{ $countryRows->count() }} }">
                 @foreach ($countryRows as $row)
                     @php
                         $isUnknown = $row['value'] === '';
@@ -138,9 +74,9 @@
                         $width = min(100, round(($row['requests'] / $maxRequests) * 100, 1));
                         $barColor = $isUnknown ? 'var(--chart-geo-empty)' : "var(--chart-geo-{$bucket})";
                     @endphp
-                    <div wire:key="geo-country-{{ $mapId }}-{{ $loop->index }}"
+                    <div wire:key="geo-country-{{ $globeId }}-{{ $loop->index }}"
                         x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
-                        class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
+                        class="flex min-h-11 items-center gap-3 border-b border-neutral-200 py-2 last:border-b-0 dark:border-white/[0.07]">
                         @php $flagUrl = $isUnknown ? null : countryFlagUrl($row['value']); @endphp
                         @if ($flagUrl)
                             <img src="{{ $flagUrl }}" srcset="{{ countryFlagUrl($row['value'], '48x36') }} 2x" alt=""
@@ -160,15 +96,39 @@
                         <span class="hidden shrink-0 text-[12px] text-neutral-500 sm:inline dark:text-fg-dim">{{ formatBytes($row['bytesOut']) }}</span>
                     </div>
                 @endforeach
+
+                @include('livewire.traffic._pager')
             </div>
-
-            @include('livewire.traffic._pager')
-
-            @if (! empty($attribution))
-                <p class="border-t border-neutral-200 px-4 py-2 text-[11px] text-neutral-400 dark:border-white/[0.07] dark:text-fg-faint">
-                    {{ $attribution }}
-                </p>
-            @endif
         </div>
+
+        @if (! empty($attribution))
+            <p class="px-4 py-2 text-[11px] text-neutral-400 dark:text-fg-faint">
+                {{ $attribution }}
+            </p>
+        @endif
+
+        @script
+        <script>
+            (() => {
+                const canvas = document.getElementById('{!! $globeId !!}');
+                if (!canvas || typeof window.mountTrafficGlobe !== 'function') { return; }
+
+                const isDark = () => document.documentElement.classList.contains('dark');
+                let controller = window.mountTrafficGlobe(canvas, @json($geoInit), isDark());
+
+                Livewire.on('refreshChartData-{!! $chartId !!}-status', payload => {
+                    const data = Array.isArray(payload) ? payload[0] : payload;
+                    if (data && Array.isArray(data.geo)) {
+                        controller.update(data.geo, isDark());
+                    }
+                });
+
+                // Tear down the WebGL context when navigating away (wire:navigate).
+                document.addEventListener('livewire:navigating', () => {
+                    if (controller) { controller.destroy(); controller = null; }
+                }, { once: true });
+            })();
+        </script>
+        @endscript
     @endif
 </div>

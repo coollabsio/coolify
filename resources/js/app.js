@@ -1,4 +1,5 @@
 import { initializeTerminalComponent } from './terminal.js';
+import './traffic-globe.js';
 
 // Livewire 3.5.19+ re-applies `x-cloak` to morphed elements during wire:navigate
 // (via replaceHtmlAttributes). With `[x-cloak]{display:none}` on the app wrapper,

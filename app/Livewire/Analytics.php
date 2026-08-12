@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Application;
 use App\Models\Server;
 use App\Services\SentinelTrafficClient;
@@ -12,6 +13,8 @@ use Livewire\Component;
 
 class Analytics extends Component
 {
+    use BuildsTrafficChartPayload;
+
     public string $chartId = 'global-analytics';
 
     /** Traffic-enabled servers owned by the current team. */
@@ -40,8 +43,9 @@ class Analytics extends Component
     #[Url(as: 'app')]
     public string $appUuid = '';
 
-    // Realtime refresh; armed only on the 24h range (matches the 60s Sentinel cache TTL).
-    public bool $live = true;
+    // Realtime refresh; off by default (click "Live" to arm it). Only meaningful on the
+    // 24h range, which matches the 60s Sentinel cache TTL.
+    public bool $live = false;
 
     public ?array $overview = null;
 
@@ -51,6 +55,9 @@ class Analytics extends Component
 
     /** @var array<int, array<string, mixed>> */
     public array $topApps = [];
+
+    /** @var array<int, array<string, mixed>> */
+    public array $topHosts = [];
 
     /** @var array<int, array<string, mixed>> */
     public array $topPaths = [];
@@ -81,7 +88,7 @@ class Analytics extends Component
     public string $nudgeKey = '';
 
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'agent', 'ip', 'useragent'];
+    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
 
     /**
      * Per-request cache of app uuid => display metadata, so resolving a name/domain/link
@@ -336,6 +343,19 @@ class Analytics extends Component
         usort($appRows, fn ($a, $b) => $b['requests'] <=> $a['requests']);
         $this->topApps = array_slice($appRows, 0, 50);
 
+        // Top hosts: fold per-app volume up to the served hostname (an app's primary
+        // domain). Apps without a configured FQDN collapse into one "Unknown host" row.
+        $hostTotals = [];
+        foreach ($appRows as $row) {
+            $host = $row['domain'] ?? '';
+            $hostTotals[$host] ??= ['host' => $host, 'requests' => 0, 'bandwidth' => 0];
+            $hostTotals[$host]['requests'] += (int) $row['requests'];
+            $hostTotals[$host]['bandwidth'] += (int) $row['bandwidth'];
+        }
+        $hosts = array_values($hostTotals);
+        usort($hosts, fn ($a, $b) => $b['requests'] <=> $a['requests']);
+        $this->topHosts = array_slice($hosts, 0, 50);
+
         $paths = array_values($pathTotals);
         usort($paths, fn ($a, $b) => $b['requests'] <=> $a['requests']);
         $this->topPaths = array_slice($paths, 0, 50);
@@ -365,6 +385,8 @@ class Analytics extends Component
      */
     protected function chartPayload(): array
     {
+        $device = $this->deviceChartData();
+
         return [
             'hasSeries' => $this->hasSeries,
             'range' => $this->range,
@@ -381,6 +403,11 @@ class Analytics extends Component
                 's4xx' => array_column($this->series, 's4xx'),
                 's5xx' => array_column($this->series, 's5xx'),
             ],
+            'requestsSpark' => $this->requestsSpark(),
+            'errorsSpark' => $this->errorsSpark(),
+            'geo' => $this->geoMarkers(),
+            'deviceLabels' => $device['labels'],
+            'deviceSeries' => $device['series'],
         ];
     }
 
@@ -390,6 +417,7 @@ class Analytics extends Component
         $this->latencyApproximate = false;
         $this->uniquesApproximate = false;
         $this->topApps = [];
+        $this->topHosts = [];
         $this->topPaths = [];
         $this->breakdowns = [];
         $this->attribution = null;

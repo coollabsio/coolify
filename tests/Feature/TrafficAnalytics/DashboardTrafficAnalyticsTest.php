@@ -112,7 +112,7 @@ it('renders the team traffic summary aggregated across servers with an approxima
         ->assertSee('approximate');
 });
 
-it('does not disclose another team application name in the top apps list', function () {
+it('shows only sparkline KPI cards that link through to the full analytics page', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,
         'private_key_id' => $this->privateKey->id,
@@ -141,8 +141,12 @@ it('does not disclose another team application name in the top apps list', funct
 
     Livewire::test(TrafficAnalytics::class)
         ->assertOk()
+        // The slimmed dashboard shows only KPI cards + a link to /analytics — no per-app rows.
+        ->assertSee('Open analytics')
+        ->assertSee(route('analytics'), false)
+        ->assertDontSee('Top applications')
         ->assertDontSee('Secret Other Team App')
-        ->assertSee($otherTeamApplication->uuid);
+        ->assertDontSee($otherTeamApplication->uuid);
 });
 
 it('shows a failure empty-state instead of an all-zero KPI panel when every server fetch fails', function () {

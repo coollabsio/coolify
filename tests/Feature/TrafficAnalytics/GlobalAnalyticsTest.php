@@ -70,6 +70,16 @@ function fakeGlobalAnalyticsResponses(array $appUuids = []): array
         '/traffic/breakdown/device' => json_encode([
             ['value' => 'Desktop', 'requests' => 800, 'bytes_out' => 20000],
         ]),
+        '/traffic/breakdown/protocol' => json_encode([
+            ['value' => 'HTTP/2', 'requests' => 700, 'bytes_out' => 18000],
+            ['value' => 'HTTP/1.1', 'requests' => 300, 'bytes_out' => 8000],
+        ]),
+        '/traffic/breakdown/cache' => json_encode([
+            ['value' => 'hit', 'requests' => 400, 'bytes_out' => 9000],
+        ]),
+        '/traffic/breakdown/status' => json_encode([
+            ['value' => '200', 'requests' => 900, 'bytes_out' => 22000],
+        ]),
         '/traffic/series' => json_encode([
             ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0],
             ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
@@ -125,9 +135,16 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSee('1,000')
         ->assertSee('Top applications')
         ->assertSee('Global Leaderboard App')
+        ->assertSee('Top hosts')
         ->assertSee('Top paths')
         ->assertSee('Countries')
         ->assertSee('United States')
+        // New breakdown sections surfaced from previously-unused Sentinel dimensions.
+        ->assertSee('Requests by device type')
+        ->assertSee('Top HTTP versions')
+        ->assertSee('HTTP/2')
+        ->assertSee('Top cache statuses')
+        ->assertSee('Top status codes')
         ->assertSee('GeoIP data by MaxMind')
         ->assertSet('serverOptions', [$server->uuid => $server->name])
         ->assertSet('appOptions', [$application->uuid => 'Global Leaderboard App']);
@@ -161,7 +178,8 @@ it('shows path domains, links top apps to analytics, groups by project, and surf
 
     $component = Livewire::test(Analytics::class)
         ->assertOk()
-        ->assertSee('shop.example.com')          // domain shown on the path row
+        ->assertSee('Top hosts')
+        ->assertSee('shop.example.com')          // served host shown in Top hosts + top-app row
         ->assertSee($analyticsUrl, false)         // top-app row links to its analytics page
         ->assertSee('AI agents & bots')
         ->assertSee('GPTBot')
@@ -197,6 +215,41 @@ it('builds a stacked status time series when Sentinel exposes the series endpoin
             ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
         ])
         ->assertDispatched('refreshChartData-global-analytics-status');
+});
+
+it('derives KPI sparklines, device-donut data, and top hosts for the chart payload', function () {
+    $server = bootEnabledGlobalServer();
+
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first()
+        ?? StandaloneDocker::factory()->create(['server_id' => $server->id, 'network' => 'coolify-test']);
+
+    $application = Application::factory()->create([
+        'name' => 'Sparkline App',
+        'fqdn' => 'https://spark.example.com',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => StandaloneDocker::class,
+    ]);
+
+    $fake = new FakeGlobalAnalyticsTrafficClient($server);
+    $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid]);
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    $instance = Livewire::test(Analytics::class)->assertOk()->instance();
+
+    // Per-bucket totals and errors from the two-bucket status series.
+    expect($instance->requestsSpark())->toBe([43, 66]);
+    expect($instance->errorsSpark())->toBe([1, 3]);
+
+    // Device breakdown folds into donut labels/series.
+    $device = $instance->deviceChartData();
+    expect($device['series'])->toBe([800]);
+
+    // Top hosts groups per-app volume by served hostname.
+    expect($instance->topHosts[0]['host'])->toBe('spark.example.com');
+    expect($instance->topHosts[0]['requests'])->toBe(1000);
 });
 
 it('falls back to the donut when Sentinel lacks the series endpoint', function () {

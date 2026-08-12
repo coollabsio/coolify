@@ -133,7 +133,7 @@ it('renders KPIs from a mocked traffic client when analytics is enabled', functi
         ->assertSee('Unique visitors')
         ->assertSee('Error rate')
         ->assertSee('/')
-        ->assertSee('US')
+        ->assertSee('United States')
         ->assertSee('GeoIP data by MaxMind');
 });
 
