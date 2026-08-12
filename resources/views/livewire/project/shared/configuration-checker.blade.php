@@ -29,45 +29,24 @@
 
     @if ($isConfigurationChanged && !is_null($resource->config_hash) && !$resource->isExited())
         @php
-            $compactStoragePrefix = "configuration-warning:{$resource->uuid}:";
             $currentConfigurationHash = $resource instanceof \App\Models\Application
                 ? $resource->deploymentConfigurationHash()
                 : md5((string) $resource->config_hash);
-            $compactStorageKey = $compactStoragePrefix.$currentConfigurationHash;
         @endphp
         <div wire:key="configuration-warning-{{ $currentConfigurationHash }}"
-            x-data="{ configurationDiffModalOpen: false, expandedRows: {} }">
-            <x-popup-small position="top-right" :compact-after="5000" :compact-storage-key="$compactStorageKey"
-                :compact-storage-prefix="$compactStoragePrefix">
-                <x-slot:title>
-                    The latest configuration has not been applied
-                </x-slot:title>
-                <x-slot:icon>
-                    <x-reicon name="alert-triangle" class="size-4" />
-                </x-slot:icon>
-                <x-slot:description>
-                    <span>
-                        @if (data_get($configurationDiff, 'count'))
-                            {{ data_get($configurationDiff, 'count') }}
-                            {{ data_get($configurationDiff, 'count') === 1 ? 'change' : 'changes' }}
-                            unapplied.
-                            @if (data_get($configurationDiff, 'requires_build'))
-                                Rebuild required.
-                            @else
-                                Redeploy to apply.
-                            @endif
-                            <button type="button"
-                                class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80"
-                                x-on:click="configurationDiffModalOpen = true">
-                                View changes
-                                <x-reicon name="arrow-right" class="size-2.5" />
-                            </button>
-                        @else
-                            Redeploy to apply.
-                        @endif
-                    </span>
-                </x-slot:description>
-            </x-popup-small>
+            x-data="{ configurationDiffModalOpen: false, expandedRows: {} }"
+            @open-configuration-diff.window="configurationDiffModalOpen = true">
+            @teleport('#configuration-warning-hud-slot')
+                <div>
+                    <x-configuration-warning :diff="$configurationDiff" />
+                </div>
+            @endteleport
+
+            @teleport('#configuration-warning-hud-slot-mobile')
+                <div>
+                    <x-configuration-warning :diff="$configurationDiff" />
+                </div>
+            @endteleport
 
             @if (data_get($configurationDiff, 'count'))
                 <template x-teleport="body">

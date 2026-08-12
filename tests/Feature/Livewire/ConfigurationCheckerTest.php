@@ -102,7 +102,7 @@ it('supports timed compact popup notifications', function () {
         ->not->toContain('<div x-show="!iconOnly"')
         ->not->toContain(':class="iconOnly')
         ->toContain('x-show="!compact"')
-        ->toContain("'w-[calc(100vw-2rem)] cursor-pointer sm:w-auto sm:max-w-[calc(100vw-2rem)]'");
+        ->toContain("'w-[calc(100vw-2rem)] max-w-sm cursor-pointer'");
 });
 
 it('warns when a service has missing required environment variables', function () {

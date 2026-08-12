@@ -140,6 +140,7 @@
                     @if ($database->destination->server->isFunctional())
                         @if (! $databaseStatus->startsWith('exited'))
                             <div id="database-desktop-actions" class="relative" x-data="{ open: false }"
+                                x-effect="$dispatch('resource-actions-toggled', { open })"
                                 @click.outside="open = false" @keydown.escape.window="open = false">
                                 <button type="button" class="button" @click="open = !open" :aria-expanded="open">
                                     <x-reicon name="play-circle" class="size-3.5 text-warning" />
