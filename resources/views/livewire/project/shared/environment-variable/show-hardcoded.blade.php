@@ -2,7 +2,12 @@
     x-show="typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $isPreview ? 'preview' : 'production' }}'">
     <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
         <div class="flex min-w-0 items-center gap-2">
-            <span class="env-key-label min-w-0 truncate font-mono text-[13px] text-black dark:text-fg" title="{{ $key }}">{{ $key }}</span>
+            <button type="button" data-env-name-trigger
+                class="env-key-label min-w-0 truncate text-left font-mono text-[13px] text-black dark:text-fg"
+                title="{{ $key }}"
+                @click="$el.closest('.data-table-row').querySelector('[data-env-settings-trigger]').click()">
+                {{ $key }}
+            </button>
             @if (filled($comment))
                 <x-helper :helper="e($comment)" />
             @endif
@@ -26,7 +31,7 @@
         <div class="justify-self-end">
             <x-modal-input title="Environment variable details" :closeOutside="false">
                 <x-slot:content>
-                    <button type="button" class="icon-button shrink-0"
+                    <button type="button" data-env-settings-trigger class="icon-button shrink-0"
                         title="View environment variable" aria-label="View environment variable">
                         <x-reicon name="settings" class="size-3.5" />
                     </button>
