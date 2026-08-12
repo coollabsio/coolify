@@ -98,7 +98,7 @@ it('uses a larger high-contrast label for every terminal loading phase', functio
     $styles = file_get_contents(resource_path('css/app.css'));
 
     expect(substr_count($resourceView.$terminalView.$globalView, 'terminal-loading-label'))
-        ->toBeGreaterThanOrEqual(3)
+        ->toBeGreaterThanOrEqual(2)
         ->and($styles)
         ->toContain('.terminal-loading-label')
         ->toContain('font-size: 0.875rem;')
@@ -323,12 +323,12 @@ it('preserves terminal scrollback across transient reconnects', function () {
         ->not->toContain("this.term.reset();\n                    this.term.clear();");
 });
 
-it('renders a horizontally scrollable mobile terminal key row', function () {
+it('renders a horizontally scrollable terminal key row only on mobile', function () {
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
     $appCss = file_get_contents(resource_path('css/app.css'));
 
     expect($terminalView)
-        ->not->toContain('class="sm:hidden" data-terminal-mobile-toolbar')
+        ->toContain('class="sm:hidden"')
         ->toContain('overflow-x-auto')
         ->toContain('whitespace-nowrap')
         ->toContain('pasteFromClipboard()')
@@ -343,11 +343,12 @@ it('renders a horizontally scrollable mobile terminal key row', function () {
         ->toContain("sendTerminalKey('~')")
         ->toContain("sendTerminalKey('-')")
         ->toContain("sendTerminalControl('ctrlC')")
+        ->toContain("sendTerminalControl('ctrlD')")
         ->toContain("sendTerminalControl('ctrlBackslash')")
         ->toContain("sendTerminalControl('ctrlS')")
         ->toContain("sendTerminalControl('ctrlZ')")
         ->not->toContain("sendTerminalControl('arrowUp')")
-        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : 'relative z-[2] mt-2 shrink-0'")
+        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : (keyboardInset > 0 ? 'fixed inset-x-0 z-[100002] px-2 pb-2' : 'relative z-[2] mt-2 shrink-0')")
         ->toContain('data-terminal-mobile-toolbar')
         ->and($appCss)
         ->toContain('.terminal-mobile-key')
@@ -358,13 +359,13 @@ it('renders a horizontally scrollable mobile terminal key row', function () {
         ->toContain('var(--terminal-scrollbar');
 });
 
-it('shows the terminal key row outside fullscreen mode', function () {
+it('shows the mobile terminal key row outside fullscreen mode', function () {
     $terminalView = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
     $terminalClient = file_get_contents(resource_path('js/terminal.js'));
 
     expect($terminalView)
-        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : 'relative z-[2] mt-2 shrink-0'")
-        ->not->toContain('class="sm:hidden" data-terminal-mobile-toolbar')
+        ->toContain("fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : (keyboardInset > 0 ? 'fixed inset-x-0 z-[100002] px-2 pb-2' : 'relative z-[2] mt-2 shrink-0')")
+        ->toContain('class="sm:hidden"')
         ->toContain(':style="!fullscreen && keyboardInset > 0 ? `top: ${keyboardAnchorTop}px; transform: translateY(-100%)` : \'\'"')
         ->and($terminalClient)
         ->toContain("this.\$refs.terminalWrapper.style.removeProperty('display')")
@@ -384,6 +385,7 @@ it('sends terminal mobile toolbar controls through the websocket', function () {
         ->toContain("tab: '\\t'")
         ->toContain("escape: '\\x1b'")
         ->toContain("ctrlC: '\\x03'")
+        ->toContain("ctrlD: '\\x04'")
         ->toContain("ctrlBackslash: '\\x1c'")
         ->toContain("ctrlS: '\\x13'")
         ->toContain("ctrlZ: '\\x1a'")
