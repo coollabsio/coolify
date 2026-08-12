@@ -2026,6 +2026,31 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
 
+@media (max-width: 768px) {
+    .environment-table-scroll .env-table-grid {
+        min-width: 0;
+    }
+
+    .data-table-header.env-table-grid {
+        display: none;
+    }
+
+    .data-table-row.env-table-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .data-table-row.env-table-grid > :not(:first-child):not(:last-child) {
+        display: none;
+    }
+
+    .data-table-row.env-table-grid > :last-child {
+        display: block;
+        justify-self: end;
+    }
+}
+
 /* Shared variables only store value shape (multiline), not per-resource flags. */
 .env-table-grid-shared {
     grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4.5rem 3rem;
