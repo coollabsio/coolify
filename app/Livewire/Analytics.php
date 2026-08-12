@@ -404,6 +404,7 @@ class Analytics extends Component
             ],
             'timeSeries' => [
                 'categories' => array_column($this->series, 'bucket'),
+                'requests' => $this->requestsSpark(),
                 's2xx' => array_column($this->series, 's2xx'),
                 's3xx' => array_column($this->series, 's3xx'),
                 's4xx' => array_column($this->series, 's4xx'),
@@ -413,6 +414,7 @@ class Analytics extends Component
             'errorsSpark' => $this->errorsSpark(),
             'bandwidthSpark' => $this->bandwidthSpark(),
             'uniquesSpark' => $this->uniquesSpark(),
+            'latencySpark' => $this->latencySpark(),
             'geo' => $this->geoMarkers(),
             'deviceLabels' => $device['labels'],
             'deviceSeries' => $device['series'],

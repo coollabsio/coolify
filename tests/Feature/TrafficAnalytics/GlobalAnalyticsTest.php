@@ -137,6 +137,7 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSee('Global Leaderboard App')
         ->assertSee('Top hosts')
         ->assertSee('Top paths')
+        ->assertSee('Status codes')
         ->assertSee('Countries')
         ->assertSee('United States')
         // New breakdown sections surfaced from previously-unused Sentinel dimensions.
@@ -244,6 +245,7 @@ it('derives KPI sparklines, device-donut data, and top hosts for the chart paylo
     expect($instance->errorsSpark())->toBe([1, 3]);
     expect($instance->bandwidthSpark())->toBe([6000, 9500]);
     expect($instance->uniquesSpark())->toBe([12, 20]);
+    expect($instance->latencySpark())->toBe([30.0, 45.0]);
 
     // Device breakdown folds into donut labels/series.
     $device = $instance->deviceChartData();

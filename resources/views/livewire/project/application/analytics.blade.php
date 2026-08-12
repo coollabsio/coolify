@@ -117,14 +117,27 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
                 <div class="col-span-2 flex flex-col bg-white px-4 py-3 sm:col-span-1 dark:bg-base">
                     <span class="text-[11px] font-medium tracking-wide text-neutral-500 uppercase dark:text-fg-dim">p95 latency</span>
                     <span class="mt-1 text-xl font-semibold text-black tabular-nums dark:text-fg">{{ number_format($overview['latencyP95'] ?? 0, 1) }} ms</span>
-                    <div class="mt-auto pt-3"><div class="h-9"></div></div>
+                    <div class="mt-auto pt-3">
+                        @include('livewire.traffic._sparkline', [
+                            'id' => $chartId.'-spark-latency',
+                            'initial' => $this->latencySpark(),
+                            'colorVar' => '--chart-status-4xx',
+                            'event' => 'refreshChartData-'.$chartId.'-status',
+                            'key' => 'latencySpark',
+                        ])
+                    </div>
                 </div>
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section id="analytics-status-section" title="Traffic"
-            helper="Request volume by status class over time for the selected range.">
-            @include('livewire.traffic._status-chart')
+        <x-application.settings-section id="analytics-requests-section" title="Requests"
+            helper="Total request volume over time for the selected range.">
+            @include('livewire.traffic._requests-chart')
+        </x-application.settings-section>
+
+        <x-application.settings-section id="analytics-status-codes-section" title="Status codes"
+            helper="Share of responses by HTTP status class for the selected range.">
+            @include('livewire.traffic._status-codes')
         </x-application.settings-section>
 
         <x-application.settings-section id="analytics-paths-section" title="Top paths"

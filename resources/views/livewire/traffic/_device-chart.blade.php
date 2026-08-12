@@ -36,7 +36,10 @@
                 dataLabels: { enabled: false },
                 legend: legend(),
                 plotOptions: { pie: { donut: { size: '68%' } } },
-                tooltip: { y: { formatter: v => `${v.toLocaleString()} requests` } },
+                {{-- Donuts otherwise fill the whole tooltip with the slice color (white
+                     text on light slices reads poorly); fillSeriesColor:false gives the
+                     same neutral tooltip the other charts use. --}}
+                tooltip: { fillSeriesColor: false, y: { formatter: v => `${v.toLocaleString()} requests` } },
                 noData: { text: 'Loading devices…', style: { color: textColor } },
             });
             chart.render();

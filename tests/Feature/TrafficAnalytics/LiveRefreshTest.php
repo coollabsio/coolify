@@ -52,14 +52,14 @@ function bootLiveServer(): Server
     return $server;
 }
 
-it('is paused by default and does not poll until Live is turned on', function () {
+it('is paused by default and does not poll until Live Refresh is turned on', function () {
     $server = bootLiveServer();
 
     Livewire::test(Analytics::class)
         ->assertOk()
         ->assertSet('live', false)
         ->assertDontSeeHtml('wire:poll.60s')
-        ->assertSee('Paused');
+        ->assertSee('Live Refresh');
 });
 
 it('starts polling when live is toggled on at the 24h range', function () {
@@ -70,22 +70,22 @@ it('starts polling when live is toggled on at the 24h range', function () {
         ->call('toggleLive')
         ->assertSet('live', true)
         ->assertSeeHtml('wire:poll.60s')
-        ->assertSee('Live');
+        ->assertSee('Live Refresh');
 });
 
-it('disables realtime polling for the 7d and 30d ranges', function () {
+it('hides the Live Refresh control and stops polling for the 7d and 30d ranges', function () {
     $server = bootLiveServer();
 
     $component = Livewire::test(Analytics::class)
         ->call('setRange', '7d')
-        ->assertDontSeeHtml('wire:poll.60s');
+        ->assertDontSeeHtml('wire:poll.60s')
+        ->assertDontSee('Live Refresh');
 
     expect($component->instance()->isLivePollable())->toBeFalse();
 
-    // toggleLive is a no-op outside the 24h range.
-    $component->call('toggleLive')->assertDontSeeHtml('wire:poll.60s');
-
-    $component->call('setRange', '30d')->assertDontSeeHtml('wire:poll.60s');
+    $component->call('setRange', '30d')
+        ->assertDontSeeHtml('wire:poll.60s')
+        ->assertDontSee('Live Refresh');
 });
 
 it('re-arms polling when returning to the 24h range after live was turned on', function () {

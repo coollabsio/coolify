@@ -63,6 +63,16 @@ trait BuildsTrafficChartPayload
     }
 
     /**
+     * Per-bucket p95 latency (ms), for the Latency spark.
+     *
+     * @return array<int, float>
+     */
+    public function latencySpark(): array
+    {
+        return array_map(fn ($b) => round((float) ($b['p95'] ?? 0), 1), $this->series);
+    }
+
+    /**
      * Per-country marker data for the globe: [{code, requests}] over known ISO-A2 rows.
      *
      * @return array<int, array{code: string, requests: int}>

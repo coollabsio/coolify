@@ -37,14 +37,14 @@ it('no longer hardcodes status color hex arrays in the analytics views', functio
         expect($contents)->not->toContain('statusColorsLight');
         expect($contents)->not->toContain('statusColorsDark');
         // The chart lives in the shared partial; the views just pull it in.
-        expect($contents)->toContain("@include('livewire.traffic._status-chart')");
+        expect($contents)->toContain("@include('livewire.traffic._requests-chart')");
     }
 });
 
-it('reads status colors from design tokens in the shared status-chart partial', function () {
-    $partial = file_get_contents(base_path('resources/views/livewire/traffic/_status-chart.blade.php'));
+it('reads its accent color from a design token in the shared requests-chart partial', function () {
+    $partial = file_get_contents(base_path('resources/views/livewire/traffic/_requests-chart.blade.php'));
 
     expect($partial)->not->toContain('statusColorsLight');
     expect($partial)->not->toContain('statusColorsDark');
-    expect($partial)->toContain('--chart-status-2xx');
+    expect($partial)->toContain('--chart-status-3xx');
 });
