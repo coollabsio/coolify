@@ -32,6 +32,7 @@ it('requires a reviewed draft release before building a stable version', functio
 
     expect($workflow)
         ->toContain('name: Release Coolify Stable')
+        ->toContain('run-name: ${{ inputs.tag }}')
         ->toContain('workflow_dispatch:')
         ->toContain('tag:')
         ->toContain("github.ref_name != 'main'")
@@ -44,6 +45,7 @@ it('requires a reviewed draft release before building a stable version', functio
         ->toContain('tag_name: process.env.TAG_NAME')
         ->toContain('actions/github-script@v8')
         ->not->toContain('actions/github-script@v7')
+        ->not->toContain('environment: production-release')
         ->not->toContain('generate-notes');
 });
 
