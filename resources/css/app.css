@@ -1107,7 +1107,7 @@ html[data-theme="custom"] textarea:disabled {
     width: 100%;
     padding: 2rem 1rem;
     background:
-        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-accent) 9%, transparent), transparent 34rem),
+        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-coollabs) 9%, transparent), transparent 34rem),
         var(--coollabs-canvas);
     color: #171717;
 }
