@@ -104,13 +104,13 @@
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    <x-reicon name="stop-circle" class="size-3.5 text-error" />
                                     Stop
                                 </button>
                             @else
                                 <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
                                     role="menuitem">
-                                    <x-reicon name="stop" class="size-3.5 opacity-70" />
+                                    <x-reicon name="stop-circle" class="size-3.5 opacity-70" />
                                     Stop
                                 </button>
                             @endcan
@@ -183,30 +183,28 @@
                     @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
                         <span class="px-2 text-[13px] text-neutral-500 dark:text-fg-dim">Load a Compose file to deploy.</span>
                     @else
-                        @if (!$application->destination->server->isSwarm())
-                            <x-applications.advanced :application="$application" />
-                        @endif
                         <div class="resource-heading-menus shrink-0">
                             <x-applications.links :application="$application" />
                         </div>
-                        @if (str($application->status)->startsWith('exited'))
-                            <x-forms.button id="application-desktop-deploy" canGate="deploy" :canResource="$application"
-                                wire:click="deploy">
-                                <x-reicon name="play-circle" class="size-4 opacity-70" />
-                                Deploy
-                            </x-forms.button>
-                        @else
-                            <div id="application-desktop-actions" class="relative" x-data="{ open: false }"
+                        <div id="application-desktop-actions" class="relative" x-data="{ open: false }"
                             @click.outside="open = false" @keydown.escape.window="open = false">
                             <button type="button" class="button" @click="open = !open" :aria-expanded="open"
                                 aria-haspopup="menu">
-                                <x-reicon name="play-circle" class="size-3.5 text-warning" />
+                                <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                 Actions
                                 <x-reicon name="chevron-down" class="size-3 opacity-55" />
                             </button>
 
                             <div x-cloak x-show="open" x-transition.origin.top.right
                                 class="listbox-panel top-full! right-0! left-auto! mt-1! w-60! min-w-0!" role="menu">
+                                @if (str($application->status)->startsWith('exited'))
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('deploy', $application))
+                                        wire:click="deploy" @click="open = false" role="menuitem">
+                                        <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                        Deploy
+                                    </button>
+                                @else
                                     @if (!$application->destination->server->isSwarm())
                                         @can('deploy', $application)
                                             <button type="button" class="listbox-option justify-start! gap-2.5!"
@@ -255,18 +253,28 @@
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                             role="menuitem">
-                                            <x-reicon name="stop" class="size-3.5 text-error" />
+                                            <x-reicon name="stop-circle" class="size-3.5 text-error" />
                                             Stop
                                         </button>
                                     @else
                                         <button type="button" class="listbox-option justify-start! gap-2.5!" disabled>
-                                            <x-reicon name="stop" class="size-3.5 opacity-70" />
+                                            <x-reicon name="stop-circle" class="size-3.5 opacity-70" />
                                             Stop
                                         </button>
                                     @endcan
-                                </div>
+                                @endif
+                                @if (!$application->destination->server->isSwarm())
+                                    <div class="my-1 border-t border-coolgray-200 dark:border-coolgray-300" role="separator"></div>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        @disabled(!auth()->user()->can('deploy', $application))
+                                        wire:click="{{ $application->status === 'running' ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                        @click="open = false" role="menuitem">
+                                        <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                        Force deploy without cache
+                                    </button>
+                                @endif
                             </div>
-                        @endif
+                        </div>
                     @endif
                 </div>
             </div>

@@ -169,11 +169,15 @@
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($dashboardServers as $server)
                         @php
+                            $proxyNeedsAttention = $server->proxySet() && $server->proxy->status !== 'running';
+                            $sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive();
+
                             [$serverStatus, $serverStatusType] = match (true) {
                                 $server->settings->force_disabled => ['Disabled', 'error'],
                                 ! $server->settings->is_reachable && ! $server->settings->is_usable => ['Unavailable', 'error'],
                                 ! $server->settings->is_reachable => ['Unreachable', 'error'],
                                 ! $server->settings->is_usable => ['Not ready', 'warning'],
+                                $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
                                 default => ['Ready', 'success'],
                             };
                         @endphp

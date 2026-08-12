@@ -78,7 +78,13 @@
 
 @layer components {
     .terminal-mobile-key {
-        @apply min-h-10 rounded-md border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white shadow-inner active:bg-white/25;
+        @apply min-h-8 shrink-0 rounded-full border bg-transparent px-3 py-1 text-sm font-medium text-neutral-300 active:text-white;
+        border-color: color-mix(in srgb, var(--terminal-scrollbar, #fff) 24%, transparent);
+    }
+
+    .terminal-key-row {
+        border: 1px solid color-mix(in srgb, var(--terminal-scrollbar, #fff) 22%, transparent);
+        background: transparent;
     }
 
     /* Active state is a solid fill only (no accent rail / border). */
@@ -711,17 +717,6 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-loading-label {
-    color: #52525b;
-}
-
-.terminal-session-expiry {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: rgb(255 255 255 / 0.6);
-}
-
-html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-expiry,
-html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-expiry {
     color: #52525b;
 }
 
@@ -2114,11 +2109,15 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .domains-table-grid {
-    grid-template-columns: minmax(0, 1.8fr) 8.5rem minmax(7rem, 0.9fr) 10rem 11rem 6.5rem;
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 11rem 6.5rem;
+}
+
+.domains-table-grid-service {
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 6.5rem;
 }
 
 .domains-table-grid-compose {
-    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem minmax(7rem, 0.9fr) 10rem 11rem 6.5rem;
+    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem 10rem 11rem 6.5rem;
 }
 
 .domains-mobile-label {
@@ -2132,9 +2131,9 @@ input[type="search"]::-webkit-search-results-decoration {
         gap: 0.75rem;
     }
 
-    /* Hide "Last checked" (3rd of 4) */
-    .domains-table-grid > :nth-child(3) {
-        display: none;
+    .domains-table-grid-service {
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 5.5rem;
+        gap: 0.75rem;
     }
 
     .domains-table-grid-compose {
@@ -2142,20 +2141,21 @@ input[type="search"]::-webkit-search-results-decoration {
         gap: 0.75rem;
     }
 
-    /* Hide "Service" (2) and "Last checked" (4) of 5 */
-    .domains-table-grid-compose > :nth-child(2),
-    .domains-table-grid-compose > :nth-child(4) {
+    /* Hide "Service" */
+    .domains-table-grid-compose > :nth-child(2) {
         display: none;
     }
 }
 
 @media (max-width: 768px) {
     .data-table-header.domains-table-grid,
+    .data-table-header.domains-table-grid-service,
     .data-table-header.domains-table-grid-compose {
         display: none;
     }
 
     .data-table-row.domains-table-grid,
+    .data-table-row.domains-table-grid-service,
     .data-table-row.domains-table-grid-compose {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
@@ -2177,26 +2177,28 @@ input[type="search"]::-webkit-search-results-decoration {
             'indexing indexing';
     }
 
-    .data-table-row.domains-table-grid.domains-row-without-direction > :nth-child(5),
-    .data-table-row.domains-table-grid-compose.domains-row-without-direction > :nth-child(6) {
+    .data-table-row.domains-table-grid.domains-row-without-direction > :nth-child(4),
+    .data-table-row.domains-table-grid-compose.domains-row-without-direction > :nth-child(5) {
         display: none;
     }
 
     /* Domain cell */
     .data-table-row.domains-table-grid > :nth-child(1),
+    .data-table-row.domains-table-grid-service > :nth-child(1),
     .data-table-row.domains-table-grid-compose > :nth-child(1) {
         grid-area: domain;
         min-width: 0;
     }
 
     .data-table-row.domains-table-grid > :nth-child(1) a,
+    .data-table-row.domains-table-grid-service > :nth-child(1) a,
     .data-table-row.domains-table-grid-compose > :nth-child(1) a {
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
     }
 
-    /* Non-compose: 1 Domain, 2 DNS, 3 Last checked, 4 Indexing, 5 Direction, 6 Actions */
+    /* Non-compose: 1 Domain, 2 DNS, 3 Indexing, 4 Direction, 5 Actions */
     .data-table-row.domains-table-grid > :nth-child(2) {
         grid-area: meta;
         display: flex !important;
@@ -2206,23 +2208,37 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid > :nth-child(3) {
-        display: none !important;
-    }
-
-    .data-table-row.domains-table-grid > :nth-child(4) {
         grid-area: indexing;
     }
 
-    .data-table-row.domains-table-grid > :nth-child(5) {
+    .data-table-row.domains-table-grid > :nth-child(4) {
         grid-area: direction;
     }
 
-    .data-table-row.domains-table-grid > :nth-child(6) {
+    .data-table-row.domains-table-grid > :nth-child(5) {
         grid-area: actions;
         align-self: center;
     }
 
-    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Last checked, 5 Indexing, 6 Direction, 7 Actions */
+    /* Compose service group: 1 Domain, 2 DNS, 3 Indexing, 4 Actions */
+    .data-table-row.domains-table-grid-service > :nth-child(2) {
+        grid-area: meta;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(3) {
+        grid-area: indexing;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(4) {
+        grid-area: actions;
+        align-self: center;
+    }
+
+    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Indexing, 5 Direction, 6 Actions */
     .data-table-row.domains-table-grid-compose > :nth-child(2) {
         display: none !important;
     }
@@ -2236,18 +2252,14 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid-compose > :nth-child(4) {
-        display: none !important;
-    }
-
-    .data-table-row.domains-table-grid-compose > :nth-child(5) {
         grid-area: indexing;
     }
 
-    .data-table-row.domains-table-grid-compose > :nth-child(6) {
+    .data-table-row.domains-table-grid-compose > :nth-child(5) {
         grid-area: direction;
     }
 
-    .data-table-row.domains-table-grid-compose > :nth-child(7) {
+    .data-table-row.domains-table-grid-compose > :nth-child(6) {
         grid-area: actions;
         align-self: center;
     }
@@ -2457,12 +2469,26 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr);
 }
 
+@media (min-width: 1024px) {
+    .deployment-table-scroll {
+        overflow-x: visible;
+    }
+
+    .deployment-table-grid {
+        min-width: 0;
+    }
+}
+
 .dashboard-deployment-table-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem;
 }
 
 .team-members-table-grid {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem minmax(10rem, 0.9fr);
+}
+
+.team-members-table-grid-2fa {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem 4rem minmax(10rem, 0.9fr);
 }
 
 .admin-users-table-grid {
@@ -2529,6 +2555,10 @@ input[type="search"]::-webkit-search-results-decoration {
         grid-template-columns: minmax(0, 1fr) 7rem 7rem;
     }
 
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 7rem 4rem 7rem;
+    }
+
     .team-members-table-grid > :nth-child(2) {
         display: none;
     }
@@ -2578,6 +2608,10 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .team-members-table-grid {
         grid-template-columns: minmax(0, 1fr) 6.5rem;
+    }
+
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 4rem 6.5rem;
     }
 
     .team-members-table-grid > :nth-child(3) {

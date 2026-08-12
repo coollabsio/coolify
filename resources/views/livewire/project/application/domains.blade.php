@@ -202,20 +202,38 @@
                         wire:key="application-compose-domain-group-{{ $redirectWireKey }}"
                         x-show="matchesDomainSearch(@js($serviceName.' '.$rows->pluck('url')->implode(' ')))"
                         class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
-                        <div class="flex w-full items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                        <div class="flex w-full items-center justify-between gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                             <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">
                                 {{ $serviceName }}
                             </span>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <span class="hidden text-xs text-neutral-500 sm:inline dark:text-fg-dim">Direction</span>
+                                @if (auth()->user()?->can('update', $application) && ! $labelsAreWritable)
+                                    <x-forms.listbox id="domain-direction-service-{{ $redirectWireKey }}" :wire="false"
+                                        :value="$serviceRedirects[$redirectWireKey] ?? 'both'" preserveValue
+                                        onChange="updateServiceRedirect" :onChangeArgs="[$serviceName]" portal :options="[
+                                            ['value' => 'both', 'label' => 'Allow www & non-www'],
+                                            ['value' => 'www', 'label' => 'Redirect to www'],
+                                            ['value' => 'non-www', 'label' => 'Redirect to non-www'],
+                                        ]" />
+                                @else
+                                    <span class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                                        {{ match ($serviceRedirects[$redirectWireKey] ?? 'both') {
+                                            'www' => 'Redirect to www',
+                                            'non-www' => 'Redirect to non-www',
+                                            default => 'Allow both',
+                                        } }}
+                                    </span>
+                                @endif
+                            </div>
                         </div>
 
                         <div wire:key="application-compose-domain-rows-{{ $redirectWireKey }}-{{ md5(serialize($rows->all())) }}"
                             class="data-table w-full">
-                            <div class="data-table-header domains-table-grid">
+                            <div class="data-table-header domains-table-grid-service">
                                 <span>Domain</span>
-                                <span>DNS</span>
-                                <span>Last checked</span>
+                                <span>DNS Check</span>
                                 <span>Search engine indexing</span>
-                                <span>Direction</span>
                                 <span></span>
                             </div>
                             @foreach ($rows as $row)
@@ -232,7 +250,8 @@
                                     'application' => $application,
                                     'labelsAreWritable' => $labelsAreWritable,
                                     'isCompose' => false,
-                                    'domainDirection' => $serviceRedirects[$redirectWireKey] ?? 'both',
+                                    'showDirectionControl' => false,
+                                    'domainGridClass' => 'domains-table-grid-service',
                                 ])
                             @endforeach
                         </div>
@@ -250,7 +269,6 @@
                 <div class="data-table-header domains-table-grid">
                     <span>Domain</span>
                     <span>DNS Check</span>
-                    <span>Last checked</span>
                     <span>Search engine indexing</span>
                     <span>Direction</span>
                     <span></span>

@@ -60,10 +60,6 @@
                         x-text="connectionState === 'reconnecting' ? `reconnecting… (attempt ${reconnectAttempts})` : (starting ? 'connecting…' : (connectionState === 'connecting' ? 'connecting…' : 'choose a container to start a session'))"></span>
                 </div>
             </div>
-            <div x-show="terminalActive" x-cloak
-                class="terminal-session-expiry pointer-events-none absolute right-3 bottom-2 z-20 font-mono"
-                x-text="terminalSessionRemainingLabel()">
-            </div>
         @else
             <div x-show="terminalActive" x-cloak class="mb-2 flex shrink-0 justify-start">
                 <div class="inline-flex rounded-sm border px-2 py-1 text-xs font-medium"
@@ -74,41 +70,35 @@
 
         <div id="terminal" wire:ignore data-terminal-style="{{ $isApplicationConsole ? 'application' : 'default' }}"
             :class="fullscreen
-                ? (mobileToolbarCollapsed
-                    ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-14'
-                    : 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent max-sm:pb-24')
+                ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent'
                 : @js($isApplicationConsole
                     ? 'terminal-host relative min-h-0 flex-1 overflow-hidden pt-[5px] pr-px pb-[5px] pl-1 bg-transparent'
                     : 'terminal-host h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')">
         </div>
 
         <div x-show="terminalActive" x-cloak
-            :class="fullscreen ? 'absolute inset-x-0 bottom-0 z-[2] px-2 pb-2' : 'relative mt-2 shrink-0'"
-            class="sm:hidden" data-terminal-mobile-toolbar>
-            <div
-                class="mx-auto max-w-3xl rounded-lg border border-white/10 bg-black/90 p-1.5 text-white shadow-lg backdrop-blur">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="px-2 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Terminal keys</span>
-                    <button type="button"
-                        class="rounded px-2 py-1 text-xs text-neutral-300 hover:bg-white/10 hover:text-white"
-                        x-on:click="mobileToolbarCollapsed = !mobileToolbarCollapsed; $nextTick(() => resizeTerminal())"
-                        x-text="mobileToolbarCollapsed ? 'Show' : 'Hide'"
-                        aria-label="Toggle mobile terminal toolbar"></button>
-                </div>
-                <div x-show="!mobileToolbarCollapsed" class="mt-1 grid grid-cols-6 gap-1">
-                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowUp')"
-                        aria-label="Previous command">↑</button>
-                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowDown')"
-                        aria-label="Next command">↓</button>
-                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowLeft')"
-                        aria-label="Move cursor left">←</button>
-                    <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('arrowRight')"
-                        aria-label="Move cursor right">→</button>
-                    <button type="button" class="terminal-mobile-key"
-                        x-on:click="sendTerminalControl('tab')">Tab</button>
-                    <button type="button" class="terminal-mobile-key"
-                        x-on:click="sendTerminalControl('escape')">Esc</button>
-                </div>
+            :class="fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : (keyboardInset > 0 ? 'fixed inset-x-0 z-[100002] px-2 pb-2' : 'relative z-[2] mt-2 shrink-0')"
+            :style="!fullscreen && keyboardInset > 0 ? `top: ${keyboardAnchorTop}px; transform: translateY(-100%)` : ''"
+            data-terminal-mobile-toolbar>
+            <div class="terminal-key-row mx-auto flex max-w-3xl gap-1.5 overflow-x-auto whitespace-nowrap rounded-lg px-2 py-1.5 text-white [scrollbar-width:thin]">
+                <button type="button" class="terminal-mobile-key" x-on:click="pasteFromClipboard()">paste</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="copyTerminalSelection()">copy</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('escape')">ESC</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('tab')">tab</button>
+                <button type="button" class="terminal-mobile-key"
+                    :class="terminalModifier === 'ctrl' ? 'border-white/35 bg-white/20 text-white' : ''"
+                    x-on:click="toggleTerminalModifier('ctrl')">ctrl</button>
+                <button type="button" class="terminal-mobile-key"
+                    :class="terminalModifier === 'alt' ? 'border-white/35 bg-white/20 text-white' : ''"
+                    x-on:click="toggleTerminalModifier('alt')">alt</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalKey('/')">/</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalKey('|')">|</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalKey('~')">~</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalKey('-')">-</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlC')">^C</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlBackslash')">^\</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlS')">^S</button>
+                <button type="button" class="terminal-mobile-key" x-on:click="sendTerminalControl('ctrlZ')">^Z</button>
             </div>
         </div>
 
@@ -124,7 +114,7 @@
         <button type="button" title="Fullscreen" x-cloak x-show="!fullscreen && terminalActive"
             @class([
                 'terminal-fullscreen-btn absolute z-20',
-                'right-2 top-2 opacity-0 group-hover/terminal:opacity-100 focus-visible:opacity-100' => $isApplicationConsole,
+                'right-2 top-2 opacity-100 sm:opacity-0 sm:group-hover/terminal:opacity-100 sm:focus-visible:opacity-100' => $isApplicationConsole,
                 'right-5 top-6' => !$isApplicationConsole,
             ])
             x-on:click="makeFullscreen">

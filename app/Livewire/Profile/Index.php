@@ -38,7 +38,7 @@ class Index extends Component
 
     public $avatar;
 
-    public function uploadAvatar(AvatarStorageService $avatarStorage): void
+    public function uploadAvatar(AvatarStorageService $avatarStorage): bool
     {
         try {
             $this->validate([
@@ -49,8 +49,12 @@ class Index extends Component
             $this->reset('avatar');
             $this->dispatch('avatar-updated', url: route('profile.avatar', ['v' => Auth::user()->fresh()->updated_at->timestamp]));
             $this->dispatch('success', 'Profile picture updated.');
+
+            return true;
         } catch (\Throwable $e) {
             handleError($e, $this);
+
+            return false;
         }
     }
 

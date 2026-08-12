@@ -75,6 +75,7 @@ it('renders the changed configuration labels without a second backend request', 
 
     expect($view)
         ->toContain(':compact-after="5000"')
+        ->toContain('position="top-right"')
         ->toContain(':compact-storage-key="$compactStorageKey"')
         ->toContain('wire:key="configuration-warning-{{ $currentConfigurationHash }}"')
         ->toContain('x-on:click="configurationDiffModalOpen = true"')
@@ -85,6 +86,7 @@ it('supports timed compact popup notifications', function () {
     $view = file_get_contents(resource_path('views/components/popup-small.blade.php'));
 
     expect($view)
+        ->toContain("\$position === 'top-right' ? 'top-16' : 'bottom-4'")
         ->toContain('compactAfter')
         ->toContain('compactStorageKey')
         ->toContain("localStorage.setItem(this.storageKey, 'compact')")
@@ -94,8 +96,10 @@ it('supports timed compact popup notifications', function () {
         ->toContain('compact = true')
         ->toContain('@click="restore()"')
         ->toContain('@click.stop="minimizeToIcon()"')
-        ->toContain('x-show="iconOnly"')
-        ->toContain('x-show="!iconOnly"')
+        ->toContain('<template x-if="iconOnly">')
+        ->toContain('<template x-if="!iconOnly">')
+        ->not->toContain('<button x-show="iconOnly"')
+        ->not->toContain('<div x-show="!iconOnly"')
         ->not->toContain(':class="iconOnly')
         ->toContain('x-show="!compact"')
         ->toContain("'w-[calc(100vw-2rem)] cursor-pointer sm:w-auto sm:max-w-[calc(100vw-2rem)]'");

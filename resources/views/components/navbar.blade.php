@@ -221,6 +221,6 @@
     </div>
     <div x-show="collapsed && tooltip.show" x-cloak x-transition.opacity.duration.100ms
         :style="`left: ${tooltip.x}px; top: ${tooltip.y}px;`"
-        class="fixed z-[100] -translate-y-1/2 px-2 py-1 text-xs font-medium rounded-lg bg-neutral-900 dark:bg-raised text-white whitespace-nowrap pointer-events-none shadow-lg border border-neutral-700 dark:border-white/10"
+        class="fixed z-[10000] -translate-y-1/2 px-2 py-1 text-xs font-medium rounded-lg bg-neutral-900 dark:bg-raised text-white whitespace-nowrap pointer-events-none shadow-lg border border-neutral-700 dark:border-white/10"
         x-text="tooltip.text"></div>
 </nav>

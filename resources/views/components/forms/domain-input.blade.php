@@ -43,15 +43,17 @@
     <div class="min-w-0">
         <x-forms.listbox id="{{ $id }}-protocol" label="Protocol" :wire="false" value="https"
             x-model="scheme" portal :options="[
-                ['value' => 'https', 'label' => 'HTTPS'],
-                ['value' => 'http', 'label' => 'HTTP'],
+                ['value' => 'https', 'label' => 'https'],
+                ['value' => 'http', 'label' => 'http'],
             ]" />
     </div>
 
     <div class="min-w-0">
-        <label for="{{ $id }}" class="mb-1.5 block text-sm font-medium">
-            Domain <x-highlighted text="*" />
-        </label>
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label for="{{ $id }}" class="mb-0! flex items-center gap-1.5 leading-4">
+                Domain <x-highlighted text="*" />
+            </label>
+        </div>
         <input id="{{ $id }}" type="text" class="input" x-model="host" placeholder="app.example.com"
             autocomplete="off" required />
         @error($errorId ?? $id)
@@ -60,13 +62,17 @@
     </div>
 
     <div class="min-w-0">
-        <label for="{{ $id }}-port" class="mb-1.5 block text-sm font-medium">Port</label>
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label for="{{ $id }}-port" class="mb-0! flex items-center gap-1.5 leading-4">Port</label>
+        </div>
         <input id="{{ $id }}-port" type="number" class="input" x-model="port" placeholder="3000"
             min="1" max="65535" inputmode="numeric" />
     </div>
 
     <div class="min-w-0 sm:col-span-3">
-        <label for="{{ $id }}-path" class="mb-1.5 block text-sm font-medium">Path</label>
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label for="{{ $id }}-path" class="mb-0! flex items-center gap-1.5 leading-4">Path</label>
+        </div>
         <input id="{{ $id }}-path" type="text" class="input" x-model="path" placeholder="/api/v3"
             autocomplete="off" />
         <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
