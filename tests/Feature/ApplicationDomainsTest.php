@@ -1263,6 +1263,14 @@ it('uses the compact service domains layout for compose applications', function 
         ->not->toContain('title="No domains for this service"');
 });
 
+it('shows domain guidance in the application domains section', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+
+    expect($view)
+        ->toContain('<p class="text-sm text-neutral-500 dark:text-fg-dim">')
+        ->toContain('{{ $helperText }}');
+});
+
 it('does not render a last checked column in the domains table', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
     $row = file_get_contents(resource_path('views/livewire/project/application/partials/domain-row.blade.php'));
