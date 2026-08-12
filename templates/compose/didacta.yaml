@@ -1,0 +1,79 @@
+# documentation: https://docs.didacta.io/instalacion/
+# slogan: Self-hosted LMS to run an online academy: courses, catalog, enrollment and certificates.
+# category: education
+# tags: lms,elearning,education,courses,school,academy,training,moodle-alternative
+# logo: svgs/didacta.svg
+# port: 3000
+
+services:
+  didacta:
+    image: ghcr.io/va360labs/didacta-community:0.0.1-alpha.107
+    environment:
+      # Web on 3000, API on 4000 rewritten internally: one domain is enough.
+      - SERVICE_FQDN_DIDACTA_3000
+      - NODE_ENV=production
+      - DIDACTA_CORE_VERSION=0.0.1-alpha.107
+      - WEB_PUBLIC_URL=$SERVICE_URL_DIDACTA
+      - WEB_PUBLIC_ALLOWED_HOSTS=$SERVICE_FQDN_DIDACTA
+      # Bootstrap only (migrations, RLS, grants). DATABASE_URL is left out so the entrypoint can derive a NOBYPASSRLS role.
+      - ADMIN_DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-didacta}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SECRET=$SERVICE_PASSWORD_64_AUTH
+      # First admin account: https://<domain>/setup?token=<this value>
+      - DIDACTA_SETUP_TOKEN=$SERVICE_PASSWORD_64_SETUP
+      - API_PORT=4000
+      - WEB_PORT=3000
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-local}
+      - STORAGE_ROOT=/app/data/storage
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_FROM=${SMTP_FROM}
+      - DIDACTA_LICENSE_KEY=${DIDACTA_LICENSE_KEY}
+    volumes:
+      - didacta-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:4000/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+  postgres:
+    # pgvector is required: the baseline migration runs CREATE EXTENSION vector.
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-didacta}
+    volumes:
+      - didacta-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $SERVICE_USER_POSTGRES -d ${POSTGRES_DB:-didacta}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - didacta-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
