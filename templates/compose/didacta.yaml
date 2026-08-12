@@ -1,0 +1,126 @@
+# documentation: https://docs.didacta.io/instalacion/
+# slogan: Plataforma de formación online (LMS) multi-tenant, fair-code y autoalojable.
+# category: education
+# tags: lms,elearning,education,courses,school,academy,training,moodle-alternative
+# logo: svgs/didacta.svg
+# port: 3000
+
+# ============================================================================
+# Didacta Community — plantilla de servicio para Coolify
+# ----------------------------------------------------------------------------
+# Este fichero está escrito en el formato de `templates/compose/*.yaml` del
+# repositorio de Coolify (coollabsio/coolify): el bloque de comentarios de
+# arriba son los metadatos que Coolify lee para pintar la tarjeta del servicio.
+#
+# Dos formas de usarlo:
+#   1. Ahora mismo, sin esperar a nadie: en Coolify, «+ New Resource» →
+#      «Docker Compose Empty» y pegar este fichero entero.
+#   2. Cuando el PR upstream esté mergeado: buscar «Didacta» en la lista de
+#      servicios de un clic.
+#
+# UN SOLO DOMINIO. El contenedor corre API (:4000) y web (:3000) juntos, y
+# Next.js reescribe `/api/*`, `/healthz` y `/readyz` al 4000 interno
+# (apps/web/next.config.mjs). Coolify solo necesita publicar el 3000.
+# ============================================================================
+
+services:
+  didacta:
+    image: ghcr.io/va360labs/didacta-community:0.0.1-alpha.107
+    environment:
+      # Publica el 3000 en el dominio generado por Coolify. `SERVICE_URL_DIDACTA`
+      # reutiliza ese mismo valor ya con esquema (https://…).
+      - SERVICE_FQDN_DIDACTA_3000
+      - NODE_ENV=production
+      # Fuente de verdad de compatibilidad de módulos: debe coincidir SIEMPRE
+      # con el tag de la imagen de arriba.
+      - DIDACTA_CORE_VERSION=0.0.1-alpha.107
+      # Base absoluta de los enlaces que salen por correo (verificación,
+      # invitaciones, recordatorios). Sin esto los correos llevan enlaces rotos.
+      - WEB_PUBLIC_URL=$SERVICE_URL_DIDACTA
+      - WEB_PUBLIC_ALLOWED_HOSTS=$SERVICE_FQDN_DIDACTA
+      # Conexión de BOOTSTRAP (superusuario del Postgres de abajo). Se usa solo
+      # para migraciones, políticas RLS y grants — nunca para servir tráfico.
+      # La conexión de runtime la deriva el entrypoint hacia el rol
+      # `didacta_app` (NOBYPASSRLS), que es lo que hace que el aislamiento
+      # entre tenants sea real. Por eso NO se define DATABASE_URL aquí.
+      - ADMIN_DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-didacta}?schema=public
+      - REDIS_URL=redis://redis:6379
+      # Única credencial obligatoria: firma las sesiones. Rotarla echa a todo
+      # el mundo de su sesión.
+      - AUTH_SECRET=$SERVICE_PASSWORD_64_AUTH
+      # Token de un solo uso que protege la creación de la primera cuenta.
+      # Fijarlo aquí evita tener que ir a buscarlo a los logs: el enlace de
+      # alta es https://<tu-dominio>/setup?token=<este valor>.
+      - DIDACTA_SETUP_TOKEN=$SERVICE_PASSWORD_64_SETUP
+      # Puertos INTERNOS fijos. No tocar: el proxy apunta al 3000 y el
+      # healthcheck al 4000.
+      - API_PORT=4000
+      - WEB_PORT=3000
+      # Almacenamiento local en disco sobre el volumen persistente. Para S3
+      # (AWS, Hetzner, MinIO…) rellenar las S3_* y poner STORAGE_DRIVER=s3.
+      - STORAGE_DRIVER=${STORAGE_DRIVER:-local}
+      - STORAGE_ROOT=/app/data/storage
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
+      # SMTP: sin esto la instalación arranca igual, avisa por la interfaz y no
+      # puede mandar correos (verificación de email, invitaciones, avisos).
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_SECURE=${SMTP_SECURE:-false}
+      - SMTP_FROM=${SMTP_FROM}
+      # Licencia Enterprise (opcional). Vacío = edición Community.
+      - DIDACTA_LICENSE_KEY=${DIDACTA_LICENSE_KEY}
+      # TENANT_SETTINGS_ENC_KEY se deja SIN definir a propósito: la app genera
+      # una clave hex de 32 bytes en el primer arranque y la persiste en el
+      # volumen `didacta-data`. Definirla aquí con un generador que no produzca
+      # exactamente 64 caracteres hexadecimales rompería el cifrado de secretos
+      # (SSO, SMTP por tenant, Stripe) de forma silenciosa.
+    volumes:
+      # Uploads de cursos, certificados y evidencias + la clave de cifrado
+      # autogenerada. Es el volumen que hay que respaldar.
+      - didacta-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:4000/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      # El primer arranque aplica migraciones, RLS y grants antes de servir.
+      start_period: 120s
+
+  postgres:
+    # pgvector NO es opcional: la migración baseline hace
+    # `CREATE EXTENSION "vector"` y falla contra un postgres:16 estándar.
+    image: pgvector/pgvector:pg16
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-didacta}
+    volumes:
+      - didacta-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $SERVICE_USER_POSTGRES -d ${POSTGRES_DB:-didacta}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - didacta-redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
