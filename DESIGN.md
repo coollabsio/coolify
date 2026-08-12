@@ -627,6 +627,16 @@ Application and server browser terminals use the same browser-oriented console
 shell, theme picker, compact header controls, and outline `browser-terminal`
 Reicon. Hide a container switcher when only one container exists.
 
+The themed console shell belongs to an open session. Before a target is
+selected, the global Terminal page stays a normal top-level destination: a
+full-width layer card titled `Start a terminal session`, its filter input in
+the card header actions, and grouped `Servers` / `Containers` rows reusing the
+command-palette row classes. Do not render an empty full-height console canvas
+just to host the target picker, and do not offer the console theme selector
+before a session owns that canvas. Rows show the target name, a muted server
+column that only appears when the team has more than one server, and the shared
+chevron. Group headers stick to the top of the scrolling list and carry a count.
+
 ### Logs
 
 Runtime and deployment logs should feel like a clean terminal surface:

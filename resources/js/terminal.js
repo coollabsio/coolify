@@ -934,6 +934,7 @@ export function initializeTerminalComponent() {
                     tab: '\t',
                     escape: '\x1b',
                     ctrlC: '\x03',
+                    ctrlD: '\x04',
                     ctrlBackslash: '\x1c',
                     ctrlS: '\x13',
                     ctrlZ: '\x1a'
