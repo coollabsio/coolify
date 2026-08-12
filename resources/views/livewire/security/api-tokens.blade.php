@@ -178,8 +178,10 @@
                     @endif
 
                     @if ($tokens->isEmpty())
-                        <x-empty title="No API tokens" description="Create a token when an external client needs access."
-                            icon-name="keys" size="sm" />
+                        <div class="p-4">
+                            <x-empty title="No API tokens" description="Create a token when an external client needs access."
+                                icon-name="keys" size="sm" />
+                        </div>
                     @else
                         <div x-cloak x-show="filteredTokens.length > 0" class="data-table">
                             <div class="data-table-header api-tokens-table-grid">
@@ -246,7 +248,7 @@
                             @endforeach
                         </div>
 
-                        <div x-cloak x-show="filteredTokens.length === 0">
+                        <div x-cloak x-show="filteredTokens.length === 0" class="p-4">
                             <x-empty size="sm" title="No matching tokens"
                                 description="Try a different description or permission." />
                         </div>
