@@ -23,6 +23,11 @@ function traefikAccessLogCommands(bool $enabled): array
         '--accesslog.fields.headers.names.Cf-Cache-Status=keep',
         '--accesslog.fields.headers.names.Cf-Verified-Bot=keep',
         '--accesslog.fields.headers.names.Cf-Ray=keep',
+        // Kept so Sentinel can resolve the real client IP behind a non-Cloudflare
+        // reverse proxy (leftmost X-Forwarded-For entry) and report User-Agents/referrers.
+        '--accesslog.fields.headers.names.X-Forwarded-For=keep',
+        '--accesslog.fields.headers.names.User-Agent=keep',
+        '--accesslog.fields.headers.names.Referer=keep',
     ];
 }
 
@@ -342,15 +347,16 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         if (isDev()) {
             $config['services']['traefik']['command'][] = '--api.insecure=true';
             $config['services']['traefik']['command'][] = '--log.level=debug';
-            $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
             $config['services']['traefik']['volumes'][] = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/:/traefik';
         } else {
             $config['services']['traefik']['command'][] = '--api.insecure=false';
             $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
-            foreach (traefikAccessLogCommands($server->isTrafficAnalyticsEnabled()) as $cmd) {
-                $config['services']['traefik']['command'][] = $cmd;
-            }
+        }
+        // Access logging + analytics header capture (JSON log, real-IP/UA/referrer headers)
+        // applies to both dev and production so traffic analytics can be exercised locally.
+        foreach (traefikAccessLogCommands($server->isTrafficAnalyticsEnabled()) as $cmd) {
+            $config['services']['traefik']['command'][] = $cmd;
         }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');

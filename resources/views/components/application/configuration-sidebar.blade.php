@@ -159,7 +159,7 @@
             'Resource Limits' => 'cpu',
             'Resource Operations' => 'server-update',
             'Metrics' => 'graph',
-            'Analytics' => 'network',
+            'Analytics' => 'analytics',
             'Tags' => 'tags',
             'Danger Zone' => 'shield-alert',
         ];

@@ -43,7 +43,16 @@ function fakeAnalyticsResponses(): array
             'unique_visitors' => 320,
         ]),
         '/traffic/paths' => json_encode([
-            ['path' => '/', 'requests' => 500, 'bytes_out' => 12000, 'p50' => 10.0, 'p95' => 30.0],
+            ['path' => '/', 'app' => 'app-key', 'requests' => 500, 'bytes_out' => 12000, 'p50' => 10.0, 'p95' => 30.0],
+        ]),
+        '/traffic/breakdown/agent' => json_encode([
+            ['value' => 'ClaudeBot', 'requests' => 90, 'bytes_out' => 2000],
+        ]),
+        '/traffic/breakdown/ip' => json_encode([
+            ['value' => '198.51.100.42', 'requests' => 60, 'bytes_out' => 1200],
+        ]),
+        '/traffic/breakdown/useragent' => json_encode([
+            ['value' => 'Mozilla/5.0 (Macintosh) PerAppAgent/2.0', 'requests' => 55, 'bytes_out' => 1100],
         ]),
         '/traffic/breakdown/country' => json_encode([
             ['value' => 'US', 'requests' => 600, 'bytes_out' => 15000],
@@ -59,6 +68,10 @@ function fakeAnalyticsResponses(): array
         ]),
         '/traffic/breakdown/device' => json_encode([
             ['value' => 'Desktop', 'requests' => 800, 'bytes_out' => 20000],
+        ]),
+        '/traffic/series' => json_encode([
+            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0],
+            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
         ]),
         '/traffic/attribution' => json_encode(['attribution' => 'GeoIP data by MaxMind']),
     ];
@@ -122,6 +135,60 @@ it('renders KPIs from a mocked traffic client when analytics is enabled', functi
         ->assertSee('/')
         ->assertSee('US')
         ->assertSee('GeoIP data by MaxMind');
+});
+
+it('loads the per-app status time series when Sentinel exposes the series endpoint', function () {
+    $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, true);
+
+    $fake = new FakeAnalyticsTrafficClient($application->destination->server);
+    $fake->responses = fakeAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    Livewire::test(Analytics::class, ['application' => $application])
+        ->assertOk()
+        ->assertSet('hasSeries', true)
+        ->assertSet('series', [
+            ['bucket' => 1_700_000_000_000, 's2xx' => 40, 's3xx' => 2, 's4xx' => 1, 's5xx' => 0],
+            ['bucket' => 1_700_003_600_000, 's2xx' => 60, 's3xx' => 3, 's4xx' => 2, 's5xx' => 1],
+        ])
+        ->assertDispatched('refreshChartData-application-analytics-status');
+});
+
+it('decorates per-app paths with the app domain and surfaces AI agents', function () {
+    $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, true);
+    $application->update(['fqdn' => 'https://api.example.com']);
+
+    $fake = new FakeAnalyticsTrafficClient($application->destination->server);
+    $fake->responses = fakeAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    $component = Livewire::test(Analytics::class, ['application' => $application])
+        ->assertOk()
+        ->assertSee('api.example.com')
+        ->assertSee('AI agents & bots')
+        ->assertSee('ClaudeBot')
+        ->assertSee('Top IPs')
+        ->assertSee('198.51.100.42')
+        ->assertSee('Top user agents')
+        ->assertSee('PerAppAgent/2.0');
+
+    expect($component->instance()->topPaths[0]['domain'])->toBe('api.example.com');
+});
+
+it('falls back to the donut for the per-app chart when the series endpoint is absent', function () {
+    $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, true);
+
+    $responses = fakeAnalyticsResponses();
+    unset($responses['/traffic/series']);
+
+    $fake = new FakeAnalyticsTrafficClient($application->destination->server);
+    $fake->responses = $responses;
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    Livewire::test(Analytics::class, ['application' => $application])
+        ->assertOk()
+        ->assertSet('hasSeries', false)
+        ->assertSet('series', []);
 });
 
 it('shows an empty state when traffic analytics is disabled for the server', function () {

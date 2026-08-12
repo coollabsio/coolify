@@ -86,94 +86,14 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
             </div>
         </x-application.settings-section>
 
-        <x-application.settings-section id="analytics-status-section" title="Status codes"
-            helper="Distribution of response status codes for the selected range.">
-            <div wire:ignore id="{!! $chartId !!}-status" class="min-h-[220px] w-full"></div>
-
-            @script
-            <script>
-                (() => {
-                    checkTheme();
-
-                    const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-                    const statusColors = () => [
-                        cssVar('--chart-status-2xx'),
-                        cssVar('--chart-status-3xx'),
-                        cssVar('--chart-status-4xx'),
-                        cssVar('--chart-status-5xx'),
-                    ];
-
-                    const statusChart = new ApexCharts(document.getElementById('{!! $chartId !!}-status'), {
-                        chart: {
-                            height: 220,
-                            type: 'donut',
-                            toolbar: {
-                                show: false
-                            },
-                            background: 'transparent',
-                        },
-                        series: [0, 0, 0, 0],
-                        labels: ['2xx', '3xx', '4xx', '5xx'],
-                        colors: statusColors(),
-                        stroke: {
-                            width: 2,
-                        },
-                        dataLabels: {
-                            enabled: false,
-                        },
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                colors: textColor,
-                            },
-                        },
-                        noData: {
-                            text: 'Loading status codes…',
-                            style: {
-                                color: textColor,
-                            },
-                        },
-                        tooltip: {
-                            y: {
-                                formatter: value => `${value.toLocaleString()} requests`,
-                            },
-                        },
-                    });
-
-                    statusChart.render();
-
-                    Livewire.on('refreshChartData-{!! $chartId !!}-status', chartData => {
-                        checkTheme();
-                        statusChart.updateOptions({
-                            colors: statusColors(),
-                            series: chartData[0].seriesData,
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    colors: textColor,
-                                },
-                            },
-                        });
-                    });
-                })();
-            </script>
-            @endscript
+        <x-application.settings-section id="analytics-status-section" title="Traffic"
+            helper="Request volume by status class over time for the selected range.">
+            @include('livewire.traffic._status-chart')
         </x-application.settings-section>
 
         <x-application.settings-section id="analytics-paths-section" title="Top paths"
             helper="Most requested paths for the selected range." flush>
-            @forelse ($topPaths as $path)
-                <div wire:key="analytics-path-{{ $loop->index }}"
-                    class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
-                    <span class="min-w-0 flex-1 truncate font-mono text-[12px] text-black dark:text-fg">{{ $path['path'] }}</span>
-                    <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ number_format($path['requests']) }} req</span>
-                    <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ formatBytes($path['bytesOut']) }}</span>
-                    <span class="hidden shrink-0 text-[12px] text-neutral-500 sm:inline dark:text-fg-dim">p95 {{ number_format($path['p95'], 1) }} ms</span>
-                </div>
-            @empty
-                <x-empty size="sm" title="No path data" description="No requests were recorded for the selected range."
-                    icon-name="unordered-list" />
-            @endforelse
+            @include('livewire.traffic._paths-list', ['paths' => $topPaths])
         </x-application.settings-section>
 
         <x-application.settings-section id="analytics-country-section" title="Countries"
@@ -184,21 +104,35 @@ $analyticsServerUuid = $application->destination?->server?->uuid;
             ])
         </x-application.settings-section>
 
-        @foreach ($dimensionLabels as $dimension => $label)
-            <x-application.settings-section id="analytics-{{ $dimension }}-section" title="{{ $label }}"
-                helper="Top {{ strtolower($label) }} by request count for the selected range." flush>
-                @forelse (data_get($breakdowns, $dimension, []) as $row)
-                    <div wire:key="analytics-{{ $dimension }}-{{ $loop->index }}"
-                        class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
-                        <span class="min-w-0 flex-1 truncate text-[12px] text-black dark:text-fg">{{ $row['value'] ?: 'Unknown' }}</span>
-                        <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ number_format($row['requests']) }} req</span>
-                        <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ formatBytes($row['bytesOut']) }}</span>
-                    </div>
-                @empty
-                    <x-empty size="sm" title="No data" description="No {{ strtolower($label) }} data for the selected range."
-                        icon-name="network" />
-                @endforelse
-            </x-application.settings-section>
-        @endforeach
+        {{-- Referrers / browsers / OS / devices / AI agents, two per row. --}}
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            @foreach ($dimensionLabels as $dimension => $label)
+                @include('livewire.traffic._breakdown-section', [
+                    'dimension' => $dimension,
+                    'label' => $label,
+                    'rows' => data_get($breakdowns, $dimension, []),
+                ])
+            @endforeach
+            @include('livewire.traffic._breakdown-section', [
+                'dimension' => 'agent',
+                'label' => 'AI agents & bots',
+                'rows' => data_get($breakdowns, 'agent', []),
+                'helper' => 'Bot and AI-crawler traffic (GPTBot, ClaudeBot, Googlebot, …) by request count.',
+            ])
+            @include('livewire.traffic._breakdown-section', [
+                'dimension' => 'ip',
+                'label' => 'Top IPs',
+                'rows' => data_get($breakdowns, 'ip', []),
+                'helper' => 'Busiest client IPs (real visitor IP, resolved behind Cloudflare / reverse proxies).',
+            ])
+        </div>
+
+        {{-- User agents (full width — raw UA strings are long). --}}
+        @include('livewire.traffic._breakdown-section', [
+            'dimension' => 'useragent',
+            'label' => 'Top user agents',
+            'rows' => data_get($breakdowns, 'useragent', []),
+            'helper' => 'Most frequent raw User-Agent strings for the selected range.',
+        ])
     @endif
 </div>

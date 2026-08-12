@@ -52,7 +52,7 @@
             return found ? found.label : @js($placeholder);
         },
         choose(option) {
-            if (option.disabled) return;
+            if (option.header || option.disabled) return;
             this.open = false;
             if (String(option.value) === String(this.value)) return;
             this.value = option.value;
@@ -123,16 +123,27 @@
                         {{ $emptyText }}
                     </div>
                     <template x-for="option in options" :key="String(option.value)">
-                        <button type="button" class="listbox-option" role="option"
-                            :class="{ 'listbox-option-disabled': option.disabled }"
-                            :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                            <span class="truncate" x-text="option.label"></span>
-                            <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
-                                fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
-                                class="size-3.5 shrink-0">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                            </svg>
-                        </button>
+                        <div>
+                            {{-- Non-selectable group header (options with header: true). Each header is the
+                                 only child of its x-for wrapper, so `first:` can't target it — the divider
+                                 is an unconditional top border, which reads as a separator between groups. --}}
+                            <template x-if="option.header">
+                                <div class="mt-1 border-t border-neutral-100 px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:border-white/[0.06] dark:text-fg-faint"
+                                    x-text="option.label"></div>
+                            </template>
+                            <template x-if="!option.header">
+                                <button type="button" class="listbox-option" role="option"
+                                    :class="{ 'listbox-option-disabled': option.disabled }"
+                                    :aria-selected="String(option.value) === String(value)" @click="choose(option)">
+                                    <span class="truncate" x-text="option.label"></span>
+                                    <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
+                                        fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+                                        class="size-3.5 shrink-0">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                    </svg>
+                                </button>
+                            </template>
+                        </div>
                     </template>
                 </div>
             </template>
@@ -149,16 +160,25 @@
                     {{ $emptyText }}
                 </div>
                 <template x-for="option in options" :key="String(option.value)">
-                    <button type="button" class="listbox-option" role="option"
-                        :class="{ 'listbox-option-disabled': option.disabled }"
-                        :aria-selected="String(option.value) === String(value)" @click="choose(option)">
-                        <span class="truncate" x-text="option.label"></span>
-                        <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
-                            fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
-                            class="size-3.5 shrink-0">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                        </svg>
-                    </button>
+                    <div>
+                        {{-- Non-selectable group header (options with header: true). --}}
+                        <template x-if="option.header">
+                            <div class="mt-1 border-t border-neutral-100 px-3 pt-2 pb-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:border-white/[0.06] dark:text-fg-faint"
+                                x-text="option.label"></div>
+                        </template>
+                        <template x-if="!option.header">
+                            <button type="button" class="listbox-option" role="option"
+                                :class="{ 'listbox-option-disabled': option.disabled }"
+                                :aria-selected="String(option.value) === String(value)" @click="choose(option)">
+                                <span class="truncate" x-text="option.label"></span>
+                                <svg x-show="String(option.value) === String(value)" xmlns="http://www.w3.org/2000/svg"
+                                    fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"
+                                    class="size-3.5 shrink-0">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
                 </template>
             </div>
         @endif

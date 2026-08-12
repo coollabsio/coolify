@@ -30,8 +30,18 @@ class Analytics extends Component
 
     public ?string $attribution = null;
 
+    /**
+     * Per-bucket status-class time series for the stacked area chart. Empty when this
+     * app's Sentinel lacks the series endpoint, which flips the chart to the donut.
+     *
+     * @var array<int, array{bucket: int, s2xx: int, s3xx: int, s4xx: int, s5xx: int}>
+     */
+    public array $series = [];
+
+    public bool $hasSeries = false;
+
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device'];
+    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'agent', 'ip', 'useragent'];
 
     public function mount(): void
     {
@@ -76,13 +86,17 @@ class Analytics extends Component
             $key = $this->application->uuid;
 
             $this->overview = $client->overview($key, $from, $to)->toArray();
-            $this->topPaths = $client->paths($key, $from, $to, 20)
-                ->map(fn ($path) => $path->toArray())
+
+            // Every path belongs to this one app, so decorate each row with its domain
+            // for a consistent "domain + path" presentation and an openable live link.
+            $domain = $this->applicationDomain();
+            $this->topPaths = $client->paths($key, $from, $to, 50)
+                ->map(fn ($path) => ['domain' => $domain] + $path->toArray())
                 ->all();
 
             $breakdowns = [];
             foreach ($this->breakdownDimensions as $dimension) {
-                $breakdowns[$dimension] = $client->breakdown($key, $dimension, $from, $to, 10)
+                $breakdowns[$dimension] = $client->breakdown($key, $dimension, $from, $to, 50)
                     ->map(fn ($row) => $row->toArray())
                     ->all();
             }
@@ -90,17 +104,48 @@ class Analytics extends Component
 
             $this->attribution = $client->attribution();
 
-            $this->dispatch("refreshChartData-{$this->chartId}-status", [
-                'seriesData' => [
-                    $this->overview['s2xx'] ?? 0,
-                    $this->overview['s3xx'] ?? 0,
-                    $this->overview['s4xx'] ?? 0,
-                    $this->overview['s5xx'] ?? 0,
-                ],
-            ]);
+            // Per-bucket status series; absent on older Sentinel builds (empty → donut fallback).
+            // Isolated so a series hiccup never errors the rest of the widget.
+            try {
+                $this->series = $client->series($key, $this->range)
+                    ->map(fn ($bucket) => $bucket->toArray())
+                    ->all();
+            } catch (\Throwable $e) {
+                $this->series = [];
+            }
+            $this->hasSeries = $this->series !== [];
+
+            $this->dispatch("refreshChartData-{$this->chartId}-status", $this->chartPayload());
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * Payload for the status chart: the stacked-area time series when available,
+     * plus the donut totals as a fallback for older Sentinel builds.
+     *
+     * @return array<string, mixed>
+     */
+    protected function chartPayload(): array
+    {
+        return [
+            'hasSeries' => $this->hasSeries,
+            'range' => $this->range,
+            'seriesData' => [
+                $this->overview['s2xx'] ?? 0,
+                $this->overview['s3xx'] ?? 0,
+                $this->overview['s4xx'] ?? 0,
+                $this->overview['s5xx'] ?? 0,
+            ],
+            'timeSeries' => [
+                'categories' => array_column($this->series, 'bucket'),
+                's2xx' => array_column($this->series, 's2xx'),
+                's3xx' => array_column($this->series, 's3xx'),
+                's4xx' => array_column($this->series, 's4xx'),
+                's5xx' => array_column($this->series, 's5xx'),
+            ],
+        ];
     }
 
     public function errorRate(): float
@@ -126,6 +171,17 @@ class Analytics extends Component
     protected function trafficClient(): SentinelTrafficClient
     {
         return app(SentinelTrafficClient::class, ['server' => $this->application->destination->server]);
+    }
+
+    /**
+     * Primary domain host for this application (first configured FQDN), or null when
+     * none is set — used to present paths as "domain + path" with an openable link.
+     */
+    protected function applicationDomain(): ?string
+    {
+        $first = collect($this->application->fqdns)->first();
+
+        return $first ? (parse_url($first, PHP_URL_HOST) ?: null) : null;
     }
 
     /**

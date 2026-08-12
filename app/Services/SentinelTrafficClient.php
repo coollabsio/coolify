@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Data\Traffic\TrafficBreakdownData;
 use App\Data\Traffic\TrafficOverviewData;
 use App\Data\Traffic\TrafficPathData;
+use App\Data\Traffic\TrafficSeriesBucketData;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -15,7 +16,7 @@ class SentinelTrafficClient
 
     /** @var array<int, string> */
     private const ALLOWED_DIMENSIONS = [
-        'status', 'method', 'country', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot',
+        'status', 'method', 'country', 'referer', 'browser', 'os', 'device', 'protocol', 'scheme', 'tls', 'cache', 'bot', 'agent', 'ip', 'useragent',
     ];
 
     public function __construct(protected Server $server) {}
@@ -82,6 +83,33 @@ class SentinelTrafficClient
         $rows = json_decode($this->raw($this->url($path, ['from' => $from, 'to' => $to, 'limit' => (int) $limit])), true) ?? [];
 
         return collect($rows)->map(fn ($r) => TrafficBreakdownData::fromSentinel($r));
+    }
+
+    /**
+     * Per-bucket status-class time series for the stacked-area chart.
+     *
+     * The series endpoints take a single `range` knob (24h/7d/30d) rather than
+     * from/to, and always return a fixed-length, zero-filled array when present.
+     * An older Sentinel without the route answers 404 (empty/non-array body);
+     * we return an empty collection in that case so callers can gracefully fall
+     * back to the donut instead of surfacing an error.
+     *
+     * @return Collection<int, TrafficSeriesBucketData>
+     */
+    public function series(?string $appKey, string $range = '24h'): Collection
+    {
+        if ($appKey !== null) {
+            $this->assertSafeKey($appKey);
+        }
+        $range = in_array($range, ['24h', '7d', '30d'], true) ? $range : '24h';
+        $path = $appKey ? "/app/{$appKey}/traffic/series" : '/traffic/series';
+        $rows = json_decode($this->raw($this->url($path, ['range' => $range])), true);
+
+        if (! is_array($rows) || $rows === []) {
+            return collect();
+        }
+
+        return collect($rows)->map(fn ($r) => TrafficSeriesBucketData::fromSentinel($r));
     }
 
     public function apps(): array

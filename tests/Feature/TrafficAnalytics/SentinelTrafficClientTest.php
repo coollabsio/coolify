@@ -102,3 +102,50 @@ it('accepts every known dimension and rejects unknown ones', function () {
     expect(fn () => $client->breakdown(null, 'not-a-real-dimension', 'a', 'b'))
         ->toThrow(InvalidArgumentException::class);
 });
+
+it('builds the server-wide series url with the range knob', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+    $client->response = json_encode([
+        ['bucket' => 1_700_000_000_000, 's2xx' => 5, 's3xx' => 1, 's4xx' => 0, 's5xx' => 0],
+    ]);
+
+    $rows = $client->series(null, '7d');
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows->first()->bucket)->toBe(1_700_000_000_000)
+        ->and($rows->first()->s2xx)->toBe(5);
+    expect($client->captured[0])->toContain('/api/traffic/series')
+        ->toContain('range=7d')->not->toContain('/app/');
+});
+
+it('builds the per-app series url and defaults an unknown range to 24h', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+    $client->response = json_encode([]);
+
+    $client->series('cm2abc123xyz456uuid', 'bogus');
+
+    expect($client->captured[0])->toContain('/api/app/cm2abc123xyz456uuid/traffic/series')
+        ->toContain('range=24h');
+});
+
+it('returns an empty series when the endpoint is absent (older Sentinel 404)', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+
+    // Empty body / unparseable / empty array all mean "no series" → donut fallback.
+    foreach (['', 'Not Found', '{}', '[]'] as $body) {
+        $client->response = $body;
+        expect($client->series(null, '24h'))->toBeEmpty();
+    }
+});
+
+it('rejects a malicious app key for the series endpoint', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new FakeTrafficClient($server);
+
+    expect(fn () => $client->series("x'; rm -rf /; '", '24h'))
+        ->toThrow(InvalidArgumentException::class);
+    expect($client->captured)->toBeEmpty();
+});

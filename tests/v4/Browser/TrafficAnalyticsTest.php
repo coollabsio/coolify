@@ -33,16 +33,15 @@ it('shows the disabled empty state on the application analytics tab', function (
         ->screenshot(filename: 'application-analytics-disabled-empty-state');
 });
 
-it('shows the disabled empty state on the server analytics tab', function () {
+it('shows the disabled empty state on the global analytics page', function () {
     loginAndSkipBoarding();
 
-    $server = $this->stack['server'];
+    $page = visit('/analytics');
 
-    $page = visit("/server/{$server->uuid}/analytics");
-
-    $page->assertSee('Traffic analytics is not enabled')
-        ->assertSee('Enable Sentinel traffic analytics for this server to start collecting request analytics.')
-        ->screenshot(filename: 'server-analytics-disabled-empty-state');
+    $page->assertSee('Analytics')
+        ->assertSee('Traffic analytics is not enabled')
+        ->assertSee('Enable Sentinel traffic analytics on a server to see request analytics here.')
+        ->screenshot(filename: 'global-analytics-disabled-empty-state');
 });
 
 it('shows the disabled empty state on the dashboard traffic widget', function () {

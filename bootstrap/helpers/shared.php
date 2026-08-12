@@ -4800,6 +4800,79 @@ function countryFlagEmoji(?string $a2): string
 }
 
 /**
+ * Resolve an ISO 3166-1 alpha-2 code to a flag image URL (flagcdn.com).
+ *
+ * Emoji flags do not render on most Linux/Windows browsers, so the analytics
+ * views render an <img> instead. Returns null for null/invalid codes so callers
+ * can fall back to a globe icon.
+ */
+function countryFlagUrl(?string $a2, string $size = '24x18'): ?string
+{
+    if (! is_string($a2)) {
+        return null;
+    }
+
+    $code = strtolower(trim($a2));
+
+    if (preg_match('/^[a-z]{2}$/', $code) !== 1) {
+        return null;
+    }
+
+    return "https://flagcdn.com/{$size}/{$code}.png";
+}
+
+/**
+ * Extract the bare host from a referer value (full URL or bare host), dropping
+ * a leading "www.". Returns null when there is no usable host (e.g. direct hits).
+ */
+function refererHost(?string $referer): ?string
+{
+    if (! is_string($referer) || trim($referer) === '') {
+        return null;
+    }
+
+    $referer = trim($referer);
+    $withScheme = str_contains($referer, '://') ? $referer : 'http://'.$referer;
+    $host = parse_url($withScheme, PHP_URL_HOST) ?: null;
+
+    if (! $host) {
+        return null;
+    }
+
+    $host = strtolower($host);
+
+    return str_starts_with($host, 'www.') ? substr($host, 4) : $host;
+}
+
+/**
+ * Favicon URL for a host, served by DuckDuckGo's icon proxy (no API key, no
+ * hotlink-referrer leakage). Used to decorate referrer rows in analytics.
+ */
+function refererFaviconUrl(string $host): string
+{
+    return 'https://icons.duckduckgo.com/ip3/'.rawurlencode($host).'.ico';
+}
+
+/**
+ * Map Sentinel's lowercase woothee device category to a friendly, capitalized
+ * label (e.g. "pc" -> "Desktop", "smartphone" -> "Mobile").
+ */
+function deviceLabel(?string $device): string
+{
+    $value = strtolower(trim((string) $device));
+
+    return match ($value) {
+        '' => 'Unknown',
+        'pc' => 'Desktop',
+        'smartphone' => 'Mobile',
+        'mobilephone' => 'Mobile',
+        'appliance' => 'Appliance',
+        'crawler' => 'Bot',
+        default => Str::title($value),
+    };
+}
+
+/**
  * Resolve an ISO 3166-1 alpha-2 country code to its English country name.
  *
  * Uses a bundled ISO 3166-1 lookup so the result is deterministic and does not

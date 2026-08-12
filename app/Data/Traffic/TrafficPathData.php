@@ -12,6 +12,9 @@ class TrafficPathData extends Data
         public int $bytesOut,
         public float $p50,
         public float $p95,
+        // Owning app key (Sentinel returns this per path row so the UI can show the
+        // domain). Empty on older Sentinel builds that predate the field.
+        public string $app = '',
     ) {}
 
     public static function fromSentinel(array $row): self
@@ -22,6 +25,7 @@ class TrafficPathData extends Data
             bytesOut: (int) data_get($row, 'bytes_out', 0),
             p50: (float) data_get($row, 'p50', 0.0),
             p95: (float) data_get($row, 'p95', 0.0),
+            app: (string) data_get($row, 'app', ''),
         );
     }
 }

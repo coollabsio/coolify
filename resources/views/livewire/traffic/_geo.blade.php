@@ -1,10 +1,10 @@
 {{--
     Shared geo visualization for traffic analytics: an inline public-domain world
-    choropleth (see _world-map.blade.php) plus a ranked country list. Driven by the
-    `country` breakdown collection; each row is ['value' => ISO-A2, 'requests', 'bytesOut'].
-    Colors come from the --chart-geo-* tokens (light + dark) so the map, bars, and
-    legend share one source. Consumed by the server + application analytics views and
-    the dashboard summary.
+    choropleth (see _world-map.blade.php) plus a ranked, paginated country list.
+    Driven by the `country` breakdown collection; each row is
+    ['value' => ISO-A2, 'requests', 'bytesOut']. Colors come from the --chart-geo-*
+    tokens (light + dark) so the map, bars, and legend share one source. Consumed by
+    the server, application and global analytics views and the dashboard summary.
 
     @param iterable $countries  country-breakdown rows
     @param ?string  $attribution  optional Sentinel attribution note
@@ -33,6 +33,16 @@
         $bucketMap[$r['value']] = min(5, max(1, $bucket));
     }
 
+    // Per-country payload for the map hover tooltip, keyed by ISO-A2.
+    $geoTip = [];
+    foreach ($known as $r) {
+        $geoTip[$r['value']] = [
+            'name' => countryName($r['value']),
+            'requests' => $r['requests'],
+            'bytesOut' => formatBytes($r['bytesOut']),
+        ];
+    }
+
     $countryRows = $known->values();
     if ($unknown->isNotEmpty()) {
         $countryRows->push([
@@ -56,7 +66,8 @@
             icon-name="network" />
     @else
         {{-- Bucket fills are server-rendered as scoped CSS so theme + range changes stay
-             in sync with no JS; the map subtree is wire:ignore'd to skip morph churn on polls. --}}
+             in sync with no JS; the map subtree is wire:ignore'd to skip morph churn on polls.
+             The :hover rule highlights whichever country is under the cursor. --}}
         <style>
             [data-geo-map="{{ $mapId }}"] svg { width: 100%; height: auto; display: block; }
             [data-geo-map="{{ $mapId }}"] svg path {
@@ -64,40 +75,94 @@
                 stroke: var(--chart-geo-stroke);
                 stroke-width: 0.4;
                 stroke-linejoin: round;
+                transition: filter 0.1s ease;
+            }
+            [data-geo-map="{{ $mapId }}"] svg path:hover {
+                filter: brightness(1.25);
+                stroke: var(--chart-geo-stroke);
+                stroke-width: 0.9;
+                cursor: default;
             }
             @foreach ($bucketMap as $a2 => $bucket)
                 [data-geo-map="{{ $mapId }}"] svg path#{{ $a2 }} { fill: var(--chart-geo-{{ $bucket }}); }
             @endforeach
         </style>
 
-        <div class="border-b border-neutral-200 px-4 py-3 dark:border-white/[0.07]">
+        {{-- Alpine reads the fresh tooltip payload from a morph-updated JSON node on each
+             move (rather than a one-time x-data literal) so it stays in sync after polls. --}}
+        <div class="relative border-b border-neutral-200 px-4 py-3 dark:border-white/[0.07]"
+            x-data="{
+                tip: { show: false, x: 0, y: 0, name: '', requests: '', bytes: '' },
+                move(e) {
+                    const path = e.target.closest('path');
+                    if (!path || !path.id) { this.tip.show = false; return; }
+                    let data = {};
+                    try { data = JSON.parse(this.$refs.geodata.textContent || '{}'); } catch (_) {}
+                    const d = data[path.id];
+                    this.tip.name = d ? d.name : path.id;
+                    this.tip.requests = d ? Number(d.requests).toLocaleString() : null;
+                    this.tip.bytes = d ? d.bytesOut : null;
+                    this.tip.x = e.clientX;
+                    this.tip.y = e.clientY;
+                    this.tip.show = true;
+                },
+            }" @mousemove="move($event)" @mouseleave="tip.show = false">
+            <script type="application/json" x-ref="geodata">{!! json_encode($geoTip, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) !!}</script>
+
             <div data-geo-map="{{ $mapId }}" wire:ignore
-                class="mx-auto max-w-[720px] overflow-hidden rounded-lg bg-neutral-50 dark:bg-white/[0.02]">
+                class="w-full overflow-hidden rounded-lg bg-neutral-50 dark:bg-white/[0.02]">
                 @include('livewire.traffic._world-map')
+            </div>
+
+            <div x-show="tip.show" x-cloak x-transition.opacity.duration.100ms
+                :style="`left: ${tip.x + 14}px; top: ${tip.y + 14}px;`"
+                class="pointer-events-none fixed z-[100] rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-1.5 text-white shadow-lg dark:border-white/10 dark:bg-raised">
+                <div class="text-[12px] font-medium" x-text="tip.name"></div>
+                <template x-if="tip.requests !== null">
+                    <div class="mt-0.5 text-[11px] text-neutral-300 dark:text-fg-dim">
+                        <span x-text="tip.requests"></span> req · <span x-text="tip.bytes"></span>
+                    </div>
+                </template>
+                <template x-if="tip.requests === null">
+                    <div class="mt-0.5 text-[11px] text-neutral-400 dark:text-fg-faint">No requests in range</div>
+                </template>
             </div>
         </div>
 
-        <div>
-            @foreach ($countryRows as $row)
-                @php
-                    $isUnknown = $row['value'] === '';
-                    $bucket = $isUnknown ? null : ($bucketMap[$row['value']] ?? 1);
-                    $width = min(100, round(($row['requests'] / $maxRequests) * 100, 1));
-                    $barColor = $isUnknown ? 'var(--chart-geo-empty)' : "var(--chart-geo-{$bucket})";
-                @endphp
-                <div wire:key="geo-country-{{ $mapId }}-{{ $loop->index }}"
-                    class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
-                    <span class="shrink-0 text-[14px] leading-none" aria-hidden="true">{{ countryFlagEmoji($isUnknown ? null : $row['value']) }}</span>
-                    <span class="min-w-0 flex-1 truncate text-[12px] text-black dark:text-fg">
-                        {{ $isUnknown ? 'Unknown' : countryName($row['value']) }}
-                    </span>
-                    <div class="hidden h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
-                        <div class="h-full rounded-full" style="width: {{ $width }}%; background-color: {{ $barColor }};"></div>
+        <div x-data="{ page: 0, per: 10, total: {{ $countryRows->count() }} }">
+            <div>
+                @foreach ($countryRows as $row)
+                    @php
+                        $isUnknown = $row['value'] === '';
+                        $bucket = $isUnknown ? null : ($bucketMap[$row['value']] ?? 1);
+                        $width = min(100, round(($row['requests'] / $maxRequests) * 100, 1));
+                        $barColor = $isUnknown ? 'var(--chart-geo-empty)' : "var(--chart-geo-{$bucket})";
+                    @endphp
+                    <div wire:key="geo-country-{{ $mapId }}-{{ $loop->index }}"
+                        x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
+                        class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
+                        @php $flagUrl = $isUnknown ? null : countryFlagUrl($row['value']); @endphp
+                        @if ($flagUrl)
+                            <img src="{{ $flagUrl }}" srcset="{{ countryFlagUrl($row['value'], '48x36') }} 2x" alt=""
+                                loading="lazy" width="20" height="15"
+                                class="h-[15px] w-5 shrink-0 rounded-[2px] object-cover ring-1 ring-black/5 dark:ring-white/10"
+                                onerror="this.style.visibility='hidden'">
+                        @else
+                            <span class="shrink-0 text-[14px] leading-none" aria-hidden="true">🌐</span>
+                        @endif
+                        <span class="min-w-0 flex-1 truncate text-[12px] text-black dark:text-fg">
+                            {{ $isUnknown ? 'Unknown' : countryName($row['value']) }}
+                        </span>
+                        <div class="hidden h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-neutral-100 sm:block dark:bg-white/[0.06]">
+                            <div class="h-full rounded-full" style="width: {{ $width }}%; background-color: {{ $barColor }};"></div>
+                        </div>
+                        <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ number_format($row['requests']) }} req</span>
+                        <span class="hidden shrink-0 text-[12px] text-neutral-500 sm:inline dark:text-fg-dim">{{ formatBytes($row['bytesOut']) }}</span>
                     </div>
-                    <span class="shrink-0 text-[12px] text-neutral-500 dark:text-fg-dim">{{ number_format($row['requests']) }} req</span>
-                    <span class="hidden shrink-0 text-[12px] text-neutral-500 sm:inline dark:text-fg-dim">{{ formatBytes($row['bytesOut']) }}</span>
-                </div>
-            @endforeach
+                @endforeach
+            </div>
+
+            @include('livewire.traffic._pager')
 
             @if (! empty($attribution))
                 <p class="border-t border-neutral-200 px-4 py-2 text-[11px] text-neutral-400 dark:border-white/[0.07] dark:text-fg-faint">

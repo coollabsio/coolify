@@ -13,5 +13,8 @@ it('returns JSON access log + Cloudflare header capture flags when enabled', fun
         ->toContain('--accesslog.fields.headers.names.Cf-Ipcountry=keep')
         ->toContain('--accesslog.fields.headers.names.Cf-Cache-Status=keep')
         ->toContain('--accesslog.fields.headers.names.Cf-Verified-Bot=keep')
-        ->toContain('--accesslog.fields.headers.names.Cf-Ray=keep');
+        ->toContain('--accesslog.fields.headers.names.Cf-Ray=keep')
+        ->toContain('--accesslog.fields.headers.names.X-Forwarded-For=keep')
+        ->toContain('--accesslog.fields.headers.names.User-Agent=keep')
+        ->toContain('--accesslog.fields.headers.names.Referer=keep');
 });

@@ -1,6 +1,6 @@
 <?php
 
-use App\Livewire\Server\Analytics;
+use App\Livewire\Analytics;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -55,7 +55,7 @@ function bootLiveServer(): Server
 it('polls for realtime data by default at the 24h range', function () {
     $server = bootLiveServer();
 
-    Livewire::test(Analytics::class, ['server_uuid' => $server->uuid])
+    Livewire::test(Analytics::class)
         ->assertOk()
         ->assertSet('live', true)
         ->assertSeeHtml('wire:poll.60s')
@@ -65,7 +65,7 @@ it('polls for realtime data by default at the 24h range', function () {
 it('stops polling when live is toggled off', function () {
     $server = bootLiveServer();
 
-    Livewire::test(Analytics::class, ['server_uuid' => $server->uuid])
+    Livewire::test(Analytics::class)
         ->assertSeeHtml('wire:poll.60s')
         ->call('toggleLive')
         ->assertSet('live', false)
@@ -75,7 +75,7 @@ it('stops polling when live is toggled off', function () {
 it('disables realtime polling for the 7d and 30d ranges', function () {
     $server = bootLiveServer();
 
-    $component = Livewire::test(Analytics::class, ['server_uuid' => $server->uuid])
+    $component = Livewire::test(Analytics::class)
         ->call('setRange', '7d')
         ->assertDontSeeHtml('wire:poll.60s');
 
@@ -90,7 +90,7 @@ it('disables realtime polling for the 7d and 30d ranges', function () {
 it('re-arms polling when returning to the 24h range', function () {
     $server = bootLiveServer();
 
-    Livewire::test(Analytics::class, ['server_uuid' => $server->uuid])
+    Livewire::test(Analytics::class)
         ->call('setRange', '7d')
         ->assertDontSeeHtml('wire:poll.60s')
         ->call('setRange', '24h')
