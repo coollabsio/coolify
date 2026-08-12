@@ -29,10 +29,10 @@ jobs:
       release_id: ${{ steps.draft.outputs.release_id }}
       version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Reject releases outside v4.x
-        if: ${{ github.ref_name != 'v4.x' }}
+      - name: Reject releases outside the production branch
+        if: ${{ ! contains(fromJSON('["v4.x", "main"]'), github.ref_name) }}
         run: |
-          echo "Fix releases must run from v4.x, not ${{ github.ref_name }}."
+          echo "Stable releases must run from v4.x or main, not ${{ github.ref_name }}."
           exit 1
 
       - uses: actions/checkout@v5

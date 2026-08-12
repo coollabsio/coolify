@@ -146,9 +146,9 @@ function loginAsRoot(): mixed
 
 ## Git Workflow
 
-- Main branch: `v4.x`
+- Production branch: `main` (`v4.x` during the branch rename)
 - Development branch: `next`
-- PRs should target `v4.x`
+- Fix PRs should target the current production branch; feature PRs should target `next`
 
 <laravel-boost-guidelines>
 === foundation rules ===

@@ -7,8 +7,7 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
 
     expect($workflow)
         ->toContain('name: Build Coolify (SHA)')
-        ->toContain('branches: ["v4.x"]')
-        ->not->toContain('branches: ["v4.x", "main"]')
+        ->toContain('branches: ["v4.x", "main"]')
         ->toContain('sha-${{ github.sha }}-${{ matrix.arch }}')
         ->toContain('sha-${{ github.sha }}')
         ->toContain('php bootstrap/getVersion.php')
@@ -34,7 +33,7 @@ it('requires a reviewed draft release before building a stable version', functio
         ->toContain('name: Release Coolify Stable')
         ->toContain('workflow_dispatch:')
         ->toContain('tag:')
-        ->toContain('github.ref_name != \'v4.x\'')
+        ->toContain('contains(fromJSON(\'["v4.x", "main"]\'), github.ref_name)')
         ->toContain('github.paginate(github.rest.repos.listReleases')
         ->toContain('release.draft')
         ->toContain('release.prerelease')
@@ -56,20 +55,18 @@ it('keeps support image workflows ready for the production branch rename', funct
     'realtime' => 'coolify-realtime.yml',
 ]);
 
-it('generates the production changelog only from v4.x', function () {
+it('generates the production changelog from either production branch during the rename', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/generate-changelog.yml');
 
-    expect($workflow)
-        ->toContain('branches: [ v4.x ]')
-        ->not->toContain('main');
+    expect($workflow)->toContain('branches: [ v4.x, main ]');
 });
 
-it('excludes only active production branches from staging builds', function () {
+it('excludes both production branch names from staging builds during the rename', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-staging-build.yml');
 
     expect($workflow)
         ->toContain('      - v4.x')
-        ->not->toContain('      - main');
+        ->toContain('      - main');
 });
 
 it('rebuilds stable images and publishes the reviewed draft after both architectures succeed', function () {
