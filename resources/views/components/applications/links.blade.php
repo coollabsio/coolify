@@ -13,7 +13,8 @@
     $linkItemClasses = 'listbox-option justify-start! gap-2.5!';
 @endphp
 
-<div @class(['relative', 'w-full' => $fullWidth]) x-data="{ open: false }" @keydown.escape.window="open = false">
+<div @class(['relative', 'w-full' => $fullWidth]) x-data="{ open: false }"
+    x-effect="$dispatch('resource-actions-toggled', { open })" @keydown.escape.window="open = false">
     <button type="button" @click="open = !open" @click.outside="open = false" title="Open application links"
         @class([
             'app-tab shrink-0 gap-1' => !$fullWidth,

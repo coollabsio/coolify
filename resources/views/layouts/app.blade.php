@@ -60,13 +60,14 @@
                     </div>
                     {{-- Dev Server-Timing HUD docks here (local only; empty in production) --}}
                     <div id="server-timing-hud-slot" data-server-timing-hud-slot class="hidden shrink-0 items-center"></div>
+                    <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
                     {{-- Resource actions dock here on desktop. --}}
                     <div id="resource-action-hud-slot" class="hidden shrink-0 items-center xl:flex"></div>
                 </div>
             </header>
 
             {{-- ============ MOBILE SLIDE-OVER SIDEBAR ============ --}}
-            <div class="relative z-50 lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
+            <div class="relative z-[1000] lg:hidden" :class="open ? 'block' : 'hidden'" role="dialog" aria-modal="true">
                 <div class="fixed inset-0 bg-black/80" x-on:click="open = false"></div>
                 <div class="fixed inset-y-0 right-0 flex h-full">
                     <div
@@ -111,6 +112,7 @@
                     {{-- Dev Server-Timing HUD docks here on <lg (desktop uses #server-timing-hud-slot) --}}
                     <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot
                         class="hidden shrink-0 items-center"></div>
+                    <div id="configuration-warning-hud-slot-mobile" class="relative shrink-0"></div>
                     <x-top-user-menu />
                     <button type="button" class="-m-1 p-2 text-neutral-500 dark:text-fg-dim" x-on:click="open = !open">
                         <span class="sr-only">Open sidebar</span>

@@ -287,7 +287,8 @@
                 @if ($server->proxySet())
                     @can('manageProxy', $server)
                         <div id="server-desktop-actions" class="resource-heading-actions relative shrink-0"
-                            x-data="{ open: false }" @click.outside="open = false"
+                            x-data="{ open: false }" x-effect="$dispatch('resource-actions-toggled', { open })"
+                            @click.outside="open = false"
                             @keydown.escape.window="open = false">
                             <button type="button" class="button" @click="open = !open" :aria-expanded="open"
                                 aria-haspopup="menu" wire:loading.attr="disabled" wire:loading.class="is-loading"

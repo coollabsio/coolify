@@ -156,16 +156,26 @@ it('groups application lifecycle controls in an actions dropdown', function () {
         ->toContain('Deploy');
 });
 
-it('raises the desktop top bar while the service actions dropdown is open', function () {
+it('raises the desktop top bar while any resource dropdown is open', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
-    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $dropdowns = [
+        resource_path('views/livewire/project/application/heading.blade.php'),
+        resource_path('views/livewire/project/database/heading.blade.php'),
+        resource_path('views/livewire/project/service/heading.blade.php'),
+        resource_path('views/livewire/server/navbar.blade.php'),
+        resource_path('views/components/applications/links.blade.php'),
+        resource_path('views/components/services/links.blade.php'),
+    ];
 
     expect($layout)
         ->toContain('resourceActionsOpen: false')
         ->toContain("'z-[1000]': resourceActionsOpen")
-        ->toContain('@resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"')
-        ->and($heading)
-        ->toContain("\$dispatch('resource-actions-toggled', { open })");
+        ->toContain('@resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"');
+
+    foreach ($dropdowns as $dropdown) {
+        expect(file_get_contents($dropdown))
+            ->toContain("\$dispatch('resource-actions-toggled', { open })");
+    }
 });
 
 it('keeps deploy in the actions menu alongside advanced operations', function () {
@@ -177,6 +187,28 @@ it('keeps deploy in the actions menu alongside advanced operations', function ()
         ->toContain('id="application-desktop-actions"')
         ->toContain('Deploy')
         ->toContain('Force deploy without cache');
+});
+
+it('renders configuration warnings as navbar popovers instead of floating notifications', function () {
+    $checker = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
+    $warning = file_get_contents(resource_path('views/components/configuration-warning.blade.php'));
+
+    expect($checker)
+        ->toContain("@teleport('#configuration-warning-hud-slot')")
+        ->toContain("@teleport('#configuration-warning-hud-slot-mobile')")
+        ->toContain('<x-configuration-warning :diff="$configurationDiff" />')
+        ->not->toContain('<x-popup-small position="top-right"')
+        ->and($warning)
+        ->toContain('aria-label="Configuration changes not applied"')
+        ->toContain('<span class="hidden text-xs font-medium lg:inline">Changes pending</span>')
+        ->toContain('The latest configuration has not been applied')
+        ->toContain('fixed top-14 left-1/2')
+        ->toContain('-translate-x-1/2')
+        ->toContain('lg:absolute lg:top-full lg:right-0 lg:left-auto')
+        ->toContain('lg:translate-x-0')
+        ->toContain('@click.outside="open = false"')
+        ->toContain('@keydown.escape.window="open = false"')
+        ->toContain("\$dispatch('open-configuration-diff')");
 });
 
 it('moves application backups from the top tabs into the settings sidebar', function () {

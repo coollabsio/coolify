@@ -63,6 +63,32 @@ it('separates the mobile sidebar from the page with a visible border', function 
     expect($layout)->toContain('max-w-56 min-w-0 flex-col border-l border-neutral-200 bg-white shadow-xl dark:border-white/[0.12] dark:bg-panel');
 });
 
+it('keeps the mobile navbar above floating configuration warnings', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $popup = file_get_contents(resource_path('views/components/popup-small.blade.php'));
+
+    expect($layout)
+        ->toContain('class="relative z-[1000] lg:hidden"')
+        ->and($popup)->toContain('z-999');
+});
+
+it('keeps compact configuration warnings the same width as their expanded state', function () {
+    $popup = file_get_contents(resource_path('views/components/popup-small.blade.php'));
+
+    expect($popup)
+        ->toContain("? 'w-[calc(100vw-2rem)] max-w-sm cursor-pointer'")
+        ->toContain(": 'w-[calc(100vw-2rem)] max-w-sm'")
+        ->not->toContain('sm:w-auto');
+});
+
+it('provides configuration warning slots in both desktop and mobile navbars', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+
+    expect($layout)
+        ->toContain('id="configuration-warning-hud-slot"')
+        ->toContain('id="configuration-warning-hud-slot-mobile"');
+});
+
 it('shows the full team name in the header', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
     $switcher = file_get_contents(resource_path('views/livewire/switch-team.blade.php'));

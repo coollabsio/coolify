@@ -187,6 +187,7 @@
                             <x-applications.links :application="$application" />
                         </div>
                         <div id="application-desktop-actions" class="relative" x-data="{ open: false }"
+                            x-effect="$dispatch('resource-actions-toggled', { open })"
                             @click.outside="open = false" @keydown.escape.window="open = false">
                             <button type="button" class="button" @click="open = !open" :aria-expanded="open"
                                 aria-haspopup="menu">
