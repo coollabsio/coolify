@@ -4,6 +4,7 @@ use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Fortify\Fortify;
 
 uses(RefreshDatabase::class);
 
@@ -67,6 +68,43 @@ it('fails login with invalid credentials', function () {
         ->assertPathIs('/login')
         ->assertSee('These credentials do not match our records.')
         ->screenshot(filename: 'login-invalid-credentials');
+});
+
+it('prevents Enter from duplicating the automatic two factor challenge submission', function () {
+    config(['app.maintenance.driver' => 'file']);
+
+    $user = createRootUser();
+    $user->forceFill([
+        'two_factor_secret' => Fortify::currentEncrypter()->encrypt('JBSWY3DPEHPK3PXP'),
+        'two_factor_confirmed_at' => now(),
+    ])->save();
+
+    $page = visit('/login')
+        ->fill('email', 'test@example.com')
+        ->fill('password', 'password')
+        ->click('Login')
+        ->assertPathIs('/two-factor-challenge');
+
+    $page->script(<<<'JS'
+        window.acceptedTwoFactorSubmissions = 0;
+
+        document.querySelector('form[action="/two-factor-challenge"]').addEventListener('submit', (event) => {
+            if (!event.defaultPrevented) {
+                window.acceptedTwoFactorSubmissions++;
+            }
+
+            event.preventDefault();
+        });
+    JS);
+
+    foreach (str_split('123456') as $index => $digit) {
+        $page->keys(sprintf('[aria-label="Digit %d"]', $index + 1), $digit);
+    }
+
+    $page->keys('[aria-label="Digit 6"]', 'Enter')
+        ->assertScript('window.acceptedTwoFactorSubmissions', 1)
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'login-two-factor-enter-single-submission');
 });
 
 /**
