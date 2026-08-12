@@ -3681,7 +3681,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
         column-gap: 0.75rem;
     }
 
-    .environments-table-grid > :nth-child(2) {
+    .environments-table-grid .environment-resource-count {
         display: none;
     }
 }
