@@ -4269,6 +4269,34 @@ NGINX;
 function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|null $source = null): array
 {
     $repository = $gitRepository;
+
+    // URL encode basic auth credentials in HTTP(S) URLs to handle special characters like @ in usernames
+    if (preg_match('/^https?:\/\//', $gitRepository)) {
+        $parsedUrl = parse_url($gitRepository);
+        if ($parsedUrl !== false && (isset($parsedUrl['user']) || isset($parsedUrl['pass']))) {
+            $host = $parsedUrl['host'] ?? '';
+            if ($host !== '') {
+                $scheme = $parsedUrl['scheme'] ?? 'https';
+                $port = isset($parsedUrl['port']) ? ':'.$parsedUrl['port'] : '';
+                $path = $parsedUrl['path'] ?? '';
+                $query = isset($parsedUrl['query']) ? '?'.$parsedUrl['query'] : '';
+                $fragment = isset($parsedUrl['fragment']) ? '#'.$parsedUrl['fragment'] : '';
+
+                // Re-wrap IPv6 hosts with brackets (parse_url strips them)
+                $isIpv6 = str_contains($host, ':');
+                $hostFormatted = $isIpv6 ? '['.$host.']' : $host;
+
+                $user = isset($parsedUrl['user']) ? rawurlencode(rawurldecode($parsedUrl['user'])) : '';
+                $pass = isset($parsedUrl['pass']) ? ':'.rawurlencode(rawurldecode($parsedUrl['pass'])) : '';
+                $hasAuth = ($user !== '' || $pass !== '');
+                $auth = $hasAuth ? $user.$pass.'@' : '';
+
+                $repository = $scheme.'://'.$auth.$hostFormatted.$port.$path.$query.$fragment;
+                $gitRepository = $repository;
+            }
+        }
+    }
+
     $providerInfo = [
         'host' => null,
         'user' => 'git',
