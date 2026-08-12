@@ -108,7 +108,7 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
     }
     $apps = $appsQuery->get();
     foreach ($apps as $app) {
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        $list_of_domains = collect(explode(',', (string) $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
         foreach ($list_of_domains as $domain) {
             if (str($domain)->endsWith('/')) {
                 $domain = str($domain)->beforeLast('/');
@@ -133,6 +133,48 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
                         'resource_type' => 'application',
                         'message' => "Domain $naked_domain is already in use by application '{$app->name}'",
                     ];
+                }
+            }
+        }
+
+        if ($app->build_pack === 'dockercompose' && ! empty($app->docker_compose_domains)) {
+            $dockerComposeDomains = json_decode($app->docker_compose_domains, true);
+            if (is_array($dockerComposeDomains)) {
+                foreach ($dockerComposeDomains as $serviceName => $domainConfig) {
+                    $domainValue = data_get($domainConfig, 'domain');
+                    if (empty($domainValue)) {
+                        continue;
+                    }
+                    $list_of_domains = collect(explode(',', $domainValue))->filter(fn ($fqdn) => $fqdn !== '');
+                    foreach ($list_of_domains as $domain) {
+                        if (str($domain)->endsWith('/')) {
+                            $domain = str($domain)->beforeLast('/');
+                        }
+                        $naked_domain = str($domain)->value();
+                        if ($domains->contains($naked_domain)) {
+                            if (data_get($resource, 'uuid')) {
+                                if ($resource->uuid !== $app->uuid) {
+                                    $conflicts[] = [
+                                        'domain' => $naked_domain,
+                                        'resource_name' => $app->name,
+                                        'resource_link' => $app->link(),
+                                        'resource_type' => 'application',
+                                        'service_name' => $serviceName,
+                                        'message' => "Domain $naked_domain is already in use by application '{$app->name}' (service: {$serviceName})",
+                                    ];
+                                }
+                            } elseif ($domain) {
+                                $conflicts[] = [
+                                    'domain' => $naked_domain,
+                                    'resource_name' => $app->name,
+                                    'resource_link' => $app->link(),
+                                    'resource_type' => 'application',
+                                    'service_name' => $serviceName,
+                                    'message' => "Domain $naked_domain is already in use by application '{$app->name}' (service: {$serviceName})",
+                                ];
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -1208,6 +1208,79 @@ it('clears pending conflict action when the conflict modal is dismissed', functi
     expect($this->application->fresh()->fqdn)->toBeNull();
 });
 
+it('warns when adding a domain already used by a docker compose application', function () {
+    Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'Compose Conflict App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://compose-taken.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomain', 'https://compose-taken.example.com')
+        ->call('addDomain')
+        ->assertSet('showDomainConflictModal', true)
+        ->assertSet('pendingAction', 'add')
+        ->call('confirmDomainUsage')
+        ->assertSet('showDomainConflictModal', false)
+        ->assertDispatched('success');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))
+        ->toContain('https://compose-taken.example.com');
+});
+
+it('detects a domain conflict between two docker compose applications', function () {
+    $composeApplication = Application::factory()->create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'First Compose App',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'fqdn' => null,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://compose-shared.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://compose-shared.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $result = checkDomainUsage(resource: $this->application->fresh());
+
+    expect($result['hasConflicts'])->toBeTrue()
+        ->and($result['conflicts'])->toHaveCount(1)
+        ->and($result['conflicts'][0]['domain'])->toBe('https://compose-shared.example.com')
+        ->and($result['conflicts'][0]['resource_name'])->toBe($composeApplication->name)
+        ->and($result['conflicts'][0]['service_name'])->toBe('api');
+});
+
+it('does not report a docker compose domain as conflicting with itself', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://self-compose.example.com', 'redirect' => 'both'],
+        ]),
+    ]);
+
+    $result = checkDomainUsage(resource: $this->application->fresh());
+
+    expect($result['hasConflicts'])->toBeFalse()
+        ->and($result['conflicts'])->toBeEmpty();
+});
+
 it('does not show a suggested row when both www variants are configured', function () {
     $this->application->update([
         'fqdn' => 'https://example.com,https://www.example.com',
