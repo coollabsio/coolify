@@ -19,12 +19,12 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.1'");
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.2'");
 });
 
 it('orders a maintenance development build before its stable release', function () {
-    expect(version_compare('4.3.1-dev.d64cbda3e', '4.3.1', '<'))->toBeTrue()
-        ->and(version_compare('4.3.1', '4.3.1-dev.d64cbda3e', '>'))->toBeTrue();
+    expect(version_compare('4.3.2-dev.d64cbda3e', '4.3.2', '<'))->toBeTrue()
+        ->and(version_compare('4.3.2', '4.3.2-dev.d64cbda3e', '>'))->toBeTrue();
 });
 
 it('requires a reviewed draft release before building a stable version', function () {
