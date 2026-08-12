@@ -727,6 +727,86 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     backdrop-filter: blur(16px);
 }
 
+/* Pre-session target list: a normal page card, not the themed console canvas. */
+.terminal-target-card .application-settings-section-body {
+    overflow: hidden;
+}
+
+/* The header inset is tuned for 32px buttons. A full-width filter needs the
+   same gutter on both sides once the actions row wraps below the title.
+   Matches the base header selector's specificity so the shorthand cannot win. */
+@media (max-width: 640px) {
+    .application-settings-section.terminal-target-card > :is(header, .application-settings-section-header) {
+        padding-right: 1rem;
+    }
+}
+
+.terminal-target-card-list {
+    max-height: min(70vh, 34rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--coollabs-fill) transparent;
+}
+
+.terminal-target-card-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.terminal-target-card-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.terminal-target-card-list::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-color: var(--coollabs-fill);
+    background-clip: padding-box;
+}
+
+/* Group headers stay readable while scrolling long container lists. */
+.terminal-target-group-label {
+    display: flex;
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.5rem 0.375rem;
+    background: var(--coollabs-base);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: var(--coollabs-subtle);
+}
+
+.terminal-target-group-count {
+    border-radius: 9999px;
+    background: var(--coollabs-fill);
+    padding: 0 0.375rem;
+    font-size: 0.625rem;
+    line-height: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The server column only earns its space once the row is wide enough. */
+.terminal-target-item-server {
+    display: none;
+    max-width: 14rem;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--coollabs-subtle);
+}
+
+@media (min-width: 640px) {
+    .terminal-target-item-server {
+        display: block;
+    }
+}
+
 .terminal-session-panel {
     border: 0;
     border-radius: 0.75rem;

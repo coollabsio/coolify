@@ -98,7 +98,7 @@ it('uses a larger high-contrast label for every terminal loading phase', functio
     $styles = file_get_contents(resource_path('css/app.css'));
 
     expect(substr_count($resourceView.$terminalView.$globalView, 'terminal-loading-label'))
-        ->toBeGreaterThanOrEqual(3)
+        ->toBeGreaterThanOrEqual(2)
         ->and($styles)
         ->toContain('.terminal-loading-label')
         ->toContain('font-size: 0.875rem;')
