@@ -149,6 +149,12 @@ it('finishes after health recovers from observed downtime for older target relea
         ->toContain('return;');
 });
 
+it('tells users to reload manually if the automatic reload does not happen', function () {
+    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
+
+    expect($upgradeView)->toContain('If the page does not reload automatically, reload it manually.');
+});
+
 it('starts the upgrade after the Livewire response so status polling is not blocked', function () {
     $upgradeComponent = file_get_contents(__DIR__.'/../../app/Livewire/Upgrade.php');
 

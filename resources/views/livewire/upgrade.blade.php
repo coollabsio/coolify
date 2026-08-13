@@ -101,6 +101,10 @@
                                                     class="font-semibold text-coollabs dark:text-warning"></span>
                                                 seconds…
                                             </p>
+                                            <p class="text-center text-[11px] leading-4"
+                                                style="color: var(--coollabs-subtle)">
+                                                If the page does not reload automatically, reload it manually.
+                                            </p>
                                             <x-forms.button @click="reloadNow()" type="button" isHighlighted>
                                                 Reload now
                                             </x-forms.button>
