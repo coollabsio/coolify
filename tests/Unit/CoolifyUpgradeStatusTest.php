@@ -139,6 +139,16 @@ it('uses the public health endpoint only for liveness during an upgrade', functi
         ->not->toContain('response.headers.get');
 });
 
+it('finishes after health recovers from observed downtime for older target releases', function () {
+    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
+
+    expect($upgradeView)
+        ->toContain("data.status === 'none' && this.instanceWentDown")
+        ->toContain('if (this.instanceWentDown) {')
+        ->toContain('this.showSuccess();')
+        ->toContain('return;');
+});
+
 it('starts the upgrade after the Livewire response so status polling is not blocked', function () {
     $upgradeComponent = file_get_contents(__DIR__.'/../../app/Livewire/Upgrade.php');
 

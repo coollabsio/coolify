@@ -281,11 +281,24 @@
                         return;
                     }
 
-                    const data = await this.$wire.getUpgradeStatus();
+                    let data;
+                    try {
+                        data = await this.$wire.getUpgradeStatus();
+                    } catch (error) {
+                        if (this.instanceWentDown) {
+                            this.showSuccess();
+                            return;
+                        }
+                        throw error;
+                    }
                     if (data.status === 'complete') {
                         this.showSuccess();
                     } else if (data.status === 'error') {
                         this.showError(data.message);
+                    } else if (data.status === 'none' && this.instanceWentDown) {
+                        // Older target releases cannot report the new upgrade status.
+                        // A failed health probe followed by a healthy response proves the restart completed.
+                        this.showSuccess();
                     } else {
                         this.currentStatus = data.message ?? this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
                     }
