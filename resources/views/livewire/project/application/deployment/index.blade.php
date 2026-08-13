@@ -162,7 +162,7 @@
             </x-table.toolbar>
 
             @if ($deployments->isNotEmpty())
-                <div class="data-table relative w-full transition-opacity"
+                <div class="data-table relative min-w-0 w-full transition-opacity"
                     wire:loading.class="opacity-50 pointer-events-none"
                     wire:target="goToPage,previousPage,nextPage,toggleDeploymentFilter,clearFilter,setPullRequestFilter">
                     <x-table.loading id="deployment-table-filter-loading"
@@ -222,7 +222,7 @@
                                 'data-table-row-active' => $selectedDeploymentUuid === data_get($deployment, 'deployment_uuid'),
                             ])>
                             <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
-                            <span>{{ $sourceLabel }}</span>
+                            <span class="truncate">{{ $sourceLabel }}</span>
                             <span class="min-w-0">
                                 @if (data_get($deployment, 'commit'))
                                     <span class="flex min-w-0 items-center gap-2">
@@ -238,7 +238,7 @@
                                     <span class="text-neutral-400 dark:text-fg-faint">-</span>
                                 @endif
                             </span>
-                            <span title="{{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}">
+                            <span class="truncate" title="{{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}">
                                 {{ \Carbon\Carbon::parse(data_get($deployment, 'created_at'))->diffForHumans() }}
                             </span>
                             <span class="tabular-nums">{{ $duration }}</span>

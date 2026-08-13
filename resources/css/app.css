@@ -1337,6 +1337,7 @@ html[data-theme="custom"] textarea:disabled {
     margin: 0;
     display: flex;
     width: 100%;
+    min-width: 0;
     flex-direction: column;
     border-radius: 8px;
     border: none;
@@ -1417,9 +1418,12 @@ html[data-theme="custom"] textarea:disabled {
     color: var(--coollabs-subtle);
 }
 
-/* Layer card body: nested rounded panel with base bg + fill ring */
+/* Layer card body: nested rounded panel with base bg + fill ring.
+   min-width: 0 keeps this flex child from growing with wide tables, which
+   would paint over the card's right hairline ring. */
 .application-settings-section-body {
     position: relative;
+    min-width: 0;
     border-radius: 8px;
     background: var(--coollabs-base);
     box-shadow: 0 0 0 1px var(--coollabs-fill);
@@ -2563,25 +2567,25 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
+/* overflow-x: auto: no bar when the columns fit, scroll when they do not.
+   Do not force a large min-width (that shows a bar too early) and do not
+   switch to overflow-x: visible at large breakpoints (that clips overflow). */
 .deployment-table-scroll {
+    min-width: 0;
+    width: 100%;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
 }
 
 .deployment-table-grid {
-    min-width: 59rem;
+    width: 100%;
+    min-width: min-content;
     grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr);
 }
 
-@media (min-width: 1024px) {
-    .deployment-table-scroll {
-        overflow-x: visible;
-    }
-
-    .deployment-table-grid {
-        min-width: 0;
-    }
+.deployment-table-grid > * {
+    min-width: 0;
 }
 
 .dashboard-deployment-table-grid {

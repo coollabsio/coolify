@@ -184,11 +184,14 @@ it('keeps deployment history fields and the log status badge accessible on mobil
 
     expect($deploymentIndexView)
         ->toContain('deployment-table-scroll')
+        ->toContain('data-table relative min-w-0 w-full')
         ->and($appCss)
-        ->toContain(".deployment-table-scroll {\n    overflow-x: auto;")
-        ->toContain(".deployment-table-grid {\n    min-width: 59rem;")
-        ->toContain("@media (min-width: 1024px) {\n    .deployment-table-scroll {\n        overflow-x: visible;")
-        ->toContain(".deployment-table-grid {\n        min-width: 0;")
+        ->toContain(".deployment-table-scroll {\n    min-width: 0;\n    width: 100%;\n    overflow-x: auto;")
+        ->toContain(".deployment-table-grid {\n    width: 100%;\n    min-width: min-content;")
+        ->toContain(".deployment-table-grid > * {\n    min-width: 0;")
+        ->toContain(".application-settings-section-body {\n    position: relative;\n    min-width: 0;")
+        ->not->toContain('.deployment-table-grid {\n    min-width: 59rem;')
+        ->not->toContain('.deployment-table-scroll {\n        overflow-x: visible;')
         ->not->toContain('.deployment-table-grid > :nth-child')
         ->toContain(".logs-viewer-primary .logs-viewer-actions {\n    width: auto;\n    flex: 1 1 auto;");
 });
