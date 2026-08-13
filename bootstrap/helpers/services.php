@@ -149,7 +149,6 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         $fileVolumes = $oneService->fileStorages()->get();
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
-            "cd $workdir",
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
@@ -325,13 +324,22 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         }
 
         if ($resource->fqdn) {
-            $firstFqdn = firstDomainFromList($resource->fqdn);
-            $url = Url::fromString($firstFqdn);
+            $resourceFqdns = str($resource->fqdn)->explode(',');
+            $resourceFqdns = $resourceFqdns->first();
+            $url = Url::fromString($resourceFqdns);
             $port = $url->getPort();
+            $path = $url->getPath();
 
-            // Same helpers as application/service parsers (COOLIFY_URL / COOLIFY_FQDN).
-            $urlValue = getFqdnWithoutPort($firstFqdn);
-            $fqdnValue = getHostWithoutPort($firstFqdn);
+            // Prepare URL value (with scheme and host)
+            $urlValue = $url->getScheme().'://'.$url->getHost();
+            $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
+
+            // Prepare FQDN value (host only, no scheme)
+            $fqdnHost = $url->getHost();
+            $fqdnValue = str($fqdnHost)->after('://');
+            if ($path !== '/') {
+                $fqdnValue = $fqdnValue.$path;
+            }
 
             // For each service name found in template, create BOTH SERVICE_URL and SERVICE_FQDN pairs
             foreach ($serviceNamesToProcess as $serviceInfo) {

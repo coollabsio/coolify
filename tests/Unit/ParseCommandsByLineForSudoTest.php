@@ -126,6 +126,47 @@ test('skips sudo for cd commands', function () {
     expect($result[0])->toBe('cd /var/www');
 });
 
+test('prepares Coolify paths before cd so non-root users can enter them', function () {
+    $commands = collect([
+        'cd /data/coolify/services/cju6fccpokhw7zkjtyxrjowk',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])
+        ->toContain('sudo mkdir -p '.escapeshellarg('/data/coolify/services/cju6fccpokhw7zkjtyxrjowk'))
+        ->toContain('sudo chown ubuntu:ubuntu '.escapeshellarg('/data/coolify/services/cju6fccpokhw7zkjtyxrjowk'))
+        ->toContain('sudo chmod a+x '.escapeshellarg('/data/coolify'))
+        ->toContain('sudo chmod a+x '.escapeshellarg('/data/coolify/services'))
+        ->toContain('cd /data/coolify/services/cju6fccpokhw7zkjtyxrjowk')
+        ->not->toContain('sudo cd ');
+});
+
+test('cd into Coolify path with follow-up command does not become sudo cd', function () {
+    $commands = collect([
+        'cd /data/coolify/source && docker compose up -d',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])
+        ->toContain('cd /data/coolify/source && sudo docker compose up -d')
+        ->not->toContain('sudo cd ');
+});
+
+test('mkdir with redirects still chowns only the Coolify directory', function () {
+    $commands = collect([
+        'mkdir -p /data/coolify/services/uuid > /dev/null 2>&1 || true',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])
+        ->toContain('sudo chown ubuntu:ubuntu '.escapeshellarg('/data/coolify/services/uuid'))
+        ->toContain('sudo chmod -R o-rwx '.escapeshellarg('/data/coolify/services/uuid'))
+        ->not->toContain('chown -R ubuntu:ubuntu /data/coolify/services/uuid >');
+});
+
 test('skips sudo for echo commands', function () {
     $commands = collect([
         'echo "test"',
@@ -183,9 +224,11 @@ test('adds ownership changes for Coolify data paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    // Note: The && operator adds another sudo, creating double sudo for chown/chmod
-    // This is existing behavior that may need refactoring but isn't part of this bug fix
-    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo sudo chown -R ubuntu:ubuntu /data/coolify/logs && sudo sudo chmod -R o-rwx /data/coolify/logs');
+    expect($result[0])
+        ->toContain('sudo mkdir -p '.escapeshellarg('/data/coolify/logs'))
+        ->toContain('sudo chown ubuntu:ubuntu '.escapeshellarg('/data/coolify/logs'))
+        ->toContain('sudo chmod a+x '.escapeshellarg('/data/coolify'))
+        ->toContain('sudo chmod -R o-rwx '.escapeshellarg('/data/coolify/logs'));
 });
 
 test('adds ownership changes for Coolify tmp paths', function () {
@@ -195,9 +238,10 @@ test('adds ownership changes for Coolify tmp paths', function () {
 
     $result = parseCommandsByLineForSudo($commands, $this->server);
 
-    // Note: The && operator adds another sudo, creating double sudo for chown/chmod
-    // This is existing behavior that may need refactoring but isn't part of this bug fix
-    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo sudo chown -R ubuntu:ubuntu /tmp/coolify/cache && sudo sudo chmod -R o-rwx /tmp/coolify/cache');
+    expect($result[0])
+        ->toContain('sudo mkdir -p '.escapeshellarg('/tmp/coolify/cache'))
+        ->toContain('sudo chown ubuntu:ubuntu '.escapeshellarg('/tmp/coolify/cache'))
+        ->toContain('sudo chmod -R o-rwx '.escapeshellarg('/tmp/coolify/cache'));
 });
 
 test('does not add ownership changes for system paths', function () {

@@ -6,7 +6,7 @@ use Illuminate\Support\Str;
 
 function shouldChangeOwnership(string $path): bool
 {
-    $path = trim($path);
+    $path = trim($path, " \t\n\r\0\x0B'\"");
 
     $systemPaths = ['/var', '/etc', '/usr', '/opt', '/sys', '/proc', '/dev', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/root', '/home', '/media', '/mnt', '/srv', '/run'];
 
@@ -20,6 +20,66 @@ function shouldChangeOwnership(string $path): bool
 
     return $isCoolifyPath;
 }
+
+/**
+ * First path argument of `mkdir -p`, ignoring redirects and trailing operators.
+ */
+function extractMkdirPath(string $line): ?string
+{
+    if (! preg_match('/mkdir -p\s+("[^"]+"|\'[^\']+\'|\S+)/', $line, $matches)) {
+        return null;
+    }
+
+    return trim($matches[1], " \t\n\r\0\x0B'\"");
+}
+
+/**
+ * Make a Coolify directory traversable/writable for a non-root SSH user.
+ * Uses `;` not `&&` so later sudo rewriting cannot inject `sudo cd`.
+ */
+function prepareCoolifyPathForNonRoot(string $path, Server $server): string
+{
+    $path = trim($path, " \t\n\r\0\x0B'\"");
+    $escapedPath = escapeshellarg($path);
+    $user = $server->user;
+
+    $toChmod = [];
+    $current = rtrim($path, '/') ?: $path;
+    while ($current !== '/' && $current !== '.' && $current !== '' && shouldChangeOwnership($current)) {
+        array_unshift($toChmod, $current);
+        $current = dirname($current);
+    }
+
+    $parts = [
+        'sudo mkdir -p '.$escapedPath,
+        'sudo chown '.$user.':'.$user.' '.$escapedPath,
+    ];
+    foreach ($toChmod as $dir) {
+        $parts[] = 'sudo chmod a+x '.escapeshellarg($dir);
+    }
+
+    return implode('; ', $parts);
+}
+
+/**
+ * `cd` is a shell builtin — `sudo cd` cannot work. For Coolify paths, chown/chmod first, then cd as the SSH user.
+ */
+function rewriteCdLineForNonRoot(string $line, Server $server): string
+{
+    $trimmed = trim($line);
+    if (! preg_match('/^cd\s+("[^"]+"|\'[^\']+\'|\S+)(.*)$/', $trimmed, $matches)) {
+        return $line;
+    }
+
+    $rawPath = $matches[1];
+    $path = trim($rawPath, " \t\n\r\0\x0B'\"");
+    if (! shouldChangeOwnership($path)) {
+        return $line;
+    }
+
+    return prepareCoolifyPathForNonRoot($path, $server).'; cd '.$rawPath.$matches[2];
+}
+
 function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 {
     $commands = $commands->map(function ($line) {
@@ -76,10 +136,17 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
     });
 
     $commands = $commands->map(function ($line) use ($server) {
+        $trimmed = trim($line);
+        if (preg_match('/^cd(\s|;|$)/', $trimmed)) {
+            return rewriteCdLineForNonRoot($line, $server);
+        }
+
         if (Str::startsWith($line, 'sudo mkdir -p')) {
-            $path = trim(Str::after($line, 'sudo mkdir -p'));
-            if (shouldChangeOwnership($path)) {
-                return "$line && sudo chown -R $server->user:$server->user $path && sudo chmod -R o-rwx $path";
+            $path = extractMkdirPath($line);
+            if ($path && shouldChangeOwnership($path)) {
+                // Ensure parents like /data/coolify are traversable (often root 700 after install),
+                // then own the leaf directory for SCP / relative file writes.
+                return prepareCoolifyPathForNonRoot($path, $server).' && sudo chmod -R o-rwx '.escapeshellarg($path);
             }
 
             return $line;
@@ -129,13 +196,15 @@ function parseCommandsByLineForSudo(Collection $commands, Server $server): array
 }
 function parseLineForSudo(string $command, Server $server): string
 {
-    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
+    if (str($command)->startSwith('cd')) {
+        $command = rewriteCdLineForNonRoot($command, $server);
+    } elseif (! str($command)->startSwith('command')) {
         $command = "sudo $command";
     }
     if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $path = trim(Str::after($command, 'sudo mkdir -p'));
-        if (shouldChangeOwnership($path)) {
-            $command = "$command && sudo chown -R $server->user:$server->user $path && sudo chmod -R o-rwx $path";
+        $path = extractMkdirPath($command);
+        if ($path && shouldChangeOwnership($path)) {
+            $command = prepareCoolifyPathForNonRoot($path, $server).' && sudo chmod -R o-rwx '.escapeshellarg($path);
         }
     }
     if (str($command)->contains('$(') || str($command)->contains('`')) {

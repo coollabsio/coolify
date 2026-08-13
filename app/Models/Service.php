@@ -94,7 +94,6 @@ class Service extends BaseModel
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
-        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
 
         $applicationImages = $this->applications()->get()->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
@@ -105,7 +104,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
+        $newConfigHash = $images.$domains.$images.$storages;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1591,9 +1590,10 @@ class Service extends BaseModel
 
         $workdir = $this->workdir();
 
+        // Never `cd` into /data/coolify/... — non-root SSH cannot enter root-owned parents.
+        // Use absolute paths only (same pattern as StartService docker compose).
         instant_remote_process([
             "mkdir -p $workdir",
-            "cd $workdir",
         ], $this->server);
 
         $filename = new_public_id().'-docker-compose.yml';
@@ -1602,8 +1602,7 @@ class Service extends BaseModel
         instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
         Storage::disk('local')->delete("tmp/{$filename}");
 
-        $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        $commands[] = "rm -f {$workdir}/.env || true";
 
         $envs = collect([]);
 
@@ -1634,10 +1633,10 @@ class Service extends BaseModel
             $envs->push("{$env->key}={$env->real_value}");
         }
         if ($envs->count() === 0) {
-            $commands[] = 'touch .env';
+            $commands[] = "touch {$workdir}/.env";
         } else {
             $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
+            $commands[] = "echo '$envs_base64' | base64 -d | tee {$workdir}/.env > /dev/null";
         }
 
         instant_remote_process($commands, $this->server);
@@ -1662,16 +1661,16 @@ class Service extends BaseModel
     protected function isDeployable(): Attribute
     {
         return Attribute::make(
-            get: fn (): bool => $this->missingRequiredEnvironmentVariables()->isEmpty()
-        );
-    }
+            get: function () {
+                $envs = $this->environment_variables()->where('is_required', true)->get();
+                foreach ($envs as $env) {
+                    if ($env->is_really_required) {
+                        return false;
+                    }
+                }
 
-    public function missingRequiredEnvironmentVariables(): Collection
-    {
-        return $this->environment_variables()
-            ->where('is_required', true)
-            ->get()
-            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)
-            ->values();
+                return true;
+            }
+        );
     }
 }
