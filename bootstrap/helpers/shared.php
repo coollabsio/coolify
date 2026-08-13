@@ -4725,6 +4725,23 @@ function downsampleLTTB(array $data, int $threshold): array
 }
 
 /**
+ * Convert Sentinel container memory samples from bytes to megabytes.
+ *
+ * Sentinel stores container `used` memory in bytes. Application and database
+ * metric charts label the series as megabytes, so the values must be converted
+ * before they are sent to the frontend.
+ *
+ * @param  array<int, array{0: int|float, 1: int|float}>  $metrics
+ * @return array<int, array{0: int, 1: float}>
+ */
+function convertContainerMemoryBytesToMegabytes(array $metrics): array
+{
+    return array_map(static function (array $point): array {
+        return [(int) $point[0], round(((float) $point[1]) / 1024 / 1024, 2)];
+    }, $metrics);
+}
+
+/**
  * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}.
  *
  * This is the canonical implementation used by both EnvironmentVariable::realValue and the compose parsers

@@ -149,8 +149,8 @@ class ScheduledJobManager implements ShouldQueue
 
     private function processScheduledBackupsAndTasks(): void
     {
-        $lastBackupId = 0;
-        $lastTaskId = 0;
+        $lastBackupId = null;
+        $lastTaskId = null;
 
         do {
             $backups = $this->scheduledBackupQuery($lastBackupId)->get();
@@ -190,16 +190,16 @@ class ScheduledJobManager implements ShouldQueue
         }
     }
 
-    private function scheduledBackupQuery(int $lastBackupId): Builder
+    private function scheduledBackupQuery(?int $lastBackupId): Builder
     {
         return ScheduledDatabaseBackup::with(['database', 'team.subscription'])
             ->where('enabled', true)
-            ->where('id', '>', $lastBackupId)
+            ->when($lastBackupId !== null, fn (Builder $query) => $query->where('id', '>', $lastBackupId))
             ->orderBy('id')
             ->limit(self::CHUNK_SIZE);
     }
 
-    private function scheduledTaskQuery(int $lastTaskId): Builder
+    private function scheduledTaskQuery(?int $lastTaskId): Builder
     {
         return ScheduledTask::with([
             'service.destination.server.settings',
@@ -208,7 +208,7 @@ class ScheduledJobManager implements ShouldQueue
             'application.destination.server.team.subscription',
         ])
             ->where('enabled', true)
-            ->where('id', '>', $lastTaskId)
+            ->when($lastTaskId !== null, fn (Builder $query) => $query->where('id', '>', $lastTaskId))
             ->orderBy('id')
             ->limit(self::CHUNK_SIZE);
     }
