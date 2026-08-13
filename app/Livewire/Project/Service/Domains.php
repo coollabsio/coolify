@@ -222,9 +222,6 @@ class Domains extends Component
                 $configured[] = $row;
             }
 
-            foreach ($this->buildSuggestedWwwRows($configured, $app, $stored) as $suggested) {
-                $rows[] = $suggested;
-            }
         }
 
         return collect($rows)
