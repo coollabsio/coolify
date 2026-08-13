@@ -66,7 +66,12 @@
                 @foreach ($fields as $serviceName => $field)
                     <div>
                         <div class="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium">
-                            <span>{{ data_get($field, 'serviceName') }} · {{ data_get($field, 'name') }}</span>
+                            <span>
+                                @if (filled(data_get($field, 'serviceName')))
+                                    {{ data_get($field, 'serviceName') }} ·
+                                @endif
+                                {{ data_get($field, 'name') }}
+                            </span>
                             @if (data_get($field, 'customHelper'))
                                 <x-helper helper="{{ data_get($field, 'customHelper') }}" />
                             @else
