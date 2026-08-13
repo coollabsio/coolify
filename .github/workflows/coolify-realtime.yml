@@ -2,14 +2,10 @@ name: Coolify Realtime
 
 on:
   push:
-    branches: [ "v4.x" ]
+    branches: [ "v4.x", "main" ]
     paths:
       - .github/workflows/coolify-realtime.yml
-      - docker/coolify-realtime/Dockerfile
-      - docker/coolify-realtime/terminal-server.js
-      - docker/coolify-realtime/package.json
-      - docker/coolify-realtime/package-lock.json
-      - docker/coolify-realtime/soketi-entrypoint.sh
+      - docker/coolify-realtime/**
 
 permissions:
   contents: read

@@ -4,6 +4,8 @@ namespace App\Livewire\Project\Resource;
 
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\V5\Application as V5Application;
+use App\Support\V5\V5Feature;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -57,20 +59,26 @@ class Index extends Component
 
         // Load projects and environments for breadcrumb navigation
         $this->allProjects = Project::ownedByCurrentTeamCached();
+        $environmentRelations = [
+            'applications:id,uuid,name,environment_id',
+            'services:id,uuid,name,environment_id',
+            'postgresqls:id,uuid,name,environment_id',
+            'redis:id,uuid,name,environment_id',
+            'mongodbs:id,uuid,name,environment_id',
+            'mysqls:id,uuid,name,environment_id',
+            'mariadbs:id,uuid,name,environment_id',
+            'keydbs:id,uuid,name,environment_id',
+            'dragonflies:id,uuid,name,environment_id',
+            'clickhouses:id,uuid,name,environment_id',
+        ];
+
+        if (V5Feature::enabled()) {
+            $environmentRelations[] = 'v5Applications:id,uuid,name,environment_id,status';
+        }
+
         $this->allEnvironments = $project->environments()
             ->select('id', 'uuid', 'name', 'project_id')
-            ->with([
-                'applications:id,uuid,name,environment_id',
-                'services:id,uuid,name,environment_id',
-                'postgresqls:id,uuid,name,environment_id',
-                'redis:id,uuid,name,environment_id',
-                'mongodbs:id,uuid,name,environment_id',
-                'mysqls:id,uuid,name,environment_id',
-                'mariadbs:id,uuid,name,environment_id',
-                'keydbs:id,uuid,name,environment_id',
-                'dragonflies:id,uuid,name,environment_id',
-                'clickhouses:id,uuid,name,environment_id',
-            ])
+            ->with($environmentRelations)
             ->get();
 
         $this->environment = $environment->loadCount([
@@ -103,6 +111,25 @@ class Index extends Component
 
             return $application;
         });
+        if (V5Feature::enabled()) {
+            $this->applications = $this->applications->merge(V5Application::query()
+                ->where('team_id', currentTeam()->id)
+                ->where('project_id', $this->project->id)
+                ->where('environment_id', $this->environment->id)
+                ->with('server:id,name')
+                ->get()
+                ->map(function (V5Application $application) use ($projectUuid, $environmentUuid) {
+                    $application->hrefLink = route('v5.dashboard', [
+                        'project' => $projectUuid,
+                        'environment' => $environmentUuid,
+                        'application' => $application->uuid,
+                    ]);
+
+                    return $application;
+                }));
+        }
+
+        $this->applications = $this->applications->sortBy('name');
 
         // Load all database resources in a single query per type
         $databaseTypes = [
@@ -161,35 +188,40 @@ class Index extends Component
             'dragonflies' => $this->dragonflies,
             'clickhouses' => $this->clickhouses,
             'services' => $this->services,
-            'applicationsJs' => $this->toSearchableArray($this->applications),
-            'postgresqlsJs' => $this->toSearchableArray($this->postgresqls),
-            'redisJs' => $this->toSearchableArray($this->redis),
-            'mongodbsJs' => $this->toSearchableArray($this->mongodbs),
-            'mysqlsJs' => $this->toSearchableArray($this->mysqls),
-            'mariadbsJs' => $this->toSearchableArray($this->mariadbs),
-            'keydbsJs' => $this->toSearchableArray($this->keydbs),
-            'dragonfliesJs' => $this->toSearchableArray($this->dragonflies),
-            'clickhousesJs' => $this->toSearchableArray($this->clickhouses),
-            'servicesJs' => $this->toSearchableArray($this->services),
+            'applicationsJs' => $this->toSearchableArray($this->applications, 'application', 'Application'),
+            'postgresqlsJs' => $this->toSearchableArray($this->postgresqls, 'database', 'Database'),
+            'redisJs' => $this->toSearchableArray($this->redis, 'database', 'Database'),
+            'mongodbsJs' => $this->toSearchableArray($this->mongodbs, 'database', 'Database'),
+            'mysqlsJs' => $this->toSearchableArray($this->mysqls, 'database', 'Database'),
+            'mariadbsJs' => $this->toSearchableArray($this->mariadbs, 'database', 'Database'),
+            'keydbsJs' => $this->toSearchableArray($this->keydbs, 'database', 'Database'),
+            'dragonfliesJs' => $this->toSearchableArray($this->dragonflies, 'database', 'Database'),
+            'clickhousesJs' => $this->toSearchableArray($this->clickhouses, 'database', 'Database'),
+            'servicesJs' => $this->toSearchableArray($this->services, 'service', 'Service'),
         ]);
     }
 
-    private function toSearchableArray(Collection $items): array
+    private function toSearchableArray(Collection $items, string $type, string $typeLabel): array
     {
         return $items->map(fn ($item) => [
             'uuid' => $item->uuid,
             'name' => $item->name,
+            'type' => $type,
+            'typeLabel' => $item instanceof V5Application ? 'Application (V5)' : $typeLabel,
             'fqdn' => $item->fqdn ?? null,
-            'description' => $item->description ?? null,
+            'description' => $item instanceof V5Application ? 'Managed by Coolify V5' : ($item->description ?? null),
             'status' => $item->status ?? '',
+            'version' => $item instanceof V5Application ? 'v5' : 'v4',
             'server_status' => $item->server_status ?? null,
             'hrefLink' => $item->hrefLink ?? '',
             'destination' => [
                 'server' => [
-                    'name' => $item->destination?->server?->name ?? 'Unknown',
+                    'name' => $item instanceof V5Application
+                        ? ($item->server?->name ?? 'Unknown')
+                        : ($item->destination?->server?->name ?? 'Unknown'),
                 ],
             ],
-            'tags' => $item->tags->map(fn ($tag) => [
+            'tags' => ($item instanceof V5Application ? collect() : $item->tags)->map(fn ($tag) => [
                 'id' => $tag->id,
                 'name' => $tag->name,
             ])->values()->toArray(),

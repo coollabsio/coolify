@@ -115,7 +115,7 @@ class DockerImage extends Component
         $parser->parse($dockerImage);
 
         $destination_uuid = $this->query['destination'] ?? null;
-        $destination = find_destination_for_current_team($destination_uuid);
+        $destination = find_resource_destination_for_current_team($destination_uuid);
         if (! $destination) {
             throw new \Exception('Destination not found.');
         }
@@ -133,7 +133,7 @@ class DockerImage extends Component
         // Determine the image tag based on whether it's a hash or regular tag
         $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
 
-        $application = Application::create([
+        $application = new Application([
             'name' => 'docker-image-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
@@ -147,6 +147,7 @@ class DockerImage extends Component
             'destination_type' => $destination_class,
             'health_check_enabled' => false,
         ]);
+        $application->save();
 
         $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
         $application->update([

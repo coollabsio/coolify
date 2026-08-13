@@ -140,13 +140,19 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    |------|-----|------|
    | Laravel Horizon (scheduler) | `http://localhost:8000/horizon` | Only accessible when logged in as root user |
    | Mailpit (email catcher) | `http://localhost:8025` | |
-   | Telescope (debugging tool) | `http://localhost:8000/telescope` | Disabled by default |
 
-> [!NOTE]
-> To enable Telescope, add the following to your `.env` file:
-> ```env
-> TELESCOPE_ENABLED=true
-> ```
+   **Server-Timing + HUD** (headers + bottom-right pill on full HTML pages):
+
+   | Setting | Effect |
+   |---------|--------|
+   | `APP_ENV=local` and `SERVER_TIMING_ENABLED` unset | **On** (default in dev) |
+   | `SERVER_TIMING_ENABLED=true` | **On** in any env, including production |
+   | `SERVER_TIMING_ENABLED=false` | **Off** even when `APP_ENV=local` |
+
+   Metrics: `app` / `db` / `php` / `dbslow` (ms), `queries`, `html` (bytes), `mem` (MB).
+   HUD keeps a request log (click row → AI-ready dump). Production: enable only
+   temporarily (`SERVER_TIMING_ENABLED=true`); if you use `config:cache`, rebuild
+   or clear config after changing the env var.
 
 
 ## Development Notes
@@ -173,9 +179,9 @@ If you encounter issues or break your database or something else, follow these s
 
 1. Stop all running containers `ctrl + c`.
 
-2. Remove all Coolify containers:
+2. Force-remove all Coolify dev containers:
    ```bash
-   docker rm coolify coolify-db coolify-redis coolify-realtime coolify-testing-host coolify-minio coolify-vite-1 coolify-mail
+   npm run clean
    ```
 
 3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on your machine, in that case remove the prefix from the command):

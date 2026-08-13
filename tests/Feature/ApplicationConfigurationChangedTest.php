@@ -58,6 +58,42 @@ it('stores a diff between successful deployments', function () {
         ->and(data_get($secondDeployment->configuration_diff, 'changes.0.label'))->toBe('Build command');
 });
 
+it('reports noindex domain changes as requiring a redeploy', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://app.example.com,https://staging.example.com',
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $application->setNoindexDomains(['https://staging.example.com']);
+    $application->save();
+
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+    $change = collect($diff->changes())->firstWhere('key', 'domains.noindex_domains');
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($change)->not->toBeNull()
+        ->and($change['label'])->toBe('Search engine indexing')
+        ->and($change['impact'])->toBe('redeploy');
+});
+
+it('does not flag applications whose older snapshot omitted noindex domains', function () {
+    $application = configurationChangedTestApplication([
+        'fqdn' => 'https://app.example.com',
+    ]);
+    $deployment = configurationChangedDeployment($application);
+    $application->markDeploymentConfigurationApplied($deployment);
+
+    $snapshot = $deployment->refresh()->configuration_snapshot;
+    $snapshot['sections']['domains']['items'] = collect($snapshot['sections']['domains']['items'])
+        ->reject(fn (array $item): bool => $item['key'] === 'noindex_domains')
+        ->values()
+        ->all();
+    $deployment->update(['configuration_snapshot' => $snapshot]);
+
+    expect($application->refresh()->pendingDeploymentConfigurationDiff()->isChanged())->toBeFalse();
+});
+
 it('checks legacy preview deployment configuration hash using preview environment variable query', function () {
     $application = configurationChangedTestApplication();
 

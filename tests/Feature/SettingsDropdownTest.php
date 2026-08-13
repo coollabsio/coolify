@@ -36,9 +36,16 @@ it('renders the changelog modal above the desktop sidebar toggle', function () {
         }
     });
 
-    Livewire::test(SettingsDropdown::class, ['trigger' => 'changelog-sidebar'])
+    $component = Livewire::test(SettingsDropdown::class, ['trigger' => 'changelog-sidebar'])
         ->call('openWhatsNewModal')
-        ->assertSee('Changelog')
-        ->assertSee('z-[60]', false)
-        ->assertSee('closeWhatsNewModal', false);
+        ->assertSee("What's new", false)
+        ->assertSee('Test Release')
+        ->assertSee('Mark read')
+        ->assertSeeHtml('z-[99]')
+        ->assertSeeHtml('closeWhatsNewModal');
+
+    // Single-release layout: no nested card chrome / unread left accent bar
+    expect($component->html())
+        ->not->toContain('dark:bg-raised')
+        ->not->toContain('w-0.5 bg-accent');
 });

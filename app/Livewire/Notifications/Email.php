@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -13,7 +14,7 @@ use Livewire\Component;
 
 class Email extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 

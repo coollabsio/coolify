@@ -6,6 +6,8 @@ use Livewire\Component;
 
 class ShowHardcoded extends Component
 {
+    public bool $showEnvironmentType = true;
+
     public array $env;
 
     public string $key;
@@ -15,6 +17,8 @@ class ShowHardcoded extends Component
     public ?string $comment = null;
 
     public ?string $serviceName = null;
+
+    public bool $isPreview = false;
 
     public function mount()
     {

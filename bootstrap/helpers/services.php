@@ -323,22 +323,13 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         }
 
         if ($resource->fqdn) {
-            $resourceFqdns = str($resource->fqdn)->explode(',');
-            $resourceFqdns = $resourceFqdns->first();
-            $url = Url::fromString($resourceFqdns);
+            $firstFqdn = firstDomainFromList($resource->fqdn);
+            $url = Url::fromString($firstFqdn);
             $port = $url->getPort();
-            $path = $url->getPath();
 
-            // Prepare URL value (with scheme and host)
-            $urlValue = $url->getScheme().'://'.$url->getHost();
-            $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
-
-            // Prepare FQDN value (host only, no scheme)
-            $fqdnHost = $url->getHost();
-            $fqdnValue = str($fqdnHost)->after('://');
-            if ($path !== '/') {
-                $fqdnValue = $fqdnValue.$path;
-            }
+            // Same helpers as application/service parsers (COOLIFY_URL / COOLIFY_FQDN).
+            $urlValue = getFqdnWithoutPort($firstFqdn);
+            $fqdnValue = getHostWithoutPort($firstFqdn);
 
             // For each service name found in template, create BOTH SERVICE_URL and SERVICE_FQDN pairs
             foreach ($serviceNamesToProcess as $serviceInfo) {

@@ -8,6 +8,7 @@ use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -78,6 +79,8 @@ class Change extends Component
     public string $manifestState = '';
 
     public string $activeTab = 'general';
+
+    public bool $isConnected = false;
 
     private bool $shouldDeriveApiUrlAfterHtmlUrlUpdate = false;
 
@@ -230,11 +233,61 @@ class Change extends Component
             GithubAppPermissionJob::dispatchSync($this->github_app);
             $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->syncData(false);
+            $this->isConnected = $this->github_app->isConnected();
             $this->name = str($this->github_app->name)->kebab();
 
             $this->dispatch('success', 'Github App permissions updated.');
         } catch (\Throwable $e) {
             // Provide better error message for unsupported key formats
+            $errorMessage = $e->getMessage();
+            if (str_contains($errorMessage, 'DECODER routines::unsupported') ||
+                str_contains($errorMessage, 'parse your key')) {
+                $this->dispatch('error', 'The selected private key format is not supported for GitHub Apps. <br><br>Please use an RSA private key in PEM format (BEGIN RSA PRIVATE KEY). <br><br>OpenSSH format keys (BEGIN OPENSSH PRIVATE KEY) are not supported.');
+
+                return;
+            }
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function testConnection()
+    {
+        try {
+            $this->authorize('view', $this->github_app);
+
+            if (! $this->github_app->isConnected()) {
+                $this->dispatch('error', 'GitHub App is not fully set up. Please complete installation first.');
+
+                return;
+            }
+
+            if (! $this->github_app->private_key_id || ! $this->github_app->privateKey) {
+                $this->dispatch('error', 'Private Key not found. Please select a valid private key.');
+
+                return;
+            }
+
+            $jwt = generateGithubJwt($this->github_app);
+            $appResponse = Http::withHeaders([
+                'Authorization' => "Bearer $jwt",
+                'Accept' => 'application/vnd.github+json',
+            ])->timeout(10)->get("{$this->github_app->api_url}/app");
+
+            if (! $appResponse->successful()) {
+                $error = data_get($appResponse->json(), 'message', 'Unknown error');
+                $this->dispatch('error', "Connection failed: {$error}");
+
+                return;
+            }
+
+            // Confirm installation credentials can mint an installation access token.
+            generateGithubInstallationToken($this->github_app);
+
+            $appName = data_get($appResponse->json(), 'name')
+                ?? data_get($appResponse->json(), 'slug', 'unknown');
+            $this->dispatch('success', "Connection successful! Authenticated as GitHub App: {$appName}");
+        } catch (\Throwable $e) {
             $errorMessage = $e->getMessage();
             if (str_contains($errorMessage, 'DECODER routines::unsupported') ||
                 str_contains($errorMessage, 'parse your key')) {
@@ -260,6 +313,7 @@ class Change extends Component
 
             // Sync data from model to properties
             $this->syncData(false);
+            $this->isConnected = $this->github_app->isConnected();
 
             // Override name with kebab case for display
             $this->name = str($this->github_app->name)->kebab();
@@ -299,6 +353,8 @@ class Change extends Component
                 $this->activeTab = 'permissions';
             } elseif ($routeName === 'source.github.resources') {
                 $this->activeTab = 'resources';
+            } elseif ($routeName === 'source.github.danger') {
+                $this->activeTab = 'danger';
             } else {
                 $this->activeTab = 'general';
             }
@@ -373,6 +429,7 @@ class Change extends Component
 
             $this->syncData(true);
             $this->github_app->save();
+            $this->isConnected = $this->github_app->isConnected();
             $this->dispatch('success', 'Github App updated.');
         } catch (ValidationException $e) {
             throw $e;
@@ -404,6 +461,7 @@ class Change extends Component
 
             $this->syncData(true);
             $this->github_app->save();
+            $this->isConnected = $this->github_app->isConnected();
             $this->dispatch('success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -422,6 +480,9 @@ class Change extends Component
                 return;
             }
             $this->github_app->delete();
+            // Clear so post-delete Livewire re-render / modal $refresh does not re-run
+            // @can and canGate checks against a deleted model (null team_id TypeError).
+            $this->github_app = null;
 
             return redirect()->route('source.all');
         } catch (\Throwable $e) {

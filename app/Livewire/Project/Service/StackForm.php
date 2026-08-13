@@ -140,6 +140,7 @@ class StackForm extends Component
     {
         $this->dockerComposeRaw = $raw;
         $this->submit(notify: true);
+        $this->dispatch('compose-save-finished');
     }
 
     public function instantSave()

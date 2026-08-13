@@ -6,6 +6,8 @@ use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
@@ -57,6 +59,12 @@ class LocalFileVolume extends BaseModel
             $fileVolume->load(['service']);
             dispatch(new ServerStorageSaveJob($fileVolume));
         });
+
+        static::deleting(function (LocalFileVolume $fileVolume): void {
+            if ($fileVolume->scheduledBackups()->exists()) {
+                throw new \RuntimeException('Delete this directory backup schedule and its archives before deleting the directory.');
+            }
+        });
     }
 
     protected function isBinary(): Attribute
@@ -73,9 +81,26 @@ class LocalFileVolume extends BaseModel
         );
     }
 
-    public function service()
+    public function resource(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function service(): MorphTo
     {
         return $this->morphTo('resource');
+    }
+
+    public function scheduledBackups(): MorphMany
+    {
+        return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
+    }
+
+    public function abortIfScheduledBackupsExist(): void
+    {
+        if ($this->scheduledBackups()->exists()) {
+            abort(422, 'Delete this directory backup schedule and its archives before deleting the directory.');
+        }
     }
 
     public function loadStorageOnServer()

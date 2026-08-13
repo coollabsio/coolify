@@ -1,0 +1,48 @@
+#!/bin/sh
+
+cd /var/www/html
+
+. /etc/s6-overlay/scripts/container-role
+role="$(coolify_container_role_value)"
+
+if ! coolify_container_has_role flux; then
+    echo "   INFO  Flux is disabled for role '$role', sleeping."
+    exec sleep infinity
+fi
+
+if grep -qE '^COOLIFY_FLUX_ENABLED=false' .env 2>/dev/null || [ "${COOLIFY_FLUX_ENABLED:-}" = "false" ]; then
+    echo "   INFO  Flux is disabled, sleeping."
+    exec sleep infinity
+fi
+
+export COOLIFY_FLUX_GRPC_BIND="${COOLIFY_FLUX_GRPC_BIND:-0.0.0.0:6443}"
+export COOLIFY_FLUX_UNIX_SOCKET_PATH="${COOLIFY_FLUX_UNIX_SOCKET_PATH:-/run/coolify/flux.sock}"
+export COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH="${COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH:-/var/www/html/storage/app/flux/jwt.priv}"
+export COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH="${COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH:-/var/www/html/storage/app/flux/jwt.pub}"
+export COOLIFY_FLUX_ALLOW_PUBLIC_BIND="${COOLIFY_FLUX_ALLOW_PUBLIC_BIND:-1}"
+export COOLIFY_FLUX_REQUIRE_HOST_BINDING="${COOLIFY_FLUX_REQUIRE_HOST_BINDING:-0}"
+export COOLIFY_FLUX_LARAVEL_API_URL="${COOLIFY_FLUX_LARAVEL_API_URL:-http://127.0.0.1:8080}"
+if [ -z "${COOLIFY_FLUX_LARAVEL_API_TOKEN:-}" ] && [ -f .env ]; then
+    COOLIFY_FLUX_LARAVEL_API_TOKEN="$(grep -E '^COOLIFY_FLUX_LARAVEL_API_TOKEN=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | sed "s/^['\"]//; s/['\"]$//")"
+fi
+export COOLIFY_FLUX_LARAVEL_API_TOKEN="${COOLIFY_FLUX_LARAVEL_API_TOKEN:-}"
+if [ ! -r "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH" ]; then
+    echo "   INFO  Flux JWT public key not found at $COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH, generating keypair..."
+    mkdir -p "$(dirname "$COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH")" "$(dirname "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH")"
+    openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "$COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH.tmp"
+    chmod 0600 "$COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH.tmp"
+    mv "$COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH.tmp" "$COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH"
+    openssl pkey -in "$COOLIFY_FLUX_JWT_PRIVATE_KEY_PATH" -pubout -out "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH.tmp"
+    chmod 0644 "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH.tmp"
+    mv "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH.tmp" "$COOLIFY_FLUX_JWT_PUBLIC_KEY_PATH"
+fi
+
+if ! /usr/local/bin/flux --version >/dev/null 2>&1; then
+    echo "   ERROR  Flux binary cannot run in this container. Check that the installed coold nightly Flux artifact is compatible with Alpine."
+    exec sleep infinity
+fi
+
+mkdir -p "$(dirname "$COOLIFY_FLUX_UNIX_SOCKET_PATH")"
+
+echo "   INFO  Flux is enabled for role '$role', starting..."
+exec /usr/local/bin/flux

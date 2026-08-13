@@ -3,36 +3,45 @@
     'status' => null,
     'type' => 'neutral',
     'as' => 'span',
+    'dynamic' => false,
 ])
 
 @php
-    $typeClasses = [
-        'neutral' => 'border-neutral-200 bg-neutral-100 text-black dark:border-coolgray-300 dark:bg-coolgray-200 dark:text-white',
-        'success' => 'border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/30 dark:text-green-300',
-        'warning' => 'border-yellow-300 bg-yellow-50 text-yellow-900 dark:border-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200',
-        'error' => 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300',
+    $dotClasses = [
+        'neutral' => 'bg-neutral-400 dark:bg-neutral-500',
+        'success' => 'bg-emerald-500',
+        'warning' => 'bg-warning',
+        'error' => 'bg-red-500',
     ];
+
+    $baseClasses = 'inline-flex h-6 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white';
 @endphp
 
 @if ($as === 'button')
-    <button {{ $attributes->class([
-        'inline-flex h-5 max-w-full items-center gap-1 rounded-sm border px-1.5 text-xs font-medium leading-4 transition-colors',
-        $typeClasses[$type] ?? $typeClasses['neutral'],
-    ])->merge(['type' => 'button']) }}>
-        {{ collect([$label, $status])->filter()->join(' ') }}
+    <button {{ $attributes->class([$baseClasses, 'transition-colors'])->merge(['type' => 'button']) }}>
+        @if ($dynamic)
+            {{ $slot }}
+        @else
+            <span class="size-1.5 shrink-0 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
+        @endif
     </button>
 @elseif ($as === 'a')
-    <a {{ $attributes->class([
-        'inline-flex h-5 max-w-full items-center gap-1 rounded-sm border px-1.5 text-xs font-medium leading-4 transition-colors',
-        $typeClasses[$type] ?? $typeClasses['neutral'],
-    ]) }}>
-        {{ collect([$label, $status])->filter()->join(' ') }}
+    <a {{ $attributes->class([$baseClasses, 'transition-colors']) }}>
+        @if ($dynamic)
+            {{ $slot }}
+        @else
+            <span class="size-1.5 shrink-0 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
+        @endif
     </a>
 @else
-    <span {{ $attributes->class([
-        'inline-flex h-5 max-w-full items-center gap-1 rounded-sm border px-1.5 text-xs font-medium leading-4',
-        $typeClasses[$type] ?? $typeClasses['neutral'],
-    ]) }}>
-        {{ collect([$label, $status])->filter()->join(' ') }}
+    <span {{ $attributes->class([$baseClasses]) }}>
+        @if ($dynamic)
+            {{ $slot }}
+        @else
+            <span class="size-1.5 shrink-0 rounded-full {{ $dotClasses[$type] ?? $dotClasses['neutral'] }}"></span>
+            <span class="truncate">{{ collect([$label, $status])->filter()->join(' ') }}</span>
+        @endif
     </span>
 @endif

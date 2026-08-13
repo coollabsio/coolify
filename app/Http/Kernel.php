@@ -2,6 +2,7 @@
 
 namespace App\Http;
 
+use App\Http\Middleware\AddServerTimingHeaders;
 use App\Http\Middleware\ApiAbility;
 use App\Http\Middleware\ApiSensitiveData;
 use App\Http\Middleware\Authenticate;
@@ -19,6 +20,8 @@ use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustHosts;
 use App\Http\Middleware\TrustProxies;
+use App\Http\Middleware\V5\EnsureCurrentTeam as V5EnsureCurrentTeam;
+use App\Http\Middleware\V5\HandleInertiaRequests as V5HandleInertiaRequests;
 use App\Http\Middleware\ValidateSignature;
 use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Auth\Middleware\AuthenticateWithBasicAuth;
@@ -49,6 +52,8 @@ class Kernel extends HttpKernel
      * @var array<int, class-string|string>
      */
     protected $middleware = [
+        // Outermost so Server-Timing includes the full middleware + app cost.
+        AddServerTimingHeaders::class,
         TrustHosts::class,
         TrustProxies::class,
         HandleCors::class,
@@ -75,6 +80,23 @@ class Kernel extends HttpKernel
             CheckForcePasswordReset::class,
             DecideWhatToDoWithUser::class,
 
+        ],
+
+        'v5.web' => [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            ShareErrorsFromSession::class,
+            VerifyCsrfToken::class,
+            SubstituteBindings::class,
+            V5HandleInertiaRequests::class,
+        ],
+
+        'v5.authenticated' => [
+            'auth',
+            'verified',
+            'throttle:v5',
+            V5EnsureCurrentTeam::class,
         ],
 
         'api' => [

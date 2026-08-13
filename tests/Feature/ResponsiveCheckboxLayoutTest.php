@@ -98,12 +98,18 @@ it('renders responsive checkbox classes on the application configuration page', 
     $response->assertSee('value="navigate|configuration|', false);
     $response->assertSee('window.Livewire?.navigate ? window.Livewire.navigate(url) : window.location.href = url', false);
     $response->assertSee('application-mobile-stop-trigger');
-    $response->assertSee('application-mobile-deploy-trigger');
     $response->assertSee('application-mobile-restart-trigger');
-    $response->assertSee('application-mobile-force-deploy-trigger');
-    $response->assertSee('Confirm Application Deployment?');
+    $response->assertSee('wire:click="deploy"', false);
+    $response->assertSee('Force deploy (without cache)');
+    expect(
+        str_contains($response->getContent(), 'wire:click="force_deploy_without_cache"')
+            || str_contains($response->getContent(), 'wire:click="deploy(true)"')
+    )->toBeTrue();
+    $response->assertDontSee('Confirm Application Deployment?');
     $response->assertSee('Confirm Application Restart?');
-    $response->assertSee('Confirm Application Force Deployment?');
+    $response->assertDontSee('Confirm Application Force Deployment?');
+    $response->assertDontSee('application-mobile-deploy-trigger');
+    $response->assertDontSee('application-mobile-force-deploy-trigger');
     $response->assertSee('sub-menu-wrapper hidden md:flex', false);
     $response->assertSee('scrollbar hidden min-h-10', false);
     $response->assertSee(route('project.application.deployment.index', [

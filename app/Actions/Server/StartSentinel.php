@@ -23,13 +23,10 @@ class StartSentinel
         $refreshRate = data_get($server, 'settings.sentinel_metrics_refresh_rate_seconds');
         $pushInterval = data_get($server, 'settings.sentinel_push_interval_seconds');
         $token = $server->settings->ensureValidSentinelToken();
-        $endpoint = data_get($server, 'settings.sentinel_custom_url');
+        $endpoint = $server->settings->ensureSentinelUrl();
         $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
         $mountDir = '/data/coolify/sentinel';
         $image = coolifyRegistryUrl().'/coollabsio/sentinel:'.$version;
-        if (! $endpoint) {
-            throw new \RuntimeException('You should set FQDN in Instance Settings.');
-        }
         $environments = [
             'TOKEN' => $token,
             'DEBUG' => $debug ? 'true' : 'false',

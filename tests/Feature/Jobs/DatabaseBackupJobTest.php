@@ -7,6 +7,7 @@ use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -236,6 +237,57 @@ test('failed method updates status when backup was not successful', function () 
     $log->refresh();
     expect($log->status)->toBe('failed');
     expect($log->message)->toContain('Some real failure');
+});
+
+test('retention cleanup failure does not fail a successful database backup', function () {
+    $team = Team::factory()->create();
+    $s3 = S3Storage::create([
+        'name' => 'Test S3',
+        'region' => 'us-east-1',
+        'key' => 'test-key',
+        'secret' => 'test-secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $s3->id,
+        'database_type' => 'App\Models\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => $team->id,
+        'database_backup_retention_amount_s3' => 1,
+    ]);
+    $oldExecution = ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'old-backup',
+        'database_name' => 'database',
+        'filename' => '/backup/old.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        's3_uploaded' => true,
+        'local_storage_deleted' => true,
+        'created_at' => now()->subDay(),
+    ]);
+    ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'new-backup',
+        'database_name' => 'database',
+        'filename' => '/backup/new.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        's3_uploaded' => true,
+        'local_storage_deleted' => true,
+    ]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')->once()->with(['/backup/old.dmp'])->andReturnFalse();
+    Storage::shouldReceive('build')->once()->andReturn($disk);
+    $job = new DatabaseBackupJob($backup);
+
+    expect(fn () => (new ReflectionClass($job))->getMethod('removeExpiredBackups')->invoke($job))
+        ->not->toThrow(Throwable::class);
+
+    expect($oldExecution->fresh()->s3_storage_deleted)->toBeFalse();
 });
 
 test('s3 storage has scheduled backups relationship', function () {

@@ -43,10 +43,10 @@
                 <h3>Stack Sub-Resources</h3>
                 <div class="pt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
                     @foreach ($stack_applications as $item)
-                        <x-forms.copy-button :label="'Application — ' . $item['name']" :text="$item['uuid']" />
+                        <x-forms.copy-button :label="'Application: ' . $item['name']" :text="$item['uuid']" />
                     @endforeach
                     @foreach ($stack_databases as $item)
-                        <x-forms.copy-button :label="'Database — ' . $item['name']" :text="$item['uuid']" />
+                        <x-forms.copy-button :label="'Database: ' . $item['name']" :text="$item['uuid']" />
                     @endforeach
                 </div>
             </div>

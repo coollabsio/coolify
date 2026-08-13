@@ -68,8 +68,10 @@ class Input extends Component
         if (is_null($this->name)) {
             $this->name = $this->modelBinding !== 'null' ? $this->modelBinding : (string) $this->id;
         }
-        if ($this->type === 'password') {
-            $this->defaultClass = $this->defaultClass.'  pr-[2.8rem]';
+        // Durable class (not type-attr based): Alpine may toggle type to "text" when revealing,
+        // and settings-workspace CSS otherwise overrides utility padding-right.
+        if ($this->type === 'password' && $this->allowToPeak) {
+            $this->defaultClass = $this->defaultClass.' input-with-password-toggle';
         }
 
         // $this->label = Str::title($this->label);

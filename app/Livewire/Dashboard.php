@@ -20,7 +20,21 @@ class Dashboard extends Component
     {
         $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
         $this->servers = Server::ownedByCurrentTeamCached();
-        $this->projects = Project::ownedByCurrentTeam()->with('environments')->get();
+        $this->projects = Project::ownedByCurrentTeam()
+            ->with(['environments:id,uuid,name,project_id'])
+            ->withCount([
+                'applications',
+                'services',
+                'postgresqls',
+                'redis',
+                'keydbs',
+                'dragonflies',
+                'clickhouses',
+                'mongodbs',
+                'mysqls',
+                'mariadbs',
+            ])
+            ->get();
     }
 
     public function render()

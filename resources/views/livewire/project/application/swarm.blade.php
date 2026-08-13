@@ -1,33 +1,30 @@
-<div>
-    <form wire:submit='submit' class="flex flex-col">
-        <div class="flex items-center gap-2">
-            <h2>Swarm Configuration</h2>
+<form wire:submit="submit" class="application-settings-form flex flex-col gap-6">
+    <x-unsaved-bar action="submit" />
+
+    <x-application.settings-section title="Swarm configuration"
+        description="Legacy placement and replica settings for Docker Swarm deployments.">
+        <x-slot:actions>
             <x-deprecated-badge />
-            @can('update', $application)
-                <x-forms.button type="submit">
-                    Save
-                </x-forms.button>
-            @else
-                <x-forms.button type="submit" disabled
-                    title="You don't have permission to update this application. Contact your team administrator for access.">
-                    Save
-                </x-forms.button>
-            @endcan
-        </div>
-        <x-callout type="warning" title="Deprecated" class="my-4">
+        </x-slot:actions>
+
+        <x-callout type="warning" title="Deprecated">
             {{ config('deprecations.swarm') }}
         </x-callout>
-        <div class="flex flex-col gap-2 py-4">
-            <div class="flex flex-col items-end gap-2 xl:flex-row">
-                <x-forms.input id="swarmReplicas" label="Replicas" required canGate="update" :canResource="$application" />
-                <x-forms.checkbox instantSave helper="If turned off, this resource will start on manager nodes too."
-                    id="isSwarmOnlyWorkerNodes" label="Only Start on Worker nodes" canGate="update" :canResource="$application" />
-            </div>
-            <x-forms.textarea id="swarmPlacementConstraints" rows="7" label="Custom Placement Constraints"
-                placeholder="placement:
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <x-forms.input id="swarmReplicas" label="Replicas" required canGate="update"
+                :canResource="$application" />
+            <x-forms.listbox id="isSwarmOnlyWorkerNodes" label="Node placement" live onChange="instantSave"
+                :disabled="! auth()->user()->can('update', $application)" :options="[
+                    ['value' => true, 'label' => 'Worker nodes only'],
+                    ['value' => false, 'label' => 'Manager and worker nodes'],
+                ]" />
+            <div class="lg:col-span-2">
+                <x-forms.textarea id="swarmPlacementConstraints" rows="8" label="Custom placement constraints"
+                    placeholder="placement:
     constraints:
         - 'node.role == worker'" canGate="update" :canResource="$application" />
+            </div>
         </div>
-    </form>
-
-</div>
+    </x-application.settings-section>
+</form>

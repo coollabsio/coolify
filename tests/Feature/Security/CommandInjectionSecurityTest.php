@@ -176,9 +176,10 @@ describe('API validation rules for path fields', function () {
     test('docker compose service domains validation rejects command injection payloads', function () {
         $rules = [
             'docker_compose_domains' => 'array|nullable',
-            'docker_compose_domains.*' => 'array:name,domain',
+            'docker_compose_domains.*' => 'array:name,domain,redirect',
             'docker_compose_domains.*.name' => 'string|required',
             'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+            'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
         ];
 
         $validator = validator(

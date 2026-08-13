@@ -143,6 +143,16 @@ class SettingsEmail extends Component
         }
     }
 
+    public function instantSaveSmtp(): void
+    {
+        $this->instantSave('SMTP');
+    }
+
+    public function instantSaveResend(): void
+    {
+        $this->instantSave('Resend');
+    }
+
     public function submitSmtp()
     {
         try {
