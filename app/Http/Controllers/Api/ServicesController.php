@@ -693,7 +693,7 @@ class ServicesController extends Controller
                 ], 422);
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            $dockerComposeRaw = Yaml::dump(parseDockerComposeYaml($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
             // Validate for command injection BEFORE saving to database
             try {
@@ -1227,7 +1227,7 @@ class ServicesController extends Controller
                 ], 422);
             }
             $dockerCompose = base64_decode($request->docker_compose_raw);
-            $dockerComposeRaw = Yaml::dump(Yaml::parse($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            $dockerComposeRaw = Yaml::dump(parseDockerComposeYaml($dockerCompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
 
             // Validate for command injection BEFORE saving to database
             try {
