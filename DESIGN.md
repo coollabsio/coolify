@@ -154,6 +154,21 @@ topbar instead of repeating its name or status summary in layer 2. Mobile
 resource navigation may repeat this context because the desktop global topbar
 is hidden there.
 
+Desktop resource lifecycle actions dock in `#resource-action-hud-slot` and
+use `<x-resource-heading-overflow>`. Show primary actions (Deploy, Redeploy,
+Restart, Stop) as sibling header buttons. Collapse that group into an Actions
+dropdown only when the remaining top-bar width cannot fit them (breadcrumb
+keeps a 200px floor). Infrequent operations live in a separate Advanced
+dropdown with the grid icon: force restart / force deploy / force cleanup
+on services, and Traefik dashboard / refresh proxy status on servers. Place
+Advanced immediately after Links, or first in the action cluster when there
+is no Links control. Application Deploy is a dropdown with Deploy and
+Deploy (without cache). A running service Restart control is a dropdown with
+Restart current version and Pull latest and restart. Mobile
+headings keep a full-width Actions dropdown because the desktop HUD is hidden
+below `xl`. Do not hide primary actions behind a menu on a wide desktop. Links
+stay a separate dropdown because the URL list is unbounded.
+
 Only add layer-2 tabs when they represent real sibling routes inside one
 context. Never repeat main-sidebar destinations such as Dashboard, Projects,
 Terminal, Servers, Sources, Destinations, or Storage as a second tab row. A

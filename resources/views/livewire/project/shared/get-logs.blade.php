@@ -5,6 +5,7 @@
         logsLoaded: false,
         fullscreen: false,
         alwaysScroll: false,
+        followManuallyDisabled: false,
         rafId: null,
         scrollDebounce: null,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
@@ -80,8 +81,10 @@
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
+                this.followManuallyDisabled = false;
                 this.scheduleScroll();
             } else {
+                this.followManuallyDisabled = true;
                 if (this.rafId) {
                     cancelAnimationFrame(this.rafId);
                     this.rafId = null;
@@ -94,7 +97,7 @@
             this.scrollDebounce = setTimeout(() => {
                 const el = event.target;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-                if (!this.alwaysScroll && distanceFromBottom <= 10) {
+                if (!this.alwaysScroll && !this.followManuallyDisabled && distanceFromBottom <= 10) {
                     this.alwaysScroll = true;
                     this.scheduleScroll();
                 }

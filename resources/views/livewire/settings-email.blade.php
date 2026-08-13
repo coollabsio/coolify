@@ -5,8 +5,12 @@
 
     <x-settings.layout>
     <div class="application-settings-form mx-auto flex w-full max-w-[1180px] min-w-0 flex-col gap-6">
+        {{-- One bar for the whole page. Three stacked bars made Save run
+             submitResend(), which required an API key even when Resend was off. --}}
+        <x-unsaved-bar action="submit"
+            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,resendApiKey" />
+
         <form wire:submit="submit">
-            <x-unsaved-bar action="submit" />
             <x-application.settings-section title="Sender">
                 <x-slot:actions>
                     @include('livewire.partials.settings-email-send-test')
@@ -21,7 +25,6 @@
         </form>
 
         <form wire:submit.prevent="submitSmtp">
-            <x-unsaved-bar action="submitSmtp" />
             <x-application.settings-section title="SMTP server">
                 <div class="grid gap-4 lg:grid-cols-3">
                     <div class="lg:col-span-3">
@@ -50,7 +53,6 @@
         </form>
 
         <form wire:submit.prevent="submitResend">
-            <x-unsaved-bar action="submitResend" />
             <x-application.settings-section title="Resend">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.listbox id="resendEnabled" label="Resend delivery"
@@ -58,8 +60,8 @@
                             ['value' => true, 'label' => 'Enabled'],
                             ['value' => false, 'label' => 'Disabled'],
                         ]" />
-                    <x-forms.input type="password" id="resendApiKey" placeholder="API key" required
-                        label="API key" autocomplete="new-password" />
+                    <x-forms.input type="password" id="resendApiKey" placeholder="API key"
+                        :required="$resendEnabled" label="API key" autocomplete="new-password" />
                 </div>
             </x-application.settings-section>
         </form>

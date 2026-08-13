@@ -119,13 +119,40 @@ it('ignores stale status files older than ten minutes', function () {
     expect($result['status'])->toBe('none');
 });
 
-it('waits for the running version to match the target before showing reload', function () {
+it('checks the running version through authenticated upgrade status before showing reload', function () {
     $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
 
     expect($upgradeView)
-        ->toContain('X-Coolify-Version')
-        ->toContain('hasReachedTargetVersion')
+        ->not->toContain('X-Coolify-Version')
+        ->toContain('this.$wire.getUpgradeStatus()')
+        ->toContain("data.status === 'complete'")
         ->toContain('livewireFailures');
+});
+
+it('uses the public health endpoint only for liveness during an upgrade', function () {
+    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
+
+    expect($upgradeView)
+        ->toContain('instanceWentDown')
+        ->toContain('startHealthWatch')
+        ->toContain("fetch('/api/health')")
+        ->not->toContain('response.headers.get');
+});
+
+it('finishes after health recovers from observed downtime for older target releases', function () {
+    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
+
+    expect($upgradeView)
+        ->toContain("data.status === 'none' && this.instanceWentDown")
+        ->toContain('if (this.instanceWentDown) {')
+        ->toContain('this.showSuccess();')
+        ->toContain('return;');
+});
+
+it('tells users to reload manually if the automatic reload does not happen', function () {
+    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
+
+    expect($upgradeView)->toContain('If the page does not reload automatically, reload it manually.');
 });
 
 it('starts the upgrade after the Livewire response so status polling is not blocked', function () {

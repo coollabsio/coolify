@@ -30,6 +30,25 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down             
 
 The app runs at `localhost:8000` by default. Instance **b** is on `8001` (db `5433`, redis `6380`, …); see `./scripts/dev-instances`.
 
+## Testing the Self-Hosted Upgrade Process
+
+Use the following workflow to test a self-hosted upgrade:
+
+1. Install the source version with the upgrade script:
+
+   ```bash
+   bash upgrade.sh sha-6492d081362c009519481ac70e50873e39ba1861
+   ```
+
+2. Set the current Coolify version and rebuild the cached configuration:
+
+   ```bash
+   docker exec -e COOLIFY_VERSION=4.3.0 coolify php artisan config:cache
+   ```
+
+3. In the Coolify UI, click **Check for Updates**.
+4. Confirm that an upgrade is available, then click **Upgrade** and verify that the upgrade completes successfully.
+
 ## Common Commands
 
 ```bash

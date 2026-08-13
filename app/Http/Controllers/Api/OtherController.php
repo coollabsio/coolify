@@ -292,20 +292,13 @@ class OtherController extends Controller
 
     #[OA\Get(
         summary: 'Healthcheck',
-        description: 'Healthcheck endpoint. Includes the running Coolify version in the X-Coolify-Version header.',
+        description: 'Healthcheck endpoint.',
         path: '/health',
         operationId: 'healthcheck',
         responses: [
             new OA\Response(
                 response: 200,
                 description: 'Healthcheck endpoint.',
-                headers: [
-                    new OA\Header(
-                        header: 'X-Coolify-Version',
-                        description: 'Currently running Coolify version.',
-                        schema: new OA\Schema(type: 'string', example: '4.3.1'),
-                    ),
-                ],
                 content: new OA\MediaType(
                     mediaType: 'text/html',
                     schema: new OA\Schema(type: 'string'),
@@ -323,6 +316,6 @@ class OtherController extends Controller
     )]
     public function healthcheck(Request $request)
     {
-        return response('OK')->header('X-Coolify-Version', (string) config('constants.coolify.version'));
+        return response('OK');
     }
 }

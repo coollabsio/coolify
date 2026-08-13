@@ -157,7 +157,6 @@
                         <button type="button" class="button w-full justify-between" @click="open = !open"
                             :aria-expanded="open" aria-haspopup="menu">
                             <span class="inline-flex items-center gap-2">
-                                <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                 Actions
                             </span>
                             <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
@@ -290,10 +289,9 @@
                             x-data="{ open: false }" x-effect="$dispatch('resource-actions-toggled', { open })"
                             @click.outside="open = false"
                             @keydown.escape.window="open = false">
-                            <button type="button" class="button" @click="open = !open" :aria-expanded="open"
+                            <button type="button" class="button button-highlighted" @click="open = !open" :aria-expanded="open"
                                 aria-haspopup="menu" wire:loading.attr="disabled" wire:loading.class="is-loading"
                                 wire:target="checkProxy,startProxy">
-                                <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                 Actions
                                 <x-reicon name="chevron-down" class="size-3 opacity-55" />
                             </button>
@@ -301,15 +299,6 @@
                             <div x-cloak x-show="open" x-transition.origin.top.right
                                 class="listbox-panel top-full! right-0! left-auto! mt-1! w-60! min-w-0!" role="menu">
                                 @if ($proxyCanBeStopped)
-                                    @if ($traefikDashboardAvailable)
-                                        <a class="listbox-option justify-start! gap-2.5!" target="_blank"
-                                            href="http://{{ $serverIp }}:8080" @click="open = false" role="menuitem">
-                                            <span class="flex size-4 shrink-0 items-center justify-center">
-                                            <x-reicon name="external-link" class="size-3! opacity-70" />
-                                    </span>
-                                            Traefik Dashboard
-                                        </a>
-                                    @endif
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('server-mobile-restart-proxy-trigger')?.click()"
                                         role="menuitem">
@@ -345,6 +334,15 @@
                                     </span>
                                     Refresh Proxy Status
                                 </button>
+                                @if ($traefikDashboardAvailable)
+                                    <a class="listbox-option justify-start! gap-2.5!" target="_blank"
+                                        href="http://{{ $serverIp }}:8080" @click="open = false" role="menuitem">
+                                        <span class="flex size-4 shrink-0 items-center justify-center">
+                                            <x-reicon name="external-link" class="size-3! opacity-70" />
+                                        </span>
+                                        Traefik Dashboard
+                                    </a>
+                                @endif
                             </div>
                         </div>
                     @endcan

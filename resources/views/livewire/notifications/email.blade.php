@@ -118,22 +118,18 @@
             </div>
 
             <div class="application-settings-form">
-                <x-application.settings-section title="Resend"
-                    description="Use Resend as an alternative email delivery provider.">
+                <x-application.settings-section title="Resend">
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <div class="lg:col-span-2">
-                            <div class="w-full sm:w-72">
-                                <x-forms.listbox id="resendEnabled" label="Resend delivery"
-                                    onChange="submitResend"
-                                    :disabled="!auth()->user()->can('update', $settings)" :options="[
-                                        ['value' => true, 'label' => 'Enabled'],
-                                        ['value' => false, 'label' => 'Disabled'],
-                                    ]" />
-                            </div>
-                        </div>
+                        <x-forms.listbox id="resendEnabled" label="Resend delivery"
+                            onChange="submitResend"
+                            :disabled="!auth()->user()->can('update', $settings)" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
                         @can('update', $settings)
-                            <x-forms.input canGate="update" :canResource="$settings" required type="password"
-                                id="resendApiKey" placeholder="API key" label="API key" />
+                            <x-forms.input canGate="update" :canResource="$settings" :required="$resendEnabled"
+                                type="password" id="resendApiKey" placeholder="API key" label="API key"
+                                autocomplete="new-password" />
                         @else
                             <x-forms.input disabled label="API key" value="Hidden (only admins can view)" />
                         @endcan

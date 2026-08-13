@@ -118,8 +118,12 @@ Route::middleware(['throttle:login'])->group(function () {
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 
-// Local-only previews for redesigned HTTP error pages (never registered in production).
-if (app()->environment('local')) {
+// Local/testing previews for HTTP error pages and the Laravel debug renderer (never in production).
+if (app()->environment(['local', 'testing'])) {
+    Route::get('/__exception', function () {
+        throw new RuntimeException('Testing Laravel exception page');
+    })->name('dev.exception-preview');
+
     Route::get('/__error/{code}', function (string $code) {
         $allowed = ['400', '401', '402', '403', '404', '419', '429', '500', '503'];
         abort_unless(in_array($code, $allowed, true), 404);

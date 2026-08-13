@@ -203,7 +203,7 @@ class SettingsEmail extends Component
             $this->authorize('update', $this->settings);
             $this->validate([
                 'resendEnabled' => 'boolean',
-                'resendApiKey' => 'required|string',
+                'resendApiKey' => $this->resendEnabled ? 'required|string' : 'nullable|string',
                 'smtpFromAddress' => 'required|email',
                 'smtpFromName' => 'required|string',
             ], [
