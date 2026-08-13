@@ -2453,6 +2453,25 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
+    "jean": {
+        "documentation": "https://github.com/coollabsio/jean/blob/main/docs/headless-server.md?utm_source=coolify.io",
+        "slogan": "Open-source desktop and server client for orchestrating AI coding agents.",
+        "compose": "c2VydmljZXM6CiAgamVhbjoKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL2plYW4tc2VydmVyOiR7SkVBTl9WRVJTSU9OOi1sYXRlc3R9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfSkVBTl8zNDU2CiAgICAgIC0gJ0pFQU5fSEVBRExFU1M9JHtKRUFOX0hFQURMRVNTOi0xfScKICAgICAgLSAnSkVBTl9IT1NUPSR7SkVBTl9IT1NUOi0wLjAuMC4wfScKICAgICAgLSAnSkVBTl9QT1JUPSR7SkVBTl9QT1JUOi0zNDU2fScKICAgICAgLSAnSkVBTl9UT0tFTj0ke1NFUlZJQ0VfUEFTU1dPUkRfNjRfSkVBTn0nCiAgICAgIC0gJ0pFQU5fTk9fVE9LRU49JHtKRUFOX05PX1RPS0VOOi0wfScKICAgICAgLSAnSkVBTl9BTExPV19VTlNBRkVfTk9fVE9LRU49JHtKRUFOX0FMTE9XX1VOU0FGRV9OT19UT0tFTjotMH0nCiAgICAgIC0gJ0pFQU5fQUxMT1dfTkFUSVZFX09QRU49JHtKRUFOX0FMTE9XX05BVElWRV9PUEVOOi0wfScKICAgICAgLSAnSkVBTl9BTExPV0VEX09SSUdJTlM9JHtKRUFOX0FMTE9XRURfT1JJR0lOUzotfScKICAgICAgLSBKRUFOX0RBVEFfRElSPS9ob21lL2plYW4vLmxvY2FsL3NoYXJlL2NvbS5qZWFuLmRlc2t0b3AKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2plYW4tZGF0YTovaG9tZS9qZWFuLy5sb2NhbC9zaGFyZS9jb20uamVhbi5kZXNrdG9wJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICdjdXJsIC1mc1MgaHR0cDovLzEyNy4wLjAuMTozNDU2L3JlYWR5eiA+L2Rldi9udWxsIHx8IGV4aXQgMScKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAxMgogICAgICBzdGFydF9wZXJpb2Q6IDE1cwo=",
+        "tags": [
+            "jean",
+            "ai",
+            "coding",
+            "agents",
+            "development",
+            "git",
+            "worktrees"
+        ],
+        "category": "development",
+        "logo": "svgs/jean.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "3456"
+    },
     "jellyfin": {
         "documentation": "https://jellyfin.org?utm_source=coolify.io",
         "slogan": "Jellyfin is a media server for hosting and streaming your media collection.",
