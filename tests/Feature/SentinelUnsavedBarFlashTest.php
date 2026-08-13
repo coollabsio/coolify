@@ -25,6 +25,14 @@ test('unsaved bar component accepts optional wire:target list', function () {
         ->toContain('wire:target="{{ $targets }}"');
 });
 
+test('unsaved bar accepts optional wire key to remount dirty tracking', function () {
+    $contents = file_get_contents(resource_path('views/components/unsaved-bar.blade.php'));
+
+    expect($contents)
+        ->toContain("'wireKey' => null")
+        ->toContain('wire:key="{{ $wireKey }}"');
+});
+
 test('unsaved bar delays show and hides while loading to avoid instant-save flash', function () {
     $path = resource_path('views/components/unsaved-bar.blade.php');
     $contents = file_get_contents($path);
