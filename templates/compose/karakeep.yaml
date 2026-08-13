@@ -7,7 +7,7 @@
 
 services:
   web:
-    image: ghcr.io/karakeep-app/karakeep:release
+    image: ghcr.io/karakeep-app/karakeep:0.33.2
     volumes:
       - karakeep-data:/data
     environment:
