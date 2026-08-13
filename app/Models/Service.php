@@ -1591,9 +1591,10 @@ class Service extends BaseModel
 
         $workdir = $this->workdir();
 
+        // Never `cd` into /data/coolify/... — non-root SSH cannot enter root-owned parents.
+        // Use absolute paths only (same pattern as StartService docker compose).
         instant_remote_process([
             "mkdir -p $workdir",
-            "cd $workdir",
         ], $this->server);
 
         $filename = new_public_id().'-docker-compose.yml';
@@ -1602,8 +1603,7 @@ class Service extends BaseModel
         instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
         Storage::disk('local')->delete("tmp/{$filename}");
 
-        $commands[] = "cd $workdir";
-        $commands[] = 'rm -f .env || true';
+        $commands[] = "rm -f {$workdir}/.env || true";
 
         $envs = collect([]);
 
@@ -1634,10 +1634,10 @@ class Service extends BaseModel
             $envs->push("{$env->key}={$env->real_value}");
         }
         if ($envs->count() === 0) {
-            $commands[] = 'touch .env';
+            $commands[] = "touch {$workdir}/.env";
         } else {
             $envs_base64 = base64_encode($envs->implode("\n"));
-            $commands[] = "echo '$envs_base64' | base64 -d | tee .env > /dev/null";
+            $commands[] = "echo '$envs_base64' | base64 -d | tee {$workdir}/.env > /dev/null";
         }
 
         instant_remote_process($commands, $this->server);

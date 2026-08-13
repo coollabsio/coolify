@@ -36,6 +36,12 @@
             'active' => $activeMenu === 'updates',
             'icon' => 'refresh3',
         ],
+        [
+            'label' => 'Migrations',
+            'route' => 'settings.migrations',
+            'active' => $activeMenu === 'migrations',
+            'icon' => 'servers',
+        ],
     ];
 @endphp
 

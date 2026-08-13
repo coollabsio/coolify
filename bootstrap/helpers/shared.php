@@ -546,6 +546,16 @@ function find_resource_destination_for_current_team(?string $uuid): StandaloneDo
     return $destination;
 }
 
+function find_destination_for_team(?string $uuid, int $teamId): StandaloneDocker|SwarmDocker|null
+{
+    if (blank($uuid)) {
+        return null;
+    }
+
+    return StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first();
+}
+
 function showBoarding(): bool
 {
     if (isDev()) {

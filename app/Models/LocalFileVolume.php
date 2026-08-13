@@ -247,7 +247,6 @@ class LocalFileVolume extends BaseModel
             $escapedFsPath = escapeshellarg($this->fs_path);
             $commands->push("mkdir -p {$escapedFsPath} > /dev/null 2>&1 || true");
             $commands->push("mkdir -p {$escapedWorkdir} > /dev/null 2>&1 || true");
-            $commands->push("cd {$escapedWorkdir}");
         }
         $path = data_get_str($this, 'fs_path');
         $content = data_get($this, 'content');

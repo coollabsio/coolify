@@ -14,11 +14,13 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\InstanceMigration;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
+use App\Models\ResourceMigration;
 use App\Models\S3Storage;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -52,12 +54,14 @@ use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
 use App\Policies\GithubAppPolicy;
 use App\Policies\GitlabAppPolicy;
+use App\Policies\InstanceMigrationPolicy;
 use App\Policies\InstanceSettingsPolicy;
 use App\Policies\IntegrationTokenPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\ResourceCreatePolicy;
+use App\Policies\ResourceMigrationPolicy;
 use App\Policies\S3StoragePolicy;
 use App\Policies\ScheduledTaskPolicy;
 use App\Policies\ServerPolicy;
@@ -118,9 +122,11 @@ class AuthServiceProvider extends ServiceProvider
 
         // Instance settings policy
         InstanceSettings::class => InstanceSettingsPolicy::class,
+        InstanceMigration::class => InstanceMigrationPolicy::class,
 
         // S3 storage policy
         S3Storage::class => S3StoragePolicy::class,
+        ResourceMigration::class => ResourceMigrationPolicy::class,
 
         // Scheduled task policy
         ScheduledTask::class => ScheduledTaskPolicy::class,

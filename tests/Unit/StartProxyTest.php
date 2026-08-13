@@ -8,10 +8,9 @@ it('ensures container cleanup includes wait loop in command sequence', function 
     // Simulate the command generation pattern from StartProxy
     $commands = collect([
         'mkdir -p /data/coolify/proxy/dynamic',
-        'cd /data/coolify/proxy',
         "echo 'Creating required Docker Compose file.'",
         "echo 'Pulling docker image.'",
-        'docker compose pull',
+        'docker compose --project-directory /data/coolify/proxy pull',
         'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
         "    echo 'Stopping and removing existing coolify-proxy.'",
         '    docker stop coolify-proxy 2>/dev/null || true',
@@ -27,7 +26,7 @@ it('ensures container cleanup includes wait loop in command sequence', function 
         "    echo 'Successfully stopped and removed existing coolify-proxy.'",
         'fi',
         "echo 'Starting coolify-proxy.'",
-        'docker compose up -d --wait --remove-orphans',
+        'docker compose --project-directory /data/coolify/proxy up -d --wait --remove-orphans',
         "echo 'Successfully started coolify-proxy.'",
     ]);
 
@@ -40,12 +39,12 @@ it('ensures container cleanup includes wait loop in command sequence', function 
         ->and($commandsString)->toContain('if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then')
         ->and($commandsString)->toContain('break')
         ->and($commandsString)->toContain('sleep 1')
-        ->and($commandsString)->toContain('docker compose up -d --wait --remove-orphans');
+        ->and($commandsString)->toContain('docker compose --project-directory /data/coolify/proxy up -d --wait --remove-orphans');
 
     // Verify the order: cleanup must come before compose up
     $stopPosition = strpos($commandsString, 'docker stop coolify-proxy');
     $waitLoopPosition = strpos($commandsString, 'for i in {1..10}');
-    $composeUpPosition = strpos($commandsString, 'docker compose up -d');
+    $composeUpPosition = strpos($commandsString, 'docker compose --project-directory /data/coolify/proxy up -d');
 
     expect($stopPosition)->toBeLessThan($waitLoopPosition)
         ->and($waitLoopPosition)->toBeLessThan($composeUpPosition);
