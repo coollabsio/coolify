@@ -81,14 +81,13 @@
         </svg>
     </button>
 
-    <template x-if="open">
-        <div @class([
-                'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
-                'right-0! left-auto!' => ! $sidebar,
-                'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
-                'origin-bottom-left' => $sidebar,
-                'origin-top-right' => ! $sidebar,
-            ])>
+    <div x-show="open" x-cloak @class([
+            'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
+            'right-0! left-auto!' => ! $sidebar,
+            'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
+            'origin-bottom-left' => $sidebar,
+            'origin-top-right' => ! $sidebar,
+        ])>
         <div class="min-w-0 px-2 py-1.5">
             <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
             <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $userEmail }}</div>
@@ -194,6 +193,5 @@
                 </span>
             </button>
         </form>
-        </div>
-    </template>
+    </div>
 </div>
