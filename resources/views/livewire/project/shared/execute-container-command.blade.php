@@ -42,7 +42,7 @@
     @endphp
 
     @if (in_array($type, ['application', 'database', 'service', 'server'], true))
-        <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+        <section class="application-settings-workspace mt-4 w-full lg:mt-0">
             <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
                 @if ($type === 'server')
                     <x-server.sidebar :server="$resource" activeMenu="terminal" />
@@ -57,7 +57,7 @@
     @endif
 
     @if ($consoleUnavailable)
-        <section class="mt-8 w-full max-w-[1180px] xl:mt-0">
+        <section class="mt-8 w-full xl:mt-0">
             @if ($type === 'server')
                 <x-empty size="lg" title="Terminal unavailable"
                     description="This server is not functional or terminal access is disabled."
@@ -69,7 +69,7 @@
             @endif
         </section>
     @else
-        <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full max-w-[1180px] xl:mt-0"
+        <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full xl:mt-0"
             x-on:terminal-theme-selected="setTheme($event.detail.theme)"
             x-on:terminal-starting.window="syncTheme()"
             x-data="{

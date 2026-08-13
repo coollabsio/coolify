@@ -472,7 +472,7 @@ it('uses the same mobile heading gap on deployment pages as application settings
     $deploymentShow = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
 
     expect($configuration)->toContain('application-settings-workspace mt-4')
-        ->and($deploymentIndex)->toContain("'mt-4 max-w-[1180px] lg:mt-0' => ! \$embedded")
+        ->and($deploymentIndex)->toContain("'mt-4 lg:mt-0' => ! \$embedded")
         ->and($deploymentShow)->toContain('application-settings-workspace mt-4')
         ->toContain('lg:mt-0');
 });

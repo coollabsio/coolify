@@ -54,7 +54,7 @@
             ]);
     @endphp
 
-    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+    <section class="application-settings-workspace mt-4 w-full lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
             <aside class="application-settings-navigation min-w-0 xl:self-start">
                 <nav aria-label="Service settings"
@@ -134,7 +134,7 @@
                                         <x-reicon name="grid" class="size-3.5" />
                                     </button>
                                 </div>
-                                <a class="button" target="_blank" href="{{ $service->documentation() }}">
+                                <a class="button h-9! min-h-9!" target="_blank" href="{{ $service->documentation() }}">
                                     Documentation
                                     <x-reicon name="external-link" class="size-4" />
                                 </a>

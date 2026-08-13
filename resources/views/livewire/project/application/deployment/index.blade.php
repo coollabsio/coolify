@@ -15,7 +15,7 @@
 
     <section @class([
         'application-settings-workspace w-full',
-        'mt-4 max-w-[1180px] lg:mt-0' => ! $embedded,
+        'mt-4 lg:mt-0' => ! $embedded,
     ])>
         <div @class([
             'min-w-0',

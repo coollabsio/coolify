@@ -57,7 +57,7 @@
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="request()->query()"
         wire:key="service-heading-volume-backup-index" />
 
-    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
+    <section class="application-settings-workspace mt-4 w-full lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
             <x-service.configuration-sidebar :service="$service"
                 current-route="project.service.volume-backups.index" />

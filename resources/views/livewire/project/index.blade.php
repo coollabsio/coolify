@@ -50,7 +50,7 @@
 
                 <div class="flex items-center gap-2">
                     <div class="relative" x-on:click.outside="sortOpen = false">
-                        <button type="button" class="button" x-on:click="sortOpen = !sortOpen">
+                        <button type="button" class="button h-9! min-h-9!" x-on:click="sortOpen = !sortOpen">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none"
                                 aria-hidden="true">
                                 <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"

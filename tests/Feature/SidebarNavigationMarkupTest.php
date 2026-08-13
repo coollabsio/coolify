@@ -124,7 +124,7 @@ it('shows section titles and descriptions above settings navigation on smaller s
         ->toContain('<header class="settings-mobile-header xl:hidden">')
         ->toContain("<h1 class=\"settings-mobile-title\">{$title}</h1>")
         ->toContain("<p class=\"settings-mobile-description\">{$description}</p>")
-        ->toContain('<section class="application-settings-workspace w-full max-w-[1180px]">')
+        ->toContain('<section class="application-settings-workspace w-full')
         ->and($css)
         ->toContain('.settings-mobile-title')
         ->toContain('.settings-mobile-description')

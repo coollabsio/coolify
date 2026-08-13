@@ -1,4 +1,4 @@
-<div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+<div class="mt-8 flex w-full flex-col gap-6 lg:mt-3">
     @if ($github_apps->isEmpty())
         <section class="application-settings-section">
             <div class="application-settings-section-header">

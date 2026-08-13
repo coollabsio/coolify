@@ -2,13 +2,13 @@
 
 /**
  * Settings title sits above the workspace; sidebar is below it. Title shell and
- * workspace share max-w-[1180px] so their left edges align.
+ * workspace share the same width so their left edges align.
  */
 test('instance settings pages use one shared sidebar workspace', function () {
     $layout = file_get_contents(resource_path('views/components/settings/layout.blade.php'));
 
     expect($layout)
-        ->toContain('max-w-[1180px]')
+        ->toContain('application-settings-workspace w-full')
         ->toContain('application-settings-navigation')
         ->toContain("'Configuration' =>")
         ->toContain("'Instance' =>");

@@ -1,4 +1,4 @@
-<nav class="w-full max-w-[1180px] pb-3 lg:pb-0">
+<nav class="w-full pb-3 lg:pb-0">
     <x-process-dialog @startproxy.window="processDialogOpen = true" closeWithX>
         <x-slot:title>Proxy Startup Logs</x-slot:title>
         <x-slot:content>

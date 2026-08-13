@@ -28,7 +28,7 @@
     ])->filter();
 @endphp
 
-<section class="application-settings-workspace w-full max-w-[1180px]">
+<section class="application-settings-workspace w-full">
     <header class="settings-mobile-header xl:hidden">
         <h1 class="settings-mobile-title">Team</h1>
         <p class="settings-mobile-description">Manage your team, members, and access settings.</p>

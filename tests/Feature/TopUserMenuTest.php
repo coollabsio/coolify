@@ -24,7 +24,7 @@ it('animates the dropdown panel when the user menu opens', function () {
     $stylesheet = file_get_contents(resource_path('css/app.css'));
 
     expect($menu)
-        ->toContain('animate-in fade-in zoom-in-95 duration-150')
+        ->toContain('x-transition.opacity.duration.120ms')
         ->toContain("'origin-bottom-left' => \$sidebar")
         ->toContain("'origin-top-right' => ! \$sidebar");
 
@@ -43,9 +43,9 @@ it('changes appearance from a submenu instead of navigating to a separate page',
         ->not->toContain('@change="appearanceOpen = false; open = false"')
         ->toContain('this.appearanceOpen = false;')
         ->toContain('this.open = false;')
-        ->toContain('<template x-if="open">')
+        ->toContain('<div x-show="open" x-cloak x-transition.opacity.duration.120ms')
         ->not->toContain('x-show.important="open"')
-        ->not->toContain('<div x-show="open" x-cloak x-transition.opacity.duration.120ms')
+        ->not->toContain('<template x-if="open">')
         ->toContain("['value' => 'light', 'label' => 'Light'")
         ->toContain("['value' => 'system', 'label' => 'System'")
         ->toContain("['value' => 'dark', 'label' => 'Dark'")
