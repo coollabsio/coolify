@@ -178,4 +178,4 @@ Thank you so much!
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=coollabsio/coolify&type=Date)](https://star-history.com/#coollabsio/coolify&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=coollabsio/coolify&type=Date)](https://star-history.dera.page/#coollabsio/coolify&Date)
