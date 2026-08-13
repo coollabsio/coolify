@@ -132,3 +132,21 @@ test('notification event multiselect truncates long selected summaries', functio
         ->toContain('title="Docker cleanup failure, Disk usage warning, Server unreachable, Server patching"')
         ->toContain('4/4');
 });
+
+test('notification event multiselect uses the same panel animation as listboxes', function () {
+    $html = Blade::render(<<<'BLADE'
+        <x-notification.event-multiselect id="deployment-email-events" label="Deployments" :events="[
+            ['property' => 'deploymentSuccessEmailNotifications', 'label' => 'Deployment success', 'enabled' => false],
+            ['property' => 'deploymentFailureEmailNotifications', 'label' => 'Deployment failure', 'enabled' => true],
+            ['property' => 'statusChangeEmailNotifications', 'label' => 'Container status changes', 'enabled' => false],
+        ]" />
+    BLADE);
+
+    expect($html)
+        ->toContain('x-transition:enter="transition ease-out duration-100"')
+        ->toContain('x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"')
+        ->toContain('x-transition:enter-end="opacity-100 translate-y-0 scale-100"')
+        ->toContain('x-transition:leave="transition ease-in duration-75"')
+        ->toContain('x-transition:leave-start="opacity-100 translate-y-0 scale-100"')
+        ->toContain('x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"');
+});

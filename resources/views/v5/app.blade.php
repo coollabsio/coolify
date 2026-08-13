@@ -63,7 +63,7 @@
     <x-inertia::head />
 </head>
 
-<body>
+<body class="overflow-y-scroll">
     <x-inertia::app id="v5-app" />
 </body>
 
