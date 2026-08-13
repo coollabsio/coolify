@@ -51,6 +51,10 @@ use OpenApi\Attributes as OA;
         'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
         'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds.'],
+        'docker_version' => ['type' => 'string', 'nullable' => true, 'description' => 'Detected Docker Engine version on the server.'],
+        'docker_version_checked_at' => ['type' => 'string', 'nullable' => true, 'description' => 'When Docker Engine version was last detected.'],
+        'compose_version' => ['type' => 'string', 'nullable' => true, 'description' => 'Detected Docker Compose plugin version on the server.'],
+        'compose_version_checked_at' => ['type' => 'string', 'nullable' => true, 'description' => 'When Docker Compose version was last detected.'],
     ]
 )]
 class ServerSetting extends Model
@@ -100,6 +104,10 @@ class ServerSetting extends Model
         'deployment_queue_limit',
         'disable_application_image_retention',
         'connection_timeout',
+        'docker_version',
+        'docker_version_checked_at',
+        'compose_version',
+        'compose_version_checked_at',
     ];
 
     protected $casts = [
@@ -113,6 +121,8 @@ class ServerSetting extends Model
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
+        'docker_version_checked_at' => 'datetime',
+        'compose_version_checked_at' => 'datetime',
     ];
 
     /**

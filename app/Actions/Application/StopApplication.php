@@ -40,7 +40,7 @@ class StopApplication
 
                 foreach ($containersToStop as $containerName) {
                     instant_remote_process(command: [
-                        "docker stop --time=$timeout $containerName",
+                        dockerStopCommand($timeout, $containerName, $server),
                         "docker rm -f $containerName",
                     ], server: $server, throwError: false);
                 }
