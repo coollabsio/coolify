@@ -7056,6 +7056,7 @@ All notable changes to this project will be documented in this file.
 - *(release)* Clarify branch strategy and SHA build flow
 - Update changelog
 - Update changelog
+- Update changelog
 
 ### ⚡ Performance
 
