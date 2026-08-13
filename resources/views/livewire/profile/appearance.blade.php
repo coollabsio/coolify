@@ -46,7 +46,7 @@
             document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
         },
-    }" class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+    }" class="mt-8 flex w-full flex-col gap-6 lg:mt-3">
         <section class="application-settings-section">
             <div class="application-settings-section-header">
                 <div>
