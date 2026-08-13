@@ -213,6 +213,7 @@
                             $commitMessage = $deployment->commitMessage()
                                 ? Str::before($deployment->commitMessage(), "\n")
                                 : null;
+                            $serverName = data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-');
                         @endphp
                         <a wire:key="deployment-{{ data_get($deployment, 'deployment_uuid') }}"
                             href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
@@ -242,9 +243,7 @@
                                 {{ \Carbon\Carbon::parse(data_get($deployment, 'created_at'))->diffForHumans() }}
                             </span>
                             <span class="tabular-nums">{{ $duration }}</span>
-                            <span class="truncate">
-                                {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
-                            </span>
+                            <span class="truncate" title="{{ $serverName }}">{{ $serverName }}</span>
                         </a>
                         @endforeach
                     </div>

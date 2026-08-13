@@ -549,11 +549,12 @@ Relevant classes:
 
 Create a page-specific grid class when columns differ. Prefer hiding secondary
 columns on small screens. When every column must stay visible, wrap the header
-and rows in a dedicated `*-table-scroll` container with `overflow-x: auto`.
-Let column `minmax()` floors and `min-width: min-content` decide when the
-table overflows. The bar then appears only if the columns cannot fit. Do not
-switch to `overflow-x: visible` at large breakpoints: that clips overflow and
-paints over the card's right hairline ring.
+and rows in a dedicated `*-table-scroll` container with `overflow-x: auto` and
+a shared grid `min-width` so header and rows stay aligned. Size the last
+column so typical values remain readable after scrolling. The bar appears
+only when that shared minimum exceeds the card. Do not switch to
+`overflow-x: visible` at large breakpoints: that clips overflow and paints
+over the card's right hairline ring.
 
 ---
 
