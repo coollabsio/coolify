@@ -81,9 +81,8 @@
         </svg>
     </button>
 
-    <div x-show="open" x-cloak x-transition.opacity.duration.120ms
-        @class([
-            'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible!',
+    <div x-show="open" x-cloak @class([
+            'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
             'right-0! left-auto!' => ! $sidebar,
             'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
             'origin-bottom-left' => $sidebar,
