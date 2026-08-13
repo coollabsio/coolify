@@ -17,6 +17,7 @@
                     <div x-data="{
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
+        followManuallyDisabled: false,
         rafId: null,
         scrollTimeout: null,
         scrollDebounce: null,
@@ -90,7 +91,7 @@
             this.scrollDebounce = setTimeout(() => {
                 if (this.destroyed) return;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-                if (!this.alwaysScroll && distanceFromBottom <= 10) {
+                if (!this.alwaysScroll && !this.followManuallyDisabled && distanceFromBottom <= 10) {
                     this.alwaysScroll = true;
                     this.scheduleScroll();
                 }
@@ -109,8 +110,10 @@
         toggleScroll() {
             this.alwaysScroll = !this.alwaysScroll;
             if (this.alwaysScroll) {
+                this.followManuallyDisabled = false;
                 this.scheduleScroll();
             } else {
+                this.followManuallyDisabled = true;
                 this.cancelScrollLoop();
             }
         },

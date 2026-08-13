@@ -3209,6 +3209,10 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     padding-block: 0.125rem;
 }
 
+.logs-viewer-line.hidden {
+    display: none;
+}
+
 .logs-viewer-timestamp {
     flex-shrink: 0;
     font-size: 0.625rem;
