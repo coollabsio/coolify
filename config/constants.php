@@ -63,6 +63,7 @@ return [
 
     'docker' => [
         'minimum_required_version' => '24.0',
+        'stop_timeout_flag_since' => '28.0.0',
     ],
 
     'ssh' => [

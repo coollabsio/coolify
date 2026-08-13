@@ -431,6 +431,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ["docker version --format '{{.Server.Version}}'"],
                 $serverToCheck
             );
+            $serverToCheck->rememberDockerVersion($dockerVersion);
 
             $versionParts = explode('.', $dockerVersion);
             $majorVersion = (int) $versionParts[0];
@@ -3972,11 +3973,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
             if ($skipRemove) {
                 $this->execute_remote_command(
-                    ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true]
                 );
             } else {
                 $this->execute_remote_command(
-                    ["docker stop --time=$timeout $containerName", 'hidden' => true, 'ignore_errors' => true],
+                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true],
                     ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
                 );
             }
