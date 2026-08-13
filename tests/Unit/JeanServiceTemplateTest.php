@@ -37,3 +37,7 @@ it('includes a Jean Server one-click service template with all deployment enviro
             ->toContain('JEAN_TOKEN=${SERVICE_PASSWORD_64_JEAN}');
     }
 });
+
+it('ships the Jean service icon from the public path used by the service picker', function () {
+    expect(__DIR__.'/../../public/svgs/jean.png')->toBeFile();
+});

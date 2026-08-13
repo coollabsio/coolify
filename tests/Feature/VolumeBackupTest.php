@@ -1599,7 +1599,7 @@ it('archives a named volume on its server', function () {
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume inspect')
         && str_contains($process->command, 'docker run --rm --name ')
         && str_contains($process->command, 'app-data:/volume:ro')
-        && str_contains($process->command, 'tar -czf -')
+        && str_contains($process->command, "tar -I 'gzip -1' -cf -")
         && str_contains($process->command, '> ')
         && str_contains($process->command, '.tar.gz')
         && ! str_contains($process->command, ':/backup'));

@@ -53,7 +53,7 @@ it('keeps backup execution actions compact', function () {
     $view = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
 
     expect($css)
-        ->toContain('grid-template-columns: 6.5rem minmax(7rem, 1fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;')
+        ->toContain('grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;')
         ->and($view)
         ->toContain('title="Download backup" aria-label="Download backup"')
         ->toContain('<x-reicon name="upload" class="size-3.5 rotate-180" />')
@@ -71,7 +71,7 @@ it('uses the compact resource table styling for backup executions', function () 
         ->toContain('data-table-row backup-executions-table-grid min-h-14 px-4 py-2.5')
         ->toContain('flex min-h-11 items-center justify-between border-t')
         ->and($css)
-        ->toMatch('/\.backup-executions-table-grid\s*\{[^}]*gap:\s*0\.75rem;[^}]*min-width:\s*49rem;/');
+        ->toMatch('/\.backup-executions-table-grid\s*\{[^}]*gap:\s*0\.75rem;[^}]*min-width:\s*66rem;/');
 });
 
 it('renders compact size without the full-page min height class', function () {

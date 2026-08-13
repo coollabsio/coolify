@@ -84,7 +84,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $archiveCommand = 'docker run --rm --name '.escapeshellarg($containerName)
                 .' -v '.escapeshellarg($source.':/volume:ro')
                 .' '.escapeshellarg($image)
-                .' tar -czf - -C /volume . > '.escapeshellarg($backupLocation);
+                ." tar -I 'gzip -1' -cf - -C /volume . > ".escapeshellarg($backupLocation);
 
             if ($this->backup->stop_during_backup) {
                 $containers = $this->containersUsingVolume($source, $server);

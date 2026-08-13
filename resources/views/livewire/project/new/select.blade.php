@@ -151,8 +151,7 @@
                                         rel="noopener noreferrer" @click.stop>
                                         Docs
                                     </a>
-                                    <span
-                                        class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
+                                    <span class="button button-highlighted ml-auto">
                                         Deploy
                                         <x-reicon name="arrow-right" class="size-3.5" />
                                     </span>
@@ -188,8 +187,7 @@
                                         rel="noopener noreferrer" @click.stop>
                                         Docs
                                     </a>
-                                    <span
-                                        class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
+                                    <span class="button button-highlighted ml-auto">
                                         Deploy
                                         <x-reicon name="arrow-right" class="size-3.5" />
                                     </span>
@@ -254,8 +252,7 @@
                                         class="button" @click.stop>
                                         Website
                                     </a>
-                                    <span
-                                        class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
+                                    <span class="button button-highlighted ml-auto">
                                         Deploy
                                         <x-reicon name="arrow-right" class="size-3.5" />
                                     </span>
@@ -334,8 +331,7 @@
                                             target="_blank" rel="noopener noreferrer" class="button" @click.stop>
                                             Website
                                         </a>
-                                        <span
-                                            class="ml-auto inline-flex items-center gap-1 text-[12px] font-medium text-neutral-400 transition-colors group-hover:text-coollabs dark:text-fg-faint dark:group-hover:text-coollabs-100">
+                                        <span class="button button-highlighted ml-auto">
                                             Deploy
                                             <x-reicon name="arrow-right" class="size-3.5" />
                                         </span>

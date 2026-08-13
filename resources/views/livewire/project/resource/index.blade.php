@@ -143,7 +143,7 @@
                     </div>
 
                     <div
-                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'

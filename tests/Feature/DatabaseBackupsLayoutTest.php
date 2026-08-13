@@ -32,3 +32,14 @@ it('returns from database backup settings to the database', function () {
         ->toContain("'Back to database'")
         ->toContain("except('backup_uuid')");
 });
+
+it('shows the backup path directly on every execution', function () {
+    $executions = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
+
+    expect($executions)
+        ->toContain('Backup path:')
+        ->toContain("data_get(\$execution, 'filename', 'N/A')")
+        ->toContain('<span>Backup path</span>')
+        ->toContain('class="select-all truncate font-mono text-[11px]')
+        ->not->toContain('backup-executions-table-grid border-t');
+});

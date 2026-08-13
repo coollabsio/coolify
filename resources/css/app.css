@@ -1570,17 +1570,6 @@ html[data-theme="custom"] textarea:disabled {
     line-height: 1.25rem;
 }
 
-/* Buttons */
-.application-settings-workspace .button,
-.application-settings-form .button {
-    height: 2rem;
-    min-height: 2rem;
-    border-radius: 8px;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    white-space: nowrap;
-}
-
 .application-settings-workspace .form-control,
 .application-settings-form .form-control {
     border-radius: 8px;
@@ -2698,9 +2687,9 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-executions-table-grid {
-    grid-template-columns: 6.5rem minmax(7rem, 1fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;
     gap: 0.75rem;
-    min-width: 49rem;
+    min-width: 66rem;
 }
 
 .volume-backup-executions-grid {
@@ -2760,11 +2749,11 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(9rem, 1fr) 8rem 6rem minmax(9rem, auto);
+        grid-template-columns: 7.5rem minmax(9rem, 0.8fr) minmax(14rem, 1.5fr) 8rem 6rem minmax(9rem, auto);
     }
 
-    .backup-executions-table-grid > :nth-child(5),
-    .backup-executions-table-grid > :nth-child(6) {
+    .backup-executions-table-grid > :nth-child(6),
+    .backup-executions-table-grid > :nth-child(7) {
         display: none;
     }
 }
@@ -2871,11 +2860,14 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(0, 1fr) minmax(7rem, auto);
+        grid-template-columns: 7.5rem 9rem minmax(14rem, 1fr) minmax(7rem, auto);
+        min-width: 42rem;
     }
 
-    .backup-executions-table-grid > :nth-child(3),
-    .backup-executions-table-grid > :nth-child(4) {
+    .backup-executions-table-grid > :nth-child(4),
+    .backup-executions-table-grid > :nth-child(5),
+    .backup-executions-table-grid > :nth-child(6),
+    .backup-executions-table-grid > :nth-child(7) {
         display: none;
     }
 
@@ -3198,7 +3190,14 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .logs-viewer-viewport {
     min-width: 0;
-    padding: 0.5rem 0.75rem 2rem;
+    padding: 0.5rem 0.75rem 0;
+}
+
+/* A flex item is reliably included in the scrollable overflow area, unlike
+   bottom padding on overflow containers in some browser/layout combinations. */
+.logs-viewer-viewport::after {
+    content: "";
+    flex: 0 0 2rem;
 }
 
 .logs-viewer-line {
@@ -3292,7 +3291,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     }
 
     .logs-viewer-viewport {
-        padding: 0.5rem 1rem 2rem;
+        padding: 0.5rem 1rem 0;
     }
 
     .logs-viewer-line {

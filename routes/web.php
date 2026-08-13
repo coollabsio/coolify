@@ -3,6 +3,7 @@
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
+use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Boarding\Index as BoardingIndex;
@@ -246,6 +247,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/projects', ProjectIndex::class)->name('project.index');
+    Route::get('/project/{project_uuid}/icon', ProjectIconController::class)->name('project.icon');
     Route::prefix('project/{project_uuid}')->group(function () {
         Route::get('/', ProjectShow::class)->name('project.show');
         Route::get('/edit', ProjectEdit::class)->name('project.edit')->middleware('can.update.resource');

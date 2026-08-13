@@ -7,6 +7,86 @@
         </header>
 
         <div class="flex flex-col gap-6">
+        <section class="application-settings-section" x-data="{
+            preview: null,
+            processing: false,
+            uploadError: null,
+            async prepareIcon(event) {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                this.processing = true;
+                this.uploadError = null;
+
+                try {
+                    const image = await new Promise((resolve, reject) => {
+                        const element = new Image();
+                        element.onload = () => resolve(element);
+                        element.onerror = reject;
+                        element.src = URL.createObjectURL(file);
+                    });
+                    const cropSize = Math.min(image.naturalWidth, image.naturalHeight);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 256;
+                    canvas.height = 256;
+                    const context = canvas.getContext('2d');
+                    context.fillStyle = '#ffffff';
+                    context.fillRect(0, 0, 256, 256);
+                    context.drawImage(image, (image.naturalWidth - cropSize) / 2, (image.naturalHeight - cropSize) / 2, cropSize, cropSize, 0, 0, 256, 256);
+                    const blob = await new Promise((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('JPEG compression failed')), 'image/jpeg', 0.8));
+                    const previewUrl = URL.createObjectURL(blob);
+                    const compressed = new File([blob], 'project-icon.jpg', { type: 'image/jpeg' });
+                    this.$wire.upload('icon', compressed, async () => {
+                        const uploaded = await this.$wire.uploadIcon();
+                        if (uploaded) {
+                            if (this.preview) URL.revokeObjectURL(this.preview);
+                            this.preview = previewUrl;
+                        } else {
+                            URL.revokeObjectURL(previewUrl);
+                        }
+                        this.processing = false;
+                    }, () => {
+                        URL.revokeObjectURL(previewUrl);
+                        this.processing = false;
+                        this.uploadError = 'The image could not be uploaded.';
+                    });
+                } catch (error) {
+                    this.processing = false;
+                    this.uploadError = 'The image could not be processed in this browser.';
+                }
+            },
+        }">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Project icon</h2>
+                    <p>Upload a JPG, PNG, or WebP image. It will appear in the projects list.</p>
+                </div>
+            </div>
+            <div class="application-settings-section-body flex items-center gap-4">
+                <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                    <img x-cloak x-show="preview" :src="preview" alt="Project icon preview" class="h-full w-full object-cover">
+                    @if ($project->icon_path)
+                        <img x-show="!preview" src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                            alt="{{ $project->name }} icon" class="h-full w-full object-cover">
+                    @else
+                        <x-reicon x-show="!preview" name="projects" class="size-6" />
+                    @endif
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col gap-3">
+                    <div class="flex flex-wrap gap-2">
+                        <input x-ref="iconInput" type="file" x-on:change="prepareIcon($event)" accept="image/jpeg,image/png,image/webp" class="hidden">
+                        <x-forms.button type="button" x-on:click="$refs.iconInput.click()" x-bind:disabled="processing">
+                            <span x-text="processing ? 'Uploading…' : 'Browse…'"></span>
+                        </x-forms.button>
+                        @if ($project->icon_path)
+                            <x-forms.button type="button" wire:click="removeIcon" x-bind:disabled="processing" isError>Remove</x-forms.button>
+                        @endif
+                    </div>
+                    <p x-cloak x-show="uploadError" x-text="uploadError" class="text-xs text-red-500"></p>
+                    @error('icon') <p class="text-xs text-red-500">{{ $message }}</p> @enderror
+                </div>
+            </div>
+        </section>
+
         <form wire:submit="submit">
             <x-unsaved-bar action="submit" />
             <section class="application-settings-section">

@@ -22,7 +22,7 @@
                 this.collapsed = !this.collapsed;
                 localStorage.setItem('sidebarCollapsed', this.collapsed);
             }
-        }" x-cloak class="dark:text-inherit text-black">
+        }" @open-global-search.window="open = false" x-cloak class="dark:text-inherit text-black">
             <livewire:deployments-indicator />
 
             {{-- ============ DESKTOP TOP BAR ============ --}}

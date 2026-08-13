@@ -30,6 +30,7 @@
                         class="data-table-header backup-executions-table-grid h-auto rounded-none px-4 py-2.5 text-[11px]">
                         <span>Status</span>
                         <span>Database</span>
+                        <span>Backup path</span>
                         <span>Finished</span>
                         <span>Duration</span>
                         <span>Size</span>
@@ -78,6 +79,11 @@
                                 </div>
                                 <div class="truncate text-[12px] font-medium text-black dark:text-fg">
                                     {{ data_get($execution, 'database_name', 'N/A') }}
+                                </div>
+                                <div class="flex min-w-0 items-center gap-1">
+                                    <code class="select-all truncate font-mono text-[11px] text-neutral-600 dark:text-fg-dim"
+                                        title="Backup path: {{ data_get($execution, 'filename', 'N/A') }}">{{ data_get($execution, 'filename', 'N/A') }}</code>
+                                    <x-copy-button :value="data_get($execution, 'filename', '')" label="Copy backup path" />
                                 </div>
                                 <div class="text-[11px] text-neutral-600 dark:text-fg-dim">
                                     @if ($executionStatus === 'running')

@@ -77,7 +77,7 @@
                     </div>
 
                     <div
-                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
@@ -110,7 +110,12 @@
                             <div class="flex items-start gap-3">
                                 <div
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <x-reicon name="projects" class="size-4" />
+                                    <template x-if="project.iconUrl">
+                                        <img :src="project.iconUrl" :alt="`${project.name} icon`" class="h-full w-full rounded-lg object-cover">
+                                    </template>
+                                    <template x-if="!project.iconUrl">
+                                        <x-reicon name="projects" class="size-4" />
+                                    </template>
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <h2
@@ -191,7 +196,12 @@
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                <x-reicon name="projects" class="size-4" />
+                                <template x-if="project.iconUrl">
+                                    <img :src="project.iconUrl" :alt="`${project.name} icon`" class="h-full w-full rounded-lg object-cover">
+                                </template>
+                                <template x-if="!project.iconUrl">
+                                    <x-reicon name="projects" class="size-4" />
+                                </template>
                             </div>
                             <a :href="project.href" {{ wireNavigate() }}
                                 class="truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"

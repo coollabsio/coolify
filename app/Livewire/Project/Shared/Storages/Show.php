@@ -105,6 +105,7 @@ class Show extends Component
         // PR deployment volume suffixes only apply to git-based applications.
         $this->supportsPreviewSuffix = $this->resource instanceof Application
             && $this->resource->git_based()
+            && filled($this->resource->git_repository)
             && ! $this->isService;
         // Parent All batches badge/url; isolated embeds still hydrate themselves.
         if (! $this->backupMetaHydrated) {
