@@ -346,7 +346,7 @@
                                     x-transition:leave="transition ease-in duration-75"
                                     x-transition:leave-start="transform opacity-100 scale-100"
                                     x-transition:leave-end="transform opacity-0 scale-95"
-                                    class="runtime-log-menu listbox-panel left-auto! right-0! z-[90]! min-w-52!">
+                                    class="runtime-log-menu listbox-panel left-0! right-auto! z-[90]! min-w-52!">
                                     <div>
                                         <button x-on:click="downloadLogs(); downloadMenuOpen = false"
                                             class="listbox-option">
