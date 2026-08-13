@@ -181,7 +181,7 @@ sync_lima_hosts_into_coolify_container() {
   done
 
   echo "==> Syncing Lima .local host records into the Coolify container..."
-  spin exec -T -u root coolify sh -lc '
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T -u root coolify sh -lc '
 set -e
 records=/tmp/coolify-lima-hosts
 next=/tmp/coolify-hosts-next
@@ -316,7 +316,7 @@ coolify_bootstrap_command() {
   endpoint_overrides="$(coolify_wg_endpoint_overrides_arg)" || return 1
 
   cat <<CMD
-spin exec -T coolify $(coolify_cli_bin) init bootstrap \\
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify $(coolify_cli_bin) init bootstrap \\
   --nodes "${nodes}" \\
   --ssh-key "$(coolify_ssh_key)" \\
   --ssh-user "$(coolify_ssh_user)" \\
@@ -341,7 +341,7 @@ coolify_bootstrap() {
   listen_overrides="$(coolify_wg_listen_overrides_arg)" || return 1
   endpoint_overrides="$(coolify_wg_endpoint_overrides_arg)" || return 1
 
-  spin exec -T coolify "$(coolify_cli_bin)" init bootstrap \
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify "$(coolify_cli_bin)" init bootstrap \
     --nodes "$nodes" \
     --ssh-key "$(coolify_ssh_key)" \
     --ssh-user "$(coolify_ssh_user)" \
@@ -413,7 +413,7 @@ coolify_dev() {
   case "$command" in
     install)
       echo "==> coolify CLI is provided by the Coolify dev container."
-      spin exec -T coolify "$(coolify_cli_bin)" --version
+      docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify "$(coolify_cli_bin)" --version
       ;;
     path)
       coolify_cli_bin
@@ -422,7 +422,7 @@ coolify_dev() {
       coolify_bootstrap_command
       ;;
     run)
-      exec spin exec -T coolify "$(coolify_cli_bin)" "$@"
+      exec docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify "$(coolify_cli_bin)" "$@"
       ;;
     -h|--help|help)
       cat <<'USAGE'
@@ -504,7 +504,7 @@ mint_host_jwt_for_host() {
   local output
 
   for attempt in $(seq 1 "$attempts"); do
-    if output="$(spin exec -T coolify php artisan flux:dev "$host_id" 2>&1)"; then
+    if output="$(docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify php artisan flux:dev "$host_id" 2>&1)"; then
       printf '%s\n' "$output" | tail -n 1
       return 0
     fi
@@ -552,7 +552,7 @@ follow_logs() {
     done
   fi
 
-  spin logs -f
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
 }
 
 sync_v5_dev_lima_servers() {
@@ -572,10 +572,10 @@ sync_v5_dev_lima_servers() {
   done
 
   echo "==> Running pending migrations before syncing v5 dev Lima state..."
-  spin exec -T coolify php artisan migrate --force
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify php artisan migrate --force
 
   echo "==> Seeding dev Lima VM(s) into v5 clusters/servers..."
-  spin exec -T \
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T \
     -e COOLIFY_CLI_SSH_USER="$ssh_user" \
     coolify php artisan v5:sync-dev-lima-servers \
       "${server_args[@]}"
@@ -613,7 +613,7 @@ up() {
   local follow_dev_logs
   local count
   local naked=false
-  local spin_args=()
+  local compose_args=()
   coold_vm_enabled="$(read_coolify_env COOLIFY_COOLD_VM_ENABLED true)"
   follow_dev_logs="$(read_coolify_env COOLIFY_DEV_FOLLOW_LOGS true)"
   count="$(coold_vm_count)"
@@ -625,14 +625,14 @@ up() {
         shift
         ;;
       *)
-        spin_args+=("$1")
+        compose_args+=("$1")
         shift
         ;;
     esac
   done
 
   if [ "$coold_vm_enabled" != "false" ]; then
-    echo "==> Starting ${count} Coolify coold VM(s) before Spin..."
+    echo "==> Starting ${count} Coolify coold VM(s) before Docker Compose..."
     for index in $(seq 1 "$count"); do
       coold_vm_up_with_retry "$index"
     done
@@ -640,17 +640,17 @@ up() {
     echo "==> COOLIFY_COOLD_VM_ENABLED=false; skipping coold VM."
   fi
 
-  echo "==> Starting Coolify Docker stack with Spin..."
+  echo "==> Starting Coolify Docker stack with Docker Compose..."
   prepare_coold_asset_cache_bust
   if [ "$COOLD_ASSETS_CHANGED" = "changed" ]; then
     echo "==> Coold nightly assets changed; rebuilding the Coolify dev image..."
-    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin build coolify
+    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" docker compose -f docker-compose.yml -f docker-compose.dev.yml build coolify
   fi
 
-  if [ "${#spin_args[@]}" -gt 0 ]; then
-    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d "${spin_args[@]}"
+  if [ "${#compose_args[@]}" -gt 0 ]; then
+    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d "${compose_args[@]}"
   else
-    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d
+    COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
   fi
 
   if [ "$coold_vm_enabled" != "false" ]; then
@@ -674,7 +674,7 @@ up() {
   fi
 
   if [ "$follow_dev_logs" = "false" ]; then
-    echo "==> Dev environment is ready. Use 'spin logs -f' or 'scripts/coold-vm.sh logs-agent' to follow logs."
+    echo "==> Dev environment is ready. Use 'docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f' or 'scripts/coold-vm.sh logs-agent' to follow logs."
     return
   fi
 
@@ -685,7 +685,7 @@ down() {
   local coold_vm_enabled
   local stop_coold_vm
   local cleanup=false
-  local spin_args=()
+  local compose_args=()
   coold_vm_enabled="$(read_coolify_env COOLIFY_COOLD_VM_ENABLED true)"
   stop_coold_vm="$(read_coolify_env COOLIFY_COOLD_VM_STOP_ON_DOWN false)"
 
@@ -696,7 +696,7 @@ down() {
         shift
         ;;
       *)
-        spin_args+=("$1")
+        compose_args+=("$1")
         shift
         ;;
     esac
@@ -709,11 +709,11 @@ down() {
     done
   fi
 
-  echo "==> Stopping Coolify Docker stack with Spin..."
-  if [ "${#spin_args[@]}" -gt 0 ]; then
-    spin down "${spin_args[@]}"
+  echo "==> Stopping Coolify Docker stack with Docker Compose..."
+  if [ "${#compose_args[@]}" -gt 0 ]; then
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml down "${compose_args[@]}"
   else
-    spin down
+    docker compose -f docker-compose.yml -f docker-compose.dev.yml down
   fi
 
   if [ "$cleanup" = "true" ]; then
@@ -1063,7 +1063,7 @@ example_nginx() {
 
 refresh_test_host_key() {
   echo "==> Refreshing /tmp/testhostkey inside coolify..."
-  spin exec -T coolify php artisan tinker --execute='file_put_contents("/tmp/testhostkey", \App\Models\PrivateKey::query()->where("name", "Testing Host Key")->sole()->private_key); chmod("/tmp/testhostkey", 0600);'
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify php artisan tinker --execute='file_put_contents("/tmp/testhostkey", \App\Models\PrivateKey::query()->where("name", "Testing Host Key")->sole()->private_key); chmod("/tmp/testhostkey", 0600);'
 }
 
 recreate_naked_lima_vm() {
@@ -1104,7 +1104,7 @@ fresh() {
   COOLIFY_DEV_FOLLOW_LOGS=false up
 
   echo "==> Refreshing Coolify database with seed data..."
-  spin exec -T coolify php artisan migrate:fresh --seed --force
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify php artisan migrate:fresh --seed --force
 
   if [ "$(read_coolify_env COOLIFY_COOLD_VM_ENABLED true)" != "false" ]; then
     echo "==> Re-syncing seeded v5 Lima servers after DB refresh..."
@@ -1115,7 +1115,7 @@ fresh() {
   refresh_test_host_key
 
   echo "==> Restarting Horizon so workers use the latest code..."
-  spin exec -T coolify php artisan horizon:terminate || true
+  docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify php artisan horizon:terminate || true
 
   echo "==> Fresh dev environment is ready."
   limactl list | grep -E 'NAME|coold-dev|coolify-naked-test' || true
@@ -1123,14 +1123,14 @@ fresh() {
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/dev.sh <command> [spin args]
+Usage: scripts/dev.sh <command> [docker compose -f docker-compose.yml -f docker-compose.dev.yml args]
 
 Commands:
-  up      Start the coold VM, Spin stack, and dev coold agent
+  up      Start the coold VM, Docker Compose stack, and dev coold agent
   fresh   Recreate coold/naked Lima VMs, refresh DB, seed, sync v5 dev servers
   up --naked
-          Start the coold VM(s) and Spin stack only; skip host bootstrap so /v5 can bootstrap
-  down    Stop the dev coold agent and Spin stack
+          Start the coold VM(s) and Docker Compose stack only; skip host bootstrap so /v5 can bootstrap
+  down    Stop the dev coold agent and Docker Compose stack
   down --cleanup
           Stop the dev stack, then delete the coold Lima VM(s) and VM-local state
   shell [hostname]

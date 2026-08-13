@@ -25,8 +25,8 @@ it('runs the coolify CLI from the development application container', function (
     $script = file_get_contents(base_path('scripts/dev.sh'));
 
     expect($script)->toContain("printf '%s\\n' '/usr/local/bin/coolify'")
-        ->and($script)->toContain('spin exec -T coolify "$(coolify_cli_bin)" init bootstrap')
-        ->and($script)->toContain('spin exec -T coolify "$(coolify_cli_bin)" "$@"')
+        ->and($script)->toContain('docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify "$(coolify_cli_bin)" init bootstrap')
+        ->and($script)->toContain('docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify "$(coolify_cli_bin)" "$@"')
         ->and($script)->toContain('ensure_coolify_container_ssh_key')
         ->and($script)->not->toContain('.dev/bin/coolify')
         ->and($script)->not->toContain('coolify-${os}-${arch}.tar.gz');
@@ -39,7 +39,7 @@ it('syncs host-resolved Lima local names into the Coolify container hosts file',
         ->and($script)->toContain('dscacheutil -q host -a name "$name"')
         ->and($script)->toContain('getent ahostsv4 "$name"')
         ->and($script)->toContain('sync_lima_hosts_into_coolify_container()')
-        ->and($script)->toContain('spin exec -T -u root coolify sh -lc')
+        ->and($script)->toContain('docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T -u root coolify sh -lc')
         ->and($script)->toContain('cat "$next" > /etc/hosts')
         ->and($script)->toContain('sync_lima_hosts_into_coolify_container')
         ->and($script)->toContain('if [ "$naked" = "true" ]; then');
@@ -58,14 +58,14 @@ it('does not require predefined UI node environment variables in the development
         ->and($config)->not->toContain('COOLIFY_CLI_NODES');
 });
 
-it('supports a naked up mode that starts VMs and Spin but skips server bootstrap wiring', function () {
+it('supports a naked up mode that starts VMs and Docker Compose but skips server bootstrap wiring', function () {
     $script = file_get_contents(base_path('scripts/dev.sh'));
 
     expect($script)->toContain('local naked=false')
         ->and($script)->toContain('--naked')
-        ->and($script)->toContain('if [ "${#spin_args[@]}" -gt 0 ]; then')
-        ->and($script)->toContain('spin up -d "${spin_args[@]}"')
-        ->and($script)->toContain('spin up -d')
+        ->and($script)->toContain('if [ "${#compose_args[@]}" -gt 0 ]; then')
+        ->and($script)->toContain('docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d "${compose_args[@]}"')
+        ->and($script)->toContain('docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d')
         ->and($script)->toContain('if [ "$naked" = "true" ]; then')
         ->and($script)->toContain('Skipping coolify bootstrap and Flux VM wiring')
         ->and($script)->toContain('coolify_bootstrap_with_retry')
@@ -94,7 +94,7 @@ it('seeds bootstrapped Lima VMs into v5 development server state', function () {
 
     expect($script)->toContain('sync_v5_dev_lima_servers()')
         ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$ssh_user"')
-        ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" spin up -d')
+        ->and($script)->toContain('COOLIFY_CLI_SSH_USER="$(coolify_ssh_user)" docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d')
         ->and($script)->toContain('coold_vm_dns_name()')
         ->and($script)->toContain('$(coold_vm_dns_name "$index")')
         ->and($script)->toContain('v5:sync-dev-lima-servers')

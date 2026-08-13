@@ -61,7 +61,7 @@ The generated bootstrap command uses the container CLI, the repo-local copy of
 the Lima SSH key, and dev WireGuard endpoint overrides, for example:
 
 ```bash
-spin exec -T coolify /usr/local/bin/coolify init bootstrap \
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T coolify /usr/local/bin/coolify init bootstrap \
   --nodes "coold-dev.local,coold-dev-2.local" \
   --ssh-key "/var/www/html/.dev/lima/ssh_key" \
   --ssh-user "coolify" \

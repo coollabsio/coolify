@@ -16,8 +16,8 @@ Docker Compose-based dev setup with services: coolify (app), postgres, redis, so
 
 ```bash
 # Start dev environment (uses docker-compose.dev.yml)
-spin up                          # or: docker compose -f docker-compose.dev.yml up -d
-spin down                        # stop services
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down                        # stop services
 
 # Two local Coolify instances (isolated stacks; server transfer / multi-control-plane)
 ./scripts/dev-instances up                   # a:8000 + b:8001 (uses npm run build for CSS/JS)
