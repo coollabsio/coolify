@@ -1,6 +1,7 @@
 @import "./fonts.css" layer(base);
 
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @import "./utilities.css";
 
@@ -45,7 +46,7 @@
     --color-coolgray-500: #323232;
 
     /* Graphite design language (ported from ref/frontend). Layered neutral
-       surfaces + translucent hairlines. See UI_REDESIGN.md. */
+       surfaces + translucent hairlines. See DESIGN.md. */
     --color-app: #0c0c0d;
     /* Canvas: neutral near-black (oklch), not pure black */
     --color-panel: oklch(10% 0 0);
@@ -77,7 +78,13 @@
 
 @layer components {
     .terminal-mobile-key {
-        @apply min-h-10 rounded-md border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white shadow-inner active:bg-white/25;
+        @apply min-h-8 shrink-0 rounded-full border bg-transparent px-3 py-1 text-sm font-medium text-neutral-300 active:text-white;
+        border-color: color-mix(in srgb, var(--terminal-scrollbar, #fff) 24%, transparent);
+    }
+
+    .terminal-key-row {
+        border: 1px solid color-mix(in srgb, var(--terminal-scrollbar, #fff) 22%, transparent);
+        background: transparent;
     }
 
     /* Active state is a solid fill only (no accent rail / border). */
@@ -307,7 +314,7 @@ a {
 
 button:focus-visible,
 a:focus-visible {
-    @apply outline-none ring-2 ring-coollabs dark:ring-warning ring-offset-2 dark:ring-offset-coolgray-100;
+    @apply outline-none ring-2 ring-coollabs dark:ring-1 dark:ring-warning ring-offset-2 dark:ring-offset-coolgray-100;
 }
 
 label {
@@ -366,24 +373,24 @@ tr td:first-child {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
-/* Loading feedback uses the yellow brand accent consistently in dark mode. */
+/* Loading feedback uses the Coolify brand accent consistently in dark mode. */
 .dark .animate-spin {
-    color: var(--color-warning) !important;
+    color: var(--color-coollabs) !important;
 }
 
 .dark #nprogress .bar {
-    background: var(--color-warning) !important;
+    background: var(--color-coollabs) !important;
 }
 
 .dark #nprogress .peg {
     box-shadow:
-        0 0 10px var(--color-warning),
-        0 0 5px var(--color-warning) !important;
+        0 0 10px var(--color-coollabs),
+        0 0 5px var(--color-coollabs) !important;
 }
 
 .dark #nprogress .spinner-icon {
-    border-top-color: var(--color-warning) !important;
-    border-left-color: var(--color-warning) !important;
+    border-top-color: var(--color-coollabs) !important;
+    border-left-color: var(--color-coollabs) !important;
 }
 
 html[data-theme="custom"] .loading-indicator,
@@ -710,17 +717,6 @@ body.terminal-is-fullscreen .terminal-fullscreen-shell [data-terminal-mobile-too
 }
 
 html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-loading-label {
-    color: #52525b;
-}
-
-.terminal-session-expiry {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: rgb(255 255 255 / 0.6);
-}
-
-html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-expiry,
-html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-expiry {
     color: #52525b;
 }
 
@@ -2113,71 +2109,96 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .domains-table-grid {
-    grid-template-columns: minmax(0, 1.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 11rem 6.5rem;
+}
+
+.domains-table-grid-service {
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 6.5rem;
 }
 
 .domains-table-grid-compose {
-    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem 10rem 11rem 6.5rem;
+}
+
+.domains-mobile-label {
+    display: none;
 }
 
 /* Domains table: collapse secondary columns on tablet/phone */
 @media (max-width: 900px) {
     .domains-table-grid {
-        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 10rem 5.5rem;
         gap: 0.75rem;
     }
 
-    /* Hide "Last checked" (3rd of 4) */
-    .domains-table-grid > :nth-child(3) {
-        display: none;
+    .domains-table-grid-service {
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 5.5rem;
+        gap: 0.75rem;
     }
 
     .domains-table-grid-compose {
-        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 10rem 5.5rem;
         gap: 0.75rem;
     }
 
-    /* Hide "Service" (2) and "Last checked" (4) of 5 */
-    .domains-table-grid-compose > :nth-child(2),
-    .domains-table-grid-compose > :nth-child(4) {
+    /* Hide "Service" */
+    .domains-table-grid-compose > :nth-child(2) {
         display: none;
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .data-table-header.domains-table-grid,
+    .data-table-header.domains-table-grid-service,
     .data-table-header.domains-table-grid-compose {
         display: none;
     }
 
     .data-table-row.domains-table-grid,
+    .data-table-row.domains-table-grid-service,
     .data-table-row.domains-table-grid-compose {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
-            'domain actions'
-            'meta actions';
-        gap: 0.35rem 0.75rem;
+            'domain domain'
+            'meta actions'
+            'indexing indexing'
+            'direction direction';
+        gap: 0.5rem 0.75rem;
         align-items: start;
-        padding: 0.875rem 1rem;
+        padding: 0.75rem;
         min-height: 0;
+    }
+
+    .data-table-row.domains-row-without-direction {
+        grid-template-areas:
+            'domain domain'
+            'meta actions'
+            'indexing indexing';
+    }
+
+    .data-table-row.domains-table-grid.domains-row-without-direction > :nth-child(4),
+    .data-table-row.domains-table-grid-compose.domains-row-without-direction > :nth-child(5) {
+        display: none;
     }
 
     /* Domain cell */
     .data-table-row.domains-table-grid > :nth-child(1),
+    .data-table-row.domains-table-grid-service > :nth-child(1),
     .data-table-row.domains-table-grid-compose > :nth-child(1) {
         grid-area: domain;
         min-width: 0;
     }
 
     .data-table-row.domains-table-grid > :nth-child(1) a,
+    .data-table-row.domains-table-grid-service > :nth-child(1) a,
     .data-table-row.domains-table-grid-compose > :nth-child(1) a {
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
     }
 
-    /* Non-compose: 1 Domain, 2 DNS, 3 Last checked, 4 Actions */
+    /* Non-compose: 1 Domain, 2 DNS, 3 Indexing, 4 Direction, 5 Actions */
     .data-table-row.domains-table-grid > :nth-child(2) {
         grid-area: meta;
         display: flex !important;
@@ -2187,15 +2208,37 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid > :nth-child(3) {
-        display: none !important;
+        grid-area: indexing;
     }
 
     .data-table-row.domains-table-grid > :nth-child(4) {
+        grid-area: direction;
+    }
+
+    .data-table-row.domains-table-grid > :nth-child(5) {
         grid-area: actions;
         align-self: center;
     }
 
-    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Last checked, 5 Actions */
+    /* Compose service group: 1 Domain, 2 DNS, 3 Indexing, 4 Actions */
+    .data-table-row.domains-table-grid-service > :nth-child(2) {
+        grid-area: meta;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(3) {
+        grid-area: indexing;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(4) {
+        grid-area: actions;
+        align-self: center;
+    }
+
+    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Indexing, 5 Direction, 6 Actions */
     .data-table-row.domains-table-grid-compose > :nth-child(2) {
         display: none !important;
     }
@@ -2209,12 +2252,31 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid-compose > :nth-child(4) {
-        display: none !important;
+        grid-area: indexing;
     }
 
     .data-table-row.domains-table-grid-compose > :nth-child(5) {
+        grid-area: direction;
+    }
+
+    .data-table-row.domains-table-grid-compose > :nth-child(6) {
         grid-area: actions;
         align-self: center;
+    }
+
+    .domains-mobile-label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.6875rem;
+        font-weight: 500;
+        line-height: 1rem;
+        color: var(--coollabs-subtle);
+    }
+
+    .data-table-row.domains-table-grid .listbox-trigger,
+    .data-table-row.domains-table-grid-compose .listbox-trigger {
+        height: 2rem;
+        font-size: 0.8125rem;
     }
 
     /* Service name as badge under domain on mobile (compose only) */
@@ -2227,7 +2289,7 @@ input[type="search"]::-webkit-search-results-decoration {
     display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .domains-service-desktop {
         display: none !important;
     }
@@ -2407,12 +2469,26 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr);
 }
 
+@media (min-width: 1024px) {
+    .deployment-table-scroll {
+        overflow-x: visible;
+    }
+
+    .deployment-table-grid {
+        min-width: 0;
+    }
+}
+
 .dashboard-deployment-table-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem;
 }
 
 .team-members-table-grid {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem minmax(10rem, 0.9fr);
+}
+
+.team-members-table-grid-2fa {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem 4rem minmax(10rem, 0.9fr);
 }
 
 .admin-users-table-grid {
@@ -2479,6 +2555,10 @@ input[type="search"]::-webkit-search-results-decoration {
         grid-template-columns: minmax(0, 1fr) 7rem 7rem;
     }
 
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 7rem 4rem 7rem;
+    }
+
     .team-members-table-grid > :nth-child(2) {
         display: none;
     }
@@ -2528,6 +2608,10 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .team-members-table-grid {
         grid-template-columns: minmax(0, 1fr) 6.5rem;
+    }
+
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 4rem 6.5rem;
     }
 
     .team-members-table-grid > :nth-child(3) {
@@ -2673,6 +2757,16 @@ input[type="search"]::-webkit-search-results-decoration {
 
 /* Shared logs viewer (deployment + runtime) — mobile-first toolbar
    Mobile stacks: search → meta → full-width actions (no side-by-side overlap). */
+.logs-viewer {
+    background: #fff;
+    color: #262626;
+}
+
+.dark .logs-viewer {
+    background: var(--color-log);
+    color: #f5f5f5;
+}
+
 .logs-viewer-toolbar {
     flex-shrink: 0;
     border-bottom: 1px solid var(--color-neutral-200);
@@ -2934,7 +3028,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .logs-viewer-viewport {
     min-width: 0;
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.75rem 2rem;
 }
 
 .logs-viewer-line {
@@ -3024,7 +3118,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     }
 
     .logs-viewer-viewport {
-        padding: 0.5rem 1rem;
+        padding: 0.5rem 1rem 2rem;
     }
 
     .logs-viewer-line {

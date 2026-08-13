@@ -176,20 +176,12 @@
 
         const toggle = qs(root, '[data-sth-toggle]');
         if (toggle) {
-            if (isMobileSlot) {
-                // Compact pill: just "83ms" — no full metric breakdown in the bar.
-                toggle.style.padding = '4px 8px';
-                toggle.style.fontSize = '11px';
-                toggle.style.maxWidth = 'none';
-                toggle.style.overflow = 'visible';
-                toggle.style.whiteSpace = 'nowrap';
-            } else {
-                toggle.style.padding = '';
-                toggle.style.fontSize = '';
-                toggle.style.maxWidth = '100%';
-                toggle.style.overflow = 'hidden';
-                toggle.style.textOverflow = 'ellipsis';
-            }
+            // Keep the navbar pill compact at every breakpoint; details stay in the panel.
+            toggle.style.padding = '4px 8px';
+            toggle.style.fontSize = '11px';
+            toggle.style.maxWidth = 'none';
+            toggle.style.overflow = 'visible';
+            toggle.style.whiteSpace = 'nowrap';
         }
 
         const panel = qs(root, '[data-sth-panel]');
@@ -680,10 +672,8 @@
         const q = latest.metrics.queries !== undefined ? Math.round(Number(latest.metrics.queries)) + 'q' : '—';
         const db = latest.metrics.db !== undefined ? Number(latest.metrics.db).toFixed(0) + 'ms db' : '—';
         const n = history.length;
-        // Mobile navbar is tight — show only total app time; full breakdown lives in the panel.
-        const compactSummary = root.getAttribute('data-sth-mode') === 'docked'
-            && root.parentElement
-            && root.parentElement.id === 'server-timing-hud-slot-mobile';
+        // Navbar pills show only total app time; full breakdown lives in the panel.
+        const compactSummary = root.getAttribute('data-sth-mode') === 'docked';
         summary.textContent = compactSummary
             ? app
             : ('ST ' + app + ' · ' + db + ' · ' + q + (n > 1 ? ' · ×' + n : ''));

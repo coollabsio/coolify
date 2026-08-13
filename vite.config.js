@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
         viteHost
     ).trim();
     const vitePort = Number(process.env.VITE_PORT || env.VITE_PORT || 5173);
+    const viteProtocol = (
+        process.env.VITE_PROTOCOL ||
+        env.VITE_PROTOCOL ||
+        "http"
+    ).trim();
 
     return {
         resolve: {
@@ -34,10 +39,11 @@ export default defineConfig(({ mode }) => {
             allowedHosts: true,
             // App (:8000) and Vite (:5173) are different origins; allow any host in dev
             cors: true,
-            origin: `http://${viteHost}:${vitePort}`,
+            origin: `${viteProtocol}://${viteHost}:${vitePort}`,
             hmr: {
                 host: viteHmrHost,
                 clientPort: vitePort,
+                protocol: viteProtocol === "https" ? "wss" : "ws",
             },
         },
         plugins: [

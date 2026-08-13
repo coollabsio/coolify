@@ -41,3 +41,20 @@ it('uses the branded input focus state for the server filter', function () {
         ->toContain('<x-reicon name="check-circle"')
         ->not->toContain('<x-reicon name="check"');
 });
+
+it('groups all desktop proxy controls in the server actions dropdown', function () {
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+    $desktopActions = str($navbar)->after('id="server-desktop-actions"')->before('@endteleport')->toString();
+
+    expect($desktopActions)
+        ->toContain('Actions')
+        ->toContain('Traefik Dashboard')
+        ->toContain('name="external-link" class="size-3! opacity-70"')
+        ->toContain('class="flex size-4 shrink-0 items-center justify-center"')
+        ->toContain('Restart Proxy')
+        ->toContain('Stop Proxy')
+        ->toContain('Start Proxy')
+        ->toContain('Refresh Proxy Status')
+        ->toContain('listbox-panel')
+        ->not->toContain('<x-modal-confirmation');
+});

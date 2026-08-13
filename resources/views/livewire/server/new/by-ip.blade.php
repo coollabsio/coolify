@@ -83,9 +83,12 @@
                             helper="Non-root SSH users are experimental." />
                         <x-forms.input type="number" id="port" label="Port" required />
                     </div>
-                    <x-forms.checkbox id="is_build_server"
+                    <x-forms.listbox id="is_build_server"
                         helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
-                        label="Use as a dedicated build server" />
+                        label="Use as a dedicated build server" :options="[
+                            ['value' => false, 'label' => 'No'],
+                            ['value' => true, 'label' => 'Yes'],
+                        ]" />
                 </x-forms.collapsible>
             </x-application.settings-section>
         </form>

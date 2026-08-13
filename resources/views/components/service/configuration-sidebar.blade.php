@@ -13,7 +13,7 @@
         ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
         ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
         ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
-        ['label' => 'Runtime', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
+        ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
@@ -31,14 +31,17 @@
         ]);
 
     $menuGroups = [
-        'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Backups'],
-        'Automation' => ['Scheduled Tasks', 'Webhooks'],
-        'Logs' => ['Runtime'],
-        'Operations' => ['Terminal', 'Resource Operations', 'Tags', 'Danger Zone'],
+        'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
+        'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
+        'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
     ];
 
     $groupedItems = collect($menuGroups)
-        ->map(fn (array $labels) => $configurationItems->whereIn('label', $labels)->values())
+        ->map(fn (array $labels) => collect($labels)
+            ->map(fn (string $label) => $configurationItems->firstWhere('label', $label))
+            ->filter()
+            ->values())
         ->filter(fn ($items) => $items->isNotEmpty());
 @endphp
 

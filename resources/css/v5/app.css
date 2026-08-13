@@ -145,7 +145,7 @@
     }
 
     :where(a, button, input, select, textarea, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
-        @apply outline-none ring-2 ring-ring ring-offset-2;
+        @apply outline-none ring-2 dark:ring-1 ring-ring ring-offset-2;
     }
 
     html,

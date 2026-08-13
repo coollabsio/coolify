@@ -1,12 +1,12 @@
-# Coolify UI redesign
+# Coolify UI design system
 
-This branch restyles Coolify without changing its Livewire + Blade + Alpine +
-Tailwind v4 architecture. The visual system now covers the global shell,
+This document defines Coolify's UI design system for its Livewire + Blade +
+Alpine + Tailwind v4 frontend. The visual system covers the global shell,
 project and environment pages, application navigation, settings surfaces,
 tables, modals, toasts, terminals, and metrics.
 
-Use this file as the source of truth when updating another page. The older
-Graphite-only notes are no longer accurate.
+Use this file as the source of truth for frontend design work. Update it in the
+same change whenever a new shared visual pattern or component is introduced.
 
 Onboarding validation and live server validation checkpoints share
 `<x-checkpoint-item>` (idle / pending / running / success / error) inside a
@@ -18,10 +18,11 @@ compact divided list, not legacy green check SVGs or fixed-width status rows.
 >   view.
 > - Preserve routes, Livewire bindings, permissions, confirmations, and working
 >   interactions while changing layout and presentation.
-> - Do not write or run tests for this redesign branch.
+> - Add or update tests when a UI change affects behavior. Follow the testing
+>   requirements in `AGENTS.md`.
 > - Validate Blade with `docker exec coolify php artisan view:cache`, then clear
 >   it with `docker exec coolify php artisan view:clear`.
-> - Build frontend assets in the Vitee container with
+> - Build frontend assets in the Vite container with
 >   `docker exec coolify-vite npm run build`.
 > - Use existing components before adding another styling abstraction.
 
@@ -68,7 +69,7 @@ the end of `resources/css/app.css`, beginning at:
 
 Important consequences:
 
-- scope restyled forms with `.application-settings-form` or
+- scope settings forms with `.application-settings-form` or
   `.application-settings-workspace`;
 - add shared surface overrides to the unlayered block instead of stacking
   `!important` utilities;
@@ -191,10 +192,10 @@ instance Settings use a compact header followed by a small route-derived tab
 strip. The active tab uses the same purple-light/yellow-dark tint as resource
 tabs. Do not nest `<button>` elements inside tab links.
 
-### Route-family completion gate
+### Route-family consistency
 
-A redesign is not complete when only its index or most visible route has been
-updated. Treat every route family as one deliverable:
+Treat every route family as one cohesive experience rather than styling only
+its index or most visible route:
 
 - index, create, detail, settings, logs, metrics, backup, execution, and danger
   routes must share the same navigation hierarchy and surface language;
@@ -206,13 +207,13 @@ updated. Treat every route family as one deliverable:
 - create and edit routes stay inside the same layer-2 family instead of
   falling back to an isolated legacy page;
 - reusable partials, empty states, confirmation flows, and row editors must be
-  migrated with the page that exposes them;
+  updated with the page that exposes them;
 - audit the whole family for native selects, legacy heading blocks, old Save
   buttons, old status chips, and `coolbox`/`navbar-main`/`sub-menu-wrapper`
-  before marking the family complete.
+  to keep the family consistent.
 
-Do not report a family as redesigned while a sibling route still uses the old
-tabs, a large in-flow title, a browser select, or a different modal anatomy.
+Do not leave a sibling route using old tabs, a large in-flow title, a browser
+select, or a different modal anatomy.
 
 The New Resource page keeps its filter controls in the top layer card, then
 renders Applications, Databases, and Services as separate layer-card sections.
@@ -280,8 +281,8 @@ spacing utilities can silently collapse.
 Use `resources/views/components/application/settings-section.blade.php`.
 Older manual shells may use `.application-settings-section-header` and
 `.application-settings-section-body`; both must retain the same padded,
-action-aligned anatomy as the component. Prefer migrating new work to the
-component instead of creating another manual variant.
+action-aligned anatomy as the component. Use the component for new work and
+replace a manual shell when modifying it instead of creating another variant.
 
 ```blade
 <x-application.settings-section
@@ -371,8 +372,8 @@ between the label and control. Password visibility uses the outline Reicon
 
 ### Dropdowns
 
-Do not use native `<select>` on any redesigned route, including mobile
-fallbacks. Use:
+Do not use native `<select>` on application routes, including mobile fallbacks.
+Use:
 
 ```blade
 <x-forms.listbox id="property" label="Setting" :options="[
@@ -389,7 +390,7 @@ Keep checkboxes for compact permission matrices and multi-select lists. Those
 controls must use the shared `x-forms.checkbox` anatomy: an 18px rounded custom
 box, purple checked fill in light mode, yellow checked fill in dark mode, and a
 high-contrast check mark. Never expose the browser or Tailwind Forms default
-checkbox on a redesigned page.
+checkbox on application pages.
 
 The popup panel uses a 10px radius around 6px options with a 4px inset. Keep
 the option content left-aligned and size the panel to its content or trigger;
@@ -397,6 +398,34 @@ do not create an unnecessarily wide menu.
 
 Toolbar filter and sort buttons keep static labels (`Filter`, `Sort`). The
 selected option is indicated inside the menu, not repeated on the trigger.
+
+#### Livewire dropdown state synchronization
+
+Instant-save listboxes must not flash back to an older value while Livewire is
+saving or morphing the DOM. Treat the Alpine selection as the current visual
+state until its request finishes:
+
+- await the Livewire change handler and prevent overlapping selections while
+  it is running;
+- when a client-managed listbox can be rerendered by an unrelated or stale
+  Livewire response, use the listbox's `preserveValue` option so the morph does
+  not replace its newer Alpine value;
+- scope `preserveValue` to controls whose value is owned by that interaction;
+  do not use it when external server events must replace the displayed value;
+- after saving through a related model, refresh the parent component's loaded
+  relationship before rendering the response. A database write alone does not
+  update an already-loaded Eloquent collection;
+- use stable `wire:key` values for rows containing listboxes. Do not include the
+  selected value in the key, because recreating the Alpine component causes a
+  visible reset;
+- remember that a portalled options panel is teleported outside its visual
+  wrapper. Guard selection in the Alpine handler itself rather than relying
+  only on `pointer-events` or a disabled wrapper.
+
+The failure mode to avoid is: selection B is shown optimistically, selection A
+is chosen next, the response for B morphs the listbox back to B, then the later
+response finally shows A. The control should remain on the newest accepted
+selection throughout the save sequence.
 
 #### Multi-select filter dropdowns
 
@@ -527,6 +556,11 @@ that hide secondary columns before allowing horizontal overflow.
 - shared 32px controls;
 - no redundant description below a self-explanatory title;
 - custom listboxes instead of native browser selects;
+- listbox and dropdown panels must render above the modal body and escape its
+  scroll container. Never clip a panel at the modal boundary or make users
+  scroll the modal to see its options;
+- when there is not enough viewport space below the trigger, open the panel
+  above it while keeping the panel visually on top of the modal;
 - right-aligned footer actions below a divider;
 - compact action buttons, never a submit button stretched by a column layout.
 
@@ -648,11 +682,6 @@ Use these as implementation references:
 | Shared styling | `resources/css/app.css`, `resources/css/utilities.css` |
 | HTTP error pages | `resources/views/components/error-page.blade.php`, `resources/views/errors/*` |
 
-Already restyled application configuration surfaces include General, Advanced,
-Environment Variables, Persistent Storage, Servers, Scheduled Tasks, Webhooks,
-Preview Deployments, Healthcheck, Rollback, Resource Limits, Resource
-Operations, Metrics, Tags, and Danger Zone.
-
 HTTP error pages (400, 401, 402, 403, 404, 419, 429, 500, 503) use the shared
 `<x-error-page>` component on the public auth-style canvas: theme-aware status
 code, compact title and muted description, neutral `.button` actions, and an
@@ -661,7 +690,7 @@ oversized 200px status numbers.
 
 ---
 
-## 11. Restyling checklist
+## 11. UI implementation checklist
 
 1. Inventory every route and reusable partial in the family before editing.
 2. Read the current Blade and Livewire class before changing presentation.

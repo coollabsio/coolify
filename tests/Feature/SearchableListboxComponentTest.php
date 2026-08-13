@@ -52,3 +52,15 @@ test('searchable listbox keeps the helper outside the label association', functi
         ->toContain('aria-label="More information"')
         ->not->toMatch('/<label[^>]*for="tz-trigger"[^>]*>[\s\S]*aria-label="More information"[\s\S]*<\/label>/');
 });
+
+test('searchable listbox serializes change handlers', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/searchable-listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain('saving: false')
+        ->toContain('async choose(option)')
+        ->toContain('if (this.saving || option.disabled)')
+        ->toContain('await this.$wire.')
+        ->toContain("'pointer-events-none opacity-70': saving")
+        ->toContain('@elseif ($live && ! $onChange) @entangle($id).live');
+});

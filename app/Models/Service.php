@@ -94,6 +94,7 @@ class Service extends BaseModel
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
+        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
 
         $applicationImages = $this->applications()->get()->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
@@ -104,7 +105,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');

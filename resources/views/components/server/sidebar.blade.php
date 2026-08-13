@@ -83,7 +83,7 @@
         [
             'label' => 'Terminal',
             'route' => 'server.command',
-            'active' => request()->routeIs('server.command'),
+            'active' => $activeMenu === 'terminal',
             'icon' => 'browser-terminal',
             'group' => 'Operations',
             'navigate' => false,

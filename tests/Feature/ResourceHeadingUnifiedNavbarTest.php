@@ -113,17 +113,27 @@ it('places the account menu beside the desktop sidebar toggle while retaining it
         ->toContain("'bottom-full! left-0! right-auto! top-auto! mb-1!' => \$sidebar");
 });
 
-it('keeps application links next to advanced actions on the right', function () {
+it('keeps advanced operations in a separated section at the bottom of actions menus', function () {
     $application = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $links = file_get_contents(resource_path('views/components/applications/links.blade.php'));
 
-    $desktop = str($application)->after('resource-heading-actions flex')->toString();
-    $advancedPosition = strpos($desktop, '<x-applications.advanced');
-    $linksPosition = strpos($desktop, '<x-applications.links');
+    $applicationDesktop = str($application)->after('resource-heading-actions flex')->toString();
+    $serviceDesktop = str($service)->after('resource-heading-actions flex')->toString();
 
-    expect($advancedPosition)->not->toBeFalse()
-        ->and($linksPosition)->not->toBeFalse()
-        ->and($linksPosition)->toBeGreaterThan($advancedPosition)
+    expect($applicationDesktop)
+        ->not->toContain('<x-applications.advanced')
+        ->toContain('application-desktop-actions')
+        ->toContain('role="separator"')
+        ->toContain('Force deploy without cache')
+        ->and($serviceDesktop)
+        ->not->toContain('<x-services.advanced')
+        ->toContain('service-desktop-actions')
+        ->toContain('role="separator"')
+        ->toContain('Pull Latest Images & Restart')
+        ->toContain('Force Restart')
+        ->toContain('Force Deploy')
+        ->toContain('Force Cleanup Containers')
         ->and($links)->toContain("'right-0! left-auto! min-w-60! max-w-96!' => !\$fullWidth")
         ->and($links)->toContain('listbox-option justify-start! gap-2.5!')
         ->and($links)->not->toContain('md:left-0 md:right-auto');
@@ -146,15 +156,27 @@ it('groups application lifecycle controls in an actions dropdown', function () {
         ->toContain('Deploy');
 });
 
-it('shows deploy directly when it is the only available lifecycle action', function () {
+it('raises the desktop top bar while the service actions dropdown is open', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+
+    expect($layout)
+        ->toContain('resourceActionsOpen: false')
+        ->toContain("'z-[1000]': resourceActionsOpen")
+        ->toContain('@resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"')
+        ->and($heading)
+        ->toContain("\$dispatch('resource-actions-toggled', { open })");
+});
+
+it('keeps deploy in the actions menu alongside advanced operations', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
 
     expect($desktop)
         ->toContain("@if (str(\$application->status)->startsWith('exited'))")
-        ->toContain('id="application-desktop-deploy"')
-        ->toContain('@else')
-        ->toContain('id="application-desktop-actions"');
+        ->toContain('id="application-desktop-actions"')
+        ->toContain('Deploy')
+        ->toContain('Force deploy without cache');
 });
 
 it('moves application backups from the top tabs into the settings sidebar', function () {
@@ -177,19 +199,20 @@ it('moves application terminal and logs from the top tabs into the settings side
         ->not->toContain("'label' => 'Runtime'")
         ->and($sidebar)
         ->toContain("'label' => 'Terminal'")
-        ->toContain("'label' => 'Deployment'")
-        ->toContain("'label' => 'Runtime'")
-        ->toContain("'Logs' => ['Deployment', 'Runtime']")
-        ->toContain("'Operations' => ['Terminal', 'Rollback', 'Resource Limits'");
+        ->toContain("'label' => 'Deployment Logs'")
+        ->toContain("'label' => 'Runtime Logs'")
+        ->toContain("'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics']")
+        ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback'");
 });
 
 it('groups application automation pages separately from build and deploy', function () {
     $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
 
     expect($sidebar)
-        ->toContain("'Build & deploy' => ['Git Source', 'Servers', 'Healthcheck']")
-        ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Preview Deployments']")
-        ->toContain("'Operations' => ['Terminal', 'Rollback', 'Resource Limits'");
+        ->toContain("'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck']")
+        ->toContain("'Deploy' => ['Git Source', 'Servers', 'Preview Deployments']")
+        ->toContain("'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups']")
+        ->toContain("'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback'");
 });
 
 it('centers the rollback image loading state across the card', function () {
@@ -228,7 +251,24 @@ it('uses neutral icons for non-destructive resource actions', function () {
             ->not->toContain('class="size-3.5 text-orange-500')
             ->not->toContain('class="size-3.5 text-warning"')
             ->not->toContain('class="size-4 text-warning"')
-            ->toContain('name="stop" class="size-3.5 text-error"');
+            ->toContain('name="stop-circle"');
+    }
+});
+
+it('uses a circular stop icon in application and service action menus', function () {
+    $icons = file_get_contents(resource_path('views/components/reicon.blade.php'));
+
+    expect($icons)
+        ->toContain("'stop-circle' =>")
+        ->toContain('<circle cx="12" cy="12"')
+        ->toContain('<rect x="8.25" y="8.25"');
+
+    foreach (['application', 'service'] as $resource) {
+        $heading = file_get_contents(resource_path("views/livewire/project/{$resource}/heading.blade.php"));
+
+        expect($heading)
+            ->toContain('name="stop-circle" class="size-3.5 text-error"')
+            ->not->toContain('name="stop" class="size-3.5 text-error"');
     }
 });
 
@@ -291,7 +331,7 @@ it('removes desktop top spacing from the deployment log viewer', function () {
 it('uses a distinct runtime log icon in the sidebar', function () {
     $sidebar = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
 
-    expect($sidebar)->toContain("'Runtime' => 'unordered-list'");
+    expect($sidebar)->toContain("'Runtime Logs' => 'unordered-list'");
 });
 
 it('shows deployment history above the selected deployment logs', function () {

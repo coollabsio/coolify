@@ -18,7 +18,7 @@
             ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
             ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
             ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
-            ['label' => 'Runtime', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
+            ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
             ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
@@ -33,14 +33,17 @@
         ]);
 
         $menuGroups = [
-            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Backups'],
-            'Automation' => ['Scheduled Tasks', 'Webhooks'],
-            'Logs' => ['Runtime'],
-            'Operations' => ['Terminal', 'Resource Operations', 'Tags', 'Danger Zone'],
+            'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
+            'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
+            'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
         ];
 
         $groupedItems = collect($menuGroups)
-            ->map(fn (array $labels) => $configurationItems->whereIn('label', $labels)->values())
+            ->map(fn (array $labels) => collect($labels)
+                ->map(fn (string $label) => $configurationItems->firstWhere('label', $label))
+                ->filter()
+                ->values())
             ->filter(fn ($items) => $items->isNotEmpty());
 
         $storageSections = $applications
@@ -113,9 +116,9 @@
                             </div>
                             <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                                 <div
-                                    class="flex h-8 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                                    class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
                                     <button type="button" x-on:click="setViewMode('table')"
-                                        class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                                        class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                                         :class="viewMode === 'table'
                                             ? 'control-selected'
                                             : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
@@ -123,7 +126,7 @@
                                         <x-reicon name="unordered-list" class="size-3.5" />
                                     </button>
                                     <button type="button" x-on:click="setViewMode('grid')"
-                                        class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                                        class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                                         :class="viewMode === 'grid'
                                             ? 'control-selected'
                                             : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"

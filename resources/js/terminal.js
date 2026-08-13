@@ -196,6 +196,14 @@ export function initializeTerminalComponent() {
             isDocumentVisible: true,
             wasConnectedBeforeHidden: false,
             mobileToolbarCollapsed: false,
+            terminalModifier: null,
+            keyboardInset: 0,
+            keyboardAnchorTop: 0,
+            keyboardViewportHeight: 0,
+            keyboardViewportWidth: 0,
+            keyboardInsetSettleTimeout: null,
+            updateKeyboardInset: null,
+            syncKeyboardInset: null,
             // Inline style snapshots for ancestors unlocked while fullscreen (no DOM reparenting).
             fullscreenAncestorPatches: null,
             pageScrollLocked: false,
@@ -212,6 +220,53 @@ export function initializeTerminalComponent() {
 
             init() {
                 this.starting = this.$el.dataset.autoStart === 'true';
+                this.updateKeyboardInset = () => {
+                    const viewport = window.visualViewport;
+                    const viewportWidth = viewport?.width ?? window.innerWidth;
+                    const layoutHeight = Math.max(
+                        window.innerHeight,
+                        document.documentElement.clientHeight,
+                        viewport ? viewport.height + viewport.offsetTop : 0,
+                    );
+
+                    // Track the tallest viewport seen at this width — an open software
+                    // keyboard shrinks the visual viewport well below it. A large width
+                    // change (rotation) resets the baseline.
+                    if (Math.abs(this.keyboardViewportWidth - viewportWidth) > 80) {
+                        this.keyboardViewportHeight = layoutHeight;
+                    } else {
+                        this.keyboardViewportHeight = Math.max(this.keyboardViewportHeight, layoutHeight);
+                    }
+                    this.keyboardViewportWidth = viewportWidth;
+
+                    const visualBottom = viewport ? viewport.height + viewport.offsetTop : layoutHeight;
+                    this.keyboardInset = window.innerWidth < 640 && viewport
+                        ? Math.max(0, Math.round(this.keyboardViewportHeight - visualBottom))
+                        : 0;
+                    // position:fixed resolves `top` against the layout viewport and
+                    // visualViewport.offsetTop is relative to it, so offsetTop + height
+                    // is the exact bottom edge of the visible area — a toolbar pinned at
+                    // this anchor rides on top of the keyboard no matter how the browser
+                    // reports keyboard geometry (iOS overlay or Android layout resize).
+                    this.keyboardAnchorTop = Math.round(visualBottom);
+
+                    this.syncFullscreenShellWithKeyboard(viewport);
+
+                    if (this.fullscreen) {
+                        this.$nextTick(() => this.resizeTerminal());
+                    }
+                };
+                this.syncKeyboardInset = () => {
+                    // iOS fires viewport events mid keyboard animation — re-measure once
+                    // the keyboard settles.
+                    this.updateKeyboardInset();
+                    clearTimeout(this.keyboardInsetSettleTimeout);
+                    this.keyboardInsetSettleTimeout = setTimeout(this.updateKeyboardInset, 250);
+                };
+                this.updateKeyboardInset();
+                window.visualViewport?.addEventListener('resize', this.syncKeyboardInset);
+                window.visualViewport?.addEventListener('scroll', this.syncKeyboardInset);
+                window.addEventListener('resize', this.syncKeyboardInset);
                 this.themeObserver = new MutationObserver(() => {
                     if (this.selectedTheme === 'system') {
                         applicationTerminalThemes.system = createSystemTerminalTheme();
@@ -257,7 +312,7 @@ export function initializeTerminalComponent() {
                     }
                     this.$nextTick(() => {
                         if (active) {
-                            this.$refs.terminalWrapper.style.display = 'block';
+                            this.$refs.terminalWrapper.style.removeProperty('display');
                             this.resizeTerminal();
 
                             // Start observing terminal wrapper for resize changes
@@ -266,8 +321,11 @@ export function initializeTerminalComponent() {
                             }
                         } else {
                             const terminalElement = document.getElementById('terminal');
-                            this.$refs.terminalWrapper.style.display =
-                                terminalElement?.dataset.terminalStyle === 'application' ? 'block' : 'none';
+                            if (terminalElement?.dataset.terminalStyle === 'application') {
+                                this.$refs.terminalWrapper.style.removeProperty('display');
+                            } else {
+                                this.$refs.terminalWrapper.style.display = 'none';
+                            }
 
                             // Stop observing when terminal is inactive
                             if (this.resizeObserver) {
@@ -305,6 +363,10 @@ export function initializeTerminalComponent() {
             },
 
             cleanup() {
+                window.visualViewport?.removeEventListener('resize', this.syncKeyboardInset);
+                window.visualViewport?.removeEventListener('scroll', this.syncKeyboardInset);
+                window.removeEventListener('resize', this.syncKeyboardInset);
+                clearTimeout(this.keyboardInsetSettleTimeout);
                 this.checkIfProcessIsRunningAndKillIt();
                 this.clearAllTimers();
                 this.connectionState = 'disconnected';
@@ -848,6 +910,10 @@ export function initializeTerminalComponent() {
 
             destroy() {
                 this.themeObserver?.disconnect();
+                window.visualViewport?.removeEventListener('resize', this.syncKeyboardInset);
+                window.visualViewport?.removeEventListener('scroll', this.syncKeyboardInset);
+                window.removeEventListener('resize', this.syncKeyboardInset);
+                clearTimeout(this.keyboardInsetSettleTimeout);
             },
 
 
@@ -856,7 +922,6 @@ export function initializeTerminalComponent() {
                     return;
                 }
 
-                this.term.focus();
                 this.sendMessage({ message: data });
             },
 
@@ -868,12 +933,33 @@ export function initializeTerminalComponent() {
                     arrowLeft: '\x1b[D',
                     tab: '\t',
                     escape: '\x1b',
-                    ctrlC: '\x03'
+                    ctrlC: '\x03',
+                    ctrlBackslash: '\x1c',
+                    ctrlS: '\x13',
+                    ctrlZ: '\x1a'
                 };
 
                 if (terminalSequences[sequence]) {
+                    this.terminalModifier = null;
                     this.sendTerminalInput(terminalSequences[sequence]);
                 }
+            },
+
+            toggleTerminalModifier(modifier) {
+                this.terminalModifier = this.terminalModifier === modifier ? null : modifier;
+            },
+
+            sendTerminalKey(key) {
+                let input = key;
+
+                if (this.terminalModifier === 'ctrl') {
+                    input = String.fromCharCode(key.toUpperCase().charCodeAt(0) & 31);
+                } else if (this.terminalModifier === 'alt') {
+                    input = `\x1b${key}`;
+                }
+
+                this.terminalModifier = null;
+                this.sendTerminalInput(input);
             },
 
             async pasteFromClipboard() {
@@ -979,6 +1065,29 @@ export function initializeTerminalComponent() {
                 this.sendMessage({ checkActive: 'force' });
             },
 
+            /**
+             * While the software keyboard is open, shrink the fullscreen shell to the
+             * visual viewport so xterm rows and the mobile key row stay visible above
+             * the keyboard. Inline !important is required to outrank the stylesheet's
+             * `inset: 0 !important` / `height: auto !important` fullscreen rules.
+             */
+            syncFullscreenShellWithKeyboard(viewport) {
+                const wrapper = this.$refs.terminalWrapper;
+                if (!wrapper) {
+                    return;
+                }
+
+                if (this.fullscreen && viewport && this.keyboardInset > 0) {
+                    wrapper.style.setProperty('top', `${Math.round(viewport.offsetTop)}px`, 'important');
+                    wrapper.style.setProperty('height', `${Math.round(viewport.height)}px`, 'important');
+                    wrapper.style.setProperty('bottom', 'auto', 'important');
+                } else {
+                    wrapper.style.removeProperty('top');
+                    wrapper.style.removeProperty('height');
+                    wrapper.style.removeProperty('bottom');
+                }
+            },
+
             makeFullscreen() {
                 if (this.fullscreen) {
                     this.exitFullscreen();
@@ -1012,6 +1121,7 @@ export function initializeTerminalComponent() {
                 this.fullscreen = true;
                 document.documentElement.classList.add('terminal-is-fullscreen');
                 document.body.classList.add('terminal-is-fullscreen');
+                this.updateKeyboardInset?.();
                 this.scheduleTerminalResize();
             },
 
@@ -1032,6 +1142,7 @@ export function initializeTerminalComponent() {
 
                 // Recover from older portal builds that left the terminal on <body>.
                 this.salvageStrayFullscreenNodes();
+                this.updateKeyboardInset?.();
                 this.scheduleTerminalResize();
             },
 

@@ -11,11 +11,15 @@ test('active deployment log controls use a coollabs background and white icon', 
 
 test('deployment logs use light surfaces in light mode and dark surfaces in dark mode', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
 
     expect($view)
         ->toContain('bg-white text-neutral-800')
-        ->toContain('dark:bg-[#0d0d0d] dark:text-neutral-100')
-        ->toContain('border-neutral-200 shadow-sm dark:border-neutral-800')
+        ->toContain('dark:bg-log dark:text-neutral-100')
+        ->toContain('border-neutral-200 shadow-sm dark:border-coolgray-200')
         ->toContain('border-neutral-200! bg-white!')
-        ->toContain('dark:border-white/[0.08]! dark:bg-white/[0.05]!');
+        ->toContain('dark:border-white/[0.08]! dark:bg-white/[0.05]!')
+        ->and($styles)
+        ->toMatch('/\.logs-viewer\s*\{[^}]*background:\s*#fff;[^}]*color:\s*#262626;/s')
+        ->toMatch('/\.dark \.logs-viewer\s*\{[^}]*background:\s*var\(--color-log\);/s');
 });

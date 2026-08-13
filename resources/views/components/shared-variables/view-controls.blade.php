@@ -14,15 +14,15 @@
     </div>
 
     <div
-        class="flex h-8 w-fit items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+        class="flex h-9 w-fit items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
         <button type="button" @click="viewMode = 'list'; localStorage.setItem('{{ $storageKey }}', 'list')"
-            class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
             :class="viewMode === 'list' ? 'control-selected' : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
             aria-label="List view" title="List view">
             <x-reicon name="unordered-list" class="size-3.5" />
         </button>
         <button type="button" @click="viewMode = 'grid'; localStorage.setItem('{{ $storageKey }}', 'grid')"
-            class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
             :class="viewMode === 'grid' ? 'control-selected' : 'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
             aria-label="Grid view" title="Grid view">
             <x-reicon name="grid" class="size-3.5" />

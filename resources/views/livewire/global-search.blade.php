@@ -3,6 +3,9 @@
     selectedIndex: -1,
     isSearching: false,
     isLoadingInitialData: false,
+    showLoadingSpinner: false,
+    spinnerTimer: null,
+    closeResetTimer: null,
     isPaletteTransitioning: false,
     allSearchableItems: [],
     searchQuery: '',
@@ -97,40 +100,66 @@
             console.warn('Global search: $wire not available, skipping open');
             return;
         }
+        clearTimeout(this.closeResetTimer);
+        clearTimeout(this.spinnerTimer);
         this.modalOpen = true;
         this.selectedIndex = -1;
         this.isLoadingInitialData = true;
+        this.showLoadingSpinner = false;
         this.searchQuery = '';
+        // Only show the spinner when loading takes longer than 150ms, so fast (cached) loads do not flash the icon
+        this.spinnerTimer = setTimeout(() => {
+            if (this.isLoadingInitialData) this.showLoadingSpinner = true;
+        }, 150);
         $wire.openSearchModal().then(() => {
             this.allSearchableItems = $wire.allSearchableItems || [];
             this.creatableItems = $wire.creatableItems || [];
+            clearTimeout(this.spinnerTimer);
             this.isLoadingInitialData = false;
+            this.showLoadingSpinner = false;
             setTimeout(() => this.$refs.searchInput?.focus(), 50);
         }).catch(() => {
             // Handle case where component was destroyed during navigation
+            clearTimeout(this.spinnerTimer);
             this.modalOpen = false;
             this.isLoadingInitialData = false;
+            this.showLoadingSpinner = false;
         });
     },
     closeModal() {
         this.modalOpen = false;
         this.selectedIndex = -1;
         this.isSearching = false;
-        this.isLoadingInitialData = false;
-        this.searchQuery = '';
-        this.allSearchableItems = [];
-        this.isPaletteTransitioning = false;
-        // Ensure scroll is restored
-        document.body.style.overflow = '';
-        // Use $wire instead of @this for SPA navigation compatibility
-        if ($wire) {
-            $wire.closeSearchModal();
-        }
+        // Keep the palette content intact until the leave animation (100ms) ends,
+        // otherwise the panel collapses to header height while it fades out
+        clearTimeout(this.closeResetTimer);
+        this.closeResetTimer = setTimeout(() => {
+            this.isLoadingInitialData = false;
+            this.showLoadingSpinner = false;
+            this.searchQuery = '';
+            this.allSearchableItems = [];
+            this.isPaletteTransitioning = false;
+        }, 150);
     },
     runPaletteTransition(callback) {
         this.isPaletteTransitioning = true;
         return Promise.resolve(callback()).finally(() => {
             this.isPaletteTransitioning = false;
+        });
+    },
+    preselectFirstResult() {
+        this.$nextTick(() => {
+            const results = Array.from(this.$el.querySelectorAll('.search-result-item'))
+                .filter(item => item.offsetParent !== null);
+
+            if (results.length === 0) {
+                this.selectedIndex = -1;
+                return;
+            }
+
+            this.selectedIndex = 0;
+            results[0].focus();
+            results[0].scrollIntoView({ block: 'nearest' });
         });
     },
     navigateResults(direction) {
@@ -299,28 +328,28 @@
 }">
 
     <!-- Command palette -->
-    <div x-show="modalOpen" x-cloak
+    <div x-cloak :class="modalOpen ? 'pointer-events-auto' : 'pointer-events-none'"
         class="fixed inset-0 z-99 flex items-start justify-center px-4 pt-[12vh]">
-            <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]">
+            <div x-show="modalOpen" @click="closeModal()"
+                x-transition:enter="animate-in fade-in-0 duration-150"
+                x-transition:leave="animate-out fade-out-0 duration-100 fill-mode-forwards"
+                class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]">
             </div>
             <div x-show="modalOpen" x-trap.inert="modalOpen"
-                x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })"
-                x-transition:enter="ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-2 scale-[0.98]"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100" x-transition:leave="ease-in duration-100"
-                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-2 scale-[0.98]"
+                x-transition:enter="animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-150"
+                x-transition:leave="animate-out fade-out-0 zoom-out-95 slide-out-to-top-2 duration-100 fill-mode-forwards"
                 class="command-palette relative mx-auto"
                 @click.stop>
 
                 <!-- Search input -->
                 <div class="command-palette-header">
-                    <span class="command-palette-header-icon" :class="isLoadingInitialData && 'is-loading'">
-                        <svg x-show="!isLoadingInitialData" class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <span class="command-palette-header-icon" :class="showLoadingSpinner && 'is-loading'">
+                        <svg x-show="!showLoadingSpinner" class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path fill-rule="evenodd" clip-rule="evenodd"
                                 d="M11.5 2.75C6.66751 2.75 2.75 6.66751 2.75 11.5C2.75 16.3325 6.66751 20.25 11.5 20.25C16.3325 20.25 20.25 16.3325 20.25 11.5C20.25 6.66751 16.3325 2.75 11.5 2.75ZM1.25 11.5C1.25 5.83908 5.83908 1.25 11.5 1.25C17.1609 1.25 21.75 5.83908 21.75 11.5C21.75 14.0605 20.8111 16.4017 19.2589 18.1982L22.5303 21.4697C22.8232 21.7626 22.8232 22.2374 22.5303 22.5303C22.2374 22.8232 21.7626 22.8232 21.4697 22.5303L18.1982 19.2589C16.4017 20.8111 14.0605 21.75 11.5 21.75C5.83908 21.75 1.25 17.1609 1.25 11.5Z"
                                 fill="currentColor" />
                         </svg>
-                        <svg x-show="isLoadingInitialData" x-cloak class="size-4 animate-spin" viewBox="0 0 24 24" fill="none"
+                        <svg x-show="showLoadingSpinner" x-cloak class="size-4 animate-spin" viewBox="0 0 24 24" fill="none"
                             aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
                             <path class="opacity-75" fill="currentColor"
@@ -372,7 +401,7 @@
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
                                 wire:target="selectServer,selectDestination,selectProject,selectEnvironment">
                             @if ($selectedServerId === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
@@ -419,7 +448,7 @@
                             @endif
 
                             @if ($selectedServerId !== null && $selectedDestinationUuid === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
@@ -467,7 +496,7 @@
                             @endif
 
                             @if ($selectedDestinationUuid !== null && $selectedProjectUuid === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">
@@ -515,7 +544,7 @@
                             @endif
 
                             @if ($selectedProjectUuid !== null && $selectedEnvironmentUuid === null)
-                                <div x-init="selectedIndex = -1">
+                                <div x-init="preselectFirstResult()">
                                     <div class="command-palette-step-header">
                                         <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
                                             title="Back">

@@ -63,7 +63,7 @@
                             class="absolute top-9 right-0 z-50 w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
                             <template x-for="option in sortOptions" :key="option.value">
                                 <button type="button"
-                                    class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                    class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                     x-on:click="sortBy = option.value; sortOpen = false; page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
                                     <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
@@ -77,9 +77,9 @@
                     </div>
 
                     <div
-                        class="flex h-8 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
                         <button type="button" x-on:click="setViewMode('table')"
-                            class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
                                 ?
                                 'control-selected' :
@@ -88,7 +88,7 @@
                             <x-reicon name="unordered-list" class="size-3.5" />
                         </button>
                         <button type="button" x-on:click="setViewMode('grid')"
-                            class="flex size-6.5 items-center justify-center rounded-md transition-colors"
+                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'grid'
                                 ?
                                 'control-selected' :
@@ -133,12 +133,12 @@
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     <a x-show="project.addResourceHref" :href="project.addResourceHref"
                                         {{ wireNavigate() }}
-                                        class="flex size-6.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                        class="flex size-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                         title="Add resource" :aria-label="`Add resource to ${project.name}`">
                                         <x-reicon name="plus" class="size-3" />
                                     </a>
                                     <a x-show="project.settingsHref" :href="project.settingsHref" {{ wireNavigate() }}
-                                        class="flex size-6.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                        class="flex size-7.5 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
                                         title="Project settings" :aria-label="`Open settings for ${project.name}`">
                                         <x-reicon name="settings" class="size-3" />
                                     </a>

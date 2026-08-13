@@ -6,7 +6,8 @@
     }
 }">
     <form wire:submit='submit' class="application-settings-form flex flex-col">
-        <x-unsaved-bar action="submit" />
+        <x-unsaved-bar action="submit"
+            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
         <div class="application-settings-grid flex flex-col gap-6">
             <x-application.settings-section id="application-details-section" title="Application details" helper="Name the application and choose the build strategy Coolify should use to deploy it." class="application-details-card">
             @if ($buildPack === 'dockercompose')
@@ -302,7 +303,7 @@
             @endif
             @if ($buildPack === 'dockercompose')
                 <div x-data="{ showRaw: true }" class="mt-5">
-                    <div class="flex items-center justify-between gap-4">
+                    <div class="mb-2 flex items-center justify-between gap-4">
                         <h3>Docker Compose</h3>
                         <x-forms.button x-show="{{ $application->settings->is_raw_compose_deployment_enabled ? 'false' : 'true' }}"
                             @click.prevent="showRaw = !showRaw"

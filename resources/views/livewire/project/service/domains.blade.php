@@ -94,7 +94,9 @@
             @endif
             @can('update', $service)
                 @if ($serviceAppCount > 0)
-                    @include('livewire.project.shared.cloudflare-autoconfigure')
+                    <div class="relative shrink-0">
+                        @include('livewire.project.shared.cloudflare-autoconfigure')
+                    </div>
                     <x-modal-input title="Add domain" :closeOutside="false" :wireIgnore="false"
                         canGate="update" :canResource="$service">
                         <x-slot:content>
@@ -106,20 +108,15 @@
                         </x-slot:content>
                         <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
                             {{-- Always show which service receives the domain --}}
-                            <x-forms.select canGate="update" :canResource="$service" label="Service application"
-                                id="newServiceApplicationId" required
-                                helper="Domain will be assigned to this compose service application.">
-                                @foreach ($serviceApps as $app)
-                                    <option value="{{ $app['id'] }}">
-                                        {{ $app['name'] }}{{ filled($app['image'] ?? null) ? ' ('.$app['image'].')' : '' }}
-                                    </option>
-                                @endforeach
-                            </x-forms.select>
+                            <x-forms.listbox label="Service application" id="newServiceApplicationId" required
+                                helper="Domain will be assigned to this compose service application."
+                                :options="collect($serviceApps)->map(fn ($app) => [
+                                    'value' => $app['id'],
+                                    'label' => $app['name'].(filled($app['image'] ?? null) ? ' ('.$app['image'].')' : ''),
+                                ])->values()->all()"
+                                :disabled="! auth()->user()->can('update', $service)" />
 
-                            <x-forms.input canGate="update" :canResource="$service" id="newDomain" label="Domain URL"
-                                placeholder="https://app.example.com"
-                                helper="Full URL including scheme. Optional path and container port are supported.<br><br><span class='text-helper'>Examples</span><br>- https://app.coolify.io<br>- https://app.coolify.io/api/v3<br>- https://app.coolify.io:3000<br>- https://app.coolify.io:8080/api"
-                                required />
+                            <x-forms.domain-input id="newDomain" />
 
                             @if ($addDomainDnsFailed)
                                 <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -177,31 +174,12 @@
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
                     $heading = \Illuminate\Support\Str::headline($app['name'] ?? $rows->first()['service_name'] ?? 'Service');
-                    $redirect = $serviceRedirects[$appId] ?? 'both';
-                    $redirectLabel = match ($redirect) {
-                        'www' => 'Redirect to www',
-                        'non-www' => 'Redirect to non-www',
-                        default => 'Allow both',
-                    };
                 @endphp
                 <section id="service-domain-group-{{ $appId }}" wire:key="service-domain-group-{{ $appId }}"
                     x-show="matchesDomainSearch(@js($heading.' '.$rows->pluck('url')->implode(' ')))"
                     class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
-                    <div class="flex w-full items-center gap-3 px-4 py-3">
+                    <div class="flex w-full items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
-                        @can('update', $service)
-                            <div class="w-52 shrink-0"
-                                wire:loading.class="opacity-50" wire:target="serviceRedirects.{{ $appId }}">
-                                <x-forms.listbox id="serviceRedirects.{{ $appId }}"
-                                    htmlId="service-domain-redirect-{{ $appId }}" live :options="[
-                                        ['value' => 'both', 'label' => 'Allow www & non-www'],
-                                        ['value' => 'www', 'label' => 'Redirect to www'],
-                                        ['value' => 'non-www', 'label' => 'Redirect to non-www'],
-                                    ]" />
-                            </div>
-                        @else
-                            <span class="shrink-0 text-sm text-neutral-600 dark:text-fg-dim">{{ $redirectLabel }}</span>
-                        @endcan
                     </div>
 
                     <div wire:key="service-domain-rows-{{ $appId }}-{{ md5(serialize($rows->all())) }}">
@@ -210,7 +188,7 @@
                             'domainRows' => $domainRows,
                             'service' => $service,
                             'showServiceColumn' => false,
-                            'showHeader' => false,
+                            'showHeader' => true,
                         ])
                     </div>
                 </section>
@@ -265,19 +243,8 @@
                                     </p>
                                 </div>
 
-                                <div class="w-full">
-                                    <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
-                                        <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4" for="editingDomainLocal">
-                                            Domain URL <x-highlighted text="*" />
-                                        </label>
-                                    </div>
-                                    <input id="editingDomainLocal" type="url" class="input" required
-                                        placeholder="https://app.example.com"
-                                        x-model="localEditingDomain" />
-                                    @error('editingDomain')
-                                        <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
-                                    @enderror
-                                </div>
+                                <x-forms.domain-input id="editingDomainLocal" errorId="editingDomain" :wire="false"
+                                    x-model="localEditingDomain" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">

@@ -3,9 +3,11 @@
 namespace App\Livewire\Project\Service;
 
 use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
+use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -16,6 +18,8 @@ class Domains extends Component
 {
     use AuthorizesRequests;
     use InteractsWithCloudflareDomainConnect;
+
+    protected bool $notifyRedirectUpdate = true;
 
     public Service $service;
 
@@ -112,6 +116,23 @@ class Domains extends Component
         $this->service->refresh();
         $this->service->load(['applications', 'server']);
         $this->loadDomainState();
+    }
+
+    public function toggleNoindexDomain(int $serviceApplicationId, string $domain, string|bool $indexing): void
+    {
+        $application = $this->service->applications()->findOrFail($serviceApplicationId);
+        $this->authorize('update', $application);
+
+        $noindex = $indexing === true || $indexing === 'noindex';
+        $domains = $application->noindexDomains();
+        $domains = $noindex ? $domains->push($domain) : $domains->reject(fn (string $item) => $item === $domain);
+
+        $application->setNoindexDomains($domains);
+        $application->save();
+        $this->service->parse();
+        $this->refreshDomains();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Search engine indexing updated.');
     }
 
     public function loadDomainState(): void
@@ -614,13 +635,16 @@ class Domains extends Component
             $this->serviceRedirects[$serviceApplicationId] = $redirect;
             $this->pendingRedirectServiceApplicationId = $serviceApplicationId;
 
-            $saved = DB::transaction(function () use ($app, $redirect): bool {
+            $addedDomains = [];
+            $saved = DB::transaction(function () use ($app, $redirect, &$addedDomains): bool {
                 // Promote the optional www/non-www suggestion to a real domain for redirects.
                 if (in_array($redirect, ['www', 'non-www'], true)) {
+                    $domainsBeforePairing = collect($this->splitDomains($app->fqdn));
                     if (! $this->ensureWwwNonWwwPairsConfigured($app)) {
                         return false;
                     }
                     $app->refresh();
+                    $addedDomains = collect($this->splitDomains($app->fqdn))->diff($domainsBeforePairing)->values()->all();
                 }
 
                 $domains = collect($this->splitDomains($app->fqdn));
@@ -644,10 +668,13 @@ class Domains extends Component
             $this->pendingRedirectServiceApplicationId = null;
             $this->forceSaveDomains = false;
             $this->forceRemovePort = false;
-            $this->dispatch('success', 'Redirect updated.');
+            if ($this->notifyRedirectUpdate) {
+                $this->dispatch('success', 'Redirect updated.');
+            }
             $this->dispatch('configurationChanged');
             $this->pruneDomainDnsStatusesToCurrentDomains();
             $this->refreshDomains();
+            $this->checkUrlsDns($addedDomains, $serviceApplicationId);
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -938,6 +965,7 @@ class Domains extends Component
             $newUrl = $this->splitDomains($normalized)[0];
             $oldUrl = $this->domainRows[$this->editingIndex]['url'];
             $current = collect($this->splitDomains($app->fqdn));
+            $wasNoindexed = $app->isDomainNoindexed($oldUrl);
 
             if ($newUrl !== $oldUrl && $current->contains($newUrl)) {
                 $this->addError('editingDomain', "Domain {$newUrl} is already configured for this service.");
@@ -962,6 +990,13 @@ class Domains extends Component
             if (! $this->saveDomainListForApp($app, $updated)) {
                 return;
             }
+
+            $noindexDomains = $app->noindexDomains()->reject(fn (string $domain) => $domain === $oldUrl);
+            if ($wasNoindexed) {
+                $noindexDomains->push($newUrl);
+            }
+            $app->setNoindexDomains($noindexDomains);
+            $app->save();
 
             $this->cancelEdit();
             $this->dispatch('edit-domain-saved');
@@ -1091,12 +1126,9 @@ class Domains extends Component
             $domain = generateUrl(server: $server, random: new_public_id());
             $requiredPort = $app->getRequiredPort();
             if ($requiredPort !== null) {
-                $parts = parse_url($domain);
-                if (is_array($parts) && empty($parts['port'])) {
-                    $scheme = $parts['scheme'] ?? 'https';
-                    $host = $parts['host'] ?? '';
-                    $path = $parts['path'] ?? '';
-                    $domain = "{$scheme}://{$host}:{$requiredPort}{$path}";
+                $parts = DomainUrlParts::split($domain);
+                if ($parts['port'] === '') {
+                    $domain = DomainUrlParts::compose($parts['scheme'], $parts['host'], (string) $requiredPort, $parts['path']);
                 }
             }
 

@@ -13,10 +13,29 @@
         'pending' => 'DNS pending',
         default => 'DNS unknown',
     };
-    $checkedAt = ! empty($row['checked_at'])
-        ? \Illuminate\Support\Carbon::parse($row['checked_at'])->diffForHumans()
+    $gridClass = $domainGridClass ?? (($isCompose ?? false) ? 'domains-table-grid-compose' : 'domains-table-grid');
+    $domainParts = $isSuggested ? null : parse_url($row['url']);
+    $faviconUrl = is_array($domainParts) && isset($domainParts['scheme'], $domainParts['host'])
+        ? $domainParts['scheme'].'://'.$domainParts['host'].(isset($domainParts['port']) ? ':'.$domainParts['port'] : '').'/favicon.ico'
         : null;
-    $gridClass = ($isCompose ?? false) ? 'domains-table-grid-compose' : 'domains-table-grid';
+    $redirectPairKey = function (string $url): string {
+        $parts = parse_url($url);
+        if (! is_array($parts) || ! isset($parts['host'])) {
+            return $url;
+        }
+
+        $host = preg_replace('/^www\./i', '', $parts['host']);
+
+        return strtolower(($parts['scheme'] ?? '').'://'.$host.':'.($parts['port'] ?? '').($parts['path'] ?? ''));
+    };
+    $pairKey = $redirectPairKey($row['url']);
+    $firstPairRowIndex = collect($domainRows)
+        ->reject(fn ($item) => (bool) ($item['is_suggested'] ?? false))
+        ->filter(fn ($item) => ($item['service'] ?? null) === ($row['service'] ?? null))
+        ->filter(fn ($item) => $redirectPairKey($item['url']) === $pairKey)
+        ->keys()
+        ->first();
+    $showDirection = ($showDirectionControl ?? true) && ! $isSuggested && $firstPairRowIndex === $index;
 @endphp
 
 <div wire:key="domain-row-{{ $index }}-{{ md5(($isSuggested ? 's:' : '') . $row['url'] . '|' . ($row['service'] ?? '')) }}"
@@ -25,6 +44,7 @@
         'data-table-row',
         $gridClass,
         'domains-row-suggested' => $isSuggested,
+        'domains-row-without-direction' => ! $showDirection,
     ])>
         <div class="flex min-w-0 flex-col gap-1">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -35,8 +55,20 @@
                         {{ $row['url'] }}
                     </span>
                 @else
+                    @if ($faviconUrl)
+                        <span class="relative size-4 shrink-0" aria-hidden="true">
+                            <x-reicon name="globe"
+                                class="domain-favicon-fallback size-4 text-neutral-400 dark:text-fg-faint" />
+                            <img src="{{ $faviconUrl }}" alt="" loading="lazy" decoding="async"
+                                referrerpolicy="no-referrer"
+                                x-init="if ($el.complete && $el.naturalWidth > 0) { $el.previousElementSibling.classList.add('hidden'); $el.classList.remove('invisible') }"
+                                x-on:load="$el.previousElementSibling.classList.add('hidden'); $el.classList.remove('invisible')"
+                                x-on:error="$el.remove()"
+                                class="invisible absolute inset-0 size-4 rounded-sm" />
+                        </span>
+                    @endif
                     <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank"
-                        class="min-w-0 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
+                        class="min-w-0 flex-1 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
                         title="{{ $row['url'] }}">
                         {{ $row['url'] }}
                     </a>
@@ -73,10 +105,54 @@
             @endif
         </div>
 
-        <div class="min-w-0 truncate text-[13px] text-neutral-500 dark:text-fg-dim"
-            title="{{ $checkedAt ?? '' }}">
-            {{ $checkedAt ?: '-' }}
+        <div class="min-w-0" title="Search engine indexing">
+            @unless ($isSuggested)
+                <span class="domains-mobile-label">Search engine indexing</span>
+            @endunless
+            @if ($isSuggested)
+                <span class="text-[13px] text-neutral-500 dark:text-fg-dim">-</span>
+            @elseif (auth()->user()?->can('update', $application) && ! $labelsAreWritable)
+                <x-forms.listbox id="domain-indexing-{{ $index }}" :wire="false"
+                    preserveValue
+                    :value="$application->isDomainNoindexed($row['url']) ? 'noindex' : 'index'"
+                    onChange="toggleNoindexDomain" :onChangeArgs="[$row['url']]" portal :options="[
+                        ['value' => 'index', 'label' => 'Indexable'],
+                        ['value' => 'noindex', 'label' => 'Noindex'],
+                    ]" />
+            @else
+                <span class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                    {{ $application->isDomainNoindexed($row['url']) ? 'Noindex' : 'Indexable' }}
+                </span>
+            @endif
         </div>
+
+        @if ($showDirectionControl ?? true)
+        <div class="min-w-0" title="Direction">
+            @php
+                $rowDirection = $domainDirection ?? $redirect;
+                $directionLabel = match ($rowDirection) {
+                    'www' => 'Redirect to www',
+                    'non-www' => 'Redirect to non-www',
+                    default => 'Allow both',
+                };
+            @endphp
+            @if ($showDirection)
+                <span class="domains-mobile-label">Direction</span>
+            @endif
+            @if ($showDirection && auth()->user()?->can('update', $application) && ! $labelsAreWritable)
+                <x-forms.listbox id="domain-direction-{{ $index }}" :wire="false" :value="$rowDirection"
+                    preserveValue
+                    :onChange="$isCompose ? 'updateServiceRedirect' : 'updateRedirect'"
+                    :onChangeArgs="$isCompose ? [$row['service']] : []" portal :options="[
+                        ['value' => 'both', 'label' => 'Allow www & non-www'],
+                        ['value' => 'www', 'label' => 'Redirect to www'],
+                        ['value' => 'non-www', 'label' => 'Redirect to non-www'],
+                    ]" />
+            @elseif ($showDirection)
+                <span class="text-[13px] text-neutral-500 dark:text-fg-dim">{{ $directionLabel }}</span>
+            @endif
+        </div>
+        @endif
 
         <div class="flex items-center justify-end gap-1">
             @can('update', $application)

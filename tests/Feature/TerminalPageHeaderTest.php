@@ -80,6 +80,16 @@ it('opens the global terminal outside Livewire navigation like resource terminal
         ->not->toMatch('/<a title="Terminal"[^>]*wireNavigate\(\)/s');
 });
 
+it('keeps the server terminal navigation active during Livewire requests', function () {
+    $sidebar = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+
+    expect($sidebar)
+        ->toContain("'active' => \$activeMenu === 'terminal'")
+        ->and($navbar)
+        ->toContain("'active' => \$currentRoute === 'server.command'");
+});
+
 it('uses floating rounded controls instead of the legacy terminal header bar', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 

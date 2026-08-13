@@ -13,7 +13,7 @@ services:
         - COOLIFY_CLI_VERSION=${COOLIFY_CLI_VERSION:-nightly}
         - COOLIFY_CLI_CHECKSUM=${COOLIFY_CLI_CHECKSUM:-unknown}
     ports:
-      - "${APP_PORT:-8000}:8080"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:${APP_PORT:-8000}:8080"
       - "${FORWARD_FLUX_PORT:-6443}:6443"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -82,8 +82,8 @@ services:
     env_file:
       - .env
     ports:
-      - "${FORWARD_SOKETI_PORT:-6001}:6001"
-      - "6002:6002"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:6002:6002"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -111,8 +111,9 @@ services:
       # Set VITE_HOST in .env to a browser-reachable IP/hostname for LAN/Tailscale access
       VITE_HOST: "${VITE_HOST:-localhost}"
       VITE_PORT: "${VITE_PORT:-5173}"
+      VITE_PROTOCOL: "${VITE_PROTOCOL:-http}"
     ports:
-      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+      - "${DEV_BIND_ADDRESS:-0.0.0.0}:${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html/:cached
     command: sh -c "npm install && npm run dev"

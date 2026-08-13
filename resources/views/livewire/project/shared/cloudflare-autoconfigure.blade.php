@@ -8,9 +8,10 @@
         x-bind:aria-expanded="dnsEntriesOpen" title="DNS entries for this server">
         <x-reicon name="globe" class="size-3.5" />
         DNS entries
-        <span class="inline-flex transition-transform" :class="dnsEntriesOpen && 'rotate-180'">
-            <x-reicon name="chevron-down" class="size-3 opacity-55" />
-        </span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+            stroke="currentColor" class="size-3.5 shrink-0 opacity-60">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8 9 4-4 4 4m0 6-4 4-4-4" />
+        </svg>
     </button>
     <div x-show="dnsEntriesOpen" x-cloak role="menu" x-transition.origin.top.right
         class="listbox-panel left-auto! right-0! z-[90]! w-56! min-w-56!">

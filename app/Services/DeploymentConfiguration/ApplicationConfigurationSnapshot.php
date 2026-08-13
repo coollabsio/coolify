@@ -194,6 +194,7 @@ class ApplicationConfigurationSnapshot
     {
         return [
             $this->item('fqdn', 'Domains', $this->application->fqdn, 'redeploy'),
+            $this->item('noindex_domains', 'Search engine indexing', $this->application->noindexDomains()->all(), 'redeploy'),
             $this->item('docker_compose_domains', 'Service domains', $this->decodedComposeDomains(), 'redeploy', displayValue: $this->summarizeText($this->composeDomainsText()), displayFull: $this->composeDomainsText(), diffMode: 'lines'),
             $this->item('redirect', 'Redirect', $this->application->redirect, 'redeploy'),
             $this->item('custom_labels', 'Container labels', $this->application->custom_labels, 'redeploy', displayValue: $this->summarizeText($this->decodeCustomLabels($this->application->custom_labels)), displayFull: $this->decodeCustomLabels($this->application->custom_labels), diffMode: 'lines'),

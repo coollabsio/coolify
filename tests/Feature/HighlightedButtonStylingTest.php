@@ -10,7 +10,7 @@ test('highlighted buttons use the shared coollabs style in every color scheme', 
 
     expect($utilities)
         ->toContain('@utility button-highlighted')
-        ->toContain('@apply border-2 text-coollabs-200 dark:text-white bg-coollabs-50 dark:bg-coollabs/20 border-coollabs dark:border-coollabs-100 hover:bg-coollabs hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white;')
+        ->toContain('@apply border-coollabs-200 bg-linear-to-b from-coollabs-100 to-coollabs-200 text-white! hover:from-coollabs-100 hover:to-coollabs hover:text-white!;')
         ->and($appStyles)
         ->toContain('button[isHighlighted]:not(:disabled)')
         ->toContain('@apply button-highlighted;')

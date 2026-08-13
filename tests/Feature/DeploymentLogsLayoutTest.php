@@ -117,6 +117,8 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('.logs-viewer-actions')
         ->toContain('.logs-viewer-deployment-actions')
         ->toContain('.logs-settings-section')
+        ->toContain('padding: 0.5rem 0.75rem 2rem;')
+        ->toContain('padding: 0.5rem 1rem 2rem;')
         ->toContain('flex-direction: column')
         ->toContain('@media (min-width: 640px)');
 
@@ -185,6 +187,8 @@ it('keeps deployment history fields and the log status badge accessible on mobil
         ->and($appCss)
         ->toContain(".deployment-table-scroll {\n    overflow-x: auto;")
         ->toContain(".deployment-table-grid {\n    min-width: 59rem;")
+        ->toContain("@media (min-width: 1024px) {\n    .deployment-table-scroll {\n        overflow-x: visible;")
+        ->toContain(".deployment-table-grid {\n        min-width: 0;")
         ->not->toContain('.deployment-table-grid > :nth-child')
         ->toContain(".logs-viewer-primary .logs-viewer-actions {\n    width: auto;\n    flex: 1 1 auto;");
 });
