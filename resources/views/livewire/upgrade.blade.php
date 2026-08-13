@@ -171,6 +171,7 @@
             checkUpgradeStatusInterval: null,
             elapsedInterval: null,
             healthCheckAttempts: 0,
+            livewireFailures: 0,
             startTime: null,
             elapsedTime: 0,
             currentStep: 0,
@@ -254,6 +255,23 @@
                 return 4;
             },
 
+            hasReachedTargetVersion(running, target) {
+                if (!running || !target) {
+                    return false;
+                }
+                const normalize = (version) => String(version).replace(/^v/i, '');
+                running = normalize(running);
+                target = normalize(target);
+                if (running === target) {
+                    return true;
+                }
+
+                return running.localeCompare(target, undefined, {
+                    numeric: true,
+                    sensitivity: 'base',
+                }) >= 0;
+            },
+
             getReviveStatusMessage(elapsedMinutes, attempts) {
                 if (elapsedMinutes === 0) {
                     return `Waiting for Coolify to come back online... (attempt ${attempts})`;
@@ -278,8 +296,13 @@
                     const elapsedMinutes = Math.floor((Date.now() - this.startTime) / 60000);
                     fetch('/api/health')
                         .then(response => {
-                            if (response.ok) {
+                            const runningVersion = response.headers.get('X-Coolify-Version');
+                            if (response.ok && this.hasReachedTargetVersion(runningVersion, this.latestVersion)) {
                                 this.showSuccess();
+                            } else if (response.ok) {
+                                this.currentStatus = runningVersion
+                                    ? `Coolify is still on ${runningVersion}. Waiting for ${this.latestVersion}...`
+                                    : this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
                             } else {
                                 this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
                             }
@@ -365,21 +388,33 @@
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.serviceDown = false;
+                this.livewireFailures = 0;
 
                 // Poll upgrade status via Livewire
                 this.checkUpgradeStatusInterval = setInterval(async () => {
                     try {
                         const data = await this.$wire.getUpgradeStatus();
+                        this.livewireFailures = 0;
                         if (data.status === 'in_progress') {
                             this.currentStep = this.mapStepToUI(data.step);
                             this.currentStatus = data.message;
                         } else if (data.status === 'complete') {
-                            this.showSuccess();
+                            if (this.hasReachedTargetVersion(data.running_version || this.currentVersion, this.latestVersion)) {
+                                this.showSuccess();
+                            } else {
+                                this.currentStep = 4;
+                                this.currentStatus = `Waiting for Coolify ${this.latestVersion} to come online...`;
+                            }
                         } else if (data.status === 'error') {
                             this.showError(data.message);
                         }
                     } catch (error) {
-                        // Service is down - switch to health check mode
+                        this.livewireFailures++;
+                        if (this.livewireFailures < 3) {
+                            this.currentStatus = 'Lost contact with Coolify, retrying...';
+                            return;
+                        }
+                        // Repeated Livewire failures usually mean the instance is restarting
                         console.log('Livewire unavailable, switching to health check mode');
                         if (!this.serviceDown) {
                             this.serviceDown = true;
