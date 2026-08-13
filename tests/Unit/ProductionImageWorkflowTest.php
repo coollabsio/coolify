@@ -60,6 +60,35 @@ it('runs support image workflows from main', function (string $workflowFile) {
     'realtime' => 'coolify-realtime.yml',
 ]);
 
+it('prevents the stable helper workflow from publishing an existing version', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-helper.yml');
+
+    expect($workflow)
+        ->toContain('check-version:')
+        ->toContain('needs: check-version')
+        ->toContain('VERSION="${BASE_VERSION}"')
+        ->toContain('docker buildx imagetools inspect "$IMAGE"')
+        ->toContain('Version $VERSION already exists in $registry')
+        ->toContain('Version $VERSION is available in both registries')
+        ->toContain('Could not verify $IMAGE')
+        ->toContain('cancel-in-progress: false');
+});
+
+it('prevents the stable realtime workflow from publishing an existing version', function () {
+    $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-realtime.yml');
+
+    expect($workflow)
+        ->toContain('check-version:')
+        ->toContain('needs: check-version')
+        ->toContain('php bootstrap/getRealtimeVersion.php')
+        ->toContain('VERSION="${BASE_VERSION}"')
+        ->toContain('docker buildx imagetools inspect "$IMAGE"')
+        ->toContain('Version $VERSION already exists in $registry')
+        ->toContain('Version $VERSION is available in both registries')
+        ->toContain('Could not verify $IMAGE')
+        ->toContain('cancel-in-progress: false');
+});
+
 it('generates the production changelog from main', function () {
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/generate-changelog.yml');
 
