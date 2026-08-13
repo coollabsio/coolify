@@ -181,6 +181,7 @@
             currentVersion: config.currentVersion || '',
             latestVersion: config.latestVersion || '',
             serviceDown: false,
+            instanceWentDown: false,
             devMode: config.devMode || false,
             simulationInterval: null,
 
@@ -272,6 +273,60 @@
                 }) >= 0;
             },
 
+            isReadyToReload(runningVersion) {
+                if (this.hasReachedTargetVersion(runningVersion, this.latestVersion)) {
+                    return true;
+                }
+
+                // Releases before this header existed (e.g. 4.3.1) still
+                // return a healthy /api/health with no X-Coolify-Version.
+                // Only treat that as done after the instance actually went down.
+                return !runningVersion && this.instanceWentDown;
+            },
+
+            startHealthWatch() {
+                if (this.checkHealthInterval) {
+                    return;
+                }
+                this.checkHealthInterval = setInterval(() => {
+                    this.probeHealth();
+                }, 2000);
+            },
+
+            probeHealth() {
+                this.healthCheckAttempts++;
+                const elapsedMinutes = Math.floor((Date.now() - this.startTime) / 60000);
+
+                return fetch('/api/health')
+                    .then(response => {
+                        const runningVersion = response.headers.get('X-Coolify-Version');
+                        if (!response.ok) {
+                            this.instanceWentDown = true;
+                            this.currentStep = 4;
+                            this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
+                            return;
+                        }
+                        if (this.isReadyToReload(runningVersion)) {
+                            this.showSuccess();
+                            return;
+                        }
+                        if (!this.instanceWentDown && this.currentStep < 4) {
+                            return;
+                        }
+                        if (runningVersion) {
+                            this.currentStatus = `Coolify is still on ${runningVersion}. Waiting for ${this.latestVersion}...`;
+                        } else {
+                            this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Health check failed:', error);
+                        this.instanceWentDown = true;
+                        this.currentStep = 4;
+                        this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
+                    });
+            },
+
             getReviveStatusMessage(elapsedMinutes, attempts) {
                 if (elapsedMinutes === 0) {
                     return `Waiting for Coolify to come back online... (attempt ${attempts})`;
@@ -287,31 +342,9 @@
             },
 
             revive() {
-                if (this.checkHealthInterval) return true;
-                this.healthCheckAttempts = 0;
                 this.currentStep = 4;
                 console.log('Checking server\'s health...');
-                this.checkHealthInterval = setInterval(() => {
-                    this.healthCheckAttempts++;
-                    const elapsedMinutes = Math.floor((Date.now() - this.startTime) / 60000);
-                    fetch('/api/health')
-                        .then(response => {
-                            const runningVersion = response.headers.get('X-Coolify-Version');
-                            if (response.ok && this.hasReachedTargetVersion(runningVersion, this.latestVersion)) {
-                                this.showSuccess();
-                            } else if (response.ok) {
-                                this.currentStatus = runningVersion
-                                    ? `Coolify is still on ${runningVersion}. Waiting for ${this.latestVersion}...`
-                                    : this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
-                            } else {
-                                this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Health check failed:', error);
-                            this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
-                        });
-                }, 2000);
+                this.startHealthWatch();
             },
 
             showSuccess() {
@@ -388,7 +421,9 @@
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.serviceDown = false;
+                this.instanceWentDown = false;
                 this.livewireFailures = 0;
+                this.startHealthWatch();
 
                 // Poll upgrade status via Livewire
                 this.checkUpgradeStatusInterval = setInterval(async () => {
@@ -399,25 +434,30 @@
                             this.currentStep = this.mapStepToUI(data.step);
                             this.currentStatus = data.message;
                         } else if (data.status === 'complete') {
-                            if (this.hasReachedTargetVersion(data.running_version || this.currentVersion, this.latestVersion)) {
+                            if (this.isReadyToReload(data.running_version)) {
                                 this.showSuccess();
                             } else {
                                 this.currentStep = 4;
                                 this.currentStatus = `Waiting for Coolify ${this.latestVersion} to come online...`;
+                                this.revive();
                             }
                         } else if (data.status === 'error') {
                             this.showError(data.message);
+                        } else if (data.status === 'none' && this.instanceWentDown) {
+                            this.revive();
+                            await this.probeHealth();
                         }
                     } catch (error) {
                         this.livewireFailures++;
                         if (this.livewireFailures < 3) {
-                            this.currentStatus = 'Lost contact with Coolify, retrying...';
+                            this.currentStatus = 'Reconnecting. This is expected during an upgrade...';
                             return;
                         }
                         // Repeated Livewire failures usually mean the instance is restarting
                         console.log('Livewire unavailable, switching to health check mode');
                         if (!this.serviceDown) {
                             this.serviceDown = true;
+                            this.instanceWentDown = true;
                             this.currentStep = 4;
                             this.currentStatus = 'Coolify is restarting with the new version...';
                             if (this.checkUpgradeStatusInterval) {

@@ -138,38 +138,28 @@
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
                     @if ($database->destination->server->isFunctional())
-                        @if (! $databaseStatus->startsWith('exited'))
-                            <div id="database-desktop-actions" class="relative" x-data="{ open: false }"
-                                x-effect="$dispatch('resource-actions-toggled', { open })"
-                                @click.outside="open = false" @keydown.escape.window="open = false">
-                                <button type="button" class="button" @click="open = !open" :aria-expanded="open">
-                                    <x-reicon name="play-circle" class="size-3.5 text-warning" />
-                                    Actions
-                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                        <x-resource-heading-overflow id="database-desktop-actions">
+                            @if (! $databaseStatus->startsWith('exited'))
+                                <button type="button" class="button"
+                                    @disabled(!auth()->user()->can('manage', $database))
+                                    @click="open = false; document.getElementById('database-restart-trigger')?.click()">
+                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    Restart
                                 </button>
-                                <div x-cloak x-show="open" x-transition.origin.top.right
-                                    class="listbox-panel top-full! right-0! left-auto! mt-1! w-52! min-w-0!" role="menu">
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                        @disabled(!auth()->user()->can('manage', $database))
-                                        @click="open = false; document.getElementById('database-restart-trigger')?.click()">
-                                        <x-reicon name="restart" class="size-3.5 opacity-70" />
-                                        Restart
-                                    </button>
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                        @disabled(!auth()->user()->can('manage', $database))
-                                        @click="open = false; document.getElementById('database-stop-trigger')?.click()">
-                                        <x-reicon name="stop" class="size-3.5 text-error" />
-                                        Stop
-                                    </button>
-                                </div>
-                            </div>
-                        @else
-                            <x-forms.button canGate="manage" :canResource="$database"
-                                @click="$wire.dispatch('startEvent')">
-                                <x-reicon name="play-circle" class="size-4 opacity-70" />
-                                Start
-                            </x-forms.button>
-                        @endif
+                                <button type="button" class="button"
+                                    @disabled(!auth()->user()->can('manage', $database))
+                                    @click="open = false; document.getElementById('database-stop-trigger')?.click()">
+                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    Stop
+                                </button>
+                            @else
+                                <x-forms.button canGate="manage" :canResource="$database"
+                                    @click="$wire.dispatch('startEvent')">
+                                    <x-reicon name="play-circle" class="size-4 opacity-70" />
+                                    Start
+                                </x-forms.button>
+                            @endif
+                        </x-resource-heading-overflow>
                     @else
                         <x-status-badge status="Server unavailable" type="error" />
                     @endif

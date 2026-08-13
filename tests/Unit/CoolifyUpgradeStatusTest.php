@@ -128,6 +128,16 @@ it('waits for the running version to match the target before showing reload', fu
         ->toContain('livewireFailures');
 });
 
+it('treats a healthy instance without a version header as ready only after downtime', function () {
+    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
+
+    expect($upgradeView)
+        ->toContain('instanceWentDown')
+        ->toContain('isReadyToReload')
+        ->toContain('startHealthWatch')
+        ->toContain('data.status === \'none\'');
+});
+
 it('starts the upgrade after the Livewire response so status polling is not blocked', function () {
     $upgradeComponent = file_get_contents(__DIR__.'/../../app/Livewire/Upgrade.php');
 

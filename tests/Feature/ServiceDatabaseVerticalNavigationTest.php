@@ -30,10 +30,9 @@ it('matches application action bar behavior for services and databases', functio
 
     foreach ([$service, $database] as $heading) {
         expect($heading)
-            ->toContain('xl:fixed xl:top-14 xl:right-4')
+            ->toContain('@teleport(\'#resource-action-hud-slot\')')
             ->toContain('xl:w-auto')
-            ->toContain('Actions')
-            ->toContain('listbox-panel top-full! right-0! left-auto!')
+            ->toContain('<x-resource-heading-overflow')
             ->not->toContain('hidden lg:block lg:h-12');
     }
 
