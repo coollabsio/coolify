@@ -58,7 +58,7 @@ it('bounds scheduled task output before storing or notifying', function () {
 
     expect($source)
         ->toContain('MAX_OUTPUT_SIZE_BYTES')
-        ->toContain('head -c {$maxOutputBytes}')
+        ->toContain('head -c {$readLimit}')
         ->toContain('[... Output truncated at');
 
     $reflection = new ReflectionClass(ScheduledTaskJob::class);
@@ -70,12 +70,26 @@ it('bounds scheduled task output before storing or notifying', function () {
     exec('bash -c '.escapeshellarg($failureCommand).' 2>&1', $failureOutput, $failureExitCode);
 
     expect(ScheduledTaskJob::MAX_OUTPUT_SIZE_BYTES)->toBe(5 * 1024 * 1024)
-        ->and($command)->toContain('head -c 5242880')
+        ->and($command)->toContain('head -c 5242881')
         ->and($exitCode)->toBe(0)
         ->and($commandExitCode)->toBe(0)
         ->and(implode("\n", $commandOutput))->toBe('hello')
         ->and($failureExitCode)->toBe(7)
         ->and(implode("\n", $failureOutput))->toBe('failure');
+});
+
+it('marks scheduled task output that exceeds the limit as truncated', function () {
+    $reflection = new ReflectionClass(ScheduledTaskJob::class);
+    $method = $reflection->getMethod('boundedTaskCommand');
+    $largeOutputCommand = 'head -c '.(ScheduledTaskJob::MAX_OUTPUT_SIZE_BYTES + 1).' /dev/zero | tr "\\0" "x"';
+    $command = $method->invoke($reflection->newInstanceWithoutConstructor(), $largeOutputCommand);
+
+    exec('bash -c '.escapeshellarg($command), $output, $exitCode);
+    $taskOutput = implode("\n", $output);
+
+    expect($exitCode)->toBe(0)
+        ->and(strlen($taskOutput))->toBeGreaterThan(ScheduledTaskJob::MAX_OUTPUT_SIZE_BYTES)
+        ->and($taskOutput)->toEndWith('[... Output truncated at 5MB limit ...]');
 });
 
 it('does not pass the scheduled task output wrapper through the sudo rewriter', function () {

@@ -211,8 +211,9 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     private function boundedTaskCommand(string $command): string
     {
         $maxOutputBytes = self::MAX_OUTPUT_SIZE_BYTES;
+        $readLimit = $maxOutputBytes + 1;
 
-        return "output_file=\$(mktemp); trap 'rm -f \"\$output_file\"' EXIT; set +e; set -o pipefail; {$command} 2>&1 | { head -c {$maxOutputBytes} > \"\$output_file\"; if IFS= read -r -n 1 extra_byte; then printf '\n\n[... Output truncated at 5MB limit ...]' >> \"\$output_file\"; fi; cat > /dev/null; }; exit_code=\${PIPESTATUS[0]}; if [ \"\$exit_code\" -eq 0 ]; then cat \"\$output_file\"; else cat \"\$output_file\" >&2; fi; exit \$exit_code";
+        return "output_file=\$(mktemp); trap 'rm -f \"\$output_file\"' EXIT; set +e; set -o pipefail; {$command} 2>&1 | { head -c {$readLimit} > \"\$output_file\"; cat > /dev/null; }; exit_code=\${PIPESTATUS[0]}; if [ \"\$(wc -c < \"\$output_file\")\" -gt {$maxOutputBytes} ]; then truncate -s {$maxOutputBytes} \"\$output_file\"; printf '\n\n[... Output truncated at 5MB limit ...]' >> \"\$output_file\"; fi; if [ \"\$exit_code\" -eq 0 ]; then cat \"\$output_file\"; else cat \"\$output_file\" >&2; fi; exit \$exit_code";
     }
 
     /**

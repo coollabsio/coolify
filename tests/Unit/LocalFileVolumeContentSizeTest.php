@@ -88,3 +88,38 @@ it('marks git-based file volumes as files before refreshing their content', func
         '/\$fileVolume->is_directory = false;\s+\$fileVolume->save\(\);\s+if \(\$fileVolume->is_based_on_git\) \{/'
     );
 });
+
+it('bounds the remote file read itself to prevent a size-check race', function () {
+    $source = file_get_contents(app_path('Models/LocalFileVolume.php'));
+    $loadStorage = str($source)
+        ->after('public function loadStorageOnServer()')
+        ->before('public function deleteStorageOnServer()');
+
+    expect($loadStorage->value())
+        ->toContain('head -c')
+        ->not->toContain('instant_remote_process(["cat {$escapedPath}"]');
+});
+
+it('bounds directory-to-file conflict reads the same way', function () {
+    $source = file_get_contents(app_path('Models/LocalFileVolume.php'));
+    $saveStorage = str($source)
+        ->after('public function saveStorageOnServer()')
+        ->before('protected function plainMountPath');
+
+    expect($saveStorage->value())
+        ->not->toContain('instant_remote_process(["cat {$escapedPath}"]');
+});
+
+it('treats a bounded remote read that exceeds the limit as too large', function () {
+    $oversized = str_repeat('a', LocalFileVolume::MAX_CONTENT_SIZE + 1);
+
+    expect(LocalFileVolume::contentFromBoundedRead($oversized))
+        ->toBe(LocalFileVolume::TOO_LARGE_PLACEHOLDER);
+});
+
+it('keeps a bounded remote read that fits the limit', function () {
+    expect(LocalFileVolume::contentFromBoundedRead('hello'))
+        ->toBe('hello')
+        ->and(LocalFileVolume::contentFromBoundedRead(null))
+        ->toBe('');
+});
