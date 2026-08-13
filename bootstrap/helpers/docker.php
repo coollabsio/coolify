@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -251,7 +252,16 @@ function dockerStopCommand(int $timeout, string $containers, Server|string|null 
         ? "--timeout={$timeout}"
         : "--time={$timeout}";
 
-    return "docker stop {$flag} {$containers}";
+    $command = "docker stop {$flag} {$containers}";
+
+    if (app()->bound('config') && isDev()) {
+        Log::info('docker stop command', [
+            'command' => $command,
+            'docker_version' => $version,
+        ]);
+    }
+
+    return $command;
 }
 function escapeShellValue(string $value): string
 {

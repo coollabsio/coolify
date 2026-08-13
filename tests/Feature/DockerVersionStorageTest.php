@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -31,6 +32,27 @@ beforeEach(function () {
 
 afterEach(function () {
     Carbon::setTestNow();
+});
+
+it('logs the docker stop command in local development', function () {
+    config(['app.env' => 'local']);
+    Log::spy();
+
+    dockerStopCommand(30, 'app-1', '27.5.1');
+
+    Log::shouldHaveReceived('info')
+        ->once()
+        ->with('docker stop command', Mockery::on(fn (array $context): bool => $context['command'] === 'docker stop --time=30 app-1'
+            && $context['docker_version'] === '27.5.1'));
+});
+
+it('does not log the docker stop command outside local development', function () {
+    config(['app.env' => 'testing']);
+    Log::spy();
+
+    dockerStopCommand(30, 'app-1', '27.5.1');
+
+    Log::shouldNotHaveReceived('info');
 });
 
 it('has docker and compose version columns on server settings', function () {
