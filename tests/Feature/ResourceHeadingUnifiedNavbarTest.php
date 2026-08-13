@@ -124,25 +124,23 @@ it('keeps advanced operations in a dedicated Advanced dropdown', function () {
     $serviceDesktop = str($service)->after('resource-heading-actions flex')->toString();
 
     expect($applicationDesktop)
-        ->toContain('<x-applications.deploy')
         ->toContain('application-desktop-actions')
+        ->toContain('Deploy (without cache)')
         ->not->toContain('<x-applications.advanced')
         ->not->toContain('resource-heading-overflow-separator')
         ->not->toContain('Force deploy without cache')
         ->and($serviceDesktop)
-        ->toContain('<x-services.advanced')
-        ->toContain('<x-services.restart')
         ->toContain('service-desktop-actions')
+        ->toContain('Force Deploy')
+        ->toContain('Force Cleanup Containers')
+        ->toContain('Restart (pull latest)')
         ->not->toContain('resource-heading-overflow-separator')
         ->not->toContain('Pull Latest Images & Restart');
 
     expect(strpos($applicationDesktop, '<x-applications.links'))
-        ->toBeLessThan(strpos($applicationDesktop, '<x-applications.deploy'))
         ->toBeLessThan(strpos($applicationDesktop, 'application-desktop-actions'));
 
     expect(strpos($serviceDesktop, '<x-services.links'))
-        ->toBeLessThan(strpos($serviceDesktop, '<x-services.advanced'))
-        ->toBeLessThan(strpos($serviceDesktop, '<x-services.restart'))
         ->toBeLessThan(strpos($serviceDesktop, 'service-desktop-actions'));
 
     expect($applicationAdvanced)
@@ -165,24 +163,20 @@ it('keeps advanced operations in a dedicated Advanced dropdown', function () {
     expect(substr_count($application, 'resource-heading-navbar'))->toBe(1);
 });
 
-it('lists desktop application lifecycle controls inline and collapses them when space runs out', function () {
+it('groups desktop application lifecycle controls in one Actions dropdown', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $overflow = file_get_contents(resource_path('views/components/resource-heading-overflow.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
 
     expect($desktop)
         ->toContain('application-desktop-actions')
-        ->toContain('<x-resource-heading-overflow')
-        ->toContain('<x-applications.deploy')
-        ->toContain('Restart')
-        ->toContain('Stop')
-        ->not->toContain('listbox-option');
-
-    expect($overflow)
         ->toContain('Actions')
         ->toContain('listbox-panel top-full! right-0! left-auto!')
-        ->toContain('measureInlineWidth')
-        ->toContain('availableWidth');
+        ->toContain('listbox-option')
+        ->toContain('Deploy')
+        ->toContain('Restart')
+        ->toContain('Stop')
+        ->not->toContain('<x-resource-heading-overflow')
+        ->not->toContain('<x-applications.deploy');
 });
 
 it('raises the desktop top bar while any resource dropdown is open', function () {
@@ -208,19 +202,17 @@ it('raises the desktop top bar while any resource dropdown is open', function ()
     }
 });
 
-it('groups service restart options in a Restart dropdown', function () {
+it('groups service restart options in the Actions dropdown', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-    $restart = file_get_contents(resource_path('views/components/services/restart.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
 
     expect($desktop)
-        ->toContain('<x-services.restart')
-        ->not->toContain('Pull Latest Images & Restart')
-        ->and($restart)
-        ->toContain('Restart current version')
-        ->toContain('Pull latest and restart')
+        ->toContain('service-desktop-actions')
+        ->toContain('Restart')
+        ->toContain('Restart (pull latest)')
         ->toContain("\$wire.dispatch('pullAndRestartEvent')")
-        ->toContain('service-restart-trigger');
+        ->not->toContain('Pull Latest Images & Restart')
+        ->not->toContain('<x-services.restart');
 
     $mobile = str($heading)->before("@teleport('#resource-action-hud-slot')")->toString();
 
@@ -230,26 +222,94 @@ it('groups service restart options in a Restart dropdown', function () {
         ->not->toContain('Pull Latest Images & Restart');
 });
 
-it('groups application deploy options in a Deploy dropdown', function () {
+it('orders service restart actions before stop and advanced operations', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $actions = str($heading)->after('id="service-desktop-actions"')->before('@else\n                        <a href')->toString();
+
+    expect(strpos($actions, 'Restart\n'))
+        ->toBeLessThan(strpos($actions, 'Restart (pull latest)'))
+        ->and(strpos($actions, 'Restart (pull latest)'))
+        ->toBeLessThan(strpos($actions, 'Stop'));
+});
+
+it('groups application lifecycle options in an Actions dropdown', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $deploy = file_get_contents(resource_path('views/components/applications/deploy.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
+    $trigger = str($desktop)->after('id="application-desktop-actions"')->before('<div x-cloak')->toString();
 
     expect($desktop)
-        ->toContain('<x-applications.deploy')
         ->toContain('id="application-desktop-actions"')
-        ->not->toContain('Force deploy without cache')
-        ->and($deploy)
+        ->toContain('Actions')
         ->toContain('Deploy')
         ->toContain('Deploy (without cache)')
         ->toContain('force_deploy_without_cache')
-        ->toContain('deploy(true)');
+        ->toContain('deploy(true)')
+        ->and($trigger)
+        ->toContain('button button-highlighted')
+        ->not->toContain('play-circle');
 
     $mobile = str($heading)->before("@teleport('#resource-action-hud-slot')")->toString();
 
     expect($mobile)
         ->toContain('Deploy (without cache)')
         ->not->toContain('Force deploy without cache');
+});
+
+it('places the state-aware no-cache action immediately after deploy or redeploy', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $actions = str($heading)->after('id="application-desktop-actions"')->before('@endteleport')->toString();
+
+    expect($actions)
+        ->toContain("str(\$application->status)->startsWith('running') ? 'Redeploy (without cache)' : 'Deploy (without cache)'")
+        ->toContain("str(\$application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)'");
+
+    expect(strpos($actions, 'wire:click="deploy"'))
+        ->toBeLessThan(strpos($actions, 'Redeploy (without cache)'))
+        ->and(strpos($actions, 'Redeploy (without cache)'))
+        ->toBeLessThan(strpos($actions, 'Restart'));
+});
+
+it('uses the shared Coollabs gradient for primary resource actions in the desktop header', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toContain('.application-heading-actions .button-highlighted')
+        ->toContain('@apply button-highlighted;');
+});
+
+it('uses iconless highlighted Actions dropdowns for service and proxy lifecycle controls', function () {
+    foreach ([
+        resource_path('views/livewire/project/service/heading.blade.php') => 'service-desktop-actions',
+        resource_path('views/livewire/server/navbar.blade.php') => 'server-desktop-actions',
+    ] as $path => $id) {
+        $heading = file_get_contents($path);
+        $trigger = str($heading)->after("id=\"{$id}\"")->before('<div x-cloak')->toString();
+
+        expect($trigger)
+            ->toContain('button button-highlighted')
+            ->toContain('Actions')
+            ->not->toContain('play-circle');
+    }
+});
+
+it('places the Traefik dashboard last in the server Actions menu', function () {
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+    $actions = str($navbar)->after('id="server-desktop-actions"')->before('@endcan')->toString();
+
+    expect(strpos($actions, 'Refresh Proxy Status'))
+        ->toBeLessThan(strpos($actions, 'Traefik Dashboard'));
+});
+
+it('keeps database lifecycle controls direct and highlights the primary action', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+    $desktop = str($heading)->after('resource-heading-actions flex')->before('@endteleport')->toString();
+
+    expect($desktop)
+        ->toContain('Restart')
+        ->toContain('Stop')
+        ->toContain('button button-highlighted')
+        ->not->toContain('<x-reicon')
+        ->not->toContain('<x-resource-heading-overflow');
 });
 
 it('renders configuration warnings as navbar popovers instead of floating notifications', function () {

@@ -1809,6 +1809,13 @@ html[data-theme="custom"] textarea:disabled {
     color: var(--color-fg);
 }
 
+.application-heading-actions .button-highlighted,
+.dark .application-heading-actions .button-highlighted,
+.application-heading-actions .button-highlighted:hover:not(:disabled),
+.dark .application-heading-actions .button-highlighted:hover:not(:disabled) {
+    @apply button-highlighted;
+}
+
 /*
  * Active primary tab styles.
  * The base rules above set background/color/box-shadow with higher specificity

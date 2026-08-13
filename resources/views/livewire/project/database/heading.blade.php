@@ -75,7 +75,6 @@
                     <button type="button" class="button w-full justify-between" @click="open = !open"
                         :aria-expanded="open" aria-haspopup="menu">
                         <span class="inline-flex items-center gap-2">
-                            <x-reicon name="play-circle" class="size-3.5 text-warning" />
                             Actions
                         </span>
                         <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
@@ -138,28 +137,25 @@
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
                     @if ($database->destination->server->isFunctional())
-                        <x-resource-heading-overflow id="database-desktop-actions">
+                        <div id="database-desktop-actions" class="flex items-center gap-0.5">
                             @if (! $databaseStatus->startsWith('exited'))
-                                <button type="button" class="button"
+                                <button type="button" class="button button-highlighted"
                                     @disabled(!auth()->user()->can('manage', $database))
-                                    @click="open = false; document.getElementById('database-restart-trigger')?.click()">
-                                    <x-reicon name="restart" class="size-3.5 opacity-70" />
+                                    @click="document.getElementById('database-restart-trigger')?.click()">
                                     Restart
                                 </button>
                                 <button type="button" class="button"
                                     @disabled(!auth()->user()->can('manage', $database))
-                                    @click="open = false; document.getElementById('database-stop-trigger')?.click()">
-                                    <x-reicon name="stop" class="size-3.5 text-error" />
+                                    @click="document.getElementById('database-stop-trigger')?.click()">
                                     Stop
                                 </button>
                             @else
-                                <x-forms.button canGate="manage" :canResource="$database"
+                                <x-forms.button class="button-highlighted" canGate="manage" :canResource="$database"
                                     @click="$wire.dispatch('startEvent')">
-                                    <x-reicon name="play-circle" class="size-4 opacity-70" />
                                     Start
                                 </x-forms.button>
                             @endif
-                        </x-resource-heading-overflow>
+                        </div>
                     @else
                         <x-status-badge status="Server unavailable" type="error" />
                     @endif
