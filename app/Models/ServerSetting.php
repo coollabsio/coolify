@@ -27,6 +27,12 @@ use OpenApi\Attributes as OA;
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
         'is_traffic_analytics_enabled' => ['type' => 'boolean'],
+        'traffic_topn' => ['type' => 'integer'],
+        'traffic_sample_threshold' => ['type' => 'integer'],
+        'traffic_retention_1h_days' => ['type' => 'integer'],
+        'traffic_retention_1d_days' => ['type' => 'integer'],
+        'is_geoip_enabled' => ['type' => 'boolean'],
+        'geoip_refresh_days' => ['type' => 'integer'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -102,6 +108,12 @@ class ServerSetting extends Model
         'disable_application_image_retention',
         'connection_timeout',
         'is_traffic_analytics_enabled',
+        'traffic_topn',
+        'traffic_sample_threshold',
+        'traffic_retention_1h_days',
+        'traffic_retention_1d_days',
+        'is_geoip_enabled',
+        'geoip_refresh_days',
         'geoip_maxmind_license_key',
     ];
 
@@ -117,6 +129,12 @@ class ServerSetting extends Model
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
         'is_traffic_analytics_enabled' => 'boolean',
+        'traffic_topn' => 'integer',
+        'traffic_sample_threshold' => 'integer',
+        'traffic_retention_1h_days' => 'integer',
+        'traffic_retention_1d_days' => 'integer',
+        'is_geoip_enabled' => 'boolean',
+        'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
     ];
 
@@ -164,7 +182,14 @@ class ServerSetting extends Model
                 $settings->wasChanged('sentinel_custom_url') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
-                $settings->wasChanged('sentinel_push_interval_seconds')
+                $settings->wasChanged('sentinel_push_interval_seconds') ||
+                $settings->wasChanged('traffic_topn') ||
+                $settings->wasChanged('traffic_sample_threshold') ||
+                $settings->wasChanged('traffic_retention_1h_days') ||
+                $settings->wasChanged('traffic_retention_1d_days') ||
+                $settings->wasChanged('is_geoip_enabled') ||
+                $settings->wasChanged('geoip_refresh_days') ||
+                $settings->wasChanged('geoip_maxmind_license_key')
             ) {
                 $settings->server->restartSentinel();
             }

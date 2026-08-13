@@ -43,6 +43,23 @@ class Sentinel extends Component
 
     public bool $isTrafficAnalyticsEnabled;
 
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $trafficTopn;
+
+    #[Validate(['required', 'integer', 'min:0'])]
+    public int|string $trafficSampleThreshold;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $trafficRetention1hDays;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $trafficRetention1dDays;
+
+    public bool $isGeoipEnabled;
+
+    #[Validate(['required', 'integer', 'min:1'])]
+    public int|string $geoipRefreshDays;
+
     #[Validate(['nullable', 'string', 'max:255'])]
     public ?string $geoipMaxmindLicenseKey = null;
 
@@ -73,6 +90,12 @@ class Sentinel extends Component
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_enabled = $this->isSentinelEnabled;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
+            $this->server->settings->traffic_topn = $this->trafficTopn;
+            $this->server->settings->traffic_sample_threshold = $this->trafficSampleThreshold;
+            $this->server->settings->traffic_retention_1h_days = $this->trafficRetention1hDays;
+            $this->server->settings->traffic_retention_1d_days = $this->trafficRetention1dDays;
+            $this->server->settings->is_geoip_enabled = $this->isGeoipEnabled;
+            $this->server->settings->geoip_refresh_days = $this->geoipRefreshDays;
             $this->server->settings->geoip_maxmind_license_key = $this->geoipMaxmindLicenseKey;
             $this->server->settings->save();
         } else {
@@ -86,6 +109,12 @@ class Sentinel extends Component
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->isTrafficAnalyticsEnabled = $this->server->isTrafficAnalyticsEnabled();
+            $this->trafficTopn = $this->server->settings->traffic_topn;
+            $this->trafficSampleThreshold = $this->server->settings->traffic_sample_threshold;
+            $this->trafficRetention1hDays = $this->server->settings->traffic_retention_1h_days;
+            $this->trafficRetention1dDays = $this->server->settings->traffic_retention_1d_days;
+            $this->isGeoipEnabled = (bool) $this->server->settings->is_geoip_enabled;
+            $this->geoipRefreshDays = $this->server->settings->geoip_refresh_days;
             $this->geoipMaxmindLicenseKey = $this->server->settings->geoip_maxmind_license_key;
         }
     }

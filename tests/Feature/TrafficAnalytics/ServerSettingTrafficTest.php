@@ -4,10 +4,12 @@ use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Queue::fake();
     $user = User::factory()->create();
     $this->team = $user->teams()->first();
 });
@@ -50,6 +52,17 @@ it('respects an explicit traffic analytics value on creation', function () {
     ]);
 
     expect($setting->is_traffic_analytics_enabled)->toBeFalse();
+});
+
+it('defaults traffic collection and geoip settings to sentinel values', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+
+    expect($server->settings->traffic_topn)->toBe(50)
+        ->and($server->settings->traffic_sample_threshold)->toBe(0)
+        ->and($server->settings->traffic_retention_1h_days)->toBe(30)
+        ->and($server->settings->traffic_retention_1d_days)->toBe(395)
+        ->and($server->settings->is_geoip_enabled)->toBeTrue()
+        ->and($server->settings->geoip_refresh_days)->toBe(30);
 });
 
 it('encrypts the maxmind license key and hides it from array output', function () {

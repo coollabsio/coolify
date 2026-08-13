@@ -17,13 +17,19 @@ class StartSentinel
         }
 
         $logPath = rtrim($server->proxyPath(), '/').'/access.log';
+        $settings = $server->settings;
         $env = [
             'TRAFFIC_ENABLED' => 'true',
             'TRAFFIC_PROXY_TYPE' => 'auto',
             'TRAFFIC_ACCESS_LOG_PATH' => $logPath,
-            'GEOIP_ENABLED' => 'true',
+            'TRAFFIC_TOPN' => (string) ($settings->traffic_topn ?: 50),
+            'TRAFFIC_SAMPLE_THRESHOLD' => (string) ($settings->traffic_sample_threshold ?? 0),
+            'TRAFFIC_RETENTION_1H_DAYS' => (string) ($settings->traffic_retention_1h_days ?: 30),
+            'TRAFFIC_RETENTION_1D_DAYS' => (string) ($settings->traffic_retention_1d_days ?: 395),
+            'GEOIP_ENABLED' => $settings->is_geoip_enabled ? 'true' : 'false',
+            'GEOIP_REFRESH_DAYS' => (string) ($settings->geoip_refresh_days ?: 30),
         ];
-        $license = data_get($server, 'settings.geoip_maxmind_license_key');
+        $license = data_get($settings, 'geoip_maxmind_license_key');
         if (filled($license)) {
             $env['GEOIP_MAXMIND_LICENSE_KEY'] = $license;
         }
