@@ -2470,11 +2470,11 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .volumes-table-grid {
-    grid-template-columns: minmax(10rem, 1.4fr) minmax(6rem, 1fr) minmax(6rem, 1fr) 5rem 17.5rem;
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(6rem, 1fr) minmax(6rem, 1fr) 5rem 12rem;
 }
 
 .volumes-table-grid-with-pr {
-    grid-template-columns: minmax(9rem, 1.2fr) minmax(5.5rem, 0.85fr) minmax(5.5rem, 0.85fr) 9.25rem 5rem 17.5rem;
+    grid-template-columns: minmax(9rem, 1.2fr) minmax(5.5rem, 0.85fr) minmax(5.5rem, 0.85fr) 9.25rem 5rem 12rem;
 }
 
 .volumes-mobile-label {
@@ -2510,7 +2510,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 @media (max-width: 1100px) {
     .volumes-table-grid {
-        grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) 5rem 17.5rem;
+        grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) 5rem 12rem;
     }
 
     .volumes-table-grid > .volumes-col-source,
@@ -2519,7 +2519,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-table-grid-with-pr {
-        grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 17.5rem;
+        grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 12rem;
     }
 
     .volumes-table-grid-with-pr > .volumes-col-source,

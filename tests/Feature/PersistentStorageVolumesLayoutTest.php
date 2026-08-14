@@ -197,7 +197,9 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('@media (max-width: 768px)')
         ->toContain('.table-badge-success');
 
-    expect($css)->toContain('17.5rem');
+    expect($css)
+        ->toContain('12rem')
+        ->not->toContain('17.5rem');
 
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)

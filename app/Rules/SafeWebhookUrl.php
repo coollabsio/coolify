@@ -62,7 +62,7 @@ class SafeWebhookUrl implements ValidationRule
 
         if ($this->isBlockedHostname($hostForDns) && ! $this->isAllowedHostname($hostForDns)) {
             $this->logBlockedHost($attribute, $host);
-            $fail('The :attribute must not point to localhost or internal hosts.');
+            $fail($this->privateTargetMessage($attribute));
 
             return;
         }
@@ -70,7 +70,9 @@ class SafeWebhookUrl implements ValidationRule
         if (filter_var($hostForIpCheck, FILTER_VALIDATE_IP)) {
             if (! $this->isAllowedIp($hostForIpCheck, $hostForDns)) {
                 $this->logBlockedIp($attribute, $host, $hostForIpCheck);
-                $fail('The :attribute must not point to private, reserved, loopback, or link-local addresses.');
+                $fail($this->isLinkLocalIp($hostForIpCheck)
+                    ? 'The :attribute must not point to link-local addresses.'
+                    : $this->privateTargetMessage($attribute));
 
                 return;
             }
@@ -88,11 +90,20 @@ class SafeWebhookUrl implements ValidationRule
         foreach ($resolvedIps as $resolvedIp) {
             if (! $this->isAllowedIp($resolvedIp, $hostForDns)) {
                 $this->logBlockedIp($attribute, $host, $resolvedIp);
-                $fail('The :attribute must not point to private, reserved, loopback, or link-local addresses.');
+                $fail($this->isLinkLocalIp($resolvedIp)
+                    ? 'The :attribute must not resolve to a link-local address.'
+                    : $this->privateTargetMessage($attribute));
 
                 return;
             }
         }
+    }
+
+    private function privateTargetMessage(string $attribute): string
+    {
+        $settingsUrl = route('settings.advanced').'#endpoint-section';
+
+        return "The {$attribute} points to a local or private address that is not allowed. Configure allowed internal targets: {$settingsUrl}";
     }
 
     /**
@@ -334,6 +345,10 @@ class SafeWebhookUrl implements ValidationRule
             $ip = $embeddedIpv4;
         }
 
+        if ($this->isLinkLocalIp($ip)) {
+            return false;
+        }
+
         if ($this->isPublicIp($ip)) {
             return true;
         }
@@ -348,6 +363,15 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         return $this->isAllowlistedIp($ip);
+    }
+
+    private function isLinkLocalIp(string $ip): bool
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $this->ipv4InCidr($ip, '169.254.0.0/16');
+        }
+
+        return $this->ipInCidr($ip, 'fe80::/10');
     }
 
     private function isPublicIp(string $ip): bool
