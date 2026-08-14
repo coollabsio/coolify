@@ -1570,11 +1570,12 @@ it('marks a running execution failed even when the job instance lost its executi
         && str_contains($process->command, 'timed-out.tar.gz'));
 });
 
-it('archives a named volume on its server', function () {
+it('archives a named volume using the server compression CPU percentage', function (int $compressionCpuPercentage) {
     config(['broadcasting.default' => 'null']);
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
-    [$application, $volume] = createVolumeBackupApplication($team);
+    [$application, $volume, $server] = createVolumeBackupApplication($team);
+    $server->settings->update(['backup_compression_cpu_percentage' => $compressionCpuPercentage]);
     $backup = $volume->scheduledBackups()->create([
         'team_id' => $team->id,
         'frequency' => 'daily',
@@ -1608,13 +1609,16 @@ it('archives a named volume on its server', function () {
         && str_contains($process->command, 'app-data:/volume:ro')
         && str_contains($process->command, 'command -v pigz')
         && str_contains($process->command, 'pigz -3 -p')
-        && str_contains($process->command, '$(nproc) + 1')
+        && str_contains($process->command, "\$(nproc) * {$compressionCpuPercentage} + 99")
         && str_contains($process->command, 'gzip -3')
         && str_contains($process->command, 'tar -I "$compressor" -cf -')
         && str_contains($process->command, '> ')
         && str_contains($process->command, '.tar.gz')
         && ! str_contains($process->command, ':/backup'));
-});
+})->with([
+    'low' => 25,
+    'high' => 75,
+]);
 
 it('logs the selected volume backup compressor in development', function (string $detectedCompressor) {
     config(['app.env' => 'local', 'broadcasting.default' => 'null']);
@@ -1644,7 +1648,8 @@ it('logs the selected volume backup compressor in development', function (string
     Log::shouldHaveReceived('info')->once()->with(
         'Volume backup compressor selected',
         Mockery::on(fn (array $context): bool => $context['compressor'] === $detectedCompressor
-            && $context['backup_id'] === $backup->id),
+            && $context['backup_id'] === $backup->id
+            && $context['cpu_percentage'] === 25),
     );
 })->with([
     'pigz' => 'pigz -3 -p 4',

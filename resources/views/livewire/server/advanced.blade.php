@@ -25,6 +25,18 @@
                 </div>
             </x-application.settings-section>
 
+            <x-application.settings-section id="server-backups-section" title="Backups"
+                helper="Limit how much CPU volume backup compression may use on this server.">
+                <x-forms.listbox canGate="update" :canResource="$server" id="backupCompressionCpuPercentage"
+                    label="Backup compression CPU" onChange="instantSave"
+                    helper="Sets how many CPU threads can be used to compress volume backups, based on this server's available CPUs." :options="[
+                        ['value' => 25, 'label' => 'Low (25%)'],
+                        ['value' => 50, 'label' => 'Balanced (50%)'],
+                        ['value' => 75, 'label' => 'High (75%)'],
+                        ['value' => 100, 'label' => 'Maximum (100%)'],
+                    ]" />
+            </x-application.settings-section>
+
             <x-application.settings-section id="server-builds-section" title="Builds"
                 helper="Set deployment concurrency, execution timeouts, and queue capacity.">
                 <div class="grid gap-4 lg:grid-cols-3">

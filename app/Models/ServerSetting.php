@@ -15,6 +15,7 @@ use OpenApi\Attributes as OA;
         'id' => ['type' => 'integer'],
         'concurrent_builds' => ['type' => 'integer'],
         'deployment_queue_limit' => ['type' => 'integer'],
+        'backup_compression_cpu_percentage' => ['type' => 'integer'],
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
@@ -102,6 +103,7 @@ class ServerSetting extends Model
         'server_disk_usage_check_frequency',
         'is_terminal_enabled',
         'deployment_queue_limit',
+        'backup_compression_cpu_percentage',
         'disable_application_image_retention',
         'connection_timeout',
         'docker_version',
@@ -123,6 +125,7 @@ class ServerSetting extends Model
         'connection_timeout' => 'integer',
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
+        'backup_compression_cpu_percentage' => 'integer',
     ];
 
     /**
