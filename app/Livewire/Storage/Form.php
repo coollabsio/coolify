@@ -120,22 +120,81 @@ class Form extends Component
         }
     }
 
+    /**
+     * The values currently shown in the form, i.e. what the user is looking at.
+     * Key/secret fall back to the saved storage for members, since those fields
+     * are hidden (and blanked out) in the form for them - see mount().
+     */
+    private function formValues(): array
+    {
+        return [
+            'name' => $this->name,
+            'description' => $this->description,
+            'endpoint' => $this->endpoint,
+            'bucket' => $this->bucket,
+            'region' => $this->region,
+            'key' => $this->isPasswordHiddenForMember ? $this->storage->key : $this->key,
+            'secret' => $this->isPasswordHiddenForMember ? $this->storage->secret : $this->secret,
+        ];
+    }
+
+    /**
+     * Whether the form is still identical to the saved storage, i.e. there are
+     * no unsaved changes to test.
+     */
+    private function formMatchesSavedStorage(array $formValues): bool
+    {
+        foreach ($formValues as $attribute => $value) {
+            if ($this->storage->{$attribute} !== $value) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public function testConnection()
     {
         try {
             $this->authorize('validateConnection', $this->storage);
 
-            $this->storage->testConnection(shouldSave: true);
+            $formValues = $this->formValues();
+
+            if ($this->formMatchesSavedStorage($formValues)) {
+                // No unsaved changes: test (and persist the outcome on) the saved
+                // storage, exactly as before.
+                $this->storage->testConnection(shouldSave: true);
+            } else {
+                // There are unsaved changes: test what's actually in the form
+                // instead of the stale saved values. Use a throwaway copy of the
+                // model so a passing or failing test never persists credentials
+                // or settings the user hasn't saved yet.
+                $unsavedStorage = $this->storage->replicate();
+                $unsavedStorage->name = $formValues['name'];
+                $unsavedStorage->description = $formValues['description'];
+                $unsavedStorage->endpoint = $formValues['endpoint'];
+                $unsavedStorage->bucket = $formValues['bucket'];
+                $unsavedStorage->region = $formValues['region'];
+                $unsavedStorage->key = $formValues['key'];
+                $unsavedStorage->secret = $formValues['secret'];
+
+                $unsavedStorage->testConnection(shouldSave: false);
+            }
 
             // Update component property to reflect the new validation status
-            $this->isUsable = $this->storage->is_usable;
+            $this->isUsable = true;
             $this->dispatch('storage-status-changed', isUsable: $this->isUsable);
 
             return $this->dispatch('success', 'Connection is working.', 'Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
-            // Refresh model and sync to get the latest state
-            $this->storage->refresh();
-            $this->isUsable = $this->storage->is_usable;
+            if ($this->formMatchesSavedStorage($this->formValues())) {
+                // Refresh model and sync to get the latest state
+                $this->storage->refresh();
+                $this->isUsable = $this->storage->is_usable;
+            } else {
+                // Unsaved changes failed the test; nothing was persisted above.
+                $this->isUsable = false;
+            }
             $this->dispatch('storage-status-changed', isUsable: $this->isUsable);
 
             $this->dispatch('error', 'Failed to test connection.', $e->getMessage());
