@@ -260,7 +260,7 @@ class Github extends Controller
             if ($installation_id) {
                 $github_app = GithubApp::where('installation_id', $installation_id)->first();
             }
-            if (! isset($github_app) || is_null($github_app)) {
+            if (empty($github_app)) {
                 $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
             }
             if (is_null($github_app)) {
