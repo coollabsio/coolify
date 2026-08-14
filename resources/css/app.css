@@ -993,8 +993,7 @@ html[data-theme="custom"] {
 }
 
 html[data-theme="custom"] .control-selected,
-html[data-theme="custom"] .logs-viewer-btn-active,
-html[data-theme="custom"] .button-highlighted:hover {
+html[data-theme="custom"] .logs-viewer-btn-active {
     color: var(--color-accent-foreground);
 }
 
