@@ -257,12 +257,8 @@ class Github extends Controller
                 return response('pong');
             }
             $installation_id = data_get($payload, 'installation.id');
-            if ($installation_id) {
-                $github_app = GithubApp::where('installation_id', $installation_id)->first();
-            }
-            if (empty($github_app)) {
-                $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
-            }
+            $github_app = GithubApp::where('installation_id', $installation_id)->first()
+                ?? GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
             if (is_null($github_app)) {
                 return response('Nothing to do. No GitHub App found.');
             }
