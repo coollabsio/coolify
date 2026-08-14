@@ -5,22 +5,6 @@
 
     <x-security.settings-layout>
 
-    @if (!$isApiEnabled)
-        <div class="application-settings-form">
-            <x-application.settings-section title="API disabled"
-                description="Enable the Coolify API before creating access tokens.">
-                <x-empty title="API access is turned off"
-                    description="Enable API access in instance settings to issue tokens." icon-name="keys"
-                    size="sm">
-                    <x-slot:actions>
-                        <a href="{{ route('settings.advanced') }}" class="button" {{ wireNavigate() }}>
-                            Open settings
-                        </a>
-                    </x-slot:actions>
-                </x-empty>
-            </x-application.settings-section>
-        </div>
-    @else
         @php
             $expirationList = collect($expirationOptions)
                 ->map(fn ($label, $days) => ['value' => (string) $days, 'label' => $label])
@@ -304,6 +288,5 @@
                 </div>
             </x-application.settings-section>
         </div>
-    @endif
     </x-security.settings-layout>
 </div>

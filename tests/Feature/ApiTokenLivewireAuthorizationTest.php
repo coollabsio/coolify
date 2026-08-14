@@ -76,6 +76,29 @@ test('member can still create read token', function () {
         ->and($token->abilities)->toBe(['read']);
 });
 
+test('member can create a token while REST API access is disabled', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false]);
+
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)
+        ->assertSee('New API token')
+        ->set('description', 'mcp-read-token')
+        ->set('expiresInDays', 30)
+        ->set('permissions', ['read'])
+        ->call('addNewToken')
+        ->assertHasNoErrors();
+
+    $token = $member->tokens()->latest()->first();
+
+    expect($token)->not->toBeNull()
+        ->and($token->abilities)->toBe(['read']);
+});
+
 test('owner can create root token', function () {
     $owner = User::factory()->create();
     $this->team->members()->attach($owner->id, ['role' => 'owner']);

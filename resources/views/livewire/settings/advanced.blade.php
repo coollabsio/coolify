@@ -83,7 +83,7 @@
                         ]" />
                     <div class="lg:col-span-2">
                         <x-forms.input id="allowed_ips" label="Allowed API IPs"
-                            helper="Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
+                            helper="Comma-separated IPs or CIDR ranges for the REST API only. Empty or 0.0.0.0 allows all sources. This allowlist does not apply to the MCP endpoint."
                             placeholder="192.168.1.100, 10.0.0.0/8" />
                     </div>
                 </div>
@@ -94,7 +94,13 @@
                 @endif
                 @if ($is_mcp_server_enabled)
                     <x-callout type="info" title="MCP endpoint" class="mt-4">
-                        <code>{{ url('/mcp') }}</code> uses Sanctum bearer tokens from Security → API Tokens.
+                        <div class="flex flex-wrap items-center gap-x-1 gap-y-1">
+                            <code>{{ url('/mcp') }}</code>
+                            <x-copy-button :value="url('/mcp')" label="Copy MCP endpoint" class="size-5!" />
+                            <span>uses Sanctum bearer tokens from
+                                <a href="{{ route('security.api-tokens') }}"
+                                    class="font-medium text-coollabs hover:underline dark:text-warning" {{ wireNavigate() }}>Security → API Tokens</a>.</span>
+                        </div>
                     </x-callout>
                 @endif
             </x-application.settings-section>
