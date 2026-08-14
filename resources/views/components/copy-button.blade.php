@@ -1,13 +1,23 @@
 @props([
-    'value',
+    'value' => null,
+    'expression' => null,
     'label' => 'Copy to clipboard',
 ])
 
+{{--
+    Pass `value` for a server-rendered string, or `expression` for an Alpine expression
+    (for example inside an x-for loop) whose result is copied when the button is clicked.
+--}}
+@php
+    $copyTarget = $expression ?? Js::from($value);
+@endphp
+
 <button type="button"
     x-data="{ copied: false }"
-    x-on:click.prevent.stop="await window.copyToClipboard({{ Js::from($value) }}); copied = true; setTimeout(() => copied = false, 1000)"
+    x-on:click.prevent.stop="await window.copyToClipboard({{ $copyTarget }}); copied = true; setTimeout(() => copied = false, 1000)"
     {{ $attributes->class('inline-flex size-6 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-40 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-white') }}
-    title="{{ $label }}" aria-label="{{ $label }}" @disabled(blank($value))>
+    @if ($expression) x-bind:disabled="!({{ $expression }})" @else @disabled(blank($value)) @endif
+    title="{{ $label }}" aria-label="{{ $label }}">
     <svg x-show="!copied" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
         aria-hidden="true">
         <path d="M8 8.75H6.5A2.25 2.25 0 0 0 4.25 11v6.5a2.25 2.25 0 0 0 2.25 2.25H13a2.25 2.25 0 0 0 2.25-2.25V16"
