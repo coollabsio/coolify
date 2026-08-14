@@ -21,6 +21,19 @@ it('escapeshellarg wraps postgres_user in single quotes for chown command', func
         ->toContain('chown');
 });
 
+it('sets postgres SSL file ownership before starting the database container', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Actions/Database/StartPostgresql.php');
+
+    $permissionCommandPosition = strpos($source, '--entrypoint chown');
+    $startCommandPosition = strpos($source, 'docker-compose.yml up -d');
+
+    expect($permissionCommandPosition)->not->toBeFalse()
+        ->and($startCommandPosition)->not->toBeFalse()
+        ->and($permissionCommandPosition)->toBeLessThan($startCommandPosition)
+        ->and($source)->toContain('postgres:postgres /var/lib/postgresql/certs/server.key')
+        ->not->toContain('chown {$postgresUser}:{$postgresUser}');
+});
+
 it('advisory PoC postgres_user payload is contained by escapeshellarg in chown command', function () {
     // Simulates a legacy row that bypassed validation
     $maliciousUser = 'root; touch /tmp/pwned_rce; #';
