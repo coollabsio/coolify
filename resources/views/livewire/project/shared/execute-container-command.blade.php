@@ -7,10 +7,8 @@
         <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.application.heading :application="$resource" wire:key="application-heading-command" />
     @elseif ($type === 'database')
-        <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.database.heading :database="$resource" />
     @elseif ($type === 'service')
-        <livewire:project.shared.configuration-checker :resource="$resource" />
         <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
     @else
         <livewire:server.navbar :server="$servers->first()" />

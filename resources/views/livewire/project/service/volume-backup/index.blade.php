@@ -53,7 +53,6 @@
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Backups | Coolify
     </x-slot>
-    <livewire:project.shared.configuration-checker :resource="$service" />
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="request()->query()"
         wire:key="service-heading-volume-backup-index" />
 
