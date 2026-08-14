@@ -1168,13 +1168,23 @@ it('uses the compact service domains layout for compose applications', function 
         ->toContain('bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]')
         ->toContain('class="data-table-header domains-table-grid-service"')
         ->toContain('<span>Direction</span>')
-        ->toContain('<span>Search engine indexing</span>')
+        ->toContain('<span class="whitespace-nowrap">Search engine indexing</span>')
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain('id="edit-domain-direction"')
         ->toContain('id="domain-direction-service-{{ $redirectWireKey }}"')
         ->toContain('onChange="updateServiceRedirect"')
         ->toContain("'showDirectionControl' => false")
         ->not->toContain('title="No domains for this service"');
+});
+
+it('keeps search engine indexing table headers on one line', function () {
+    $applicationView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+    $serviceView = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
+
+    expect(substr_count($applicationView, '<span class="whitespace-nowrap">Search engine indexing</span>'))
+        ->toBe(2)
+        ->and($serviceView)
+        ->toContain('<span class="whitespace-nowrap">Search engine indexing</span>');
 });
 
 it('shows domain guidance in the application domains section', function () {
