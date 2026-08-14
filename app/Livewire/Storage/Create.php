@@ -71,34 +71,12 @@ class Create extends Component
         'endpoint' => 'Endpoint',
     ];
 
-    public function updatedEndpoint($value)
-    {
-        try {
-            if (empty($value)) {
-                return;
-            }
-            if (str($value)->contains('digitaloceanspaces.com')) {
-                $uri = Uri::of($value);
-                $host = $uri->host();
-
-                if (preg_match('/^(.+)\.([^.]+\.digitaloceanspaces\.com)$/', $host, $matches)) {
-                    $host = $matches[2];
-                    $value = "https://{$host}";
-                }
-            }
-        } finally {
-            if (! str($value)->startsWith('https://') && ! str($value)->startsWith('http://')) {
-                $value = 'https://'.$value;
-            }
-            $this->endpoint = $value;
-        }
-    }
-
     public function submit()
     {
         try {
             $this->authorize('create', S3Storage::class);
 
+            $this->endpoint = $this->normalizeEndpoint($this->endpoint);
             $this->validate();
             $this->storage = new S3Storage;
             $this->storage->name = $this->name;
@@ -118,8 +96,42 @@ class Create extends Component
 
             return redirectRoute($this, 'storage.show', [$this->storage->uuid]);
         } catch (\Throwable $e) {
-            $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
+            $this->dispatch('error', 'Failed to create storage.', $this->connectionErrorDescription($e));
             // return handleError($e, $this);
         }
+    }
+
+    private function connectionErrorDescription(\Throwable $exception): string
+    {
+        $settingsUrl = route('settings.advanced').'#endpoint-section';
+        $description = e($exception->getMessage());
+
+        if (! str_contains($exception->getMessage(), $settingsUrl)) {
+            return $description;
+        }
+
+        $link = '<a class="font-medium underline" href="'.e($settingsUrl).'">Set them here.</a>';
+
+        return str_replace(e($settingsUrl), $link, $description);
+    }
+
+    private function normalizeEndpoint(string $endpoint): string
+    {
+        $endpoint = trim($endpoint);
+
+        $hasScheme = preg_match('/^(?:https?:|[a-z][a-z0-9+.-]*:\/\/)/i', $endpoint) === 1;
+        if (! $hasScheme) {
+            $endpoint = 'https://'.$endpoint;
+        }
+
+        if (str($endpoint)->contains('digitaloceanspaces.com')) {
+            $host = Uri::of($endpoint)->host();
+
+            if (preg_match('/^(.+)\.([^.]+\.digitaloceanspaces\.com)$/', $host, $matches)) {
+                return "https://{$matches[2]}";
+            }
+        }
+
+        return $endpoint;
     }
 }

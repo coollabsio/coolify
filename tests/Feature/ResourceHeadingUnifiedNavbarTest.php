@@ -334,6 +334,32 @@ it('renders configuration warnings as navbar popovers instead of floating notifi
         ->toContain("\$dispatch('open-configuration-diff')");
 });
 
+it('renders only one configuration warning on database runtime logs', function () {
+    $logs = file_get_contents(resource_path('views/livewire/project/shared/logs.blade.php'));
+    $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+
+    expect($logs)
+        ->not->toContain("    <livewire:project.shared.configuration-checker :resource=\"\$resource\" />\n\n    @if (\$type === 'application')")
+        ->and($databaseHeading)
+        ->toContain('<livewire:project.shared.configuration-checker :resource="$database" />');
+});
+
+it('renders only one configuration warning on database and service terminal pages', function () {
+    $terminal = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($terminal)
+        ->not->toContain("@elseif (\$type === 'database')\n        <livewire:project.shared.configuration-checker :resource=\"\$resource\" />")
+        ->not->toContain("@elseif (\$type === 'service')\n        <livewire:project.shared.configuration-checker :resource=\"\$resource\" />");
+});
+
+it('renders only one configuration warning on the service volume backups page', function () {
+    $volumeBackups = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($volumeBackups)
+        ->not->toContain('<livewire:project.shared.configuration-checker :resource="$service" />')
+        ->toContain('<livewire:project.service.heading :service="$service"');
+});
+
 it('moves application backups from the top tabs into the settings sidebar', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $configuration = file_get_contents(resource_path('views/livewire/project/application/configuration.blade.php'));

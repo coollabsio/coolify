@@ -7,7 +7,18 @@
                 <x-forms.input required label="Name" id="name" />
                 <x-forms.input label="Description" id="description" />
             </div>
-            <x-forms.input required type="url" label="Endpoint" wire:model.blur="endpoint" />
+            <x-forms.input required type="url" label="Endpoint" id="endpoint"
+                x-on:blur="
+                    let value = $el.value.trim();
+                    const hasScheme = /^https?:/i.test(value) || /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
+                    if (value && !hasScheme) {
+                        value = `https://${value}`;
+                    }
+                    if ($el.value !== value) {
+                        $el.value = value;
+                        $el.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                " />
             <div class="flex gap-2">
                 <x-forms.input required label="Bucket" id="bucket" />
                 <x-forms.input required helper="Region only required for AWS. Leave it as-is for other providers."
@@ -18,7 +29,7 @@
                 <x-forms.input required type="password" label="Secret Key" id="secret" />
             </div>
 
-            <x-forms.button class="mt-4" type="submit">
+            <x-forms.button class="mt-4" type="submit" wire:target="submit">
                 Validate Connection & Continue
             </x-forms.button>
         </form>
