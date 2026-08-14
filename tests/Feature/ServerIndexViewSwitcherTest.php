@@ -25,12 +25,15 @@ test('view switchers use the shared coollabs selected state on every page', func
         ->toContain('@apply bg-linear-to-b from-coollabs-100 to-coollabs-200 text-white;');
 });
 
-test('server index does not expose server IP addresses', function () {
+test('server index never renders a server address unguarded', function () {
     $view = file_get_contents(resource_path('views/livewire/server/index.blade.php'));
+    $addressCell = file_get_contents(resource_path('views/livewire/server/partials/address-cell.blade.php'));
 
     expect($view)
-        ->not->toContain("'address' => \$server->ip")
-        ->not->toContain('<div>Address</div>')
+        ->not->toContain('x-text="server.ip"')
         ->not->toContain('x-text="server.address"')
-        ->not->toContain('server.address,');
+        ->toContain('address-cell');
+
+    expect($addressCell)
+        ->toContain("{{ \$revealed }} ? ({{ \$address }} ?? '-') : addressMask");
 });

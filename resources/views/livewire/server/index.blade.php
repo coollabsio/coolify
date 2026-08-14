@@ -56,6 +56,7 @@
                 'uuid' => $server->uuid,
                 'name' => $server->name,
                 'description' => $server->description ?: 'No description',
+                'ip' => $server->ip,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,
@@ -63,17 +64,35 @@
         })->values();
     @endphp
 
+    {{--
+        Server addresses stay masked until they are explicitly revealed, so the list can be
+        shown or screenshotted without leaking every host. Copying does not require revealing,
+        and reveals are per row and never persisted, so a reload masks everything again.
+    --}}
     <div x-data="{
         search: '',
         viewMode: localStorage.getItem('coolify-servers-view') || 'table',
         servers: @js($serverRows),
+        addressMask: '{{ str_repeat('•', 10) }}',
+        revealedAddresses: [],
         get filteredServers() {
             const query = this.search.trim().toLowerCase();
             if (!query) return this.servers;
             return this.servers.filter(server =>
-                [server.name, server.description, server.status]
+                [server.name, server.description, server.ip, server.status]
                     .some(value => String(value || '').toLowerCase().includes(query))
             );
+        },
+        serverAddress(uuid) {
+            return this.servers.find(server => server.uuid === uuid)?.ip || null;
+        },
+        isAddressRevealed(uuid) {
+            return this.revealedAddresses.includes(uuid);
+        },
+        toggleAddress(uuid) {
+            this.revealedAddresses = this.isAddressRevealed(uuid)
+                ? this.revealedAddresses.filter(revealed => revealed !== uuid)
+                : [...this.revealedAddresses, uuid];
         },
         setViewMode(mode) {
             this.viewMode = mode;
@@ -131,54 +150,73 @@
                     @php
                         $serverRow = $serverRows->firstWhere('uuid', $server->uuid);
                     @endphp
-                    <a x-cloak
+                    {{--
+                        The card link stays a plain <a> wrapping the whole card so the metrics chart
+                        keeps its hover tooltips. The address controls are buttons, which may not be
+                        nested in a link, so they are overlaid on the footer strip reserved by pb-11.
+                    --}}
+                    <article x-cloak
                         x-show="filteredServers.some(server => server.uuid === @js($server->uuid))"
-                        href="{{ $serverRow['href'] }}" {{ wireNavigate() }}
-                        class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
-                        @if ($server->isMetricsEnabled())
-                            <livewire:dashboard.server-metrics-chart :server="$server"
-                                :key="'server-index-metrics-'.$server->uuid" />
-                        @endif
-
-                        <div class="relative z-10 flex items-start gap-3">
-                            <div
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
-                                <x-reicon name="servers" class="size-4" />
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
-                                    {{ $serverRow['name'] }}
-                                </h2>
-                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
-                                    {{ $serverRow['description'] }}
-                                </p>
-                            </div>
-                            @if ($serverRow['statusType'] !== 'success')
-                                <span data-tooltip="{{ $serverRow['status'] }}"
-                                    aria-label="Server status: {{ $serverRow['status'] }}"
-                                    @class([
-                                        'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md',
-                                        'text-orange-500 dark:text-warning' => $serverRow['statusType'] === 'warning',
-                                        'text-red-500 dark:text-red-400' => $serverRow['statusType'] === 'error',
-                                    ])>
-                                    <x-reicon name="alert-triangle" class="size-4" />
-                                </span>
+                        class="relative flex min-h-32 flex-col">
+                        <a href="{{ $serverRow['href'] }}" {{ wireNavigate() }}
+                            class="group relative flex flex-1 flex-col rounded-xl border border-neutral-200 bg-white p-3 pb-11 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            @if ($server->isMetricsEnabled())
+                                <livewire:dashboard.server-metrics-chart :server="$server"
+                                    :key="'server-index-metrics-'.$server->uuid" />
                             @endif
+
+                            <div class="relative z-10 flex items-start gap-3">
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    <x-reicon name="servers" class="size-4" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                        {{ $serverRow['name'] }}
+                                    </h2>
+                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        {{ $serverRow['description'] }}
+                                    </p>
+                                </div>
+                                @if ($serverRow['statusType'] !== 'success')
+                                    <span data-tooltip="{{ $serverRow['status'] }}"
+                                        aria-label="Server status: {{ $serverRow['status'] }}"
+                                        @class([
+                                            'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md',
+                                            'text-orange-500 dark:text-warning' => $serverRow['statusType'] === 'warning',
+                                            'text-red-500 dark:text-red-400' => $serverRow['statusType'] === 'error',
+                                        ])>
+                                        <x-reicon name="alert-triangle" class="size-4" />
+                                    </span>
+                                @endif
+                            </div>
+                        </a>
+
+                        <div class="absolute inset-x-3 bottom-3 z-20 flex items-center gap-1.5">
+                            <span class="shrink-0 text-[11px] text-neutral-400 dark:text-fg-faint">Address</span>
+                            @include('livewire.server.partials.address-cell', [
+                                'uuid' => \Illuminate\Support\Js::from($serverRow['uuid']),
+                                'name' => \Illuminate\Support\Js::from($serverRow['name']),
+                                'valueClass' => 'flex-1 text-[11px] text-neutral-500 dark:text-fg-dim',
+                            ])
                         </div>
-                    </a>
+                    </article>
                 @endforeach
             </div>
 
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
                 <div
-                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="grid min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                     <div>Server</div>
+                    <div>Address</div>
                     <div>Status</div>
                 </div>
                 <template x-for="server in filteredServers" :key="server.uuid">
-                    <a :href="server.href" {{ wireNavigate() }}
-                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                    <div
+                        class="group relative grid min-h-14 min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        <a :href="server.href" {{ wireNavigate() }} class="absolute inset-0"
+                            :aria-label="'Open ' + server.name"></a>
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -190,17 +228,26 @@
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                     x-text="server.description"></p>
                             </div>
+                        </div>
+                        <div class="relative z-10 flex min-w-0 items-center gap-1">
+                            @include('livewire.server.partials.address-cell', [
+                                'uuid' => 'server.uuid',
+                                'name' => 'server.name',
+                                'valueClass' => 'text-neutral-600 dark:text-fg-dim',
+                            ])
+                        </div>
+                        {{-- The alert icon lives with the status text here; the grid card has no
+                             status label, so it keeps the icon on its own. --}}
+                        <div class="flex items-center gap-1.5 text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
                             <span x-show="server.statusType !== 'success'" :data-tooltip="server.status"
                                 :aria-label="`Server status: ${server.status}`"
-                                class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md"
+                                class="flex shrink-0 items-center justify-center"
                                 :class="server.statusType === 'warning' ? 'text-orange-500 dark:text-warning' : 'text-red-500 dark:text-red-400'">
-                                <x-reicon name="alert-triangle" class="size-4" />
+                                <x-reicon name="alert-triangle" class="size-3.5" />
                             </span>
-                        </div>
-                        <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
                             <span x-text="server.status"></span>
                         </div>
-                    </a>
+                    </div>
                 </template>
             </div>
 
