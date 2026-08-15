@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Dashboard;
 use App\Livewire\Project\Edit;
 use App\Livewire\Project\Index;
 use App\Models\InstanceSettings;
@@ -98,4 +99,17 @@ it('exposes the icon URL on the projects index', function () {
             'project_uuid' => $this->project->uuid,
             'v' => $this->project->updated_at->timestamp,
         ]));
+});
+
+it('displays the project icon on the dashboard', function () {
+    $this->project->forceFill([
+        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
+        'icon_storage_type' => 'local',
+    ])->save();
+
+    Livewire::test(Dashboard::class)
+        ->assertSeeHtml('src="'.route('project.icon', [
+            'project_uuid' => $this->project->uuid,
+            'v' => $this->project->updated_at->timestamp,
+        ]).'"');
 });
