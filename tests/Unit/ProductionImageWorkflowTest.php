@@ -19,7 +19,7 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.2'");
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.4'");
 });
 
 it('orders a maintenance development build before its stable release', function () {

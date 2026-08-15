@@ -1,5 +1,4 @@
-<div
-    class="flex min-h-[calc(100dvh-7.5rem)] flex-col xl:h-[calc(100dvh-7.5rem)] xl:min-h-0 xl:overflow-hidden">
+<div class="flex min-h-[calc(100dvh-7.5rem)] flex-col">
     <x-slot:title>
         {{ data_get_str($application, 'name')->limit(10) }} > Deployment | Coolify
         </x-slot>
@@ -274,7 +273,7 @@
                 this.deploymentFinishedCleanup = null;
             }
         }
-    }" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full flex-col overflow-hidden xl:h-auto xl:min-h-0 xl:flex-1">
+    }" class="flex h-[calc(100dvh-8rem)] min-h-[32rem] w-full flex-col overflow-hidden xl:h-[32rem] xl:min-h-0 xl:flex-none">
             <div id="screen" :class="fullscreen ? 'fullscreen flex flex-col' : 'mt-2 flex flex-1 min-h-0 flex-col overflow-hidden lg:mt-0'">
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-log dark:text-neutral-100"
