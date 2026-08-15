@@ -99,7 +99,7 @@
                                 ['value' => true, 'label' => 'Delete unused networks'],
                             ]" />
                         <x-forms.listbox id="disableApplicationImageRetention" label="Application images"
-                            helper="Keeping retained images allows application rollbacks."
+                            helper="Choose Keep retained images to follow each application’s Images to keep setting under Rollback. Delete all old images ignores that setting and keeps only the running image."
                             onChange="instantSave" :options="[
                                 ['value' => false, 'label' => 'Keep retained images'],
                                 ['value' => true, 'label' => 'Delete all old images'],
