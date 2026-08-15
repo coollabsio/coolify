@@ -27,7 +27,8 @@ services:
     healthcheck:
       test: curl --fail http://127.0.0.1:8080/api/health || exit 1
       interval: 5s
-      retries: 10
+      retries: 24
+      start_period: 1m
       timeout: 2s
     depends_on:
       postgres:
