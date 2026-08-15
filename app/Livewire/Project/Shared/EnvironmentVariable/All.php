@@ -714,6 +714,12 @@ class All extends Component
         // Extract all hard-coded variables
         $hardcodedVars = extractHardcodedEnvironmentVariables($dockerComposeRaw);
 
+        // Compose self-references are inputs supplied through Coolify's .env file,
+        // not hard-coded values. Keep them editable in the environment variables UI.
+        $hardcodedVars = $hardcodedVars->reject(
+            fn (array $variable): bool => $this->isSelfReferencingComposeVariable($variable)
+        );
+
         // Filter out magic variables (SERVICE_FQDN_*, SERVICE_URL_*, SERVICE_NAME_*)
         $hardcodedVars = $hardcodedVars->filter(function ($var) {
             $key = $var['key'];
@@ -755,12 +761,41 @@ class All extends Component
             return [];
         }
 
-        return extractHardcodedEnvironmentVariables($dockerComposeRaw)
+        $assignments = extractHardcodedEnvironmentVariables($dockerComposeRaw);
+        $editableKeys = $assignments
+            ->filter(fn (array $variable): bool => $this->isSelfReferencingComposeVariable($variable))
+            ->pluck('key')
+            ->unique();
+
+        return $assignments
+            ->reject(fn (array $variable): bool => $editableKeys->contains($variable['key']))
             ->pluck('key')
             ->reject(fn (string $key): bool => str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_']))
             ->unique()
             ->values()
             ->all();
+    }
+
+    private function isSelfReferencingComposeVariable(array $variable): bool
+    {
+        $value = $variable['value'] ?? null;
+        if (! is_string($value)) {
+            return false;
+        }
+
+        if ($value === '$'.$variable['key']) {
+            return true;
+        }
+
+        $reference = extractBalancedBraceContent($value);
+        if ($reference === null || $reference['start'] !== 1 || $reference['end'] !== strlen($value) - 1) {
+            return false;
+        }
+
+        $splitReference = splitOnOperatorOutsideNested($reference['content']);
+        $referencedKey = $splitReference['variable'] ?? $reference['content'];
+
+        return $referencedKey === $variable['key'];
     }
 
     public function getDevView()
