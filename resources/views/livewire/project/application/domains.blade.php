@@ -237,7 +237,7 @@
                             <div class="data-table-header domains-table-grid-service">
                                 <span>Domain</span>
                                 <span>DNS Check</span>
-                                <span>Search engine indexing</span>
+                                <span class="whitespace-nowrap">Search engine indexing</span>
                                 <span></span>
                             </div>
                             @foreach ($rows as $row)
@@ -273,7 +273,7 @@
                 <div class="data-table-header domains-table-grid">
                     <span>Domain</span>
                     <span>DNS Check</span>
-                    <span>Search engine indexing</span>
+                    <span class="whitespace-nowrap">Search engine indexing</span>
                     <span>Direction</span>
                     <span></span>
                 </div>
