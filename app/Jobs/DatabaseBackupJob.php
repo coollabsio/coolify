@@ -18,6 +18,7 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Rules\SafeWebhookUrl;
+use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -609,7 +610,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             $escapedUsername = escapeshellarg($this->database->postgres_user);
             if ($this->backup->dump_all) {
-                $backupCommand .= " $this->container_name pg_dumpall --username $escapedUsername | gzip > $this->backup_location";
+                $backupCommand .= " $this->container_name pg_dumpall --username $escapedUsername";
+                $backupCommand = $this->buildCompressedDumpCommand($backupCommand).' > '.escapeshellarg($this->backup_location);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
@@ -635,7 +637,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = 'mkdir -p '.$this->backup_dir;
             $escapedPassword = escapeshellarg($this->database->mysql_root_password);
             if ($this->backup->dump_all) {
-                $commands[] = "docker exec $this->container_name mysqldump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false --compress | gzip > $this->backup_location";
+                $dumpCommand = "docker exec $this->container_name mysqldump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
+                $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.escapeshellarg($this->backup_location);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
@@ -659,7 +662,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = 'mkdir -p '.$this->backup_dir;
             $escapedPassword = escapeshellarg($this->database->mariadb_root_password);
             if ($this->backup->dump_all) {
-                $commands[] = "docker exec $this->container_name mariadb-dump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false --compress > $this->backup_location";
+                $dumpCommand = "docker exec $this->container_name mariadb-dump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
+                $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.escapeshellarg($this->backup_location);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
@@ -804,6 +808,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
+    }
+
+    private function buildCompressedDumpCommand(string $dumpCommand): string
+    {
+        $cpuPercentage = BackupCompression::cpuPercentage($this->server->settings->backup_compression_cpu_percentage);
+        $compressorCommand = BackupCompression::compressorCommand($cpuPercentage);
+        $script = "compressor=\$({$compressorCommand}); exec \$compressor";
+
+        return $dumpCommand.' | docker run --rm -i '.escapeshellarg($this->getFullImageName()).' sh -c '.escapeshellarg($script);
     }
 
     private function markStaleExecutionsAsFailed(): void
