@@ -200,12 +200,9 @@
                             <div class="min-w-0">
                                 <div class="flex min-w-0 items-center gap-1.5">
                                     <a :href="item.hrefLink"
-                                        @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
                                         {{ wireNavigate() }}
                                         class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                         x-text="item.name"></a>
-                                    <span x-show="item.version === 'v5'"
-                                        class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
                                 </div>
                                 <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                     <span x-show="item.description" x-text="item.description"></span>
@@ -320,8 +317,6 @@
                                         <h2
                                             class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                             x-text="item.name"></h2>
-                                        <span x-show="item.version === 'v5'"
-                                            class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
                                     </div>
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="item.typeLabel"></p>

@@ -22,13 +22,8 @@ services:
       args:
         - USER_ID=${USERID:-1000}
         - GROUP_ID=${GROUPID:-1000}
-        - COOLIFY_FLUX_VERSION=${COOLIFY_FLUX_VERSION:-nightly}
-        - COOLIFY_FLUX_CHECKSUM=${COOLIFY_FLUX_CHECKSUM:-unknown}
-        - COOLIFY_CLI_VERSION=${COOLIFY_CLI_VERSION:-nightly}
-        - COOLIFY_CLI_CHECKSUM=${COOLIFY_CLI_CHECKSUM:-unknown}
     ports:
       - "${APP_PORT:-8000}:8080"
-      - "${FORWARD_FLUX_PORT:-6443}:6443"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
