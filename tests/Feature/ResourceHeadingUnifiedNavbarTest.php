@@ -592,7 +592,7 @@ it('shows an icon in application and service Links controls', function () {
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
     $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
 
-    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false])")
+    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false, 'compact' => false])")
         ->toContain('<x-reicon name="external-link"')
         ->and($serviceLinksComponent)->toContain('public bool $fullWidth = false')
         ->and($serviceLinks)
@@ -610,25 +610,34 @@ it('visually distinguishes production and pull request application links', funct
         ->not->toContain("PR{{ data_get(\$preview, 'pull_request_id') }} |");
 });
 
-it('shows application and service Links on mobile headings', function () {
+it('shows application Links as a compact badge beside the mobile status', function () {
     $application = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-
-    $mobileApplicationSection = str($application)->between('class="w-full xl:hidden"', 'class="hidden w-full items-center xl:fixed')->toString();
-    $mobileServiceSection = str($service)->between('class="w-full md:hidden"', 'class="hidden w-full items-center md:flex')->toString();
-
-    expect($mobileApplicationSection)
-        ->toContain('<x-applications.links')
-        ->toContain('full-width')
-        ->toContain('resource-heading-menus')
-        ->not->toContain('<x-resource-heading-tabs')
-        ->not->toContain("'label' => 'Settings'");
-
     $applicationLinks = file_get_contents(resource_path('views/components/applications/links.blade.php'));
+    $mobileApplicationTitle = str($application)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+    $mobileApplicationActions = str($application)->between('<div class="w-full xl:hidden">', '<div class="hidden" aria-hidden="true">')->toString();
+
+    expect($mobileApplicationTitle)
+        ->toContain('<x-status-summary')
+        ->toContain('<x-applications.links')
+        ->toContain('relative flex w-full min-w-0 items-center gap-2')
+        ->toContain('compact')
+        ->not->toContain('full-width');
+
+    expect($mobileApplicationActions)
+        ->not->toContain('<x-applications.links');
+
     expect($applicationLinks)
-        ->toContain("'button w-full justify-between' => \$fullWidth")
-        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
+        ->toContain("'compact' => false")
+        ->toContain("'static' => \$compact")
+        ->toContain("'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => \$compact")
+        ->toContain('@unless ($compact)')
+        ->toContain("'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => \$compact")
         ->toContain('<x-reicon name="chevron-down"');
+});
+
+it('keeps service Links full width on mobile headings', function () {
+    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $mobileServiceSection = str($service)->between('class="w-full md:hidden"', 'class="hidden w-full items-center md:flex')->toString();
 
     expect($mobileServiceSection)
         ->toContain('<x-services.links')
@@ -643,8 +652,6 @@ it('shows application and service Links on mobile headings', function () {
         ->toContain('<x-reicon name="chevron-down"')
         ->toContain('No links available');
 
-    // One mobile + one desktop instance.
-    expect(substr_count($application, '<x-applications.links'))->toBe(2);
     expect(substr_count($service, '<x-services.links'))->toBe(2);
 });
 

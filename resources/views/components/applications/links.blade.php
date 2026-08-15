@@ -1,4 +1,4 @@
-@props(['application', 'fullWidth' => false])
+@props(['application', 'fullWidth' => false, 'compact' => false])
 
 @php
     $hasLinks =
@@ -13,15 +13,22 @@
     $linkItemClasses = 'listbox-option justify-start! gap-2.5!';
 @endphp
 
-<div @class(['relative', 'w-full' => $fullWidth]) x-data="{ open: false }"
+<div @class([
+    'relative' => !$compact,
+    'static' => $compact,
+    'w-full' => $fullWidth,
+]) x-data="{ open: false }"
     x-effect="$dispatch('resource-actions-toggled', { open })" @keydown.escape.window="open = false">
     <button type="button" @click="open = !open" @click.outside="open = false" title="Open application links"
         @class([
-            'app-tab shrink-0 gap-1' => !$fullWidth,
+            'app-tab shrink-0 gap-1' => !$fullWidth && !$compact,
             'button w-full justify-between' => $fullWidth,
+            'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => $compact,
         ])>
         <span class="inline-flex items-center gap-2">
-            <x-reicon name="external-link" class="size-3.5 shrink-0 opacity-70" />
+            @unless ($compact)
+                <x-reicon name="external-link" class="size-3.5 shrink-0 opacity-70" />
+            @endunless
             Links
         </span>
         <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
@@ -32,7 +39,8 @@
         @class([
             'listbox-panel top-full! mt-1!',
             'left-0! right-0! w-full! min-w-0! max-w-none!' => $fullWidth,
-            'right-0! left-auto! min-w-60! max-w-96!' => !$fullWidth,
+            'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => $compact,
+            'right-0! left-auto! min-w-60! max-w-96!' => !$fullWidth && !$compact,
         ])>
         @if ($hasLinks)
             @if (data_get($application, 'gitBrancLocation'))

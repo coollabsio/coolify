@@ -30,7 +30,10 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $application->name }}
                 </h1>
-                <x-status-summary :status="$application->status" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$application->status" />
+                    <x-applications.links :application="$application" compact />
+                </div>
             </div>
         </div>
 
@@ -147,9 +150,6 @@
                     </div>
                 </div>
             @endif
-            <div class="resource-heading-menus w-full">
-                <x-applications.links :application="$application" full-width />
-            </div>
             <div class="hidden" aria-hidden="true">
                 <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
                     submitAction="stop" :checkboxes="$checkboxes" :actions="[
