@@ -3,6 +3,7 @@
 use App\Livewire\Dashboard;
 use App\Livewire\Project\Edit;
 use App\Livewire\Project\Index;
+use App\Livewire\SharedVariables\Project\Index as SharedVariablesProjectIndex;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Team;
@@ -112,4 +113,20 @@ it('displays the project icon on the dashboard', function () {
             'project_uuid' => $this->project->uuid,
             'v' => $this->project->updated_at->timestamp,
         ]).'"');
+});
+
+it('displays the project icon in shared variables project views', function () {
+    $this->project->forceFill([
+        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
+        'icon_storage_type' => 'local',
+    ])->save();
+
+    $iconUrl = route('project.icon', [
+        'project_uuid' => $this->project->uuid,
+        'v' => $this->project->updated_at->timestamp,
+    ]);
+
+    $component = Livewire::test(SharedVariablesProjectIndex::class);
+
+    expect(substr_count($component->html(), 'src="'.$iconUrl.'"'))->toBe(2);
 });
