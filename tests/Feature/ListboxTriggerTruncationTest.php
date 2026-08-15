@@ -39,6 +39,29 @@ test('listbox component uses shared trigger label truncation', function () {
         ->not->toContain('class="truncate" x-text="current"');
 });
 
+test('portaled listboxes center in the mobile viewport', function () {
+    $html = Blade::render('<x-forms.listbox id="region" :options="[]" :wire="false" />');
+
+    expect($html)
+        ->toContain('window.innerWidth < 768')
+        ->toContain('(window.innerWidth - panelWidth) / 2')
+        ->toContain('panel.style.width = `${panelWidth}px`')
+        ->toContain('panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`')
+        ->toContain('x-show="open"')
+        ->not->toContain('x-show="open && positioned"');
+});
+
+test('legacy floating panels have a centered mobile fallback', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toContain('@media (max-width: 767px)')
+        ->toContain('.listbox-panel:not([style*="position: fixed"])')
+        ->toContain('position: fixed !important;')
+        ->toContain('left: 50% !important;')
+        ->toContain('transform: translate(-50%, -50%) !important;');
+});
+
 test('searchable listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.searchable-listbox id="tz" label="Timezone"

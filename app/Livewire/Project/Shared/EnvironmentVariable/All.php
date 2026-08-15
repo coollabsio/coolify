@@ -44,6 +44,14 @@ class All extends Component
 
     public int $perPage = 10;
 
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+
+        $this->page = 1;
+        $this->clearEnvironmentVariableCaches();
+    }
+
     public bool $is_env_sorting_enabled = false;
 
     public bool $use_build_secrets = false;

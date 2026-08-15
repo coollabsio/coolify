@@ -14,7 +14,7 @@
     'value' => null, // initial value when wire=false
     'disabled' => false,
     'tooltip' => true,
-    'portal' => false,
+    'portal' => true,
     'preserveValue' => false,
 ])
 
@@ -90,19 +90,26 @@
             const gap = 4;
             const edge = 12;
             const triggerRect = trigger.getBoundingClientRect();
-            const panelWidth = Math.max(triggerRect.width, panel.offsetWidth);
+            const panelWidth = Math.min(
+                Math.max(triggerRect.width, panel.offsetWidth),
+                window.innerWidth - (edge * 2),
+            );
             const panelHeight = Math.min(panel.scrollHeight, 256);
             const fitsBelow = window.innerHeight - triggerRect.bottom - gap >= panelHeight;
             const top = fitsBelow
                 ? triggerRect.bottom + gap
                 : Math.max(edge, triggerRect.top - gap - panelHeight);
-            const left = Math.min(
-                Math.max(edge, triggerRect.left),
-                window.innerWidth - panelWidth - edge,
-            );
+            const left = window.innerWidth < 768
+                ? (window.innerWidth - panelWidth) / 2
+                : Math.min(
+                    Math.max(edge, triggerRect.left),
+                    window.innerWidth - panelWidth - edge,
+                );
 
             panel.style.top = `${top}px`;
             panel.style.left = `${left}px`;
+            panel.style.width = `${panelWidth}px`;
+            panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`;
             panel.style.minWidth = `${triggerRect.width}px`;
             this.positioned = true;
         }
@@ -123,7 +130,7 @@
         @if ($portal)
             <template x-teleport="body">
                 <div id="{{ $panelId }}" class="listbox-panel"
-                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open && positioned"
+                    style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
                     x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
                     x-transition:enter="transition ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"

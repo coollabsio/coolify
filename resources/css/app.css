@@ -1939,6 +1939,28 @@ html[data-theme="custom"] textarea:disabled {
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
+.floating-dropdown-panel {
+    min-width: 0;
+}
+
+/* Older menus still render inside their page container. On mobile, keep
+   those panels fully visible until they are migrated to the portaled
+   dropdown component. Portaled panels carry their own fixed coordinates. */
+@media (max-width: 767px) {
+    .listbox-panel:not([style*="position: fixed"]) {
+        position: fixed !important;
+        top: 50% !important;
+        right: auto !important;
+        left: 50% !important;
+        width: max-content;
+        max-width: calc(100vw - 1.5rem) !important;
+        max-height: calc(100dvh - 1.5rem) !important;
+        box-sizing: border-box;
+        transform: translate(-50%, -50%) !important;
+        z-index: 9999 !important;
+    }
+}
+
 .listbox-option {
     display: flex;
     align-items: center;

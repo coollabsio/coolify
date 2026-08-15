@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\File;
 
 it('renders the standard table toolbar controls', function () {
     $html = Blade::render(<<<'BLADE'
@@ -21,6 +22,16 @@ it('renders the standard table toolbar controls', function () {
         ->toContain('table-toolbar')
         ->toContain('table-search')
         ->toContain('wire:model.live="search"')
+        ->toContain('x-teleport="body"')
+        ->toContain('positionPanel')
+        ->toContain('position: fixed')
+        ->toContain('floating-dropdown-panel')
+        ->toContain('window.innerWidth < 768')
+        ->toContain('(window.innerWidth - panelWidth) / 2')
+        ->toContain('panel.style.width = `${panelWidth}px`')
+        ->toContain('panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`')
+        ->toContain('x-show="open"')
+        ->not->toContain('x-show="open && positioned"')
         ->toContain('aria-multiselectable="true"')
         ->toContain('Reset filters')
         ->toContain('wire:click="clearFilters"')
@@ -60,4 +71,31 @@ it('uses the standard search control for frontend filtered infrastructure tables
         ->toContain('<x-table.search')
         ->toContain('clear-when="search"')
         ->toContain("clear-action=\"search = ''\"");
+});
+
+it('uses the collision aware dropdown on the projects page', function () {
+    $projects = file_get_contents(resource_path('views/livewire/project/index.blade.php'));
+
+    expect($projects)
+        ->toContain('<x-table.dropdown')
+        ->not->toContain('x-show="sortOpen"');
+});
+
+it('uses collision aware filter and sort dropdowns on the resources page', function () {
+    $resources = file_get_contents(resource_path('views/livewire/project/resource/index.blade.php'));
+
+    expect(substr_count($resources, '<x-table.dropdown'))->toBeGreaterThanOrEqual(2)
+        ->and($resources)
+        ->not->toContain('x-show="filterOpen"')
+        ->not->toContain('x-show="sortOpen"');
+});
+
+it('does not use legacy floating sort or filter panels', function () {
+    $views = collect(File::allFiles(resource_path('views')))
+        ->filter(fn (SplFileInfo $file): bool => $file->getExtension() === 'php')
+        ->map(fn (SplFileInfo $file): string => $file->getContents())
+        ->implode("\n");
+
+    expect($views)
+        ->not->toMatch('/x-show="(?:sortOpen|filterOpen|filtersOpen)"/');
 });
