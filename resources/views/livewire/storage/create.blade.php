@@ -7,18 +7,8 @@
                 <x-forms.input required label="Name" id="name" />
                 <x-forms.input label="Description" id="description" />
             </div>
-            <x-forms.input required type="url" label="Endpoint" id="endpoint"
-                x-on:blur="
-                    let value = $el.value.trim();
-                    const hasScheme = /^https?:/i.test(value) || /^[a-z][a-z0-9+.-]*:\/\//i.test(value);
-                    if (value && !hasScheme) {
-                        value = `https://${value}`;
-                    }
-                    if ($el.value !== value) {
-                        $el.value = value;
-                        $el.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                " />
+            <x-forms.domain-input id="endpoint" host-label="Host"
+                host-placeholder="minio.internal or 192.168.1.50" />
             <div class="flex gap-2">
                 <x-forms.input required label="Bucket" id="bucket" />
                 <x-forms.input required helper="Region only required for AWS. Leave it as-is for other providers."

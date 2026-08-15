@@ -30,6 +30,7 @@ class StopDatabase
 
             // Reset restart tracking when database is manually stopped
             $database->update([
+                'status' => 'exited',
                 'restart_count' => 0,
                 'last_restart_at' => null,
                 'last_restart_type' => null,

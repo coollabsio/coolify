@@ -5,14 +5,18 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-it('normalizes S3 endpoints without a Livewire blur request', function () {
-    $view = file_get_contents(resource_path('views/livewire/storage/create.blade.php'));
+it('uses the shared split URL input without a Livewire blur request', function () {
+    $createView = file_get_contents(resource_path('views/livewire/storage/create.blade.php'));
+    $editView = file_get_contents(resource_path('views/livewire/storage/form.blade.php'));
 
-    expect($view)
+    expect($createView)
         ->not->toContain('wire:model.blur="endpoint"')
-        ->toContain('x-on:blur')
-        ->toContain('const hasScheme')
-        ->toContain('dispatchEvent');
+        ->toContain('<x-forms.domain-input id="endpoint"')
+        ->toContain('host-label="Host"')
+        ->toContain('host-placeholder="minio.internal or 192.168.1.50"')
+        ->and($editView)
+        ->toContain('<x-forms.domain-input id="endpoint"')
+        ->toContain('@can(\'update\', $storage)');
 });
 
 it('normalizes endpoints again on the backend', function (string $endpoint, string $expected) {

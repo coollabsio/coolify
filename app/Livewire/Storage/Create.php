@@ -26,7 +26,7 @@ class Create extends Component
 
     public string $bucket;
 
-    public string $endpoint;
+    public string $endpoint = '';
 
     public S3Storage $storage;
 

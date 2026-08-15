@@ -3,6 +3,8 @@
     'wire' => true,
     'value' => '',
     'errorId' => null,
+    'hostLabel' => 'Domain',
+    'hostPlaceholder' => 'app.example.com',
 ])
 
 <div class="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)_8rem]" x-data="{
@@ -51,13 +53,24 @@
     <div class="min-w-0">
         <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
             <label for="{{ $id }}" class="mb-0! flex items-center gap-1.5 leading-4">
-                Domain <x-highlighted text="*" />
+                {{ $hostLabel }} <x-highlighted text="*" />
             </label>
         </div>
-        <input id="{{ $id }}" type="text" class="input" x-model="host" placeholder="app.example.com"
+        <input id="{{ $id }}" type="text" class="input" x-model="host" placeholder="{{ $hostPlaceholder }}"
             autocomplete="off" required />
         @error($errorId ?? $id)
-            <p class="mt-1 text-[12px] text-red-500">{{ $message }}</p>
+            @php
+                preg_match('/(https?:\/\/\S+)$/', $message, $validationLinkMatches);
+                $validationLink = $validationLinkMatches[1] ?? null;
+            @endphp
+            <p class="mt-1 text-[12px] text-red-500">
+                @if ($validationLink)
+                    {{ str($message)->beforeLast($validationLink)->trim() }}
+                    <a class="font-medium underline" href="{{ $validationLink }}">Set them here.</a>
+                @else
+                    {{ $message }}
+                @endif
+            </p>
         @enderror
     </div>
 

@@ -49,6 +49,9 @@ class StopService
                 $this->stopContainersInParallel($containersToStop, $server);
             }
 
+            $applications->each->update(['status' => 'exited']);
+            $dbs->each->update(['status' => 'exited']);
+
             if ($deleteConnectedNetworks) {
                 $service->deleteConnectedNetworks();
             }
