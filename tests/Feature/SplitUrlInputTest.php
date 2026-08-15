@@ -22,6 +22,18 @@ it('renders configurable host copy for S3 endpoints', function () {
         ->toContain("path: ''");
 });
 
+it('does not reparse partial numeric hosts while typing', function () {
+    $view = file_get_contents(resource_path('views/components/forms/domain-input.blade.php'));
+    $writeMethod = str($view)->between('write() {', "\n    },\n}")->value();
+
+    expect($writeMethod)
+        ->toContain('this.syncing = true;')
+        ->toContain('this.value = next;')
+        ->toContain('this.$nextTick(() => this.syncing = false);')
+        ->and(strpos($writeMethod, 'this.syncing = true;'))
+        ->toBeLessThan(strpos($writeMethod, 'this.value = next;'));
+});
+
 it('keeps validation errors attached to the composed endpoint', function () {
     $settingsUrl = route('settings.advanced').'#endpoint-section';
     $errors = new ViewErrorBag;

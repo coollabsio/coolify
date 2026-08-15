@@ -39,7 +39,11 @@
         const path = this.path.trim();
         const normalizedPath = path && !['/', '?', '#'].includes(path[0]) ? `/${path}` : path;
         const next = `${this.scheme}://${this.host.trim()}${this.port ? `:${this.port}` : ''}${normalizedPath}`;
-        if (this.value !== next) this.value = next;
+        if (this.value !== next) {
+            this.syncing = true;
+            this.value = next;
+            this.$nextTick(() => this.syncing = false);
+        }
     },
 }" x-modelable="value" {{ $attributes->whereStartsWith('x-model') }}>
     <div class="min-w-0">
