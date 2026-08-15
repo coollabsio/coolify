@@ -107,7 +107,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()
-                ->merge(GitlabApp::where('team_id', $team->id)->get());
+                ->concat(GitlabApp::where('team_id', $team->id)->get());
             foreach ($teamSources as $source) {
                 $source->delete();
             }
