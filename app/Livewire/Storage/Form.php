@@ -122,20 +122,39 @@ class Form extends Component
 
     public function testConnection()
     {
+        $testedStorage = null;
+
         try {
             $this->authorize('validateConnection', $this->storage);
+            $testedStorage = new S3Storage;
+            $testedStorage->uuid = $this->storage->uuid;
+            $testedStorage->team_id = $this->storage->team_id;
+            $testedStorage->unusable_email_sent = $this->storage->unusable_email_sent;
+            $testedStorage->name = $this->name;
+            $testedStorage->description = $this->description;
+            $testedStorage->endpoint = $this->endpoint;
+            $testedStorage->bucket = $this->bucket;
+            $testedStorage->region = $this->region;
+            $testedStorage->key = $this->key;
+            $testedStorage->secret = $this->secret;
 
-            $this->storage->testConnection(shouldSave: true);
+            $testedStorage->testConnection();
 
             // Update component property to reflect the new validation status
-            $this->isUsable = $this->storage->is_usable;
+            $this->isUsable = $testedStorage->is_usable;
+            $this->storage->is_usable = $testedStorage->is_usable;
+            $this->storage->unusable_email_sent = $testedStorage->unusable_email_sent;
+            $this->storage->save();
             $this->dispatch('storage-status-changed', isUsable: $this->isUsable);
 
             return $this->dispatch('success', 'Connection is working.', 'Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
-            // Refresh model and sync to get the latest state
-            $this->storage->refresh();
-            $this->isUsable = $this->storage->is_usable;
+            if ($testedStorage) {
+                $this->isUsable = $testedStorage->is_usable;
+                $this->storage->is_usable = $testedStorage->is_usable;
+                $this->storage->unusable_email_sent = $testedStorage->unusable_email_sent;
+                $this->storage->save();
+            }
             $this->dispatch('storage-status-changed', isUsable: $this->isUsable);
 
             $this->dispatch('error', 'Failed to test connection.', $e->getMessage());
