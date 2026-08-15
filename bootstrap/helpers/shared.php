@@ -4630,6 +4630,8 @@ function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collect
             continue;
         }
 
+        $passthroughKeys = extractDockerComposePassthroughKeys($environment);
+
         // Convert environment variables to key-value format
         $environment = convertToKeyValueCollection($environment);
 
@@ -4639,11 +4641,151 @@ function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collect
                 'value' => $value,
                 'comment' => $envComments[$key] ?? null,
                 'service_name' => $serviceName,
+                'is_passthrough' => $passthroughKeys->contains($key),
             ]);
         }
     }
 
     return $hardcodedVars;
+}
+
+/** @return Collection<int, string> */
+function extractDockerComposePassthroughKeys(mixed $environment): Collection
+{
+    return collect($environment)
+        ->map(function (mixed $value, mixed $key): ?string {
+            if (is_numeric($key)) {
+                return is_string($value) && ! str_contains($value, '=') ? $value : null;
+            }
+
+            return $value === null ? (string) $key : null;
+        })
+        ->filter()
+        ->unique()
+        ->values();
+}
+
+/** @return Collection<int, string> */
+function extractDockerComposeEnvironmentVariableReferences(mixed $value): Collection
+{
+    if (! is_string($value) || ! str_contains($value, '$')) {
+        return collect();
+    }
+
+    preg_match_all('/(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)/', $value, $bracedMatches);
+    preg_match_all('/(?<!\$)\$(?!\{)([A-Za-z_][A-Za-z0-9_]*)/', $value, $bareMatches);
+
+    return collect([...$bracedMatches[1], ...$bareMatches[1]])
+        ->unique()
+        ->values();
+}
+
+/** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+function dockerComposeEnvironmentVariableInfo(?string $dockerCompose, string $key): ?array
+{
+    if (blank($dockerCompose)) {
+        return null;
+    }
+
+    $services = [];
+    $default = null;
+    $operator = null;
+    $required = false;
+
+    foreach (extractHardcodedEnvironmentVariables($dockerCompose) as $assignment) {
+        $value = $assignment['value'] ?? null;
+        $isPassthrough = ($assignment['is_passthrough'] ?? false) && $assignment['key'] === $key;
+        if (! $isPassthrough && ! extractDockerComposeEnvironmentVariableReferences($value)->contains($key)) {
+            continue;
+        }
+
+        if (filled($assignment['service_name'] ?? null)) {
+            $services[] = $assignment['service_name'];
+        }
+
+        if (is_string($value)) {
+            $offset = 0;
+            while (($referenceStart = strpos($value, '${', $offset)) !== false) {
+                if ($referenceStart > 0 && $value[$referenceStart - 1] === '$') {
+                    $offset = $referenceStart + 2;
+
+                    continue;
+                }
+
+                $balancedReference = extractBalancedBraceContent(substr($value, $referenceStart));
+                if ($balancedReference === null) {
+                    break;
+                }
+
+                $splitReference = splitOnOperatorOutsideNested($balancedReference['content']);
+                if ($splitReference !== null && $splitReference['variable'] === $key) {
+                    $matchedOperator = $splitReference['operator'];
+                    $operator ??= $matchedOperator;
+                    if (str_contains($matchedOperator, '-')) {
+                        $default ??= $splitReference['default'];
+                    }
+                    $required = $required || str_contains($matchedOperator, '?');
+                }
+
+                $offset = $referenceStart + 2;
+            }
+        }
+    }
+
+    if ($services === []) {
+        return null;
+    }
+
+    return [
+        'services' => array_values(array_unique($services)),
+        'default' => $default,
+        'operator' => $operator,
+        'required' => $required,
+    ];
+}
+
+function dockerComposeEnvironmentVariableIsRequired(?string $dockerCompose, string $key): bool
+{
+    if (blank($dockerCompose)) {
+        return false;
+    }
+
+    $key = preg_quote($key, '/');
+
+    return preg_match('/(?<!\$)\$\{'.$key.'(?::\?|\?)/', $dockerCompose) === 1;
+}
+
+function dockerComposeEnvironmentVariableRequiresUnsetWhenBlank(?string $dockerCompose, string $key): bool
+{
+    if (blank($dockerCompose)) {
+        return false;
+    }
+
+    $assignments = extractHardcodedEnvironmentVariables($dockerCompose);
+    if ($assignments->contains(fn (array $assignment): bool => $assignment['key'] === $key && $assignment['is_passthrough'])) {
+        return true;
+    }
+
+    $key = preg_quote($key, '/');
+
+    return preg_match('/(?<!\$)\$\{'.$key.'(?:-|\?)/', $dockerCompose) === 1;
+}
+
+function syncDockerComposeEnvironmentVariableRequiredState(Application|Service $resource): void
+{
+    $dockerCompose = $resource->docker_compose_raw ?? $resource->docker_compose;
+
+    $environmentVariables = $resource->environment_variables()->get();
+    if ($resource instanceof Application) {
+        $environmentVariables = $environmentVariables->concat($resource->environment_variables_preview()->get());
+    }
+
+    $environmentVariables->each(function (EnvironmentVariable $environmentVariable) use ($dockerCompose): void {
+        $isRequired = dockerComposeEnvironmentVariableIsRequired($dockerCompose, $environmentVariable->key);
+        if ((bool) $environmentVariable->is_required !== $isRequired) {
+            $environmentVariable->update(['is_required' => $isRequired]);
+        }
+    });
 }
 
 /**

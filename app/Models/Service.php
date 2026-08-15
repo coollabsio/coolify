@@ -1631,7 +1631,11 @@ class Service extends BaseModel
             return 3;
         });
         foreach ($sorted as $env) {
-            $envs->push("{$env->key}={$env->real_value}");
+            $resolvedValue = $env->real_value;
+            if (blank($resolvedValue) && dockerComposeEnvironmentVariableRequiresUnsetWhenBlank($this->docker_compose_raw ?? $this->docker_compose, $env->key)) {
+                continue;
+            }
+            $envs->push("{$env->key}={$resolvedValue}");
         }
         if ($envs->count() === 0) {
             $commands[] = 'touch .env';

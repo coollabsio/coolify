@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use phpseclib3\Crypt\EC;
+use Symfony\Component\Yaml\Yaml;
 
 uses(RefreshDatabase::class);
 
@@ -47,6 +48,59 @@ beforeEach(function () {
         'server_id' => $this->server->id,
         'network' => 'test-network-'.fake()->uuid(),
     ]);
+});
+
+test('applicationParser creates an editable variable for bare Compose passthrough syntax', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      - API_TOKEN
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+    ]);
+
+    applicationParser($application);
+
+    expect($application->environment_variables()->where('key', 'API_TOKEN')->exists())->toBeTrue()
+        ->and(Yaml::parse($application->fresh()->docker_compose_raw))
+        ->toBe(Yaml::parse($dockerCompose));
+});
+
+test('applicationParser creates derived inputs and preserves required Compose expressions', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  app:
+    image: nginx
+    environment:
+      API_URL: https://${API_HOST}/v1
+      API_TOKEN: ${API_TOKEN:?API_TOKEN must be set}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $requiredVariable = $application->environment_variables()->where('key', 'API_TOKEN')->firstOrFail();
+
+    expect($application->environment_variables()->where('key', 'API_HOST')->exists())->toBeTrue()
+        ->and($requiredVariable->value)->toBeNull()
+        ->and((bool) $requiredVariable->is_required)->toBeTrue()
+        ->and(data_get($parsedCompose, 'services.app.environment.API_URL'))->toBe('https://${API_HOST}/v1')
+        ->and(data_get($parsedCompose, 'services.app.environment.API_TOKEN'))->toBe('${API_TOKEN:?API_TOKEN must be set}')
+        ->and(Yaml::parse($application->fresh()->docker_compose_raw))->toBe(Yaml::parse($dockerCompose));
 });
 
 test('applicationParser populates docker_compose_domains for KEY-based SERVICE_FQDN variables', function () {

@@ -47,6 +47,10 @@ test('resource environment variables table has a Managed column and no name-cell
     // Name cell does not repeat the environment type; Type owns Production/Preview.
     expect($show)
         ->toContain('env-managed-desktop')
+        ->toContain('Used by Compose')
+        ->toContain('Compose default:')
+        ->toContain('data-env-key="{{ $env->key }}"')
+        ->toContain(':disabled="!$canEditValue || $is_redis_credential || $composeInfo !== null"')
         ->toContain('env-type-desktop')
         ->not->toContain('env-type-mobile')
         ->not->toContain('env-managed-mobile')
@@ -63,6 +67,10 @@ test('resource environment variables table has a Managed column and no name-cell
 
     expect($hardcoded)
         ->toContain('env-managed-desktop data-table-cell-check')
+        ->toContain('Defined in Compose')
+        ->toContain('Derived in Compose')
+        ->toContain('data-compose-reference')
+        ->toContain("\$dispatch('focus-compose-environment-variable'")
         ->toContain('title="Environment variable details"')
         ->toContain('<x-forms.input label="Value" :value="$value ?? \'\'" readonly />')
         ->not->toContain("{{ filled(\$value) ? \$value : '(empty)' }}")
@@ -77,6 +85,9 @@ test('resource environment variables table has a Managed column and no name-cell
         ->toContain('minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem');
 
     expect($all)->not->toContain('<span>Comment</span>');
+    expect($all)
+        ->toContain('x-on:focus-compose-environment-variable.window')
+        ->toContain('data-env-settings-trigger');
     expect($show)->toContain('<x-helper :helper="e($comment)" />');
 });
 

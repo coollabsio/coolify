@@ -21,6 +21,9 @@ class Show extends Component
 {
     public bool $showEnvironmentType = true;
 
+    /** @var array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    public ?array $composeInfo = null;
+
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
 
     public $parameters;
@@ -221,6 +224,9 @@ class Show extends Component
     private function hydrateValueFields(): void
     {
         $this->value = $this->env->value;
+        if (($this->composeInfo['default'] ?? null) === $this->value) {
+            $this->value = null;
+        }
         $this->is_shared = (bool) ($this->env->is_shared ?? false);
 
         if ($this->is_shared) {
@@ -284,12 +290,27 @@ class Show extends Component
             $this->authorize('update', $this->env);
             $this->loadValues();
 
+            $composeInfo = $this->serverComposeInfo();
+            if ($composeInfo !== null) {
+                $storedKey = $this->env->fresh()?->key;
+                if ($storedKey === null || $this->key !== $storedKey) {
+                    $this->key = $storedKey ?? $this->key;
+                    $this->dispatch('error', 'Compose-linked environment variable names cannot be changed.');
+
+                    return;
+                }
+            }
+
             if (! $this->isSharedVariable && $this->is_required && str($this->value)->isEmpty()) {
                 $oldValue = $this->env->getOriginal('value');
                 $this->value = $oldValue;
                 $this->dispatch('error', 'Required environment variables cannot be empty.');
 
                 return;
+            }
+
+            if (! $this->isSharedVariable && blank($this->value) && ($composeInfo['default'] ?? null) !== null) {
+                $this->value = $composeInfo['default'];
             }
 
             $this->serialize();
@@ -301,6 +322,29 @@ class Show extends Component
         } catch (\Exception $e) {
             return handleError($e);
         }
+    }
+
+    /** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+    private function serverComposeInfo(): ?array
+    {
+        if ($this->isSharedVariable) {
+            return null;
+        }
+
+        $storedEnvironmentVariable = $this->env->fresh();
+        if ($storedEnvironmentVariable === null) {
+            return null;
+        }
+
+        $resource = $storedEnvironmentVariable->resourceable;
+        if (! $resource instanceof Application && ! $resource instanceof Service) {
+            return null;
+        }
+
+        return dockerComposeEnvironmentVariableInfo(
+            $resource->docker_compose_raw ?? $resource->docker_compose,
+            $storedEnvironmentVariable->key
+        );
     }
 
     #[Computed]
