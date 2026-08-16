@@ -136,6 +136,13 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('flex-direction: column')
         ->toContain('@media (min-width: 640px)');
 
+    $actionsCss = str($appCss)
+        ->after('.logs-viewer-actions {')
+        ->before('}')
+        ->toString();
+
+    expect($actionsCss)->not->toContain('isolation: isolate');
+
     $primaryGroup = str($deploymentView)
         ->after('class="logs-viewer-primary"')
         ->before('class="logs-viewer-end"')

@@ -3119,7 +3119,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    isolation: isolate;
 }
 
 .logs-viewer-actions::-webkit-scrollbar {
