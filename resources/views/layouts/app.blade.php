@@ -84,6 +84,14 @@
                                 </svg>
                             </button>
                         </div>
+                        <div data-mobile-sidebar-brand
+                            class="flex h-12 shrink-0 items-center gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
+                            <a href="/" {{ wireNavigate() }} title="Coolify"
+                                class="text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
+                                Coolify
+                            </a>
+                            <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
+                        </div>
                         <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-2 scrollbar">
                             <x-navbar />
                         </div>
