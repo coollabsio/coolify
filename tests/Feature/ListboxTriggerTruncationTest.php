@@ -45,6 +45,7 @@ test('portaled listboxes center in the mobile viewport', function () {
     expect($html)
         ->toContain('floatingDropdown(')
         ->not->toContain('x-teleport="body"')
+        ->toContain('class="listbox-panel floating-dropdown-panel"')
         ->toContain("align: 'left'")
         ->toContain('matchTriggerWidth: true')
         ->toContain('x-show="open"')

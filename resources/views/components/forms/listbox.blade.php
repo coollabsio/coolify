@@ -94,7 +94,8 @@
             </svg>
         </button>
         @if ($portal)
-            <div id="{{ $panelId }}" class="listbox-panel"
+            {{-- floating-dropdown-panel drops the min-width floor: the panel is fixed, so 100% would be the viewport. --}}
+            <div id="{{ $panelId }}" class="listbox-panel floating-dropdown-panel"
                 style="position: fixed; z-index: 9999; visibility: hidden" x-show="open"
                 x-cloak :style="{ visibility: positioned ? 'visible' : 'hidden' }"
                 x-transition:enter="transition ease-out duration-100"
