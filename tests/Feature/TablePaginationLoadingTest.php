@@ -30,6 +30,20 @@ it('renders the shared page size selector', function () {
         ->toContain('max="100"');
 });
 
+it('positions table dropdown panels outside overflowing containers', function () {
+    $html = Blade::render(<<<'BLADE'
+        <x-table.dropdown>
+            <x-slot:trigger><button type="button">Open</button></x-slot:trigger>
+            <button type="button">Option</button>
+        </x-table.dropdown>
+    BLADE);
+
+    expect($html)
+        ->toContain('position: fixed')
+        ->toContain('getBoundingClientRect()')
+        ->toContain('x-on:scroll.window');
+});
+
 it('renders compact client-side pagination', function () {
     $html = Blade::render('<x-client-pagination summary="1-10 of 20" page-size-model="pageSize" storage-key="tests.page-size" />');
 

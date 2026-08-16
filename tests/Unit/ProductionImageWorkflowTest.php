@@ -23,9 +23,9 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.6'")
-        ->and($versions['coolify']['v4']['version'])->toBe('4.3.6')
-        ->and($versions['coolify']['nightly']['version'])->toBe('4.3.7')
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.7'")
+        ->and($versions['coolify']['v4']['version'])->toBe('4.3.7')
+        ->and($versions['coolify']['nightly']['version'])->toBe('4.3.8')
         ->and($nightlyVersions)->toBe($versions);
 });
 
