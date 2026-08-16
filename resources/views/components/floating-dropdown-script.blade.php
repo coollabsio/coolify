@@ -35,7 +35,7 @@
             const availableHeight = window.innerHeight - (edge * 2);
             const triggerRect = trigger.getBoundingClientRect();
             const desiredWidth = config.matchTriggerWidth
-                ? Math.max(triggerRect.width, panel.offsetWidth)
+                ? triggerRect.width
                 : panel.offsetWidth;
             const panelWidth = Math.min(desiredWidth, availableWidth);
             const panelHeight = Math.min(panel.scrollHeight, config.maxHeight ?? availableHeight);

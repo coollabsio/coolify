@@ -46,6 +46,9 @@ it('centralizes floating dropdown positioning in an Alpine data provider', funct
         ->toContain('window.floatingDropdown = function floatingDropdown')
         ->toContain('window.requestAnimationFrame')
         ->toContain('positionPanel(panel = null)')
+        ->toContain('const desiredWidth = config.matchTriggerWidth')
+        ->toContain('? triggerRect.width')
+        ->not->toContain('? Math.max(triggerRect.width, panel.offsetWidth)')
         ->toContain('window.innerWidth < 768');
 });
 
