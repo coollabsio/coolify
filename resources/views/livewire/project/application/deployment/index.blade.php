@@ -15,11 +15,11 @@
 
     <section @class([
         'application-settings-workspace w-full',
-        'mt-4 max-w-[1180px] lg:mt-0' => ! $embedded,
+        'mt-4 max-w-none lg:mt-0' => ! $embedded,
     ])>
         <div @class([
             'min-w-0',
-            'grid gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10' => ! $embedded,
+            'grid gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8' => ! $embedded,
         ])>
             @unless ($embedded)
                 <x-application.configuration-sidebar :application="$application"

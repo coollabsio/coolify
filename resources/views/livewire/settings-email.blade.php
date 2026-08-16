@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-settings.layout>
-    <div class="application-settings-form mx-auto flex w-full max-w-[1180px] min-w-0 flex-col gap-6">
+    <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
         {{-- One bar for the whole page. Three stacked bars made Save run
              submitResend(), which required an API key even when Resend was off. --}}
         <x-unsaved-bar action="submit"

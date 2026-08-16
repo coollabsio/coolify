@@ -57,3 +57,16 @@ test('top breadcrumb lets users switch between resources in the current environm
         ->toContain("'database' => route('project.database.configuration'")
         ->toContain("'service' => route('project.service.configuration'");
 });
+
+test('breadcrumb switchers let users search their items', function () {
+    $switcher = file_get_contents(resource_path('views/components/breadcrumb-switcher.blade.php'));
+
+    expect($switcher)
+        ->toContain('x-model.debounce.150ms="search"')
+        ->toContain('type="search"')
+        ->toContain('placeholder="Search {{ strtolower($title) }}"')
+        ->toContain('class="searchable-listbox-search"')
+        ->toContain('class="searchable-listbox-search-input"')
+        ->toContain('<x-reicon name="search"')
+        ->toContain('.includes(search.toLowerCase())');
+});

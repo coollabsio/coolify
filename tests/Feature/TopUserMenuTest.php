@@ -65,3 +65,17 @@ it('changes appearance from a submenu instead of navigating to a separate page',
         ->toContain('hover:bg-neutral-200 hover:text-neutral-950')
         ->not->toContain("route('profile.appearance')");
 });
+
+it('offers page width controls inside the appearance menu', function () {
+    $menu = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
+
+    expect($menu)
+        ->toContain("pageWidth: localStorage.getItem('pageWidth') || 'full'")
+        ->toContain("['value' => 'full', 'label' => 'Full width']")
+        ->toContain("['value' => 'centered', 'label' => 'Centered']")
+        ->toContain("@click=\"setWidth('{{ \$option['value'] }}')\"")
+        ->toContain('Full width')
+        ->toContain('Centered')
+        ->toContain("localStorage.setItem('pageWidth', width)")
+        ->toContain("new CustomEvent('page-width-changed', { detail: width })");
+});

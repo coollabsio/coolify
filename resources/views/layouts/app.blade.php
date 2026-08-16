@@ -10,6 +10,7 @@
         <div x-data="{
             open: false,
             collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            pageWidth: localStorage.getItem('pageWidth') || 'full',
             sidebarReady: false,
             init() {
                 this.$nextTick(() => {
@@ -22,7 +23,8 @@
                 this.collapsed = !this.collapsed;
                 localStorage.setItem('sidebarCollapsed', this.collapsed);
             }
-        }" @open-global-search.window="open = false" x-cloak class="dark:text-inherit text-black">
+        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-cloak
+            class="dark:text-inherit text-black">
             <livewire:deployments-indicator />
 
             {{-- ============ DESKTOP TOP BAR ============ --}}
@@ -128,7 +130,7 @@
             <main
                 class="min-h-screen bg-white dark:bg-panel px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
                 :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
-                <div class="mx-auto w-full max-w-[1400px]">
+                <div class="w-full" :class="pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'">
                     {{ $slot }}
                 </div>
             </main>
