@@ -105,7 +105,7 @@ services:
       start_period: 10s
 
   couchdb-service:
-    image: budibase/couchdb
+    image: budibase/database
     environment:
       - COUCHDB_PASSWORD=$SERVICE_PASSWORD_COUCHDB
       - COUCHDB_USER=$SERVICE_USER_COUCHDB
@@ -117,7 +117,7 @@ services:
       retries: 5
       start_period: 10s
     volumes:
-      - couchdb3_data:/opt/couchdb/data
+      - couchdb3_data:/data
 
   redis-service:
     image: redis
