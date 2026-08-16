@@ -7,7 +7,7 @@
 
 services:
   terraria-server:
-    image: 'hexlo/terraria-server-docker:1.4.4.9'
+    image: 'hexlo/terraria-server-docker:1.4.5.0'
     stdin_open: true
     tty: true
     ports:
@@ -15,12 +15,12 @@ services:
     volumes:
       - 'terraria-server:/root/.local/share/Terraria/Worlds'
     environment:
-      - 'WORLD=${WORLD:-/root/.local/share/Terraria/Worlds/world1.wld}'
-      - 'AUTOCREATE=${AUTOCREATE:-2}'
-      - 'WORLDNAME=${WORLDNAME:-world1}'
-      - 'DIFFICULTY=${DIFFICULTY:-1}'
-      - 'MAXPLAYERS=${MAXPLAYERS:-8}'
-      - 'PASSWORD=${PASSWORD:-mypassword}'
-      - 'MOTD=${MOTD:-Welcome to the server!}'
-      - 'LANGUAGE=${LANGUAGE:-en/US}'
-      - 'SECURE=${SECURE:-1}'
+      - 'worldpath=${WORLDPATH:-/root/.local/share/Terraria/Worlds}'
+      - 'autocreate=${AUTOCREATE:-2}'
+      - 'world=${WORLD:-world1.wld}'
+      - 'difficulty=${DIFFICULTY:-1}'
+      - 'maxplayers=${MAXPLAYERS:-8}'
+      - 'password=${PASSWORD:-mypassword}'
+      - 'motd=${MOTD:-Welcome to the server!}'
+      - 'language=${LANGUAGE:-en/US}'
+      - 'secure=${SECURE:-1}'
