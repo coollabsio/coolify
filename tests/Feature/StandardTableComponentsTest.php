@@ -23,33 +23,21 @@ it('renders the standard table toolbar controls', function () {
         ->toContain('table-search')
         ->toContain('wire:model.live="search"')
         ->not->toContain('x-teleport="body"')
-        ->toContain('floatingDropdown(')
-        ->toContain('position: fixed')
-        ->toContain('floating-dropdown-panel')
+        ->not->toContain('floatingDropdown(')
+        ->not->toContain('position: fixed')
+        ->toContain('absolute top-full')
         ->toContain('x-show="open"')
-        ->toContain('schedulePosition($el)')
-        ->toContain("visibility: positioned ? 'visible' : 'hidden'")
-        ->not->toContain('positionPanel() {')
-        ->not->toContain('x-show="open && positioned"')
         ->toContain('aria-multiselectable="true"')
         ->toContain('Reset filters')
         ->toContain('wire:click="clearFilters"')
         ->toContain('Sort');
 });
 
-it('centralizes floating dropdown positioning in an Alpine data provider', function () {
+it('does not load a global floating dropdown positioning provider', function () {
     $layout = file_get_contents(resource_path('views/layouts/base.blade.php'));
-    $provider = file_get_contents(resource_path('views/components/floating-dropdown-script.blade.php'));
 
-    expect($layout)->toContain("@include('components.floating-dropdown-script')")
-        ->and($provider)
-        ->toContain('window.floatingDropdown = function floatingDropdown')
-        ->toContain('window.requestAnimationFrame')
-        ->toContain('positionPanel(panel = null)')
-        ->toContain('const desiredWidth = config.matchTriggerWidth')
-        ->toContain('? triggerRect.width')
-        ->not->toContain('? Math.max(triggerRect.width, panel.offsetWidth)')
-        ->toContain('window.innerWidth < 768');
+    expect($layout)->not->toContain("@include('components.floating-dropdown-script')")
+        ->and(File::exists(resource_path('views/components/floating-dropdown-script.blade.php')))->toBeFalse();
 });
 
 it('renders the standard table loading overlay', function () {

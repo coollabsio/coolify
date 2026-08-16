@@ -14,7 +14,7 @@
     'value' => null, // initial value when wire=false
     'disabled' => false,
     'tooltip' => true,
-    'portal' => true,
+    'portal' => false,
     'preserveValue' => false,
 ])
 
@@ -43,13 +43,9 @@
             @endif
         </div>
     @endif
-    <div class="relative min-w-0" x-data="floatingDropdown({
-        panelId: @js($panelId),
-        portal: @js($portal),
-        align: 'left',
-        matchTriggerWidth: true,
-        maxHeight: 256,
-    }, {
+    <div class="relative min-w-0" x-data="{
+        open: false,
+        positioned: false,
         saving: false,
         options: @js(array_values($options)),
         value: @if (!$wire) @js($value) @elseif ($live && ! $onChange) @entangle($id).live @else @entangle($id) @endif,
@@ -79,11 +75,47 @@
                 }
             @endif
         },
-    })" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
+        toggle() {
+            this.open = !this.open;
+            this.positioned = false;
+            if (this.open && @js($portal)) {
+                this.$nextTick(() => requestAnimationFrame(() => this.positionPanel()));
+            }
+        },
+        positionPanel(panel = null) {
+            const trigger = this.$refs.trigger;
+            panel ??= document.getElementById(@js($panelId));
+            if (!trigger || !panel) return;
+
+            const gap = 4;
+            const edge = 12;
+            const triggerRect = trigger.getBoundingClientRect();
+            const panelWidth = Math.min(
+                Math.max(triggerRect.width, panel.offsetWidth),
+                window.innerWidth - (edge * 2),
+            );
+            const panelHeight = Math.min(panel.scrollHeight, 256);
+            const fitsBelow = window.innerHeight - triggerRect.bottom - gap >= panelHeight;
+            const top = fitsBelow
+                ? triggerRect.bottom + gap
+                : Math.max(edge, triggerRect.top - gap - panelHeight);
+            const left = Math.min(
+                Math.max(edge, triggerRect.left),
+                window.innerWidth - panelWidth - edge,
+            );
+
+            panel.style.top = `${top}px`;
+            panel.style.left = `${left}px`;
+            panel.style.width = `${panelWidth}px`;
+            panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`;
+            panel.style.minWidth = `${triggerRect.width}px`;
+            this.positioned = true;
+        },
+    }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
         {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
         @if ($preserveValue) wire:ignore @endif
-        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && schedulePosition()">
+        @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()">
         <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"
             @disabled($disabled) {{ $attributes->whereStartsWith('x-bind:disabled') }} aria-haspopup="listbox"
             :aria-expanded="open" @if ($tooltip) :title="current" @endif>
@@ -103,7 +135,7 @@
                 x-transition:leave="transition ease-in duration-75"
                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
                 x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"
-                x-effect="if (open) schedulePosition($el)" role="listbox">
+                x-effect="if (open) requestAnimationFrame(() => positionPanel($el))" role="listbox">
                 <div x-show="options.length === 0"
                     class="px-3 py-2 text-[13px] text-neutral-500 dark:text-fg-dim">
                     {{ $emptyText }}

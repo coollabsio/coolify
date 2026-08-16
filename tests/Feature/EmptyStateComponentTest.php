@@ -42,10 +42,13 @@ it('insets empty states nested inside a flush settings section wrapper', functio
     expect($css)->toContain('.application-settings-section-body.is-flush > div:has(> .empty-state:only-child)');
 });
 
-it('insets the backup executions empty state from the table header', function () {
+it('renders the backup executions empty state without a scrollable table', function () {
     $view = file_get_contents(resource_path('views/livewire/project/database/backup-executions.blade.php'));
 
-    expect($view)->toMatch('/@empty\s*<div class="p-4">\s*<x-empty size="sm" title="No backup executions"/');
+    expect($view)
+        ->toMatch('/@if \(\$executions_count === 0\)\s*<div class="p-4">\s*<x-empty size="sm" title="No backup executions"/')
+        ->toMatch('/@else\s*<div class="data-table deployment-table-scroll">/')
+        ->not->toContain('@forelse ($executions as $execution)');
 });
 
 it('keeps backup execution actions compact', function () {
@@ -55,6 +58,8 @@ it('keeps backup execution actions compact', function () {
     expect($css)
         ->toContain('grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;')
         ->and($view)
+        ->toContain('<span class="bg-base sticky right-0 z-10 text-right">Actions</span>')
+        ->toContain('class="bg-base sticky right-0 z-10 flex items-center justify-end gap-1"')
         ->toContain('title="Download backup" aria-label="Download backup"')
         ->toContain('<x-reicon name="upload" class="size-3.5 rotate-180" />')
         ->toContain('title="Delete backup" aria-label="Delete backup"')

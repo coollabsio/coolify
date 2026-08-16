@@ -44,3 +44,16 @@ test('resource headings do not duplicate database and service breadcrumbs', func
 
     expect($headings->implode("\n"))->not->toContain("@teleport('#server-topbar-context')");
 });
+
+test('top breadcrumb lets users switch between resources in the current environment', function () {
+    $breadcrumb = file_get_contents(resource_path('views/components/top-breadcrumb.blade.php'));
+
+    expect($breadcrumb)
+        ->toContain('$currentEnvironment->applications')
+        ->toContain('$currentEnvironment->databases()')
+        ->toContain('$currentEnvironment->services')
+        ->toContain('<x-breadcrumb-switcher title="Resources"')
+        ->toContain("'application' => route('project.application.configuration'")
+        ->toContain("'database' => route('project.database.configuration'")
+        ->toContain("'service' => route('project.service.configuration'");
+});

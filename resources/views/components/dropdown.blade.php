@@ -25,10 +25,13 @@
             const triggerRect = this.$refs.trigger.getBoundingClientRect();
             const panelRect = this.$refs.panel.getBoundingClientRect();
             const viewportPadding = 8;
-            const left = Math.max(
-                viewportPadding,
-                (window.innerWidth - panelRect.width) / 2,
-            );
+            let left = triggerRect.left;
+
+            if ((left + panelRect.width + viewportPadding) > window.innerWidth) {
+                left = window.innerWidth - panelRect.width - viewportPadding;
+            }
+
+            left = Math.max(viewportPadding, left);
 
             let top = triggerRect.bottom + 4;
             const maxTop = window.innerHeight - panelRect.height - viewportPadding;
