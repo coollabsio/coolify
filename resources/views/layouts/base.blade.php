@@ -70,6 +70,7 @@
         <link rel="icon" href="{{ asset('coolify-logo.svg') }}" type="image/svg+xml" />
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @include('components.floating-dropdown-script')
     @vite(['resources/js/app.js', 'resources/css/app.css'])
     <script>
         // Update theme-color meta tag (non-critical, can run async)
