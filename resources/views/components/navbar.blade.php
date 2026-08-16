@@ -195,8 +195,17 @@
                     </a>
                 </li>
             @endif
-
             <li class="flex-1" aria-hidden="true"></li>
+        @endif
+        @if (auth()->id() === 0 && (isCloud() || isDev()))
+            <li>
+                <a title="Admin" {{ wireNavigate() }}
+                    class="{{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">
+                    <x-reicon name="fire" class="menu-item-icon text-pink-500" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Admin</span>
+                </a>
+            </li>
         @endif
         @if (isCloud() && ! isSubscribed())
             {{-- Unsubscribed cloud has no workspace items — keep these at the top of the list. --}}
