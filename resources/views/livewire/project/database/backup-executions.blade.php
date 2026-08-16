@@ -32,7 +32,7 @@
                             icon-name="browser-terminal" />
                     </div>
                 @else
-                    <div class="data-table deployment-table-scroll">
+                    <div class="data-table deployment-table-scroll backup-executions-table-scroll">
                         <div
                             class="data-table-header backup-executions-table-grid h-auto rounded-none px-4 py-2.5 text-[11px]">
                             <span>Status</span>
@@ -75,8 +75,8 @@
                                 }
                             @endphp
                             <div wire:key="{{ data_get($execution, 'id') }}"
-                                class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.06]">
-                                <div class="data-table-row backup-executions-table-grid min-h-14 px-4 py-2.5">
+                                class="backup-execution-row">
+                                <div class="data-table-row backup-executions-table-grid min-h-14 border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.06]">
                                     <div class="flex items-center gap-2">
                                         <x-status-badge :status="$executionStatusLabel"
                                             :type="$executionStatusType" />

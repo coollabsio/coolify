@@ -2707,6 +2707,14 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 66rem;
 }
 
+.backup-executions-table-scroll {
+    overflow-x: auto;
+}
+
+.backup-execution-row:last-child > .data-table-row {
+    border-bottom: 0;
+}
+
 .volume-backup-executions-grid {
     grid-template-columns: 7.5rem minmax(0, 1fr) 8.5rem 7rem 9rem minmax(9rem, 0.7fr);
     min-width: 50rem;
