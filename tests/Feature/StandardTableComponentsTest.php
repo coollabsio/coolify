@@ -22,20 +22,31 @@ it('renders the standard table toolbar controls', function () {
         ->toContain('table-toolbar')
         ->toContain('table-search')
         ->toContain('wire:model.live="search"')
-        ->toContain('x-teleport="body"')
-        ->toContain('positionPanel')
+        ->not->toContain('x-teleport="body"')
+        ->toContain('floatingDropdown(')
         ->toContain('position: fixed')
         ->toContain('floating-dropdown-panel')
-        ->toContain('window.innerWidth < 768')
-        ->toContain('(window.innerWidth - panelWidth) / 2')
-        ->toContain('panel.style.width = `${panelWidth}px`')
-        ->toContain('panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`')
         ->toContain('x-show="open"')
+        ->toContain('schedulePosition($el)')
+        ->toContain("visibility: positioned ? 'visible' : 'hidden'")
+        ->not->toContain('positionPanel() {')
         ->not->toContain('x-show="open && positioned"')
         ->toContain('aria-multiselectable="true"')
         ->toContain('Reset filters')
         ->toContain('wire:click="clearFilters"')
         ->toContain('Sort');
+});
+
+it('centralizes floating dropdown positioning in an Alpine data provider', function () {
+    $layout = file_get_contents(resource_path('views/layouts/base.blade.php'));
+    $provider = file_get_contents(resource_path('views/components/floating-dropdown-script.blade.php'));
+
+    expect($layout)->toContain("@include('components.floating-dropdown-script')")
+        ->and($provider)
+        ->toContain('window.floatingDropdown = function floatingDropdown')
+        ->toContain('window.requestAnimationFrame')
+        ->toContain('positionPanel(panel = null)')
+        ->toContain('window.innerWidth < 768');
 });
 
 it('renders the standard table loading overlay', function () {

@@ -43,11 +43,14 @@ test('portaled listboxes center in the mobile viewport', function () {
     $html = Blade::render('<x-forms.listbox id="region" :options="[]" :wire="false" />');
 
     expect($html)
-        ->toContain('window.innerWidth < 768')
-        ->toContain('(window.innerWidth - panelWidth) / 2')
-        ->toContain('panel.style.width = `${panelWidth}px`')
-        ->toContain('panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`')
+        ->toContain('floatingDropdown(')
+        ->not->toContain('x-teleport="body"')
+        ->toContain("align: 'left'")
+        ->toContain('matchTriggerWidth: true')
         ->toContain('x-show="open"')
+        ->toContain('schedulePosition($el)')
+        ->toContain("visibility: positioned ? 'visible' : 'hidden'")
+        ->not->toContain('positionPanel(panel = null)')
         ->not->toContain('x-show="open && positioned"');
 });
 
