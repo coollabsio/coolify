@@ -373,24 +373,24 @@ tr td:first-child {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
-/* Loading feedback uses the Coolify brand accent consistently in dark mode. */
+/* Loading feedback uses the higher-contrast warning accent in dark mode. */
 .dark .animate-spin {
-    color: var(--color-coollabs) !important;
+    color: var(--color-warning) !important;
 }
 
 .dark #nprogress .bar {
-    background: var(--color-coollabs) !important;
+    background: var(--color-warning) !important;
 }
 
 .dark #nprogress .peg {
     box-shadow:
-        0 0 10px var(--color-coollabs),
-        0 0 5px var(--color-coollabs) !important;
+        0 0 10px var(--color-warning),
+        0 0 5px var(--color-warning) !important;
 }
 
 .dark #nprogress .spinner-icon {
-    border-top-color: var(--color-coollabs) !important;
-    border-left-color: var(--color-coollabs) !important;
+    border-top-color: var(--color-warning) !important;
+    border-left-color: var(--color-warning) !important;
 }
 
 html[data-theme="custom"] .loading-indicator,

@@ -57,6 +57,22 @@ it('draws a single border between the desktop sidebar and main content', functio
         ->and($layout)->not->toContain('lg:border-l border-neutral-200');
 });
 
+it('does not separate the desktop sidebar controls with a top border', function () {
+    $navbar = file_get_contents(resource_path('views/components/navbar.blade.php'));
+
+    expect($navbar)
+        ->toContain('sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 bg-white')
+        ->not->toContain('sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 border-t');
+});
+
+it('does not draw a bottom border below the desktop top bar', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+
+    expect($layout)
+        ->toContain('fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur')
+        ->not->toContain('backdrop-blur border-b border-neutral-200 dark:border-white/[0.06]');
+});
+
 it('separates the mobile sidebar from the page with a visible border', function () {
     $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
