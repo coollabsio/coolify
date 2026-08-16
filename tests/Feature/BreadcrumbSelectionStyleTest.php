@@ -68,5 +68,6 @@ test('breadcrumb switchers let users search their items', function () {
         ->toContain('class="searchable-listbox-search"')
         ->toContain('class="searchable-listbox-search-input"')
         ->toContain('<x-reicon name="search"')
+        ->toContain('left-4 size-3')
         ->toContain('.includes(search.toLowerCase())');
 });

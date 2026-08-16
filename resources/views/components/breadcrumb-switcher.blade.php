@@ -23,7 +23,7 @@
         class="listbox-panel scrollbar left-0! z-[90]! max-h-80! min-w-56 max-w-72">
         <div class="searchable-listbox-search">
             <x-reicon name="search"
-                class="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                class="pointer-events-none absolute top-1/2 left-4 size-3 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
             <input x-ref="search" x-model.debounce.150ms="search" type="search"
                 autocomplete="off" placeholder="Search {{ strtolower($title) }}"
                 class="searchable-listbox-search-input" @keydown.escape.stop="open = false">

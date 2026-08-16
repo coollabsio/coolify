@@ -55,7 +55,8 @@
                     @endif
                 </div>
                 {{-- Collapse toggle + team switcher --}}
-                <div class="flex items-center gap-0.5 min-w-0 flex-1 pl-3 pr-4">
+                <div
+                    class="flex h-full items-center gap-0.5 min-w-0 flex-1 border-b border-neutral-200 pl-3 pr-4 dark:border-white/[0.06]">
                     <div class="relative flex min-w-0 flex-1 items-center">
                         <x-top-breadcrumb />
                         <div id="server-topbar-context" class="min-w-0"></div>
