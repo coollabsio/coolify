@@ -84,7 +84,7 @@
             @endif
 
             {{-- Adjust Server Limit Modal --}}
-            <template x-teleport="body">
+            <template x-teleport="body" wire:ignore>
                 <div x-show="showModal"
                     class="fixed top-0 left-0 z-99 flex items-center justify-center w-screen h-screen p-4" x-cloak>
                     <div x-show="showModal" class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"

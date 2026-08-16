@@ -1959,6 +1959,19 @@ html[data-theme="custom"] textarea:disabled {
         transform: translate(-50%, -50%) !important;
         z-index: 9999 !important;
     }
+
+    /* The mobile top bar's backdrop filter makes it the containing block for
+       fixed descendants. Keep this menu anchored below its trigger instead
+       of centering it within the short top bar. */
+    .listbox-panel.top-user-menu-panel {
+        position: absolute !important;
+        top: calc(100% + 0.25rem) !important;
+        right: 0 !important;
+        left: auto !important;
+        max-height: calc(100dvh - 4.5rem) !important;
+        overflow-y: auto !important;
+        transform: none !important;
+    }
 }
 
 .listbox-option {

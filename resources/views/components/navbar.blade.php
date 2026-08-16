@@ -167,6 +167,16 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Keys & Tokens</span>
                 </a>
             </li>
+            @if (isCloud() && auth()->user()->isAdmin())
+                <li>
+                    <a title="Subscription" {{ wireNavigate() }}
+                        class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('subscription.show') }}">
+                        <x-reicon name="subscription" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Subscription</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <a title="Tags" {{ wireNavigate() }}
                     class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
