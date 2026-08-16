@@ -86,7 +86,9 @@ test('subscribed cloud sidebar shows subscription link for team admins', functio
 test('subscription adjustment modal is protected from livewire morphing', function () {
     $view = file_get_contents(resource_path('views/livewire/subscription/actions.blade.php'));
 
-    expect($view)->toContain('<template x-teleport="body" wire:ignore>');
+    expect($view)
+        ->toContain('<div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6" x-data="{')
+        ->toContain('<template x-teleport="body" wire:ignore>');
 });
 
 test('subscription pricing page does not render a single-item pricing tab strip', function () {

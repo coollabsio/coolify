@@ -1,40 +1,40 @@
-<div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6">
+<div wire:init="loadRefundEligibility" class="application-settings-workspace flex flex-col gap-6" x-data="{
+    qty: {{ $quantity }},
+    get current() { return $wire.server_limits; },
+    activeServers: {{ currentTeam()->servers->count() }},
+    preview: @js($pricePreview),
+    loading: false,
+    showModal: false,
+    async fetchPreview() {
+        if (this.qty < 2 || this.qty > 100 || this.qty === this.current) { return; }
+        this.loading = true;
+        this.preview = null;
+        await $wire.loadPricePreview(this.qty);
+        this.preview = $wire.pricePreview;
+        this.loading = false;
+    },
+    fmt(cents) {
+        if (!this.preview) return '';
+        const c = this.preview.currency;
+        return c === 'USD' ? '$' + (cents / 100).toFixed(2) : (cents / 100).toFixed(2) + ' ' + c;
+    },
+    get isReduction() { return this.qty < this.activeServers; },
+    get hasChanged() { return this.qty !== this.current; },
+    get hasPreview() { return this.preview !== null; },
+    openAdjust() {
+        this.showModal = true;
+    },
+    closeAdjust() {
+        this.showModal = false;
+        this.qty = this.current;
+        this.preview = null;
+    }
+}" @success.window="preview = null; showModal = false; qty = $wire.server_limits"
+    @keydown.escape.window="if (showModal) { closeAdjust(); }">
     @if (subscriptionProvider() === 'stripe')
         {{-- Plan Overview --}}
         <x-application.settings-section title="Plan overview"
-            description="Review billing status and the number of servers included in this plan." x-data="{
-            qty: {{ $quantity }},
-            get current() { return $wire.server_limits; },
-            activeServers: {{ currentTeam()->servers->count() }},
-            preview: @js($pricePreview),
-            loading: false,
-            showModal: false,
-            async fetchPreview() {
-                if (this.qty < 2 || this.qty > 100 || this.qty === this.current) { return; }
-                this.loading = true;
-                this.preview = null;
-                await $wire.loadPricePreview(this.qty);
-                this.preview = $wire.pricePreview;
-                this.loading = false;
-            },
-            fmt(cents) {
-                if (!this.preview) return '';
-                const c = this.preview.currency;
-                return c === 'USD' ? '$' + (cents / 100).toFixed(2) : (cents / 100).toFixed(2) + ' ' + c;
-            },
-            get isReduction() { return this.qty < this.activeServers; },
-            get hasChanged() { return this.qty !== this.current; },
-            get hasPreview() { return this.preview !== null; },
-            openAdjust() {
-                this.showModal = true;
-            },
-            closeAdjust() {
-                this.showModal = false;
-                this.qty = this.current;
-                this.preview = null;
-            }
-        }" @success.window="preview = null; showModal = false; qty = $wire.server_limits"
-            @keydown.escape.window="if (showModal) { closeAdjust(); }">
+            description="Review billing status and the number of servers included in this plan.">
             <div class="space-y-2">
                 <div class="text-sm">
                     <span class="text-neutral-500">Plan:</span>
