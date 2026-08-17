@@ -31,7 +31,21 @@
                 this.updateCode();
                 inputs[Math.min(pastedDigits.length, 6) - 1]?.focus();
             },
-        }">
+            focusEmptyTwoFactorCodeInput() {
+                this.$nextTick(() => {
+                    const emptyDigitIndex = this.digits.findIndex(digit => digit === '');
+
+                    if (emptyDigitIndex === -1) {
+                        return;
+                    }
+
+                    document.getElementById(`two_factor_code_input_${emptyDigitIndex}`)?.focus();
+                });
+            },
+            focusRecoveryCodeInput() {
+                this.$nextTick(() => this.$refs.recoveryCode?.focus());
+            },
+        }" x-init="focusEmptyTwoFactorCodeInput()">
             @if (session('status'))
                 <x-auth.alert type="success">{{ session('status') }}</x-auth.alert>
             @endif
@@ -60,7 +74,7 @@
                     <div class="flex justify-center gap-2" aria-label="Two-factor authentication code"
                         @paste="pasteCode($event)">
                         <template x-for="(digit, index) in digits" :key="index">
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"
+                            <input :id="`two_factor_code_input_${index}`" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1"
                                 x-model="digits[index]" :aria-label="`Digit ${index + 1}`"
                                 @input="focusNext($event); updateCode()" @keydown="focusPrevious($event)"
                                 class="h-12 w-11 rounded-md border border-neutral-300 bg-white text-center text-lg font-semibold text-neutral-900 transition-colors focus:border-warning focus:outline-none focus:ring-1 focus:ring-warning dark:border-white/10 dark:bg-coolgray-100 dark:text-white sm:h-14 sm:w-12 sm:text-xl"
@@ -68,7 +82,7 @@
                         </template>
                     </div>
                     <button type="button" class="auth-text-link self-center"
-                        x-on:click="showRecovery = true; $nextTick(() => $refs.recoveryCode.focus())">
+                        x-on:click="showRecovery = true; focusRecoveryCodeInput()">
                         Use a recovery code
                     </button>
                 </div>
@@ -77,7 +91,7 @@
                     <x-forms.input x-ref="recoveryCode" name="recovery_code" autocomplete="one-time-code"
                         x-bind:disabled="!showRecovery" label="{{ __('input.recovery_code') }}" />
                     <button type="button" class="auth-text-link self-center"
-                        x-on:click="showRecovery = false; $nextTick(() => $el.closest('form').querySelector('input[type=text]').focus())">
+                        x-on:click="showRecovery = false; focusEmptyTwoFactorCodeInput()">
                         Use an authenticator code
                     </button>
                 </div>
