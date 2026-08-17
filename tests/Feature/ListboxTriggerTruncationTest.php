@@ -39,6 +39,27 @@ test('listbox component uses shared trigger label truncation', function () {
         ->not->toContain('class="truncate" x-text="current"');
 });
 
+test('listboxes stay in their local Alpine scope by default', function () {
+    $component = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+    $html = Blade::render('<x-forms.listbox id="region" :options="[]" :wire="false" />');
+
+    expect($component)->toContain("'portal' => false")
+        ->and($html)
+        ->toContain('x-data="{')
+        ->toContain('x-ref="panel"')
+        ->not->toContain('x-teleport="body"')
+        ->not->toContain('floatingDropdown(')
+        ->not->toContain('style="position: fixed');
+});
+
+test('mobile listbox panels stay anchored to their trigger', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->not->toContain('.listbox-panel:not([style*="position: fixed"])')
+        ->not->toContain('transform: translate(-50%, -50%) !important;');
+});
+
 test('searchable listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.searchable-listbox id="tz" label="Timezone"
@@ -88,6 +109,31 @@ test('listbox forwards dynamic disabled state to its trigger', function () {
         ->toContain('x-bind:disabled="!selectedMoveProject || availableEnvironments.length === 0"');
 });
 
+test('listbox waits for change handlers and prevents overlapping selections', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain('saving: false')
+        ->toContain('async choose(option)')
+        ->toContain('await this.$wire.')
+        ->toContain('if (this.saving || option.disabled) return;')
+        ->toContain("'pointer-events-none opacity-70': saving");
+});
+
+test('listbox does not send a second live entangle request when using a change handler', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)->toContain('@elseif ($live && ! $onChange) @entangle($id).live');
+});
+
+test('listbox can preserve its client value across Livewire morphs', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain("'preserveValue' => false")
+        ->toContain('@if ($preserveValue) wire:ignore @endif');
+});
+
 test('notification event multiselect truncates long selected summaries', function () {
     $html = Blade::render(<<<'BLADE'
         <x-notification.event-multiselect id="server-slack-events" label="Servers" :events="[
@@ -106,4 +152,22 @@ test('notification event multiselect truncates long selected summaries', functio
         ->toContain('Docker cleanup failure, Disk usage warning, Server unreachable, Server patching')
         ->toContain('title="Docker cleanup failure, Disk usage warning, Server unreachable, Server patching"')
         ->toContain('4/4');
+});
+
+test('notification event multiselect uses the same panel animation as listboxes', function () {
+    $html = Blade::render(<<<'BLADE'
+        <x-notification.event-multiselect id="deployment-email-events" label="Deployments" :events="[
+            ['property' => 'deploymentSuccessEmailNotifications', 'label' => 'Deployment success', 'enabled' => false],
+            ['property' => 'deploymentFailureEmailNotifications', 'label' => 'Deployment failure', 'enabled' => true],
+            ['property' => 'statusChangeEmailNotifications', 'label' => 'Container status changes', 'enabled' => false],
+        ]" />
+    BLADE);
+
+    expect($html)
+        ->toContain('x-transition:enter="transition ease-out duration-100"')
+        ->toContain('x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"')
+        ->toContain('x-transition:enter-end="opacity-100 translate-y-0 scale-100"')
+        ->toContain('x-transition:leave="transition ease-in duration-75"')
+        ->toContain('x-transition:leave-start="opacity-100 translate-y-0 scale-100"')
+        ->toContain('x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"');
 });

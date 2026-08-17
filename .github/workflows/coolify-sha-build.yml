@@ -2,7 +2,7 @@ name: Build Coolify (SHA)
 
 on:
   push:
-    branches: ["v4.x", "main"]
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -15,6 +15,8 @@ env:
 
 jobs:
   build-push:
+    outputs:
+      short_sha: ${{ steps.version.outputs.short_sha }}
     strategy:
       matrix:
         include:
@@ -29,6 +31,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
+
+      - name: Resolve internal version
+        id: version
+        run: |
+          BASE_VERSION=$(docker run --rm -v "$(pwd):/app" -w /app php:8.2-alpine3.16 php bootstrap/getVersion.php)
+          echo "version=${BASE_VERSION}-dev.${GITHUB_SHA::9}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Login to ${{ env.GITHUB_REGISTRY }}
         uses: docker/login-action@v3
@@ -51,9 +60,11 @@ jobs:
           file: docker/production/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
+          build-args: |
+            COOLIFY_VERSION=${{ steps.version.outputs.version }}
           tags: |
-            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.arch }}
-            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.arch }}
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}
+            ${{ env.GITHUB_REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}
 
   merge-manifest:
     runs-on: ubuntu-24.04
@@ -78,33 +89,21 @@ jobs:
       - name: Create & publish manifest on ${{ env.GITHUB_REGISTRY }}
         env:
           REGISTRY: ${{ env.GITHUB_REGISTRY }}
-          BRANCH: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ needs.build-push.outputs.short_sha }}
         run: |
           IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          TAG_ARGS=(--tag "${IMAGE}:sha-${SHA}")
-          # Moving tag for the latest production-line SHA image (v4.x only).
-          if [ "${BRANCH}" = "v4.x" ]; then
-            TAG_ARGS+=(--tag "${IMAGE}:edge")
-          fi
           docker buildx imagetools create \
             "${IMAGE}:sha-${SHA}-amd64" \
             "${IMAGE}:sha-${SHA}-aarch64" \
-            "${TAG_ARGS[@]}"
+            --tag "${IMAGE}:sha-${SHA}"
 
       - name: Create & publish manifest on ${{ env.DOCKER_REGISTRY }}
         env:
           REGISTRY: ${{ env.DOCKER_REGISTRY }}
-          BRANCH: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
+          SHA: ${{ needs.build-push.outputs.short_sha }}
         run: |
           IMAGE="${REGISTRY}/${IMAGE_NAME}"
-          TAG_ARGS=(--tag "${IMAGE}:sha-${SHA}")
-          # Moving tag for the latest production-line SHA image (v4.x only).
-          if [ "${BRANCH}" = "v4.x" ]; then
-            TAG_ARGS+=(--tag "${IMAGE}:edge")
-          fi
           docker buildx imagetools create \
             "${IMAGE}:sha-${SHA}-amd64" \
             "${IMAGE}:sha-${SHA}-aarch64" \
-            "${TAG_ARGS[@]}"
+            --tag "${IMAGE}:sha-${SHA}"

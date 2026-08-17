@@ -41,10 +41,6 @@ class Domains extends Component
 
     public string $editingDomain = '';
 
-    public string $editingIndexing = 'index';
-
-    public string $editingDirection = 'both';
-
     public ?string $editingService = null;
 
     /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool}> */
@@ -103,8 +99,6 @@ class Domains extends Component
         return [
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
-            'editingIndexing' => 'string|in:index,noindex',
-            'editingDirection' => 'string|in:both,www,non-www',
             'redirect' => 'string|required|in:both,www,non-www',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
@@ -149,6 +143,12 @@ class Domains extends Component
         $this->resetDefaultLabels();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Search engine indexing updated.');
+    }
+
+    public function updateRedirect(string $redirect): void
+    {
+        $this->redirect = $redirect;
+        $this->setRedirect();
     }
 
     public function loadDomainState(): void
@@ -293,9 +293,6 @@ class Domains extends Component
                     $configured[] = $row;
                 }
 
-                foreach ($this->buildSuggestedWwwRows($configured, $stored, $serviceName) as $suggested) {
-                    $rows[] = $suggested;
-                }
             }
 
             return $this->sortDomainRowsByDnsStatus($rows);
@@ -305,7 +302,7 @@ class Domains extends Component
             $rows[] = $this->domainRowFromStored($url, null, $stored);
         }
 
-        return $this->sortDomainRowsByDnsStatus(array_merge($rows, $this->buildSuggestedWwwRows($rows, $stored)));
+        return $this->sortDomainRowsByDnsStatus($rows);
     }
 
     /**
@@ -912,8 +909,6 @@ class Domains extends Component
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
         $this->editingService = $this->domainRows[$index]['service'];
-        $this->editingDirection = $this->serviceRedirectFor($this->editingService);
-        $this->editingIndexing = $this->application->isDomainNoindexed($this->editingDomain) ? 'noindex' : 'index';
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
@@ -996,8 +991,6 @@ class Domains extends Component
         $this->editingIndex = null;
         $this->editingDomain = '';
         $this->editingService = null;
-        $this->editingDirection = 'both';
-        $this->editingIndexing = 'index';
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         if ($this->pendingAction === 'update') {
@@ -1040,6 +1033,7 @@ class Domains extends Component
             $newUrl = $this->splitDomains($normalized)[0];
             $oldUrl = $this->domainRows[$this->editingIndex]['url'];
             $service = $this->editingService;
+            $wasNoindexed = $this->application->isDomainNoindexed($oldUrl);
 
             $current = $this->currentDomainList($service);
             if ($newUrl !== $oldUrl && $current->contains($newUrl)) {
@@ -1066,19 +1060,12 @@ class Domains extends Component
             }
 
             $noindexDomains = $this->application->noindexDomains()->reject(fn (string $domain) => $domain === $oldUrl);
-            if ($this->editingIndexing === 'noindex') {
+            if ($wasNoindexed) {
                 $noindexDomains->push($newUrl);
             }
             $this->application->setNoindexDomains($noindexDomains);
             $this->application->save();
             $this->resetDefaultLabels();
-
-            if ($this->isCompose && filled($service) && $this->editingDirection !== $this->savedRedirectForService($service)) {
-                $this->serviceRedirects[$this->serviceRedirectWireKey($service)] = $this->editingDirection;
-                $this->notifyRedirectUpdate = false;
-                $this->setServiceRedirect($service);
-                $this->notifyRedirectUpdate = true;
-            }
 
             $this->forceSaveDomains = false;
             $this->pendingAction = null;
@@ -1235,6 +1222,12 @@ class Domains extends Component
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    public function updateServiceRedirect(string $serviceName, string $redirect): void
+    {
+        $this->serviceRedirects[$this->serviceRedirectWireKey($serviceName)] = $redirect;
+        $this->setServiceRedirect($serviceName);
     }
 
     /**

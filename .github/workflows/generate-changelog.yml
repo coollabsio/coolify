@@ -2,7 +2,7 @@ name: Generate Changelog
 
 on:
   push:
-    branches: [ v4.x, main ]
+    branches: [ main ]
     paths-ignore:
       - .github/workflows/coolify-helper.yml
       - .github/workflows/coolify-helper-next.yml

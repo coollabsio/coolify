@@ -90,13 +90,17 @@ class DatabaseBackupFileValidator
 
     public static function containsPostgresqlProgramExecution(string $sql): bool
     {
+        if (str_starts_with($sql, 'PGDMP')) {
+            return false;
+        }
+
         $withoutComments = self::stripSqlComments($sql);
 
-        if (preg_match('/^\s*\\\\(?:!|copy\b.*\bprogram\b)/mi', $withoutComments) === 1) {
+        if (preg_match('/^\s*\\\\(?:!|copy\b[^\r\n]*\bprogram\b|(?:o|g)\s*\|)/mi', $withoutComments) === 1) {
             return true;
         }
 
-        return preg_match('/\bcopy\b[\s\S]{0,2000}\b(?:from|to)\s+program\b/i', $withoutComments) === 1;
+        return preg_match('/(?:^|;)\s*copy\b[^;]{0,2000}\b(?:from|to)\s+program\b/i', $withoutComments) === 1;
     }
 
     private static function extensionFor(string $name): ?string

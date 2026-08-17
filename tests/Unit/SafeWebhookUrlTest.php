@@ -50,6 +50,19 @@ it('rejects link-local range', function () {
     expect($validator->fails())->toBeTrue('Expected rejection: link-local IP');
 });
 
+it('rejects link-local targets even when allowlisted', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['169.254.0.0/16'],
+    ]));
+
+    $validator = Validator::make(
+        ['url' => 'http://169.254.169.254/latest/meta-data'],
+        ['url' => new SafeWebhookUrl],
+    );
+
+    expect($validator->fails())->toBeTrue();
+});
+
 it('rejects hostnames that resolve to blocked addresses', function (string $url, array $resolvedIps) {
     $rule = new SafeWebhookUrl(fn (string $host): array => $resolvedIps);
 

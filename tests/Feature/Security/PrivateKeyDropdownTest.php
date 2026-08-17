@@ -60,6 +60,22 @@ test('generating a private key from the index stores it without redirecting to a
         ->assertNoRedirect();
 });
 
+test('saving a private key from its modal editor closes the modal', function () {
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id,
+    ]);
+
+    Livewire::test(Show::class, [
+        'private_key_uuid' => $privateKey->uuid,
+        'modalMode' => true,
+    ])->set('name', 'Updated SSH key')
+        ->call('changePrivateKey')
+        ->assertDispatched('securityResourceChanged')
+        ->assertDispatched('close-modal');
+
+    expect($privateKey->fresh()->name)->toBe('Updated SSH key');
+});
+
 test('manual private key form does not expose key generation controls', function () {
     Livewire::test(Create::class)
         ->assertDontSee('Generate new ED25519 SSH Key')

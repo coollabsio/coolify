@@ -25,14 +25,14 @@
             <div
                 class="flex min-h-10 items-center justify-center gap-2 border-r border-neutral-200 px-2 text-[11px] font-medium last:border-r-0 dark:border-white/[0.08] sm:px-3"
                 :class="{
-                    'bg-coollabs/[0.07] text-coollabs dark:bg-warning/[0.09] dark:text-warning': currentStep === {{ $stepNumber }},
+                    'bg-neutral-100 text-neutral-900 dark:bg-white/[0.08] dark:text-fg': currentStep === {{ $stepNumber }},
                     'text-emerald-600 dark:text-emerald-400': currentStep > {{ $stepNumber }},
                     'text-neutral-500 dark:text-fg-dim': currentStep < {{ $stepNumber }}
                 }">
                 <span
                     class="flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px] font-semibold"
                     :class="{
-                        'border-coollabs/25 bg-coollabs/10 dark:border-warning/25 dark:bg-warning/15': currentStep === {{ $stepNumber }},
+                        'border-neutral-300 bg-white dark:border-white/[0.16] dark:bg-white/[0.1]': currentStep === {{ $stepNumber }},
                         'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400': currentStep > {{ $stepNumber }},
                         'border-neutral-200 dark:border-white/[0.1]': currentStep < {{ $stepNumber }}
                     }">
@@ -40,7 +40,7 @@
                         <x-reicon name="check-circle" class="size-3" />
                     </template>
                     <template x-if="currentStep === {{ $stepNumber }}">
-                        <svg class="loading-indicator size-3 animate-spin" xmlns="http://www.w3.org/2000/svg"
+                        <svg class="spinner-current size-3 animate-spin text-current" xmlns="http://www.w3.org/2000/svg"
                             fill="none" viewBox="0 0 24 24" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
                                 stroke-width="4"></circle>

@@ -113,17 +113,48 @@ it('places the account menu beside the desktop sidebar toggle while retaining it
         ->toContain("'bottom-full! left-0! right-auto! top-auto! mb-1!' => \$sidebar");
 });
 
-it('keeps application links next to advanced actions on the right', function () {
+it('keeps advanced operations in a dedicated Advanced dropdown', function () {
     $application = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $applicationAdvanced = file_get_contents(resource_path('views/components/applications/advanced.blade.php'));
+    $serviceAdvanced = file_get_contents(resource_path('views/components/services/advanced.blade.php'));
     $links = file_get_contents(resource_path('views/components/applications/links.blade.php'));
 
-    $desktop = str($application)->after('resource-heading-actions flex')->toString();
-    $advancedPosition = strpos($desktop, '<x-applications.advanced');
-    $linksPosition = strpos($desktop, '<x-applications.links');
+    $applicationDesktop = str($application)->after('resource-heading-actions flex')->toString();
+    $serviceDesktop = str($service)->after('resource-heading-actions flex')->toString();
 
-    expect($advancedPosition)->not->toBeFalse()
-        ->and($linksPosition)->not->toBeFalse()
-        ->and($linksPosition)->toBeGreaterThan($advancedPosition)
+    expect($applicationDesktop)
+        ->toContain('application-desktop-actions')
+        ->toContain('Deploy (without cache)')
+        ->not->toContain('<x-applications.advanced')
+        ->not->toContain('resource-heading-overflow-separator')
+        ->not->toContain('Force deploy without cache')
+        ->and($serviceDesktop)
+        ->toContain('service-desktop-actions')
+        ->toContain('Force Deploy')
+        ->toContain('Force Cleanup Containers')
+        ->toContain('Restart (pull latest)')
+        ->not->toContain('resource-heading-overflow-separator')
+        ->not->toContain('Pull Latest Images & Restart');
+
+    expect(strpos($applicationDesktop, '<x-applications.links'))
+        ->toBeLessThan(strpos($applicationDesktop, 'application-desktop-actions'));
+
+    expect(strpos($serviceDesktop, '<x-services.links'))
+        ->toBeLessThan(strpos($serviceDesktop, 'service-desktop-actions'));
+
+    expect($applicationAdvanced)
+        ->toContain('Advanced')
+        ->toContain('name="grid"')
+        ->not->toContain('Force deploy without cache')
+        ->and($serviceAdvanced)
+        ->toContain('Advanced')
+        ->toContain('name="grid"')
+        ->not->toContain('Pull Latest Images & Restart')
+        ->not->toContain('Pull latest and restart')
+        ->toContain('Force Restart')
+        ->toContain('Force Deploy')
+        ->toContain('Force Cleanup Containers')
         ->and($links)->toContain("'right-0! left-auto! min-w-60! max-w-96!' => !\$fullWidth")
         ->and($links)->toContain('listbox-option justify-start! gap-2.5!')
         ->and($links)->not->toContain('md:left-0 md:right-auto');
@@ -132,7 +163,7 @@ it('keeps application links next to advanced actions on the right', function () 
     expect(substr_count($application, 'resource-heading-navbar'))->toBe(1);
 });
 
-it('groups application lifecycle controls in an actions dropdown', function () {
+it('groups desktop application lifecycle controls in one Actions dropdown', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
 
@@ -140,21 +171,193 @@ it('groups application lifecycle controls in an actions dropdown', function () {
         ->toContain('application-desktop-actions')
         ->toContain('Actions')
         ->toContain('listbox-panel top-full! right-0! left-auto!')
-        ->toContain('Redeploy')
+        ->toContain('listbox-option')
+        ->toContain('Deploy')
         ->toContain('Restart')
         ->toContain('Stop')
-        ->toContain('Deploy');
+        ->not->toContain('<x-resource-heading-overflow')
+        ->not->toContain('<x-applications.deploy');
 });
 
-it('shows deploy directly when it is the only available lifecycle action', function () {
-    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+it('raises the desktop top bar while any resource dropdown is open', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+    $dropdowns = [
+        resource_path('views/components/resource-heading-overflow.blade.php'),
+        resource_path('views/components/applications/links.blade.php'),
+        resource_path('views/components/services/links.blade.php'),
+        resource_path('views/components/applications/deploy.blade.php'),
+        resource_path('views/components/services/advanced.blade.php'),
+        resource_path('views/components/services/restart.blade.php'),
+        resource_path('views/components/server/advanced.blade.php'),
+    ];
+
+    expect($layout)
+        ->toContain('resourceActionsOpen: false')
+        ->toContain("'z-[1000]': resourceActionsOpen")
+        ->toContain('@resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"');
+
+    foreach ($dropdowns as $dropdown) {
+        expect(file_get_contents($dropdown))
+            ->toContain("\$dispatch('resource-actions-toggled', { open })");
+    }
+});
+
+it('groups service restart options in the Actions dropdown', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
 
     expect($desktop)
-        ->toContain("@if (str(\$application->status)->startsWith('exited'))")
-        ->toContain('id="application-desktop-deploy"')
-        ->toContain('@else')
-        ->toContain('id="application-desktop-actions"');
+        ->toContain('service-desktop-actions')
+        ->toContain('Restart')
+        ->toContain('Restart (pull latest)')
+        ->toContain("\$wire.dispatch('pullAndRestartEvent')")
+        ->not->toContain('Pull Latest Images & Restart')
+        ->not->toContain('<x-services.restart');
+
+    $mobile = str($heading)->before("@teleport('#resource-action-hud-slot')")->toString();
+
+    expect($mobile)
+        ->toContain('Restart current version')
+        ->toContain('Pull latest and restart')
+        ->not->toContain('Pull Latest Images & Restart');
+});
+
+it('orders service restart actions before stop and advanced operations', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $actions = str($heading)->after('id="service-desktop-actions"')->before('@else\n                        <a href')->toString();
+
+    expect(strpos($actions, 'Restart\n'))
+        ->toBeLessThan(strpos($actions, 'Restart (pull latest)'))
+        ->and(strpos($actions, 'Restart (pull latest)'))
+        ->toBeLessThan(strpos($actions, 'Stop'));
+});
+
+it('groups application lifecycle options in an Actions dropdown', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $desktop = str($heading)->after('resource-heading-actions flex')->toString();
+    $trigger = str($desktop)->after('id="application-desktop-actions"')->before('<div x-cloak')->toString();
+
+    expect($desktop)
+        ->toContain('id="application-desktop-actions"')
+        ->toContain('Actions')
+        ->toContain('Deploy')
+        ->toContain('Deploy (without cache)')
+        ->toContain('force_deploy_without_cache')
+        ->toContain('deploy(true)')
+        ->and($trigger)
+        ->toContain('button button-highlighted')
+        ->not->toContain('play-circle');
+
+    $mobile = str($heading)->before("@teleport('#resource-action-hud-slot')")->toString();
+
+    expect($mobile)
+        ->toContain('Deploy (without cache)')
+        ->not->toContain('Force deploy without cache');
+});
+
+it('places the state-aware no-cache action immediately after deploy or redeploy', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $actions = str($heading)->after('id="application-desktop-actions"')->before('@endteleport')->toString();
+
+    expect($actions)
+        ->toContain("str(\$application->status)->startsWith('running') ? 'Redeploy (without cache)' : 'Deploy (without cache)'")
+        ->toContain("str(\$application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)'");
+
+    expect(strpos($actions, 'wire:click="deploy"'))
+        ->toBeLessThan(strpos($actions, 'Redeploy (without cache)'))
+        ->and(strpos($actions, 'Redeploy (without cache)'))
+        ->toBeLessThan(strpos($actions, 'Restart'));
+});
+
+it('uses the shared Coollabs gradient for primary resource actions in the desktop header', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toContain('.application-heading-actions .button-highlighted')
+        ->toContain('@apply button-highlighted;');
+});
+
+it('uses iconless highlighted Actions dropdowns for service and proxy lifecycle controls', function () {
+    foreach ([
+        resource_path('views/livewire/project/service/heading.blade.php') => 'service-desktop-actions',
+        resource_path('views/livewire/server/navbar.blade.php') => 'server-desktop-actions',
+    ] as $path => $id) {
+        $heading = file_get_contents($path);
+        $trigger = str($heading)->after("id=\"{$id}\"")->before('<div x-cloak')->toString();
+
+        expect($trigger)
+            ->toContain('button button-highlighted')
+            ->toContain('Actions')
+            ->not->toContain('play-circle');
+    }
+});
+
+it('places the Traefik dashboard last in the server Actions menu', function () {
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+    $actions = str($navbar)->after('id="server-desktop-actions"')->before('@endcan')->toString();
+
+    expect(strpos($actions, 'Refresh Proxy Status'))
+        ->toBeLessThan(strpos($actions, 'Traefik Dashboard'));
+});
+
+it('keeps database lifecycle controls direct and highlights the primary action', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+    $desktop = str($heading)->after('resource-heading-actions flex')->before('@endteleport')->toString();
+
+    expect($desktop)
+        ->toContain('Restart')
+        ->toContain('Stop')
+        ->toContain('button button-highlighted')
+        ->not->toContain('<x-reicon')
+        ->not->toContain('<x-resource-heading-overflow');
+});
+
+it('renders configuration warnings as navbar popovers instead of floating notifications', function () {
+    $checker = file_get_contents(resource_path('views/livewire/project/shared/configuration-checker.blade.php'));
+    $warning = file_get_contents(resource_path('views/components/configuration-warning.blade.php'));
+
+    expect($checker)
+        ->toContain("@teleport('#configuration-warning-hud-slot')")
+        ->toContain("@teleport('#configuration-warning-hud-slot-mobile')")
+        ->toContain('<x-configuration-warning :diff="$configurationDiff" />')
+        ->not->toContain('<x-popup-small position="top-right"')
+        ->and($warning)
+        ->toContain('aria-label="Configuration changes not applied"')
+        ->toContain('<span class="hidden text-xs font-medium lg:inline">Changes pending</span>')
+        ->toContain('The latest configuration has not been applied')
+        ->toContain('fixed top-14 left-1/2')
+        ->toContain('-translate-x-1/2')
+        ->toContain('lg:absolute lg:top-full lg:right-0 lg:left-auto')
+        ->toContain('lg:translate-x-0')
+        ->toContain('@click.outside="open = false"')
+        ->toContain('@keydown.escape.window="open = false"')
+        ->toContain("\$dispatch('open-configuration-diff')");
+});
+
+it('renders only one configuration warning on database runtime logs', function () {
+    $logs = file_get_contents(resource_path('views/livewire/project/shared/logs.blade.php'));
+    $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+
+    expect($logs)
+        ->not->toContain("    <livewire:project.shared.configuration-checker :resource=\"\$resource\" />\n\n    @if (\$type === 'application')")
+        ->and($databaseHeading)
+        ->toContain('<livewire:project.shared.configuration-checker :resource="$database" />');
+});
+
+it('renders only one configuration warning on database and service terminal pages', function () {
+    $terminal = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($terminal)
+        ->not->toContain("@elseif (\$type === 'database')\n        <livewire:project.shared.configuration-checker :resource=\"\$resource\" />")
+        ->not->toContain("@elseif (\$type === 'service')\n        <livewire:project.shared.configuration-checker :resource=\"\$resource\" />");
+});
+
+it('renders only one configuration warning on the service volume backups page', function () {
+    $volumeBackups = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($volumeBackups)
+        ->not->toContain('<livewire:project.shared.configuration-checker :resource="$service" />')
+        ->toContain('<livewire:project.service.heading :service="$service"');
 });
 
 it('moves application backups from the top tabs into the settings sidebar', function () {
@@ -229,7 +432,24 @@ it('uses neutral icons for non-destructive resource actions', function () {
             ->not->toContain('class="size-3.5 text-orange-500')
             ->not->toContain('class="size-3.5 text-warning"')
             ->not->toContain('class="size-4 text-warning"')
-            ->toContain('name="stop" class="size-3.5 text-error"');
+            ->toContain('name="stop-circle"');
+    }
+});
+
+it('uses a circular stop icon in application and service action menus', function () {
+    $icons = file_get_contents(resource_path('views/components/reicon.blade.php'));
+
+    expect($icons)
+        ->toContain("'stop-circle' =>")
+        ->toContain('<circle cx="12" cy="12"')
+        ->toContain('<rect x="8.25" y="8.25"');
+
+    foreach (['application', 'service'] as $resource) {
+        $heading = file_get_contents(resource_path("views/livewire/project/{$resource}/heading.blade.php"));
+
+        expect($heading)
+            ->toContain('name="stop-circle" class="size-3.5 text-error"')
+            ->not->toContain('name="stop" class="size-3.5 text-error"');
     }
 });
 
@@ -372,7 +592,7 @@ it('shows an icon in application and service Links controls', function () {
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
     $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
 
-    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false])")
+    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false, 'compact' => false])")
         ->toContain('<x-reicon name="external-link"')
         ->and($serviceLinksComponent)->toContain('public bool $fullWidth = false')
         ->and($serviceLinks)
@@ -390,25 +610,34 @@ it('visually distinguishes production and pull request application links', funct
         ->not->toContain("PR{{ data_get(\$preview, 'pull_request_id') }} |");
 });
 
-it('shows application and service Links on mobile headings', function () {
+it('shows application Links as a compact badge beside the mobile status', function () {
     $application = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-
-    $mobileApplicationSection = str($application)->between('class="w-full xl:hidden"', 'class="hidden w-full items-center xl:fixed')->toString();
-    $mobileServiceSection = str($service)->between('class="w-full md:hidden"', 'class="hidden w-full items-center md:flex')->toString();
-
-    expect($mobileApplicationSection)
-        ->toContain('<x-applications.links')
-        ->toContain('full-width')
-        ->toContain('resource-heading-menus')
-        ->not->toContain('<x-resource-heading-tabs')
-        ->not->toContain("'label' => 'Settings'");
-
     $applicationLinks = file_get_contents(resource_path('views/components/applications/links.blade.php'));
+    $mobileApplicationTitle = str($application)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+    $mobileApplicationActions = str($application)->between('<div class="w-full xl:hidden">', '<div class="hidden" aria-hidden="true">')->toString();
+
+    expect($mobileApplicationTitle)
+        ->toContain('<x-status-summary')
+        ->toContain('<x-applications.links')
+        ->toContain('relative flex w-full min-w-0 items-center gap-2')
+        ->toContain('compact')
+        ->not->toContain('full-width');
+
+    expect($mobileApplicationActions)
+        ->not->toContain('<x-applications.links');
+
     expect($applicationLinks)
-        ->toContain("'button w-full justify-between' => \$fullWidth")
-        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
+        ->toContain("'compact' => false")
+        ->toContain("'static' => \$compact")
+        ->toContain("'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => \$compact")
+        ->toContain('@unless ($compact)')
+        ->toContain("'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => \$compact")
         ->toContain('<x-reicon name="chevron-down"');
+});
+
+it('keeps service Links full width on mobile headings', function () {
+    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $mobileServiceSection = str($service)->between('class="w-full md:hidden"', 'class="hidden w-full items-center md:flex')->toString();
 
     expect($mobileServiceSection)
         ->toContain('<x-services.links')
@@ -423,15 +652,12 @@ it('shows application and service Links on mobile headings', function () {
         ->toContain('<x-reicon name="chevron-down"')
         ->toContain('No links available');
 
-    // One mobile + one desktop instance.
-    expect(substr_count($application, '<x-applications.links'))->toBe(2);
     expect(substr_count($service, '<x-services.links'))->toBe(2);
 });
 
 it('uses overflow scroll arrows on resource heading navbars', function () {
     $files = [
         resource_path('views/livewire/server/navbar.blade.php'),
-        resource_path('views/components/project/navbar.blade.php'),
     ];
 
     foreach ($files as $path) {

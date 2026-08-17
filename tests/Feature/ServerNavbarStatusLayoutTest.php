@@ -41,3 +41,35 @@ it('uses the branded input focus state for the server filter', function () {
         ->toContain('<x-reicon name="check-circle"')
         ->not->toContain('<x-reicon name="check"');
 });
+
+it('lists desktop proxy controls inline and keeps Traefik and refresh in Advanced', function () {
+    $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
+    $overflow = file_get_contents(resource_path('views/components/resource-heading-overflow.blade.php'));
+    $advanced = file_get_contents(resource_path('views/components/server/advanced.blade.php'));
+    $desktopActions = str($navbar)->after("@teleport('#resource-action-hud-slot')")->before('@endteleport')->toString();
+
+    expect($desktopActions)
+        ->toContain('Restart Proxy')
+        ->toContain('Stop Proxy')
+        ->toContain('Start Proxy')
+        ->toContain('<x-server.advanced')
+        ->not->toContain('Traefik Dashboard')
+        ->not->toContain('Refresh Proxy Status')
+        ->not->toContain('resource-heading-overflow-separator')
+        ->not->toContain('<x-modal-confirmation');
+
+    expect(strpos($desktopActions, '<x-server.advanced'))
+        ->toBeLessThan(strpos($desktopActions, 'id="server-desktop-actions"'));
+
+    expect($advanced)
+        ->toContain('Advanced')
+        ->toContain('name="grid"')
+        ->toContain('Traefik Dashboard')
+        ->toContain('name="external-link" class="size-3! opacity-70"')
+        ->toContain('class="flex size-4 shrink-0 items-center justify-center"')
+        ->toContain('Refresh Proxy Status');
+
+    expect($overflow)
+        ->toContain('Actions')
+        ->toContain('listbox-panel');
+});

@@ -177,7 +177,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
             $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());

@@ -7,7 +7,7 @@
 }"
     @close-email-change-modal.window="emailModalOpen = false">
     <x-slot:title>Profile | Coolify</x-slot>
-    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+    <div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
         <section class="application-settings-section" x-data="{
             preview: null,
             processing: false,
@@ -52,9 +52,25 @@
                     const blob = await new Promise((resolve, reject) => {
                         canvas.toBlob(value => value ? resolve(value) : reject(new Error('JPEG compression failed')), 'image/jpeg', 0.8);
                     });
-                    this.preview = URL.createObjectURL(blob);
+                    const previewUrl = URL.createObjectURL(blob);
                     const compressed = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-                    this.$wire.upload('avatar', compressed, () => this.processing = false, () => {
+                    this.$wire.upload('avatar', compressed, async () => {
+                        try {
+                            const uploaded = await this.$wire.uploadAvatar();
+                            if (uploaded) {
+                                if (this.preview) URL.revokeObjectURL(this.preview);
+                                this.preview = previewUrl;
+                            } else {
+                                URL.revokeObjectURL(previewUrl);
+                            }
+                        } catch (error) {
+                            URL.revokeObjectURL(previewUrl);
+                            this.uploadError = 'The image could not be uploaded.';
+                        } finally {
+                            this.processing = false;
+                        }
+                    }, () => {
+                        URL.revokeObjectURL(previewUrl);
                         this.processing = false;
                         this.uploadError = 'The image could not be uploaded.';
                     });
@@ -84,22 +100,22 @@
                     @endif
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-3">
-                    <input type="file" x-on:change="prepareAvatar($event)" accept="image/jpeg,image/png,image/webp"
-                        class="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-200 file:px-3 file:py-2 file:text-xs file:font-medium file:text-neutral-800 hover:file:bg-neutral-300 dark:text-fg-dim dark:file:bg-white/[0.08] dark:file:text-fg dark:hover:file:bg-white/[0.12]">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input x-ref="avatarInput" type="file" x-on:change="prepareAvatar($event)"
+                            accept="image/jpeg,image/png,image/webp" class="hidden">
+                        <x-forms.button type="button" x-on:click="$refs.avatarInput.click()"
+                            x-bind:disabled="processing">
+                            <span x-text="processing ? 'Uploading…' : 'Browse…'"></span>
+                        </x-forms.button>
+                        @if (auth()->user()->avatar_path)
+                            <x-forms.button type="button" wire:click="removeAvatar" x-bind:disabled="processing"
+                                isError>Remove</x-forms.button>
+                        @endif
+                    </div>
                     <p x-cloak x-show="uploadError" x-text="uploadError" class="text-xs text-red-500"></p>
                     @error('avatar')
                         <p class="text-xs text-red-500">{{ $message }}</p>
                     @enderror
-                    <div class="flex flex-wrap gap-2">
-                        <x-forms.button type="button" wire:click="uploadAvatar" wire:loading.attr="disabled"
-                            wire:target="avatar,uploadAvatar" x-bind:disabled="processing || !preview" isHighlighted>
-                            <span wire:loading.remove wire:target="uploadAvatar">Upload picture</span>
-                            <span wire:loading wire:target="uploadAvatar">Compressing…</span>
-                        </x-forms.button>
-                        @if (auth()->user()->avatar_path)
-                            <x-forms.button type="button" wire:click="removeAvatar" isError>Remove</x-forms.button>
-                        @endif
-                    </div>
                 </div>
             </div>
         </section>
@@ -245,19 +261,16 @@
                     </div>
                 @elseif (request()->user()->two_factor_confirmed_at)
                     <div class="flex flex-col gap-4">
-                        <div class="flex flex-wrap items-center justify-between gap-3">
-                            <x-status-badge status="Enabled" type="success" />
-                            <div class="flex flex-wrap items-center gap-2">
-                                <form action="/user/two-factor-recovery-codes" method="POST">
-                                    @csrf
-                                    <x-forms.button type="submit">Regenerate recovery codes</x-forms.button>
-                                </form>
-                                <form action="/user/two-factor-authentication" method="POST">
-                                    @csrf
-                                    @method('DELETE')
-                                    <x-forms.button type="submit" isError>Disable 2FA</x-forms.button>
-                                </form>
-                            </div>
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            <form action="/user/two-factor-recovery-codes" method="POST">
+                                @csrf
+                                <x-forms.button type="submit">Regenerate recovery codes</x-forms.button>
+                            </form>
+                            <form action="/user/two-factor-authentication" method="POST">
+                                @csrf
+                                @method('DELETE')
+                                <x-forms.button type="submit" isError>Disable 2FA</x-forms.button>
+                            </form>
                         </div>
                         @if (session('status') === 'two-factor-authentication-confirmed'
                                 || session('status') === 'recovery-codes-generated')

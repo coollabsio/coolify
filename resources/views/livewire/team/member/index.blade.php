@@ -4,7 +4,7 @@
     sortBy: 'name_asc',
     page: 1,
     perPage: 10,
-    members: @js(currentTeam()->members->map(fn ($member) => [
+    members: @js($members->map(fn ($member) => [
         'id' => $member->id,
         'name' => $member->name,
         'email' => $member->email,
@@ -95,14 +95,31 @@
                 </div>
             </div>
 
+            @can('manageMembers', currentTeam())
+                <div
+                    class="border-b border-neutral-200 px-4 py-2.5 text-[12px] dark:border-white/[0.08]">
+                    @if ($membersWithoutTwoFactorCount > 0)
+                        <span class="text-warning-700 dark:text-warning">{{ $membersWithoutTwoFactorCount }} of {{ $members->count() }} {{ Str::plural('member', $members->count()) }} {{ $membersWithoutTwoFactorCount === 1 ? 'does' : 'do' }} not have two-factor authentication enabled.</span>
+                    @else
+                        <span class="text-neutral-500 dark:text-fg-dim">All members have two-factor authentication enabled.</span>
+                    @endif
+                </div>
+            @endcan
+
             <div x-cloak x-show="filteredMembers.length > 0" class="data-table flex flex-col">
-                <div class="data-table-header team-members-table-grid">
+                <div @class([
+                    'data-table-header team-members-table-grid',
+                    'team-members-table-grid-2fa' => auth()->user()?->can('manageMembers', currentTeam()),
+                ])>
                     <span>Name</span>
                     <span>Email</span>
                     <span>Role</span>
+                    @can('manageMembers', currentTeam())
+                        <span>2FA</span>
+                    @endcan
                     <span class="text-right">Actions</span>
                 </div>
-                @foreach (currentTeam()->members as $member)
+                @foreach ($members as $member)
                     <livewire:team.member :member="$member" :wire:key="$member->id" />
                 @endforeach
             </div>
@@ -112,58 +129,11 @@
                     description="Try a different name, email address, or role." />
             </div>
 
-            <div x-cloak x-show="filteredMembers.length > 0"
-                class="flex min-h-14 items-center justify-between gap-3 border-t border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
-                <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
-                    Showing
-                    <span class="tabular-nums text-black dark:text-fg"
-                        x-text="`${firstVisibleRow}–${lastVisibleRow}`"></span>
-                    of
-                    <span class="tabular-nums text-black dark:text-fg" x-text="filteredMembers.length"></span>
-                </p>
-                <div
-                    class="inline-flex h-8 overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.10]">
-                    <button type="button"
-                        class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                        aria-label="First page" title="First page" x-on:click="goToPage(1)"
-                        x-bind:disabled="page === 1">
-                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M18 6L12 12L18 18M11 6L5 12L11 18" stroke="currentColor"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                    <button type="button"
-                        class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                        aria-label="Previous page" title="Previous page" x-on:click="goToPage(page - 1)"
-                        x-bind:disabled="page === 1">
-                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M15 6L9 12L15 18" stroke="currentColor" stroke-width="1.8"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                    <span
-                        class="flex min-w-12 items-center justify-center border-r border-neutral-200 px-3 text-[13px] tabular-nums text-black dark:border-white/[0.10] dark:text-fg"
-                        x-text="page"></span>
-                    <button type="button"
-                        class="flex w-10 items-center justify-center border-r border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/[0.10] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                        aria-label="Next page" title="Next page" x-on:click="goToPage(page + 1)"
-                        x-bind:disabled="page === lastPage">
-                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M9 6L15 12L9 18" stroke="currentColor" stroke-width="1.8"
-                                stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                    <button type="button"
-                        class="flex w-10 items-center justify-center text-neutral-500 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-35 dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                        aria-label="Last page" title="Last page" x-on:click="goToPage(lastPage)"
-                        x-bind:disabled="page === lastPage">
-                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                            <path d="M6 6L12 12L6 18M13 6L19 12L13 18" stroke="currentColor"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                    </button>
-                </div>
-            </div>
+            <x-client-pagination x-cloak x-show="filteredMembers.length > 0"
+                summary="`${firstVisibleRow}-${lastVisibleRow} of ${filteredMembers.length}`"
+                page-size-model="perPage" storage-key="coolify.page-size.team-members"
+                previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"
+                next-disabled="page >= lastPage" />
         </x-application.settings-section>
 
         @can('manageInvitations', currentTeam())

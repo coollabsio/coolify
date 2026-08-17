@@ -78,7 +78,13 @@
 
 @layer components {
     .terminal-mobile-key {
-        @apply min-h-10 rounded-md border border-white/10 bg-white/10 px-2 py-2 text-sm font-semibold text-white shadow-inner active:bg-white/25;
+        @apply min-h-8 shrink-0 rounded-full border bg-transparent px-3 py-1 text-sm font-medium text-neutral-300 active:text-white;
+        border-color: color-mix(in srgb, var(--terminal-scrollbar, #fff) 24%, transparent);
+    }
+
+    .terminal-key-row {
+        border: 1px solid color-mix(in srgb, var(--terminal-scrollbar, #fff) 22%, transparent);
+        background: transparent;
     }
 
     /* Active state is a solid fill only (no accent rail / border). */
@@ -367,29 +373,35 @@ tr td:first-child {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
-/* Loading feedback uses the Coolify brand accent consistently in dark mode. */
+/* Loading feedback uses the higher-contrast warning accent in dark mode. */
 .dark .animate-spin {
-    color: var(--color-coollabs) !important;
+    color: var(--color-warning) !important;
 }
 
 .dark #nprogress .bar {
-    background: var(--color-coollabs) !important;
+    background: var(--color-warning) !important;
 }
 
 .dark #nprogress .peg {
     box-shadow:
-        0 0 10px var(--color-coollabs),
-        0 0 5px var(--color-coollabs) !important;
+        0 0 10px var(--color-warning),
+        0 0 5px var(--color-warning) !important;
 }
 
 .dark #nprogress .spinner-icon {
-    border-top-color: var(--color-coollabs) !important;
-    border-left-color: var(--color-coollabs) !important;
+    border-top-color: var(--color-warning) !important;
+    border-left-color: var(--color-warning) !important;
 }
 
 html[data-theme="custom"] .loading-indicator,
 html[data-theme="custom"] .animate-spin {
     color: var(--theme-bright-color) !important;
+}
+
+/* Opt out of the brand spinner when the surrounding surface is a selected/neutral control. */
+.dark .animate-spin.spinner-current,
+html[data-theme="custom"] .animate-spin.spinner-current {
+    color: inherit !important;
 }
 
 html[data-theme="custom"] #nprogress .bar {
@@ -714,22 +726,91 @@ html:not(.dark) .application-console-shell[data-console-theme="system"] .termina
     color: #52525b;
 }
 
-.terminal-session-expiry {
-    font-size: 0.75rem;
-    font-weight: 500;
-    color: rgb(255 255 255 / 0.6);
-}
-
-html:not(.dark) .application-console-shell[data-console-theme="system"] .terminal-session-expiry,
-html:not(.dark) .terminal-fullscreen-shell[data-console-theme="system"] .terminal-session-expiry {
-    color: #52525b;
-}
-
 .terminal-target-picker {
     color: rgb(255 255 255 / 0.75);
     background: rgb(0 0 0 / 0.18);
     border-color: rgb(255 255 255 / 0.1);
     backdrop-filter: blur(16px);
+}
+
+/* Pre-session target list: a normal page card, not the themed console canvas. */
+.terminal-target-card .application-settings-section-body {
+    overflow: hidden;
+}
+
+/* The header inset is tuned for 32px buttons. A full-width filter needs the
+   same gutter on both sides once the actions row wraps below the title.
+   Matches the base header selector's specificity so the shorthand cannot win. */
+@media (max-width: 640px) {
+    .application-settings-section.terminal-target-card > :is(header, .application-settings-section-header) {
+        padding-right: 1rem;
+    }
+}
+
+.terminal-target-card-list {
+    max-height: min(70vh, 34rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--coollabs-fill) transparent;
+}
+
+.terminal-target-card-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.terminal-target-card-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.terminal-target-card-list::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 9999px;
+    background-color: var(--coollabs-fill);
+    background-clip: padding-box;
+}
+
+/* Group headers stay readable while scrolling long container lists. */
+.terminal-target-group-label {
+    display: flex;
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.5rem 0.5rem 0.375rem;
+    background: var(--coollabs-base);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    color: var(--coollabs-subtle);
+}
+
+.terminal-target-group-count {
+    border-radius: 9999px;
+    background: var(--coollabs-fill);
+    padding: 0 0.375rem;
+    font-size: 0.625rem;
+    line-height: 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* The server column only earns its space once the row is wide enough. */
+.terminal-target-item-server {
+    display: none;
+    max-width: 14rem;
+    flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    color: var(--coollabs-subtle);
+}
+
+@media (min-width: 640px) {
+    .terminal-target-item-server {
+        display: block;
+    }
 }
 
 .terminal-session-panel {
@@ -1112,7 +1193,7 @@ html[data-theme="custom"] textarea:disabled {
     width: 100%;
     padding: 2rem 1rem;
     background:
-        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-accent) 9%, transparent), transparent 34rem),
+        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-coollabs) 9%, transparent), transparent 34rem),
         var(--coollabs-canvas);
     color: #171717;
 }
@@ -1489,17 +1570,6 @@ html[data-theme="custom"] textarea:disabled {
     line-height: 1.25rem;
 }
 
-/* Buttons */
-.application-settings-workspace .button,
-.application-settings-form .button {
-    height: 2rem;
-    min-height: 2rem;
-    border-radius: 8px;
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
-    white-space: nowrap;
-}
-
 .application-settings-workspace .form-control,
 .application-settings-form .form-control {
     border-radius: 8px;
@@ -1635,6 +1705,58 @@ html[data-theme="custom"] textarea:disabled {
     overflow: visible;
 }
 
+.resource-heading-overflow {
+    display: inline-flex;
+    align-items: center;
+}
+
+.resource-heading-overflow-items {
+    display: flex;
+    align-items: center;
+    gap: 0.125rem;
+}
+
+.resource-heading-overflow-items.is-measuring {
+    display: flex !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    inset: auto auto 0 0 !important;
+    flex-direction: row !important;
+    width: max-content !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    pointer-events: none !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.resource-heading-overflow-separator {
+    width: 1px;
+    align-self: stretch;
+    margin: 0.25rem 0.25rem;
+    background: color-mix(in srgb, var(--coollabs-line) 80%, transparent);
+}
+
+.resource-heading-overflow.is-collapsed .resource-heading-overflow-separator {
+    width: auto;
+    height: 1px;
+    align-self: auto;
+    margin: 0.25rem 0.375rem;
+}
+
+.resource-heading-overflow.is-collapsed .resource-heading-overflow-items > .button,
+.resource-heading-overflow.is-collapsed .resource-heading-overflow-items > a.button {
+    width: 100%;
+    justify-content: flex-start;
+    height: auto;
+    min-height: 2rem;
+    padding: 0.375rem 0.625rem;
+}
+
 /* Heading action group: buttons + dropdown triggers styled like the tabs */
 .application-heading-actions .button,
 .application-heading-actions .app-tab,
@@ -1674,6 +1796,13 @@ html[data-theme="custom"] textarea:disabled {
 .dark .application-heading-actions .relative > button[x-ref='trigger']:hover {
     background: rgba(255, 255, 255, 0.06);
     color: var(--color-fg);
+}
+
+.application-heading-actions .button-highlighted,
+.dark .application-heading-actions .button-highlighted,
+.application-heading-actions .button-highlighted:hover:not(:disabled),
+.dark .application-heading-actions .button-highlighted:hover:not(:disabled) {
+    @apply button-highlighted;
 }
 
 /*
@@ -1808,6 +1937,21 @@ html[data-theme="custom"] textarea:disabled {
     border: 1px solid var(--coollabs-line);
     background: var(--coollabs-recessed);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 767px) {
+    /* The mobile top bar's backdrop filter makes it the containing block for
+       fixed descendants. Keep this menu anchored below its trigger instead
+       of centering it within the short top bar. */
+    .listbox-panel.top-user-menu-panel {
+        position: absolute !important;
+        top: calc(100% + 0.25rem) !important;
+        right: 0 !important;
+        left: auto !important;
+        max-height: calc(100dvh - 4.5rem) !important;
+        overflow-y: auto !important;
+        transform: none !important;
+    }
 }
 
 .listbox-option {
@@ -2031,6 +2175,31 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
 
+@media (max-width: 768px) {
+    .environment-table-scroll .env-table-grid {
+        min-width: 0;
+    }
+
+    .data-table-header.env-table-grid {
+        display: none;
+    }
+
+    .data-table-row.env-table-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .data-table-row.env-table-grid > :not(:first-child):not(:last-child) {
+        display: none;
+    }
+
+    .data-table-row.env-table-grid > :last-child {
+        display: block;
+        justify-self: end;
+    }
+}
+
 /* Shared variables only store value shape (multiline), not per-resource flags. */
 .env-table-grid-shared {
     grid-template-columns: minmax(0, 1.6fr) 6rem minmax(0, 1fr) 4.5rem 3rem;
@@ -2114,71 +2283,96 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .domains-table-grid {
-    grid-template-columns: minmax(0, 1.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 11rem 6.5rem;
+}
+
+.domains-table-grid-service {
+    grid-template-columns: minmax(0, 1.8fr) 8.5rem 10rem 6.5rem;
 }
 
 .domains-table-grid-compose {
-    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem minmax(7rem, 0.9fr) 6.5rem;
+    grid-template-columns: minmax(0, 1.6fr) minmax(6rem, 0.8fr) 8.5rem 10rem 11rem 6.5rem;
+}
+
+.domains-mobile-label {
+    display: none;
 }
 
 /* Domains table: collapse secondary columns on tablet/phone */
 @media (max-width: 900px) {
     .domains-table-grid {
-        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 10rem 5.5rem;
         gap: 0.75rem;
     }
 
-    /* Hide "Last checked" (3rd of 4) */
-    .domains-table-grid > :nth-child(3) {
-        display: none;
+    .domains-table-grid-service {
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 5.5rem;
+        gap: 0.75rem;
     }
 
     .domains-table-grid-compose {
-        grid-template-columns: minmax(0, 1fr) 8.25rem 5.5rem;
+        grid-template-columns: minmax(0, 1fr) 8.25rem 9rem 10rem 5.5rem;
         gap: 0.75rem;
     }
 
-    /* Hide "Service" (2) and "Last checked" (4) of 5 */
-    .domains-table-grid-compose > :nth-child(2),
-    .domains-table-grid-compose > :nth-child(4) {
+    /* Hide "Service" */
+    .domains-table-grid-compose > :nth-child(2) {
         display: none;
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .data-table-header.domains-table-grid,
+    .data-table-header.domains-table-grid-service,
     .data-table-header.domains-table-grid-compose {
         display: none;
     }
 
     .data-table-row.domains-table-grid,
+    .data-table-row.domains-table-grid-service,
     .data-table-row.domains-table-grid-compose {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
-            'domain actions'
-            'meta actions';
-        gap: 0.35rem 0.75rem;
+            'domain domain'
+            'meta actions'
+            'indexing indexing'
+            'direction direction';
+        gap: 0.5rem 0.75rem;
         align-items: start;
-        padding: 0.875rem 1rem;
+        padding: 0.75rem;
         min-height: 0;
+    }
+
+    .data-table-row.domains-row-without-direction {
+        grid-template-areas:
+            'domain domain'
+            'meta actions'
+            'indexing indexing';
+    }
+
+    .data-table-row.domains-table-grid.domains-row-without-direction > :nth-child(4),
+    .data-table-row.domains-table-grid-compose.domains-row-without-direction > :nth-child(5) {
+        display: none;
     }
 
     /* Domain cell */
     .data-table-row.domains-table-grid > :nth-child(1),
+    .data-table-row.domains-table-grid-service > :nth-child(1),
     .data-table-row.domains-table-grid-compose > :nth-child(1) {
         grid-area: domain;
         min-width: 0;
     }
 
     .data-table-row.domains-table-grid > :nth-child(1) a,
+    .data-table-row.domains-table-grid-service > :nth-child(1) a,
     .data-table-row.domains-table-grid-compose > :nth-child(1) a {
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
     }
 
-    /* Non-compose: 1 Domain, 2 DNS, 3 Last checked, 4 Actions */
+    /* Non-compose: 1 Domain, 2 DNS, 3 Indexing, 4 Direction, 5 Actions */
     .data-table-row.domains-table-grid > :nth-child(2) {
         grid-area: meta;
         display: flex !important;
@@ -2188,15 +2382,37 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid > :nth-child(3) {
-        display: none !important;
+        grid-area: indexing;
     }
 
     .data-table-row.domains-table-grid > :nth-child(4) {
+        grid-area: direction;
+    }
+
+    .data-table-row.domains-table-grid > :nth-child(5) {
         grid-area: actions;
         align-self: center;
     }
 
-    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Last checked, 5 Actions */
+    /* Compose service group: 1 Domain, 2 DNS, 3 Indexing, 4 Actions */
+    .data-table-row.domains-table-grid-service > :nth-child(2) {
+        grid-area: meta;
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(3) {
+        grid-area: indexing;
+    }
+
+    .data-table-row.domains-table-grid-service > :nth-child(4) {
+        grid-area: actions;
+        align-self: center;
+    }
+
+    /* Compose: 1 Domain, 2 Service, 3 DNS, 4 Indexing, 5 Direction, 6 Actions */
     .data-table-row.domains-table-grid-compose > :nth-child(2) {
         display: none !important;
     }
@@ -2210,12 +2426,31 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.domains-table-grid-compose > :nth-child(4) {
-        display: none !important;
+        grid-area: indexing;
     }
 
     .data-table-row.domains-table-grid-compose > :nth-child(5) {
+        grid-area: direction;
+    }
+
+    .data-table-row.domains-table-grid-compose > :nth-child(6) {
         grid-area: actions;
         align-self: center;
+    }
+
+    .domains-mobile-label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-size: 0.6875rem;
+        font-weight: 500;
+        line-height: 1rem;
+        color: var(--coollabs-subtle);
+    }
+
+    .data-table-row.domains-table-grid .listbox-trigger,
+    .data-table-row.domains-table-grid-compose .listbox-trigger {
+        height: 2rem;
+        font-size: 0.8125rem;
     }
 
     /* Service name as badge under domain on mobile (compose only) */
@@ -2228,7 +2463,7 @@ input[type="search"]::-webkit-search-results-decoration {
     display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .domains-service-desktop {
         display: none !important;
     }
@@ -2250,11 +2485,11 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .volumes-table-grid {
-    grid-template-columns: minmax(10rem, 1.4fr) minmax(6rem, 1fr) minmax(6rem, 1fr) 5rem 17.5rem;
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(6rem, 1fr) minmax(6rem, 1fr) 5rem 12rem;
 }
 
 .volumes-table-grid-with-pr {
-    grid-template-columns: minmax(9rem, 1.2fr) minmax(5.5rem, 0.85fr) minmax(5.5rem, 0.85fr) 9.25rem 5rem 17.5rem;
+    grid-template-columns: minmax(9rem, 1.2fr) minmax(5.5rem, 0.85fr) minmax(5.5rem, 0.85fr) 9.25rem 5rem 12rem;
 }
 
 .volumes-mobile-label {
@@ -2290,7 +2525,7 @@ input[type="search"]::-webkit-search-results-decoration {
 
 @media (max-width: 1100px) {
     .volumes-table-grid {
-        grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) 5rem 17.5rem;
+        grid-template-columns: minmax(9rem, 1.2fr) minmax(6rem, 1fr) 5rem 12rem;
     }
 
     .volumes-table-grid > .volumes-col-source,
@@ -2299,7 +2534,7 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-table-grid-with-pr {
-        grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 17.5rem;
+        grid-template-columns: minmax(9rem, 1.1fr) minmax(6rem, 1fr) 8.5rem 5rem 12rem;
     }
 
     .volumes-table-grid-with-pr > .volumes-col-source,
@@ -2408,12 +2643,26 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: 7.5rem minmax(7rem, 0.8fr) minmax(12rem, 1.7fr) minmax(8rem, 0.9fr) 6.5rem minmax(7rem, 0.8fr);
 }
 
+@media (min-width: 1024px) {
+    .deployment-table-scroll {
+        overflow-x: visible;
+    }
+
+    .deployment-table-grid {
+        min-width: 0;
+    }
+}
+
 .dashboard-deployment-table-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(6.25rem, 0.75fr) 10rem 8rem;
 }
 
 .team-members-table-grid {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem minmax(10rem, 0.9fr);
+}
+
+.team-members-table-grid-2fa {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.55fr) 7rem 4rem minmax(10rem, 0.9fr);
 }
 
 .admin-users-table-grid {
@@ -2453,9 +2702,17 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .backup-executions-table-grid {
-    grid-template-columns: 6.5rem minmax(7rem, 1fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;
+    grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;
     gap: 0.75rem;
-    min-width: 49rem;
+    min-width: 66rem;
+}
+
+.backup-executions-table-scroll {
+    overflow-x: auto;
+}
+
+.backup-execution-row:last-child > .data-table-row {
+    border-bottom: 0;
 }
 
 .volume-backup-executions-grid {
@@ -2478,6 +2735,10 @@ input[type="search"]::-webkit-search-results-decoration {
 @media (max-width: 900px) {
     .team-members-table-grid {
         grid-template-columns: minmax(0, 1fr) 7rem 7rem;
+    }
+
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 7rem 4rem 7rem;
     }
 
     .team-members-table-grid > :nth-child(2) {
@@ -2511,11 +2772,11 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(9rem, 1fr) 8rem 6rem minmax(9rem, auto);
+        grid-template-columns: 7.5rem minmax(9rem, 0.8fr) minmax(14rem, 1.5fr) 8rem 6rem minmax(9rem, auto);
     }
 
-    .backup-executions-table-grid > :nth-child(5),
-    .backup-executions-table-grid > :nth-child(6) {
+    .backup-executions-table-grid > :nth-child(6),
+    .backup-executions-table-grid > :nth-child(7) {
         display: none;
     }
 }
@@ -2529,6 +2790,10 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .team-members-table-grid {
         grid-template-columns: minmax(0, 1fr) 6.5rem;
+    }
+
+    .team-members-table-grid-2fa {
+        grid-template-columns: minmax(0, 1fr) 4rem 6.5rem;
     }
 
     .team-members-table-grid > :nth-child(3) {
@@ -2618,11 +2883,14 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .backup-executions-table-grid {
-        grid-template-columns: 7.5rem minmax(0, 1fr) minmax(7rem, auto);
+        grid-template-columns: 7.5rem 9rem minmax(14rem, 1fr) minmax(7rem, auto);
+        min-width: 42rem;
     }
 
-    .backup-executions-table-grid > :nth-child(3),
-    .backup-executions-table-grid > :nth-child(4) {
+    .backup-executions-table-grid > :nth-child(4),
+    .backup-executions-table-grid > :nth-child(5),
+    .backup-executions-table-grid > :nth-child(6),
+    .backup-executions-table-grid > :nth-child(7) {
         display: none;
     }
 
@@ -2839,7 +3107,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    isolation: isolate;
 }
 
 .logs-viewer-actions::-webkit-scrollbar {
@@ -2945,7 +3212,14 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
 .logs-viewer-viewport {
     min-width: 0;
-    padding: 0.5rem 0.75rem 2rem;
+    padding: 0.5rem 0.75rem 0;
+}
+
+/* A flex item is reliably included in the scrollable overflow area, unlike
+   bottom padding on overflow containers in some browser/layout combinations. */
+.logs-viewer-viewport::after {
+    content: "";
+    flex: 0 0 2rem;
 }
 
 .logs-viewer-line {
@@ -2954,6 +3228,10 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     flex-direction: column;
     gap: 0.125rem;
     padding-block: 0.125rem;
+}
+
+.logs-viewer-line.hidden {
+    display: none;
 }
 
 .logs-viewer-timestamp {
@@ -3035,7 +3313,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     }
 
     .logs-viewer-viewport {
-        padding: 0.5rem 1rem 2rem;
+        padding: 0.5rem 1rem 0;
     }
 
     .logs-viewer-line {
@@ -3442,6 +3720,10 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     column-gap: 1rem;
 }
 
+.environment-resource-grid .mobile-resource-domain {
+    display: none;
+}
+
 .projects-table-grid {
     display: grid;
     grid-template-columns:
@@ -3489,7 +3771,7 @@ html[data-theme="custom"] .logs-viewer-timestamp {
         column-gap: 0.75rem;
     }
 
-    .environments-table-grid > :nth-child(2) {
+    .environments-table-grid .environment-resource-count {
         display: none;
     }
 }
@@ -3555,9 +3837,13 @@ html[data-theme="custom"] .logs-viewer-timestamp {
         column-gap: 0.75rem;
     }
 
-    .environment-resource-grid > :nth-child(2),
-    .environment-resource-grid > :nth-child(5) {
+    .environment-resource-grid .resource-type,
+    .environment-resource-grid .resource-server {
         display: none;
+    }
+
+    .environment-resource-grid .mobile-resource-domain {
+        display: block;
     }
 }
 

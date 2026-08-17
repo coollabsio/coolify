@@ -82,13 +82,12 @@
                     <x-forms.input canGate="update" :canResource="$gitlab_app" type="number" id="customPort"
                         label="SSH port" />
                     <div class="lg:col-span-2">
-                        <x-forms.select canGate="update" :canResource="$gitlab_app" id="privateKeyId"
-                            label="SSH private key (optional)">
-                            <option value="">None</option>
-                            @foreach ($privateKeys as $key)
-                                <option value="{{ $key->id }}">{{ $key->name }}</option>
-                            @endforeach
-                        </x-forms.select>
+                        <x-forms.listbox id="privateKeyId" label="SSH private key (optional)"
+                            :options="collect($privateKeys)->map(fn ($key) => [
+                                'value' => $key->id,
+                                'label' => $key->name,
+                            ])->prepend(['value' => null, 'label' => 'None'])->values()->all()"
+                            :disabled="! auth()->user()->can('update', $gitlab_app)" />
                     </div>
                 </div>
             </x-application.settings-section>
@@ -249,22 +248,14 @@
                                     helper="Use a custom public URL when Coolify is behind a tunnel or reverse proxy." />
                             </div>
                             <div class="lg:col-span-2" x-show="!useCustomWebhookEndpoint">
-                                <x-forms.select wire:model.live="webhook_endpoint" x-model="webhookEndpoint"
+                                <x-forms.listbox id="webhook_endpoint" x-model="webhookEndpoint"
                                     label="Selected endpoint"
-                                    helper="GitLab will use this endpoint unless custom mode is enabled.">
-                                    @if ($fqdn)
-                                        <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
-                                    @endif
-                                    @if ($ipv4)
-                                        <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
-                                    @endif
-                                    @if ($ipv6)
-                                        <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
-                                    @endif
-                                    @if (config('app.url'))
-                                        <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
-                                    @endif
-                                </x-forms.select>
+                                    helper="GitLab will use this endpoint unless custom mode is enabled."
+                                    :options="collect([$fqdn, $ipv4, $ipv6, config('app.url')])
+                                        ->filter()->unique()->map(fn ($endpoint) => [
+                                            'value' => $endpoint,
+                                            'label' => 'Use '.$endpoint,
+                                        ])->values()->all()" />
                             </div>
                             <div class="lg:col-span-2" x-cloak x-show="useCustomWebhookEndpoint">
                                 <x-forms.input x-model="customWebhookEndpoint" id="custom_webhook_endpoint"
