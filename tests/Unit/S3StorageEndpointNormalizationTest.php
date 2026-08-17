@@ -11,11 +11,11 @@ it('uses the shared split URL input without a Livewire blur request', function (
 
     expect($createView)
         ->not->toContain('wire:model.blur="endpoint"')
-        ->toContain('<x-forms.domain-input id="endpoint"')
+        ->toContain('<x-forms.domain-input id="endpointParts"')
         ->toContain('host-label="Host"')
         ->toContain('host-placeholder="minio.internal or 192.168.1.50"')
         ->and($editView)
-        ->toContain('<x-forms.domain-input id="endpoint"')
+        ->toContain('<x-forms.domain-input id="endpointParts"')
         ->toContain('@can(\'update\', $storage)');
 });
 

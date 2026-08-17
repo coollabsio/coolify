@@ -19,29 +19,14 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: '',
-        localEditingIndex: @js($editingIndex),
-        localEditingDomain: @js($editingDomain),
-        localEditingServiceApplicationId: @js($editingServiceApplicationId),
-        openEditDomain(index, url, serviceApplicationId, serviceLabel) {
-            this.localEditingIndex = index;
-            this.localEditingDomain = url;
-            this.localEditingServiceApplicationId = serviceApplicationId;
-            this.editingServiceLabel = serviceLabel || '';
+        openEditDomain() {
+            this.editingServiceLabel = $wire.serviceApps.find(app => app.id === $wire.editingServiceApplicationId)?.name || '';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
         },
         closeEditDomain() {
             this.modalOpen = false;
             this.editingServiceLabel = '';
-            this.localEditingIndex = null;
-            this.localEditingDomain = '';
-            this.localEditingServiceApplicationId = null;
-        },
-        prepareEditSubmit() {
-            $wire.editingIndex = this.localEditingIndex;
-            $wire.editingDomain = this.localEditingDomain;
-            $wire.editingServiceApplicationId = this.localEditingServiceApplicationId;
-            $wire.showEditDomainModal = true;
         },
         matchesDomainSearch(value) {
             return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
@@ -50,7 +35,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel)"
+    @open-edit-domain.window="openEditDomain()"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="service-domains-section" title="Domains">
         @can('update', $service)
@@ -116,7 +101,7 @@
                                 ])->values()->all()"
                                 :disabled="! auth()->user()->can('update', $service)" />
 
-                            <x-forms.domain-input id="newDomain" />
+                            <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
 
                             @if ($addDomainDnsFailed)
                                 <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -232,7 +217,7 @@
                         </header>
                         <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
                             style="-webkit-overflow-scrolling: touch;">
-                            <form @submit.prevent="prepareEditSubmit(); $wire.updateDomain()" class="flex flex-col gap-4">
+                            <form wire:submit="updateDomain" class="flex flex-col gap-4">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service application</label>
@@ -243,8 +228,7 @@
                                     </p>
                                 </div>
 
-                                <x-forms.domain-input id="editingDomainLocal" errorId="editingDomain" :wire="false"
-                                    x-model="localEditingDomain" />
+                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -260,7 +244,7 @@
                                 <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
                                     @if ($editDomainDnsFailed)
                                         <x-forms.button type="button" isError
-                                            @click="prepareEditSubmit(); $wire.forceSaveEditDns = true; $wire.confirmUpdateDomainDespiteDns()">
+                                            wire:click="confirmUpdateDomainDespiteDns">
                                             Continue
                                         </x-forms.button>
                                     @else

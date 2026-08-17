@@ -6,6 +6,7 @@ use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
+use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -35,11 +36,19 @@ class Domains extends Component
 
     public string $newDomain = '';
 
+    public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $newDomainPartsChanged = false;
+
     public ?string $newDomainService = null;
 
     public ?int $editingIndex = null;
 
     public string $editingDomain = '';
+
+    public array $editingDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $editingDomainPartsChanged = false;
 
     public ?string $editingService = null;
 
@@ -662,6 +671,12 @@ class Domains extends Component
         $this->resetAddDomainDnsGate();
     }
 
+    public function updatedNewDomainParts(): void
+    {
+        $this->newDomainPartsChanged = true;
+        $this->resetAddDomainDnsGate();
+    }
+
     public function updatedNewDomainService(): void
     {
         $this->resetAddDomainDnsGate();
@@ -677,6 +692,8 @@ class Domains extends Component
     public function resetAddDomainForm(): void
     {
         $this->newDomain = '';
+        $this->newDomainParts = DomainUrlParts::empty();
+        $this->newDomainPartsChanged = false;
         $this->resetAddDomainDnsGate();
         $this->resetErrorBag('newDomain');
     }
@@ -743,6 +760,9 @@ class Domains extends Component
                 return;
             }
 
+            if ($this->newDomainPartsChanged) {
+                $this->newDomain = DomainUrlParts::compose(...$this->newDomainParts);
+            }
             $this->validateOnly('newDomain');
 
             $normalized = ValidationPatterns::normalizeApplicationDomains($this->newDomain);
@@ -893,6 +913,12 @@ class Domains extends Component
         $this->resetEditDomainDnsGate();
     }
 
+    public function updatedEditingDomainParts(): void
+    {
+        $this->editingDomainPartsChanged = true;
+        $this->resetEditDomainDnsGate();
+    }
+
     public function resetEditDomainDnsGate(): void
     {
         $this->editDomainDnsFailed = false;
@@ -908,10 +934,13 @@ class Domains extends Component
 
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
+        $this->editingDomainParts = DomainUrlParts::split($this->editingDomain);
+        $this->editingDomainPartsChanged = false;
         $this->editingService = $this->domainRows[$index]['service'];
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
+        $this->dispatch('open-edit-domain');
     }
 
     public function addSuggestedDomain(int $index): void
@@ -990,6 +1019,8 @@ class Domains extends Component
         $this->showEditDomainModal = false;
         $this->editingIndex = null;
         $this->editingDomain = '';
+        $this->editingDomainParts = DomainUrlParts::empty();
+        $this->editingDomainPartsChanged = false;
         $this->editingService = null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
@@ -1021,6 +1052,9 @@ class Domains extends Component
                 return;
             }
 
+            if ($this->editingDomainPartsChanged) {
+                $this->editingDomain = DomainUrlParts::compose(...$this->editingDomainParts);
+            }
             $this->validateOnly('editingDomain');
 
             $normalized = ValidationPatterns::normalizeApplicationDomains($this->editingDomain);
