@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ApplicationDeploymentJob;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -30,11 +31,19 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config([
+        'cache.default' => 'array',
+        'session.driver' => 'array',
+        'queue.default' => 'sync',
+        'app.maintenance.driver' => 'file',
+    ]);
+
     InstanceSettings::query()->where('id', 0)->delete();
     InstanceSettings::query()->delete();
     $settings = new InstanceSettings(['is_mcp_server_enabled' => true]);
@@ -1744,6 +1753,7 @@ test('cancel_deployment cancels team deployment and rejects other team', functio
     Process::fake([
         '*' => Process::result(output: ''),
     ]);
+    Queue::fake();
 
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $this->application->id,
@@ -1754,6 +1764,17 @@ test('cancel_deployment cancels team deployment and rejects other team', functio
         'server_name' => $this->server->name,
         'commit' => 'abc',
         'current_process_id' => '12345',
+    ]);
+    $nextDeployment = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'dep-next-'.fake()->uuid(),
+        'status' => 'queued',
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'application_name' => $this->application->name,
+        'server_name' => $this->server->name,
+        'commit' => 'def',
+        'pull_request_id' => 0,
     ]);
 
     $token = $this->user->createToken('mcp-cancel', ['read', 'deploy'])->plainTextToken;
@@ -1777,6 +1798,8 @@ test('cancel_deployment cancels team deployment and rejects other team', functio
     expect($body['data']['ok'])->toBeTrue()
         ->and($body['data']['status'])->toBe('cancelled-by-user');
     expect($deployment->fresh()->status)->toBe('cancelled-by-user');
+    expect($nextDeployment->fresh()->status)->toBe('in_progress');
+    Queue::assertPushed(ApplicationDeploymentJob::class, fn (ApplicationDeploymentJob $job) => $job->application_deployment_queue_id === $nextDeployment->id);
 
     $otherTeam = Team::factory()->create();
     $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);

@@ -17,7 +17,7 @@
             <x-forms.input canGate="update" :canResource="$storage" label="Description" id="description" />
             <div class="lg:col-span-2">
                 @can('update', $storage)
-                    <x-forms.domain-input id="endpoint" host-label="Host"
+                    <x-forms.domain-input id="endpointParts" errorId="endpoint" host-label="Host"
                         host-placeholder="minio.internal or 192.168.1.50" />
                 @else
                     <x-forms.input label="Endpoint" :value="$endpoint" disabled />

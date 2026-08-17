@@ -60,6 +60,15 @@ test('mobile listbox panels stay anchored to their trigger', function () {
         ->not->toContain('transform: translate(-50%, -50%) !important;');
 });
 
+test('portaled listboxes measure content without inheriting the viewport width', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain("panel.style.width = 'max-content';")
+        ->toContain('panel.style.minWidth = `${triggerRect.width}px`;')
+        ->toContain('Math.max(triggerRect.width, panel.offsetWidth)');
+});
+
 test('searchable listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.searchable-listbox id="tz" label="Timezone"

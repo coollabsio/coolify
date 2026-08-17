@@ -236,6 +236,22 @@ it('adds a domain to the application', function () {
         ->toBe(['https://app.example.com', 'https://www.app.example.com']);
 });
 
+it('composes the complete port on the server without duplicating an existing www domain', function () {
+    $this->application->update(['fqdn' => 'https://www.example.com:3000']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'example.com')
+        ->set('newDomainParts.port', '3000')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))->toBe([
+        'https://www.example.com:3000',
+        'https://example.com:3000',
+    ]);
+});
+
 it('adds multiple domains without replacing existing ones', function () {
     $this->application->update([
         'fqdn' => 'https://app.example.com',
@@ -1222,16 +1238,16 @@ it('uses segmented fields when adding and editing application domains', function
     $component = file_get_contents(resource_path('views/components/forms/domain-input.blade.php'));
 
     expect($view)
-        ->toContain('<x-forms.domain-input id="newDomain"')
-        ->toContain('<x-forms.domain-input id="editingDomainLocal"')
+        ->toContain('<x-forms.domain-input id="newDomainParts"')
+        ->toContain('<x-forms.domain-input id="editingDomainParts"')
         ->not->toContain('placeholder="https://app.example.com"')
         ->and($component)
         ->toContain('Protocol')
         ->toContain('Domain')
         ->toContain('Port')
         ->toContain('Path')
-        ->toContain("scheme: 'https'")
-        ->toContain('<x-forms.listbox id="{{ $id }}-protocol"')
+        ->toContain('wire:model="{{ $id }}.host"')
+        ->toContain('<x-forms.listbox id="{{ $id }}.scheme"')
         ->not->toContain('<select id="{{ $id }}-protocol"')
         ->toContain("['value' => 'https', 'label' => 'https']")
         ->toContain("['value' => 'http', 'label' => 'http']")
