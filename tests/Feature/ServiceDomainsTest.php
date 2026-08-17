@@ -141,8 +141,8 @@ it('uses segmented fields when adding and editing service domains', function () 
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
 
     expect($view)
-        ->toContain('<x-forms.domain-input id="newDomain"')
-        ->toContain('<x-forms.domain-input id="editingDomainLocal"')
+        ->toContain('<x-forms.domain-input id="newDomainParts"')
+        ->toContain('<x-forms.domain-input id="editingDomainParts"')
         ->not->toContain('placeholder="https://app.example.com"');
 });
 
