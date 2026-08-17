@@ -22,6 +22,13 @@ test('listbox trigger height matches shared inputs', function () {
         ->toMatch('/\.application-settings-workspace \.listbox-trigger[^}]*height: 2rem;/s');
 });
 
+test('listbox trigger uses an opaque background on hover', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toMatch('/\.listbox-trigger:hover \{[^}]*background: var\(--coollabs-fill\);/s');
+});
+
 test('listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.listbox id="longOption" label="Example"

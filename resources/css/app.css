@@ -1903,6 +1903,10 @@ html[data-theme="custom"] textarea:disabled {
     color: var(--color-fg);
 }
 
+.listbox-trigger:hover {
+    background: var(--coollabs-fill);
+}
+
 .listbox-trigger:disabled {
     cursor: not-allowed;
     opacity: 0.5;
