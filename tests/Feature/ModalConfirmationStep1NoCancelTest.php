@@ -13,3 +13,11 @@ test('modal confirmation step 1 does not render a cancel button', function () {
         ->toContain('step1ButtonText')
         ->not->toContain('Cancel');
 });
+
+test('modal confirmation lets checkbox ids define their Livewire model binding', function () {
+    $modal = file_get_contents(resource_path('views/components/modal-confirmation.blade.php'));
+
+    expect($modal)
+        ->not->toContain(':wire:model="$checkbox[\'id\']"')
+        ->toContain(':id="$checkbox[\'id\']"');
+});
