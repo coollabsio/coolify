@@ -44,6 +44,14 @@ test('scheduled database backup execution model casts storage deletion fields co
     expect($casts['s3_storage_deleted'])->toBe('boolean');
 });
 
+test('scheduled database backup casts full dump selection to boolean', function () {
+    $model = new ScheduledDatabaseBackup;
+
+    expect($model->getCasts())->toMatchArray(['dump_all' => 'boolean'])
+        ->and((new ScheduledDatabaseBackup(['dump_all' => '0']))->dump_all)->toBeFalse()
+        ->and((new ScheduledDatabaseBackup(['dump_all' => '1']))->dump_all)->toBeTrue();
+});
+
 test('upload_to_s3 throws exception and disables s3 when storage is null', function () {
     $backup = ScheduledDatabaseBackup::create([
         'frequency' => '0 0 * * *',
@@ -361,4 +369,42 @@ test('all dump all database commands use shared helper compression', function ()
         ->toContain('mariadb-dump -u root')
         ->and(substr_count($source, '$this->buildCompressedDumpCommand($dumpCommand)'))->toBe(2)
         ->and($source)->not->toContain('| gzip >');
+});
+
+test('full database dumps create one logical all-databases archive regardless of saved database names', function (string $databaseType) {
+    $backup = new ScheduledDatabaseBackup([
+        'dump_all' => true,
+        'databases_to_backup' => 'default,analytics',
+    ]);
+    $job = new DatabaseBackupJob($backup);
+
+    $databases = (new ReflectionClass($job))
+        ->getMethod('databasesToBackup')
+        ->invoke($job, $databaseType, $backup->databases_to_backup);
+
+    expect($databases)->toBe(['all']);
+})->with(['postgresql', 'mysql', 'mariadb']);
+
+test('specific database dumps keep every selected database', function (string $databaseType) {
+    $backup = new ScheduledDatabaseBackup([
+        'dump_all' => false,
+        'databases_to_backup' => 'default, analytics',
+    ]);
+    $job = new DatabaseBackupJob($backup);
+
+    $databases = (new ReflectionClass($job))
+        ->getMethod('databasesToBackup')
+        ->invoke($job, $databaseType, $backup->databases_to_backup);
+
+    expect($databases)->toBe(['default', 'analytics']);
+})->with(['postgresql', 'mysql', 'mariadb']);
+
+test('individual database backup deletion surfaces local failures and honors selected S3 deletion', function () {
+    $source = file_get_contents(app_path('Livewire/Project/Database/BackupExecutions.php'));
+
+    expect($source)
+        ->toContain("in_array('delete_backup_s3', \$selectedActions, true)")
+        ->toContain('deleteBackupsLocally($execution->filename, $server, throwError: true)')
+        ->toContain("throw new \\RuntimeException('The backup server is unavailable.')")
+        ->not->toContain('deleteBackupsLocally($execution->filename, $server);');
 });

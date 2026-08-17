@@ -279,33 +279,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     return;
                 }
-            } else {
-                if (str($databaseType)->contains('postgres')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif (str($databaseType)->contains('mongo')) {
-                    // Format: db1:collection1,collection2|db2:collection3,collection4
-                    // Only explode if it's a string, not if it's already an array
-                    if (is_string($databasesToBackup)) {
-                        $databasesToBackup = explode('|', $databasesToBackup);
-                        $databasesToBackup = array_map('trim', $databasesToBackup);
-                    }
-                } elseif (str($databaseType)->contains('mysql')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif (str($databaseType)->contains('mariadb')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif ($this->database instanceof StandaloneClickhouse) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } else {
-                    return;
-                }
+            }
+            $databasesToBackup = $this->databasesToBackup($databaseType, $databasesToBackup);
+            if ($databasesToBackup === []) {
+                return;
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
             if ($this->database->name === 'coolify-db') {
@@ -598,6 +575,30 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $this->add_to_error_output($e->getMessage());
             throw $e;
         }
+    }
+
+    /** @return array<int, string> */
+    private function databasesToBackup(string $databaseType, string|array $databases): array
+    {
+        $type = str($databaseType);
+
+        if ($this->backup->dump_all && $type->contains(['postgres', 'mysql', 'mariadb'])) {
+            return ['all'];
+        }
+
+        if (is_array($databases)) {
+            return $databases;
+        }
+
+        if ($type->contains('mongo')) {
+            return array_map('trim', explode('|', $databases));
+        }
+
+        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse'])) {
+            return array_map('trim', explode(',', $databases));
+        }
+
+        return [];
     }
 
     private function backup_standalone_postgresql(string $database): void
