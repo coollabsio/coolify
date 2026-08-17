@@ -14,6 +14,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseBackupFileValidator;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -28,11 +29,10 @@ class ImportForm extends Component
 
     /**
      * Validate that a string is safe for use as an S3 bucket name.
-     * Allows alphanumerics, dots, dashes, and underscores.
      */
     private function validateBucketName(string $bucket): bool
     {
-        return preg_match('/^[a-zA-Z0-9.\-_]+$/', $bucket) === 1;
+        return ValidationPatterns::isValidS3BucketName($bucket);
     }
 
     /**
@@ -582,7 +582,7 @@ EOD;
 
             // Validate bucket name early
             if (! $this->validateBucketName($s3Storage->bucket)) {
-                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only lowercase letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return;
             }
@@ -599,6 +599,7 @@ EOD;
                 'bucket' => $s3Storage->bucket,
                 'endpoint' => $s3Storage->endpoint,
                 'use_path_style_endpoint' => true,
+                'http' => SafeWebhookUrl::httpClientOptions($s3Storage->endpoint),
             ]);
 
             // Check if file exists
@@ -663,7 +664,7 @@ EOD;
 
             // Validate bucket name to prevent command injection
             if (! $this->validateBucketName($bucket)) {
-                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only alphanumerics, dots, dashes, and underscores.');
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only lowercase letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
 
                 return true;
             }
@@ -679,7 +680,7 @@ EOD;
             }
 
             // Get helper image
-            $helperImage = config('constants.coolify.helper_image');
+            $helperImage = coolifyHelperImage();
             $latestVersion = getHelperVersion();
             $fullImageName = "{$helperImage}:{$latestVersion}";
 
@@ -811,14 +812,13 @@ EOD;
         // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
         $sep = '([[:space:]]|/\\*[^*]*\\*/)';
 
-        $pattern = implode('|', [
-            "copy{$sep}+[^;]*(from|to){$sep}+program",
-            '(^|[[:space:]])\\\\!',
-            "(^|[[:space:]])\\\\(o|g){$sep}*\\|",
-        ]);
-        $escapedPattern = escapeshellarg($pattern);
+        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
+        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
+        $escapedSqlPattern = escapeshellarg($sqlPattern);
+        $escapedPsqlPattern = escapeshellarg($psqlPattern);
+        $contents = "{ gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}; }";
 
-        return "if (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | sed 's/--.*//' | tr '\n\r\t' '   ' | grep -Eiq {$escapedPattern}; then echo 'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.'; exit 1; fi";
+        return "header=\$({$contents} | head -c 5); if [ \"\$header\" = 'PGDMP' ]; then exit 0; fi; if {$contents} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$contents} | sed 's/--.*//' | tr '\n\r\t' '   ' | grep -Eiq {$escapedSqlPattern}; then echo 'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.'; exit 1; fi";
     }
 
     private function addRestoreSafetyCheckCommand(array &$commands, string $tmpPath): void

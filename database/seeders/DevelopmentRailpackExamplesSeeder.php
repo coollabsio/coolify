@@ -20,8 +20,6 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
 {
     public const PROJECT_UUID = 'railpack-examples';
 
-    public const ENVIRONMENT_UUID = 'railpack-examples-production';
-
     public const GIT_REPOSITORY = 'coollabsio/coolify-examples';
 
     public const GIT_BRANCH = 'next';
@@ -37,17 +35,15 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
         }
 
         $this->ensureDevelopmentPrerequisitesExist();
-        $destination = StandaloneDocker::query()->find(0);
 
-        if (! $destination) {
+        if (! StandaloneDocker::query()->find(0)) {
             throw new RuntimeException('StandaloneDocker with id=0 is required before running DevelopmentRailpackExamplesSeeder.');
         }
 
-        $environment = $this->prepareEnvironment();
+        $this->cleanupLegacyLimaProjects();
+        $this->cleanupLegacyProductionExamples();
 
-        foreach (self::examples() as $example) {
-            $this->upsertApplication($environment, $destination, $example);
-        }
+        $this->seedEnvironment(StandaloneDocker::query()->findOrFail(0));
     }
 
     /**
@@ -489,6 +485,50 @@ KEY,
         return in_array(config('app.env'), ['local', 'development', 'dev'], true);
     }
 
+    private function cleanupLegacyLimaProjects(): void
+    {
+        Project::query()
+            ->whereIn('uuid', [
+                'railpack-examples-lima-ubuntu-2404',
+                'railpack-examples-lima-ubuntu-2604',
+            ])
+            ->get()
+            ->each(function (Project $project): void {
+                Application::withTrashed()
+                    ->whereIn('environment_id', $project->environments()->pluck('id'))
+                    ->get()
+                    ->each
+                    ->forceDelete();
+
+                $project->delete();
+            });
+    }
+
+    private function cleanupLegacyProductionExamples(): void
+    {
+        $project = Project::query()->where('uuid', self::PROJECT_UUID)->first();
+
+        if (! $project) {
+            return;
+        }
+
+        Application::withTrashed()
+            ->whereIn('environment_id', $project->environments()->pluck('id'))
+            ->whereIn('uuid', collect(self::examples())->pluck('uuid'))
+            ->get()
+            ->each
+            ->forceDelete();
+    }
+
+    private function seedEnvironment(StandaloneDocker $destination): void
+    {
+        $environment = $this->prepareEnvironment();
+
+        foreach (self::examples() as $example) {
+            $this->upsertApplication($environment, $destination, $example);
+        }
+    }
+
     private function prepareEnvironment(): Environment
     {
         $project = Project::query()->firstOrNew(['uuid' => self::PROJECT_UUID]);
@@ -499,19 +539,20 @@ KEY,
         ]);
         $project->save();
 
-        $environment = $project->environments()->first();
+        $environment = $project->environments()->firstOrCreate(['name' => 'production']);
 
-        if (! $environment) {
-            $environment = $project->environments()->create([
-                'name' => 'production',
-                'uuid' => self::ENVIRONMENT_UUID,
-            ]);
-        } else {
-            $environment->update([
-                'name' => 'production',
-                'uuid' => self::ENVIRONMENT_UUID,
-            ]);
-        }
+        $project->environments()
+            ->whereKeyNot($environment->id)
+            ->get()
+            ->each(function (Environment $obsoleteEnvironment): void {
+                Application::withTrashed()
+                    ->where('environment_id', $obsoleteEnvironment->id)
+                    ->get()
+                    ->each
+                    ->forceDelete();
+
+                $obsoleteEnvironment->delete();
+            });
 
         return $environment;
     }
@@ -521,11 +562,13 @@ KEY,
      */
     private function upsertApplication(Environment $environment, StandaloneDocker $destination, array $example): void
     {
-        $application = Application::withTrashed()->firstOrNew(['uuid' => $example['uuid']]);
+        $uuid = $example['uuid'];
+        $name = $example['name'];
+        $application = Application::withTrashed()->firstOrNew(['uuid' => $uuid]);
         $application->fill([
-            'name' => $example['name'],
-            'description' => $example['name'],
-            'fqdn' => "http://{$example['uuid']}.127.0.0.1.sslip.io",
+            'name' => $name,
+            'description' => $name,
+            'fqdn' => "http://{$uuid}.127.0.0.1.sslip.io",
             'repository_project_id' => $example['repository_project_id'] ?? self::REPOSITORY_PROJECT_ID,
             'git_repository' => $example['git_repository'] ?? self::GIT_REPOSITORY,
             'git_branch' => $example['git_branch'] ?? self::GIT_BRANCH,

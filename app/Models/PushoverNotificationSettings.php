@@ -34,6 +34,11 @@ class PushoverNotificationSettings extends Model
         'traefik_outdated_pushover_notifications',
     ];
 
+    protected $hidden = [
+        'pushover_user_key',
+        'pushover_api_token',
+    ];
+
     protected $casts = [
         'pushover_enabled' => 'boolean',
         'pushover_user_key' => 'encrypted',

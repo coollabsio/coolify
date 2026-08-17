@@ -12,6 +12,12 @@ use Illuminate\Support\Once;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config([
+        'app.maintenance.driver' => 'file',
+        'cache.default' => 'array',
+        'session.driver' => 'array',
+    ]);
+
     InstanceSettings::query()->whereKey(0)->delete();
     $settings = new InstanceSettings(['is_api_enabled' => true]);
     $settings->id = 0;
@@ -78,6 +84,63 @@ describe('GET /api/v1/cloud-tokens', function () {
         $response = $this->getJson('/api/v1/cloud-tokens');
         $response->assertStatus(401);
     });
+
+    test('read token does not include provider token values', function () {
+        CloudProviderToken::create([
+            'team_id' => $this->team->id,
+            'name' => 'Hidden Token',
+            'provider' => 'hetzner',
+            'token' => 'hidden-cloud-provider-token',
+        ]);
+
+        $readToken = $this->user->createToken('read-token', ['read'])->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$readToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/cloud-tokens');
+
+        $response->assertSuccessful();
+        expect($response->getContent())->not->toContain('"token":');
+    });
+
+    test('read sensitive token includes provider token values', function () {
+        CloudProviderToken::create([
+            'team_id' => $this->team->id,
+            'name' => 'Visible Token',
+            'provider' => 'hetzner',
+            'token' => 'visible-cloud-provider-token',
+        ]);
+
+        $readSensitiveToken = $this->user->createToken('read-sensitive-token', ['read', 'read:sensitive'])->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$readSensitiveToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/cloud-tokens');
+
+        $response->assertSuccessful();
+        $response->assertJsonFragment(['token' => 'visible-cloud-provider-token']);
+    });
+
+    test('root token includes provider token values', function () {
+        CloudProviderToken::create([
+            'team_id' => $this->team->id,
+            'name' => 'Root Visible Token',
+            'provider' => 'hetzner',
+            'token' => 'root-visible-cloud-provider-token',
+        ]);
+
+        $rootToken = $this->user->createToken('root-token', ['root'])->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$rootToken,
+            'Content-Type' => 'application/json',
+        ])->getJson('/api/v1/cloud-tokens');
+
+        $response->assertSuccessful();
+        $response->assertJsonFragment(['token' => 'root-visible-cloud-provider-token']);
+    });
 });
 
 describe('GET /api/v1/cloud-tokens/{uuid}', function () {
@@ -119,6 +182,44 @@ describe('GET /api/v1/cloud-tokens/{uuid}', function () {
         ])->getJson("/api/v1/cloud-tokens/{$token->uuid}");
 
         $response->assertStatus(404);
+    });
+
+    test('read token does not include provider token value by UUID', function () {
+        $token = CloudProviderToken::create([
+            'team_id' => $this->team->id,
+            'name' => 'Hidden Token Detail',
+            'provider' => 'hetzner',
+            'token' => 'hidden-cloud-provider-token-detail',
+        ]);
+
+        $readToken = $this->user->createToken('read-token', ['read'])->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$readToken,
+            'Content-Type' => 'application/json',
+        ])->getJson("/api/v1/cloud-tokens/{$token->uuid}");
+
+        $response->assertSuccessful();
+        expect($response->getContent())->not->toContain('"token":');
+    });
+
+    test('read sensitive token includes provider token value by UUID', function () {
+        $token = CloudProviderToken::create([
+            'team_id' => $this->team->id,
+            'name' => 'Visible Token Detail',
+            'provider' => 'hetzner',
+            'token' => 'visible-cloud-provider-token-detail',
+        ]);
+
+        $readSensitiveToken = $this->user->createToken('read-sensitive-token', ['read', 'read:sensitive'])->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$readSensitiveToken,
+            'Content-Type' => 'application/json',
+        ])->getJson("/api/v1/cloud-tokens/{$token->uuid}");
+
+        $response->assertSuccessful();
+        $response->assertJsonFragment(['token' => 'visible-cloud-provider-token-detail']);
     });
 });
 
@@ -168,6 +269,30 @@ describe('POST /api/v1/cloud-tokens', function () {
         $response->assertJsonStructure(['uuid']);
     });
 
+    test('creates a Vultr cloud provider token', function () {
+        Http::fake([
+            'https://api.vultr.com/v2/account' => Http::response([], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson('/api/v1/cloud-tokens', [
+            'provider' => 'vultr',
+            'token' => 'test-vultr-token',
+            'name' => 'My Vultr Token',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonStructure(['uuid']);
+
+        $this->assertDatabaseHas('cloud_provider_tokens', [
+            'team_id' => $this->team->id,
+            'provider' => 'vultr',
+            'name' => 'My Vultr Token',
+        ]);
+    });
+
     test('validates provider is required', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
@@ -207,7 +332,7 @@ describe('POST /api/v1/cloud-tokens', function () {
         $response->assertJsonValidationErrors(['name']);
     });
 
-    test('validates provider must be hetzner or digitalocean', function () {
+    test('validates provider must be hetzner digitalocean or vultr', function () {
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$this->bearerToken,
             'Content-Type' => 'application/json',
@@ -294,8 +419,11 @@ describe('PATCH /api/v1/cloud-tokens/{uuid}', function () {
             'Content-Type' => 'application/json',
         ])->patchJson("/api/v1/cloud-tokens/{$token->uuid}", []);
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['name']);
+        $response->assertStatus(400);
+        $response->assertJson([
+            'message' => 'Invalid request.',
+            'error' => 'Invalid JSON.',
+        ]);
     });
 
     test('cannot update token from another team', function () {
@@ -409,6 +537,25 @@ describe('POST /api/v1/cloud-tokens/{uuid}/validate', function () {
 
         Http::fake([
             'https://api.digitalocean.com/v2/account' => Http::response([], 200),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->postJson("/api/v1/cloud-tokens/{$token->uuid}/validate");
+
+        $response->assertStatus(200);
+        $response->assertJson(['valid' => true, 'message' => 'Token is valid.']);
+    });
+
+    test('validates a valid Vultr token', function () {
+        $token = CloudProviderToken::factory()->create([
+            'team_id' => $this->team->id,
+            'provider' => 'vultr',
+        ]);
+
+        Http::fake([
+            'https://api.vultr.com/v2/account' => Http::response([], 200),
         ]);
 
         $response = $this->withHeaders([

@@ -44,7 +44,7 @@ function authenticateGithubSetupCallbackTest(object $test): void
     session(['currentTeam' => $test->team]);
 }
 
-function fakeGithubManifestConversion(): void
+function fakeGithubManifestConversion(string $apiUrl = 'https://api.github.com'): void
 {
     $key = openssl_pkey_new([
         'private_key_bits' => 2048,
@@ -54,7 +54,7 @@ function fakeGithubManifestConversion(): void
 
     Http::preventStrayRequests();
     Http::fake([
-        'https://api.github.com/app-manifests/*/conversions' => Http::response([
+        "{$apiUrl}/app-manifests/*/conversions" => Http::response([
             'id' => 987654,
             'slug' => 'attacker-controlled-app',
             'client_id' => 'new-client-id',
@@ -86,14 +86,14 @@ function configureGithubAppCredentials(GithubApp $githubApp): void
     ])->save();
 }
 
-function fakeGithubInstallationVerification(int $appId): void
+function fakeGithubInstallationVerification(int $appId, string $apiUrl = 'https://api.github.com'): void
 {
     Http::preventStrayRequests();
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
+        "{$apiUrl}/zen" => Http::response('Keep it logically awesome.', 200, [
             'Date' => now()->toRfc7231String(),
         ]),
-        'https://api.github.com/app/installations/*' => Http::response([
+        "{$apiUrl}/app/installations/*" => Http::response([
             'id' => 555,
             'app_id' => $appId,
         ], 200),
@@ -181,6 +181,21 @@ it('configures an unbound github app with a valid one-time manifest state', func
         ->and($this->githubApp->client_id)->toBe('new-client-id')
         ->and($this->githubApp->webhook_secret)->toBe('new-webhook-secret')
         ->and($this->githubApp->private_key_id)->not->toBeNull();
+});
+
+it('converts ghe dot com app manifests through the data residency api host', function () {
+    authenticateGithubSetupCallbackTest($this);
+    $this->githubApp->forceFill([
+        'api_url' => 'https://api.octocorp.ghe.com',
+        'html_url' => 'https://octocorp.ghe.com',
+    ])->save();
+    fakeGithubManifestConversion('https://api.octocorp.ghe.com');
+    cacheGithubAppSetupState('valid-state', 'manifest', $this->githubApp);
+
+    $this->get('/webhooks/source/github/redirect?state=valid-state&code=real-code')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/app-manifests/real-code/conversions');
 });
 
 it('rejects replayed github app manifest states', function () {
@@ -331,6 +346,23 @@ it('sets installation id when github confirms it belongs to the app', function (
 
     $this->githubApp->refresh();
     expect($this->githubApp->installation_id)->toBe(123456);
+});
+
+it('verifies ghe dot com installations through the data residency api host', function () {
+    authenticateGithubSetupCallbackTest($this);
+    $this->githubApp->forceFill([
+        'api_url' => 'https://api.octocorp.ghe.com',
+        'html_url' => 'https://octocorp.ghe.com',
+    ])->save();
+    configureGithubAppCredentials($this->githubApp);
+    fakeGithubInstallationVerification($this->githubApp->app_id, 'https://api.octocorp.ghe.com');
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/zen');
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/app/installations/123456');
 });
 
 it('rejects replayed github app install states', function () {

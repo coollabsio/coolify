@@ -180,10 +180,9 @@ test('convertContainerEnvsToArray', function () {
               "OpenStdin": false,
               "StdinOnce": false,
               "Env": [
-                  "RAY_ENABLED=true=123",
+                  "FEATURE_FLAG_WITH_EQUALS=true=123",
                   "REGISTRY_URL=docker.io",
                   "SUBSCRIPTION_PROVIDER=stripe",
-                  "TELESCOPE_ENABLED=false",
                   "POSTGRES_HOST_AUTH_METHOD=trust",
                   "DB_PASSWORD=password",
                   "SSH_MUX_ENABLED=true",
@@ -192,7 +191,6 @@ test('convertContainerEnvsToArray', function () {
                   "DB_HOST=host.docker.internal",
                   "POSTGRES_DB=coolify",
                   "APP_KEY=base64:8VEfVNVkXQ9mH2L33WBWNMF4eQ0BWD5CTzB9mIxcl+k=",
-                  "DEBUGBAR_ENABLED=false",
                   "APP_ID=development",
                   "DB_DATABASE=coolify",
                   "DUSK_DRIVER_URL=http://selenium:4444",
@@ -295,5 +293,5 @@ test('convertContainerEnvsToArray', function () {
       }
   ]';
     $envs = format_docker_envs_to_json($data);
-    $this->assertEquals('true=123', $envs->get('RAY_ENABLED'));
+    $this->assertEquals('true=123', $envs->get('FEATURE_FLAG_WITH_EQUALS'));
 });

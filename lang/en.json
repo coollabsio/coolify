@@ -15,6 +15,7 @@
     "auth.forgot_password_link": "Forgot password?",
     "auth.forgot_password_heading": "Password recovery",
     "auth.forgot_password_send_email": "Send password reset email",
+    "auth.forgot_password_disabled_tooltip": "Password reset is unavailable because transactional email (SMTP or Resend) is not configured on this instance.",
     "auth.register_now": "Register",
     "auth.logout": "Logout",
     "auth.register": "Register",

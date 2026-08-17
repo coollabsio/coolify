@@ -164,7 +164,7 @@ test('admin dev view shows unlocked env value', function () {
 
     $component = Livewire::test(EnvironmentVariableAll::class, [
         'resource' => $this->application,
-    ]);
+    ])->call('switch');
 
     expect($component->get('variables'))->toContain('UNLOCKED_VAR=secret-unlocked-value');
 });
@@ -175,7 +175,7 @@ test('admin dev view hides locked env value', function () {
 
     $component = Livewire::test(EnvironmentVariableAll::class, [
         'resource' => $this->application,
-    ]);
+    ])->call('switch');
 
     expect($component->get('variables'))->toContain('LOCKED_VAR=(Locked Secret, delete and add again to change)');
     expect($component->get('variables'))->not->toContain('secret-locked-value');
@@ -187,7 +187,7 @@ test('member dev view hides all env values', function () {
 
     $component = Livewire::test(EnvironmentVariableAll::class, [
         'resource' => $this->application,
-    ]);
+    ])->call('switch');
 
     expect($component->get('variables'))->not->toContain('secret-unlocked-value');
     expect($component->get('variables'))->not->toContain('secret-locked-value');

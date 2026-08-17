@@ -7,7 +7,10 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Server\CleanupDocker;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
@@ -42,6 +45,10 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle()
     {
+        if (! $this->resource instanceof ApplicationPreview) {
+            $this->deleteScheduledVolumeBackups();
+        }
+
         try {
             // Handle ApplicationPreview instances separately
             if ($this->resource instanceof ApplicationPreview) {
@@ -113,6 +120,24 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function deleteScheduledVolumeBackups(): void
+    {
+        $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+        $resources = $this->resource instanceof Service
+            ? $this->resource->applications()->get()->concat($this->resource->databases()->get())
+            : collect([$this->resource]);
+
+        foreach ($resources as $resource) {
+            $storages = $resource->persistentStorages()->get()->concat($resource->fileStorages()->get());
+
+            foreach ($storages as $storage) {
+                foreach ($storage->scheduledBackups()->get() as $backup) {
+                    DeleteScheduledVolumeBackup::run($backup, $server);
+                }
+            }
+        }
+    }
+
     private function deleteApplicationPreview()
     {
         $application = $this->resource->application;
@@ -125,20 +150,23 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         // Cancel any active deployments for this PR (same logic as API cancel_deployment)
-        $activeDeployments = \App\Models\ApplicationDeploymentQueue::where('application_id', $application->id)
+        $activeDeployments = ApplicationDeploymentQueue::where('application_id', $application->id)
             ->where('pull_request_id', $pull_request_id)
             ->whereIn('status', [
-                \App\Enums\ApplicationDeploymentStatus::QUEUED->value,
-                \App\Enums\ApplicationDeploymentStatus::IN_PROGRESS->value,
+                ApplicationDeploymentStatus::QUEUED->value,
+                ApplicationDeploymentStatus::IN_PROGRESS->value,
             ])
             ->get();
+
+        $cancelledDeployments = 0;
 
         foreach ($activeDeployments as $activeDeployment) {
             try {
                 // Mark deployment as cancelled
                 $activeDeployment->update([
-                    'status' => \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                    'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
                 ]);
+                $cancelledDeployments++;
 
                 // Add cancellation log entry
                 $activeDeployment->addLogEntry('Deployment cancelled: Pull request closed.', 'stderr');
@@ -158,6 +186,14 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
             } catch (\Throwable $e) {
                 // Silently handle errors during deployment cancellation
+            }
+        }
+
+        if ($cancelledDeployments > 0) {
+            try {
+                next_after_cancel($server);
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to advance deployment queue after deleting preview {$this->resource->id}: {$e->getMessage()}");
             }
         }
 
@@ -191,7 +227,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
         $commands = [
-            "docker stop -t $timeout $containerList",
+            dockerStopCommand($timeout, $containerList, $server),
             "docker rm -f $containerList",
         ];
         instant_remote_process(

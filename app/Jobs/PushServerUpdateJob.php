@@ -188,7 +188,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             Cache::forget($storageCacheKey);
         }
 
-        if ($this->containers->isEmpty()) {
+        if ($this->containers->isEmpty() && ! $this->isCompleteSnapshot()) {
             return;
         }
 
@@ -311,6 +311,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             }
         }
 
+        if (! $this->isCompleteSnapshot()) {
+            return;
+        }
+
         $this->updateProxyStatus();
 
         $this->updateNotFoundApplicationStatus();
@@ -327,6 +331,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->aggregateServiceContainerStatuses();
 
         $this->checkLogDrainContainer();
+    }
+
+    private function isCompleteSnapshot(): bool
+    {
+        return data_get($this->data, 'snapshot.complete', true) !== false;
     }
 
     private function loadApplications(): Collection
@@ -616,12 +625,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             return;
         }
 
-        // Only protection: Verify we received any container data at all
-        // If containers collection is completely empty, Sentinel might have failed
-        if ($this->containers->isEmpty()) {
-            return;
-        }
-
         // Batch update: mark all not-found applications as exited (excluding already exited ones)
         Application::whereIn('id', $notFoundApplicationIds)
             ->where('status', 'not like', 'exited%')
@@ -632,12 +635,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     {
         $notFoundApplicationPreviewsIds = $this->allApplicationPreviewsIds->diff($this->foundApplicationPreviewsIds);
         if ($notFoundApplicationPreviewsIds->isEmpty()) {
-            return;
-        }
-
-        // Only protection: Verify we received any container data at all
-        // If containers collection is completely empty, Sentinel might have failed
-        if ($this->containers->isEmpty()) {
             return;
         }
 
@@ -700,6 +697,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $database->status = $containerStatus;
             $database->save();
         }
+        if (! $this->isCompleteSnapshot()) {
+            return;
+        }
         if ($this->isRunning($containerStatus) && $tcpProxy) {
             $tcpProxyContainerFound = $this->containers->filter(function ($value, $key) use ($databaseUuid) {
                 return data_get($value, 'name') === "$databaseUuid-proxy" && data_get($value, 'state') === 'running';
@@ -723,12 +723,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     {
         $notFoundDatabaseUuids = $this->allDatabaseUuids->diff($this->foundDatabaseUuids);
         if ($notFoundDatabaseUuids->isEmpty()) {
-            return;
-        }
-
-        // Only protection: Verify we received any container data at all
-        // If containers collection is completely empty, Sentinel might have failed
-        if ($this->containers->isEmpty()) {
             return;
         }
 

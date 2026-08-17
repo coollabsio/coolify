@@ -1,10 +1,36 @@
-<div class="sub-menu-wrapper">
-    <a class="{{ request()->routeIs('server.security.patches') ? 'sub-menu-item menu-item-active' : 'sub-menu-item' }}" {{ wireNavigate() }}
-        href="{{ route('server.security.patches', $parameters) }}">
-        <span class="menu-item-label">Server Patching</span>
-    </a>
-    <a class="{{ request()->routeIs('server.security.terminal-access') ? 'sub-menu-item menu-item-active' : 'sub-menu-item' }}"
-        href="{{ route('server.security.terminal-access', $parameters) }}">
-        <span class="menu-item-label">Terminal Access</span>
-    </a>
-</div>
+@php
+    $securityMenuItems = [
+        [
+            'label' => 'Server Patching',
+            'route' => 'server.security.patches',
+            'active' => request()->routeIs('server.security.patches'),
+            'icon' => 'bandage',
+        ],
+        [
+            'label' => 'Terminal Access',
+            'route' => 'server.security.terminal-access',
+            'active' => request()->routeIs('server.security.terminal-access'),
+            'icon' => 'browser-terminal',
+            'navigate' => false,
+        ],
+    ];
+@endphp
+
+<aside class="application-settings-navigation min-w-0 xl:self-start">
+    <nav aria-label="Server security sections"
+        class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
+        <div class="nav-section hidden xl:block">Security</div>
+        @foreach ($securityMenuItems as $menuItem)
+            <a wire:key="server-security-link-{{ str($menuItem['label'])->slug() }}"
+                @class([
+                    'menu-item',
+                    'menu-item-active' => $menuItem['active'],
+                ])
+                @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
+                href="{{ route($menuItem['route'], $parameters) }}">
+                <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
+                <span class="menu-item-label">{{ $menuItem['label'] }}</span>
+            </a>
+        @endforeach
+    </nav>
+</aside>

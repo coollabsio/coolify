@@ -11,7 +11,10 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::query()->delete();
+    $settings = new InstanceSettings;
+    $settings->id = 0;
+    $settings->save();
 
     $this->team = Team::factory()->create(['personal_team' => false]);
 
@@ -124,6 +127,33 @@ test('member cannot submit team settings via policy', function () {
     session(['currentTeam' => $this->team]);
 
     expect(auth()->user()->can('update', $this->team))->toBeFalse();
+});
+
+test('owner can update team MCP setting', function () {
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TeamIndex::class)
+        ->set('is_mcp_server_enabled', false)
+        ->call('submit')
+        ->assertDispatched('success');
+
+    expect($this->team->fresh()->is_mcp_server_enabled)->toBeFalse();
+});
+
+test('team index mounts when is_mcp_server_enabled is null on the session team', function () {
+    $this->actingAs($this->owner);
+
+    // Simulate Team::create() without hydrating the DB default into session.
+    $this->team->setRawAttributes(array_merge(
+        $this->team->getAttributes(),
+        ['is_mcp_server_enabled' => null],
+    ));
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TeamIndex::class)
+        ->assertSuccessful()
+        ->assertSet('is_mcp_server_enabled', true);
 });
 
 // --- Team Index Livewire: delete ---

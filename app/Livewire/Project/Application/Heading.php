@@ -20,6 +20,8 @@ class Heading extends Component
 
     public array $parameters;
 
+    public string $activeRouteName = '';
+
     protected string $deploymentUuid;
 
     public bool $docker_cleanup = true;
@@ -38,6 +40,7 @@ class Heading extends Component
 
     public function mount()
     {
+        $this->syncActiveRouteName();
         $this->parameters = [
             'project_uuid' => $this->application->project()->uuid,
             'environment_uuid' => $this->application->environment->uuid,
@@ -46,6 +49,20 @@ class Heading extends Component
         $lastDeployment = $this->application->get_last_successful_deployment();
         $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7).' '.data_get($lastDeployment, 'commit_message');
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
+    }
+
+    /**
+     * Keep the active tab in sync with the real page route.
+     * Only update when the request is a full page route (not livewire.update),
+     * so wire:poll re-renders do not wipe the highlighted tab.
+     */
+    protected function syncActiveRouteName(): void
+    {
+        $routeName = request()->route()?->getName();
+
+        if (is_string($routeName) && str_starts_with($routeName, 'project.application.')) {
+            $this->activeRouteName = $routeName;
+        }
     }
 
     public function checkStatus()
@@ -115,12 +132,12 @@ class Heading extends Component
                 return;
             }
 
-            return $this->redirectRoute('project.application.deployment.show', [
+            return redirectRoute($this, 'project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'application_uuid' => $this->parameters['application_uuid'],
                 'deployment_uuid' => $this->deploymentUuid,
                 'environment_uuid' => $this->parameters['environment_uuid'],
-            ], navigate: false);
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -172,12 +189,12 @@ class Heading extends Component
                 return;
             }
 
-            return $this->redirectRoute('project.application.deployment.show', [
+            return redirectRoute($this, 'project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'application_uuid' => $this->parameters['application_uuid'],
                 'deployment_uuid' => $this->deploymentUuid,
                 'environment_uuid' => $this->parameters['environment_uuid'],
-            ], navigate: false);
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -185,6 +202,8 @@ class Heading extends Component
 
     public function render()
     {
+        $this->syncActiveRouteName();
+
         return view('livewire.project.application.heading', [
             'checkboxes' => [
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],

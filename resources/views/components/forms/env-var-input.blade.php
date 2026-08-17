@@ -1,13 +1,15 @@
 <div class="w-full">
     @if ($label)
-        <label class="flex gap-1 items-center mb-1 text-sm font-medium">{{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @endif
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-        </label>
+        </div>
     @endif
 
     <div class="relative" @success.window="type = '{{ $type }}'" x-data="{
@@ -223,34 +225,22 @@
 
         @if ($type === 'password' && $allowToPeak)
             <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
-                class="flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer dark:hover:text-white"
+                class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
                 aria-label="Toggle password visibility">
-                <svg x-show="type === 'password'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
-                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                    <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
-                </svg>
-                <svg x-cloak x-show="type === 'text'" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
-                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                    <path d="M10.585 10.587a2 2 0 0 0 2.829 2.828" />
-                    <path d="M16.681 16.673a8.717 8.717 0 0 1 -4.681 1.327c-3.6 0 -6.6 -2 -9 -6c1.272 -2.12 2.712 -3.678 4.32 -4.674m2.86 -1.146a9.055 9.055 0 0 1 1.82 -.18c3.6 0 6.6 2 9 6c-.666 1.11 -1.379 2.067 -2.138 2.87" />
-                    <path d="M3 3l18 18" />
-                </svg>
+                <x-reicon name="eye" x-show="type === 'password'" class="size-[18px]" />
+                <x-reicon name="eye-off2" x-cloak x-show="type === 'text'" class="size-[18px]" />
             </button>
         @endif
 
         {{-- Dropdown for suggestions --}}
-        <div x-show="showDropdown"
-             x-transition
-             class="absolute z-[60] w-full mt-1 bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-400 rounded shadow-lg">
+        <div x-show="showDropdown" x-cloak x-transition.origin.top
+            class="listbox-panel top-full! z-[60]! mt-1! w-full! min-w-0! max-w-full!" role="listbox">
 
             <template x-if="suggestions.length === 0 && currentScope">
-                <div class="px-3 py-2 text-sm text-neutral-500 dark:text-neutral-400">
+                <div class="px-2 py-2 text-sm text-neutral-500 dark:text-fg-dim">
                     <div>No shared variables found in <span class="font-semibold" x-text="currentScope"></span> scope.</div>
                     <a :href="getScopeUrl(currentScope)"
-                       class="text-coollabs dark:text-warning hover:underline text-xs mt-1 inline-block"
+                       class="mt-1 inline-block text-xs text-coollabs hover:underline dark:text-warning"
                        target="_blank">
                         Add <span x-text="currentScope"></span> variables →
                     </a>
@@ -259,24 +249,25 @@
 
             <div x-show="suggestions.length > 0"
                  x-ref="dropdownList"
-                 class="max-h-48 overflow-y-scroll"
+                 class="max-h-48 overflow-y-auto"
                  style="scrollbar-width: thin;">
                 <template x-for="(suggestion, index) in suggestions" :key="index">
                     <div :id="'suggestion-' + index"
                          @click="selectSuggestion(suggestion)"
-                         class="px-3 py-2 cursor-pointer hover:bg-neutral-100 dark:hover:bg-coolgray-200 flex items-center gap-2"
-                         :class="{ 'bg-neutral-50 dark:bg-coolgray-300': index === selectedIndex }">
+                         class="listbox-option justify-start! gap-2.5!"
+                         :class="{ 'bg-neutral-100 dark:bg-white/[0.08]': index === selectedIndex }"
+                         role="option" :aria-selected="index === selectedIndex">
                         <template x-if="suggestion.type === 'scope'">
-                            <span class="text-xs px-2 py-0.5 bg-coollabs/10 dark:bg-warning/10 text-coollabs dark:text-warning rounded">
+                            <span class="rounded-md border border-warning/25 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-warning">
                                 SCOPE
                             </span>
                         </template>
                         <template x-if="suggestion.type === 'variable'">
-                            <span class="text-xs px-2 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded">
+                            <span class="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-emerald-600 dark:text-emerald-400">
                                 VAR
                             </span>
                         </template>
-                        <span class="text-sm font-mono" x-text="suggestion.display"></span>
+                        <span class="min-w-0 truncate font-mono text-sm" x-text="suggestion.display"></span>
                     </div>
                 </template>
             </div>

@@ -8,6 +8,7 @@ use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -23,9 +24,14 @@ class ServersController extends Controller
 {
     private function removeSensitiveDataFromSettings($settings)
     {
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            $settings = $settings->makeHidden([
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $settings = $settings->makeVisible([
                 'sentinel_token',
+                'sentinel_custom_url',
+                'logdrain_newrelic_license_key',
+                'logdrain_axiom_api_key',
+                'logdrain_custom_config',
+                'logdrain_custom_config_parser',
             ]);
         }
 
@@ -37,8 +43,11 @@ class ServersController extends Controller
         $server->makeHidden([
             'id',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
-            // Do nothing
+        if (request()->attributes->get('can_read_sensitive', false) === true) {
+            $server->makeVisible([
+                'logdrain_axiom_api_key',
+                'logdrain_newrelic_license_key',
+            ]);
         }
 
         return serializeApiResponse($server);
@@ -654,7 +663,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'connection_timeout', 'is_terminal_enabled'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -681,6 +690,7 @@ class ServersController extends Controller
             'server_disk_usage_notification_threshold' => 'integer|min:1|max:100',
             'server_disk_usage_check_frequency' => 'string',
             'connection_timeout' => 'integer|min:1|max:300',
+            'is_terminal_enabled' => 'boolean|nullable',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
         ]);
@@ -728,10 +738,23 @@ class ServersController extends Controller
             ], 422);
         }
 
+        if ($request->boolean('is_build_server') && ! $server->isBuildServer() && ! $server->isEmpty()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['is_build_server' => ['A server with existing resources cannot be configured as a build server.']],
+            ], 422);
+        }
+
         $server->update($updateFields);
         if ($request->has('is_build_server')) {
             $server->settings()->update([
                 'is_build_server' => $request->boolean('is_build_server'),
+            ]);
+        }
+
+        if ($request->has('is_terminal_enabled')) {
+            $server->settings()->update([
+                'is_terminal_enabled' => $request->boolean('is_terminal_enabled'),
             ]);
         }
 
@@ -835,7 +858,7 @@ class ServersController extends Controller
         if ($server->definedResources()->count() > 0 && ! $force) {
             return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
-        if ($server->isLocalhost()) {
+        if ($server->is_coolify_host) {
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
 
@@ -854,7 +877,11 @@ class ServersController extends Controller
             false, // Don't delete from Hetzner via API
             $server->hetzner_server_id,
             $server->cloud_provider_token_id,
-            $server->team_id
+            $server->team_id,
+            false, // Don't delete from Vultr via API
+            $server->vultr_instance_id,
+            false, // Don't delete from DigitalOcean via API
+            $server->digitalocean_droplet_id
         );
 
         auditLog('api.server.deleted', [
@@ -868,7 +895,7 @@ class ServersController extends Controller
         return response()->json(['message' => 'Server deleted.']);
     }
 
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Validate',
         description: 'Validate server by UUID.',
         path: '/servers/{uuid}/validate',
@@ -880,6 +907,19 @@ class ServersController extends Controller
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
         ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(
+                        property: 'install',
+                        description: 'Install missing prerequisites and Docker. This can restart the Docker daemon.',
+                        type: 'boolean',
+                        default: false,
+                    ),
+                ],
+            ),
+        ),
         responses: [
             new OA\Response(
                 response: 201,
@@ -929,14 +969,39 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $this->authorize('update', $server);
-        ValidateServer::dispatch($server);
+
+        if (! $server->canBeValidated()) {
+            return response()->json([
+                'message' => 'This server was transferred to another Coolify instance and cannot be revalidated here.',
+            ], 422);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'install' => 'boolean',
+        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $install = $request->boolean('install', false);
+        if ($install) {
+            ValidateAndInstallServerJob::dispatch($server);
+        } else {
+            ValidateServer::dispatch($server);
+        }
 
         auditLog('api.server.validated', [
             'team_id' => $teamId,
             'server_uuid' => $server->uuid,
             'server_name' => $server->name,
+            'install' => $install,
         ]);
 
-        return response()->json(['message' => 'Validation started.'], 201);
+        $message = $install ? 'Validation and installation started.' : 'Validation started.';
+
+        return response()->json(['message' => $message], 201);
     }
 }

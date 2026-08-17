@@ -16,6 +16,10 @@ class SecurityController extends Controller
             $team->makeHidden([
                 'private_key',
             ]);
+        } else {
+            $team->makeVisible([
+                'private_key',
+            ]);
         }
 
         return serializeApiResponse($team);

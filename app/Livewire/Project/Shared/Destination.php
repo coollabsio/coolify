@@ -118,9 +118,8 @@ class Destination extends Component
             $server = Server::ownedByCurrentTeam()->findOrFail($server_id);
             $network = StandaloneDocker::ownedByCurrentTeam()->where('server_id', $server->id)->findOrFail($network_id);
             $this->authorize('update', $this->resource);
-
             $this->resource->getConnection()->transaction(function () use ($network, $server) {
-                $main_destination = $this->resource->destination;
+                $mainDestination = $this->resource->destination;
                 $this->resource->update([
                     'destination_id' => $network->id,
                     'destination_type' => StandaloneDocker::class,
@@ -128,7 +127,7 @@ class Destination extends Component
                 $this->resource->additional_networks()
                     ->wherePivot('server_id', $server->id)
                     ->detach($network->id);
-                $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
+                $this->resource->additional_networks()->attach($mainDestination->id, ['server_id' => $mainDestination->server->id]);
             });
             $this->resource->refresh();
             $this->refreshServers();

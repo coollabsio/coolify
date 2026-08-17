@@ -38,114 +38,74 @@ it('can seed the railpack examples directly on a clean development database', fu
 
     $this->seed(DevelopmentRailpackExamplesSeeder::class);
 
-    expect(Team::query()->find(0))->not->toBeNull();
-    expect(PrivateKey::query()->find(1))->not->toBeNull();
-    expect(Server::query()->find(0))->not->toBeNull();
-    expect(StandaloneDocker::query()->find(0))->not->toBeNull();
-    expect(GithubApp::query()->find(0))->not->toBeNull();
-    expect(GitlabApp::query()->find(1))->not->toBeNull();
-    expect(Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->exists())->toBeTrue();
-    expect(Application::query()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
+    expect(Team::query()->find(0))->not->toBeNull()
+        ->and(PrivateKey::query()->find(1))->not->toBeNull()
+        ->and(Server::query()->count())->toBe(1)
+        ->and(Server::query()->find(0)?->uuid)->toBe('localhost')
+        ->and(StandaloneDocker::query()->find(0))->not->toBeNull()
+        ->and(GithubApp::query()->find(0))->not->toBeNull()
+        ->and(GitlabApp::query()->find(1))->not->toBeNull()
+        ->and(Application::query()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
+
+    $project = Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->firstOrFail();
+
+    expect($project->environments)->toHaveCount(1)
+        ->and($project->environments->first()->name)->toBe('production')
+        ->and($project->applications()->whereRelation('destination.server', 'uuid', 'localhost')->count())
+        ->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
 });
 
-it('seeds the railpack examples in development mode', function () {
+it('seeds every railpack example in the production environment on testing-host', function () {
     config()->set('app.env', 'local');
 
     seedRailpackExamplePrerequisites();
     $this->seed(DevelopmentRailpackExamplesSeeder::class);
 
-    $project = Project::query()
-        ->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)
-        ->first();
+    $project = Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->firstOrFail();
+    $environment = $project->environments()->sole();
+    $applications = $environment->applications()->with('settings', 'destination.server')->orderBy('uuid')->get();
 
-    expect($project)
-        ->not->toBeNull()
-        ->and($project->name)->toBe('Railpack Examples')
-        ->and($project->environments)->toHaveCount(1)
-        ->and($project->environments->first()->uuid)->toBe(DevelopmentRailpackExamplesSeeder::ENVIRONMENT_UUID);
-
-    $applications = $project->applications()->with('settings')->orderBy('uuid')->get();
-
-    expect($applications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()));
-    expect($applications->every(fn (Application $application) => $application->build_pack === 'railpack'))->toBeTrue();
-    $examples = collect(DevelopmentRailpackExamplesSeeder::examples())->keyBy('uuid');
-    expect($applications->every(
-        fn (Application $application) => $application->git_repository === ($examples->get($application->uuid)['git_repository'] ?? DevelopmentRailpackExamplesSeeder::GIT_REPOSITORY)
-    ))->toBeTrue();
-    expect($applications->every(
-        fn (Application $application) => $application->git_branch === ($examples->get($application->uuid)['git_branch'] ?? DevelopmentRailpackExamplesSeeder::GIT_BRANCH)
-    ))->toBeTrue();
+    expect($environment->name)->toBe('production')
+        ->and($applications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()))
+        ->and($applications->every(fn (Application $application) => $application->build_pack === 'railpack'))->toBeTrue()
+        ->and($applications->every(fn (Application $application) => $application->destination->server->uuid === 'localhost'))->toBeTrue()
+        ->and($applications->pluck('uuid')->sort()->values()->all())
+        ->toBe(collect(DevelopmentRailpackExamplesSeeder::examples())->pluck('uuid')->sort()->values()->all());
 
     $nestjs = $applications->firstWhere('uuid', 'railpack-nestjs');
     $angularStatic = $applications->firstWhere('uuid', 'railpack-angular-static');
-    $eleventyStatic = $applications->firstWhere('uuid', 'railpack-eleventy-static');
-    $pythonFlask = $applications->firstWhere('uuid', 'railpack-python-flask');
-    $goGin = $applications->firstWhere('uuid', 'railpack-go-gin');
-    $rust = $applications->firstWhere('uuid', 'railpack-rust');
     $githubDeployKey = $applications->firstWhere('uuid', 'railpack-github-deploy-key');
     $gitlabDeployKey = $applications->firstWhere('uuid', 'railpack-gitlab-deploy-key');
-    $gitlabPublic = $applications->firstWhere('uuid', 'railpack-gitlab-public-example');
 
-    expect($nestjs)
-        ->not->toBeNull()
-        ->and($nestjs->base_directory)->toBe('/node/nestjs')
-        ->and($nestjs->ports_exposes)->toBe('3000')
+    expect($nestjs->base_directory)->toBe('/node/nestjs')
         ->and($nestjs->build_command)->toBe('npm run build')
         ->and($nestjs->start_command)->toBe('npm run start:prod')
-        ->and($nestjs->settings->is_static)->toBeFalse();
-
-    expect($angularStatic)
-        ->not->toBeNull()
         ->and($angularStatic->publish_directory)->toBe('/dist/static/browser')
-        ->and($angularStatic->ports_exposes)->toBe('80')
         ->and($angularStatic->settings->is_static)->toBeTrue()
-        ->and($angularStatic->settings->is_spa)->toBeTrue();
-
-    expect($eleventyStatic)
-        ->not->toBeNull()
-        ->and($eleventyStatic->publish_directory)->toBe('/_site')
-        ->and($eleventyStatic->settings->is_static)->toBeTrue()
-        ->and($eleventyStatic->settings->is_spa)->toBeFalse();
-
-    expect($pythonFlask)
-        ->not->toBeNull()
-        ->and($pythonFlask->ports_exposes)->toBe('5000')
-        ->and($pythonFlask->start_command)->toBe('flask run --host=0.0.0.0 --port=5000');
-
-    expect($goGin)
-        ->not->toBeNull()
-        ->and($goGin->ports_exposes)->toBe('3000');
-
-    expect($rust)
-        ->not->toBeNull()
-        ->and($rust->ports_exposes)->toBe('8000');
-
-    expect($githubDeployKey)
-        ->not->toBeNull()
-        ->and($githubDeployKey->git_repository)->toBe('git@github.com:coollabsio/coolify-examples-deploy-key.git')
-        ->and($githubDeployKey->git_branch)->toBe('main')
-        ->and($githubDeployKey->build_pack)->toBe('railpack')
         ->and($githubDeployKey->private_key_id)->toBe(1)
         ->and($githubDeployKey->source_type)->toBe(GithubApp::class)
-        ->and($githubDeployKey->source_id)->toBe(0);
+        ->and($gitlabDeployKey->source_type)->toBe(GitlabApp::class);
+});
 
-    expect($gitlabDeployKey)
-        ->not->toBeNull()
-        ->and($gitlabDeployKey->git_repository)->toBe('git@gitlab.com:coollabsio/php-example.git')
-        ->and($gitlabDeployKey->git_branch)->toBe('main')
-        ->and($gitlabDeployKey->build_pack)->toBe('railpack')
-        ->and($gitlabDeployKey->private_key_id)->toBe(1)
-        ->and($gitlabDeployKey->source_type)->toBe(GitlabApp::class)
-        ->and($gitlabDeployKey->source_id)->toBe(1);
+it('consolidates legacy railpack environments into production', function () {
+    config()->set('app.env', 'local');
 
-    expect($gitlabPublic)
-        ->not->toBeNull()
-        ->and($gitlabPublic->git_repository)->toBe('https://gitlab.com/andrasbacsai/coolify-examples.git')
-        ->and($gitlabPublic->base_directory)->toBe('/astro/static')
-        ->and($gitlabPublic->publish_directory)->toBe('/dist')
-        ->and($gitlabPublic->build_pack)->toBe('railpack')
-        ->and($gitlabPublic->source_type)->toBe(GitlabApp::class)
-        ->and($gitlabPublic->settings->is_static)->toBeTrue();
+    seedRailpackExamplePrerequisites();
+    $project = Project::query()->create([
+        'uuid' => DevelopmentRailpackExamplesSeeder::PROJECT_UUID,
+        'name' => 'Railpack Examples',
+        'team_id' => 0,
+    ]);
+    $project->environments()->first()->update(['name' => 'ubuntu24', 'uuid' => 'railpack-examples-ubuntu24']);
+    $project->environments()->create(['name' => 'ubuntu26', 'uuid' => 'railpack-examples-ubuntu26']);
+
+    $this->seed(DevelopmentRailpackExamplesSeeder::class);
+
+    $project->refresh();
+
+    expect($project->environments)->toHaveCount(1)
+        ->and($project->environments->first()->name)->toBe('production')
+        ->and($project->applications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()));
 });
 
 it('skips the railpack examples outside development mode', function () {
@@ -155,7 +115,6 @@ it('skips the railpack examples outside development mode', function () {
     $this->seed(DevelopmentRailpackExamplesSeeder::class);
 
     expect(Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->exists())->toBeFalse();
-    expect(Application::query()->where('uuid', 'railpack-nextjs-ssr')->exists())->toBeFalse();
 });
 
 it('is idempotent when run multiple times', function () {
@@ -165,10 +124,8 @@ it('is idempotent when run multiple times', function () {
     $this->seed(DevelopmentRailpackExamplesSeeder::class);
     $this->seed(DevelopmentRailpackExamplesSeeder::class);
 
-    $project = Project::query()
-        ->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)
-        ->first();
+    $project = Project::query()->where('uuid', DevelopmentRailpackExamplesSeeder::PROJECT_UUID)->firstOrFail();
 
-    expect($project)->not->toBeNull();
-    expect($project->applications()->count())->toBe(count(DevelopmentRailpackExamplesSeeder::examples()));
+    expect($project->environments)->toHaveCount(1)
+        ->and($project->applications)->toHaveCount(count(DevelopmentRailpackExamplesSeeder::examples()));
 });

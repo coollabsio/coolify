@@ -286,6 +286,7 @@ class Advanced extends Component
             $this->application->settings->save();
 
             $this->dispatch('success', 'Stop grace period updated.');
+            $this->dispatch('configurationChanged');
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {

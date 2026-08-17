@@ -9,7 +9,7 @@ trait SummarizesDiffText
      * worth expanding. Kept as one constant so the snapshot summary and the
      * differ's expand decision never drift apart.
      */
-    private const SINGLE_LINE_LIMIT = 120;
+    private const SINGLE_LINE_LIMIT = 40;
 
     /**
      * Returns the value only when it is worth expanding (multi-line or longer

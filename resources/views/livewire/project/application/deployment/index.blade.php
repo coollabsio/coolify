@@ -1,183 +1,275 @@
 <div>
-    <x-slot:title>{{ data_get_str($application, 'name')->limit(10) }} > Deployments | Coolify</x-slot>
-    <h1>Deployments</h1>
-    <livewire:project.shared.configuration-checker :resource="$application" />
-    <livewire:project.application.heading :application="$application" />
-    <div class="flex flex-col gap-2 pb-10" @if (!$skip) wire:poll.5000ms='reloadDeployments' @endif>
-        <div class="flex items-end gap-2">
-            <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
-            @if ($deployments_count > 0)
-                <div class="flex items-center gap-2">
-                    <x-forms.button disabled="{{ !$showPrev }}" wire:click="previousPage('{{ $defaultTake }}')">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24">
-                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2" d="m14 6l-6 6l6 6z" />
-                        </svg>
-                    </x-forms.button>
-                    <span class="text-sm text-gray-600 dark:text-gray-400 px-2">
-                        Page {{ $currentPage }} of {{ ceil($deployments_count / $defaultTake) }}
-                    </span>
-                    <x-forms.button disabled="{{ !$showNext }}" wire:click="nextPage('{{ $defaultTake }}')">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24">
-                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2" d="m10 18l6-6l-6-6z" />
-                        </svg>
-                    </x-forms.button>
-                </div>
-            @endif
-        </div>
-        <form class="flex items-end gap-2">
-            <x-forms.input id="pull_request_id" type="number" min="1" label="Pull Request Id"></x-forms.input>
-            <x-forms.button type="submit">Filter</x-forms.button>
-            @if ($pull_request_id)
-                <x-forms.button type="button" wire:click="clearFilter">Clear</x-forms.button>
-            @endif
-        </form>
-        @forelse ($deployments as $deployment)
-            <div @class([
-                'p-2 border-l-2 bg-white dark:bg-coolgray-100',
-                'border-blue-500/50 border-dashed' =>
-                    data_get($deployment, 'status') === 'in_progress',
-                'border-purple-500/50 border-dashed' =>
-                    data_get($deployment, 'status') === 'queued',
-                'border-white border-dashed' =>
-                    data_get($deployment, 'status') === 'cancelled-by-user',
-                'border-error' => data_get($deployment, 'status') === 'failed',
-                'border-success' => data_get($deployment, 'status') === 'finished',
-            ])>
-                <a href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}" {{ wireNavigate() }} class="block">
-                    <div class="flex flex-col">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span @class([
-                                'px-3 py-1 rounded-md text-xs font-medium shadow-xs',
-                                'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' =>
-                                    data_get($deployment, 'status') === 'in_progress',
-                                'bg-purple-100/80 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300' =>
-                                    data_get($deployment, 'status') === 'queued',
-                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' =>
-                                    data_get($deployment, 'status') === 'failed',
-                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' =>
-                                    data_get($deployment, 'status') === 'finished',
-                                'bg-gray-100 text-gray-700 dark:bg-gray-600/30 dark:text-gray-300' =>
-                                    data_get($deployment, 'status') === 'cancelled-by-user',
-                            ])>
-                                @php
-                                    $statusText = match (data_get($deployment, 'status')) {
-                                        'finished' => 'Success',
-                                        'in_progress' => 'In Progress',
-                                        'cancelled-by-user' => 'Cancelled',
-                                        'queued' => 'Queued',
-                                        default => ucfirst(data_get($deployment, 'status')),
-                                    };
-                                @endphp
-                                {{ $statusText }}
-                            </span>
-                        </div>
-                        @if (data_get($deployment, 'status') !== 'queued')
-                            <div class="text-gray-600 dark:text-gray-400 text-sm">
-                                Started:
-                                {{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}
-                                @if ($deployment->status !== 'in_progress' && $deployment->status !== 'cancelled-by-user')
-                                    <br>Ended:
-                                    {{ formatDateInServerTimezone(data_get($deployment, 'finished_at'), data_get($application, 'destination.server')) }}
-                                    <br>Duration:
-                                    {{ calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'finished_at')) }}
-                                    <br>Finished
-                                    {{ \Carbon\Carbon::parse(data_get($deployment, 'finished_at'))->diffForHumans() }}
-                                @elseif($deployment->status === 'in_progress')
-                                    <br>Running for:
-                                    {{ calculateDuration(data_get($deployment, 'created_at'), now()) }}
-                                @endif
-                            </div>
-                        @endif
+    @unless ($embedded)
+        <x-slot:title>{{ data_get_str($application, 'name')->limit(10) }} > Deployments | Coolify</x-slot>
+        <livewire:project.shared.configuration-checker :resource="$application" />
+        <livewire:project.application.heading :application="$application" wire:key="application-heading-deployment-index" />
+    @endunless
 
-                        <div class="text-gray-600 dark:text-gray-400 text-sm mt-2">
-                            @if (data_get($deployment, 'commit'))
-                                <div x-data="{ expanded: false }">
-                                    <div class="flex items-center gap-2">
-                                        <span class="font-medium">Commit:</span>
-                                        <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
-                                            target="_blank" class="underline">
-                                            {{ substr(data_get($deployment, 'commit'), 0, 7) }}
-                                        </a>
-                                        @if (!$deployment->commitMessage())
-                                            <span
-                                                class="bg-gray-200/70 dark:bg-gray-600/20 px-2 py-0.5 rounded-md text-xs text-gray-800 dark:text-gray-100 border border-gray-400/30">
-                                                @if (data_get($deployment, 'is_webhook'))
-                                                    Webhook
-                                                    @if (data_get($deployment, 'pull_request_id'))
-                                                        | Pull Request #{{ data_get($deployment, 'pull_request_id') }}
-                                                    @endif
-                                                @elseif (data_get($deployment, 'pull_request_id'))
-                                                    Pull Request #{{ data_get($deployment, 'pull_request_id') }}
-                                                @elseif (data_get($deployment, 'rollback') === true)
-                                                    Rollback
-                                                @elseif (data_get($deployment, 'is_api'))
-                                                    API
-                                                @else
-                                                    Manual
-                                                @endif
-                                            </span>
-                                        @endif
-                                        @if ($deployment->commitMessage())
-                                            <span class="text-gray-600 dark:text-gray-400">-</span>
-                                            <a href="{{ $application->gitCommitLink(data_get($deployment, 'commit')) }}"
-                                                target="_blank"
-                                                class="text-gray-600 dark:text-gray-400 truncate max-w-md underline">
-                                                {{ Str::before($deployment->commitMessage(), "\n") }}
-                                            </a>
-                                            @if ($deployment->commitMessage() !== Str::before($deployment->commitMessage(), "\n"))
-                                                <button @click="expanded = !expanded"
-                                                    class="text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                                                    <svg x-bind:class="{ 'rotate-180': expanded }"
-                                                        class="w-4 h-4 transition-transform" viewBox="0 0 24 24">
-                                                        <path fill="none" stroke="currentColor"
-                                                            stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2" d="m6 9l6 6l6-6" />
-                                                    </svg>
-                                                </button>
+    @php
+        $lastPage = max(1, (int) ceil($deployments_count / $defaultTake));
+        $firstVisibleRow = $deployments_count === 0 ? 0 : $skip + 1;
+        $lastVisibleRow = min($skip + $deployments->count(), $deployments_count);
+        $hasActiveFilter = count($deploymentFilters) > 0 || filled($pull_request_id);
+        $hasActiveQuery = trim($search) !== '' || $hasActiveFilter;
+    @endphp
+
+    <section @class([
+        'application-settings-workspace w-full',
+        'mt-4 max-w-none lg:mt-0' => ! $embedded,
+    ])>
+        <div @class([
+            'min-w-0',
+            'grid gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8' => ! $embedded,
+        ])>
+            @unless ($embedded)
+                <x-application.configuration-sidebar :application="$application"
+                    current-route="project.application.deployment.index" />
+            @endunless
+
+            <div class="application-settings-form min-w-0"
+        @if (!$skip) wire:poll.5000ms="reloadDeployments" @endif>
+        <x-application.settings-section title="Deployment history"
+            helper="Search, filter, and open a deployment to inspect its build logs." flush>
+            <x-table.toolbar class="border-b border-neutral-200 p-3 dark:border-white/[0.08]">
+                <x-slot:search>
+                    <x-table.search placeholder="Search deployments" loading-target="search"
+                        wire:model.live.debounce.300ms="search" />
+                </x-slot:search>
+                <x-table.filter :active-count="count($deploymentFilters) + (filled($pull_request_id) ? 1 : 0)"
+                    reset-action="clearFilter">
+                            @if (count($statusFilterOptions) > 0)
+                                <span
+                                    class="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Status</span>
+                                @foreach ($statusFilterOptions as $option)
+                                    <button type="button" class="listbox-option" role="option"
+                                        aria-selected="{{ in_array($option['value'], $deploymentFilters, true) ? 'true' : 'false' }}"
+                                        wire:click="toggleDeploymentFilter('{{ $option['value'] }}')">
+                                        <span>{{ $option['label'] }}</span>
+                                        @php
+                                            $selected = in_array($option['value'], $deploymentFilters, true);
+                                        @endphp
+                                        <span @class([
+                                            'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                            'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
+                                        ])>
+                                            @if ($selected)
+                                                <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
                                             @endif
-                                            <span
-                                                class="bg-gray-200/70 dark:bg-gray-600/20 px-2 py-0.5 rounded-md text-xs text-gray-800 dark:text-gray-100 border border-gray-400/30">
-                                                @if (data_get($deployment, 'is_webhook'))
-                                                    Webhook
-                                                    @if (data_get($deployment, 'pull_request_id'))
-                                                        | Pull Request #{{ data_get($deployment, 'pull_request_id') }}
-                                                    @endif
-                                                @elseif (data_get($deployment, 'pull_request_id'))
-                                                    Pull Request #{{ data_get($deployment, 'pull_request_id') }}
-                                                @elseif (data_get($deployment, 'rollback') === true)
-                                                    Rollback
-                                                @elseif (data_get($deployment, 'is_api'))
-                                                    API
-                                                @else
-                                                    Manual
-                                                @endif
-                                            </span>
-                                        @endif
-                                    </div>
-                                    @if ($deployment->commitMessage())
-                                        <div x-show="expanded" x-transition:enter="transition ease-out duration-200"
-                                            x-transition:enter-start="opacity-0 transform -translate-y-2"
-                                            x-transition:enter-end="opacity-100 transform translate-y-0"
-                                            class="mt-2 ml-4 text-gray-600 dark:text-gray-400">
-                                            {{ Str::after($deployment->commitMessage(), "\n") }}
-                                        </div>
-                                    @endif
-                                </div>
+                                        </span>
+                                    </button>
+                                @endforeach
                             @endif
+
+                            @if (count($sourceFilterOptions) > 0)
+                                <span
+                                    class="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Source</span>
+                                @foreach ($sourceFilterOptions as $option)
+                                    <button type="button" class="listbox-option" role="option"
+                                        aria-selected="{{ in_array($option['value'], $deploymentFilters, true) ? 'true' : 'false' }}"
+                                        wire:click="toggleDeploymentFilter('{{ $option['value'] }}')">
+                                        <span>{{ $option['label'] }}</span>
+                                        @php
+                                            $selected = in_array($option['value'], $deploymentFilters, true);
+                                        @endphp
+                                        <span @class([
+                                            'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                            'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
+                                        ])>
+                                            @if ($selected)
+                                                <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            @endif
+                                        </span>
+                                    </button>
+                                @endforeach
+                            @endif
+
+                            @if (count($serverFilterOptions) > 0)
+                                <span
+                                    class="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Server</span>
+                                @foreach ($serverFilterOptions as $option)
+                                    <button type="button" class="listbox-option" role="option"
+                                        aria-selected="{{ in_array($option['value'], $deploymentFilters, true) ? 'true' : 'false' }}"
+                                        wire:click="toggleDeploymentFilter('{{ $option['value'] }}')">
+                                        <span class="truncate">{{ $option['label'] }}</span>
+                                        @php
+                                            $selected = in_array($option['value'], $deploymentFilters, true);
+                                        @endphp
+                                        <span @class([
+                                            'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
+                                            'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                            'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
+                                        ])>
+                                            @if ($selected)
+                                                <svg class="size-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                    <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                </svg>
+                                            @endif
+                                        </span>
+                                    </button>
+                                @endforeach
+                            @endif
+
+                            @if (count($pullRequestOptions) > 1)
+                                <span
+                                    class="px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Pull request</span>
+                                @foreach (array_slice($pullRequestOptions, 1) as $option)
+                                    <button type="button" class="listbox-option" role="option"
+                                        aria-selected="{{ $pull_request_id === $option['value'] ? 'true' : 'false' }}"
+                                        wire:click="setPullRequestFilter('{{ $option['value'] }}')"
+                                        @click="open = false">
+                                        <span>{{ $option['label'] }}</span>
+                                        @if ($pull_request_id === $option['value'])
+                                            <svg class="size-3.5 shrink-0" viewBox="0 0 24 24"
+                                                fill="none">
+                                                <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
+                                                    stroke-width="2.5" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        @endif
+                                    </button>
+                                @endforeach
+                            @endif
+                </x-table.filter>
+                <x-table.sort>
+                            @foreach ([
+                                'newest' => 'Newest first',
+                                'oldest' => 'Oldest first',
+                            ] as $sortValue => $sortLabel)
+                                <button type="button" class="listbox-option" role="option"
+                                    aria-selected="{{ $deploymentSort === $sortValue ? 'true' : 'false' }}"
+                                    wire:click="setDeploymentSort('{{ $sortValue }}')"
+                                    @click="open = false">
+                                    <span>{{ $sortLabel }}</span>
+                                    @if ($deploymentSort === $sortValue)
+                                        <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                                            <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
+                                                stroke-width="2.5" stroke-linecap="round"
+                                                stroke-linejoin="round" />
+                                        </svg>
+                                    @endif
+                                </button>
+                            @endforeach
+                </x-table.sort>
+            </x-table.toolbar>
+
+            @if ($deployments->isNotEmpty())
+                <div class="data-table relative w-full transition-opacity"
+                    wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="goToPage,previousPage,nextPage,toggleDeploymentFilter,clearFilter,setPullRequestFilter">
+                    <x-table.loading id="deployment-table-filter-loading"
+                        target="toggleDeploymentFilter,clearFilter,setPullRequestFilter"
+                        text="Filtering deployments..." class="rounded-lg" />
+                    <div class="deployment-table-scroll">
+                        <div class="data-table-header deployment-table-grid rounded-none!">
+                            <span>Status</span>
+                            <span>Source</span>
+                            <span>Commit</span>
+                            <span>Started</span>
+                            <span>Duration</span>
+                            <span>Server</span>
                         </div>
 
-                        @if (data_get($deployment, 'server_name') && $application->additional_servers->count() > 0)
-                            <div class="text-gray-600 dark:text-gray-400 text-sm mt-2">
-                                Server: {{ data_get($deployment, 'server_name') }}
-                            </div>
-                        @endif
+                        @foreach ($deployments as $deployment)
+                        @php
+                            $deploymentStatus = data_get($deployment, 'status');
+                            $statusLabel = match ($deploymentStatus) {
+                                'finished' => 'Success',
+                                'in_progress' => 'In progress',
+                                'cancelled-by-user' => 'Cancelled',
+                                'queued' => 'Queued',
+                                default => str($deploymentStatus)->headline()->toString(),
+                            };
+                            $statusType = match ($deploymentStatus) {
+                                'finished' => 'success',
+                                'in_progress', 'queued' => 'warning',
+                                'failed' => 'error',
+                                default => 'neutral',
+                            };
+                            $pullRequestId = (int) data_get($deployment, 'pull_request_id', 0);
+                            $sourceLabel = match (true) {
+                                (bool) data_get($deployment, 'is_webhook') && $pullRequestId > 0 => 'Webhook · PR #' . $pullRequestId,
+                                (bool) data_get($deployment, 'is_webhook') => 'Webhook',
+                                $pullRequestId > 0 => 'Pull request #' . $pullRequestId,
+                                (bool) data_get($deployment, 'rollback') => 'Rollback',
+                                (bool) data_get($deployment, 'is_api') => 'API',
+                                default => 'Manual',
+                            };
+                            $duration = match ($deploymentStatus) {
+                                'queued' => 'Waiting',
+                                'in_progress' => calculateDuration(data_get($deployment, 'created_at'), now()),
+                                default => data_get($deployment, 'finished_at')
+                                    ? calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'finished_at'))
+                                    : '-',
+                            };
+                            $commitMessage = $deployment->commitMessage()
+                                ? Str::before($deployment->commitMessage(), "\n")
+                                : null;
+                        @endphp
+                        <a wire:key="deployment-{{ data_get($deployment, 'deployment_uuid') }}"
+                            href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
+                            {{ wireNavigate() }}
+                            @class([
+                                'data-table-row deployment-table-grid border-b border-neutral-200 text-[13px] text-neutral-600 dark:border-white/[0.08] dark:text-fg-dim',
+                                'data-table-row-active' => $selectedDeploymentUuid === data_get($deployment, 'deployment_uuid'),
+                            ])>
+                            <span><x-status-badge :status="$statusLabel" :type="$statusType" /></span>
+                            <span>{{ $sourceLabel }}</span>
+                            <span class="min-w-0">
+                                @if (data_get($deployment, 'commit'))
+                                    <span class="flex min-w-0 items-center gap-2">
+                                        <span class="shrink-0 font-mono text-xs text-neutral-950 dark:text-fg">
+                                            {{ substr(data_get($deployment, 'commit'), 0, 7) }}
+                                        </span>
+                                        @if ($commitMessage)
+                                            <span class="truncate text-neutral-500 dark:text-fg-faint"
+                                                title="{{ $commitMessage }}">{{ $commitMessage }}</span>
+                                        @endif
+                                    </span>
+                                @else
+                                    <span class="text-neutral-400 dark:text-fg-faint">-</span>
+                                @endif
+                            </span>
+                            <span title="{{ formatDateInServerTimezone(data_get($deployment, 'created_at'), data_get($application, 'destination.server')) }}">
+                                {{ \Carbon\Carbon::parse(data_get($deployment, 'created_at'))->diffForHumans() }}
+                            </span>
+                            <span class="tabular-nums">{{ $duration }}</span>
+                            <span class="truncate">
+                                {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
+                            </span>
+                        </a>
+                        @endforeach
                     </div>
-                </a>
-            </div>
-        @empty
-            <div>No deployments found</div>
-        @endforelse
+
+                    <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$deployments_count"
+                        :current-page="$currentPage" :last-page="$lastPage"
+                        wire-target="goToPage,previousPage,nextPage" first-action="goToPage(1)"
+                        previous-action="previousPage" next-action="nextPage"
+                        last-action="goToPage({{ $lastPage }})">
+                        @unless ($embedded)
+                            <x-slot:pageSize>
+                                <x-page-size-select model="defaultTake" livewire storage-key="coolify.page-size.deployments" />
+                            </x-slot:pageSize>
+                        @endunless
+                    </x-table-pagination>
+                </div>
+            @else
+                <x-empty size="sm" title="No deployments found"
+                    :description="$hasActiveQuery
+                        ? 'No deployments match the current search and filters.'
+                        : 'Deploy the application to create its first deployment record.'"
+                    icon-name="layers" />
+            @endif
+        </x-application.settings-section>
     </div>
+        </div>
+    </section>
 </div>

@@ -8,7 +8,7 @@ Coolify is an open-source, self-hostable PaaS (alternative to Heroku/Netlify/Ver
 
 ## Design Reference
 
-For UI/UX design specifications, principles, and visual standards, consult `DESIGN.md` in the [coollabsio/architecture](https://github.com/coollabsio/architecture) repo.
+For UI/UX design specifications, principles, and visual standards, consult the local [`DESIGN.md`](DESIGN.md). It is the source of truth for frontend design work in this repository.
 
 ## Development Environment
 
@@ -16,11 +16,38 @@ Docker Compose-based dev setup with services: coolify (app), postgres, redis, so
 
 ```bash
 # Start dev environment (uses docker-compose.dev.yml)
-spin up                          # or: docker compose -f docker-compose.dev.yml up -d
-spin down                        # stop services
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down                        # stop services
+
+# Two local Coolify instances (isolated stacks; server transfer / multi-control-plane)
+./scripts/dev-instances up                   # a:8000 + b:8001 (uses npm run build for CSS/JS)
+./scripts/dev-instances up a --with vite     # HMR only when starting a single instance
+./scripts/dev-instances urls
+./scripts/dev-instances down
+# Compose: docker-compose.dev-multi.yml  Env: .dev-instances/{a,b}.env (gitignored)
+# Note: dual Vite HMR is unsupported (shared public/hot); multi-instance always uses public/build.
 ```
 
-The app runs at `localhost:8000` by default. Vite dev server on port 5173.
+The app runs at `localhost:8000` by default. Instance **b** is on `8001` (db `5433`, redis `6380`, …); see `./scripts/dev-instances`.
+
+## Testing the Self-Hosted Upgrade Process
+
+Use the following workflow to test a self-hosted upgrade:
+
+1. Install the source version with the upgrade script:
+
+   ```bash
+   bash upgrade.sh sha-6492d081362c009519481ac70e50873e39ba1861
+   ```
+
+2. Set the current Coolify version and rebuild the cached configuration:
+
+   ```bash
+   docker exec -e COOLIFY_VERSION=4.3.0 coolify php artisan config:cache
+   ```
+
+3. In the Coolify UI, click **Check for Updates**.
+4. Confirm that an upgrade is available, then click **Upgrade** and verify that the upgrade completes successfully.
 
 ## Common Commands
 
@@ -114,6 +141,23 @@ function loginAsRoot(): mixed
 - **Project/Environment** — Organizational hierarchy: Team → Project → Environment → Resources.
 - **Proxy** — Traefik reverse proxy managed per server.
 
+### Instance sentinels (`id = 0`)
+
+Coolify seeds **instance-owned** rows at primary key `0`. That value is a sentinel meaning “this is the Coolify instance itself”, not a normal autoincrement id. Do not migrate, resequence, or “fix” these to a positive id.
+
+| Record | Model / lookup | Meaning |
+|---|---|---|
+| Root team | `Team::find(0)`, `team_id === 0` | Instance / root team. Cloud billing and many skip-checks exempt `team_id === 0`. |
+| Localhost server | `Server::find(0)` / `findOrFail(0)` | The machine running Coolify. Upgrades, instance backups, and docker inspect target this server. |
+| Instance settings | `InstanceSettings` with `id = 0` | Singleton settings row. Tests must seed `InstanceSettings::create(['id' => 0])` (or `forceCreate`). |
+| Instance Postgres | `StandalonePostgresql` `id = 0`, name `coolify-db` | Coolify’s own database. UI treats `database_id === 0` as the instance DB (e.g. hide delete on backup screens). |
+| Local docker dest | `StandaloneDocker` `id = 0` | Destination on the localhost server (`destination_id = 0`). |
+| Root user / default GitHub App | seeders | First-install defaults. |
+
+**Do not assign `id = 0` to new or non-instance rows.** In particular, `ScheduledDatabaseBackup` and `ScheduledTask` are ordinary schedules. Legacy installs may still have a `coolify-db` backup at `id = 0`; resolve that backup via the `coolify-db` relation / uuid, not `ScheduledDatabaseBackup::find(0)`.
+
+`0` is a PHP/Eloquent landmine (`empty(0)` is true; keyset pagination `where('id', '>', $cursor)` starting at `0` skips the row). Queries that page by id must include `id = 0` on the first page (no lower bound, or cursor `< 0`). Prefer `chunkById()` over a hand-rolled `id > 0` cursor.
+
 ### Frontend
 - Livewire 3 components with Alpine.js for client-side interactivity
 - Blade templates in `resources/views/livewire/`
@@ -135,12 +179,13 @@ function loginAsRoot(): mixed
 - Run `vendor/bin/pint --dirty --format agent` before finalizing changes
 - Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
 - Check sibling files for conventions before creating new files
+- When adding remote shell commands, account for servers using non-root SSH users: commands pass through `parseCommandsByLineForSudo()`, so test pipelines, redirects, substitutions, and `sh -c`/`bash -c` scripts with the non-root sudo parser.
 
 ## Git Workflow
 
-- Main branch: `v4.x`
+- Production branch: `main`
 - Development branch: `next`
-- PRs should target `v4.x`
+- Fix PRs should target the current production branch; feature PRs should target `next`
 
 <laravel-boost-guidelines>
 === foundation rules ===
@@ -167,7 +212,6 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - laravel/boost (BOOST) - v2
 - laravel/dusk (DUSK) - v8
 - laravel/pint (PINT) - v1
-- laravel/telescope (TELESCOPE) - v5
 - pestphp/pest (PEST) - v4
 - phpunit/phpunit (PHPUNIT) - v12
 - rector/rector (RECTOR) - v2

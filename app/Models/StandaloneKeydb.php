@@ -54,6 +54,17 @@ class StandaloneKeydb extends BaseModel
 
     protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'keydb_password',
+        'internal_db_url',
+        'external_db_url',
+    ];
+
     protected $casts = [
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
@@ -123,7 +134,7 @@ class StandaloneKeydb extends BaseModel
     {
         $newConfigHash = $this->image.$this->ports_mappings.$this->keydb_conf;
         $newConfigHash .= $this->healthCheckConfigurationHash();
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {

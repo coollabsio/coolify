@@ -77,7 +77,7 @@ test('database status is updated when container status changes', function () {
     expect($database->status)->toBe('running:healthy');
 });
 
-test('database is not marked exited when containers list is empty', function () {
+test('database is not marked exited when an incomplete containers snapshot is empty', function () {
     $team = Team::factory()->create();
     $database = createPushUpdatePostgresql($team, [
         'status' => 'running:healthy',
@@ -88,6 +88,7 @@ test('database is not marked exited when containers list is empty', function () 
     // Empty containers = Sentinel might have failed, should NOT mark as exited
     $data = [
         'containers' => [],
+        'snapshot' => ['complete' => false],
     ];
 
     $job = new PushServerUpdateJob($server, $data);
@@ -97,6 +98,22 @@ test('database is not marked exited when containers list is empty', function () 
 
     // Status should remain running, NOT be set to exited
     expect($database->status)->toBe('running:healthy');
+});
+
+test('database is marked exited when a complete containers snapshot is empty', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'running:healthy',
+    ]);
+
+    $data = [
+        'containers' => [],
+        'snapshot' => ['complete' => true],
+    ];
+
+    (new PushServerUpdateJob($database->destination->server, $data))->handle();
+
+    expect($database->refresh()->status)->toBe('exited:unhealthy');
 });
 
 function createPushUpdatePostgresql(Team $team, array $attributes = []): StandalonePostgresql
@@ -126,3 +143,112 @@ function createPushUpdatePostgresql(Team $team, array $attributes = []): Standal
 
     return $database;
 }
+
+test('partial sentinel snapshots do not mark missing databases as exited', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'running:healthy',
+        'is_public' => true,
+    ]);
+
+    $server = $database->destination->server;
+    Queue::fake();
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+        'containers' => [
+            [
+                'name' => 'unrelated-container',
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    $database->refresh();
+
+    expect($database->status)->toBe('running:healthy');
+});
+
+test('partial sentinel snapshots apply directly observed database status updates', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'exited',
+    ]);
+
+    $server = $database->destination->server;
+    Queue::fake();
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+        'containers' => [
+            [
+                'name' => $database->uuid,
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                    'coolify.type' => 'database',
+                    'com.docker.compose.service' => $database->uuid,
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    $database->refresh();
+
+    expect($database->status)->toBe('running:healthy');
+});
+
+test('partial sentinel snapshots do not trigger missing tcp proxy recovery', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'exited',
+        'is_public' => true,
+    ]);
+
+    $server = $database->destination->server;
+    Queue::fake();
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+        'containers' => [
+            [
+                'name' => $database->uuid,
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                    'coolify.type' => 'database',
+                    'com.docker.compose.service' => $database->uuid,
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    $database->refresh();
+
+    expect($database->status)->toBe('running:healthy');
+    Queue::assertNothingPushed();
+});
