@@ -71,7 +71,7 @@ class AvatarStorageService
     protected function disk(string $storageType, ?int $s3StorageId): FilesystemAdapter
     {
         if ($storageType !== 's3') {
-            return Storage::disk('local');
+            return Storage::disk('images');
         }
 
         $storage = S3Storage::query()->whereKey($s3StorageId)->where('is_usable', true)->first();
