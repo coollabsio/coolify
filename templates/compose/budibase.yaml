@@ -90,7 +90,6 @@ services:
       - WORKER_UPSTREAM_URL=http://worker-service:4003
       - MINIO_UPSTREAM_URL=http://minio-service:9000
       - COUCHDB_UPSTREAM_URL=http://couchdb-service:5984
-      - WATCHTOWER_UPSTREAM_URL=http://watchtower-service:8080
       - RESOLVER=127.0.0.11
     depends_on:
       - minio-service
@@ -131,17 +130,3 @@ services:
       timeout: 15s
       retries: 5
       start_period: 10s
-
-  watchtower-service:
-    restart: always
-    image: containrrr/watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --debug --http-api-update bbapps bbworker bbproxy
-    environment:
-      - WATCHTOWER_HTTP_API=true
-      - WATCHTOWER_HTTP_API_TOKEN=$SERVICE_PASSWORD_WATCHTOWER
-      - WATCHTOWER_CLEANUP=true
-    labels:
-      - "com.centurylinklabs.watchtower.enable=false"
-    exclude_from_hc: true
