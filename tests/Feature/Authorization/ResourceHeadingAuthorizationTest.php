@@ -19,7 +19,9 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    // `id` is not fillable, so `updateOrCreate` would seed an autoincremented
+    // row and `InstanceSettings::get()` (findOrFail(0)) would fail on render.
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->team = Team::factory()->create();
 
@@ -245,4 +247,59 @@ test('admin sees terminal link for service', function () {
         'query' => [],
     ])
         ->assertSee('Terminal');
+});
+
+// --- Denied action menu items must carry the disabled attribute ---
+//
+// The `.listbox-option:disabled` style relies on it to render the item as
+// unavailable. Without the attribute the item looks clickable and silently
+// does nothing.
+
+/**
+ * Collect the disabled state of every `.listbox-option` button whose visible
+ * text matches the given label exactly.
+ *
+ * @return array<int, bool>
+ */
+function listboxOptionDisabledStates(string $html, string $label): array
+{
+    preg_match_all('/<button\b[^>]*class="[^"]*listbox-option[^"]*"[^>]*>(.*?)<\/button>/s', $html, $matches, PREG_SET_ORDER);
+
+    return collect($matches)
+        ->filter(fn (array $match): bool => trim(preg_replace('/\s+/', ' ', strip_tags($match[1]))) === $label)
+        ->map(fn (array $match): bool => str_contains($match[0], 'disabled'))
+        ->values()
+        ->all();
+}
+
+test('member sees application action items as disabled', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $html = Livewire::test(ApplicationHeading::class, ['application' => $this->application])->html();
+
+    foreach (['Redeploy', 'Restart', 'Stop'] as $label) {
+        $states = listboxOptionDisabledStates($html, $label);
+
+        expect($states)->not->toBeEmpty("Expected a '{$label}' action item to be rendered.");
+        expect($states)->each->toBeTrue();
+    }
+});
+
+test('member sees service action items as disabled', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $html = Livewire::test(ServiceHeading::class, [
+        'service' => $this->service,
+        'parameters' => $this->serviceParams,
+        'query' => [],
+    ])->html();
+
+    foreach (['Deploy', 'Force Deploy'] as $label) {
+        $states = listboxOptionDisabledStates($html, $label);
+
+        expect($states)->not->toBeEmpty("Expected a '{$label}' action item to be rendered.");
+        expect($states)->each->toBeTrue();
+    }
 });

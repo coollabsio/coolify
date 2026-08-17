@@ -1985,12 +1985,14 @@ html[data-theme="custom"] textarea:disabled {
     color: var(--coollabs-fg);
 }
 
-.listbox-option-disabled {
+.listbox-option-disabled,
+.listbox-option:disabled {
     cursor: not-allowed;
     opacity: 0.4;
 }
 
-.listbox-option-disabled:hover {
+.listbox-option-disabled:hover,
+.listbox-option:disabled:hover {
     background: transparent;
 }
 
