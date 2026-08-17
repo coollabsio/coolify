@@ -90,6 +90,27 @@ test('MCP endpoint returns 404 when the instance setting is disabled', function 
     $response->assertStatus(404);
 });
 
+test('MCP endpoint returns 403 when the token team has MCP disabled', function () {
+    $this->team->update(['is_mcp_server_enabled' => false]);
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $response = mcpListTools($token);
+
+    $response->assertForbidden();
+    $response->assertJson(['message' => 'MCP server is disabled for this team.']);
+});
+
+test('MCP endpoint is enabled for teams by default', function () {
+    $defaultTeam = Team::factory()->create();
+    $this->user->teams()->attach($defaultTeam->id, ['role' => 'owner']);
+    session(['currentTeam' => $defaultTeam]);
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    $response = mcpListTools($token);
+
+    $response->assertOk();
+});
+
 test('MCP endpoint rejects unauthenticated requests', function () {
     $response = mcpPost(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list']);
     $response->assertStatus(401);
@@ -113,8 +134,13 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_database',
         'list_services',
         'get_service',
+        'get_project',
+        'list_deployments',
+        'get_logs',
+        'list_env_keys',
     );
     expect($toolNames)->not->toContain('get_resource_status');
+    expect($toolNames)->toContain('coolify_help', 'control', 'deploy');
 });
 
 test('list_projects returns summary + pagination scoped to the token team', function () {
@@ -174,10 +200,18 @@ test('get_infrastructure_overview returns counts', function () {
 
     $body = mcpToolJson($response);
     expect($body)->toHaveKey('data');
-    expect($body['data'])->toHaveKeys(['coolify_version', 'servers', 'projects', 'counts']);
+    expect($body['data'])->toHaveKeys(['coolify_version', 'servers', 'projects', 'counts', 'health_hints']);
     expect($body['data']['counts']['projects'])->toBe(2);
     expect($body['data']['projects'])->toHaveCount(2);
     expect($body['data']['projects'][0])->toHaveKey('counts');
+    expect($body['data']['projects'][0]['counts'])->toHaveKeys(['applications', 'services', 'databases']);
+    expect($body['data']['health_hints'])->toHaveKeys([
+        'unreachable_servers',
+        'applications_not_running',
+        'services_not_running',
+        'databases_not_running',
+        'next',
+    ]);
 });
 
 test('get_server scrubs sensitive nested data and exposes connection_timeout', function () {

@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Once;
 use Visus\Cuid2\Cuid2;
@@ -70,6 +71,55 @@ it('accepts a valid magic link invitation only once and rotates the temporary pa
 
     auth()->logout();
     session()->flush();
+
+    $this->get(route('auth.link', ['token' => $token]))
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest();
+});
+
+it('accepts a magic link when opened from a different public origin', function () {
+    [$team, $user, $password, $token] = createInvitationLinkFixture();
+
+    $this->get('https://coolify.example.com/auth/link?token='.urlencode($token))
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertAuthenticatedAs($user);
+    $this->assertDatabaseMissing('team_invitations', ['email' => $user->email]);
+    expect($user->teams()->where('team_id', $team->id)->exists())->toBeTrue();
+
+    $user->refresh();
+    expect(Hash::check($password, $user->password))->toBeFalse();
+});
+
+it('keeps the invited user authenticated after rotating the temporary password with database sessions', function () {
+    $this->withMiddleware([CheckForcePasswordReset::class, DecideWhatToDoWithUser::class]);
+    Config::set('session.driver', 'database');
+
+    [$team, $user, $password, $token] = createInvitationLinkFixture();
+
+    $this->get(route('auth.link', ['token' => $token]))
+        ->assertRedirect(route('dashboard'));
+
+    expect(DB::table('sessions')->where('user_id', $user->id)->exists())->toBeTrue();
+
+    $this->get(route('dashboard'))
+        ->assertRedirect(route('auth.force-password-reset'));
+
+    $this->assertAuthenticatedAs($user);
+    expect($user->teams()->where('team_id', $team->id)->exists())->toBeTrue();
+
+    $user->refresh();
+    expect(Hash::check($password, $user->password))->toBeFalse();
+});
+
+it('rejects a magic link when the stored invitation token differs', function () {
+    [, $user, , $token, $invitation] = createInvitationLinkFixture();
+    $differentToken = Crypt::encryptString("{$user->email}@@@{$invitation->uuid}@@@different-password");
+
+    $invitation->forceFill([
+        'link' => route('auth.link', ['token' => $differentToken]),
+    ])->save();
 
     $this->get(route('auth.link', ['token' => $token]))
         ->assertRedirect(route('login'));

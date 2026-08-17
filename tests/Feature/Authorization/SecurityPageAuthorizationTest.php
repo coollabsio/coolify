@@ -15,7 +15,11 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    if (! InstanceSettings::query()->whereKey(0)->exists()) {
+        $settings = new InstanceSettings;
+        $settings->id = 0;
+        $settings->save();
+    }
 
     $this->team = Team::factory()->create();
 

@@ -20,30 +20,32 @@ beforeEach(function () {
 });
 
 describe('new application buildpack defaults', function () {
-    test('github app repository flow defaults to nixpacks', function () {
+    test('github app repository flow defaults to railpack', function () {
         Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
-            ->assertSet('build_pack', 'nixpacks');
+            ->assertSet('build_pack', 'railpack');
     });
 
-    test('deploy key repository flow defaults to nixpacks', function () {
+    test('deploy key repository flow defaults to railpack', function () {
         Livewire::test(GithubPrivateRepositoryDeployKey::class, ['type' => 'private-deploy-key'])
-            ->assertSet('build_pack', 'nixpacks');
+            ->assertSet('build_pack', 'railpack');
     });
 
-    test('public repository flow defaults to nixpacks and lists railpack second', function () {
+    test('public repository flow defaults to railpack and lists railpack first', function () {
         Livewire::test(PublicGitRepository::class, ['type' => 'public'])
-            ->assertSet('build_pack', 'nixpacks');
+            ->assertSet('build_pack', 'railpack');
     });
 
     test('public repository flow keeps railpack available after branch lookup', function () {
         Livewire::test(PublicGitRepository::class, ['type' => 'public'])
             ->set('branchFound', true)
-            ->assertSeeInOrder(['Nixpacks', 'Railpack (Beta)']);
+            ->assertSeeInOrder(['Railpack', 'Nixpacks']);
     });
 
-    test('deploy key repository flow shows railpack beta label in build pack selector without beta badge', function () {
+    test('deploy key repository flow shows railpack without beta label', function () {
         Livewire::test(GithubPrivateRepositoryDeployKey::class, ['type' => 'private-deploy-key'])
             ->set('current_step', 'repository')
-            ->assertSee('Railpack (Beta)');
+            ->assertSee('Railpack')
+            ->assertDontSee('Railpack (Beta)')
+            ->assertDontSee('Railpack (beta)');
     });
 });

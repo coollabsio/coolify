@@ -1,46 +1,35 @@
 @props(['currentStep' => 1, 'totalSteps' => 3])
 
-<div class="w-full max-w-2xl mx-auto mb-8">
-    <div class="flex items-center justify-between">
+<div class="mx-auto mb-6 w-full max-w-3xl">
+    <div
+        class="grid grid-cols-3 overflow-hidden rounded-[10px] border border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.025]">
         @for ($i = 1; $i <= $totalSteps; $i++)
-            <div class="flex items-center {{ $i < $totalSteps ? 'flex-1' : '' }}">
-                <div class="flex flex-col items-center">
-                    <div
-                        class="flex items-center justify-center size-10 rounded-full border-2 transition-all duration-300
-                        {{ $i < $currentStep ? 'bg-success border-success' : 'border-neutral-200 dark:border-coolgray-300' }}
-                        {{ $i === $currentStep ? 'bg-white dark:bg-coolgray-500' : '' }}
-                       ">
-                        @if ($i < $currentStep)
-                            <svg class="size-5 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
-                                fill="currentColor">
-                                <path fill-rule="evenodd"
-                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                        @else
-                            <span
-                                class="text-sm font-bold text-black dark:text-white">
-                                {{ $i }}
-                            </span>
-                        @endif
-                    </div>
-                    <span
-                        class="mt-2 text-xs font-medium text-black dark:text-white">
-                        @if ($i === 1)
-                            Server
-                        @elseif ($i === 2)
-                            Connection
-                        @elseif ($i === 3)
-                            Complete
-                        @endif
-                    </span>
-                </div>
-                @if ($i < $totalSteps)
-                    <div
-                        class="flex-1 h-0.5 mx-4 transition-all duration-300
-                        {{ $i < $currentStep ? 'bg-success' : 'bg-neutral-200 dark:bg-coolgray-300' }}">
-                    </div>
-                @endif
+            <div @class([
+                'flex min-h-10 items-center justify-center gap-2 border-r border-neutral-200 px-3 text-[11px] font-medium last:border-r-0 dark:border-white/[0.08]',
+                'bg-coollabs/[0.07] text-coollabs dark:bg-warning/[0.09] dark:text-warning' => $i === $currentStep,
+                'text-neutral-500 dark:text-fg-dim' => $i !== $currentStep,
+            ])>
+                <span @class([
+                    'flex size-5 items-center justify-center rounded-full border text-[10px] font-semibold',
+                    'border-coollabs/25 bg-coollabs/10 dark:border-warning/25 dark:bg-warning/15' => $i === $currentStep,
+                    'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' => $i < $currentStep,
+                    'border-neutral-200 dark:border-white/[0.1]' => $i > $currentStep,
+                ])>
+                    @if ($i < $currentStep)
+                        <x-reicon name="check-circle" class="size-3" />
+                    @else
+                        {{ $i }}
+                    @endif
+                </span>
+                <span class="hidden sm:inline">
+                    @if ($i === 1)
+                        Server
+                    @elseif ($i === 2)
+                        Connection
+                    @else
+                        Complete
+                    @endif
+                </span>
             </div>
         @endfor
     </div>

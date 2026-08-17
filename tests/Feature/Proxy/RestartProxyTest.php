@@ -11,7 +11,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::create(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
 });
 
 function setupProxyUser(string $role): array
@@ -72,6 +72,25 @@ test('admin can see proxy restart and stop buttons', function () {
         ->assertSee('Stop Proxy');
 });
 
+test('admin can stop a proxy while it is starting', function () {
+    [$user, $team, $server] = setupProxyUser('admin');
+
+    $server->proxy->status = 'starting';
+    $server->proxy->type = ProxyTypes::TRAEFIK->value;
+    $server->save();
+    $server->refresh();
+
+    $mock = Mockery::mock($server)->makePartial();
+    $mock->shouldReceive('proxySet')->andReturn(true);
+
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    Livewire::test('server.navbar', ['server' => $mock])
+        ->assertSee('Stop Proxy')
+        ->assertDontSee('Start Proxy');
+});
+
 test('member cannot see start proxy button', function () {
     [$user, $team, $server] = setupProxyUser('member');
 
@@ -88,4 +107,24 @@ test('member cannot see start proxy button', function () {
 
     Livewire::test('server.navbar', ['server' => $mock])
         ->assertDontSee('Start Proxy');
+});
+
+test('start proxy button shows a loading state while proxy startup actions run', function () {
+    [$user, $team, $server] = setupProxyUser('admin');
+
+    $server->proxy->status = 'exited';
+    $server->proxy->type = ProxyTypes::TRAEFIK->value;
+    $server->save();
+    $server->refresh();
+
+    $mock = Mockery::mock($server)->makePartial();
+    $mock->shouldReceive('proxySet')->andReturn(true);
+
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    Livewire::test('server.navbar', ['server' => $mock])
+        ->assertSeeHtml('wire:loading.attr="disabled"')
+        ->assertSeeHtml('wire:loading.class="is-loading"')
+        ->assertSeeHtml('wire:target="checkProxy,startProxy"');
 });

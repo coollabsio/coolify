@@ -36,9 +36,54 @@ it('renders the changelog modal above the desktop sidebar toggle', function () {
         }
     });
 
-    Livewire::test(SettingsDropdown::class, ['trigger' => 'changelog-sidebar'])
+    $component = Livewire::test(SettingsDropdown::class, ['trigger' => 'changelog-sidebar'])
         ->call('openWhatsNewModal')
-        ->assertSee('Changelog')
-        ->assertSee('z-[60]', false)
-        ->assertSee('closeWhatsNewModal', false);
+        ->assertNotDispatched('whats-new-opened')
+        ->assertSee("What's new", false)
+        ->assertSee('Test Release')
+        ->assertSee('Mark read')
+        ->assertSeeHtml('z-[99]')
+        ->assertSeeHtml('closeWhatsNewModal');
+
+    // Single-release layout: no nested card chrome / unread left accent bar
+    expect($component->html())
+        ->not->toContain('dark:bg-raised')
+        ->not->toContain('w-0.5 bg-accent')
+        ->toContain('absolute right-2 top-2');
+});
+
+it('keeps the account menu mounted while the changelog modal opens', function () {
+    $dropdownView = file_get_contents(resource_path('views/livewire/settings-dropdown.blade.php'));
+    $accountMenuView = file_get_contents(resource_path('views/components/top-user-menu.blade.php'));
+
+    expect($dropdownView)
+        ->not->toContain('wire:click="openWhatsNewModal" @click="open = false"')
+        ->and($accountMenuView)
+        ->not->toContain('@whats-new-opened.window="open = false"');
+});
+
+it('opens the changelog modal when there are no entries', function () {
+    $user = new User(['email' => 'test@example.com']);
+    $user->id = 1;
+
+    Auth::setUser($user);
+
+    app()->instance(ChangelogService::class, new class extends ChangelogService
+    {
+        public function getEntriesForUser(User $user): Collection
+        {
+            return collect();
+        }
+
+        public function getUnreadCountForUser(User $user): int
+        {
+            return 0;
+        }
+    });
+
+    Livewire::test(SettingsDropdown::class, ['trigger' => 'account-menu'])
+        ->call('openWhatsNewModal')
+        ->assertSet('showWhatsNewModal', true)
+        ->assertSee("What's new", false)
+        ->assertSee('No updates found');
 });

@@ -1,7 +1,10 @@
-<form class="flex flex-col w-full gap-2" wire:submit='submit'>
+<form class="application-settings-form flex w-full flex-col gap-4" wire:submit="submit">
     <x-forms.input id="name" label="Name" required />
     <x-forms.input id="description" label="Description" />
-    <x-forms.button type="submit">
-        Continue
-    </x-forms.button>
+    <div class="flex justify-end">
+        <x-forms.button type="submit"
+            defaultClass="button button-highlighted">
+            Create team
+        </x-forms.button>
+    </div>
 </form>

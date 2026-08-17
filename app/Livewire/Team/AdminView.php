@@ -4,55 +4,60 @@ namespace App\Livewire\Team;
 
 use App\Models\User;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class AdminView extends Component
 {
-    public $users;
+    use WithPagination;
 
-    public ?string $search = '';
+    public string $search = '';
 
-    public bool $lots_of_users = false;
+    public string $teamFilter = 'all';
 
-    private $number_of_users_to_show = 20;
+    public string $sort = 'name_asc';
+
+    public int $perPage = 10;
 
     public function mount()
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
-        $this->getUsers();
     }
 
-    public function submitSearch()
+    public function updatedSearch(): void
     {
         if (! isInstanceAdmin()) {
             return;
         }
-        if ($this->search !== '') {
-            $this->users = User::where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== auth()->id();
-            });
-        } else {
-            $this->getUsers();
-        }
+
+        $this->resetPage();
     }
 
-    public function getUsers()
+    public function updatedTeamFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSort(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+
+        $this->resetPage();
+    }
+
+    public function submitSearch(): void
     {
         if (! isInstanceAdmin()) {
             return;
         }
-        $users = User::where('id', '!=', auth()->id())->get();
-        if ($users->count() > $this->number_of_users_to_show) {
-            $this->lots_of_users = true;
-            $this->users = $users->take($this->number_of_users_to_show);
-        } else {
-            $this->lots_of_users = false;
-            $this->users = $users;
-        }
+
+        $this->resetPage();
     }
 
     public function delete($id, $password, $selectedActions = [])
@@ -76,7 +81,7 @@ class AdminView extends Component
 
         try {
             $user->delete();
-            $this->getUsers();
+            $this->resetPage();
 
             return true;
         } catch (\Exception $e) {
@@ -86,6 +91,31 @@ class AdminView extends Component
 
     public function render()
     {
-        return view('livewire.team.admin-view');
+        $search = trim($this->search);
+        $teamId = currentTeam()->id;
+        $users = User::query()
+            ->where('id', '!=', auth()->id())
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->when($this->teamFilter === 'current', function ($query) use ($teamId): void {
+                $query->whereHas('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $teamId));
+            })
+            ->when($this->teamFilter === 'outside', function ($query) use ($teamId): void {
+                $query->whereDoesntHave('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $teamId));
+            })
+            ->when($this->sort === 'name_desc', fn ($query) => $query->orderByDesc('name'))
+            ->when($this->sort === 'email_asc', fn ($query) => $query->orderBy('email'))
+            ->when($this->sort === 'email_desc', fn ($query) => $query->orderByDesc('email'))
+            ->when($this->sort === 'name_asc', fn ($query) => $query->orderBy('name'))
+            ->orderBy('id')
+            ->paginate($this->perPage);
+
+        return view('livewire.team.admin-view', [
+            'users' => $users,
+        ]);
     }
 }

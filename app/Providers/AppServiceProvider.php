@@ -10,23 +10,19 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
-use Laravel\Telescope\TelescopeServiceProvider;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        if (App::isLocal()) {
-            $this->app->register(TelescopeServiceProvider::class);
-        }
-
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
     }
 
     public function boot(): void
     {
         $this->configureCommands();
+
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();
@@ -80,6 +76,17 @@ class AppServiceProvider extends ServiceProvider
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->baseUrl($api_url);
             }
+        });
+
+        Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
+            $client = Http::withHeaders([
+                'Accept' => 'application/json',
+            ])->baseUrl($api_url);
+            if ($access_token) {
+                $client = $client->withToken($access_token);
+            }
+
+            return $client;
         });
     }
 }

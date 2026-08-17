@@ -72,8 +72,8 @@ describe('GitHub Source Create Component', function () {
         Livewire::test(Create::class)
             ->assertSuccessful()
             ->set('name', 'enterprise-app')
-            ->set('api_url', 'https://github.enterprise.com/api/v3')
-            ->set('html_url', 'https://github.enterprise.com')
+            ->set('api_url', 'https://github.ghe.com/api/v3')
+            ->set('html_url', 'https://github.ghe.com')
             ->set('custom_user', 'git-custom')
             ->set('custom_port', 2222)
             ->call('createGitHubApp')
@@ -82,10 +82,26 @@ describe('GitHub Source Create Component', function () {
         $githubApp = GithubApp::where('name', 'enterprise-app')->first();
 
         expect($githubApp)->not->toBeNull();
-        expect($githubApp->api_url)->toBe('https://github.enterprise.com/api/v3');
-        expect($githubApp->html_url)->toBe('https://github.enterprise.com');
+        expect($githubApp->api_url)->toBe('https://github.ghe.com/api/v3');
+        expect($githubApp->html_url)->toBe('https://github.ghe.com');
         expect($githubApp->custom_user)->toBe('git-custom');
         expect($githubApp->custom_port)->toBe(2222);
+    });
+
+    test('preserves custom github enterprise api url when creating github app', function () {
+        Livewire::test(Create::class)
+            ->assertSuccessful()
+            ->set('name', 'ghe-custom-api-app')
+            ->set('api_url', 'https://github.ghe.com/api/v3')
+            ->set('html_url', 'https://github.ghe.com')
+            ->call('createGitHubApp')
+            ->assertRedirect();
+
+        $githubApp = GithubApp::where('name', 'ghe-custom-api-app')->first();
+
+        expect($githubApp)->not->toBeNull();
+        expect($githubApp->api_url)->toBe('https://github.ghe.com/api/v3');
+        expect($githubApp->html_url)->toBe('https://github.ghe.com');
     });
 
     test('validates required fields', function () {

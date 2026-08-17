@@ -57,6 +57,7 @@ class Swarm extends Component
             $this->authorize('update', $this->application);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -68,6 +69,7 @@ class Swarm extends Component
             $this->authorize('update', $this->application);
             $this->syncData(true);
             $this->dispatch('success', 'Swarm settings updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

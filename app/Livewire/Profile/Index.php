@@ -2,15 +2,19 @@
 
 namespace App\Livewire\Profile;
 
+use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Index extends Component
 {
+    use WithFileUploads;
+
     public int $userId;
 
     public string $email;
@@ -31,6 +35,39 @@ class Index extends Component
     public bool $show_email_change = false;
 
     public bool $show_verification = false;
+
+    public $avatar;
+
+    public function uploadAvatar(AvatarStorageService $avatarStorage): bool
+    {
+        try {
+            $this->validate([
+                'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
+            ]);
+
+            $avatarStorage->store(Auth::user(), $this->avatar);
+            $this->reset('avatar');
+            $this->dispatch('avatar-updated', url: route('profile.avatar', ['v' => Auth::user()->fresh()->updated_at->timestamp]));
+            $this->dispatch('success', 'Profile picture updated.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
+        }
+    }
+
+    public function removeAvatar(AvatarStorageService $avatarStorage): void
+    {
+        try {
+            $avatarStorage->delete(Auth::user());
+            $this->dispatch('avatar-updated', url: null);
+            $this->dispatch('success', 'Profile picture removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
 
     public function mount()
     {
@@ -167,6 +204,7 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                $this->dispatch('close-email-change-modal');
             } else {
                 $this->dispatch('error', 'Failed to update email address.');
             }
@@ -229,12 +267,6 @@ class Index extends Component
         $this->show_verification = false;
 
         $this->dispatch('success', 'Email change request cancelled.');
-    }
-
-    public function showEmailChangeForm()
-    {
-        $this->show_email_change = true;
-        $this->new_email = '';
     }
 
     public function resetPassword()

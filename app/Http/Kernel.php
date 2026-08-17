@@ -2,6 +2,7 @@
 
 namespace App\Http;
 
+use App\Http\Middleware\AddServerTimingHeaders;
 use App\Http\Middleware\ApiAbility;
 use App\Http\Middleware\ApiSensitiveData;
 use App\Http\Middleware\Authenticate;
@@ -12,6 +13,7 @@ use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
+use App\Http\Middleware\EnsureTeamMcpEnabled;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -48,6 +50,8 @@ class Kernel extends HttpKernel
      * @var array<int, class-string|string>
      */
     protected $middleware = [
+        // Outermost so Server-Timing includes the full middleware + app cost.
+        AddServerTimingHeaders::class,
         TrustHosts::class,
         TrustProxies::class,
         HandleCors::class,
@@ -110,5 +114,6 @@ class Kernel extends HttpKernel
         'can.update.resource' => CanUpdateResource::class,
         'can.access.terminal' => CanAccessTerminal::class,
         'mcp.enabled' => EnsureMcpEnabled::class,
+        'mcp.team.enabled' => EnsureTeamMcpEnabled::class,
     ];
 }

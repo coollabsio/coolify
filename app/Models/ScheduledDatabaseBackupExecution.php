@@ -24,6 +24,7 @@ class ScheduledDatabaseBackupExecution extends BaseModel
     {
         return [
             'size' => 'integer',
+            'finished_at' => 'datetime',
             's3_uploaded' => 'boolean',
             'local_storage_deleted' => 'boolean',
             's3_storage_deleted' => 'boolean',

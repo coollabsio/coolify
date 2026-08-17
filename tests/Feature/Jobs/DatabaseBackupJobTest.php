@@ -1,12 +1,16 @@
 <?php
 
 use App\Jobs\DatabaseBackupJob;
+use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -38,6 +42,14 @@ test('scheduled database backup execution model casts storage deletion fields co
     expect($casts['local_storage_deleted'])->toBe('boolean');
     expect($casts)->toHaveKey('s3_storage_deleted');
     expect($casts['s3_storage_deleted'])->toBe('boolean');
+});
+
+test('scheduled database backup casts full dump selection to boolean', function () {
+    $model = new ScheduledDatabaseBackup;
+
+    expect($model->getCasts())->toMatchArray(['dump_all' => 'boolean'])
+        ->and((new ScheduledDatabaseBackup(['dump_all' => '0']))->dump_all)->toBeFalse()
+        ->and((new ScheduledDatabaseBackup(['dump_all' => '1']))->dump_all)->toBeTrue();
 });
 
 test('upload_to_s3 throws exception and disables s3 when storage is null', function () {
@@ -238,6 +250,57 @@ test('failed method updates status when backup was not successful', function () 
     expect($log->message)->toContain('Some real failure');
 });
 
+test('retention cleanup failure does not fail a successful database backup', function () {
+    $team = Team::factory()->create();
+    $s3 = S3Storage::create([
+        'name' => 'Test S3',
+        'region' => 'us-east-1',
+        'key' => 'test-key',
+        'secret' => 'test-secret',
+        'bucket' => 'test-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $s3->id,
+        'database_type' => 'App\Models\StandalonePostgresql',
+        'database_id' => 1,
+        'team_id' => $team->id,
+        'database_backup_retention_amount_s3' => 1,
+    ]);
+    $oldExecution = ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'old-backup',
+        'database_name' => 'database',
+        'filename' => '/backup/old.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        's3_uploaded' => true,
+        'local_storage_deleted' => true,
+        'created_at' => now()->subDay(),
+    ]);
+    ScheduledDatabaseBackupExecution::create([
+        'uuid' => 'new-backup',
+        'database_name' => 'database',
+        'filename' => '/backup/new.dmp',
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        's3_uploaded' => true,
+        'local_storage_deleted' => true,
+    ]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('delete')->once()->with(['/backup/old.dmp'])->andReturnFalse();
+    Storage::shouldReceive('build')->once()->andReturn($disk);
+    $job = new DatabaseBackupJob($backup);
+
+    expect(fn () => (new ReflectionClass($job))->getMethod('removeExpiredBackups')->invoke($job))
+        ->not->toThrow(Throwable::class);
+
+    expect($oldExecution->fresh()->s3_storage_deleted)->toBeFalse();
+});
+
 test('s3 storage has scheduled backups relationship', function () {
     $team = Team::factory()->create();
 
@@ -261,4 +324,87 @@ test('s3 storage has scheduled backups relationship', function () {
     ]);
 
     expect($s3->scheduledBackups()->count())->toBe(1);
+});
+
+test('database backup job escapes the S3 copy destination argument', function () {
+    $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
+
+    expect($source)->toContain('$escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");')
+        ->and($source)->toContain('mc cp {$escapedBackupLocation} {$escapedS3Destination}')
+        ->and($source)->not->toContain('mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/');
+});
+
+test('database dump compression uses the helper image and shared CPU setting', function (int $compressionCpuPercentage) {
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $backup = new ScheduledDatabaseBackup(['timeout' => 3600]);
+    $job = new DatabaseBackupJob($backup);
+    $server = new Server;
+    $server->setRelation('settings', new ServerSetting([
+        'backup_compression_cpu_percentage' => $compressionCpuPercentage,
+    ]));
+    $job->server = $server;
+
+    $command = (new ReflectionClass($job))
+        ->getMethod('buildCompressedDumpCommand')
+        ->invoke($job, 'docker exec database pg_dumpall');
+
+    expect($command)
+        ->toStartWith('docker exec database pg_dumpall | docker run --rm -i')
+        ->toContain('coolify-helper')
+        ->toContain('command -v pigz')
+        ->toContain('pigz -3 -p')
+        ->toContain("\$(nproc) * {$compressionCpuPercentage} + 99")
+        ->toContain('gzip -3');
+})->with([
+    'low' => 25,
+    'high' => 75,
+]);
+
+test('all dump all database commands use shared helper compression', function () {
+    $source = file_get_contents(app_path('Jobs/DatabaseBackupJob.php'));
+
+    expect($source)
+        ->toContain('$this->buildCompressedDumpCommand($backupCommand)')
+        ->toContain('mysqldump -u root')
+        ->toContain('mariadb-dump -u root')
+        ->and(substr_count($source, '$this->buildCompressedDumpCommand($dumpCommand)'))->toBe(2)
+        ->and($source)->not->toContain('| gzip >');
+});
+
+test('full database dumps create one logical all-databases archive regardless of saved database names', function (string $databaseType) {
+    $backup = new ScheduledDatabaseBackup([
+        'dump_all' => true,
+        'databases_to_backup' => 'default,analytics',
+    ]);
+    $job = new DatabaseBackupJob($backup);
+
+    $databases = (new ReflectionClass($job))
+        ->getMethod('databasesToBackup')
+        ->invoke($job, $databaseType, $backup->databases_to_backup);
+
+    expect($databases)->toBe(['all']);
+})->with(['postgresql', 'mysql', 'mariadb']);
+
+test('specific database dumps keep every selected database', function (string $databaseType) {
+    $backup = new ScheduledDatabaseBackup([
+        'dump_all' => false,
+        'databases_to_backup' => 'default, analytics',
+    ]);
+    $job = new DatabaseBackupJob($backup);
+
+    $databases = (new ReflectionClass($job))
+        ->getMethod('databasesToBackup')
+        ->invoke($job, $databaseType, $backup->databases_to_backup);
+
+    expect($databases)->toBe(['default', 'analytics']);
+})->with(['postgresql', 'mysql', 'mariadb']);
+
+test('individual database backup deletion surfaces local failures and honors selected S3 deletion', function () {
+    $source = file_get_contents(app_path('Livewire/Project/Database/BackupExecutions.php'));
+
+    expect($source)
+        ->toContain("in_array('delete_backup_s3', \$selectedActions, true)")
+        ->toContain('deleteBackupsLocally($execution->filename, $server, throwError: true)')
+        ->toContain("throw new \\RuntimeException('The backup server is unavailable.')")
+        ->not->toContain('deleteBackupsLocally($execution->filename, $server);');
 });

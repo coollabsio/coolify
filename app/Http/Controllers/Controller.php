@@ -98,7 +98,7 @@ class Controller extends BaseController
     public function link()
     {
         $token = request()->get('token');
-        if ($token) {
+        if (is_string($token) && $token !== '') {
             try {
                 $decrypted = Crypt::decryptString($token);
             } catch (DecryptException) {
@@ -126,9 +126,8 @@ class Controller extends BaseController
             $invitation = TeamInvitation::query()
                 ->where('email', $email)
                 ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
-                ->where('link', request()->fullUrl())
                 ->first();
-            if (! $invitation || ! $invitation->isValid()) {
+            if (! $invitation || ! $this->invitationLinkMatchesToken($invitation, $token) || ! $invitation->isValid()) {
                 return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
             }
 
@@ -139,10 +138,11 @@ class Controller extends BaseController
                 }
                 $invitation->delete();
 
-                Auth::login($user);
                 $user->forceFill([
                     'password' => Hash::make(Str::random(64)),
                 ])->save();
+
+                Auth::login($user);
                 session(['currentTeam' => $team]);
 
                 return redirect()->route('dashboard');
@@ -150,6 +150,19 @@ class Controller extends BaseController
         }
 
         return redirect()->route('login')->with('error', 'Invalid credentials.');
+    }
+
+    private function invitationLinkMatchesToken(TeamInvitation $invitation, string $token): bool
+    {
+        $query = parse_url($invitation->link, PHP_URL_QUERY);
+        if (! is_string($query)) {
+            return false;
+        }
+
+        parse_str($query, $parameters);
+        $storedToken = $parameters['token'] ?? null;
+
+        return is_string($storedToken) && hash_equals($storedToken, $token);
     }
 
     public function showInvitation()

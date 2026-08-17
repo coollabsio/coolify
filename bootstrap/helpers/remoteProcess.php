@@ -102,6 +102,35 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
     );
 }
 
+/**
+ * Download a remote file from a managed server onto the Coolify host via SCP.
+ */
+function instant_scp_from_server(string $remoteSource, string $localDest, Server $server, $throwError = true)
+{
+    return SshRetryHandler::retry(
+        function () use ($remoteSource, $localDest, $server) {
+            $scp_command = SshMultiplexingHelper::generateScpDownloadCommand($server, $remoteSource, $localDest);
+            $process = Process::timeout(config('constants.ssh.command_timeout'))->run($scp_command);
+
+            $output = trim($process->output());
+            $exitCode = $process->exitCode();
+
+            if ($exitCode !== 0) {
+                excludeCertainErrors($process->errorOutput(), $exitCode);
+            }
+
+            return $output === 'null' ? null : $output;
+        },
+        [
+            'server' => $server->ip,
+            'source' => $remoteSource,
+            'dest' => $localDest,
+            'function' => 'instant_scp_from_server',
+        ],
+        $throwError
+    );
+}
+
 function instant_remote_process_with_timeout(Collection|array $command, Server $server, bool $throwError = true, bool $no_sudo = false): ?string
 {
     $command = $command instanceof Collection ? $command->toArray() : $command;
@@ -148,7 +177,7 @@ function instant_remote_process(Collection|array $command, Server $server, bool 
 
     return SshRetryHandler::retry(
         function () use ($server, $command_string, $effectiveTimeout, $disableMultiplexing) {
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing);
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $command_string, $disableMultiplexing, (int) $effectiveTimeout);
             $process = Process::timeout($effectiveTimeout)->run($sshCommand);
 
             $output = trim($process->output());
@@ -253,7 +282,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             } catch (Exception) {
                 $timestamp->setTimezone('UTC');
             }
-            data_set($i, 'timestamp', $timestamp->format('Y-M-d H:i:s.u'));
+            data_set($i, 'timestamp', $timestamp->format('Y-M-d H:i:s'));
 
             return $i;
         })
@@ -301,6 +330,7 @@ function remove_iip($text)
 
     // Git access tokens
     $text = preg_replace('/x-access-token:.*?(?=@)/', 'x-access-token:'.REDACTED, $text);
+    $text = preg_replace('/oauth2:.*?(?=@)/', 'oauth2:'.REDACTED, $text);
 
     // ANSI color codes
     $text = preg_replace('/\x1b\[[0-9;]*m/', '', $text);

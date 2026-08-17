@@ -33,6 +33,19 @@ it('ensures GlobalSearch uses redirect route helper', function () {
         ->toContain('redirectRoute($this, \'project.resource.create\'');
 });
 
+it('routes new server quick action to the new server page', function () {
+    $globalSearchFile = file_get_contents(__DIR__.'/../../app/Livewire/GlobalSearch.php');
+    $bladeFile = file_get_contents(__DIR__.'/../../resources/views/livewire/global-search.blade.php');
+
+    expect($globalSearchFile)
+        ->toContain("if (\$type === 'server')")
+        ->toContain("redirectRoute(\$this, 'server.create')");
+
+    expect($bladeFile)
+        ->toContain("window.location.href = '/servers/new'")
+        ->not->toContain('@open-create-modal-server.window');
+});
+
 it('ensures docker-image item has quickcommand with new image', function () {
     $globalSearchFile = file_get_contents(__DIR__.'/../../app/Livewire/GlobalSearch.php');
 
@@ -141,4 +154,14 @@ it('uses cropped image assets instead of inline wide logos for GlobalSearch data
         ->not->toContain('x-html="item.logo_html"');
 
     expect($globalSearchFile)->not->toContain("'logo_html' =>");
+});
+
+it('uses rounded yellow plus icons for GlobalSearch creatable actions without logos', function () {
+    $bladeFile = file_get_contents(__DIR__.'/../../resources/views/livewire/global-search.blade.php');
+
+    expect($bladeFile)
+        ->toContain('rounded-full bg-warning/20 flex items-center justify-center')
+        ->toContain('class="h-6 w-6 text-warning"')
+        ->not->toContain('rounded-lg bg-warning-100 dark:bg-warning-900/40')
+        ->not->toContain('text-warning-600 dark:text-warning-400');
 });

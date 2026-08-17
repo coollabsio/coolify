@@ -8,11 +8,11 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class Index extends Component
 {
@@ -282,6 +282,18 @@ class Index extends Component
         }
     }
 
+    public function enablePublicAccess(): void
+    {
+        $this->isPublic = true;
+        $this->instantSave();
+    }
+
+    public function disablePublicAccess(): void
+    {
+        $this->isPublic = false;
+        $this->instantSave();
+    }
+
     public function instantSave()
     {
         try {
@@ -480,15 +492,11 @@ class Index extends Component
     {
         try {
             $this->authorize('update', $this->serviceApplication);
-            $this->fqdn = str($this->fqdn)->replaceEnd(',', '')->trim()->toString();
-            $this->fqdn = str($this->fqdn)->replaceStart(',', '')->trim()->toString();
-            $domains = str($this->fqdn)->trim()->explode(',')->map(function ($domain) {
-                $domain = trim($domain);
-                Url::fromString($domain, ['http', 'https']);
+            $this->validate([
+                'fqdn' => ValidationPatterns::applicationDomainRules(),
+            ]);
 
-                return str($domain)->lower();
-            });
-            $this->fqdn = $domains->unique()->implode(',');
+            $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
             if ($warning) {
                 $this->dispatch('warning', __('warning.sslipdomain'));

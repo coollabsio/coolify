@@ -1,38 +1,44 @@
 <?php
 
+use App\Livewire\Project\Index;
+use App\Models\InstanceSettings;
+use App\Models\Project;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Queue::fake();
+
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
+
+    $this->user = User::factory()->create();
+    $this->team = Team::factory()->create();
+    $this->user->teams()->attach($this->team, ['role' => 'owner']);
+
+    $this->actingAs($this->user);
+    session(['currentTeam' => $this->team]);
+});
+
 it('shows an empty state when there are no projects', function () {
-    $this->view('livewire.project.index', [
-        'projects' => collect(),
-    ])
-        ->assertSee('No projects found.')
-        ->assertSee('onboarding');
+    Livewire::test(Index::class)
+        ->assertSee('No projects yet')
+        ->assertSee('Create a project to organize your environments and resources.')
+        ->assertSee('Open onboarding');
 });
 
 it('does not show the empty state when projects exist', function () {
-    $project = new class
-    {
-        public string $name = 'Test Project';
+    Project::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Test Project',
+        'description' => 'A project description',
+    ]);
 
-        public string $description = 'A project description';
-
-        public string $uuid = 'test-project-uuid';
-
-        public $environments;
-
-        public function __construct()
-        {
-            $this->environments = collect();
-        }
-
-        public function navigateTo(): string
-        {
-            return '#';
-        }
-    };
-
-    $this->view('livewire.project.index', [
-        'projects' => collect([$project]),
-    ])
+    Livewire::test(Index::class)
         ->assertSee('Test Project')
-        ->assertDontSee('No projects found.');
+        ->assertDontSee('No projects yet');
 });

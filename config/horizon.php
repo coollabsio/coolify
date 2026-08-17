@@ -192,6 +192,7 @@ return [
             'sleep' => 3,
             'timeout' => env('HORIZON_TIMEOUT', 36000),
         ],
+
     ],
 
     'environments' => [
@@ -203,7 +204,6 @@ return [
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
-
         ],
         'local' => [
             's6' => [

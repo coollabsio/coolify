@@ -98,4 +98,17 @@ class GithubApp extends BaseModel
             },
         );
     }
+
+    /**
+     * A private GitHub App is connected once it has been registered and installed.
+     * Public sources do not require installation credentials.
+     */
+    public function isConnected(): bool
+    {
+        if ($this->is_public) {
+            return true;
+        }
+
+        return filled($this->app_id) && filled($this->installation_id);
+    }
 }
