@@ -591,6 +591,7 @@ class Server extends BaseModel
                 $schema = $url->getScheme();
                 $caddy_file = "
 $schema://$host {
+    encode zstd gzip
     handle /app/* {
         reverse_proxy coolify-realtime:6001
     }
