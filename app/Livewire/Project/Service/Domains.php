@@ -43,9 +43,17 @@ class Domains extends Component
 
     public string $newDomain = '';
 
+    public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $newDomainPartsChanged = false;
+
     public ?int $editingIndex = null;
 
     public string $editingDomain = '';
+
+    public array $editingDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $editingDomainPartsChanged = false;
 
     public ?int $editingServiceApplicationId = null;
 
@@ -515,11 +523,23 @@ class Domains extends Component
         $this->forceSaveDns = false;
     }
 
+    public function updatedNewDomainParts(): void
+    {
+        $this->newDomainPartsChanged = true;
+        $this->resetAddDomainDnsGate();
+    }
+
     public function updatedEditingDomain(): void
     {
         $this->editDomainDnsFailed = false;
         $this->editDomainDnsMessage = '';
         $this->forceSaveEditDns = false;
+    }
+
+    public function updatedEditingDomainParts(): void
+    {
+        $this->editingDomainPartsChanged = true;
+        $this->updatedEditingDomain();
     }
 
     public function confirmAddDomainDespiteDns(): void
@@ -842,6 +862,9 @@ class Domains extends Component
     {
         try {
             $this->authorize('update', $this->service);
+            if ($this->newDomainPartsChanged) {
+                $this->newDomain = DomainUrlParts::compose(...$this->newDomainParts);
+            }
             $this->validateOnly('newDomain');
 
             $app = $this->findServiceApp($this->newServiceApplicationId);
@@ -893,6 +916,8 @@ class Domains extends Component
             }
 
             $this->newDomain = '';
+            $this->newDomainParts = DomainUrlParts::empty();
+            $this->newDomainPartsChanged = false;
             $this->addDomainDnsFailed = false;
             $this->addDomainDnsMessage = '';
             $this->forceSaveDns = false;
@@ -916,12 +941,15 @@ class Domains extends Component
 
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
+        $this->editingDomainParts = DomainUrlParts::split($this->editingDomain);
+        $this->editingDomainPartsChanged = false;
         $this->editingServiceApplicationId = (int) $this->domainRows[$index]['service_application_id'];
         $this->editDomainDnsFailed = false;
         $this->editDomainDnsMessage = '';
         $this->forceSaveEditDns = false;
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
+        $this->dispatch('open-edit-domain');
     }
 
     public function cancelEdit(): void
@@ -929,6 +957,8 @@ class Domains extends Component
         $this->showEditDomainModal = false;
         $this->editingIndex = null;
         $this->editingDomain = '';
+        $this->editingDomainParts = DomainUrlParts::empty();
+        $this->editingDomainPartsChanged = false;
         $this->editingServiceApplicationId = null;
         $this->editDomainDnsFailed = false;
         $this->editDomainDnsMessage = '';
@@ -945,6 +975,9 @@ class Domains extends Component
                 return;
             }
 
+            if ($this->editingDomainPartsChanged) {
+                $this->editingDomain = DomainUrlParts::compose(...$this->editingDomainParts);
+            }
             $this->validateOnly('editingDomain');
 
             $app = $this->findServiceApp($this->editingServiceApplicationId);
@@ -1130,6 +1163,8 @@ class Domains extends Component
             }
 
             $this->newDomain = $domain;
+            $this->newDomainParts = DomainUrlParts::split($domain);
+            $this->newDomainPartsChanged = true;
             $this->updatedNewDomain();
         } catch (\Throwable $e) {
             handleError($e, $this);
