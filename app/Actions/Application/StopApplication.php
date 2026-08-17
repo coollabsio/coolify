@@ -13,7 +13,7 @@ class StopApplication
 
     public string $jobQueue = 'high';
 
-    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true)
+    public function handle(Application $application, bool $previewDeployments = false, bool $dockerCleanup = true, bool $resetRestartCount = true)
     {
         $servers = collect([$application->destination->server]);
         if ($application?->additional_servers?->count() > 0) {
@@ -28,7 +28,7 @@ class StopApplication
                 if ($server->isSwarm()) {
                     instant_remote_process(["docker stack rm {$application->uuid}"], $server);
 
-                    return;
+                    continue;
                 }
 
                 $containers = $previewDeployments
@@ -36,10 +36,11 @@ class StopApplication
                     : getCurrentApplicationContainerStatus($server, $application->id, 0);
 
                 $containersToStop = $containers->pluck('Names')->toArray();
+                $timeout = $application->settings->stopGracePeriodSeconds();
 
                 foreach ($containersToStop as $containerName) {
                     instant_remote_process(command: [
-                        "docker stop -t 30 $containerName",
+                        dockerStopCommand($timeout, $containerName, $server),
                         "docker rm -f $containerName",
                     ], server: $server, throwError: false);
                 }
@@ -56,12 +57,15 @@ class StopApplication
             }
         }
 
-        // Reset restart tracking when application is manually stopped
-        $application->update([
-            'restart_count' => 0,
-            'last_restart_at' => null,
-            'last_restart_type' => null,
-        ]);
+        $status = ['status' => 'exited'];
+        if ($resetRestartCount) {
+            $status = array_merge($status, [
+                'restart_count' => 0,
+                'last_restart_at' => null,
+                'last_restart_type' => null,
+            ]);
+        }
+        $application->update($status);
 
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }

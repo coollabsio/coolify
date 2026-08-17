@@ -1,5 +1,6 @@
 # documentation: https://github.com/calibrain/calibre-web-automated-book-downloader
 # slogan: An intuitive web interface for searching and requesting book downloads, designed to work seamlessly with Calibre-Web-Automated.
+# category: media
 # tags: calibre,calibre-web,ebook,library,epub,ereader,kindle,book,reader,download,downloader
 # logo: svgs/calibre-web-automated-with-downloader.png
 # port: 8083

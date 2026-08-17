@@ -33,7 +33,7 @@ beforeEach(function () {
 
 describe('PATCH /api/v1/databases', function () {
     test('updates public_port_timeout on a postgresql database', function () {
-        $database = StandalonePostgresql::forceCreate([
+        $database = StandalonePostgresql::create([
             'name' => 'test-postgres',
             'image' => 'postgres:15-alpine',
             'postgres_user' => 'postgres',
@@ -57,7 +57,7 @@ describe('PATCH /api/v1/databases', function () {
     });
 
     test('updates public_port_timeout on a redis database', function () {
-        $database = StandaloneRedis::forceCreate([
+        $database = StandaloneRedis::create([
             'name' => 'test-redis',
             'image' => 'redis:7',
             'redis_password' => 'password',
@@ -79,7 +79,7 @@ describe('PATCH /api/v1/databases', function () {
     });
 
     test('rejects invalid public_port_timeout value', function () {
-        $database = StandalonePostgresql::forceCreate([
+        $database = StandalonePostgresql::create([
             'name' => 'test-postgres',
             'image' => 'postgres:15-alpine',
             'postgres_user' => 'postgres',
@@ -101,7 +101,7 @@ describe('PATCH /api/v1/databases', function () {
     });
 
     test('accepts null public_port_timeout', function () {
-        $database = StandalonePostgresql::forceCreate([
+        $database = StandalonePostgresql::create([
             'name' => 'test-postgres',
             'image' => 'postgres:15-alpine',
             'postgres_user' => 'postgres',

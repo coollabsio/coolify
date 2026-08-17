@@ -1,0 +1,19 @@
+# documentation: https://github.com/favonia/cloudflare-ddns
+# slogan: A small, feature-rich, and robust Cloudflare DDNS updater.
+# category: automation
+# tags: cloud, ddns
+# logo: svgs/cloudflare-ddns.svg
+
+services:
+  cloudflare-ddns:
+    image: favonia/cloudflare-ddns:1.16.2
+    network_mode: host
+    user: "1000:1000"
+    read_only: true
+    cap_drop: [all]
+    security_opt: [no-new-privileges:true]
+    environment:
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:?}
+      - DOMAINS=${DOMAINS:?}
+      - PROXIED=${PROXIED:-false}
+      - IP6_PROVIDER=${IP6_PROVIDER:-none}

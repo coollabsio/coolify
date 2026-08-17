@@ -8,7 +8,17 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledDatabaseBackup extends BaseModel
 {
+    protected function casts(): array
+    {
+        return [
+            'database_backup_retention_max_storage_locally' => 'float',
+            'database_backup_retention_max_storage_s3' => 'float',
+        ];
+    }
+
     protected $fillable = [
+        'uuid',
+        'team_id',
         'description',
         'enabled',
         'save_s3',

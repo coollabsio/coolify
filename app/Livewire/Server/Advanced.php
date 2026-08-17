@@ -27,6 +27,9 @@ class Advanced extends Component
     #[Validate(['required', 'integer', 'min:1'])]
     public int|string $deploymentQueueLimit = 25;
 
+    #[Validate(['required', 'integer', 'in:25,50,75,100'])]
+    public int|string $backupCompressionCpuPercentage = 25;
+
     public function mount(string $server_uuid)
     {
         try {
@@ -47,6 +50,7 @@ class Advanced extends Component
             $this->server->settings->concurrent_builds = $this->concurrentBuilds;
             $this->server->settings->dynamic_timeout = $this->dynamicTimeout;
             $this->server->settings->deployment_queue_limit = $this->deploymentQueueLimit;
+            $this->server->settings->backup_compression_cpu_percentage = $this->backupCompressionCpuPercentage;
             $this->server->settings->server_disk_usage_notification_threshold = $this->serverDiskUsageNotificationThreshold;
             $this->server->settings->server_disk_usage_check_frequency = $this->serverDiskUsageCheckFrequency;
             $this->server->settings->save();
@@ -54,6 +58,7 @@ class Advanced extends Component
             $this->concurrentBuilds = $this->server->settings->concurrent_builds;
             $this->dynamicTimeout = $this->server->settings->dynamic_timeout;
             $this->deploymentQueueLimit = $this->server->settings->deployment_queue_limit;
+            $this->backupCompressionCpuPercentage = $this->server->settings->backup_compression_cpu_percentage;
             $this->serverDiskUsageNotificationThreshold = $this->server->settings->server_disk_usage_notification_threshold;
             $this->serverDiskUsageCheckFrequency = $this->server->settings->server_disk_usage_check_frequency;
         }

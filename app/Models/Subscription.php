@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Subscription extends Model
 {
     protected $fillable = [
+        'team_id',
         'stripe_invoice_paid',
         'stripe_subscription_id',
         'stripe_customer_id',

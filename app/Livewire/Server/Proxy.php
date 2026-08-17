@@ -102,11 +102,15 @@ class Proxy extends Component
 
     public function changeProxy()
     {
-        $this->authorize('update', $this->server);
-        $this->server->proxy = null;
-        $this->server->save();
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy = null;
+            $this->server->save();
 
-        $this->dispatch('reloadWindow');
+            $this->dispatch('reloadWindow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function selectProxy($proxy_type)

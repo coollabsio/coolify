@@ -31,7 +31,7 @@ beforeEach(function () {
         'redirect' => 'both',
     ]);
 
-    $this->application->settings->forceFill([
+    $this->application->settings->fill([
         'is_container_label_readonly_enabled' => false,
     ])->save();
 
@@ -92,7 +92,7 @@ test('cloning application with multiple persistent volumes generates unique uuid
 });
 
 test('cloning application reassigns settings to the cloned application', function () {
-    $this->application->settings->forceFill([
+    $this->application->settings->fill([
         'is_static' => true,
         'is_spa' => true,
         'is_build_server_enabled' => true,
@@ -118,7 +118,7 @@ test('cloning application reassigns settings to the cloned application', functio
 });
 
 test('cloning application reassigns scheduled tasks and previews to the cloned application', function () {
-    $scheduledTask = ScheduledTask::forceCreate([
+    $scheduledTask = ScheduledTask::create([
         'uuid' => 'scheduled-task-original',
         'application_id' => $this->application->id,
         'team_id' => $this->team->id,
@@ -129,7 +129,7 @@ test('cloning application reassigns scheduled tasks and previews to the cloned a
         'timeout' => 120,
     ]);
 
-    $preview = ApplicationPreview::forceCreate([
+    $preview = ApplicationPreview::create([
         'uuid' => 'preview-original',
         'application_id' => $this->application->id,
         'pull_request_id' => 123,

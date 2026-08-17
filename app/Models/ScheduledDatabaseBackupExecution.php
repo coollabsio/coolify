@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ScheduledDatabaseBackupExecution extends BaseModel
 {
     protected $fillable = [
+        'uuid',
+        'scheduled_database_backup_id',
         'status',
         'message',
         'size',
@@ -21,6 +23,8 @@ class ScheduledDatabaseBackupExecution extends BaseModel
     protected function casts(): array
     {
         return [
+            'size' => 'integer',
+            'finished_at' => 'datetime',
             's3_uploaded' => 'boolean',
             'local_storage_deleted' => 'boolean',
             's3_storage_deleted' => 'boolean',

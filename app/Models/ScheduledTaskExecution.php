@@ -23,6 +23,7 @@ use OpenApi\Attributes as OA;
 class ScheduledTaskExecution extends BaseModel
 {
     protected $fillable = [
+        'scheduled_task_id',
         'status',
         'message',
         'finished_at',

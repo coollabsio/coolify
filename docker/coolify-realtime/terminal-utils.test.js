@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    MAX_TERMINAL_SESSION_TIMEOUT_SECONDS,
     extractSshArgs,
     extractTargetHost,
+    getTerminalSessionTimeout,
     isAuthorizedTargetHost,
     normalizeHostForAuthorization,
 } from './terminal-utils.js';
@@ -44,4 +46,11 @@ test('normalizeHostForAuthorization unwraps bracketed IPv6 hosts', () => {
 
 test('isAuthorizedTargetHost rejects hosts that are not in the allowlist', () => {
     assert.equal(isAuthorizedTargetHost("'10.0.0.9'", ['10.0.0.5']), false);
+});
+
+
+test('getTerminalSessionTimeout always enforces the maximum terminal session lifetime', () => {
+    assert.equal(getTerminalSessionTimeout(null), MAX_TERMINAL_SESSION_TIMEOUT_SECONDS);
+    assert.equal(getTerminalSessionTimeout(60), MAX_TERMINAL_SESSION_TIMEOUT_SECONDS);
+    assert.equal(getTerminalSessionTimeout(MAX_TERMINAL_SESSION_TIMEOUT_SECONDS + 60), MAX_TERMINAL_SESSION_TIMEOUT_SECONDS);
 });

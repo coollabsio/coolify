@@ -38,8 +38,7 @@ class ResourceCreatePolicy
      */
     public function createAny(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -51,8 +50,7 @@ class ResourceCreatePolicy
             return false;
         }
 
-        //  return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**

@@ -1,0 +1,49 @@
+# documentation: https://github.com/grimmory-tools/grimmory
+# slogan: Grimmory is a self-hosted application for managing your entire book collection in one place. Organize, read, annotate, sync across devices, and share without relying on third-party services.
+# tags: books,ebooks,library,reader
+# logo: svgs/grimmory.svg
+# port: 80
+
+services:
+  grimmory:
+    image: 'grimmory/grimmory:nightly-20260403-3a371f7' # Released on April 3 2026
+    environment:
+      - SERVICE_URL_GRIMMORY_80
+      - 'USER_ID=${GRIMMORY_USER_ID:-0}'
+      - 'GROUP_ID=${GRIMMORY_GROUP_ID:-0}'
+      - 'TZ=${TZ:-UTC}'
+      - 'DATABASE_URL=jdbc:mariadb://mariadb:3306/${MARIADB_DATABASE:-grimmory-db}'
+      - 'DATABASE_USERNAME=${SERVICE_USER_MARIADB}'
+      - 'DATABASE_PASSWORD=${SERVICE_PASSWORD_MARIADB}'
+      - BOOKLORE_PORT=80
+    volumes:
+      - 'grimmory-data:/app/data'
+      - 'grimmory-books:/books'
+      - 'grimmory-bookdrop:/bookdrop'
+    healthcheck:
+      test: 'wget --no-verbose --tries=1 --spider http://127.0.0.1/health || exit 1'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  mariadb:
+    image: 'mariadb:12'
+    environment:
+      - 'MARIADB_USER=${SERVICE_USER_MARIADB}'
+      - 'MARIADB_PASSWORD=${SERVICE_PASSWORD_MARIADB}'
+      - 'MARIADB_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}'
+      - 'MARIADB_DATABASE=${MARIADB_DATABASE:-grimmory-db}'
+    volumes:
+      - 'mariadb-data:/var/lib/mysql'
+    healthcheck:
+      test:
+        - CMD
+        - healthcheck.sh
+        - '--connect'
+        - '--innodb_initialized'
+      interval: 10s
+      timeout: 5s
+      retries: 10

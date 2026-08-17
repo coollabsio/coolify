@@ -9,7 +9,7 @@
 # Add the public Key in "Key" env variable and token in the "Token" variable below (These are obtained from Beszel UI)
 services:
   beszel:
-    image: 'henrygd/beszel:0.18.4' # Released on 21 Feb 2026
+    image: 'henrygd/beszel:0.18.7' # Released on 6 April 2026
     environment:
       - SERVICE_URL_BESZEL_8090
       - CONTAINER_DETAILS=${CONTAINER_DETAILS:-true}
@@ -24,7 +24,7 @@ services:
       retries: 10
       start_period: 5s
   beszel-agent:
-    image: 'henrygd/beszel-agent:0.18.4' # Released on 21 Feb 2026
+    image: 'henrygd/beszel-agent:0.18.7' # Released on 6 April 2026
     network_mode: host # Network stats graphs won't work if agent cannot access host system network stack
     environment:
       # Required

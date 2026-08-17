@@ -7,7 +7,8 @@
                 <x-forms.input required label="Name" id="name" />
                 <x-forms.input label="Description" id="description" />
             </div>
-            <x-forms.input required type="url" label="Endpoint" wire:model.blur="endpoint" />
+            <x-forms.domain-input id="endpoint" host-label="Host"
+                host-placeholder="minio.internal or 192.168.1.50" />
             <div class="flex gap-2">
                 <x-forms.input required label="Bucket" id="bucket" />
                 <x-forms.input required helper="Region only required for AWS. Leave it as-is for other providers."
@@ -18,13 +19,13 @@
                 <x-forms.input required type="password" label="Secret Key" id="secret" />
             </div>
 
-            <x-forms.button class="mt-4" type="submit">
+            <x-forms.button class="mt-4" type="submit" wire:target="submit">
                 Validate Connection & Continue
             </x-forms.button>
         </form>
     </div>
 @else
-    <x-callout type="warning" title="Permission Required">
+    <x-callout type="danger" title="Insufficient Permissions">
         You don't have permission to create new S3 storage configurations. Please contact your team administrator for
         access.
     </x-callout>

@@ -7,7 +7,7 @@
 
 services:
   mealie:
-    image: 'ghcr.io/mealie-recipes/mealie:latest'
+    image: 'ghcr.io/mealie-recipes/mealie:3.17.0'
     environment:
       - SERVICE_URL_MEALIE_9000
       - ALLOW_SIGNUP=${ALLOW_SIGNUP:-true}

@@ -8,12 +8,15 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class SettingsBackup extends Component
 {
+    use AuthorizesRequests;
+
     public InstanceSettings $settings;
 
     public Server $server;
@@ -77,13 +80,15 @@ class SettingsBackup extends Component
     public function addCoolifyDatabase()
     {
         try {
+            $this->authorize('update', $this->settings);
             $server = Server::findOrFail(0);
             $out = instant_remote_process(['docker inspect coolify-db'], $server);
             $envs = format_docker_envs_to_json($out);
             $postgres_password = $envs['POSTGRES_PASSWORD'];
             $postgres_user = $envs['POSTGRES_USER'];
             $postgres_db = $envs['POSTGRES_DB'];
-            $this->database = StandalonePostgresql::forceCreate([
+            $this->database = new StandalonePostgresql;
+            $this->database->forceFill([
                 'id' => 0,
                 'name' => 'coolify-db',
                 'description' => 'Coolify database',
@@ -94,6 +99,7 @@ class SettingsBackup extends Component
                 'destination_type' => StandaloneDocker::class,
                 'destination_id' => 0,
             ]);
+            $this->database->save();
             $this->backup = ScheduledDatabaseBackup::create([
                 'id' => 0,
                 'enabled' => true,
@@ -121,14 +127,19 @@ class SettingsBackup extends Component
 
     public function submit()
     {
-        $this->validate();
+        try {
+            $this->authorize('update', $this->settings);
+            $this->validate();
 
-        $this->database->update([
-            'name' => $this->name,
-            'description' => $this->description,
-            'postgres_user' => $this->postgres_user,
-            'postgres_password' => $this->postgres_password,
-        ]);
-        $this->dispatch('success', 'Backup updated.');
+            $this->database->update([
+                'name' => $this->name,
+                'description' => $this->description,
+                'postgres_user' => $this->postgres_user,
+                'postgres_password' => $this->postgres_password,
+            ]);
+            $this->dispatch('success', 'Backup updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 }

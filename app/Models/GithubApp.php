@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 class GithubApp extends BaseModel
 {
     protected $fillable = [
+        'team_id',
+        'private_key_id',
         'name',
         'organization',
         'api_url',
@@ -71,26 +73,6 @@ class GithubApp extends BaseModel
         });
     }
 
-    public static function public()
-    {
-        return GithubApp::where(function ($query) {
-            $query->where(function ($q) {
-                $q->where('team_id', currentTeam()->id)
-                    ->orWhere('is_system_wide', true);
-            })->where('is_public', true);
-        })->whereNotNull('app_id')->get();
-    }
-
-    public static function private()
-    {
-        return GithubApp::where(function ($query) {
-            $query->where(function ($q) {
-                $q->where('team_id', currentTeam()->id)
-                    ->orWhere('is_system_wide', true);
-            })->where('is_public', false);
-        })->whereNotNull('app_id')->get();
-    }
-
     public function team()
     {
         return $this->belongsTo(Team::class);
@@ -115,5 +97,18 @@ class GithubApp extends BaseModel
                 }
             },
         );
+    }
+
+    /**
+     * A private GitHub App is connected once it has been registered and installed.
+     * Public sources do not require installation credentials.
+     */
+    public function isConnected(): bool
+    {
+        if ($this->is_public) {
+            return true;
+        }
+
+        return filled($this->app_id) && filled($this->installation_id);
     }
 }

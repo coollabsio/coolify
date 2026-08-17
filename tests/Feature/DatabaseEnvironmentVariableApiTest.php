@@ -14,7 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0], ['is_api_enabled' => true]));
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
@@ -33,7 +33,7 @@ beforeEach(function () {
 
 function createDatabase($context): StandalonePostgresql
 {
-    return StandalonePostgresql::forceCreate([
+    return StandalonePostgresql::create([
         'name' => 'test-postgres',
         'image' => 'postgres:15-alpine',
         'postgres_user' => 'postgres',
@@ -342,5 +342,46 @@ describe('DELETE /api/v1/databases/{uuid}/envs/{env_uuid}', function () {
         ])->deleteJson("/api/v1/databases/{$database->uuid}/envs/non-existent-uuid");
 
         $response->assertStatus(404);
+    });
+});
+
+describe('environment variable key validation for database APIs', function () {
+    test('rejects invalid database environment variable keys on create update and bulk', function () {
+        $database = createDatabase($this);
+
+        EnvironmentVariable::create([
+            'key' => 'SAFE_KEY',
+            'value' => 'old-value',
+            'resourceable_type' => StandalonePostgresql::class,
+            'resourceable_id' => $database->id,
+        ]);
+
+        $headers = [
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ];
+
+        $this->withHeaders($headers)
+            ->postJson("/api/v1/databases/{$database->uuid}/envs", [
+                'key' => 'BAD$(id)',
+                'value' => '1',
+            ])
+            ->assertStatus(422);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/databases/{$database->uuid}/envs", [
+                'key' => 'BAD$(id)',
+                'value' => '1',
+            ])
+            ->assertStatus(422);
+
+        $this->withHeaders($headers)
+            ->patchJson("/api/v1/databases/{$database->uuid}/envs/bulk", [
+                'data' => [[
+                    'key' => 'BAD$(id)',
+                    'value' => '1',
+                ]],
+            ])
+            ->assertStatus(422);
     });
 });

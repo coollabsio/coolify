@@ -16,8 +16,8 @@ it('ensures service parser does not include image in trusted service creation qu
     expect($parsersFile)
         ->toContain("\$databaseFound = ServiceDatabase::where('name', \$serviceName)->where('service_id', \$resource->id)->first();")
         ->toContain("\$applicationFound = ServiceApplication::where('name', \$serviceName)->where('service_id', \$resource->id)->first();")
-        ->toContain("forceCreate([\n                        'name' => \$serviceName,\n                        'service_id' => \$resource->id,\n                    ]);")
-        ->not->toContain("forceCreate([\n                        'name' => \$serviceName,\n                        'image' => \$image,\n                        'service_id' => \$resource->id,\n                    ]);");
+        ->toContain("create([\n                        'name' => \$serviceName,\n                        'service_id' => \$resource->id,\n                    ]);")
+        ->not->toContain("create([\n                        'name' => \$serviceName,\n                        'image' => \$image,\n                        'service_id' => \$resource->id,\n                    ]);");
 });
 
 it('ensures service parser updates image after finding or creating service', function () {
@@ -41,8 +41,8 @@ it('ensures parseDockerComposeFile does not create duplicates on null savedServi
     // The new code checks for null within the else block and creates only if needed
     expect($sharedFile)
         ->toContain('if (is_null($savedService)) {')
-        ->toContain('$savedService = ServiceDatabase::forceCreate([')
-        ->toContain('$savedService = ServiceApplication::forceCreate([');
+        ->toContain('$savedService = ServiceDatabase::create([')
+        ->toContain('$savedService = ServiceApplication::create([');
 });
 
 it('verifies image update logic is present in parseDockerComposeFile', function () {

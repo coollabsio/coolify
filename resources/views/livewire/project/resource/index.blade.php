@@ -1,440 +1,561 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($project, 'name')->limit(10) }} > Resources | Coolify
+        {{ data_get_str($environment, 'name')->limit(10) }} > Resources | Coolify
     </x-slot>
-    <div class="flex flex-col">
-        <div class="flex min-w-0 flex-nowrap items-center gap-1">
-            <h1>Resources</h1>
-            @if ($environment->isEmpty())
-                @can('createAnyResource')
-                    <a class="button" {{ wireNavigate() }}
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
-                    </a>
-                @endcan
-            @else
-                @can('createAnyResource')
-                    <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                        {{ wireNavigate() }} class="button">+
-                        New</a>
-                @endcan
-                @can('createAnyResource')
-                    <a class="button" {{ wireNavigate() }}
-                        href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}">
-                        Clone
-                    </a>
-                @endcan
-            @endif
-            @can('delete', $environment)
-                <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
-            @endcan
-        </div>
-        <nav class="flex pt-2 pb-6">
-            <ol class="flex items-center">
-                <li class="inline-flex items-center" x-data="{ projectOpen: false, toggle() { this.projectOpen = !this.projectOpen }, open() { this.projectOpen = true }, close() { this.projectOpen = false } }">
-                    <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
-                        <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
-                            href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}">
-                            {{ $project->name }}</a>
-                        <button type="button" @click.stop="toggle()" class="px-1 text-warning">
-                            <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-90': projectOpen }"
-                                fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M9 5l7 7-7 7">
-                                </path>
-                            </svg>
-                        </button>
-
-                        <div x-show="projectOpen" @click.outside="close()"
-                            x-transition:enter="transition ease-out duration-200"
-                            x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                            x-transition:leave="transition ease-in duration-75"
-                            x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute z-20 top-full mt-1 w-56 -ml-2 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
-                            @foreach ($allProjects as $proj)
-                                <a href="{{ route('project.show', ['project_uuid' => $proj->uuid]) }}"
-                                    class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $proj->uuid === $project->uuid ? 'dark:text-warning font-semibold' : '' }}"
-                                    title="{{ $proj->name }}">
-                                    {{ $proj->name }}
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
-                </li>
-                <li class="inline-flex items-center" x-data="{ envOpen: false, activeEnv: null, envPositions: {}, closeTimeout: null, envTimeout: null, toggle() { this.envOpen = !this.envOpen; if (!this.envOpen) { this.activeEnv = null; } }, open() { clearTimeout(this.closeTimeout); this.envOpen = true }, close() { this.closeTimeout = setTimeout(() => { this.envOpen = false; this.activeEnv = null; }, 100) }, openEnv(id) { clearTimeout(this.closeTimeout); clearTimeout(this.envTimeout); this.activeEnv = id }, closeEnv() { this.envTimeout = setTimeout(() => { this.activeEnv = null; }, 100) } }">
-                    <div class="flex items-center relative" @mouseenter="open()" @mouseleave="close()">
-                        <a class="text-xs truncate lg:text-sm hover:text-warning" {{ wireNavigate() }}
-                            href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $environment->uuid]) }}">
-                            {{ $environment->name }}
-                        </a>
-
-                        <div x-show="envOpen" @click.outside="close()"
-                            x-transition:enter="transition ease-out duration-200"
-                            x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
-                            x-transition:leave="transition ease-in duration-75"
-                            x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute z-20 top-full mt-1 left-0 sm:left-auto max-w-[calc(100vw-1rem)]"
-                            x-init="$nextTick(() => { const rect = $el.getBoundingClientRect(); if (rect.right > window.innerWidth) { $el.style.left = 'auto';
-                                    $el.style.right = '0'; } })">
-                            <!-- Environment List -->
-                            <div
-                                class="relative w-48 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
-                                @foreach ($allEnvironments as $env)
-                                    @php
-                                        $envDatabases = collect()
-                                            ->merge($env->postgresqls ?? collect())
-                                            ->merge($env->redis ?? collect())
-                                            ->merge($env->mongodbs ?? collect())
-                                            ->merge($env->mysqls ?? collect())
-                                            ->merge($env->mariadbs ?? collect())
-                                            ->merge($env->keydbs ?? collect())
-                                            ->merge($env->dragonflies ?? collect())
-                                            ->merge($env->clickhouses ?? collect());
-                                        $envResources = collect()
-                                            ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
-                                            ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
-                                            ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]))
-                                            ->sortBy(fn($item) => strtolower($item['resource']->name));
-                                    @endphp
-                                    <div @mouseenter="openEnv('{{ $env->uuid }}'); envPositions['{{ $env->uuid }}'] = $el.offsetTop - ($el.closest('.overflow-y-auto')?.scrollTop || 0)"
-                                        @mouseleave="closeEnv()">
-                                        <a href="{{ route('project.resource.index', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => $env->uuid]) }}"
-                                            {{ wireNavigate() }}
-                                            class="flex items-center justify-between gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 {{ $env->uuid === $environment->uuid ? 'dark:text-warning font-semibold' : '' }}"
-                                            title="{{ $env->name }}">
-                                            <span class="truncate">{{ $env->name }}</span>
-                                            @if ($envResources->count() > 0)
-                                                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor"
-                                                    viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                        stroke-width="4" d="M9 5l7 7-7 7"></path>
-                                                </svg>
-                                            @endif
-                                        </a>
-                                    </div>
-                                @endforeach
-                                <div class="border-t border-neutral-200 dark:border-coolgray-200 mt-1 pt-1">
-                                    <a href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}"
-                                        {{ wireNavigate() }}
-                                        class="flex items-center gap-2 px-4 py-2 text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z">
-                                            </path>
-                                        </svg>
-                                        Create / Edit
-                                    </a>
-                                </div>
-                            </div>
-
-                            <!-- Resources Sub-dropdown (2nd level) -->
-                            @foreach ($allEnvironments as $env)
-                                @php
-                                    $envDatabases = collect()
-                                        ->merge($env->postgresqls ?? collect())
-                                        ->merge($env->redis ?? collect())
-                                        ->merge($env->mongodbs ?? collect())
-                                        ->merge($env->mysqls ?? collect())
-                                        ->merge($env->mariadbs ?? collect())
-                                        ->merge($env->keydbs ?? collect())
-                                        ->merge($env->dragonflies ?? collect())
-                                        ->merge($env->clickhouses ?? collect());
-                                    $envResources = collect()
-                                        ->merge($env->applications->map(fn($app) => ['type' => 'application', 'resource' => $app]))
-                                        ->merge($envDatabases->map(fn($db) => ['type' => 'database', 'resource' => $db]))
-                                        ->merge($env->services->map(fn($svc) => ['type' => 'service', 'resource' => $svc]));
-                                @endphp
-                                @if ($envResources->count() > 0)
-                                    <div x-show="activeEnv === '{{ $env->uuid }}'" x-cloak
-                                        x-transition:enter="transition ease-out duration-150"
-                                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                                        @mouseenter="openEnv('{{ $env->uuid }}')" @mouseleave="closeEnv()"
-                                        :style="'position: absolute; left: 100%; top: ' + (envPositions['{{ $env->uuid }}'] || 0) + 'px; z-index: 30;'"
-                                        class="flex flex-col sm:flex-row items-start pl-1">
-                                        <div
-                                            class="relative w-56 bg-white dark:bg-coolgray-100 rounded-md shadow-lg py-1 border border-neutral-200 dark:border-coolgray-200 max-h-96 overflow-y-auto scrollbar">
-                                            @foreach ($envResources as $envResource)
-                                                @php
-                                                    $resType = $envResource['type'];
-                                                    $res = $envResource['resource'];
-                                                    $resRoute = match ($resType) {
-                                                        'application' => route('project.application.configuration', [
-                                                            'project_uuid' => $project->uuid,
-                                                            'environment_uuid' => $env->uuid,
-                                                            'application_uuid' => $res->uuid,
-                                                        ]),
-                                                        'service' => route('project.service.configuration', [
-                                                            'project_uuid' => $project->uuid,
-                                                            'environment_uuid' => $env->uuid,
-                                                            'service_uuid' => $res->uuid,
-                                                        ]),
-                                                        'database' => route('project.database.configuration', [
-                                                            'project_uuid' => $project->uuid,
-                                                            'environment_uuid' => $env->uuid,
-                                                            'database_uuid' => $res->uuid,
-                                                        ]),
-                                                    };
-                                                @endphp
-                                                <a href="{{ $resRoute }}" {{ wireNavigate() }}
-                                                    class="block px-4 py-2 text-sm truncate hover:bg-neutral-100 dark:hover:bg-coolgray-200"
-                                                    title="{{ $res->name }}">
-                                                    {{ $res->name }}
-                                                </a>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endif
-                            @endforeach
-                        </div>
-                    </div>
-                </li>
-            </ol>
-        </nav>
-    </div>
-    @if ($environment->isEmpty())
-        @can('createAnyResource')
-            <a href="{{ route('project.resource.create', ['project_uuid' => data_get($parameters, 'project_uuid'), 'environment_uuid' => data_get($environment, 'uuid')]) }}"
-                {{ wireNavigate() }} class="items-center justify-center coolbox">+ Add Resource</a>
-        @else
-            <div
-                class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-neutral-300 dark:border-coolgray-300 rounded-lg">
-                <h3 class="mb-2 text-lg font-semibold text-neutral-600 dark:text-neutral-400">No Resources Found</h3>
-                <p class="text-sm text-neutral-600 dark:text-neutral-400">
-                    This environment doesn't have any resources yet.<br>
-                    Contact your team administrator to add resources.
+    <div x-data="resourceIndex()" class="w-full">
+        <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+                <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $environment->name }}</h1>
+                <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                    <span x-text="`${resources.length} ${resources.length === 1 ? 'resource' : 'resources'}`"></span>
+                    in {{ $project->name }}
                 </p>
             </div>
-        @endcan
-    @else
-        <div x-data="searchComponent()">
-            <x-forms.input placeholder="Search for name, fqdn..." x-model="search" id="null" />
-            <template
-                x-if="filteredApplications.length === 0 && filteredDatabases.length === 0 && filteredServices.length === 0">
-                <div class="flex flex-col items-center justify-center p-8 text-center">
-                    <div x-show="search.length > 0">
-                        <p class="text-neutral-600 dark:text-neutral-400">No resource found with the search term "<span
-                                class="font-semibold" x-text="search"></span>".</p>
-                        <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">Try adjusting your search
-                            criteria.</p>
-                    </div>
-                    <div x-show="search.length === 0">
-                        <p class="text-neutral-600 dark:text-neutral-400">No resources found in this environment.</p>
-                        @cannot('createAnyResource')
-                            <p class="text-sm text-neutral-500 dark:text-neutral-500 mt-1">Contact your team administrator
-                                to add resources.</p>
-                        @endcannot
+            <div class="flex w-fit shrink-0 items-center gap-2">
+                @can('update', $project)
+                    <a href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                        {{ wireNavigate() }}
+                        class="button whitespace-nowrap"
+                        title="Environment settings"
+                        aria-label="Open settings for {{ $environment->name }}">
+                        <x-reicon name="settings" class="size-3.5" />
+                        Settings
+                    </a>
+                @endcan
+                @can('createAnyResource')
+                    <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                        {{ wireNavigate() }}
+                        class="button whitespace-nowrap button-highlighted">
+                        <x-reicon name="plus" class="size-3.5" />
+                        New resource
+                    </a>
+                @endcan
+            </div>
+        </header>
+
+        @if ($environment->isEmpty())
+            @can('createAnyResource')
+                <x-empty title="No resources yet"
+                    description="Add an application, database, or service to this environment."
+                    icon-name="layers">
+                    <x-slot:contents>
+                        <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                            {{ wireNavigate() }} class="button">
+                            <x-reicon name="plus" class="size-3.5" />
+                            Add resource
+                        </a>
+                    </x-slot:contents>
+                </x-empty>
+            @else
+                <x-empty title="No resources yet"
+                    description="Add an application, database, or service to this environment."
+                    icon-name="layers" />
+            @endcan
+        @else
+            <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="relative w-full sm:max-w-sm">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input x-model.debounce.150ms="search" x-on:input="page = 1" type="search"
+                        placeholder="Search resources"
+                        class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                    <button x-cloak x-show="search" x-on:click="search = ''; page = 1" type="button"
+                        class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                        aria-label="Clear search">
+                        <span class="text-sm leading-none">×</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <x-table.dropdown panel-class="w-64! overflow-hidden! p-0!" :multiselectable="true">
+                        <x-slot:trigger>
+                            <button type="button" class="button max-w-64"
+                                :class="activeFilterCount > 0 && 'button-highlighted'"
+                                :title="activeFilterCount > 0 ? filterButtonText : 'Filter'"
+                                aria-haspopup="listbox" :aria-expanded="open">
+                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
+                                    stroke-linecap="round" />
+                            </svg>
+                            <span class="truncate" x-text="activeFilterCount > 0 ? filterButtonText : 'Filter'"></span>
+                            <span x-show="activeFilterCount > 0"
+                                class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"
+                                x-text="activeFilterCount"></span>
+                            </button>
+                        </x-slot:trigger>
+                            <div class="max-h-80 overflow-y-auto p-1">
+                                <template x-for="group in filterGroups" :key="group.key">
+                                    <div x-show="group.options.length > 0">
+                                        <div class="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-fg-faint"
+                                            x-text="group.label"></div>
+                                        <template x-for="option in group.options" :key="`${group.key}-${option.value}`">
+                                            <button type="button" class="listbox-option"
+                                                x-on:click="toggleFilter(group.key, option.value)">
+                                                <span class="min-w-0 flex-1 truncate" x-text="option.label"></span>
+                                                <span
+                                                    class="flex size-4 shrink-0 items-center justify-center rounded-[5px] border"
+                                                    :class="isFilterSelected(group.key, option.value)
+                                                        ? 'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black'
+                                                        : 'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]'">
+                                                    <svg x-show="isFilterSelected(group.key, option.value)" class="size-3"
+                                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                        <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="border-t border-neutral-200 bg-white p-1 dark:border-white/10 dark:bg-raised">
+                                <button type="button" class="listbox-option justify-center! text-center!"
+                                    x-on:click="clearFilters()">
+                                    Clear filters
+                                </button>
+                            </div>
+                    </x-table.dropdown>
+
+                    <x-table.dropdown panel-class="w-48!">
+                        <x-slot:trigger>
+                            <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
+                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
+                                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                            Sort
+                            </button>
+                        </x-slot:trigger>
+                            <template x-for="option in sortOptions" :key="option.value">
+                                <button type="button"
+                                    class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                                    x-on:click="sortBy = option.value; close(); page = 1">
+                                    <span class="flex-1" x-text="option.label"></span>
+                                    <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
+                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
+                                            stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </button>
+                            </template>
+                    </x-table.dropdown>
+
+                    <div
+                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
+                        <button type="button" x-on:click="setViewMode('table')"
+                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
+                            :class="viewMode === 'table'
+                                ?
+                                'control-selected' :
+                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                            aria-label="Table view" title="Table view">
+                            <x-reicon name="unordered-list" class="size-3.5" />
+                        </button>
+                        <button type="button" x-on:click="setViewMode('grid')"
+                            class="flex size-7.5 items-center justify-center rounded-md transition-colors"
+                            :class="viewMode === 'grid'
+                                ?
+                                'control-selected' :
+                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg'"
+                            aria-label="Grid view" title="Grid view">
+                            <x-reicon name="grid" class="size-3.5" />
+                        </button>
                     </div>
                 </div>
-            </template>
+            </div>
 
-            <template x-if="filteredApplications.length > 0">
-                <h2 class="pt-4">Applications</h2>
-            </template>
-            <div x-show="filteredApplications.length > 0"
-                class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredApplications" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-            <template x-if="filteredDatabases.length > 0">
-                <h2 class="pt-4">Databases</h2>
-            </template>
-            <div x-show="filteredDatabases.length > 0"
-                class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredDatabases" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-            <template x-if="filteredServices.length > 0">
-                <h2 class="pt-4">Services</h2>
-            </template>
-            <div x-show="filteredServices.length > 0"
-                class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in filteredServices" :key="item.uuid">
-                    <span>
-                        <a class="h-24 coolbox group" :href="item.hrefLink" {{ wireNavigate() }}>
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('starting')">
-                                        <div title="starting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge-dashboard"></div>
-                                    </template>
-                                </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
-                                <div class="max-w-full px-4 pt-1 truncate box-description">Server: <span
-                                        x-text="item.destination?.server?.name || 'Unknown'"></span></div>
-                                <template x-if="item.server_status == false">
-                                    <div class="px-4 text-xs font-bold text-error">Server is unreachable or
-                                        misconfigured
-                                    </div>
-                                </template>
-                            </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 dark:group-hover:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <a :href="`/tags/${tag.name}`" class="tag" x-text="tag.name">
-                                </a>
-                            </template>
-                            <a :href="`${item.hrefLink}/tags`" class="add-tag">
-                                Add tag
-                            </a>
-                        </div>
-                    </span>
-                </template>
-            </div>
-        </div>
-    @endif
+            <div x-show="viewMode === 'table'"
+                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                <div
+                    class="environment-resource-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    <div>Resource</div>
+                    <div class="resource-type">Type</div>
+                    <div>Status</div>
+                    <div class="resource-domain">Domain</div>
+                    <div class="resource-server">Server</div>
+                    <div class="resource-tags">Tags</div>
+                </div>
 
+                <template x-for="item in paginatedResources" :key="item.uuid">
+                    <div
+                        class="environment-resource-grid group relative min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        <a :href="item.hrefLink"
+                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                            {{ wireNavigate() }} class="absolute inset-0" :aria-label="`Open ${item.name}`"></a>
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <template x-if="item.type === 'application'">
+                                    <x-reicon name="browser-code" class="size-4" />
+                                </template>
+                                <template x-if="item.type === 'database'">
+                                    <x-reicon name="database" class="size-4" />
+                                </template>
+                                <template x-if="item.type === 'service'">
+                                    <x-reicon name="layers" class="size-4" />
+                                </template>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex min-w-0 items-center gap-1.5">
+                                    <a :href="item.hrefLink"
+                                        {{ wireNavigate() }}
+                                        class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
+                                        x-text="item.name"></a>
+                                </div>
+                                <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    <span x-show="item.description" x-text="item.description"></span>
+                                </p>
+                                <div class="mobile-resource-domain min-w-0">
+                                    <template x-if="item.fqdn">
+                                        <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
+                                            class="relative z-10 block truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
+                                            x-text="displayDomain(item.fqdn)"></a>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="resource-type truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                            x-text="item.typeLabel"></div>
+
+                        <div>
+                            <x-status-badge dynamic>
+                                <span class="size-1.5 shrink-0 rounded-full"
+                                    x-bind:class="statusDotClass(item)"></span>
+                                <span class="truncate" x-text="statusLabel(item)"></span>
+                            </x-status-badge>
+                        </div>
+
+                        <div class="resource-domain min-w-0">
+                            <template x-if="item.fqdn">
+                                <a :href="firstDomain(item.fqdn)" target="_blank"
+                                    class="relative inline-block max-w-full truncate align-middle text-[12px] text-neutral-600 hover:underline dark:text-fg-dim"
+                                    x-text="displayDomain(item.fqdn)"></a>
+                            </template>
+                            <span x-show="!item.fqdn" class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
+                        </div>
+
+                        <div class="resource-server truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                            x-text="item.destination?.server?.name || 'Unknown'"></div>
+
+                        <div class="resource-tags flex min-w-0 items-center gap-1 overflow-hidden">
+                            <template x-for="tag in item.tags.slice(0, 2)" :key="tag.id">
+                                <a :href="`/tags/${tag.name}`"
+                                    class="relative max-w-24 truncate rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-black dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint dark:hover:text-fg"
+                                    x-text="tag.name"></a>
+                            </template>
+                            <span x-show="item.tags.length > 2"
+                                class="text-[10px] text-neutral-400 dark:text-fg-faint"
+                                x-text="`+${item.tags.length - 2}`"></span>
+                            <span x-show="item.tags.length === 0"
+                                class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
+                        </div>
+                    </div>
+                </template>
+
+                <div x-show="filteredResources.length === 0"
+                    class="flex min-h-52 flex-col items-center justify-center px-6 text-center">
+                    <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
+                    <p class="text-[13px] font-medium">No matching resources</p>
+                    <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        Try a different search or filter.
+                    </p>
+                </div>
+                <x-client-pagination x-show="filteredResources.length > 0"
+                    summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
+                    page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
+            </div>
+
+            <div x-cloak x-show="viewMode === 'grid'">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <template x-for="item in paginatedResources" :key="item.uuid">
+                        <article
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <a :href="item.hrefLink"
+                                @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                                {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
+                                :aria-label="`Open ${item.name}`"></a>
+
+                            <div class="flex items-start gap-3">
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    <template x-if="item.type === 'application'">
+                                        <x-reicon name="browser-code" class="size-4" />
+                                    </template>
+                                    <template x-if="item.type === 'database'">
+                                        <x-reicon name="database" class="size-4" />
+                                    </template>
+                                    <template x-if="item.type === 'service'">
+                                        <x-reicon name="layers" class="size-4" />
+                                    </template>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex min-w-0 items-center gap-1.5">
+                                        <h2
+                                            class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
+                                            x-text="item.name"></h2>
+                                    </div>
+                                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
+                                        x-text="item.typeLabel"></p>
+                                </div>
+                                <x-status-badge dynamic>
+                                    <span class="size-1.5 shrink-0 rounded-full"
+                                        x-bind:class="statusDotClass(item)"></span>
+                                    <span class="truncate" x-text="statusLabel(item)"></span>
+                                </x-status-badge>
+                            </div>
+                            <div class="mt-auto flex min-w-0 flex-col gap-0.5 pt-4">
+                                <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    <span x-show="item.description" x-text="item.description"></span>
+                                </p>
+                                <template x-if="item.fqdn">
+                                    <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
+                                        class="relative z-10 max-w-full self-start truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
+                                        :title="displayDomain(item.fqdn)" x-text="displayDomain(item.fqdn)"></a>
+                                </template>
+                                <span x-show="!item.fqdn"
+                                    class="text-[11px] text-neutral-400 dark:text-fg-faint">-</span>
+                            </div>
+                        </article>
+                    </template>
+                </div>
+
+                <div x-show="filteredResources.length === 0"
+                    class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.025]">
+                    <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
+                    <p class="text-[13px] font-medium">No matching resources</p>
+                    <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        Try a different search or filter.
+                    </p>
+                </div>
+                <x-client-pagination x-show="filteredResources.length > 0"
+                    class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]"
+                    summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
+                    page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
+            </div>
+        @endif
+    </div>
 </div>
 
 <script>
-    function sortFn(a, b) {
-        return a.name.localeCompare(b.name)
-    }
-
-    function searchComponent() {
+    function resourceIndex() {
         return {
             search: '',
-            applications: @js($applicationsJs),
-            postgresqls: @js($postgresqlsJs),
-            redis: @js($redisJs),
-            mongodbs: @js($mongodbsJs),
-            mysqls: @js($mysqlsJs),
-            mariadbs: @js($mariadbsJs),
-            keydbs: @js($keydbsJs),
-            dragonflies: @js($dragonfliesJs),
-            clickhouses: @js($clickhousesJs),
-            services: @js($servicesJs),
-            filterAndSort(items) {
-                if (this.search === '') {
-                    return Object.values(items).sort(sortFn);
+            typeFilters: [],
+            tagFilters: [],
+            serverFilters: [],
+            statusFilters: [],
+            sortBy: 'name-asc',
+            viewMode: localStorage.getItem('environment-resource-view') || 'table',
+            filterOpen: false,
+            sortOpen: false,
+            page: 1,
+            pageSize: 10,
+            resources: [
+                ...@js($applicationsJs),
+                ...@js($postgresqlsJs),
+                ...@js($redisJs),
+                ...@js($mongodbsJs),
+                ...@js($mysqlsJs),
+                ...@js($mariadbsJs),
+                ...@js($keydbsJs),
+                ...@js($dragonfliesJs),
+                ...@js($clickhousesJs),
+                ...@js($servicesJs),
+            ],
+            get filterGroups() {
+                return [{
+                        key: 'typeFilters',
+                        label: 'Resource types',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: item.type,
+                            label: item.typeLabel,
+                        }))),
+                    },
+                    {
+                        key: 'tagFilters',
+                        label: 'Tags',
+                        options: this.uniqueOptions(this.resources.flatMap((item) =>
+                            (item.tags || []).map((tag) => ({ value: tag.name, label: tag.name }))
+                        )),
+                    },
+                    {
+                        key: 'serverFilters',
+                        label: 'Servers',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: item.destination?.server?.name || 'Unknown',
+                            label: item.destination?.server?.name || 'Unknown',
+                        }))),
+                    },
+                    {
+                        key: 'statusFilters',
+                        label: 'Statuses',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: this.statusState(item),
+                            label: this.statusLabel(item),
+                        }))),
+                    },
+                ];
+            },
+            get activeFilterCount() {
+                return this.typeFilters.length + this.tagFilters.length + this.serverFilters.length +
+                    this.statusFilters.length;
+            },
+            get filterButtonText() {
+                const selectedLabels = this.filterGroups.flatMap((group) => group.options
+                    .filter((option) => this[group.key].includes(option.value))
+                    .map((option) => option.label));
+
+                if (selectedLabels.length === 0) return 'Filter';
+                if (selectedLabels.length === 1) return selectedLabels[0];
+                return `${selectedLabels[0]} +${selectedLabels.length - 1}`;
+            },
+            sortOptions: [{
+                    value: 'name-asc',
+                    label: 'Name A–Z'
+                },
+                {
+                    value: 'name-desc',
+                    label: 'Name Z–A'
+                },
+                {
+                    value: 'type',
+                    label: 'Resource type'
+                },
+                {
+                    value: 'status',
+                    label: 'Status'
+                },
+            ],
+            get filteredResources() {
+                const query = this.search.trim().toLowerCase();
+                const items = this.resources.filter((item) => {
+                    const matchesType = this.typeFilters.length === 0 || this.typeFilters.includes(item.type);
+                    const matchesTags = this.tagFilters.length === 0 || (item.tags || [])
+                        .some((tag) => this.tagFilters.includes(tag.name));
+                    const serverName = item.destination?.server?.name || 'Unknown';
+                    const matchesServer = this.serverFilters.length === 0 || this.serverFilters.includes(serverName);
+                    const matchesStatus = this.statusFilters.length === 0 || this.statusFilters.includes(this.statusState(item));
+                    const searchable = [
+                        item.name,
+                        item.fqdn,
+                        item.description,
+                        item.typeLabel,
+                        item.status,
+                        item.destination?.server?.name,
+                        ...(item.tags || []).map((tag) => tag.name),
+                    ].filter(Boolean).join(' ').toLowerCase();
+
+                    return matchesType && matchesTags && matchesServer && matchesStatus &&
+                        (!query || searchable.includes(query));
+                });
+
+                return items.sort((first, second) => {
+                    if (this.sortBy === 'name-desc') {
+                        return second.name.localeCompare(first.name);
+                    }
+                    if (this.sortBy === 'type') {
+                        return first.typeLabel.localeCompare(second.typeLabel) ||
+                            first.name.localeCompare(second.name);
+                    }
+                    if (this.sortBy === 'status') {
+                        return this.statusLabel(first).localeCompare(this.statusLabel(second)) ||
+                            first.name.localeCompare(second.name);
+                    }
+
+                    return first.name.localeCompare(second.name);
+                });
+            },
+            uniqueOptions(options) {
+                return [...new Map(options
+                    .filter((option) => option.value)
+                    .map((option) => [option.value, option])).values()]
+                    .sort((first, second) => first.label.localeCompare(second.label));
+            },
+            isFilterSelected(group, value) {
+                return this[group].includes(value);
+            },
+            toggleFilter(group, value) {
+                this[group] = this[group].includes(value)
+                    ? this[group].filter((selected) => selected !== value)
+                    : [...this[group], value];
+                this.page = 1;
+            },
+            clearFilters() {
+                this.typeFilters = [];
+                this.tagFilters = [];
+                this.serverFilters = [];
+                this.statusFilters = [];
+                this.page = 1;
+            },
+            get totalPages() {
+                return Math.max(1, Math.ceil(this.filteredResources.length / this.pageSize));
+            },
+            get paginatedResources() {
+                if (this.page > this.totalPages) {
+                    this.page = this.totalPages;
                 }
-                const searchLower = this.search.toLowerCase();
-                return Object.values(items).filter(item => {
-                    return (item.name?.toLowerCase().includes(searchLower) ||
-                        item.fqdn?.toLowerCase().includes(searchLower) ||
-                        item.description?.toLowerCase().includes(searchLower) ||
-                        item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
-                }).sort(sortFn);
+
+                const start = (this.page - 1) * this.pageSize;
+                return this.filteredResources.slice(start, start + this.pageSize);
             },
-            get filteredApplications() {
-                return this.filterAndSort(this.applications)
+            get rangeStart() {
+                return this.filteredResources.length === 0 ? 0 : ((this.page - 1) * this.pageSize) + 1;
             },
-            get filteredDatabases() {
-                return [
-                    this.postgresqls,
-                    this.redis,
-                    this.mongodbs,
-                    this.mysqls,
-                    this.mariadbs,
-                    this.keydbs,
-                    this.dragonflies,
-                    this.clickhouses,
-                ].flatMap((items) => this.filterAndSort(items))
+            get rangeEnd() {
+                return Math.min(this.page * this.pageSize, this.filteredResources.length);
             },
-            get filteredServices() {
-                return this.filterAndSort(this.services)
-            }
+            previousPage() {
+                this.page = Math.max(1, this.page - 1);
+            },
+            nextPage() {
+                this.page = Math.min(this.totalPages, this.page + 1);
+            },
+            setViewMode(mode) {
+                this.viewMode = mode;
+                this.page = 1;
+                localStorage.setItem('environment-resource-view', mode);
+            },
+            statusState(item) {
+                return String(item.status || 'unknown').split(':')[0].toLowerCase();
+            },
+            statusLabel(item) {
+                const state = this.statusState(item);
+                return state.charAt(0).toUpperCase() + state.slice(1);
+            },
+            statusTone(item) {
+                const state = this.statusState(item);
+                if (state === 'running') {
+                    return 'success';
+                }
+                if (['starting', 'restarting', 'degraded'].includes(state)) {
+                    return 'warning';
+                }
+                if (['exited', 'stopped', 'failed'].includes(state)) {
+                    return 'error';
+                }
+
+                return 'neutral';
+            },
+            statusDotClass(item) {
+                return {
+                    success: 'bg-emerald-500',
+                    warning: 'bg-warning',
+                    error: 'bg-red-500',
+                    neutral: 'bg-neutral-400 dark:bg-neutral-500',
+                } [this.statusTone(item)];
+            },
+            firstDomain(fqdn) {
+                return String(fqdn).split(',')[0].trim();
+            },
+            displayDomain(fqdn) {
+                if (!fqdn) {
+                    return '';
+                }
+
+                return this.firstDomain(fqdn).replace(/^https?:\/\//, '');
+            },
         };
     }
 </script>

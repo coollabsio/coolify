@@ -10,10 +10,10 @@ use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null)
 {
+    $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $application_id = $application->id;
     $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
     $deployment_url = $deployment_link->getPath();
@@ -191,7 +191,7 @@ function next_after_cancel(?Server $server = null)
 
 function clone_application(Application $source, $destination, array $overrides = [], bool $cloneVolumeData = false): Application
 {
-    $uuid = $overrides['uuid'] ?? (string) new Cuid2;
+    $uuid = $overrides['uuid'] ?? new_public_id();
     $server = $destination->server;
 
     if ($server->team_id !== currentTeam()->id) {
@@ -214,12 +214,13 @@ function clone_application(Application $source, $destination, array $overrides =
         'updated_at',
         'additional_servers_count',
         'additional_networks_count',
-    ])->forceFill(array_merge([
+    ])->fill(array_merge([
         'uuid' => $uuid,
         'name' => $name,
         'fqdn' => $url,
         'status' => 'exited',
         'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
     ], $overrides));
     $newApplication->save();
 
@@ -237,7 +238,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'id',
             'created_at',
             'updated_at',
-        ])->forceFill([
+        ])->fill([
             'application_id' => $newApplication->id,
         ]);
         $newApplicationSettings->save();
@@ -257,8 +258,8 @@ function clone_application(Application $source, $destination, array $overrides =
             'id',
             'created_at',
             'updated_at',
-        ])->forceFill([
-            'uuid' => (string) new Cuid2,
+        ])->fill([
+            'uuid' => new_public_id(),
             'application_id' => $newApplication->id,
             'team_id' => currentTeam()->id,
         ]);
@@ -272,8 +273,8 @@ function clone_application(Application $source, $destination, array $overrides =
             'id',
             'created_at',
             'updated_at',
-        ])->forceFill([
-            'uuid' => (string) new Cuid2,
+        ])->fill([
+            'uuid' => new_public_id(),
             'application_id' => $newApplication->id,
             'status' => 'exited',
             'fqdn' => null,
@@ -304,7 +305,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'created_at',
             'updated_at',
             'uuid',
-        ])->forceFill([
+        ])->fill([
             'name' => $newName,
             'resource_id' => $newApplication->id,
         ]);
@@ -321,7 +322,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 VolumeCloneJob::dispatch($sourceVolume, $targetVolume, $sourceServer, $targetServer, $newPersistentVolume);
 
                 queue_application_deployment(
-                    deployment_uuid: (string) new Cuid2,
+                    deployment_uuid: new_public_id(),
                     application: $source,
                     server: $sourceServer,
                     destination: $source->destination,
@@ -340,7 +341,7 @@ function clone_application(Application $source, $destination, array $overrides =
             'id',
             'created_at',
             'updated_at',
-        ])->forceFill([
+        ])->fill([
             'resource_id' => $newApplication->id,
         ]);
         $newStorage->save();
@@ -354,7 +355,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 'id',
                 'created_at',
                 'updated_at',
-            ])->forceFill([
+            ])->fill([
                 'resourceable_id' => $newApplication->id,
                 'resourceable_type' => $newApplication->getMorphClass(),
                 'is_preview' => false,
@@ -371,7 +372,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 'id',
                 'created_at',
                 'updated_at',
-            ])->forceFill([
+            ])->fill([
                 'resourceable_id' => $newApplication->id,
                 'resourceable_type' => $newApplication->getMorphClass(),
                 'is_preview' => true,

@@ -1,0 +1,64 @@
+# documentation: https://www.inngest.com/docs/self-hosting
+# slogan: Durable workflow engine for background jobs, queues and scheduled tasks.
+# category: automation
+# tags: queue, workflow, jobs, events, background, automation
+# logo: svgs/inngest.png
+# port: 8288
+
+services:
+  inngest:
+    image: 'inngest/inngest:v1.27.0'
+    command: 'inngest start --host 0.0.0.0'
+    environment:
+      - SERVICE_URL_INNGEST_8288
+      - 'INNGEST_EVENT_KEY=${SERVICE_HEX_32_EVENTKEY}'
+      - 'INNGEST_SIGNING_KEY=${SERVICE_HEX_32_SIGNINGKEY}'
+      - 'INNGEST_POSTGRES_URI=postgres://inngest:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/inngest'
+      - 'INNGEST_REDIS_URI=redis://redis:6379'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - inngest
+        - alpha
+        - doctor
+        - healthcheck
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+  postgres:
+    image: 'postgres:17'
+    environment:
+      - POSTGRES_DB=inngest
+      - POSTGRES_USER=inngest
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+    volumes:
+      - 'postgres-data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U inngest -d inngest'
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  redis:
+    image: 'redis:7-alpine'
+    command: 'redis-server --appendonly yes'
+    volumes:
+      - 'redis-data:/data'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
