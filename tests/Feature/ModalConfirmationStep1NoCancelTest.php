@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\Blade;
+
 /**
  * Step 1 (checkbox options) should only show Continue — dismiss is the header X.
  */
@@ -15,9 +17,15 @@ test('modal confirmation step 1 does not render a cancel button', function () {
 });
 
 test('modal confirmation lets checkbox ids define their Livewire model binding', function () {
-    $modal = file_get_contents(resource_path('views/components/modal-confirmation.blade.php'));
+    $checkbox = Blade::render(<<<'BLADE'
+        <x-forms.checkbox id="deleteVolumes"
+            x-on:change="toggleAction('deleteVolumes')"
+            x-bind:checked="selectedActions.includes('deleteVolumes')" />
+    BLADE);
 
-    expect($modal)
-        ->not->toContain(':wire:model="$checkbox[\'id\']"')
-        ->toContain(':id="$checkbox[\'id\']"');
+    expect($checkbox)
+        ->toContain('x-on:change="toggleAction(\'deleteVolumes\')"')
+        ->toContain('x-bind:checked="selectedActions.includes(\'deleteVolumes\')"')
+        ->toContain('wire:model=deleteVolumes')
+        ->toMatch('/id="deleteVolumes-[a-zA-Z0-9]{24}"/');
 });
