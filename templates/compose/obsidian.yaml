@@ -9,12 +9,10 @@ services:
   obsidian:
     image: lscr.io/linuxserver/obsidian:latest
     environment:
-      # Coolify routing - do not remove
       - SERVICE_URL_OBSIDIAN_3000
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Etc/UTC}
-      # HTTP Basic Auth - auto-generated on first deploy; change via Coolify env vars
       - CUSTOM_USER=${SERVICE_USER_OBSIDIAN}
       - PASSWORD=${SERVICE_PASSWORD_OBSIDIAN}
     volumes:
@@ -30,4 +28,3 @@ services:
       timeout: 20s
       retries: 10
       start_period: 90s
-    restart: unless-stopped
