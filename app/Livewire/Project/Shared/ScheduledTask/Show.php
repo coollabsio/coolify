@@ -165,7 +165,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->resource);
-            $this->authorize('update', $this->task);
+            $this->authorize('delete', $this->task);
             $this->task->delete();
 
             if ($this->type === 'application') {

@@ -29,6 +29,7 @@ class Executions extends Component
 
     public $logsPerPage = 100;
 
+    #[Locked]
     public $selectedExecution = null;
 
     public $isPollingActive = false;

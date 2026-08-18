@@ -66,6 +66,13 @@ describe('ScheduledTask locked properties', function () {
 
         expect($attributes)->not->toBeEmpty();
     });
+
+    test('Executions component selected execution property has Locked attribute', function () {
+        $property = new ReflectionProperty(Executions::class, 'selectedExecution');
+        $attributes = $property->getAttributes(Locked::class);
+
+        expect($attributes)->not->toBeEmpty();
+    });
 });
 
 describe('ScheduledTask cross-team access', function () {
@@ -88,6 +95,18 @@ describe('ScheduledTask cross-team access', function () {
 
         expect(
             Gate::forUser($this->attacker)->allows('update', $victimTask)
+        )->toBeFalse();
+    });
+
+    test('Show policy denies deleting another team task', function () {
+        $victimTask = ScheduledTask::factory()->create([
+            'team_id' => $this->victimTeam->id,
+            'name' => 'victim-task',
+            'command' => 'echo original-victim-command',
+        ]);
+
+        expect(
+            Gate::forUser($this->attacker)->allows('delete', $victimTask)
         )->toBeFalse();
     });
 
