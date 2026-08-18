@@ -26,6 +26,7 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+
   web:
     image: bugsink/bugsink
     restart: unless-stopped
@@ -44,3 +45,6 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
+    depends_on:
+      mysql:
+        condition: service_healthy
