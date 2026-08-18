@@ -1,5 +1,5 @@
 <div x-data x-init="$nextTick(() => { if ($refs.autofocusInput) $refs.autofocusInput.focus(); })"
-    class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+    class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
     <form wire:submit="loadBranch">
         <section class="application-settings-section">
             <div class="application-settings-section-header">

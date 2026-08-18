@@ -295,6 +295,16 @@
                         }
                         throw error;
                     }
+                    if (!data) {
+                        if (this.instanceWentDown) {
+                            // The upgraded instance can no longer return data for the old Livewire component.
+                            // A healthy response after observed downtime confirms that the restart completed.
+                            this.showSuccess();
+                        } else {
+                            this.currentStatus = this.getReviveStatusMessage(elapsedMinutes, this.healthCheckAttempts);
+                        }
+                        return;
+                    }
                     if (data.status === 'complete') {
                         this.showSuccess();
                     } else if (data.status === 'error') {

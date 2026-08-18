@@ -7,7 +7,9 @@
         alwaysScroll: false,
         followManuallyDisabled: false,
         rafId: null,
+        scrollTimeout: null,
         scrollDebounce: null,
+        destroyed: false,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         logFilters: JSON.parse(localStorage.getItem('coolify-log-filters')) || {error: true, warning: true, debug: true, info: true},
         searchQuery: '',
@@ -17,10 +19,7 @@
             this.fullscreen = !this.fullscreen;
             if (this.fullscreen === false) {
                 this.alwaysScroll = false;
-                if (this.rafId) {
-                    cancelAnimationFrame(this.rafId);
-                    this.rafId = null;
-                }
+                this.cancelScrollLoop();
             }
         },
         handleKeyDown(event) {
@@ -33,9 +32,20 @@
         disableFollow() {
             if (!this.alwaysScroll) return;
             this.alwaysScroll = false;
+            this.cancelScrollLoop();
+        },
+        cancelScrollLoop() {
             if (this.rafId) {
                 cancelAnimationFrame(this.rafId);
                 this.rafId = null;
+            }
+            if (this.scrollTimeout) {
+                clearTimeout(this.scrollTimeout);
+                this.scrollTimeout = null;
+            }
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
             }
         },
         handleWheel(event) {
@@ -62,7 +72,8 @@
             }
         },
         scrollToBottom() {
-            const logsContainer = document.getElementById('logsContainer');
+            if (this.destroyed) return;
+            const logsContainer = this.$root.querySelector('#logsContainer');
             if (logsContainer) {
                 this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
@@ -70,11 +81,12 @@
             }
         },
         scheduleScroll() {
-            if (!this.alwaysScroll) return;
+            if (!this.alwaysScroll || this.destroyed) return;
             this.rafId = requestAnimationFrame(() => {
+                if (!this.alwaysScroll || this.destroyed) return;
                 this.scrollToBottom();
-                if (this.alwaysScroll) {
-                    setTimeout(() => this.scheduleScroll(), 250);
+                if (this.alwaysScroll && !this.destroyed) {
+                    this.scrollTimeout = setTimeout(() => this.scheduleScroll(), 250);
                 }
             });
         },
@@ -85,16 +97,14 @@
                 this.scheduleScroll();
             } else {
                 this.followManuallyDisabled = true;
-                if (this.rafId) {
-                    cancelAnimationFrame(this.rafId);
-                    this.rafId = null;
-                }
+                this.cancelScrollLoop();
             }
         },
         handleScroll(event) {
-            if (this.isScrolling) return;
+            if (this.isScrolling || this.destroyed) return;
             clearTimeout(this.scrollDebounce);
             this.scrollDebounce = setTimeout(() => {
+                if (this.destroyed) return;
                 const el = event.target;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
                 if (!this.alwaysScroll && !this.followManuallyDisabled && distanceFromBottom <= 10) {
@@ -253,6 +263,11 @@
                     applyAfterUpdate();
                 }
             });
+        },
+        destroy() {
+            this.destroyed = true;
+            this.alwaysScroll = false;
+            this.cancelScrollLoop();
         }
     }" @keydown.window="handleKeyDown($event)">
         @if ($collapsible)
@@ -405,24 +420,16 @@
                                         d="M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42" />
                                 </svg>
                             </button>
-                            <div x-data="{ filterOpen: false }" class="relative order-4 shrink-0">
-                                <button x-on:click="filterOpen = !filterOpen" title="Filter Log Levels"
+                            <x-table.dropdown panel-class="runtime-log-menu min-w-40!">
+                                <x-slot:trigger><button type="button" title="Filter Log Levels"
                                     :class="Object.values(logFilters).some(v => !v) ? 'runtime-log-icon-button-active' : ''"
-                                    class="runtime-log-icon-button">
+                                    class="runtime-log-icon-button" aria-haspopup="listbox" :aria-expanded="open">
                                     <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                                         stroke-width="1.5" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round"
                                             d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z" />
                                     </svg>
-                                </button>
-                                <div x-show="filterOpen" x-on:click.away="filterOpen = false"
-                                    x-transition:enter="transition ease-out duration-100"
-                                    x-transition:enter-start="transform opacity-0 scale-95"
-                                    x-transition:enter-end="transform opacity-100 scale-100"
-                                    x-transition:leave="transition ease-in duration-75"
-                                    x-transition:leave-start="transform opacity-100 scale-100"
-                                    x-transition:leave-end="transform opacity-0 scale-95"
-                                    class="runtime-log-menu listbox-panel left-auto! right-0! z-[90]! min-w-40!">
+                                </button></x-slot:trigger>
                                     <div>
                                         <button type="button" class="listbox-option" x-on:click="toggleLogFilter('error')">
                                             <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
@@ -445,8 +452,7 @@
                                             <span x-show="logFilters.info">✓</span>
                                         </button>
                                     </div>
-                                </div>
-                            </div>
+                            </x-table.dropdown>
                             <button title="Follow Logs" :class="alwaysScroll ? 'runtime-log-icon-button-active' : ''"
                                 x-on:click="toggleScroll"
                                 class="runtime-log-icon-button order-2">

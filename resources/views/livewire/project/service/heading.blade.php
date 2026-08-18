@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $servicePageItems = [
             [
@@ -64,12 +64,16 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $service->name }}
                 </h1>
-                <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                    <x-services.links :service="$service" compact />
+                </div>
             </div>
         </div>
 
         <div class="w-full xl:hidden">
             @if ($service->isDeployable)
+                @can('deploy', $service)
                 <div id="service-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
@@ -162,6 +166,7 @@
                         @endif
                     </div>
                 </div>
+                @endcan
             @else
                 <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
                     class="mb-3 inline-flex" aria-label="Open required environment variables">
@@ -169,9 +174,6 @@
                 </a>
             @endif
 
-            <div class="resource-heading-menus w-full">
-                <x-services.links :service="$service" full-width />
-            </div>
         </div>
 
         @teleport('#resource-action-hud-slot')
@@ -183,6 +185,7 @@
                         <div class="resource-heading-menus shrink-0">
                             <x-services.links :service="$service" />
                         </div>
+                        @can('deploy', $service)
                         <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
                                 x-effect="$dispatch('resource-actions-toggled', { open })"
                                 @click.outside="open = false" @keydown.escape.window="open = false">
@@ -247,6 +250,7 @@
                                     @endif
                                 </div>
                         </div>
+                        @endcan
                     @else
                         <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
                             aria-label="Open required environment variables">

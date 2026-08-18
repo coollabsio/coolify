@@ -4,13 +4,17 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-sha-build.yml');
     $dockerfile = file_get_contents(dirname(__DIR__, 2).'/docker/production/Dockerfile');
     $constants = file_get_contents(dirname(__DIR__, 2).'/config/constants.php');
+    $versions = json_decode(file_get_contents(dirname(__DIR__, 2).'/versions.json'), true, flags: JSON_THROW_ON_ERROR);
+    $nightlyVersions = json_decode(file_get_contents(dirname(__DIR__, 2).'/other/nightly/versions.json'), true, flags: JSON_THROW_ON_ERROR);
 
     expect($workflow)
         ->toContain('name: Build Coolify (SHA)')
         ->toContain('branches: ["main"]')
         ->not->toContain('v4.x')
-        ->toContain('sha-${{ github.sha }}-${{ matrix.arch }}')
-        ->toContain('sha-${{ github.sha }}')
+        ->toContain('short_sha=${GITHUB_SHA::7}')
+        ->toContain('sha-${{ steps.version.outputs.short_sha }}-${{ matrix.arch }}')
+        ->toContain('SHA: ${{ needs.build-push.outputs.short_sha }}')
+        ->not->toContain('sha-${{ github.sha }}')
         ->toContain('php bootstrap/getVersion.php')
         ->toContain('version=${BASE_VERSION}-dev.${GITHUB_SHA::9}')
         ->toContain('COOLIFY_VERSION=${{ steps.version.outputs.version }}')
@@ -19,7 +23,10 @@ it('publishes v4 branch builds under the commit sha with a traceable internal ve
         ->toContain('ARG COOLIFY_VERSION')
         ->toContain('ENV COOLIFY_VERSION=${COOLIFY_VERSION}')
         ->and($constants)
-        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.2'");
+        ->toContain("'version' => env('COOLIFY_VERSION') ?: '4.3.9'")
+        ->and($versions['coolify']['v4']['version'])->toBe('4.3.9')
+        ->and($versions['coolify']['nightly']['version'])->toBe('4.3.10')
+        ->and($nightlyVersions)->toBe($versions);
 });
 
 it('orders a maintenance development build before its stable release', function () {

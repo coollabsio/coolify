@@ -5,7 +5,7 @@
 | Shared Browser Test Helpers
 |--------------------------------------------------------------------------
 |
-| Helpers for Pest browser tests under tests/v4/Browser and tests/v5/Browser.
+| Helpers for Pest browser tests under tests/v4/Browser.
 | Loaded from tests/Pest.php.
 |
 */

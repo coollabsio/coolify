@@ -222,6 +222,18 @@ it('creates a scheduled backup for a preselected application directory', functio
     expect(ScheduledVolumeBackup::query()->sole()->backupable->is($directory))->toBeTrue();
 });
 
+it('renders the backup form for an application with only a directory target', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $volume->delete();
+    $directory = createApplicationBackupDirectory($application);
+
+    Livewire::test(CreateScheduledVolumeBackup::class, ['application' => $application])
+        ->assertSet('targetKey', 'directory:'.$directory->id)
+        ->assertSuccessful();
+});
+
 it('rejects files and directory mounts owned by another application as backup targets', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);

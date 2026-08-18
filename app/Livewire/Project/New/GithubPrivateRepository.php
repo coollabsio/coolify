@@ -134,8 +134,9 @@ class GithubPrivateRepository extends Component
 
     public function loadBranches()
     {
-        $this->selected_repository_owner = $this->repositories->where('id', $this->selected_repository_id)->first()['owner']['login'];
-        $this->selected_repository_repo = $this->repositories->where('id', $this->selected_repository_id)->first()['name'];
+        $repository = $this->repositories->firstWhere('id', $this->selected_repository_id);
+        $this->selected_repository_owner = data_get($repository, 'owner.login');
+        $this->selected_repository_repo = data_get($repository, 'name');
         $this->branches = collect();
         $this->page = 1;
         $this->loadBranchByPage();
@@ -146,7 +147,10 @@ class GithubPrivateRepository extends Component
             }
         }
         $this->branches = sortBranchesByPriority($this->branches);
-        $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
+        $defaultBranch = data_get($repository, 'default_branch', 'main');
+        $this->selected_branch_name = $this->branches->contains('name', $defaultBranch)
+            ? $defaultBranch
+            : data_get($this->branches, '0.name', 'main');
     }
 
     protected function loadBranchByPage()

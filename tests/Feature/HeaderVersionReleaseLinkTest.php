@@ -28,3 +28,11 @@ test('development versions are not linked to nonexistent github releases', funct
         ->not->toContain('href=')
         ->not->toContain('target="_blank"');
 });
+
+test('mobile sidebar shows the installed coolify version when opened', function () {
+    $layout = file_get_contents(resource_path('views/layouts/app.blade.php'));
+
+    expect($layout)
+        ->toContain('data-mobile-sidebar-brand')
+        ->toContain('<x-version class="!text-[10.5px]');
+});

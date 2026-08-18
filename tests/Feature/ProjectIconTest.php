@@ -1,7 +1,9 @@
 <?php
 
+use App\Livewire\Dashboard;
 use App\Livewire\Project\Edit;
 use App\Livewire\Project\Index;
+use App\Livewire\SharedVariables\Project\Index as SharedVariablesProjectIndex;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Team;
@@ -29,7 +31,7 @@ beforeEach(function () {
 });
 
 it('stores a project icon using the instance image storage setting', function () {
-    Storage::fake('local');
+    Storage::fake('images');
 
     $upload = UploadedFile::fake()->createWithContent('project.jpg', file_get_contents(base_path('tests/Fixtures/project-icon.jpg')));
 
@@ -45,16 +47,16 @@ it('stores a project icon using the instance image storage setting', function ()
         ->and($this->project->icon_storage_type)->toBe('local')
         ->and($this->project->icon_s3_storage_id)->toBeNull();
 
-    Storage::disk('local')->assertExists($this->project->icon_path);
+    Storage::disk('images')->assertExists($this->project->icon_path);
 });
 
 it('serves a project icon only to a member of its team', function () {
-    Storage::fake('local');
+    Storage::fake('images');
     $this->project->forceFill([
         'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
         'icon_storage_type' => 'local',
     ])->save();
-    Storage::disk('local')->put($this->project->icon_path, 'icon-content');
+    Storage::disk('images')->put($this->project->icon_path, 'icon-content');
 
     $this->withoutMiddleware()->get(route('project.icon', ['project_uuid' => $this->project->uuid]))
         ->assertSuccessful()
@@ -71,20 +73,20 @@ it('serves a project icon only to a member of its team', function () {
 });
 
 it('removes a project icon', function () {
-    Storage::fake('local');
+    Storage::fake('images');
     $path = "project-icons/{$this->project->uuid}/icon.jpg";
     $this->project->forceFill([
         'icon_path' => $path,
         'icon_storage_type' => 'local',
     ])->save();
-    Storage::disk('local')->put($path, 'icon-content');
+    Storage::disk('images')->put($path, 'icon-content');
 
     Livewire::test(Edit::class, ['project_uuid' => $this->project->uuid])
         ->call('removeIcon')
         ->assertHasNoErrors();
 
     expect($this->project->refresh()->icon_path)->toBeNull();
-    Storage::disk('local')->assertMissing($path);
+    Storage::disk('images')->assertMissing($path);
 });
 
 it('exposes the icon URL on the projects index', function () {
@@ -98,4 +100,33 @@ it('exposes the icon URL on the projects index', function () {
             'project_uuid' => $this->project->uuid,
             'v' => $this->project->updated_at->timestamp,
         ]));
+});
+
+it('displays the project icon on the dashboard', function () {
+    $this->project->forceFill([
+        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
+        'icon_storage_type' => 'local',
+    ])->save();
+
+    Livewire::test(Dashboard::class)
+        ->assertSeeHtml('src="'.route('project.icon', [
+            'project_uuid' => $this->project->uuid,
+            'v' => $this->project->updated_at->timestamp,
+        ]).'"');
+});
+
+it('displays the project icon in shared variables project views', function () {
+    $this->project->forceFill([
+        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
+        'icon_storage_type' => 'local',
+    ])->save();
+
+    $iconUrl = route('project.icon', [
+        'project_uuid' => $this->project->uuid,
+        'v' => $this->project->updated_at->timestamp,
+    ]);
+
+    $component = Livewire::test(SharedVariablesProjectIndex::class);
+
+    expect(substr_count($component->html(), 'src="'.$iconUrl.'"'))->toBe(2);
 });

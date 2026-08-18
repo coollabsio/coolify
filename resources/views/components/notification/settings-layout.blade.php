@@ -9,12 +9,12 @@
     ];
 @endphp
 
-<section class="application-settings-workspace w-full max-w-[1180px]">
+<section class="application-settings-workspace w-full max-w-none">
     <header class="settings-mobile-header xl:hidden">
         <h1 class="settings-mobile-title">Notifications</h1>
         <p class="settings-mobile-description">Configure how your team receives deployment and system alerts.</p>
     </header>
-    <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <aside class="application-settings-navigation min-w-0 xl:self-start">
             <nav aria-label="Notification settings"
                 class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">

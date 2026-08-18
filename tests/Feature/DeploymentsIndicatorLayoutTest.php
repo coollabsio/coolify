@@ -30,7 +30,7 @@ it('uses the redesigned elevated surface and status badge patterns', function ()
         ->toContain("'In progress'")
         ->toContain("'Queued'")
         ->toContain('dark:text-fg')
-        ->toContain('dark:border-white/[0.08]')
+        ->toContain('dark:border-coolgray-300')
         ->toContain('$this->shouldShow')
         ->toContain('updateShouldShowFromPath')
         ->toContain('livewire:navigated')
@@ -38,4 +38,17 @@ it('uses the redesigned elevated surface and status badge patterns', function ()
         ->not->toContain('dark:bg-coolgray-200')
         ->not->toContain('text-gray-800')
         ->not->toContain("str_replace('_', ' ', \$deployment->status)");
+});
+
+it('uses solid surfaces in every deployments indicator state', function () {
+    $indicatorView = file_get_contents(resource_path('views/livewire/deployments-indicator.blade.php'));
+
+    expect($indicatorView)
+        ->not->toContain('reduceOpacity')
+        ->not->toContain('transition-opacity')
+        ->not->toContain('x-transition:enter-start="opacity-0')
+        ->not->toContain('x-transition:leave-end="opacity-0')
+        ->not->toContain('dark:bg-white/[')
+        ->not->toContain('dark:hover:bg-white/[')
+        ->not->toContain('dark:border-white/[');
 });
