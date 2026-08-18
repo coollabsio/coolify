@@ -33,7 +33,7 @@ it('keeps the resource details helper text visible below the modal header', func
 });
 
 it('renders copy fields as visible readonly controls with an accessible copy action', function () {
-    $html = Blade::render('<x-forms.copy-button label="UUID" text="crashloop" />');
+    $html = Blade::render('<x-forms.copy-input label="UUID" text="crashloop" />');
 
     expect($html)
         ->toContain('label class="flex gap-1 items-center mb-1 text-sm font-medium text-black dark:text-white"')
