@@ -210,10 +210,16 @@ class SshMultiplexingHelper
 
         $delimiter = base64_encode(Hash::make($command));
         $command = str_replace($delimiter, '', $command);
+        $remoteShellCommand = self::remoteShellCommand();
 
-        return $sshCommand.self::escapedUserAtHost($server)." 'bash -se' << \\$delimiter".PHP_EOL
+        return $sshCommand.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
             .$command.PHP_EOL
             .$delimiter;
+    }
+
+    private static function remoteShellCommand(): string
+    {
+        return 'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi';
     }
 
     public static function getConnectionTimeout(Server $server): int
