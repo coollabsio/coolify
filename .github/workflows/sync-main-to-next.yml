@@ -1,0 +1,60 @@
+name: Sync main to next
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-main-to-next
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Merge main into next
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout next
+        uses: actions/checkout@v5
+        with:
+          ref: next
+          fetch-depth: 0
+
+      - name: Merge main into next
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main next
+
+          if git merge --no-edit origin/main; then
+            git push origin HEAD:next
+            exit 0
+          fi
+
+          conflicts=$(git diff --name-only --diff-filter=U)
+          git merge --abort
+
+          if [ -z "$conflicts" ]; then
+            echo 'The merge failed without conflicts, so no pull request was created.'
+            exit 1
+          fi
+
+          existing_pr=$(gh pr list --base next --head main --state open --json url --jq '.[0].url')
+          if [ -n "$existing_pr" ]; then
+            echo "A main to next pull request already exists: $existing_pr"
+          else
+            gh pr create \
+              --base next \
+              --head main \
+              --title 'chore: merge main into next' \
+              --body 'This pull request was created automatically because main could not be merged into next without conflicts.'
+          fi
+
+          echo 'main could not be merged into next without conflicts.'
+          exit 1

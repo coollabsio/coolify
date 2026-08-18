@@ -47,6 +47,11 @@ class Environment extends BaseModel
         return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');
     }
 
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Environment::whereRelation('project.team', 'id', $teamId)->orderBy('name');
+    }
+
     public function isEmpty()
     {
         return $this->applications()->count() == 0 &&

@@ -2,6 +2,9 @@
 
 use App\Jobs\ScheduledJobManager;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 it('uses WithoutOverlapping middleware with expireAfter to prevent stale locks', function () {
     $job = new ScheduledJobManager;

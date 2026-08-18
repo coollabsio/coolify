@@ -32,14 +32,55 @@ class Index extends Component
 
     public bool $show_verification = false;
 
+    public bool $uses_sso = false;
+
+    public ?string $sso_provider_label = null;
+
+    public $avatar;
+
+    public function uploadAvatar(AvatarStorageService $avatarStorage): bool
+    {
+        try {
+            $this->validate([
+                'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
+            ]);
+
+            $avatarStorage->store(Auth::user(), $this->avatar);
+            $this->reset('avatar');
+            $this->dispatch('avatar-updated', url: route('profile.avatar', ['v' => Auth::user()->fresh()->updated_at->timestamp]));
+            $this->dispatch('success', 'Profile picture updated.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
+        }
+    }
+
+    public function removeAvatar(AvatarStorageService $avatarStorage): void
+    {
+        try {
+            $avatarStorage->delete(Auth::user());
+            $this->dispatch('avatar-updated', url: null);
+            $this->dispatch('success', 'Profile picture removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function mount()
     {
         $this->userId = Auth::id();
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
 
+        $oauthIdentity = Auth::user()->oauthIdentities()->latest('id')->first();
+        $this->uses_sso = $oauthIdentity !== null;
+        $this->sso_provider_label = $oauthIdentity ? $this->providerLabel($oauthIdentity->provider) : null;
+
         // Check if there's a pending email change
-        if (Auth::user()->hasEmailChangeRequest()) {
+        if (! $this->uses_sso && Auth::user()->hasEmailChangeRequest()) {
             $this->new_email = Auth::user()->pending_email;
             $this->show_verification = true;
         }
@@ -64,6 +105,10 @@ class Index extends Component
     public function requestEmailChange()
     {
         try {
+            if ($this->rejectSsoEmailChange()) {
+                return;
+            }
+
             // For self-hosted, check if email is enabled
             if (! isCloud()) {
                 $settings = instanceSettings();
@@ -122,6 +167,10 @@ class Index extends Component
     public function verifyEmailChange()
     {
         try {
+            if ($this->rejectSsoEmailChange()) {
+                return;
+            }
+
             $this->validate([
                 'email_verification_code' => ['required', 'string', 'size:6'],
             ]);
@@ -178,6 +227,10 @@ class Index extends Component
     public function resendVerificationCode()
     {
         try {
+            if ($this->rejectSsoEmailChange()) {
+                return;
+            }
+
             // Check if there's a pending request
             if (! Auth::user()->hasEmailChangeRequest()) {
                 $this->dispatch('error', 'No pending email change request.');
@@ -233,8 +286,26 @@ class Index extends Component
 
     public function showEmailChangeForm()
     {
+        if ($this->rejectSsoEmailChange()) {
+            return;
+        }
+
         $this->show_email_change = true;
         $this->new_email = '';
+    }
+
+    private function rejectSsoEmailChange(): bool
+    {
+        if (! Auth::user()->hasSsoIdentity()) {
+            return false;
+        }
+
+        $this->uses_sso = true;
+        $this->show_email_change = false;
+        $this->show_verification = false;
+        $this->dispatch('error', 'Email addresses managed by SSO cannot be changed in Coolify.');
+
+        return true;
     }
 
     public function resetPassword()
@@ -265,6 +336,14 @@ class Index extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function providerLabel(string $provider): string
+    {
+        return match ($provider) {
+            'oidc' => 'OIDC',
+            default => str($provider)->headline()->toString(),
+        };
     }
 
     public function render()

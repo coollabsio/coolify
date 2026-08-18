@@ -17,6 +17,10 @@ use App\Livewire\Server\Proxy;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\ConfigurationRepository;
+use App\Services\DigitalOceanService;
+use App\Services\HetznerService;
+use App\Services\VultrService;
+use App\Support\ValidationPatterns;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
@@ -36,7 +40,6 @@ use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Spatie\Url\Url;
 use Stevebauman\Purify\Facades\Purify;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 /**
  * @property array{
@@ -109,6 +112,15 @@ use Visus\Cuid2\Cuid2;
 class Server extends BaseModel
 {
     use ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
+
+    /**
+     * Sentinel IP for servers that do not have a real address yet
+     * (cloud provisioning in progress or parked as unreachable).
+     * Scheduled jobs skip these servers via skipServer().
+     */
+    public const PLACEHOLDER_IP = '1.2.3.4';
+
+    public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
 
     public static $batch_counter = 0;
 
@@ -254,6 +266,16 @@ class Server extends BaseModel
         'force_disabled' => 'boolean',
     ];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'logdrain_axiom_api_key',
+        'logdrain_newrelic_license_key',
+    ];
+
     protected $schemalessAttributes = [
         'proxy',
     ];
@@ -269,7 +291,12 @@ class Server extends BaseModel
         'team_id',
         'hetzner_server_id',
         'hetzner_server_status',
+        'vultr_instance_id',
+        'vultr_instance_status',
+        'digitalocean_droplet_id',
+        'digitalocean_droplet_status',
         'is_validating',
+        'validation_logs',
         'detected_traefik_version',
         'traefik_outdated_info',
         'server_metadata',
@@ -288,6 +315,162 @@ class Server extends BaseModel
     public function type()
     {
         return 'server';
+    }
+
+    public function hasPlaceholderIp(): bool
+    {
+        // Cast: the saving hook stores the ip as a Stringable in memory.
+        return self::isPlaceholderIp((string) $this->ip);
+    }
+
+    public static function isPlaceholderIp(?string $ip): bool
+    {
+        return blank($ip) || in_array($ip, self::PLACEHOLDER_IPS, true);
+    }
+
+    /**
+     * Replace a placeholder IP with the real address once the cloud
+     * provider reports one. Returns true when the IP was updated.
+     */
+    public function backfillPlaceholderIp(?string $ip): bool
+    {
+        if (self::isPlaceholderIp($ip)) {
+            return false;
+        }
+
+        $updated = static::query()
+            ->whereKey($this->getKey())
+            ->where(function (Builder $query): void {
+                $query->whereNull('ip')
+                    ->orWhere('ip', '')
+                    ->orWhereIn('ip', self::PLACEHOLDER_IPS);
+            })
+            ->update(['ip' => $ip]);
+
+        if ($updated === 0) {
+            return false;
+        }
+
+        $this->forceFill(['ip' => $ip]);
+        $this->syncOriginalAttribute('ip');
+        static::flushIdentityMap();
+
+        return true;
+    }
+
+    /**
+     * Persist provider status without saving a stale in-memory IP value.
+     *
+     * @param  array<string, mixed>  $updates
+     */
+    private function persistProviderState(array $updates): void
+    {
+        if (empty($updates)) {
+            return;
+        }
+
+        static::query()->whereKey($this->getKey())->update($updates);
+        $this->forceFill($updates);
+        $this->syncOriginalAttributes(array_keys($updates));
+        static::flushIdentityMap();
+    }
+
+    public function refreshHetznerState(): ?string
+    {
+        if (! $this->hetzner_server_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hetzner') {
+            return $this->hetzner_server_status;
+        }
+
+        $hetznerService = new HetznerService($this->cloudProviderToken->token);
+        $server = $hetznerService->getServer($this->hetzner_server_id);
+        $status = $server['status'] ?? null;
+        $assignedIp = data_get($server, 'public_net.ipv4.ip') ?? data_get($server, 'public_net.ipv6.ip');
+
+        $updates = [];
+        if ($this->hetzner_server_status !== $status) {
+            $updates['hetzner_server_status'] = $status;
+        }
+        $this->persistProviderState($updates);
+        $this->backfillPlaceholderIp($assignedIp);
+
+        return $status;
+    }
+
+    public function refreshVultrState(): ?string
+    {
+        if (! $this->vultr_instance_id || ! $this->cloudProviderToken) {
+            return null;
+        }
+
+        $vultrService = new VultrService($this->cloudProviderToken->token);
+        try {
+            $instance = $vultrService->getInstance($this->vultr_instance_id);
+        } catch (\Throwable $e) {
+            if ((int) $e->getCode() !== 404) {
+                throw $e;
+            }
+
+            if ($this->vultr_instance_status !== 'deleted') {
+                $this->persistProviderState(['vultr_instance_status' => 'deleted']);
+            }
+
+            return 'deleted';
+        }
+
+        $status = ($instance['power_status'] ?? null) === 'stopped'
+            ? 'stopped'
+            : ($instance['status'] ?? null);
+        $publicIp = $vultrService->getPublicIp($instance);
+
+        $updates = [];
+        if ($this->vultr_instance_status !== $status) {
+            $updates['vultr_instance_status'] = $status;
+        }
+        $this->persistProviderState($updates);
+        $this->backfillPlaceholderIp($publicIp);
+
+        return $status;
+    }
+
+    public function refreshDigitalOceanState(): ?string
+    {
+        if (! $this->digitalocean_droplet_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'digitalocean') {
+            return $this->digitalocean_droplet_status;
+        }
+
+        $digitalOceanService = new DigitalOceanService($this->cloudProviderToken->token);
+
+        try {
+            $droplet = $digitalOceanService->getDroplet((int) $this->digitalocean_droplet_id);
+        } catch (RequestException $e) {
+            if ($e->response?->status() === 404) {
+                $this->persistProviderState(['digitalocean_droplet_status' => 'deleted']);
+
+                return 'deleted';
+            }
+
+            throw $e;
+        } catch (\Throwable $e) {
+            if ((int) $e->getCode() === 404) {
+                $this->persistProviderState(['digitalocean_droplet_status' => 'deleted']);
+
+                return 'deleted';
+            }
+
+            throw $e;
+        }
+
+        if (empty($droplet)) {
+            return $this->digitalocean_droplet_status;
+        }
+
+        $status = $droplet['status'] ?? null;
+        $ip = $digitalOceanService->getPublicIpAddress($droplet);
+
+        $this->persistProviderState(['digitalocean_droplet_status' => $status]);
+        $this->backfillPlaceholderIp($ip);
+
+        return $status;
     }
 
     protected function isCoolifyHost(): Attribute
@@ -326,9 +509,29 @@ class Server extends BaseModel
         });
     }
 
-    public static function isUsable()
+    public static function isUsable(): Builder
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
+        return self::usableByBuildServerStatus(false);
+    }
+
+    public static function isUsableBuildServer(): Builder
+    {
+        return self::usableByBuildServerStatus(true);
+    }
+
+    private static function usableByBuildServerStatus(bool $isBuildServer): Builder
+    {
+        return Server::ownedByCurrentTeam()
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'is_build_server', $isBuildServer)
+            ->whereRelation('settings', 'force_disabled', false);
+    }
+
+    public function canHostResources(): bool
+    {
+        return ! $this->isBuildServer();
     }
 
     public function settings()
@@ -528,11 +731,12 @@ class Server extends BaseModel
                 ];
 
                 if ($schema === 'https') {
-                    $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
-                        0 => 'redirect-to-https',
-                    ];
+                    $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = $this->dashboardHttpMiddlewares($settings);
 
                     $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
+                        'middlewares' => [
+                            0 => 'gzip',
+                        ],
                         'entryPoints' => [
                             0 => 'https',
                         ],
@@ -586,8 +790,10 @@ class Server extends BaseModel
                 $url = Url::fromString($settings->fqdn);
                 $host = $url->getHost();
                 $schema = $url->getScheme();
+                $siteAddress = $this->dashboardCaddySiteAddress($settings, $schema, $host);
                 $caddy_file = "
-$schema://$host {
+$siteAddress {
+    encode zstd gzip
     handle /app/* {
         reverse_proxy coolify-realtime:6001
     }
@@ -612,6 +818,24 @@ $schema://$host {
         ], $this);
     }
 
+    public function dashboardHttpMiddlewares(InstanceSettings $settings): array
+    {
+        if ($settings->is_dashboard_force_https_enabled) {
+            return ['redirect-to-https'];
+        }
+
+        return ['gzip'];
+    }
+
+    public function dashboardCaddySiteAddress(InstanceSettings $settings, string $schema, string $host): string
+    {
+        if ($schema === 'https' && ! $settings->is_dashboard_force_https_enabled) {
+            return "http://{$host}, https://{$host}";
+        }
+
+        return "{$schema}://{$host}";
+    }
+
     public function proxyPath()
     {
         $base_path = config('constants.coolify.base_config_path');
@@ -632,6 +856,33 @@ $schema://$host {
     public function proxyType()
     {
         return data_get($this->proxy, 'type');
+    }
+
+    public function hasPendingProxyConfiguration(): bool
+    {
+        if ($this->proxy->get('status') !== 'running') {
+            return false;
+        }
+
+        $savedSettings = $this->proxy->get('last_saved_settings');
+        $appliedSettings = $this->proxy->get('last_applied_settings');
+
+        return filled($savedSettings) && filled($appliedSettings) && $savedSettings !== $appliedSettings;
+    }
+
+    public function hasCurrentTraefikOutdatedInfo(): bool
+    {
+        if ($this->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return false;
+        }
+
+        $detectedVersion = ltrim((string) $this->detected_traefik_version, 'v');
+        $storedVersion = ltrim((string) data_get($this->traefik_outdated_info, 'current'), 'v');
+        $type = data_get($this->traefik_outdated_info, 'type');
+
+        return filled($detectedVersion)
+            && $storedVersion === $detectedVersion
+            && in_array($type, ['patch_update', 'minor_upgrade'], true);
     }
 
     public function scopeWithProxy(): Builder
@@ -659,8 +910,29 @@ $schema://$host {
         return $this->settings->force_disabled;
     }
 
+    /**
+     * Server was migrated away from this Coolify instance (source side).
+     * Must not be revalidated or re-enabled as a live managed host.
+     */
+    public function isTransferredAway(): bool
+    {
+        return data_get($this->server_metadata, 'transfer.status') === 'transferred';
+    }
+
+    /**
+     * Whether this server may be validated / installed against from this instance.
+     */
+    public function canBeValidated(): bool
+    {
+        return ! $this->isTransferredAway();
+    }
+
     public function forceEnableServer()
     {
+        if ($this->isTransferredAway()) {
+            return;
+        }
+
         $this->settings->force_disabled = false;
         $this->settings->save();
     }
@@ -737,7 +1009,7 @@ $schema://$host {
 
     public function stopUnmanaged($id)
     {
-        return instant_remote_process(['docker stop -t 0 '.escapeshellarg($id)], $this);
+        return instant_remote_process([dockerStopCommand(0, escapeshellarg($id), $this)], $this);
     }
 
     public function restartUnmanaged($id)
@@ -945,10 +1217,10 @@ $schema://$host {
     {
         return Attribute::make(
             get: function ($value) {
-                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+                return preg_replace(ValidationPatterns::INVALID_SERVER_USERNAME_CHARACTERS_PATTERN, '', $value);
             },
             set: function ($value) {
-                return preg_replace('/[^A-Za-z0-9\-_]/', '', $value);
+                return preg_replace(ValidationPatterns::INVALID_SERVER_USERNAME_CHARACTERS_PATTERN, '', $value);
             }
         );
     }
@@ -1040,7 +1312,7 @@ $schema://$host {
     {
         $attributes = [
             'name' => 'coolify',
-            'uuid' => (string) new Cuid2,
+            'uuid' => new_public_id(),
             'network' => 'coolify',
             'server_id' => $this->id,
         ];
@@ -1069,7 +1341,7 @@ $schema://$host {
 
     public function skipServer()
     {
-        if ($this->ip === '1.2.3.4') {
+        if ($this->hasPlaceholderIp()) {
             return true;
         }
         if ($this->settings->force_disabled === true) {
@@ -1081,7 +1353,7 @@ $schema://$host {
 
     public function isFunctional()
     {
-        $isFunctional = data_get($this->settings, 'is_reachable') && data_get($this->settings, 'is_usable') && data_get($this->settings, 'force_disabled') === false && $this->ip !== '1.2.3.4';
+        $isFunctional = data_get($this->settings, 'is_reachable') && data_get($this->settings, 'is_usable') && data_get($this->settings, 'force_disabled') === false && ! $this->hasPlaceholderIp();
 
         if ($isFunctional === false) {
             Storage::disk('ssh-mux')->delete($this->muxFilename());
@@ -1127,7 +1399,7 @@ $schema://$host {
 
         try {
             $output = instant_remote_process([
-                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s',
+                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true)',
             ], $this, false);
 
             if (! $output) {
@@ -1156,6 +1428,23 @@ $schema://$host {
             ];
 
             $this->update(['server_metadata' => $metadata]);
+
+            try {
+                $detectedDockerVersion = parseDockerEngineVersion($sections['DOCKER'] ?? null);
+                if ($detectedDockerVersion !== null) {
+                    $this->rememberDockerVersion($detectedDockerVersion);
+                }
+
+                $detectedComposeVersion = parseDockerEngineVersion($sections['COMPOSE'] ?? null);
+                if ($detectedComposeVersion !== null) {
+                    $this->rememberComposeVersion($detectedComposeVersion);
+                }
+            } catch (\Throwable $e) {
+                Log::debug('Failed to store server runtime versions', [
+                    'server_id' => $this->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return $metadata;
         } catch (\Throwable $e) {
@@ -1380,11 +1669,40 @@ $schema://$host {
         return true;
     }
 
+    public function dockerVersion(): ?string
+    {
+        return $this->settings?->docker_version;
+    }
+
+    public function rememberDockerVersion(?string $version): void
+    {
+        $this->settings->update([
+            'docker_version' => parseDockerEngineVersion($version),
+            'docker_version_checked_at' => now(),
+        ]);
+    }
+
+    public function composeVersion(): ?string
+    {
+        return $this->settings?->compose_version;
+    }
+
+    public function rememberComposeVersion(?string $version): void
+    {
+        $this->settings->update([
+            'compose_version' => parseDockerEngineVersion($version),
+            'compose_version_checked_at' => now(),
+        ]);
+    }
+
     public function validateDockerEngineVersion()
     {
         $dockerVersionRaw = instant_remote_process(['docker version --format json'], $this, false);
         $dockerVersionJson = json_decode($dockerVersionRaw, true);
         $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
+        $this->rememberDockerVersion(is_string($dockerVersion) ? $dockerVersion : null);
+        $composeVersionRaw = instant_remote_process(['docker compose version --short'], $this, false);
+        $this->rememberComposeVersion(is_string($composeVersionRaw) ? $composeVersionRaw : null);
         $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
         if (is_null($dockerVersion)) {
             $this->settings->is_usable = false;
@@ -1523,7 +1841,6 @@ $schema://$host {
     public function generateCaCertificate()
     {
         try {
-            ray('Generating CA certificate for server', $this->id);
             SslHelper::generateSslCertificate(
                 commonName: 'Coolify CA Certificate',
                 serverId: $this->id,
@@ -1531,7 +1848,6 @@ $schema://$host {
                 validityDays: 10 * 365
             );
             $caCertificate = $this->sslCertificates()->where('is_ca_certificate', true)->first();
-            ray('CA certificate generated', $caCertificate);
             if ($caCertificate) {
                 $certificateContent = $caCertificate->ssl_certificate;
                 $caCertPath = config('constants.coolify.base_config_path').'/ssl/';

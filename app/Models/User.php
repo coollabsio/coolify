@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\User\RevokeUserTeamTokens;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\EmailChangeVerification;
@@ -10,6 +11,7 @@ use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notifiable;
@@ -52,6 +54,9 @@ class User extends Authenticatable implements SendsEmail
         'pending_email',
         'email_change_code',
         'email_change_code_expires_at',
+        'avatar_path',
+        'avatar_storage_type',
+        'avatar_s3_storage_id',
     ];
 
     protected $hidden = [
@@ -98,13 +103,31 @@ class User extends Authenticatable implements SendsEmail
                 $team['id'] = 0;
                 $team['name'] = 'Root Team';
             }
+            $new_team = $user->id === 0 ? Team::find(0) : null;
+
+            if ($new_team !== null) {
+                $new_team->forceFill($team);
+                $new_team->save();
+
+                if (! $user->teams()->whereKey($new_team->id)->exists()) {
+                    $user->teams()->attach($new_team, ['role' => 'owner']);
+                } else {
+                    $user->teams()->updateExistingPivot($new_team->id, ['role' => 'owner']);
+                }
+
+                return;
+            }
+
             $new_team = (new Team)->forceFill($team);
             $new_team->save();
+
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
 
         static::deleting(function (User $user) {
             \DB::transaction(function () use ($user) {
+                RevokeUserTeamTokens::forUser($user);
+
                 $teams = $user->teams;
                 foreach ($teams as $team) {
                     $user_alone_in_team = $team->members->count() === 1;
@@ -142,6 +165,7 @@ class User extends Authenticatable implements SendsEmail
                             if ($found_other_member_who_is_not_owner) {
                                 $found_other_member_who_is_not_owner->pivot->role = 'owner';
                                 $found_other_member_who_is_not_owner->pivot->save();
+                                RevokeUserTeamTokens::forUserTeam($found_other_member_who_is_not_owner, $team->id);
                                 $team->members()->detach($user->id);
                             } else {
                                 static::finalizeTeamDeletion($user, $team);
@@ -329,6 +353,11 @@ class User extends Authenticatable implements SendsEmail
     {
         $sessionTeamId = data_get(session('currentTeam'), 'id');
 
+        // Fallback for stateless API requests: resolve team from Sanctum token
+        if (is_null($sessionTeamId) && $this->currentAccessToken()) {
+            $sessionTeamId = data_get($this->currentAccessToken(), 'team_id');
+        }
+
         if (is_null($sessionTeamId)) {
             return null;
         }
@@ -479,12 +508,26 @@ class User extends Authenticatable implements SendsEmail
             && Carbon::now()->lessThan($this->email_change_code_expires_at);
     }
 
+    public function oauthIdentities(): HasMany
+    {
+        return $this->hasMany(OauthIdentity::class);
+    }
+
+    public function hasSsoIdentity(): bool
+    {
+        return $this->oauthIdentities()->exists();
+    }
+
     /**
      * Check if the user has a password set.
-     * OAuth users are created without passwords.
      */
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function requiresPasswordConfirmation(): bool
+    {
+        return $this->hasPassword() && ! $this->hasSsoIdentity();
     }
 }

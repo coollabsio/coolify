@@ -82,7 +82,7 @@ $this->app->bind(PaymentGateway::class, StripeGateway::class);
 
 ## Default Sort by Descending
 
-When no explicit order is specified, sort by `id` or `created_at` descending. Explicit ordering prevents cross-database inconsistencies between MySQL and Postgres.
+When no explicit order is specified, sort by `id` or `created_at` descending. Without an explicit `ORDER BY`, row order is undefined.
 
 Incorrect:
 ```php

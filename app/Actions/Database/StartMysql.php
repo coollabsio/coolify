@@ -103,13 +103,9 @@ class StartMysql
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => [
-                        'test' => ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}"],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 10,
-                        'start_period' => '5s',
-                    ],
+                    'healthcheck' => $this->database->healthCheckConfiguration([
+                        'CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}",
+                    ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -203,6 +199,9 @@ class StartMysql
             ];
         }
 
+        if (! $this->database->isHealthcheckEnabled()) {
+            unset($docker_compose['services'][$container_name]['healthcheck']);
+        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
@@ -210,14 +209,12 @@ class StartMysql
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
-        $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
+        if ($this->database->enable_ssl) {
+            $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mysql:mysql /etc/mysql/certs/server.key /etc/mysql/certs/server.crt < /dev/null";
+        }
+        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
-
-        if ($this->database->enable_ssl) {
-            $mysqlUser = escapeshellarg($this->database->mysql_user);
-            $this->commands[] = executeInDocker($this->database->uuid, "chown {$mysqlUser}:{$mysqlUser} /etc/mysql/certs/server.crt /etc/mysql/certs/server.key");
-        }
 
         $this->commands[] = "echo 'Database started.'";
 

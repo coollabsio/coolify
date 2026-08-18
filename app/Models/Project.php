@@ -5,8 +5,8 @@ namespace App\Models;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Project model',
@@ -59,7 +59,7 @@ class Project extends BaseModel
             Environment::create([
                 'name' => 'production',
                 'project_id' => $project->id,
-                'uuid' => (string) new Cuid2,
+                'uuid' => new_public_id(),
             ]);
         });
         static::deleting(function ($project) {
@@ -156,9 +156,16 @@ class Project extends BaseModel
             $this->services()->count() == 0;
     }
 
-    public function databases()
+    public function databases(array $with = []): Collection
     {
-        return $this->postgresqls()->get()->merge($this->redis()->get())->merge($this->mongodbs()->get())->merge($this->mysqls()->get())->merge($this->mariadbs()->get())->merge($this->keydbs()->get())->merge($this->dragonflies()->get())->merge($this->clickhouses()->get());
+        return $this->postgresqls()->with($with)->get()
+            ->concat($this->redis()->with($with)->get())
+            ->concat($this->mongodbs()->with($with)->get())
+            ->concat($this->mysqls()->with($with)->get())
+            ->concat($this->mariadbs()->with($with)->get())
+            ->concat($this->keydbs()->with($with)->get())
+            ->concat($this->dragonflies()->with($with)->get())
+            ->concat($this->clickhouses()->with($with)->get());
     }
 
     public function navigateTo()

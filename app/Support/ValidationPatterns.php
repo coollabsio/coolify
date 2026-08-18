@@ -36,6 +36,17 @@ class ValidationPatterns
     public const DOCKER_TARGET_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
 
     /**
+     * Pattern for SSH usernames.
+     * Allows alphanumeric characters, dots, hyphens, and underscores.
+     */
+    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9._-]+$/';
+
+    /**
+     * Pattern for removing characters not allowed in SSH usernames.
+     */
+    public const INVALID_SERVER_USERNAME_CHARACTERS_PATTERN = '/[^A-Za-z0-9.\-_]/';
+
+    /**
      * Token-aware pattern for shell-safe command strings (docker compose commands, docker run options).
      *
      * Accepts a sequence of the following tokens only:
@@ -83,6 +94,27 @@ class ValidationPatterns
     public const DOCKER_NETWORK_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
 
     /**
+     * Pattern for S3 bucket names.
+     *
+     * Bucket names must be 3-63 lowercase characters, start and end with a
+     * letter or digit, and contain only lowercase letters, digits, dots, and
+     * hyphens. Additional semantic checks live in isValidS3BucketName().
+     */
+    public const S3_BUCKET_NAME_PATTERN = '/\A(?=.{3,63}\z)[a-z0-9][a-z0-9.-]*[a-z0-9]\z/';
+
+    /**
+     * Pattern for Docker-compatible environment variable keys.
+     * Environment variable keys are later interpolated into shell commands as Docker build args, so only shell-safe identifier characters are allowed.
+     */
+    public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[A-Za-z_][A-Za-z0-9_.]*\z/u';
+
+    /**
+     * Characters that are valid in some URL positions but unsafe for values
+     * that are later reused in shell assignment contexts.
+     */
+    public const APPLICATION_DOMAIN_FORBIDDEN_PATTERN = '/[`$;&|<>()\\\\\r\n]/';
+
+    /**
      * Pattern for SQL-safe unquoted database identifiers (usernames, database names).
      * Allows letters, digits, underscore; first char must be letter or underscore.
      * Excludes all shell metacharacters. Max 63 chars (Postgres identifier limit).
@@ -95,6 +127,175 @@ class ValidationPatterns
      * Allows a broad set of printable characters so passwords remain strong.
      */
     public const DB_PASSWORD_PATTERN = '/^[A-Za-z0-9!@#%^*()_+\-=\[\]{}:,.?\/~]+$/';
+
+    /**
+     * Pattern for Docker image repository names without a tag.
+     *
+     * Allows an optional registry host/port followed by lowercase repository
+     * path components. A trailing @sha256 marker is accepted for existing
+     * digest-based dockerimage records that store the digest hash separately.
+     */
+    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
+
+    /**
+     * Pattern for Docker image tags.
+     *
+     * Docker tags may contain letters, digits, underscores, dots, and hyphens,
+     * must start with an alphanumeric/underscore, and are limited to 128 chars.
+     */
+    public const DOCKER_IMAGE_TAG_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/';
+
+    /**
+     * Normalize environment variable keys before validation and storage.
+     */
+    public static function normalizeEnvironmentVariableKey(string $value): string
+    {
+        return str($value)->trim()->value;
+    }
+
+    /**
+     * Get validation rules for environment variable keys.
+     */
+    public static function environmentVariableKeyRules(bool $required = true, int $maxLength = 255): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::ENVIRONMENT_VARIABLE_KEY_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for environment variable key fields.
+     */
+    public static function environmentVariableKeyMessages(string $field = 'key', string $label = 'key'): array
+    {
+        return [
+            "{$field}.regex" => "The {$label} must start with a letter or underscore and may only contain letters, numbers, underscores, and dots.",
+            "{$field}.max" => "The {$label} may not be greater than :max characters.",
+        ];
+    }
+
+    /**
+     * Check if a string is a valid environment variable key.
+     */
+    public static function isValidEnvironmentVariableKey(string $value): bool
+    {
+        return preg_match(self::ENVIRONMENT_VARIABLE_KEY_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Check if a string is a valid S3 bucket name.
+     */
+    public static function isValidS3BucketName(string $value): bool
+    {
+        if (preg_match(self::S3_BUCKET_NAME_PATTERN, $value) !== 1) {
+            return false;
+        }
+
+        if (str_contains($value, '..') || str_contains($value, '.-') || str_contains($value, '-.')) {
+            return false;
+        }
+
+        return filter_var($value, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false;
+    }
+
+    /**
+     * Normalize and validate an environment variable key.
+     */
+    public static function validatedEnvironmentVariableKey(string $value, string $label = 'key'): string
+    {
+        $key = self::normalizeEnvironmentVariableKey($value);
+
+        if (! self::isValidEnvironmentVariableKey($key)) {
+            throw new \InvalidArgumentException(self::environmentVariableKeyMessages(label: $label)['key.regex']);
+        }
+
+        return $key;
+    }
+
+    /**
+     * Get validation rules for Docker image repository names without tags.
+     */
+    public static function dockerImageNameRules(bool $required = false, int $maxLength = 255): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::DOCKER_IMAGE_NAME_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation rules for Docker image tags.
+     */
+    public static function dockerImageTagRules(bool $required = false, int $maxLength = 128): array
+    {
+        $rules = [];
+
+        if ($required) {
+            $rules[] = 'required';
+        } else {
+            $rules[] = 'nullable';
+        }
+
+        $rules[] = 'string';
+        $rules[] = "max:$maxLength";
+        $rules[] = 'regex:'.self::DOCKER_IMAGE_TAG_PATTERN;
+
+        return $rules;
+    }
+
+    /**
+     * Get validation messages for Docker image fields.
+     */
+    public static function dockerImageMessages(string $nameField = 'docker_registry_image_name', string $tagField = 'docker_registry_image_tag'): array
+    {
+        return [
+            "{$nameField}.regex" => 'The Docker registry image name must be a valid image repository without a tag and may not contain shell metacharacters.',
+            "{$tagField}.regex" => 'The Docker registry image tag must be a valid Docker tag and may not contain shell metacharacters.',
+        ];
+    }
+
+    /**
+     * Check if a string is a valid Docker image repository name without a tag.
+     */
+    public static function isValidDockerImageName(?string $value): bool
+    {
+        if (blank($value)) {
+            return true;
+        }
+
+        return preg_match(self::DOCKER_IMAGE_NAME_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Check if a string is a valid Docker image tag.
+     */
+    public static function isValidDockerImageTag(?string $value): bool
+    {
+        if (blank($value)) {
+            return true;
+        }
+
+        return preg_match(self::DOCKER_IMAGE_TAG_PATTERN, $value) === 1;
+    }
 
     /**
      * Get validation rules for database identifier fields (username, database name).
@@ -122,6 +323,28 @@ class ValidationPatterns
         }
 
         return $rules;
+    }
+
+    /**
+     * Get validation rules for SSH username fields.
+     */
+    public static function serverUsernameRules(bool $required = true): array
+    {
+        return [
+            $required ? 'required' : 'nullable',
+            'string',
+            'regex:'.self::SERVER_USERNAME_PATTERN,
+        ];
+    }
+
+    /**
+     * Get validation messages for SSH username fields.
+     */
+    public static function serverUsernameMessages(string $field = 'user', string $label = 'User'): array
+    {
+        return [
+            "{$field}.regex" => "The {$label} may only contain letters, numbers, dots, hyphens, and underscores.",
+        ];
     }
 
     /**
@@ -292,6 +515,156 @@ class ValidationPatterns
     public static function shellSafeCommandRules(int $maxLength = 1000): array
     {
         return ['nullable', 'string', 'max:'.$maxLength, 'regex:'.self::SHELL_SAFE_COMMAND_PATTERN];
+    }
+
+    /**
+     * Get validation rules for comma-separated application URL fields.
+     */
+    public static function applicationDomainRules(int $maxLength = 2048): array
+    {
+        return [
+            'nullable',
+            'string',
+            'max:'.$maxLength,
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                foreach (self::validateApplicationDomains($value) as $error) {
+                    $fail($error);
+                }
+            },
+        ];
+    }
+
+    /**
+     * Validate a comma-separated list of application URLs.
+     *
+     * @return array<int, string>
+     */
+    public static function validateApplicationDomains(mixed $value): array
+    {
+        if (blank($value)) {
+            return [];
+        }
+
+        if (! is_string($value)) {
+            return ['The domains field must be a string.'];
+        }
+
+        $errors = [];
+        foreach (self::applicationDomainList($value) as $url) {
+            if (preg_match(self::APPLICATION_DOMAIN_FORBIDDEN_PATTERN, $url) === 1) {
+                $errors[] = "Invalid URL: {$url}";
+
+                continue;
+            }
+
+            if (! isValidDomainUrl($url)) {
+                $errors[] = "Invalid URL: {$url}";
+
+                continue;
+            }
+
+            $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
+            if (! in_array(strtolower($scheme), ['http', 'https'], true)) {
+                $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
+
+                continue;
+            }
+
+            if (blank(parse_url($url, PHP_URL_HOST))) {
+                $errors[] = "Invalid URL: {$url}";
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Normalize a comma-separated application URL list for storage.
+     */
+    public static function normalizeApplicationDomains(?string $value): ?string
+    {
+        $urls = self::applicationDomainList($value);
+
+        if ($urls === []) {
+            return null;
+        }
+
+        return collect($urls)
+            ->map(fn (string $url) => self::normalizeApplicationDomainUrl($url))
+            ->implode(',');
+    }
+
+    /**
+     * Normalize URL components that are case-insensitive while preserving
+     * case-sensitive path, query, and fragment components.
+     */
+    public static function normalizeApplicationDomainUrl(string $url): string
+    {
+        $components = parse_url($url);
+
+        if ($components === false) {
+            return $url;
+        }
+
+        $normalized = '';
+
+        if (isset($components['scheme'])) {
+            $normalized .= strtolower($components['scheme']).'://';
+        }
+
+        if (isset($components['user'])) {
+            $normalized .= $components['user'];
+
+            if (isset($components['pass'])) {
+                $normalized .= ':'.$components['pass'];
+            }
+
+            $normalized .= '@';
+        }
+
+        if (isset($components['host'])) {
+            $normalized .= strtolower($components['host']);
+        }
+
+        if (isset($components['port'])) {
+            $normalized .= ':'.$components['port'];
+        }
+
+        if (isset($components['path'])) {
+            $normalized .= $components['path'];
+        }
+
+        if (array_key_exists('query', $components)) {
+            $normalized .= '?'.$components['query'];
+        }
+
+        if (array_key_exists('fragment', $components)) {
+            $normalized .= '#'.$components['fragment'];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Split a comma-separated application URL list into trimmed URL strings.
+     *
+     * @return array<int, string>
+     */
+    public static function applicationDomainList(?string $value): array
+    {
+        if (blank($value)) {
+            return [];
+        }
+
+        return str($value)
+            ->replaceStart(',', '')
+            ->replaceEnd(',', '')
+            ->trim()
+            ->explode(',')
+            ->map(fn (string $url) => trim($url))
+            ->filter(fn (string $url) => filled($url))
+            ->values()
+            ->all();
     }
 
     /**

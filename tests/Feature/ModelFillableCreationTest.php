@@ -84,6 +84,8 @@ it('creates Server with all fillable attributes', function () {
         'team_id' => $this->team->id,
         'hetzner_server_id' => 'htz-12345',
         'hetzner_server_status' => 'running',
+        'digitalocean_droplet_id' => 987654,
+        'digitalocean_droplet_status' => 'active',
         'is_validating' => false,
         'detected_traefik_version' => 'v2.10.0',
         'traefik_outdated_info' => 'Up to date',
@@ -101,6 +103,8 @@ it('creates Server with all fillable attributes', function () {
     expect($server->cloud_provider_token_id)->toBe($cloudToken->id);
     expect($server->hetzner_server_id)->toBe('htz-12345');
     expect($server->hetzner_server_status)->toBe('running');
+    expect($server->digitalocean_droplet_id)->toBe(987654);
+    expect($server->digitalocean_droplet_status)->toBe('active');
     expect($server->ip_previous)->toBe('10.0.0.1');
 });
 
@@ -299,6 +303,7 @@ it('creates ApplicationSetting with all fillable attributes', function () {
         'inject_build_args_to_dockerfile' => true,
         'include_source_commit_in_build' => true,
         'docker_images_to_keep' => 5,
+        'stop_grace_period' => 300,
     ]);
 
     expect($setting->exists)->toBeTrue();
@@ -309,6 +314,7 @@ it('creates ApplicationSetting with all fillable attributes', function () {
     expect($setting->custom_internal_name)->toBe('my-custom-app');
     expect($setting->is_spa)->toBeTrue();
     expect($setting->docker_images_to_keep)->toBe(5);
+    expect($setting->stop_grace_period)->toBe(300);
 });
 
 it('creates ServerSetting with all fillable attributes', function () {
@@ -457,6 +463,7 @@ it('creates ServiceApplication with all fillable attributes', function () {
         'is_include_timestamps' => true,
         'is_gzip_enabled' => true,
         'is_stripprefix_enabled' => true,
+        'is_force_https_enabled' => false,
         'last_online_at' => now()->toISOString(),
         'is_migrated' => false,
     ]);
@@ -467,6 +474,26 @@ it('creates ServiceApplication with all fillable attributes', function () {
     expect($svcApp->human_name)->toBe('Web Server');
     expect($svcApp->image)->toBe('nginx:latest');
     expect($svcApp->is_log_drain_enabled)->toBeTrue();
+    expect($svcApp->is_force_https_enabled)->toBeFalse();
+    expect($svcApp->isForceHttpsEnabled())->toBeFalse();
+});
+
+it('enables HTTPS redirects for service applications by default', function () {
+    $service = Service::create([
+        'docker_compose_raw' => 'services: {}',
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $serviceApplication = ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web-default-redirect',
+    ]);
+
+    expect($serviceApplication->is_force_https_enabled)->toBeTrue();
+    expect($serviceApplication->isForceHttpsEnabled())->toBeTrue();
 });
 
 it('creates ServiceDatabase with all fillable attributes', function () {

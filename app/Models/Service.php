@@ -16,7 +16,6 @@ use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 #[OA\Schema(
     description: 'Service model',
@@ -67,11 +66,22 @@ class Service extends BaseModel
 
     protected $appends = ['server_status', 'status'];
 
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability. Internal compose generators
+     * must makeVisible explicitly before toArray().
+     */
+    protected $hidden = [
+        'docker_compose',
+        'docker_compose_raw',
+    ];
+
     protected static function booted()
     {
         static::creating(function ($service) {
             if (blank($service->name)) {
-                $service->name = 'service-'.(new Cuid2);
+                $service->name = 'service-'.new_public_id();
             }
         });
         static::created(function ($service) {
@@ -84,6 +94,7 @@ class Service extends BaseModel
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
+        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
 
         $applicationImages = $this->applications()->get()->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
@@ -94,8 +105,8 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -626,7 +637,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $image->contains('grafana'):
+                case $this->isGrafanaImage($image->toString()):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -778,7 +789,8 @@ class Service extends BaseModel
                     }
                     $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
                     if (is_null($rpc_secret)) {
-                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_64_RPCSECRET')->first()
+                            ?? $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
                     }
                     $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
                     if (is_null($metrics_token)) {
@@ -1168,6 +1180,27 @@ class Service extends BaseModel
                     }
                     $fields->put('Openclaw', $data->toArray());
                     break;
+                case $image->contains('coollabsio/jean-server'):
+                    $data = collect([]);
+                    $settings = [
+                        'Token' => ['key' => 'SERVICE_PASSWORD_64_JEAN', 'rules' => 'required', 'isPassword' => true, 'sortOrder' => 1, 'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN'],
+                        'Allowed Origins' => ['key' => 'JEAN_ALLOWED_ORIGINS', 'rules' => 'nullable|string', 'sortOrder' => 2, 'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS'],
+                    ];
+
+                    foreach ($settings as $label => $setting) {
+                        $variable = $this->environment_variables()->where('key', $setting['key'])->first();
+                        if (! $variable) {
+                            continue;
+                        }
+
+                        $data->put($label, [
+                            ...$setting,
+                            'value' => data_get($variable, 'value'),
+                        ]);
+                    }
+
+                    $fields->put('', $data->toArray());
+                    break;
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
@@ -1379,6 +1412,15 @@ class Service extends BaseModel
         return $fields;
     }
 
+    private function isGrafanaImage(string $image): bool
+    {
+        return in_array($image, [
+            'grafana/grafana',
+            'grafana/grafana-oss',
+            'grafana/grafana-enterprise',
+        ], true);
+    }
+
     public function saveExtraFields($fields)
     {
         foreach ($fields as $field) {
@@ -1554,7 +1596,7 @@ class Service extends BaseModel
             "cd $workdir",
         ], $this->server);
 
-        $filename = new Cuid2.'-docker-compose.yml';
+        $filename = new_public_id().'-docker-compose.yml';
         Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
         $path = Storage::path("tmp/{$filename}");
         instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
@@ -1574,7 +1616,6 @@ class Service extends BaseModel
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             } catch (\Exception $e) {
-                ray($e->getMessage());
             }
         }
 
@@ -1621,16 +1662,16 @@ class Service extends BaseModel
     protected function isDeployable(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $envs = $this->environment_variables()->where('is_required', true)->get();
-                foreach ($envs as $env) {
-                    if ($env->is_really_required) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
+            get: fn (): bool => $this->missingRequiredEnvironmentVariables()->isEmpty()
         );
+    }
+
+    public function missingRequiredEnvironmentVariables(): Collection
+    {
+        return $this->environment_variables()
+            ->where('is_required', true)
+            ->get()
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)
+            ->values();
     }
 }

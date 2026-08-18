@@ -1,3 +1,9 @@
+export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
+
+export function getTerminalSessionTimeout() {
+    return MAX_TERMINAL_SESSION_TIMEOUT_SECONDS;
+}
+
 export function extractTimeout(commandString) {
     const timeoutMatch = commandString.match(/timeout (\d+)/);
     return timeoutMatch ? parseInt(timeoutMatch[1], 10) : null;
