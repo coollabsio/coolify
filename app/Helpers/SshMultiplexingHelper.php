@@ -98,6 +98,21 @@ class SshMultiplexingHelper
         self::clearConnectionMetadata($server);
     }
 
+    /**
+     * Retire the master without disturbing the sessions already running on it.
+     *
+     * `ssh -O exit` terminates the master *and every channel multiplexed over
+     * it*. `-O stop` asks it to stop accepting new multiplexing requests
+     * instead: the control socket is unlinked immediately, so the next caller
+     * establishes a fresh master, while sessions already attached run to
+     * completion.
+     */
+    public static function stopAcceptingNewSessions(Server $server): void
+    {
+        Process::run(self::muxControlCommand($server, 'stop'));
+        self::clearConnectionMetadata($server);
+    }
+
     public static function generateScpCommand(Server $server, string $source, string $dest): string
     {
         $sshConfig = self::serverSshConfiguration($server);
@@ -263,7 +278,13 @@ class SshMultiplexingHelper
 
     public static function refreshMultiplexedConnection(Server $server): bool
     {
-        self::removeMuxFile($server);
+        // Recycling happens on age or health, on a connection shared by every
+        // job touching this server — so it can fire in the middle of somebody
+        // else's deployment. Tearing the master down would take that build's
+        // command with it (exit code 255, BuildKit "context canceled"), so the
+        // old master is only stopped from accepting new sessions. Callers that
+        // genuinely want it gone still use removeMuxFile().
+        self::stopAcceptingNewSessions($server);
 
         return self::establishNewMultiplexedConnection($server);
     }

@@ -87,7 +87,13 @@ it('reuses an existing healthy master without spawning a new one', function () {
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN'));
 });
 
-it('refreshes an expired master before reuse', function () {
+it('refreshes an expired master without killing the sessions running on it', function () {
+    // The master is shared by every job touching this server, so recycling it
+    // on age can land in the middle of an unrelated deployment. `ssh -O exit`
+    // would take that deployment's command down with it (exit code 255, and
+    // BuildKit logging "context canceled" a moment later, with nothing in the
+    // build output to explain it), so the aged master is only stopped from
+    // accepting new sessions.
     config([
         'constants.ssh.mux_enabled' => true,
         'constants.ssh.mux_health_check_enabled' => false,
@@ -98,14 +104,33 @@ it('refreshes an expired master before reuse', function () {
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
         '*-O exit*' => Process::result(exitCode: 0),
         '*-fN *' => Process::result(exitCode: 0),
     ]);
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
+    // -O stop unlinks the control socket as it stops listening, so the
+    // replacement master claims the same ControlPath straight away.
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+});
+
+it('still uses ssh -O exit where the master is meant to be torn down', function () {
+    // Key rotation and the explicit cleanup job want the master gone rather
+    // than drained, so removeMuxFile() keeps its behaviour.
+    config(['constants.ssh.mux_enabled' => true]);
+    $server = makeMuxServer();
+
+    Process::fake([
+        '*-O exit*' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
 });
 
 it('does not spawn a master when the per-server lock is already held', function () {
