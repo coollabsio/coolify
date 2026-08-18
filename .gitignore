@@ -39,6 +39,7 @@ docker/coolify-realtime/node_modules
 CHANGELOG.md
 /.workspaces
 /.superpowers/
+/docs/superpowers/plans/
 tests/Browser/Screenshots
 tests/v4/Browser/Screenshots
 ref
