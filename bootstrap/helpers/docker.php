@@ -263,6 +263,15 @@ function dockerStopCommand(int $timeout, string $containers, Server|string|null 
 
     return $command;
 }
+
+function dockerRemoveCommandWithTimeout(string $container, int $timeout = 60, int $killAfter = 10): string
+{
+    $container = escapeShellValue($container);
+    $script = "if command -v timeout >/dev/null 2>&1; then timeout -k {$killAfter}s {$timeout}s docker rm -f {$container}; exit_code=\$?; else exit_code=124; fi; if [ \"\$exit_code\" -eq 124 ]; then echo '__COOLIFY_CONTAINER_REMOVE_TIMEOUT__'; fi; exit \$exit_code";
+
+    return 'bash -c '.escapeShellValue($script);
+}
+
 function escapeShellValue(string $value): string
 {
     return "'".str_replace("'", "'\\''", $value)."'";

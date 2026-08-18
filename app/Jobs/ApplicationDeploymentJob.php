@@ -52,6 +52,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private const RAILPACK_GENERATED_CONFIG_PATH = '.coolify/railpack.generated.json';
 
+    private const CONTAINER_REMOVE_TIMEOUT_MARKER = '__COOLIFY_CONTAINER_REMOVE_TIMEOUT__';
+
     private const DOCKER_CLIENT_ENV_KEYS = [
         'BUILDKIT_HOST',
         'BUILDX_BUILDER',
@@ -3977,13 +3979,43 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             } else {
                 $this->execute_remote_command(
-                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true],
-                    ["docker rm -f $containerName", 'hidden' => true, 'ignore_errors' => true]
+                    [dockerStopCommand($timeout, $containerName, $this->server), 'hidden' => true, 'ignore_errors' => true]
                 );
+                $this->removeContainerWithTimeout($containerName);
             }
         } catch (Exception $error) {
             $this->application_deployment_queue->addLogEntry("Error stopping container $containerName: ".$error->getMessage(), 'stderr');
         }
+    }
+
+    private function removeContainerWithTimeout(string $containerName): void
+    {
+        $outputKey = 'container_remove_'.md5($containerName);
+
+        $this->execute_remote_command([
+            dockerRemoveCommandWithTimeout($containerName),
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => $outputKey,
+            'append' => false,
+        ]);
+
+        if (! isset($this->saved_outputs)) {
+            return;
+        }
+
+        $output = (string) $this->saved_outputs->get($outputKey, '');
+        if (! str_contains($output, self::CONTAINER_REMOVE_TIMEOUT_MARKER)) {
+            return;
+        }
+
+        $this->application_deployment_queue->addLogEntry(
+            "Warning: Removing container {$containerName} timed out after 60 seconds. The deployment will continue and cleanup will be retried in 5 minutes.",
+            'stderr'
+        );
+
+        RemoveContainerJob::dispatch($this->server->id, $containerName)
+            ->delay(now()->addMinutes(5));
     }
 
     private function stop_running_container(bool $force = false)
@@ -5016,9 +5048,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     // do not remove already running container for PR deployments
                 } else {
                     $this->application_deployment_queue->addLogEntry('Deployment failed. Removing the new version of your application.', 'stderr');
-                    $this->execute_remote_command(
-                        ["docker rm -f $this->container_name >/dev/null 2>&1", 'hidden' => true, 'ignore_errors' => true]
-                    );
+                    $this->removeContainerWithTimeout($this->container_name);
                 }
             }
         }

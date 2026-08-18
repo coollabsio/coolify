@@ -731,9 +731,7 @@ class Server extends BaseModel
                 ];
 
                 if ($schema === 'https') {
-                    $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
-                        0 => 'redirect-to-https',
-                    ];
+                    $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = $this->dashboardHttpMiddlewares($settings);
 
                     $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
                         'middlewares' => [
@@ -792,8 +790,9 @@ class Server extends BaseModel
                 $url = Url::fromString($settings->fqdn);
                 $host = $url->getHost();
                 $schema = $url->getScheme();
+                $siteAddress = $this->dashboardCaddySiteAddress($settings, $schema, $host);
                 $caddy_file = "
-$schema://$host {
+$siteAddress {
     encode zstd gzip
     handle /app/* {
         reverse_proxy coolify-realtime:6001
@@ -817,6 +816,24 @@ $schema://$host {
         return instant_remote_process([
             'docker exec coolify-proxy caddy reload --config /config/caddy/Caddyfile.autosave',
         ], $this);
+    }
+
+    public function dashboardHttpMiddlewares(InstanceSettings $settings): array
+    {
+        if ($settings->is_dashboard_force_https_enabled) {
+            return ['redirect-to-https'];
+        }
+
+        return ['gzip'];
+    }
+
+    public function dashboardCaddySiteAddress(InstanceSettings $settings, string $schema, string $host): string
+    {
+        if ($schema === 'https' && ! $settings->is_dashboard_force_https_enabled) {
+            return "http://{$host}, https://{$host}";
+        }
+
+        return "{$schema}://{$host}";
     }
 
     public function proxyPath()

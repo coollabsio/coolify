@@ -9,6 +9,10 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
+    protected $attributes = [
+        'is_dashboard_force_https_enabled' => true,
+    ];
+
     protected $fillable = [
         'public_ipv4',
         'public_ipv6',
@@ -51,6 +55,7 @@ class InstanceSettings extends Model
         'webhook_allow_localhost',
         'avatar_storage_type',
         'avatar_s3_storage_id',
+        'is_dashboard_force_https_enabled',
     ];
 
     protected $hidden = [
@@ -89,6 +94,7 @@ class InstanceSettings extends Model
         'is_mcp_server_enabled' => 'boolean',
         'webhook_allowed_internal_hosts' => 'array',
         'webhook_allow_localhost' => 'boolean',
+        'is_dashboard_force_https_enabled' => 'boolean',
     ];
 
     protected static function booted(): void
