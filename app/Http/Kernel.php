@@ -2,6 +2,7 @@
 
 namespace App\Http;
 
+use App\Http\Middleware\AddServerTimingHeaders;
 use App\Http\Middleware\ApiAbility;
 use App\Http\Middleware\ApiSensitiveData;
 use App\Http\Middleware\Authenticate;
@@ -49,6 +50,8 @@ class Kernel extends HttpKernel
      * @var array<int, class-string|string>
      */
     protected $middleware = [
+        // Outermost so Server-Timing includes the full middleware + app cost.
+        AddServerTimingHeaders::class,
         TrustHosts::class,
         TrustProxies::class,
         HandleCors::class,

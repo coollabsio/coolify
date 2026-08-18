@@ -14,6 +14,8 @@ class Show extends Component
 
     public PrivateKey $private_key;
 
+    public bool $modalMode = false;
+
     // Explicit properties
     public string $name;
 
@@ -79,8 +81,9 @@ class Show extends Component
         }
     }
 
-    public function mount(?string $private_key_uuid = null)
+    public function mount(?string $private_key_uuid = null, bool $modalMode = false)
     {
+        $this->modalMode = $modalMode;
         try {
             $this->private_key = PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related', 'team_id'])->whereUuid($private_key_uuid ?? request()->private_key_uuid)->firstOrFail();
 
@@ -119,6 +122,13 @@ class Show extends Component
             $this->private_key->delete();
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
+            if ($this->modalMode) {
+                $this->dispatch('securityResourceChanged');
+                $this->dispatch('close-modal');
+
+                return null;
+            }
+
             return redirectRoute($this, 'security.private-key.index');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
@@ -140,6 +150,10 @@ class Show extends Component
             ]);
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
+            $this->dispatch('securityResourceChanged');
+            if ($this->modalMode) {
+                $this->dispatch('close-modal');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

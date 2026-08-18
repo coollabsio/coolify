@@ -32,9 +32,7 @@ Coolify is currently at v4. While v4 is stable, it has some limitations, includi
 - A more complex user experience
 - Other smaller issues that need refinement
 
-These limitations will be addressed in Coolify v5, which is in the planning stage. Because of this, major features, architectural changes, or significant UI changes will not be accepted for v4 at this stage.
-
-We welcome contributions that help stabilize v4 for a bug free experience.
+These limitations will be addressed over time. Fixes and small improvements are accepted on the production line. New features and larger changes require prior discussion and must go through the development line.
 
 
 ## What Makes a Strong Contribution
@@ -188,8 +186,19 @@ If maintainers cannot reproduce working behavior, the PR will be closed without 
 - GitHub will auto-populate the PR template
 - The contributor agreement in PR description must remain intact
 - Pull requests without the contributor agreement will be closed
-- All pull requests must target the `next` branch
-- PRs targeting other branches will be closed without review
+
+Choose the branch based on the type of change:
+
+| Change | Start from | Pull request target |
+| --- | --- | --- |
+| Fixes and small improvements | `main` | `main` |
+| Security fixes | `main` | `main` |
+| New features and larger changes | `next` | `next` |
+
+- For a fix, branch from `main` and target `main`.
+- For a feature, branch from `next` and target `next`.
+- If a fix is discovered while developing a feature, submit it separately to `main`. Maintainers will merge `main` into `next` so the fix is included there too.
+- Pull requests targeting the wrong branch may be closed or asked to retarget.
 
 
 ## FAQ

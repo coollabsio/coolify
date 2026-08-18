@@ -105,6 +105,32 @@ describe('GitHub Private Repository Component', function () {
             ->assertSet('selected_repository_id', 1);
     });
 
+    test('repository selection uses the shared listbox and disables loading action', function () {
+        fakeGithubHttp([
+            ['id' => 1, 'name' => 'alpha-repo', 'owner' => ['login' => 'testuser']],
+        ]);
+
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->call('loadRepositories', $this->githubApp->id)
+            ->assertSee('id="selected_repository_id-trigger"', false)
+            ->assertSee('wire:loading.attr="disabled"', false)
+            ->assertSee('wire:target="loadBranches,selected_repository_id"', false)
+            ->assertDontSee('<datalist', false);
+    });
+
+    test('continue button uses the shared submit loading indicator', function () {
+        fakeGithubHttp([
+            ['id' => 1, 'name' => 'alpha-repo', 'owner' => ['login' => 'testuser']],
+        ]);
+
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->call('loadRepositories', $this->githubApp->id)
+            ->set('branches', collect([['name' => 'main']]))
+            ->assertSee('type="submit"', false)
+            ->assertSee('wire:target="submit"', false)
+            ->assertSee('wire:loading.class="is-loading"', false);
+    });
+
     test('loadRepositories rejects a github app owned by another team', function () {
         $victimTeam = Team::factory()->create();
         $victimPrivateKey = githubPrivateRepositoryTestPrivateKeyForTeam($victimTeam);

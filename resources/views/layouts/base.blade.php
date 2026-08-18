@@ -1,12 +1,32 @@
 <!DOCTYPE html>
 <html data-theme="dark" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<script>
+<script data-navigate-once>
     // Immediate theme application - runs before any rendering
     (function () {
-        const t = localStorage.theme || 'dark';
-        const d = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.classList[d ? 'add' : 'remove']('dark');
-        document.documentElement.setAttribute('data-theme', d ? 'dark' : 'light');
+        window.themeAccentForeground = (color) => {
+            const channels = color.match(/[a-f\d]{2}/gi).map(channel => parseInt(channel, 16) * 0.85 + 255 * 0.15);
+            const luminance = channels
+                .map(channel => channel / 255)
+                .map(channel => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+                .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+
+            return luminance > 0.179 ? '#000000' : '#ffffff';
+        };
+        window.applyStoredTheme = () => {
+            const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
+            const themeColor = localStorage.themeColor || '#6b16ed';
+            const isDark = theme === 'dark' || theme === 'custom' || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+
+            localStorage.theme = theme;
+            document.documentElement.classList.toggle('dark', isDark);
+            document.documentElement.dataset.theme = theme === 'custom' ? 'custom' : (isDark ? 'dark' : 'light');
+            document.documentElement.style.setProperty('--theme-base-color', themeColor);
+            document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(themeColor));
+            document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+        };
+
+        document.addEventListener('livewire:navigated', window.applyStoredTheme);
+        window.applyStoredTheme();
     })();
 </script>
 
@@ -14,7 +34,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <meta name="theme-color" content="#ffffff" id="theme-color-meta" />
+    <meta name="theme-color" content="#101010" id="theme-color-meta" />
     <meta name="color-scheme" content="dark light" />
     <meta name="Description" content="Coolify: An open-source & self-hostable Heroku / Netlify / Vercel alternative" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -54,7 +74,7 @@
     <script>
         // Update theme-color meta tag (non-critical, can run async)
         const t = localStorage.theme || 'dark';
-        const isDark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+        const isDark = t === 'dark' || t === 'custom' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
         document.getElementById('theme-color-meta')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
     </script>
     <style>
@@ -75,8 +95,9 @@
 </head>
 @section('body')
 
-<body class="dark:text-inherit text-black">
+<body class="overflow-y-scroll dark:text-inherit text-black">
     <x-toast />
+    <x-icon-tooltip />
     <script data-navigate-once>
         // Global HTML sanitization function using DOMPurify
         window.sanitizeHTML = function (html) {
@@ -156,7 +177,7 @@
             if (theme == 'system') {
                 theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
             }
-            if (theme == 'dark') {
+            if (theme == 'dark' || theme == 'custom') {
                 cpuColor = '#1e90ff'
                 ramColor = '#00ced1'
                 textColor = '#ffffff'
@@ -204,9 +225,30 @@
         let checkHealthInterval = null;
         let checkIfIamDeadInterval = null;
 
-        function copyToClipboard(text) {
-            navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');
+        async function copyToClipboard(text) {
+            try {
+                if (navigator.clipboard?.writeText && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    textarea.setAttribute('readonly', '');
+                    textarea.style.position = 'fixed';
+                    textarea.style.left = '-9999px';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    const copied = document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    if (!copied) {
+                        throw new Error('Copy command was rejected.');
+                    }
+                }
+                window.Livewire.dispatch('success', 'Copied to clipboard.');
+            } catch (error) {
+                window.Livewire.dispatch('error', 'Failed to copy to clipboard.');
+            }
         }
+        window.copyToClipboard = copyToClipboard;
         document.addEventListener('livewire:init', () => {
             window.Livewire.on('reloadWindow', (timeout) => {
                 if (timeout) {

@@ -3,10 +3,35 @@
     selectedIndex: -1,
     isSearching: false,
     isLoadingInitialData: false,
+    showLoadingSpinner: false,
+    spinnerTimer: null,
+    closeResetTimer: null,
+    isPaletteTransitioning: false,
     allSearchableItems: [],
     searchQuery: '',
     creatableItems: [],
     isCreateMode: false,
+    // macOS/iOS use ⌘; Windows/Linux use Ctrl+
+    modKeyLabel: (() => {
+        const platform = navigator.userAgentData?.platform || navigator.platform || '';
+        const ua = navigator.userAgent || '';
+        return /Mac|iPhone|iPad|iPod/i.test(platform) || /Mac OS X|Macintosh/i.test(ua) ? '⌘' : 'Ctrl+';
+    })(),
+    serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
+    developerCommandsEnabled: @js(app()->environment('local')),
+
+    get showServerTimingCommand() {
+        if (!this.developerCommandsEnabled) return false;
+        const query = this.searchQuery.toLowerCase().trim();
+        return query.length > 0 && ['server timing', 'timing hud', 'debug hud'].some(term => term.includes(query) || query.includes(term));
+    },
+
+    toggleServerTimingHud() {
+        this.serverTimingHudEnabled = !this.serverTimingHudEnabled;
+        localStorage.setItem('coolify.serverTimingHud.enabled', this.serverTimingHudEnabled ? '1' : '0');
+        window.dispatchEvent(new CustomEvent('server-timing-hud-visibility-changed'));
+        this.closeModal();
+    },
 
     // Client-side search function
     get searchResults() {
@@ -75,37 +100,71 @@
             console.warn('Global search: $wire not available, skipping open');
             return;
         }
+        clearTimeout(this.closeResetTimer);
+        clearTimeout(this.spinnerTimer);
         this.modalOpen = true;
         this.selectedIndex = -1;
         this.isLoadingInitialData = true;
+        this.showLoadingSpinner = false;
         this.searchQuery = '';
+        // Only show the spinner when loading takes longer than 150ms, so fast (cached) loads do not flash the icon
+        this.spinnerTimer = setTimeout(() => {
+            if (this.isLoadingInitialData) this.showLoadingSpinner = true;
+        }, 150);
         $wire.openSearchModal().then(() => {
             this.allSearchableItems = $wire.allSearchableItems || [];
             this.creatableItems = $wire.creatableItems || [];
+            clearTimeout(this.spinnerTimer);
             this.isLoadingInitialData = false;
+            this.showLoadingSpinner = false;
             setTimeout(() => this.$refs.searchInput?.focus(), 50);
         }).catch(() => {
             // Handle case where component was destroyed during navigation
+            clearTimeout(this.spinnerTimer);
             this.modalOpen = false;
             this.isLoadingInitialData = false;
+            this.showLoadingSpinner = false;
         });
     },
     closeModal() {
         this.modalOpen = false;
         this.selectedIndex = -1;
         this.isSearching = false;
-        this.isLoadingInitialData = false;
-        this.searchQuery = '';
-        this.allSearchableItems = [];
-        // Ensure scroll is restored
-        document.body.style.overflow = '';
-        // Use $wire instead of @this for SPA navigation compatibility
-        if ($wire) {
-            $wire.closeSearchModal();
-        }
+        // Keep the palette content intact until the leave animation (100ms) ends,
+        // otherwise the panel collapses to header height while it fades out
+        clearTimeout(this.closeResetTimer);
+        this.closeResetTimer = setTimeout(() => {
+            this.isLoadingInitialData = false;
+            this.showLoadingSpinner = false;
+            this.searchQuery = '';
+            this.allSearchableItems = [];
+            this.isPaletteTransitioning = false;
+        }, 150);
+    },
+    runPaletteTransition(callback) {
+        this.isPaletteTransitioning = true;
+        return Promise.resolve(callback()).finally(() => {
+            this.isPaletteTransitioning = false;
+        });
+    },
+    preselectFirstResult() {
+        this.$nextTick(() => {
+            const results = Array.from(this.$el.querySelectorAll('.search-result-item'))
+                .filter(item => item.offsetParent !== null);
+
+            if (results.length === 0) {
+                this.selectedIndex = -1;
+                return;
+            }
+
+            this.selectedIndex = 0;
+            results[0].focus();
+            results[0].scrollIntoView({ block: 'nearest' });
+        });
     },
     navigateResults(direction) {
-        const results = document.querySelectorAll('.search-result-item');
+        const results = Array.from(this.$el.querySelectorAll('.search-result-item'))
+            .filter(item => item.offsetParent !== null);
         if (results.length === 0) return;
 
         if (direction === 'down') {
@@ -162,7 +221,7 @@
                 });
 
                 if (matchingItem && typeof $wire !== 'undefined' && $wire) {
-                    $wire.navigateToResource(matchingItem.type);
+                    this.runPaletteTransition(() => $wire.navigateToResource(matchingItem.type));
                 }
             }
         });
@@ -268,639 +327,402 @@
     }
 }">
 
-    <!-- Modal overlay -->
-    <template x-teleport="body">
-        <div x-show="modalOpen" x-cloak
-            class="fixed top-0 left-0 z-99 flex items-start justify-center w-screen h-screen pt-[10vh]">
-            <div @click="closeModal()" class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-sm">
+    <!-- Command palette -->
+    <div x-cloak :class="modalOpen ? 'pointer-events-auto' : 'pointer-events-none'"
+        class="fixed inset-0 z-99 flex items-start justify-center px-4 pt-[12vh]">
+            <div x-show="modalOpen" @click="closeModal()"
+                x-transition:enter="animate-in fade-in-0 duration-150"
+                x-transition:leave="animate-out fade-out-0 duration-100 fill-mode-forwards"
+                class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]">
             </div>
             <div x-show="modalOpen" x-trap.inert="modalOpen"
-                x-init="$watch('modalOpen', value => { document.body.style.overflow = value ? 'hidden' : '' })"
-                x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-4 scale-95"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100" x-transition:leave="ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-4 scale-95" class="relative w-full max-w-2xl mx-4"
+                x-transition:enter="animate-in fade-in-0 zoom-in-95 slide-in-from-top-2 duration-150"
+                x-transition:leave="animate-out fade-out-0 zoom-out-95 slide-out-to-top-2 duration-100 fill-mode-forwards"
+                class="command-palette relative mx-auto"
                 @click.stop>
 
-                <!-- Search input (always visible) -->
-                <div class="relative">
-                    <div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                        <svg x-show="!isLoadingInitialData" class="w-5 h-5 text-neutral-400"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <!-- Search input -->
+                <div class="command-palette-header">
+                    <span class="command-palette-header-icon" :class="showLoadingSpinner && 'is-loading'">
+                        <svg x-show="!showLoadingSpinner" class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <path fill-rule="evenodd" clip-rule="evenodd"
+                                d="M11.5 2.75C6.66751 2.75 2.75 6.66751 2.75 11.5C2.75 16.3325 6.66751 20.25 11.5 20.25C16.3325 20.25 20.25 16.3325 20.25 11.5C20.25 6.66751 16.3325 2.75 11.5 2.75ZM1.25 11.5C1.25 5.83908 5.83908 1.25 11.5 1.25C17.1609 1.25 21.75 5.83908 21.75 11.5C21.75 14.0605 20.8111 16.4017 19.2589 18.1982L22.5303 21.4697C22.8232 21.7626 22.8232 22.2374 22.5303 22.5303C22.2374 22.8232 21.7626 22.8232 21.4697 22.5303L18.1982 19.2589C16.4017 20.8111 14.0605 21.75 11.5 21.75C5.83908 21.75 1.25 17.1609 1.25 11.5Z"
+                                fill="currentColor" />
                         </svg>
-                        <svg x-show="isLoadingInitialData" x-cloak class="animate-spin h-5 w-5 text-warning"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                            </circle>
+                        <svg x-show="showLoadingSpinner" x-cloak class="size-4 animate-spin" viewBox="0 0 24 24" fill="none"
+                            aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
                             <path class="opacity-75" fill="currentColor"
                                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
                             </path>
                         </svg>
-                    </div>
+                    </span>
                     <input type="text" x-model="searchQuery"
                         placeholder="Search resources, paths, everything (type new for create)..." x-ref="searchInput"
                         x-init="$watch('modalOpen', value => { if (value) setTimeout(() => $refs.searchInput.focus(), 100) })"
-                        class="w-full pl-12 pr-32 py-4 text-base bg-white dark:bg-coolgray-100 border-none rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus-visible:outline-none focus-visible:border-l-4 focus-visible:border-l-coollabs dark:focus-visible:border-l-warning" />
-                    <div class="absolute inset-y-0 right-2 flex items-center gap-2 pointer-events-none">
-                        <span class="text-xs font-medium text-neutral-400 dark:text-neutral-500">
-                            / or ⌘K to focus
-                        </span>
-                        <button @click="closeModal()"
-                            class="pointer-events-auto px-2 py-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded">
+                        class="command-palette-input" autocomplete="off" spellcheck="false" />
+                    <div class="command-palette-shortcuts">
+                        <span class="command-palette-kbd">/</span>
+                        <span class="command-palette-kbd" x-text="modKeyLabel + 'K'"></span>
+                        <button type="button" @click="closeModal()" class="command-palette-kbd" title="Close">
                             ESC
                         </button>
                     </div>
                 </div>
 
-                <!-- Search results (with background) -->
-                <div x-show="searchQuery.length >= 1" x-cloak
-                    class="mt-2 bg-white dark:bg-coolgray-100 rounded-lg shadow-xl ring-1 ring-neutral-200 dark:ring-coolgray-300 overflow-hidden">
-                    <!-- Results content -->
-                    <div class="max-h-[60vh] overflow-y-auto scrollbar">
-                        @if ($isSelectingResource)
-                            <!-- Resource Selection Flow -->
-                            <div class="p-6">
-                                <!-- Server Selection -->
-                                @if ($selectedServerId === null)
-                                    <div class="mb-4" x-init="selectedIndex = -1">
-                                        <div class="flex items-center gap-3 mb-3">
-                                            <button type="button"
-                                                @click="$wire.goBack()"
-                                                class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
-                                                </svg>
-                                            </button>
-                                            <div>
-                                                <h2 class="text-base font-semibold text-neutral-900 dark:text-white">
-                                                    Select Server
-                                                </h2>
-                                                @if ($this->selectedResourceName)
-                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                        for {{ $this->selectedResourceName }}
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        @if ($loadingServers)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                    </path>
-                                                </svg>
-                                                <span class="text-sm text-neutral-600 dark:text-neutral-400">Loading
-                                                    servers...</span>
-                                            </div>
-                                        @elseif (count($availableServers) > 0)
-                                            @foreach ($availableServers as $index => $server)
-                                                <button type="button" wire:click="selectServer({{ $server['id'] }}, true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
-                                                        <div class="flex-1 min-w-0">
-                                                            <div class="font-medium text-neutral-900 dark:text-white">
-                                                                {{ $server['name'] }}
-                                                            </div>
-                                                            @if (!empty($server['description']))
-                                                                <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                                    {{ $server['description'] }}
-                                                                </div>
-                                                            @else
-                                                                <div class="text-xs text-transparent select-none">
-                                                                    &nbsp;
-                                                                </div>
-                                                            @endif
-                                                        </div>
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
-                                                        </svg>
-                                                    </div>
-                                                </button>
-                                            @endforeach
-                                        @else
-                                            <div
-                                                class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                                <p class="text-sm text-red-800 dark:text-red-200">No servers
-                                                    available</p>
-                                            </div>
-                                        @endif
+                <!-- Search results -->
+                <div x-show="searchQuery.length >= 1" x-cloak class="command-palette-body relative">
+                    @if (app()->environment('local'))
+                        <div x-show="showServerTimingCommand && !$wire.isSelectingResource"
+                            class="command-palette-section">
+                            <div class="command-palette-group-label">Developer tools</div>
+                            <button type="button" @click="toggleServerTimingHud()"
+                                class="search-result-item command-palette-item">
+                                <div class="command-palette-item-main">
+                                    <div class="command-palette-item-title">
+                                        <span class="command-palette-item-name">Toggle Server Timing HUD</span>
+                                        <span class="command-palette-type-badge" x-text="serverTimingHudEnabled ? 'Enabled' : 'Disabled'"></span>
                                     </div>
-                                @endif
-
-                                <!-- Destination Selection -->
-                                @if ($selectedServerId !== null && $selectedDestinationUuid === null)
-                                    <div class="mb-4" x-init="selectedIndex = -1">
-                                        <div class="flex items-center gap-3 mb-3">
-                                            <button type="button"
-                                                @click="$wire.goBack()"
-                                                class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
-                                                </svg>
-                                            </button>
-                                            <div>
-                                                <h2 class="text-base font-semibold text-neutral-900 dark:text-white">
-                                                    Select Destination
-                                                </h2>
-                                                @if ($this->selectedResourceName)
-                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                        for {{ $this->selectedResourceName }}
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        @if ($loadingDestinations)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                    </path>
-                                                </svg>
-                                                <span class="text-sm text-neutral-600 dark:text-neutral-400">Loading
-                                                    destinations...</span>
-                                            </div>
-                                        @elseif (count($availableDestinations) > 0)
-                                            @foreach ($availableDestinations as $index => $destination)
-                                                <button type="button" wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
-                                                        <div class="flex-1 min-w-0">
-                                                            <div class="font-medium text-neutral-900 dark:text-white">
-                                                                {{ $destination['name'] }}
-                                                            </div>
-                                                            <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                                Network: {{ $destination['network'] }}
-                                                            </div>
-                                                        </div>
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
-                                                        </svg>
-                                                    </div>
-                                                </button>
-                                            @endforeach
-                                        @else
-                                            <div
-                                                class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                                <p class="text-sm text-red-800 dark:text-red-200">No destinations
-                                                    available</p>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                <!-- Project Selection -->
-                                @if ($selectedDestinationUuid !== null && $selectedProjectUuid === null)
-                                    <div class="mb-4" x-init="selectedIndex = -1">
-                                        <div class="flex items-center gap-3 mb-3">
-                                            <button type="button"
-                                                @click="$wire.goBack()"
-                                                class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
-                                                </svg>
-                                            </button>
-                                            <div>
-                                                <h2 class="text-base font-semibold text-neutral-900 dark:text-white">
-                                                    Select Project
-                                                </h2>
-                                                @if ($this->selectedResourceName)
-                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                        for {{ $this->selectedResourceName }}
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        @if ($loadingProjects)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                    </path>
-                                                </svg>
-                                                <span class="text-sm text-neutral-600 dark:text-neutral-400">Loading
-                                                    projects...</span>
-                                            </div>
-                                        @elseif (count($availableProjects) > 0)
-                                            @foreach ($availableProjects as $index => $project)
-                                                <button type="button" wire:click="selectProject('{{ $project['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
-                                                        <div class="flex-1 min-w-0">
-                                                            <div class="font-medium text-neutral-900 dark:text-white">
-                                                                {{ $project['name'] }}
-                                                            </div>
-                                                            @if (!empty($project['description']))
-                                                                <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                                    {{ $project['description'] }}
-                                                                </div>
-                                                            @else
-                                                                <div class="text-xs text-transparent select-none">
-                                                                    &nbsp;
-                                                                </div>
-                                                            @endif
-                                                        </div>
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
-                                                        </svg>
-                                                    </div>
-                                                </button>
-                                            @endforeach
-                                        @else
-                                            <div
-                                                class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                                <p class="text-sm text-red-800 dark:text-red-200">No projects
-                                                    available</p>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                <!-- Environment Selection -->
-                                @if ($selectedProjectUuid !== null && $selectedEnvironmentUuid === null)
-                                    <div class="mb-4" x-init="selectedIndex = -1">
-                                        <div class="flex items-center gap-3 mb-3">
-                                            <button type="button"
-                                                @click="$wire.goBack()"
-                                                class="text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-                                                    viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M15 19l-7-7 7-7" />
-                                                </svg>
-                                            </button>
-                                            <div>
-                                                <h2 class="text-base font-semibold text-neutral-900 dark:text-white">
-                                                    Select Environment
-                                                </h2>
-                                                @if ($this->selectedResourceName)
-                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                        for {{ $this->selectedResourceName }}
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        </div>
-                                        @if ($loadingEnvironments)
-                                            <div class="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-coolgray-200 rounded-lg">
-                                                <svg class="animate-spin h-5 w-5 text-warning-500" xmlns="http://www.w3.org/2000/svg"
-                                                    fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                                        stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor"
-                                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                    </path>
-                                                </svg>
-                                                <span class="text-sm text-neutral-600 dark:text-neutral-400">Loading
-                                                    environments...</span>
-                                            </div>
-                                        @elseif (count($availableEnvironments) > 0)
-                                            @foreach ($availableEnvironments as $index => $environment)
-                                                <button type="button" wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
-                                                    class="search-result-item w-full text-left block px-4 py-3 min-h-[4rem] hover:bg-warning-50 dark:hover:bg-warning-900/20 transition-colors focus:outline-none focus:bg-warning-100 dark:focus:bg-warning-900/30 border-b border-neutral-100 dark:border-coolgray-300 last:border-0">
-                                                    <div class="flex items-center justify-between gap-3 min-h-[2.5rem]">
-                                                        <div class="flex-1 min-w-0">
-                                                            <div class="font-medium text-neutral-900 dark:text-white">
-                                                                {{ $environment['name'] }}
-                                                            </div>
-                                                            @if (!empty($environment['description']))
-                                                                <div class="text-xs text-neutral-500 dark:text-neutral-400">
-                                                                    {{ $environment['description'] }}
-                                                                </div>
-                                                            @else
-                                                                <div class="text-xs text-transparent select-none">
-                                                                    &nbsp;
-                                                                </div>
-                                                            @endif
-                                                        </div>
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                            class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400" fill="none"
-                                                            viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                d="M9 5l7 7-7 7" />
-                                                        </svg>
-                                                    </div>
-                                                </button>
-                                            @endforeach
-                                        @else
-                                            <div
-                                                class="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                                                <p class="text-sm text-red-800 dark:text-red-200">No environments
-                                                    available</p>
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endif
-                            </div>
-                        @elseif ($isCreateMode && count($this->filteredCreatableItems) > 0 && !$autoOpenResource)
-                            <!-- Create new resources section -->
-                            <div class="py-2">
-                                {{-- Show existing resources first if any match --}}
-                                @php
-                                    $existingResources = collect($searchResults)
-                                        ->filter(fn($r) => !isset($r['is_creatable_suggestion']))
-                                        ->count();
-                                @endphp
-                                @if ($existingResources > 0)
-                                    <!-- Existing Resources Section -->
-                                    <div class="px-4 pt-3 pb-1">
-                                        <h4
-                                            class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                                            Existing Resources
-                                        </h4>
-                                    </div>
-                                    @foreach ($searchResults as $result)
-                                        @if (!isset($result['is_creatable_suggestion']))
-                                            <a href="{{ $result['link'] ?? '#' }}"
-                                                class="search-result-item block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                                                <div class="flex items-center justify-between gap-3">
-                                                    <div class="flex-1 min-w-0">
-                                                        <div class="flex items-center gap-2 mb-1">
-                                                            <span class="font-medium text-neutral-900 dark:text-white truncate">
-                                                                {{ $result['name'] }}
-                                                            </span>
-                                                            <span
-                                                                class="px-2 py-0.5 text-xs rounded-full bg-neutral-100 dark:bg-coolgray-300 text-neutral-700 dark:text-neutral-300 shrink-0">
-                                                                @if ($result['type'] === 'application')
-                                                                    Application
-                                                                @elseif ($result['type'] === 'service')
-                                                                    Service
-                                                                @elseif ($result['type'] === 'database')
-                                                                    {{ ucfirst($result['subtype'] ?? 'Database') }}
-                                                                @elseif ($result['type'] === 'server')
-                                                                    Server
-                                                                @elseif ($result['type'] === 'project')
-                                                                    Project
-                                                                @elseif ($result['type'] === 'environment')
-                                                                    Environment
-                                                                @endif
-                                                            </span>
-                                                        </div>
-                                                        @if (!empty($result['project']) && !empty($result['environment']))
-                                                            <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                                                                {{ $result['project'] }} /
-                                                                {{ $result['environment'] }}
-                                                            </div>
-                                                        @endif
-                                                        @if (!empty($result['description']))
-                                                            <div class="text-sm text-neutral-600 dark:text-neutral-400">
-                                                                {{ Str::limit($result['description'], 80) }}
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                        class="shrink-0 h-5 w-5 text-neutral-300 dark:text-neutral-600 self-center"
-                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                            d="M9 5l7 7-7 7" />
-                                                    </svg>
+                                    <div class="command-palette-item-meta"
+                                        x-text="serverTimingHudEnabled ? 'Hide the local request timing overlay' : 'Show the local request timing overlay'"></div>
+                                </div>
+                                <x-reicon name="time-back" class="command-palette-item-chevron" />
+                            </button>
+                        </div>
+                    @endif
+                    <div x-show="isPaletteTransitioning" x-cloak
+                        class="absolute inset-0 z-30 flex items-center justify-center bg-white/50 backdrop-blur-[2px] dark:bg-black/40">
+                        <x-loading text="Loading…" />
+                    </div>
+                    @if ($isSelectingResource)
+                        <!-- Resource selection flow -->
+                        <div class="relative min-h-32">
+                            <div class="command-palette-section transition-all"
+                                wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
+                                wire:target="selectServer,selectDestination,selectProject,selectEnvironment">
+                            @if ($selectedServerId === null)
+                                <div x-init="preselectFirstResult()">
+                                    <div class="command-palette-step-header">
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
+                                            title="Back">
+                                            <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
+                                        </button>
+                                        <div class="min-w-0">
+                                            <div class="command-palette-step-title">Select server</div>
+                                            @if ($this->selectedResourceName)
+                                                <div class="command-palette-step-subtitle">
+                                                    for {{ $this->selectedResourceName }}
                                                 </div>
-                                            </a>
-                                        @endif
-                                    @endforeach
-                                @endif
-
-                                @php
-                                    $grouped = collect($this->filteredCreatableItems)->groupBy('category');
-                                @endphp
-
-                                @foreach ($grouped as $category => $items)
-                                    <!-- Category Header -->
-                                    <div class="px-4 pt-3 pb-1">
-                                        <h4
-                                            class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                                            {{ $category }}
-                                        </h4>
+                                            @endif
+                                        </div>
                                     </div>
+                                    @if ($loadingServers)
+                                        <div class="command-palette-status">
+                                            <svg class="size-3.5 animate-spin shrink-0" viewBox="0 0 24 24" fill="none"
+                                                aria-hidden="true">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                    stroke-width="3"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                </path>
+                                            </svg>
+                                            <span>Loading servers…</span>
+                                        </div>
+                                    @elseif (count($availableServers) > 0)
+                                        @foreach ($availableServers as $server)
+                                            <button type="button" wire:click="selectServer({{ $server['id'] }}, true)"
+                                                class="search-result-item command-palette-item">
+                                                <div class="command-palette-item-main">
+                                                    <div class="command-palette-item-name">{{ $server['name'] }}</div>
+                                                    @if (!empty($server['description']))
+                                                        <div class="command-palette-item-meta">{{ $server['description'] }}</div>
+                                                    @endif
+                                                </div>
+                                                <x-reicon name="arrow-right" class="command-palette-item-chevron" />
+                                            </button>
+                                        @endforeach
+                                    @else
+                                        <div class="command-palette-status is-error">No servers available</div>
+                                    @endif
+                                </div>
+                            @endif
 
-                                    <!-- Category Items -->
-                                    @foreach ($items as $item)
-                                        <button type="button" wire:click="navigateToResource('{{ $item['type'] }}')"
-                                            class="search-result-item w-full text-left block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                                            <div class="flex items-center justify-between gap-3">
-                                                <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                    @if (! empty($item['logo']))
-                                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
-                                                            <img src="{{ asset($item['logo']) }}" alt="{{ $item['name'] }}" class="w-8 h-8 object-contain">
-                                                        </div>
-                                                    @else
-                                                        <div
-                                                            class="flex-shrink-0 w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
-                                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                                class="h-6 w-6 text-warning" fill="none"
-                                                                viewBox="0 0 24 24" stroke="currentColor">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                                    d="M12 4v16m8-8H4" />
-                                                            </svg>
+                            @if ($selectedServerId !== null && $selectedDestinationUuid === null)
+                                <div x-init="preselectFirstResult()">
+                                    <div class="command-palette-step-header">
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
+                                            title="Back">
+                                            <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
+                                        </button>
+                                        <div class="min-w-0">
+                                            <div class="command-palette-step-title">Select destination</div>
+                                            @if ($this->selectedResourceName)
+                                                <div class="command-palette-step-subtitle">
+                                                    for {{ $this->selectedResourceName }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    @if ($loadingDestinations)
+                                        <div class="command-palette-status">
+                                            <svg class="size-3.5 animate-spin shrink-0" viewBox="0 0 24 24" fill="none"
+                                                aria-hidden="true">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                    stroke-width="3"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                </path>
+                                            </svg>
+                                            <span>Loading destinations…</span>
+                                        </div>
+                                    @elseif (count($availableDestinations) > 0)
+                                        @foreach ($availableDestinations as $destination)
+                                            <button type="button"
+                                                wire:click="selectDestination('{{ $destination['uuid'] }}', true)"
+                                                class="search-result-item command-palette-item">
+                                                <div class="command-palette-item-main">
+                                                    <div class="command-palette-item-name">{{ $destination['name'] }}</div>
+                                                    <div class="command-palette-item-meta">
+                                                        Network: {{ $destination['network'] }}
+                                                    </div>
+                                                </div>
+                                                <x-reicon name="arrow-right" class="command-palette-item-chevron" />
+                                            </button>
+                                        @endforeach
+                                    @else
+                                        <div class="command-palette-status is-error">No destinations available</div>
+                                    @endif
+                                </div>
+                            @endif
+
+                            @if ($selectedDestinationUuid !== null && $selectedProjectUuid === null)
+                                <div x-init="preselectFirstResult()">
+                                    <div class="command-palette-step-header">
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
+                                            title="Back">
+                                            <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
+                                        </button>
+                                        <div class="min-w-0">
+                                            <div class="command-palette-step-title">Select project</div>
+                                            @if ($this->selectedResourceName)
+                                                <div class="command-palette-step-subtitle">
+                                                    for {{ $this->selectedResourceName }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    @if ($loadingProjects)
+                                        <div class="command-palette-status">
+                                            <svg class="size-3.5 animate-spin shrink-0" viewBox="0 0 24 24" fill="none"
+                                                aria-hidden="true">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                    stroke-width="3"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                </path>
+                                            </svg>
+                                            <span>Loading projects…</span>
+                                        </div>
+                                    @elseif (count($availableProjects) > 0)
+                                        @foreach ($availableProjects as $project)
+                                            <button type="button"
+                                                wire:click="selectProject('{{ $project['uuid'] }}', true)"
+                                                class="search-result-item command-palette-item">
+                                                <div class="command-palette-item-main">
+                                                    <div class="command-palette-item-name">{{ $project['name'] }}</div>
+                                                    @if (!empty($project['description']))
+                                                        <div class="command-palette-item-meta">{{ $project['description'] }}</div>
+                                                    @endif
+                                                </div>
+                                                <x-reicon name="arrow-right" class="command-palette-item-chevron" />
+                                            </button>
+                                        @endforeach
+                                    @else
+                                        <div class="command-palette-status is-error">No projects available</div>
+                                    @endif
+                                </div>
+                            @endif
+
+                            @if ($selectedProjectUuid !== null && $selectedEnvironmentUuid === null)
+                                <div x-init="preselectFirstResult()">
+                                    <div class="command-palette-step-header">
+                                        <button type="button" @click="runPaletteTransition(() => $wire.goBack())" class="command-palette-step-back"
+                                            title="Back">
+                                            <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
+                                        </button>
+                                        <div class="min-w-0">
+                                            <div class="command-palette-step-title">Select environment</div>
+                                            @if ($this->selectedResourceName)
+                                                <div class="command-palette-step-subtitle">
+                                                    for {{ $this->selectedResourceName }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    @if ($loadingEnvironments)
+                                        <div class="command-palette-status">
+                                            <svg class="size-3.5 animate-spin shrink-0" viewBox="0 0 24 24" fill="none"
+                                                aria-hidden="true">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                                    stroke-width="3"></circle>
+                                                <path class="opacity-75" fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                                </path>
+                                            </svg>
+                                            <span>Loading environments…</span>
+                                        </div>
+                                    @elseif (count($availableEnvironments) > 0)
+                                        @foreach ($availableEnvironments as $environment)
+                                            <button type="button"
+                                                wire:click="selectEnvironment('{{ $environment['uuid'] }}', true)"
+                                                class="search-result-item command-palette-item">
+                                                <div class="command-palette-item-main">
+                                                    <div class="command-palette-item-name">{{ $environment['name'] }}</div>
+                                                    @if (!empty($environment['description']))
+                                                        <div class="command-palette-item-meta">
+                                                            {{ $environment['description'] }}
                                                         </div>
                                                     @endif
-                                                    <div class="flex-1 min-w-0">
-                                                        <div class="flex items-center gap-2 mb-1">
-                                                            <div class="font-medium text-neutral-900 dark:text-white truncate">
-                                                                {{ $item['name'] }}
-                                                            </div>
-                                                            @if (isset($item['quickcommand']))
-                                                                <span
-                                                                    class="text-xs text-neutral-500 dark:text-neutral-400 shrink-0">{{ $item['quickcommand'] }}</span>
-                                                            @endif
-                                                        </div>
-                                                        <div class="text-sm text-neutral-600 dark:text-neutral-400 truncate">
-                                                            {{ $item['description'] }}
-                                                        </div>
-                                                    </div>
                                                 </div>
-                                                <svg xmlns="http://www.w3.org/2000/svg"
-                                                    class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400 self-center"
-                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                        d="M9 5l7 7-7 7" />
-                                                </svg>
-                                            </div>
-                                        </button>
-                                    @endforeach
-                                @endforeach
+                                                <x-reicon name="arrow-right" class="command-palette-item-chevron" />
+                                            </button>
+                                        @endforeach
+                                    @else
+                                        <div class="command-palette-status is-error">No environments available</div>
+                                    @endif
+                                </div>
+                            @endif
                             </div>
-                        @endif
+                            <div wire:loading.flex
+                                wire:target="selectServer,selectDestination,selectProject,selectEnvironment"
+                                class="absolute inset-0 z-10 hidden items-center justify-center bg-white/40 backdrop-blur-[1px] dark:bg-black/30">
+                                <x-loading text="Loading selection…" />
+                            </div>
+                        </div>
+                    @endif
 
-                        <template
-                            x-if="searchQuery.length >= 1 && searchResults.length > 0 && !$wire.isSelectingResource">
-                            <div class="py-2">
-                                <template x-if="filteredCreatableItems.length > 0">
-                                    <div class="px-4 pt-3 pb-1">
-                                        <h4
-                                            class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                                            Existing Resources
-                                        </h4>
-                                    </div>
-                                </template>
-                                <template x-for="(result, index) in searchResults" :key="index">
-                                    <a :href="result.link || '#'"
-                                        class="search-result-item block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                                        <div class="flex items-center justify-between gap-3">
-                                            <div class="flex-1 min-w-0">
-                                                <div class="flex items-center gap-2 mb-1">
-                                                    <span class="font-medium text-neutral-900 dark:text-white truncate"
-                                                        x-text="result.name">
-                                                    </span>
-                                                    <span
-                                                        class="px-2 py-0.5 text-xs rounded-full bg-neutral-100 dark:bg-coolgray-300 text-neutral-700 dark:text-neutral-300 shrink-0">
-                                                        <span x-show="result.type === 'navigation'">Navigation</span>
-                                                        <span x-show="result.type === 'application'">Application</span>
-                                                        <span x-show="result.type === 'service'">Service</span>
-                                                        <span x-show="result.type === 'database'"
-                                                            x-text="result.subtype ? result.subtype.charAt(0).toUpperCase() + result.subtype.slice(1) : 'Database'"></span>
-                                                        <span x-show="result.type === 'server'">Server</span>
-                                                        <span x-show="result.type === 'project'">Project</span>
-                                                        <span x-show="result.type === 'environment'">Environment</span>
-                                                    </span>
-                                                </div>
-                                                <template x-if="result.project && result.environment">
-                                                    <div class="text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                                                        <span x-text="result.project"></span> / <span
-                                                            x-text="result.environment"></span>
-                                                    </div>
-                                                </template>
-                                                <template x-if="result.description">
-                                                    <div class="text-sm text-neutral-600 dark:text-neutral-400"
-                                                        x-text="result.description.length > 80 ? result.description.substring(0, 80) + '...' : result.description">
-                                                    </div>
-                                                </template>
-                                            </div>
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                class="shrink-0 h-5 w-5 text-neutral-300 dark:text-neutral-600 self-center"
-                                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                    d="M9 5l7 7-7 7" />
-                                            </svg>
+                    <div wire:ignore>
+                        <template x-if="searchQuery.length >= 1 && searchResults.length > 0 && !$wire.isSelectingResource">
+                        <div class="command-palette-section">
+                            <template x-if="filteredCreatableItems.length > 0">
+                                <div class="command-palette-group-label">Existing resources</div>
+                            </template>
+                            <template x-for="(result, index) in searchResults" :key="index">
+                                <a :href="result.link || '#'" class="search-result-item command-palette-item">
+                                    <div class="command-palette-item-main">
+                                        <div class="command-palette-item-title">
+                                            <span class="command-palette-item-name" x-text="result.name"></span>
+                                            <span class="command-palette-type-badge">
+                                                <span x-show="result.type === 'navigation'">Navigation</span>
+                                                <span x-show="result.type === 'application'">Application</span>
+                                                <span x-show="result.type === 'service'">Service</span>
+                                                <span x-show="result.type === 'database'"
+                                                    x-text="result.subtype ? result.subtype.charAt(0).toUpperCase() + result.subtype.slice(1) : 'Database'"></span>
+                                                <span x-show="result.type === 'server'">Server</span>
+                                                <span x-show="result.type === 'project'">Project</span>
+                                                <span x-show="result.type === 'environment'">Environment</span>
+                                            </span>
                                         </div>
-                                    </a>
-                                </template>
-                            </div>
+                                        <template x-if="result.project && result.environment">
+                                            <div class="command-palette-item-meta">
+                                                <span x-text="result.project"></span> / <span x-text="result.environment"></span>
+                                            </div>
+                                        </template>
+                                        <template x-if="result.description">
+                                            <div class="command-palette-item-meta"
+                                                x-text="result.description.length > 80 ? result.description.substring(0, 80) + '...' : result.description">
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <svg class="command-palette-item-chevron" viewBox="0 0 24 24" fill="none"
+                                        aria-hidden="true">
+                                        <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.5"
+                                            stroke-linecap="round" stroke-linejoin="round" />
+                                    </svg>
+                                </a>
+                            </template>
+                        </div>
                         </template>
 
                         <template x-if="filteredCreatableItems.length > 0 && !$wire.isSelectingResource">
-                            <div class="py-2">
-                                <template x-for="[categoryName, items] in Object.entries(groupedCreatableItems)"
-                                    :key="categoryName">
-                                    <div>
-                                        <div class="px-4 pt-3 pb-1">
-                                            <h4 class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider"
-                                                x-text="categoryName">
-                                            </h4>
-                                        </div>
-
-                                        <template x-for="item in items" :key="item.type">
-                                            <button type="button" @click="$wire.navigateToResource(item.type)"
-                                                class="search-result-item w-full text-left block px-4 py-3 hover:bg-neutral-100 dark:hover:bg-coolgray-200 transition-colors focus:outline-none focus:bg-neutral-100 dark:focus:bg-coolgray-200 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                                                <div class="flex items-center justify-between gap-3">
-                                                    <div class="flex items-center gap-3 flex-1 min-w-0">
-                                                        <template x-if="item.logo">
-                                                            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center overflow-hidden">
-                                                                <img :src="'/' + item.logo" :alt="item.name" class="w-8 h-8 object-contain">
-                                                            </div>
-                                                        </template>
-                                                        <template x-if="!item.logo">
-                                                            <div
-                                                                class="flex-shrink-0 w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
-                                                                <svg xmlns="http://www.w3.org/2000/svg"
-                                                                    class="h-6 w-6 text-warning"
-                                                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                                                        stroke-width="2" d="M12 4v16m8-8H4" />
-                                                                </svg>
-                                                            </div>
-                                                        </template>
-                                                        <div class="flex-1 min-w-0">
-                                                            <div class="flex items-center gap-2 mb-1">
-                                                                <div class="font-medium text-neutral-900 dark:text-white truncate"
-                                                                    x-text="item.name">
-                                                                </div>
-                                                                <template x-if="item.amd_only">
-                                                                    <span
-                                                                        class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 shrink-0"
-                                                                        title="This service only supports AMD64/x86_64 architecture">
-                                                                        AMD only
-                                                                    </span>
-                                                                </template>
-                                                                <template x-if="item.arm_only">
-                                                                    <span
-                                                                        class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 shrink-0"
-                                                                        title="This service only supports ARM64/aarch64 architecture">
-                                                                        ARM only
-                                                                    </span>
-                                                                </template>
-                                                                <span
-                                                                    class="text-xs text-neutral-500 dark:text-neutral-400 shrink-0"
-                                                                    x-text="item.quickcommand"
-                                                                    x-show="item.quickcommand">
-                                                                </span>
-                                                            </div>
-                                                            <div class="text-sm text-neutral-600 dark:text-neutral-400 truncate"
-                                                                x-text="item.description">
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                        class="shrink-0 h-5 w-5 text-warning-500 dark:text-warning-400 self-center"
-                                                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                                            stroke-width="2" d="M9 5l7 7-7 7" />
+                        <div>
+                            <template x-for="[categoryName, items] in Object.entries(groupedCreatableItems)"
+                                :key="categoryName">
+                                <div class="command-palette-section">
+                                    <div class="command-palette-group-label" x-text="categoryName"></div>
+                                    <template x-for="item in items" :key="item.type">
+                                        <button type="button" @click="runPaletteTransition(() => $wire.navigateToResource(item.type))"
+                                            class="search-result-item command-palette-item">
+                                            <template x-if="item.logo">
+                                                <div class="command-palette-item-icon">
+                                                    <img :src="'/' + item.logo" :alt="item.name">
+                                                </div>
+                                            </template>
+                                            <template x-if="!item.logo">
+                                                <div class="command-palette-item-icon is-create">
+                                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                        <path d="M6 12H18" stroke="currentColor" stroke-width="1.5"
+                                                            stroke-linecap="round" />
+                                                        <path d="M12 18V6" stroke="currentColor" stroke-width="1.5"
+                                                            stroke-linecap="round" />
                                                     </svg>
                                                 </div>
-                                            </button>
-                                        </template>
-                                    </div>
-                                </template>
-                            </div>
+                                            </template>
+                                            <div class="command-palette-item-main">
+                                                <div class="command-palette-item-title">
+                                                    <span class="command-palette-item-name" x-text="item.name"></span>
+                                                    <template x-if="item.amd_only">
+                                                        <span class="command-palette-arch-badge"
+                                                            title="This service only supports AMD64/x86_64 architecture">
+                                                            AMD only
+                                                        </span>
+                                                    </template>
+                                                    <template x-if="item.arm_only">
+                                                        <span class="command-palette-arch-badge"
+                                                            title="This service only supports ARM64/aarch64 architecture">
+                                                            ARM only
+                                                        </span>
+                                                    </template>
+                                                    <span class="command-palette-quickcommand"
+                                                        x-text="(item.quickcommand || '').replace(/^\(type:\s*/i, '').replace(/\)$/, '')"
+                                                        x-show="item.quickcommand"></span>
+                                                </div>
+                                                <div class="command-palette-item-meta" x-text="item.description"></div>
+                                            </div>
+                                            <svg class="command-palette-item-chevron" viewBox="0 0 24 24" fill="none"
+                                                aria-hidden="true">
+                                                <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="1.5"
+                                                    stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                        </button>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
                         </template>
 
                         <template
-                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
-                            <div class="flex items-center justify-center py-12 px-4">
-                                <div class="text-center">
-                                    <p class="mt-4 text-sm font-medium text-neutral-900 dark:text-white">
-                                        No results found
-                                    </p>
-                                    <p class="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-                                        Try different keywords or check the spelling
-                                    </p>
-                                    <p class="mt-2 text-xs text-neutral-400 dark:text-neutral-500">
-                                        💡 Tip: Search for service names like "wordpress", "postgres", or "redis"
-                                    </p>
-                                </div>
+                            x-if="searchQuery.length >= 2 && searchResults.length === 0 && filteredCreatableItems.length === 0 && !showServerTimingCommand && !$wire.isSelectingResource && !$wire.autoOpenResource && !isLoadingInitialData">
+                            <div class="command-palette-empty">
+                                <p class="command-palette-empty-title">No results found</p>
+                                <p class="command-palette-empty-desc">
+                                    Try different keywords, or type <span class="font-medium">new</span> to create a resource.
+                                </p>
                             </div>
                         </template>
                     </div>
                 </div>
             </div>
-        </div>
-    </template>
+    </div>
 
-    <!-- Create Resource Modals - Always rendered so they're available when triggered -->
+    {{-- Create resource modals: always mounted with stable Livewire keys so
+         Alpine teleport can open them. Do not loop @livewire() — Livewire
+         ignores a third positional key arg and collides component ids. --}}
+    @php
+        $createModalShell = 'application-settings-form application-settings-section relative max-h-[calc(100dvh-2rem)] w-full lg:w-auto lg:min-w-2xl lg:max-w-4xl';
+        $createModalClose = 'flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg';
+    @endphp
+
     <div x-data="{ modalOpen: false }" @open-create-modal-project.window="modalOpen = true"
         @keydown.window.escape="modalOpen=false" class="relative w-auto h-auto">
         <template x-teleport="body">
@@ -911,30 +733,33 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
-                    class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
-                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
-                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                    class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
-                    <div class="flex items-center justify-between pb-3">
-                        <h3 class="text-2xl font-bold">New Project</h3>
-                        <button @click="modalOpen=false"
-                            class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="relative flex items-center justify-center w-auto">
-                        <livewire:project.add-empty key="create-modal-project" />
+            })" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
+                    class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
+                <div @click.self="modalOpen=false"
+                    class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="{{ $createModalShell }}"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header class="flex-nowrap!">
+                            <h3 class="min-w-0 flex-1 truncate">New project</h3>
+                            <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                            style="-webkit-overflow-scrolling: touch;">
+                            <livewire:project.add-empty key="create-modal-project" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -951,30 +776,33 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
-                    class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
-                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
-                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                    class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
-                    <div class="flex items-center justify-between pb-3">
-                        <h3 class="text-2xl font-bold">New Team</h3>
-                        <button @click="modalOpen=false"
-                            class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="relative flex items-center justify-center w-auto">
-                        <livewire:team.create key="create-modal-team" />
+            })" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
+                    class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
+                <div @click.self="modalOpen=false"
+                    class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="{{ $createModalShell }}"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header class="flex-nowrap!">
+                            <h3 class="min-w-0 flex-1 truncate">New team</h3>
+                            <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                            style="-webkit-overflow-scrolling: touch;">
+                            <livewire:team.create key="create-modal-team" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -991,30 +819,33 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
-                    class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
-                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
-                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                    class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
-                    <div class="flex items-center justify-between pb-3">
-                        <h3 class="text-2xl font-bold">New S3 Storage</h3>
-                        <button @click="modalOpen=false"
-                            class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="relative flex items-center justify-center w-auto">
-                        <livewire:storage.create key="create-modal-storage" />
+            })" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
+                    class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
+                <div @click.self="modalOpen=false"
+                    class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="{{ $createModalShell }}"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header class="flex-nowrap!">
+                            <h3 class="min-w-0 flex-1 truncate">New S3 storage</h3>
+                            <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                            style="-webkit-overflow-scrolling: touch;">
+                            <livewire:storage.create key="create-modal-storage" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1031,30 +862,33 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
-                    class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
-                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
-                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                    class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
-                    <div class="flex items-center justify-between pb-3">
-                        <h3 class="text-2xl font-bold">New Private Key</h3>
-                        <button @click="modalOpen=false"
-                            class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="relative flex items-center justify-center w-auto">
-                        <livewire:security.private-key.create key="create-modal-private-key" />
+            })" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
+                    class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
+                <div @click.self="modalOpen=false"
+                    class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="{{ $createModalShell }}"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header class="flex-nowrap!">
+                            <h3 class="min-w-0 flex-1 truncate">New private key</h3>
+                            <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                            style="-webkit-overflow-scrolling: touch;">
+                            <livewire:security.private-key.create key="create-modal-private-key" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1071,30 +905,33 @@
                         if (firstInput) firstInput.focus();
                     }, 200);
                 }
-            })" class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
-                <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                    x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="modalOpen=false"
-                    class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
-                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen" x-transition:enter="ease-out duration-100"
-                    x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                    x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave="ease-in duration-100"
-                    x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                    x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                    class="relative w-full py-6 border rounded-sm drop-shadow-sm min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
-                    <div class="flex items-center justify-between pb-3">
-                        <h3 class="text-2xl font-bold">New GitHub App</h3>
-                        <button @click="modalOpen=false"
-                            class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300 outline-0 focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning">
-                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="relative flex items-center justify-center w-auto">
-                        <livewire:source.github.create key="create-modal-source" />
+            })" class="fixed inset-0 z-99 overflow-y-auto" x-cloak>
+                <div x-show="modalOpen" x-transition:enter="ease-out duration-100"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                    x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                    x-transition:leave-end="opacity-0" @click="modalOpen=false"
+                    class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
+                <div @click.self="modalOpen=false"
+                    class="relative flex min-h-full items-start justify-center p-4 sm:items-center">
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        x-transition:enter="ease-out duration-100"
+                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave="ease-in duration-100"
+                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                        class="{{ $createModalShell }}"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header class="flex-nowrap!">
+                            <h3 class="min-w-0 flex-1 truncate">New GitHub app</h3>
+                            <button type="button" @click="modalOpen=false" class="{{ $createModalClose }}">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
+                            style="-webkit-overflow-scrolling: touch;">
+                            <livewire:source.github.create key="create-modal-source" />
+                        </div>
                     </div>
                 </div>
             </div>

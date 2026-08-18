@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -13,7 +14,7 @@ use Livewire\Component;
 
 class Slack extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 

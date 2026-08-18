@@ -1,4 +1,7 @@
 @props(['closeWithX' => false, 'fullScreen' => false])
+{{-- `contents` so event-only shells (no trigger in the default slot) do not leave a
+     ghost layout box above layer-2 tabs. Trigger buttons in the slot still flow
+     into the parent as if unwrapped. --}}
 <div x-data="{
     slideOverOpen: false
 }"
@@ -7,7 +10,7 @@ x-init="$watch('slideOverOpen', value => {
         $dispatch('slideOverClosed')
     }
 })"
-{{ $attributes->merge(['class' => 'relative w-auto h-auto']) }}>
+{{ $attributes->merge(['class' => 'contents']) }}>
     {{ $slot }}
     <template x-teleport="body">
         <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif

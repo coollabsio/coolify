@@ -36,6 +36,39 @@ class Index extends Component
 
     public ?string $sso_provider_label = null;
 
+    public $avatar;
+
+    public function uploadAvatar(AvatarStorageService $avatarStorage): bool
+    {
+        try {
+            $this->validate([
+                'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
+            ]);
+
+            $avatarStorage->store(Auth::user(), $this->avatar);
+            $this->reset('avatar');
+            $this->dispatch('avatar-updated', url: route('profile.avatar', ['v' => Auth::user()->fresh()->updated_at->timestamp]));
+            $this->dispatch('success', 'Profile picture updated.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
+        }
+    }
+
+    public function removeAvatar(AvatarStorageService $avatarStorage): void
+    {
+        try {
+            $avatarStorage->delete(Auth::user());
+            $this->dispatch('avatar-updated', url: null);
+            $this->dispatch('success', 'Profile picture removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function mount()
     {
         $this->userId = Auth::id();

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Events\ServiceStatusChanged;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -129,7 +130,10 @@ class Previews extends Component
                     $this->previewFqdns[$previewKey] = $fqdn;
 
                     if (! validateDNSEntry($fqdn, $this->application->destination->server)) {
-                        $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                        $server = $this->application->destination->server;
+                        $target = serverDnsTargetIp($server) ?? $server->ip;
+                        $guidance = dnsMismatchGuidanceMessage($target, $target);
+                        $this->dispatch('error', 'Validating DNS failed.', "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                         $success = false;
                     }
 
@@ -351,7 +355,7 @@ class Previews extends Component
 
         foreach ($containersToStop as $containerName) {
             instant_remote_process(command: [
-                "docker stop --time=$timeout $containerName",
+                dockerStopCommand($timeout, $containerName, $server),
                 "docker rm -f $containerName",
             ], server: $server, throwError: false);
         }
@@ -369,6 +373,11 @@ class Previews extends Component
                 $containers = getCurrentApplicationContainerStatus($server, $this->application->id, $pull_request_id)->toArray();
                 $this->stopContainers($containers, $server);
             }
+
+            ApplicationPreview::where('application_id', $this->application->id)
+                ->where('pull_request_id', $pull_request_id)
+                ->update(['status' => 'exited']);
+            ServiceStatusChanged::dispatch($this->application->environment->project->team->id);
 
             GetContainersStatus::run($server);
             $this->application->refresh();

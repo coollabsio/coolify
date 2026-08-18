@@ -206,6 +206,38 @@ test('admin can update email notification settings', function () {
     expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
+test('admin can save team smtp settings without a resend api key when resend is disabled', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->set('smtpFromAddress', 'alerts@example.com')
+        ->set('smtpFromName', 'Coolify')
+        ->set('smtpHost', 'smtp.example.com')
+        ->set('smtpPort', '587')
+        ->set('smtpEncryption', 'starttls')
+        ->set('resendEnabled', false)
+        ->set('resendApiKey', null)
+        ->call('submitResend')
+        ->assertHasNoErrors()
+        ->assertNotDispatched('error');
+});
+
+test('admin cannot enable team resend without an api key', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(EmailNotification::class)
+        ->set('smtpFromAddress', 'alerts@example.com')
+        ->set('smtpFromName', 'Coolify')
+        ->set('resendEnabled', true)
+        ->set('resendApiKey', null)
+        ->call('submitResend')
+        ->assertDispatched('error');
+
+    expect($this->team->emailNotificationSettings()->first()->resend_enabled)->toBeFalse();
+});
+
 // --- Pushover ---
 
 test('member cannot send test notification on pushover', function () {

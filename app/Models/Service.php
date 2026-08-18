@@ -94,6 +94,7 @@ class Service extends BaseModel
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
+        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
 
         $applicationImages = $this->applications()->get()->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
@@ -104,7 +105,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1179,6 +1180,27 @@ class Service extends BaseModel
                     }
                     $fields->put('Openclaw', $data->toArray());
                     break;
+                case $image->contains('coollabsio/jean-server'):
+                    $data = collect([]);
+                    $settings = [
+                        'Token' => ['key' => 'SERVICE_PASSWORD_64_JEAN', 'rules' => 'required', 'isPassword' => true, 'sortOrder' => 1, 'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN'],
+                        'Allowed Origins' => ['key' => 'JEAN_ALLOWED_ORIGINS', 'rules' => 'nullable|string', 'sortOrder' => 2, 'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS'],
+                    ];
+
+                    foreach ($settings as $label => $setting) {
+                        $variable = $this->environment_variables()->where('key', $setting['key'])->first();
+                        if (! $variable) {
+                            continue;
+                        }
+
+                        $data->put($label, [
+                            ...$setting,
+                            'value' => data_get($variable, 'value'),
+                        ]);
+                    }
+
+                    $fields->put('', $data->toArray());
+                    break;
                 default:
                     $data = collect([]);
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
@@ -1640,16 +1662,16 @@ class Service extends BaseModel
     protected function isDeployable(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $envs = $this->environment_variables()->where('is_required', true)->get();
-                foreach ($envs as $env) {
-                    if ($env->is_really_required) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
+            get: fn (): bool => $this->missingRequiredEnvironmentVariables()->isEmpty()
         );
+    }
+
+    public function missingRequiredEnvironmentVariables(): Collection
+    {
+        return $this->environment_variables()
+            ->where('is_required', true)
+            ->get()
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)
+            ->values();
     }
 }

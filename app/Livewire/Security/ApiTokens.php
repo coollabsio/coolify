@@ -93,11 +93,11 @@ class ApiTokens extends Component
             return;
         }
 
-        if ($permissionToUpdate == 'root') {
+        if ($permissionToUpdate == 'root' && in_array('root', $this->permissions, true)) {
             $this->permissions = ['root'];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions, true)) {
             $this->permissions[] = 'read';
-        } elseif ($permissionToUpdate == 'deploy') {
+        } elseif ($permissionToUpdate == 'deploy' && in_array('deploy', $this->permissions, true)) {
             $this->permissions = ['deploy'];
         } else {
             if (count($this->permissions) == 0) {

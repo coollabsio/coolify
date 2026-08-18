@@ -32,6 +32,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Horizon Allowed Emails
+    |--------------------------------------------------------------------------
+    |
+    | A comma-separated list of email addresses that may access the Horizon
+    | dashboard in addition to the root user.
+    |
+    */
+
+    'allowed_emails' => env('HORIZON_ALLOWED_EMAILS', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Horizon Redis Connection
     |--------------------------------------------------------------------------
     |
@@ -192,6 +204,7 @@ return [
             'sleep' => 3,
             'timeout' => env('HORIZON_TIMEOUT', 36000),
         ],
+
     ],
 
     'environments' => [
@@ -203,7 +216,6 @@ return [
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
-
         ],
         'local' => [
             's6' => [

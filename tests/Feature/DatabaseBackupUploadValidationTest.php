@@ -185,6 +185,24 @@ test('file scanner allows ordinary gzipped dumps', function () {
     expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($gzClean))->toBeFalse();
 });
 
+test('file scanner allows PostgreSQL custom format archives', function () {
+    $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload");
+
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
+});
+
+test('file scanner allows gzipped PostgreSQL custom format archives', function () {
+    $archive = writeScanPayload("PGDMP\0binary COPY records FROM PROGRAM payload", gzip: true);
+
+    expect(DatabaseBackupFileValidator::fileContainsPostgresqlProgramExecution($archive))->toBeFalse();
+});
+
+test('postgresql backup safety scanner allows copy words in table data', function () {
+    $dump = "COPY notes FROM stdin;\n1\tcopy files from program storage\n\\.\n";
+
+    expect(DatabaseBackupFileValidator::containsPostgresqlProgramExecution($dump))->toBeFalse();
+});
+
 test('backup validator rejects plaintext .dump containing program execution', function () {
     $file = makeTemporaryUpload('evil.dump', "COPY x FROM PROGRAM 'id';\n");
 
@@ -206,6 +224,7 @@ test('remote postgresql scanner blocks bypass payloads', function (string $conte
     'copy split across lines' => ["COPY x FROM\nPROGRAM 'id';\n", false],
     'copy to program' => ["COPY x TO PROGRAM 'cat > /tmp/x';\n", false],
     'psql pipe redirect' => ["\\o | id\n", false],
+    'psql query pipe redirect' => ["\\g | id\n", false],
     'gzipped comment bypass' => ["COPY x FROM/**/PROGRAM 'id';\n", true],
 ]);
 
@@ -222,6 +241,9 @@ test('remote postgresql scanner allows legitimate restores', function (string $c
     'copy from stdin' => ["COPY users FROM stdin;\n1\tTaylor\n\\.\n", false],
     'plain select' => ["SELECT * FROM users;\n", false],
     'gzipped clean dump' => ["CREATE TABLE users (id int);\n", true],
+    'custom format archive' => ["PGDMP\0binary COPY records FROM PROGRAM payload", false],
+    'custom format gzip archive' => ["PGDMP\0binary COPY records FROM PROGRAM payload", true],
+    'copy words in table data' => ["COPY notes FROM stdin;\n1\tcopy files from program storage\n\\.\n", false],
 ]);
 
 test('MAX_BYTES constant is 10 GiB', function () {

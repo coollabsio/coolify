@@ -50,6 +50,11 @@ it('rejects invalid RFC 1123 hostnames', function (string $hostname, string $exp
     'special characters' => ['my@server', 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
     'space' => ['my server', 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
     'shell metacharacters' => ['my;server', 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
+    'newline before dot' => ["evil\n.com", 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
+    'newline inside label' => ["evil\ncom", 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
+    'carriage return' => ["evil\r.com", 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
+    'tab character' => ["evil\t.com", 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
+    'caddy block injection' => ["evil.com {\n} http://x", 'letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.)'],
 ]);
 
 it('accepts empty hostname', function () {

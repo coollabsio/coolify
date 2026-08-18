@@ -33,6 +33,13 @@ class ServiceDatabase extends BaseModel
     ];
 
     protected $casts = [
+        'exclude_from_status' => 'boolean',
+        'is_public' => 'boolean',
+        'is_log_drain_enabled' => 'boolean',
+        'is_include_timestamps' => 'boolean',
+        'is_gzip_enabled' => 'boolean',
+        'is_stripprefix_enabled' => 'boolean',
+        'public_port' => 'integer',
         'public_port_timeout' => 'integer',
     ];
 

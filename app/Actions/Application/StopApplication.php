@@ -28,7 +28,7 @@ class StopApplication
                 if ($server->isSwarm()) {
                     instant_remote_process(["docker stack rm {$application->uuid}"], $server);
 
-                    return;
+                    continue;
                 }
 
                 $containers = $previewDeployments
@@ -40,7 +40,7 @@ class StopApplication
 
                 foreach ($containersToStop as $containerName) {
                     instant_remote_process(command: [
-                        "docker stop --time=$timeout $containerName",
+                        dockerStopCommand($timeout, $containerName, $server),
                         "docker rm -f $containerName",
                     ], server: $server, throwError: false);
                 }
@@ -57,17 +57,15 @@ class StopApplication
             }
         }
 
+        $status = ['status' => 'exited'];
         if ($resetRestartCount) {
-            $application->update([
+            $status = array_merge($status, [
                 'restart_count' => 0,
                 'last_restart_at' => null,
                 'last_restart_type' => null,
             ]);
-        } else {
-            $application->update([
-                'status' => 'exited',
-            ]);
         }
+        $application->update($status);
 
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
     }

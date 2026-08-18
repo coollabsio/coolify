@@ -34,6 +34,7 @@ class InstanceSettings extends Model
         'resend_api_key',
         'is_dns_validation_enabled',
         'custom_dns_servers',
+        'domain_connect_private_key',
         'instance_name',
         'is_api_enabled',
         'allowed_ips',
@@ -49,6 +50,8 @@ class InstanceSettings extends Model
         'is_mcp_server_enabled',
         'webhook_allowed_internal_hosts',
         'webhook_allow_localhost',
+        'avatar_storage_type',
+        'avatar_s3_storage_id',
     ];
 
     protected $hidden = [
@@ -59,6 +62,7 @@ class InstanceSettings extends Model
         'smtp_username',
         'smtp_password',
         'resend_api_key',
+        'domain_connect_private_key',
         'sentinel_token',
     ];
 
@@ -75,6 +79,7 @@ class InstanceSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'domain_connect_private_key' => 'encrypted',
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',

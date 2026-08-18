@@ -509,9 +509,29 @@ class Server extends BaseModel
         });
     }
 
-    public static function isUsable()
+    public static function isUsable(): Builder
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
+        return self::usableByBuildServerStatus(false);
+    }
+
+    public static function isUsableBuildServer(): Builder
+    {
+        return self::usableByBuildServerStatus(true);
+    }
+
+    private static function usableByBuildServerStatus(bool $isBuildServer): Builder
+    {
+        return Server::ownedByCurrentTeam()
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'is_build_server', $isBuildServer)
+            ->whereRelation('settings', 'force_disabled', false);
+    }
+
+    public function canHostResources(): bool
+    {
+        return ! $this->isBuildServer();
     }
 
     public function settings()
@@ -842,8 +862,29 @@ $schema://$host {
         return $this->settings->force_disabled;
     }
 
+    /**
+     * Server was migrated away from this Coolify instance (source side).
+     * Must not be revalidated or re-enabled as a live managed host.
+     */
+    public function isTransferredAway(): bool
+    {
+        return data_get($this->server_metadata, 'transfer.status') === 'transferred';
+    }
+
+    /**
+     * Whether this server may be validated / installed against from this instance.
+     */
+    public function canBeValidated(): bool
+    {
+        return ! $this->isTransferredAway();
+    }
+
     public function forceEnableServer()
     {
+        if ($this->isTransferredAway()) {
+            return;
+        }
+
         $this->settings->force_disabled = false;
         $this->settings->save();
     }
@@ -920,7 +961,7 @@ $schema://$host {
 
     public function stopUnmanaged($id)
     {
-        return instant_remote_process(['docker stop -t 0 '.escapeshellarg($id)], $this);
+        return instant_remote_process([dockerStopCommand(0, escapeshellarg($id), $this)], $this);
     }
 
     public function restartUnmanaged($id)
@@ -1310,7 +1351,7 @@ $schema://$host {
 
         try {
             $output = instant_remote_process([
-                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s',
+                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true)',
             ], $this, false);
 
             if (! $output) {
@@ -1339,6 +1380,23 @@ $schema://$host {
             ];
 
             $this->update(['server_metadata' => $metadata]);
+
+            try {
+                $detectedDockerVersion = parseDockerEngineVersion($sections['DOCKER'] ?? null);
+                if ($detectedDockerVersion !== null) {
+                    $this->rememberDockerVersion($detectedDockerVersion);
+                }
+
+                $detectedComposeVersion = parseDockerEngineVersion($sections['COMPOSE'] ?? null);
+                if ($detectedComposeVersion !== null) {
+                    $this->rememberComposeVersion($detectedComposeVersion);
+                }
+            } catch (\Throwable $e) {
+                Log::debug('Failed to store server runtime versions', [
+                    'server_id' => $this->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             return $metadata;
         } catch (\Throwable $e) {
@@ -1563,11 +1621,40 @@ $schema://$host {
         return true;
     }
 
+    public function dockerVersion(): ?string
+    {
+        return $this->settings?->docker_version;
+    }
+
+    public function rememberDockerVersion(?string $version): void
+    {
+        $this->settings->update([
+            'docker_version' => parseDockerEngineVersion($version),
+            'docker_version_checked_at' => now(),
+        ]);
+    }
+
+    public function composeVersion(): ?string
+    {
+        return $this->settings?->compose_version;
+    }
+
+    public function rememberComposeVersion(?string $version): void
+    {
+        $this->settings->update([
+            'compose_version' => parseDockerEngineVersion($version),
+            'compose_version_checked_at' => now(),
+        ]);
+    }
+
     public function validateDockerEngineVersion()
     {
         $dockerVersionRaw = instant_remote_process(['docker version --format json'], $this, false);
         $dockerVersionJson = json_decode($dockerVersionRaw, true);
         $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
+        $this->rememberDockerVersion(is_string($dockerVersion) ? $dockerVersion : null);
+        $composeVersionRaw = instant_remote_process(['docker compose version --short'], $this, false);
+        $this->rememberComposeVersion(is_string($composeVersionRaw) ? $composeVersionRaw : null);
         $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
         if (is_null($dockerVersion)) {
             $this->settings->is_usable = false;

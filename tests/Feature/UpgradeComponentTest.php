@@ -34,6 +34,36 @@ it('initializes latest version during mount from cached versions data', function
         ->assertSee('4.0.0-beta.999');
 });
 
+it('does not highlight the current upgrade stage with the warning yellow accent', function () {
+    $progressView = file_get_contents(resource_path('views/components/upgrade-progress.blade.php'));
+
+    expect($progressView)
+        ->toContain('bg-neutral-100 text-neutral-900 dark:bg-white/[0.08] dark:text-fg')
+        ->not->toContain('dark:text-warning')
+        ->not->toContain('dark:bg-warning');
+});
+
+it('uses a current-color spinner on upgrade stages instead of the brand purple loader', function () {
+    $progressView = file_get_contents(resource_path('views/components/upgrade-progress.blade.php'));
+    $appCss = file_get_contents(resource_path('css/app.css'));
+
+    expect($progressView)
+        ->toContain('spinner-current')
+        ->not->toContain('loading-indicator')
+        ->and($appCss)
+        ->toContain('.dark .animate-spin.spinner-current')
+        ->toContain('html[data-theme="custom"] .animate-spin.spinner-current')
+        ->toContain('color: inherit !important;');
+});
+
+it('treats a brief upgrade poll miss as a reconnect, not a lost-contact failure', function () {
+    $upgradeView = file_get_contents(resource_path('views/livewire/upgrade.blade.php'));
+
+    expect($upgradeView)
+        ->toContain('Reconnecting. This is expected during an upgrade...')
+        ->not->toContain('Lost contact with Coolify');
+});
+
 it('uses sidebar state css instead of nested alpine state for upgrade labels', function () {
     $upgradeView = file_get_contents(resource_path('views/livewire/upgrade.blade.php'));
     $utilitiesCss = file_get_contents(resource_path('css/utilities.css'));

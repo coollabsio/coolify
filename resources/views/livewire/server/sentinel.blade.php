@@ -1,73 +1,126 @@
-<div>
-    <form wire:submit.prevent='submit'>
-        <div class="flex gap-2 items-center pb-2">
-            <h2>Sentinel</h2>
-            <x-helper helper="Sentinel reports your server's & container's health and collects metrics." />
-            @if (!$isSentinelEnabled)
-                <x-forms.button canGate="update" :canResource="$server" isHighlighted wire:click="toggleSentinel">Enable Sentinel</x-forms.button>
-            @else
-                <div class="flex gap-2 items-center">
-                    <x-forms.button type="submit" canGate="update" :canResource="$server">Save</x-forms.button>
-                    <x-forms.button wire:click='restartSentinel' canGate="update" :canResource="$server">
-                        {{ $server->isSentinelLive() ? 'Restart' : 'Sync' }}
-                    </x-forms.button>
-                    <x-forms.button canGate="update" :canResource="$server" wire:click="toggleSentinel">Disable Sentinel</x-forms.button>
-                </div>
-            @endif
-        </div>
-        @if ($isSentinelEnabled && !$server->isSentinelLive())
-            <x-callout type="warning" title="Out of Sync" class="mt-2">
-                Sentinel is not in sync with your server. Click "Sync" to re-sync.
-            </x-callout>
+<div class="application-settings-form flex w-full flex-col gap-6">
+    <form wire:submit.prevent="submit" class="contents">
+        @if ($isSentinelEnabled)
+            {{-- Scope dirty tracking to savable form fields only. Without wire:target,
+                 Livewire compares the entire component snapshot — so dev-only x-init
+                 `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
+                 flashes this bar on every page open. --}}
+            <x-unsaved-bar action="submit"
+                targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
         @endif
-        <div class="flex flex-col gap-2 pt-2">
-            @if ($isSentinelEnabled && isDev())
-                <div class="w-full sm:w-96">
-                    <x-forms.checkbox canGate="update" :canResource="$server" id="isSentinelDebugEnabled"
-                        label="Enable Sentinel (with debug)" instantSave />
-                </div>
-            @endif
-            @if (isDev() && $server->isSentinelEnabled())
-                <div class="pt-4" x-data="{
-                    customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
-                    saveCustomImage() {
-                        localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
-                        $wire.set('sentinelCustomDockerImage', this.customImage);
-                    }
-                }" x-init="$wire.set('sentinelCustomDockerImage', customImage)">
-                    <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
-                        @input.debounce.500ms="saveCustomImage()"
-                        placeholder="e.g., sentinel:latest or myregistry/sentinel:dev"
-                        label="Custom Sentinel Docker Image (Dev Only)"
-                        helper="Override the default Sentinel Docker image for testing. Leave empty to use the default." />
-                </div>
-            @endif
-            @if ($server->isSentinelEnabled())
-                <div class="flex flex-wrap gap-2 sm:flex-nowrap items-end">
-                    <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl" required
-                        label="Coolify URL"
-                        helper="URL to your Coolify instance. If it is empty that means you do not have a FQDN set for your Coolify instance." />
-                    <x-forms.input canGate="update" :canResource="$server" type="password" id="sentinelToken"
-                        label="Sentinel token" required helper="Token for Sentinel." />
-                    <x-forms.button canGate="update" :canResource="$server"
-                        wire:click="regenerateSentinelToken">Regenerate</x-forms.button>
-                </div>
 
-                <div class="flex flex-col gap-2">
-                    <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-                        <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
-                            id="sentinelMetricsRefreshRateSeconds" label="Metrics rate (seconds)" required
-                            helper="Interval used for gathering metrics. Lower values result in more disk space usage." />
-                        <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
-                            id="sentinelMetricsHistoryDays"
-                            label="Metrics history (days)" required
-                            helper="Number of days to retain metrics data for." />
-                        <x-forms.input canGate="update" :canResource="$server" type="number" min="10"
-                            id="sentinelPushIntervalSeconds" label="Push interval (seconds)" required
-                            helper="Interval at which metrics data is sent to the collector." />
+        <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
+            helper="Monitor server and container health while collecting historical metrics.">
+            <x-slot:actions>
+                <div class="flex items-center gap-2">
+                    @if (!$isSentinelEnabled)
+                        <x-forms.button canGate="update" :canResource="$server" isHighlighted
+                            wire:click="toggleSentinel">
+                            Enable Sentinel
+                        </x-forms.button>
+                    @else
+                        <x-status-badge :status="$server->isSentinelLive() ? 'In sync' : 'Out of sync'"
+                            :type="$server->isSentinelLive() ? 'success' : 'warning'" />
+                        <x-forms.button wire:click="restartSentinel" canGate="update"
+                            :canResource="$server">
+                            <x-reicon name="refresh" class="size-3.5" />
+                            {{ $server->isSentinelLive() ? 'Restart' : 'Sync' }}
+                        </x-forms.button>
+                        <x-forms.button canGate="update" :canResource="$server"
+                            wire:click="toggleSentinel">
+                            Disable
+                        </x-forms.button>
+                    @endif
+                </div>
+            </x-slot:actions>
+
+            @if ($isSentinelEnabled && !$server->isSentinelLive())
+                <x-callout type="warning" title="Sentinel is out of sync">
+                    Sync Sentinel to apply its current configuration and restore health reporting.
+                </x-callout>
+            @elseif ($isSentinelEnabled)
+                <div class="flex items-start gap-3">
+                    <div
+                        class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                        <x-reicon name="dashboard" class="size-4" />
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-neutral-950 dark:text-fg">Health reporting active</p>
+                        <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                            Sentinel is connected and reporting server health to this Coolify instance.
+                        </p>
                     </div>
                 </div>
+            @else
+                <x-empty size="sm" title="Sentinel is disabled"
+                    description="Enable Sentinel to collect metrics and monitor server and container health."
+                    icon-name="dashboard" />
             @endif
-        </div>
+        </x-application.settings-section>
+
+        @if ($server->isSentinelEnabled())
+            <x-application.settings-section id="server-sentinel-connection-section" title="Connection"
+                helper="Configure how Sentinel authenticates with and reports to Coolify.">
+                <x-slot:actions>
+                    <x-forms.button canGate="update" :canResource="$server"
+                        wire:click="regenerateSentinelToken">
+                        Regenerate token
+                    </x-forms.button>
+                </x-slot:actions>
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
+                        required label="Coolify URL"
+                        helper="Public URL used by Sentinel to reach this Coolify instance." />
+                    <x-forms.input canGate="update" :canResource="$server" type="password"
+                        id="sentinelToken" label="Sentinel token" required
+                        helper="Authentication token used by Sentinel." />
+                </div>
+            </x-application.settings-section>
+
+            <x-application.settings-section id="server-sentinel-metrics-section" title="Metrics collection"
+                helper="Control collection frequency, retention, and the push interval.">
+                <div class="grid gap-4 lg:grid-cols-3">
+                    <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
+                        id="sentinelMetricsRefreshRateSeconds" label="Collection rate" required
+                        helper="Seconds between metric samples." />
+                    <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
+                        id="sentinelMetricsHistoryDays" label="History retention" required
+                        helper="Days of CPU and memory history to retain." />
+                    <x-forms.input canGate="update" :canResource="$server" type="number" min="10"
+                        id="sentinelPushIntervalSeconds" label="Push interval" required
+                        helper="Seconds between health reports sent to Coolify." />
+                </div>
+            </x-application.settings-section>
+
+            @if (isDev())
+                <x-application.settings-section id="server-sentinel-development-section"
+                    title="Development overrides"
+                    helper="Local testing controls that are unavailable in production.">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.listbox id="isSentinelDebugEnabled" label="Debug logging"
+                            onChange="instantSave" :options="[
+                                ['value' => false, 'label' => 'Standard logging'],
+                                ['value' => true, 'label' => 'Enable debug logging'],
+                            ]" />
+                        <div x-data="{
+                            customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
+                            saveCustomImage() {
+                                localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
+                                $wire.set('sentinelCustomDockerImage', this.customImage || null);
+                            }
+                        }"
+                            {{-- Only hydrate Livewire when a real override exists. Unconditional
+                                 $wire.set('', null→'') on every open marks the component dirty and
+                                 flashes the unsaved bar until the round-trip completes. --}}
+                            x-init="if (customImage) { $wire.set('sentinelCustomDockerImage', customImage) }">
+                            <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
+                                @input.debounce.500ms="saveCustomImage()"
+                                placeholder="sentinel:latest" label="Custom Docker image"
+                                helper="Leave empty to use the default Sentinel image." />
+                        </div>
+                    </div>
+                </x-application.settings-section>
+            @endif
+        @endif
     </form>
 </div>

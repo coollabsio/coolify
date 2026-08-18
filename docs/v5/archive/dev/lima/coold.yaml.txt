@@ -1,0 +1,53 @@
+vmType: "vz"
+arch: "default"
+user:
+  name: coolify
+cpus: 4
+memory: "2GiB"
+disk: "20GiB"
+containerd:
+  system: false
+  user: false
+
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/26.04/release/ubuntu-26.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+  - location: "https://cloud-images.ubuntu.com/releases/26.04/release/ubuntu-26.04-server-cloudimg-arm64.img"
+    arch: "aarch64"
+
+
+networks:
+  - lima: bridged
+
+provision:
+  - mode: system
+    script: |
+      coolify_test_public_key="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68 sail@76ff66d2e2dd"
+
+
+      echo "[coold-vm] Installing and configuring mDNS."
+      apt-get update
+      apt-get install -y avahi-daemon
+      hostnamectl set-hostname "{{.Name}}"
+      systemctl enable --now avahi-daemon
+      echo "[coold-vm] Installing SSH keys."
+
+      install_public_key() {
+        user="$1"
+        home="$(getent passwd "$user" | cut -d: -f6 || true)"
+        if [ -z "$home" ] || [ ! -d "$home" ]; then
+          return
+        fi
+
+        owner="$(stat -c '%u:%g' "$home")"
+        authorized_keys="$home/.ssh/authorized_keys"
+        install -d -m 700 -o "${owner%:*}" -g "${owner#*:}" "$home/.ssh"
+        touch "$authorized_keys"
+        chown "$owner" "$authorized_keys"
+        chmod 600 "$authorized_keys"
+        grep -qxF "$coolify_test_public_key" "$authorized_keys" || echo "$coolify_test_public_key" >>"$authorized_keys"
+        chown "$owner" "$authorized_keys"
+      }
+
+      install_public_key root
+      install_public_key coolify

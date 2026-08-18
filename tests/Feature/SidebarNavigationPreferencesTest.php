@@ -33,6 +33,12 @@ it('keeps changelog and appearance options out of the preferences dropdown', fun
         ->toContain('M9.813 15.904 9 18.75')
         ->not->toContain('<span>Changelog</span>')
         ->not->toContain('Appearance</div>')
+        ->not->toContain('switchWidth')
+        ->not->toContain('setZoom')
+        ->not->toContain("localStorage.setItem('pageWidth'")
+        ->not->toContain("localStorage.setItem('zoom'")
+        ->not->toContain('>Width</div>')
+        ->not->toContain('>Zoom</div>')
         ->not->toContain("@click=\"setTheme('dark'); dropdownOpen = false\"")
         ->not->toContain("@click=\"setTheme('light'); dropdownOpen = false\"")
         ->not->toContain("@click=\"setTheme('system'); dropdownOpen = false\"");

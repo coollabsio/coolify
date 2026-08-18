@@ -50,6 +50,19 @@ it('rejects link-local range', function () {
     expect($validator->fails())->toBeTrue('Expected rejection: link-local IP');
 });
 
+it('rejects link-local targets even when allowlisted', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['169.254.0.0/16'],
+    ]));
+
+    $validator = Validator::make(
+        ['url' => 'http://169.254.169.254/latest/meta-data'],
+        ['url' => new SafeWebhookUrl],
+    );
+
+    expect($validator->fails())->toBeTrue();
+});
+
 it('rejects hostnames that resolve to blocked addresses', function (string $url, array $resolvedIps) {
     $rule = new SafeWebhookUrl(fn (string $host): array => $resolvedIps);
 
@@ -219,8 +232,30 @@ it('builds HTTP client options that pin resolved DNS for the request', function 
     expect($options['allow_redirects'])->toBeFalse();
 
     if (defined('CURLOPT_RESOLVE')) {
-        expect($options['curl'][CURLOPT_RESOLVE])->toContain('localhost:8080:127.0.0.1');
+        expect($options['curl'][CURLOPT_RESOLVE])->toContain('localhost:8080:127.0.0.1,[::1]');
     }
+});
+
+it('pins every resolved address in a single CURLOPT_RESOLVE entry', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['localhost'],
+        'webhook_allow_localhost' => true,
+    ]));
+
+    if (! defined('CURLOPT_RESOLVE')) {
+        expect(true)->toBeTrue();
+
+        return;
+    }
+
+    $entries = SafeWebhookUrl::httpClientOptions('http://localhost:8080/webhook')['curl'][CURLOPT_RESOLVE];
+
+    // localhost resolves to both 127.0.0.1 and ::1. libcurl overrides an
+    // existing host:port cache entry with each new one, so multiple entries
+    // would leave only [::1] pinned and break every request on hosts without
+    // IPv6 egress.
+    expect($entries)->toHaveCount(1)
+        ->and($entries[0])->toBe('localhost:8080:127.0.0.1,[::1]');
 });
 
 it('fails closed while building HTTP options when the send-time resolution is unsafe', function () {
@@ -237,6 +272,19 @@ it('builds MinIO client resolve options for S3 backup uploads', function () {
     $options = SafeWebhookUrl::minioClientResolveOptions('http://localhost:9000');
 
     expect($options)->toContain('localhost:9000=127.0.0.1');
+});
+
+it('collapses dual-stack S3 hosts to a single bracket-free IPv4 resolve entry', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['localhost'],
+        'webhook_allow_localhost' => true,
+    ]));
+
+    // localhost resolves to both 127.0.0.1 and ::1. The MinIO client keeps one IP per
+    // host and rejects bracketed IPv6, so exactly one bracket-free IPv4 entry is produced.
+    $options = SafeWebhookUrl::minioClientResolveOptions('http://localhost:9000');
+
+    expect($options)->toBe(['localhost:9000=127.0.0.1']);
 });
 
 it('rejects trailing-dot hostnames to avoid DNS pinning mismatch', function () {
@@ -277,4 +325,104 @@ it('rejects hostnames that resolve to reserved IPv6 ranges by default', function
 it('redacts webhook URLs for logs', function () {
     expect(SafeWebhookUrl::redactedUrlForLog('https://hooks.slack.com/services/T000/B000/secret-token?foo=bar'))
         ->toBe('https://hooks.slack.com');
+});
+
+it('falls back to system DNS when custom DNS returns no answers', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'custom_dns_servers' => '1.1.1.1',
+        'webhook_allowed_internal_hosts' => ['coolify-minio'],
+    ]));
+
+    $rule = new class extends SafeWebhookUrl
+    {
+        /** @var array<int, array{0: string, 1: array<int, string>}> */
+        public array $customCalls = [];
+
+        /** @var array<int, string> */
+        public array $systemCalls = [];
+
+        protected function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
+        {
+            $this->customCalls[] = [$host, $dnsServers];
+
+            // Simulate public DNS (1.1.1.1) having no record for a docker hostname.
+            return [];
+        }
+
+        protected function resolveHostWithSystemDns(string $host): array
+        {
+            $this->systemCalls[] = $host;
+
+            return ['172.16.0.5'];
+        }
+    };
+
+    $validator = Validator::make(
+        ['url' => 'http://coolify-minio:9000'],
+        ['url' => $rule],
+    );
+
+    expect($validator->passes())->toBeTrue('Expected system-DNS fallback for allowlisted docker hostname')
+        ->and($rule->customCalls)->toHaveCount(1)
+        ->and($rule->customCalls[0][0])->toBe('coolify-minio')
+        ->and($rule->customCalls[0][1])->toBe(['1.1.1.1'])
+        ->and($rule->systemCalls)->toBe(['coolify-minio']);
+});
+
+it('does not fall back to system DNS when custom DNS returns answers', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'custom_dns_servers' => '1.1.1.1',
+    ]));
+
+    $rule = new class extends SafeWebhookUrl
+    {
+        public int $systemCalls = 0;
+
+        protected function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
+        {
+            return ['93.184.216.34'];
+        }
+
+        protected function resolveHostWithSystemDns(string $host): array
+        {
+            $this->systemCalls++;
+
+            return ['10.0.0.1'];
+        }
+    };
+
+    $validator = Validator::make(
+        ['url' => 'https://example.com/webhook'],
+        ['url' => $rule],
+    );
+
+    expect($validator->passes())->toBeTrue()
+        ->and($rule->systemCalls)->toBe(0);
+});
+
+it('still rejects private targets after system DNS fallback when host is not allowlisted', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'custom_dns_servers' => '1.1.1.1',
+        'webhook_allowed_internal_hosts' => [],
+    ]));
+
+    $rule = new class extends SafeWebhookUrl
+    {
+        protected function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
+        {
+            return [];
+        }
+
+        protected function resolveHostWithSystemDns(string $host): array
+        {
+            return ['172.16.0.5'];
+        }
+    };
+
+    $validator = Validator::make(
+        ['url' => 'http://coolify-minio:9000'],
+        ['url' => $rule],
+    );
+
+    expect($validator->fails())->toBeTrue('Expected private IP rejection without allowlist after fallback');
 });

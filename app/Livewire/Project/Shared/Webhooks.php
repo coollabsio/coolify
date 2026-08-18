@@ -62,7 +62,7 @@ class Webhooks extends Component
                 'manual_webhook_secret_bitbucket' => $this->bitbucketManualWebhookSecret,
                 'manual_webhook_secret_gitea' => $this->giteaManualWebhookSecret,
             ]);
-            $this->dispatch('success', 'Secret Saved.');
+            $this->dispatch('success', 'Webhook secrets saved.');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

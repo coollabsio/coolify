@@ -2,54 +2,56 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > Terminal Access | Coolify
     </x-slot>
+
     <livewire:server.navbar :server="$server" />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
-        <x-server.sidebar-security :server="$server" :parameters="$parameters" />
-        <div class="w-full">
-             <div>
-                <div class="flex items-center gap-2">
-                    <h2>Terminal Access</h2>
-                    <x-helper
-                        helper="Decide if users (including admins and the owner) can access the terminal for this server and its containers from the dashboard.<br/>
-                                Only team administrators and owners can change this setting."/>
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="security" />
+
+        <div class="application-settings-form w-full">
+            <x-application.settings-section id="server-terminal-access-section" title="Terminal access"
+                helper="Control dashboard terminal access for this server and its containers.">
+                <x-slot:actions>
+                    <x-status-badge :status="$isTerminalEnabled ? 'Enabled' : 'Disabled'"
+                        :type="$isTerminalEnabled ? 'success' : 'error'" />
+                </x-slot:actions>
+
+                <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+                    <div class="flex items-start gap-3">
+                        <div
+                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
+                            <x-reicon name="browser-terminal" class="size-4" />
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-neutral-950 dark:text-fg">
+                                {{ $isTerminalEnabled ? 'Dashboard terminal is available' : 'Dashboard terminal is blocked' }}
+                            </p>
+                            <p class="mt-1 max-w-xl text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                This setting applies to every user, including administrators and the team owner.
+                                Only administrators and owners can change it.
+                            </p>
+                        </div>
+                    </div>
+
                     @if (auth()->user()->isAdmin())
                         <div wire:key="terminal-access-change-{{ $isTerminalEnabled }}">
                             <x-modal-confirmation title="Confirm Terminal Access Change?"
                                 temporaryDisableTwoStepConfirmation
-                                buttonTitle="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
+                                buttonTitle="{{ $isTerminalEnabled ? 'Disable terminal' : 'Enable terminal' }}"
                                 submitAction="toggleTerminal" :actions="[
                                     $isTerminalEnabled
-                                        ? 'This will disable terminal access for this server and all its containers.'
-                                        : 'This will enable terminal access for this server and all its containers.',
-                                    $isTerminalEnabled
-                                        ? 'Users will no longer be able to access terminal views from the UI.'
-                                        : 'Users will be able to access terminal views from the UI.',
-                                    'This change will take effect immediately.',
+                                        ? 'Disable terminal access for this server and all of its containers.'
+                                        : 'Enable terminal access for this server and all of its containers.',
+                                    'The change takes effect immediately for every user.',
                                 ]" confirmationText="{{ $server->name }}"
                                 shortConfirmationLabel="Server Name"
                                 step3ButtonText="{{ $isTerminalEnabled ? 'Disable Terminal' : 'Enable Terminal' }}"
-                                isHighlightedButton>
-                            </x-modal-confirmation>
+                                :isHighlightedButton="!$isTerminalEnabled" />
                         </div>
                     @endif
                 </div>
-                <div class="mb-4">Manage terminal access to this server and its containers.</div>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <h3>Terminal Status:</h3>
-                @if ($isTerminalEnabled)
-                    <span
-                        class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded dark:text-green-100 dark:bg-green-800">
-                        Operational
-                    </span>
-                @else
-                    <span
-                        class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded dark:text-red-100 dark:bg-red-800">
-                        Disabled
-                    </span>
-                @endif
-            </div>
+            </x-application.settings-section>
         </div>
     </div>
 </div>

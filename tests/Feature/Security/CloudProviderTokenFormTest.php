@@ -55,6 +55,29 @@ test('adding a digitalocean token from a modal closes the modal and refreshes di
             && data_get($dispatch, 'to') === 'security.cloud-provider-tokens'))->toBeTrue();
 });
 
+test('security cloud token form lets users choose every supported provider', function () {
+    Livewire::test(CloudProviderTokenForm::class)
+        ->assertSee('Provider')
+        ->assertSee('Hetzner')
+        ->assertSee('DigitalOcean')
+        ->assertSee('Vultr');
+});
+
+test('cloud provider help link reacts to provider selection without a live request', function () {
+    $view = file_get_contents(resource_path('views/livewire/security/cloud-provider-token-form.blade.php'));
+
+    expect($view)
+        ->toContain("selectedProvider: \$wire.entangle('provider')")
+        ->toContain(':wire="false"')
+        ->toContain('x-model="selectedProvider"')
+        ->toContain(':href="providerConsoleUrl"')
+        ->toContain('x-text="providerName + \' console\'"')
+        ->not->toContain('wire:model.live="provider"');
+
+    expect(strpos($view, ':href="providerConsoleUrl"'))
+        ->toBeLessThan(strpos($view, '<div class="grid gap-4 lg:grid-cols-2">'));
+});
+
 test('adding a cloud provider token stores an optional description', function () {
     Http::fake([
         'https://api.hetzner.cloud/v1/servers' => Http::response([], 200),
