@@ -8,16 +8,12 @@ services:
       args:
         - USER_ID=${USERID:-1000}
         - GROUP_ID=${GROUPID:-1000}
-        - COOLIFY_FLUX_VERSION=${COOLIFY_FLUX_VERSION:-nightly}
-        - COOLIFY_CLI_VERSION=${COOLIFY_CLI_VERSION:-nightly}
     ports:
       - "${APP_PORT:-8000}:8080"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
       AUTORUN_ENABLED: false
-      COOLIFY_FLUX_VERSION: "${COOLIFY_FLUX_VERSION:-nightly}"
-      COOLIFY_CLI_VERSION: "${COOLIFY_CLI_VERSION:-nightly}"
       PUSHER_HOST: "${PUSHER_HOST:-}"
       PUSHER_PORT: "${PUSHER_PORT:-}"
       PUSHER_SCHEME: "${PUSHER_SCHEME:-http}"

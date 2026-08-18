@@ -67,10 +67,12 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <div class="relative" x-on:click.outside="filterOpen = false">
-                        <button type="button" class="button max-w-64"
-                            :class="activeFilterCount > 0 && 'button-highlighted'"
-                            x-on:click="filterOpen = !filterOpen" :title="activeFilterCount > 0 ? filterButtonText : 'Filter'">
+                    <x-table.dropdown panel-class="w-64! overflow-hidden! p-0!" :multiselectable="true">
+                        <x-slot:trigger>
+                            <button type="button" class="button max-w-64"
+                                :class="activeFilterCount > 0 && 'button-highlighted'"
+                                :title="activeFilterCount > 0 ? filterButtonText : 'Filter'"
+                                aria-haspopup="listbox" :aria-expanded="open">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
                                     stroke-linecap="round" />
@@ -79,9 +81,8 @@
                             <span x-show="activeFilterCount > 0"
                                 class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"
                                 x-text="activeFilterCount"></span>
-                        </button>
-                        <div x-cloak x-show="filterOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 flex w-64 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                            </button>
+                        </x-slot:trigger>
                             <div class="max-h-80 overflow-y-auto p-1">
                                 <template x-for="group in filterGroups" :key="group.key">
                                     <div x-show="group.options.length > 0">
@@ -113,24 +114,23 @@
                                     Clear filters
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                    </x-table.dropdown>
 
-                    <div class="relative" x-on:click.outside="sortOpen = false">
-                        <button type="button" class="button" x-on:click="sortOpen = !sortOpen">
+                    <x-table.dropdown panel-class="w-48!">
+                        <x-slot:trigger>
+                            <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
                                     stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
                                     stroke-linejoin="round" />
                             </svg>
                             Sort
-                        </button>
-                        <div x-cloak x-show="sortOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                            </button>
+                        </x-slot:trigger>
                             <template x-for="option in sortOptions" :key="option.value">
                                 <button type="button"
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="sortBy = option.value; sortOpen = false; page = 1">
+                                    x-on:click="sortBy = option.value; close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
                                     <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -139,8 +139,7 @@
                                     </svg>
                                 </button>
                             </template>
-                        </div>
-                    </div>
+                    </x-table.dropdown>
 
                     <div
                         class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
@@ -200,12 +199,9 @@
                             <div class="min-w-0">
                                 <div class="flex min-w-0 items-center gap-1.5">
                                     <a :href="item.hrefLink"
-                                        @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
                                         {{ wireNavigate() }}
                                         class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                         x-text="item.name"></a>
-                                    <span x-show="item.version === 'v5'"
-                                        class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
                                 </div>
                                 <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                     <span x-show="item.description" x-text="item.description"></span>
@@ -266,30 +262,9 @@
                         Try a different search or filter.
                     </p>
                 </div>
-
-                <footer x-show="totalPages > 1"
-                    class="flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
-                    <span
-                        x-text="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"></span>
-                    <div class="flex items-center gap-1">
-                        <button type="button" x-on:click="previousPage" :disabled="page === 1"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Previous page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" x-on:click="nextPage" :disabled="page >= totalPages"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Next page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </footer>
+                <x-client-pagination x-show="filteredResources.length > 0"
+                    summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
+                    page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
             </div>
 
             <div x-cloak x-show="viewMode === 'grid'">
@@ -320,8 +295,6 @@
                                         <h2
                                             class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                             x-text="item.name"></h2>
-                                        <span x-show="item.version === 'v5'"
-                                            class="shrink-0 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint">V5</span>
                                     </div>
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="item.typeLabel"></p>
@@ -356,32 +329,10 @@
                         Try a different search or filter.
                     </p>
                 </div>
-
-                <footer x-show="totalPages > 1"
-                    class="mt-3 flex min-h-11 items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 text-[11px] text-neutral-500 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
-                    <span
-                        x-text="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"></span>
-                    <div class="flex items-center gap-1">
-                        <button type="button" x-on:click="previousPage" :disabled="page === 1"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Previous page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" x-on:click="nextPage" :disabled="page >= totalPages"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Next page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </footer>
+                <x-client-pagination x-show="filteredResources.length > 0"
+                    class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]"
+                    summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
+                    page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
             </div>
         @endif
     </div>

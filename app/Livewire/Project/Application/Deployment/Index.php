@@ -22,6 +22,14 @@ class Index extends Component
 
     public int $defaultTake = 10;
 
+    public function updatedDefaultTake(): void
+    {
+        $this->defaultTake = max(1, min(100, $this->defaultTake));
+
+        $this->skip = 0;
+        $this->loadDeployments();
+    }
+
     public bool $showNext = false;
 
     public bool $showPrev = false;

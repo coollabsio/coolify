@@ -334,6 +334,32 @@ it('renders configuration warnings as navbar popovers instead of floating notifi
         ->toContain("\$dispatch('open-configuration-diff')");
 });
 
+it('renders only one configuration warning on database runtime logs', function () {
+    $logs = file_get_contents(resource_path('views/livewire/project/shared/logs.blade.php'));
+    $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+
+    expect($logs)
+        ->not->toContain("    <livewire:project.shared.configuration-checker :resource=\"\$resource\" />\n\n    @if (\$type === 'application')")
+        ->and($databaseHeading)
+        ->toContain('<livewire:project.shared.configuration-checker :resource="$database" />');
+});
+
+it('renders only one configuration warning on database and service terminal pages', function () {
+    $terminal = file_get_contents(resource_path('views/livewire/project/shared/execute-container-command.blade.php'));
+
+    expect($terminal)
+        ->not->toContain("@elseif (\$type === 'database')\n        <livewire:project.shared.configuration-checker :resource=\"\$resource\" />")
+        ->not->toContain("@elseif (\$type === 'service')\n        <livewire:project.shared.configuration-checker :resource=\"\$resource\" />");
+});
+
+it('renders only one configuration warning on the service volume backups page', function () {
+    $volumeBackups = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($volumeBackups)
+        ->not->toContain('<livewire:project.shared.configuration-checker :resource="$service" />')
+        ->toContain('<livewire:project.service.heading :service="$service"');
+});
+
 it('moves application backups from the top tabs into the settings sidebar', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $configuration = file_get_contents(resource_path('views/livewire/project/application/configuration.blade.php'));
@@ -566,7 +592,7 @@ it('shows an icon in application and service Links controls', function () {
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
     $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
 
-    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false])")
+    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false, 'compact' => false])")
         ->toContain('<x-reicon name="external-link"')
         ->and($serviceLinksComponent)->toContain('public bool $fullWidth = false')
         ->and($serviceLinks)
@@ -584,41 +610,59 @@ it('visually distinguishes production and pull request application links', funct
         ->not->toContain("PR{{ data_get(\$preview, 'pull_request_id') }} |");
 });
 
-it('shows application and service Links on mobile headings', function () {
+it('shows application Links as a compact badge beside the mobile status', function () {
     $application = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-
-    $mobileApplicationSection = str($application)->between('class="w-full xl:hidden"', 'class="hidden w-full items-center xl:fixed')->toString();
-    $mobileServiceSection = str($service)->between('class="w-full md:hidden"', 'class="hidden w-full items-center md:flex')->toString();
-
-    expect($mobileApplicationSection)
-        ->toContain('<x-applications.links')
-        ->toContain('full-width')
-        ->toContain('resource-heading-menus')
-        ->not->toContain('<x-resource-heading-tabs')
-        ->not->toContain("'label' => 'Settings'");
-
     $applicationLinks = file_get_contents(resource_path('views/components/applications/links.blade.php'));
+    $mobileApplicationTitle = str($application)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+    $mobileApplicationActions = str($application)->between('<div class="w-full xl:hidden">', '<div class="hidden" aria-hidden="true">')->toString();
+
+    expect($mobileApplicationTitle)
+        ->toContain('<x-status-summary')
+        ->toContain('<x-applications.links')
+        ->toContain('relative flex w-full min-w-0 items-center gap-2')
+        ->toContain('compact')
+        ->not->toContain('full-width');
+
+    expect($mobileApplicationActions)
+        ->not->toContain('<x-applications.links');
+
     expect($applicationLinks)
-        ->toContain("'button w-full justify-between' => \$fullWidth")
-        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
+        ->toContain("'compact' => false")
+        ->toContain("'static' => \$compact")
+        ->toContain("'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => \$compact")
+        ->toContain('@unless ($compact)')
+        ->toContain("'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => \$compact")
         ->toContain('<x-reicon name="chevron-down"');
+});
 
-    expect($mobileServiceSection)
-        ->toContain('<x-services.links')
-        ->toContain('full-width')
-        ->toContain('resource-heading-menus')
-        ->not->toContain('<x-resource-heading-tabs');
-
+it('shows service Links as a compact badge beside the mobile status', function () {
+    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
+    $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
+    $mobileServiceTitle = str($service)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+    $mobileServiceActions = str($service)->between('<div class="w-full xl:hidden">', '@teleport')->toString();
+
+    expect($mobileServiceTitle)
+        ->toContain('<x-status-summary')
+        ->toContain('<x-services.links')
+        ->toContain('relative flex w-full min-w-0 items-center gap-2')
+        ->toContain('compact')
+        ->not->toContain('full-width');
+
+    expect($mobileServiceActions)
+        ->not->toContain('<x-services.links');
+
+    expect($serviceLinksComponent)
+        ->toContain('public bool $compact = false');
+
     expect($serviceLinks)
-        ->toContain("'button w-full justify-between' => \$fullWidth")
-        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
+        ->toContain("'static' => \$compact")
+        ->toContain("'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => \$compact")
+        ->toContain('@unless ($compact)')
+        ->toContain("'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => \$compact")
         ->toContain('<x-reicon name="chevron-down"')
         ->toContain('No links available');
 
-    // One mobile + one desktop instance.
-    expect(substr_count($application, '<x-applications.links'))->toBe(2);
     expect(substr_count($service, '<x-services.links'))->toBe(2);
 });
 

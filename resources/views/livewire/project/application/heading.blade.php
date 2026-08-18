@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $routeIs = fn (string|array $routes): bool => \Illuminate\Support\Str::is($routes, $activeRouteName);
         // Settings covers all configuration sub-pages (General, Webhooks, Domains, …),
@@ -30,12 +30,16 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $application->name }}
                 </h1>
-                <x-status-summary :status="$application->status" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$application->status" />
+                    <x-applications.links :application="$application" compact />
+                </div>
             </div>
         </div>
 
         <div class="w-full xl:hidden">
             @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
+                @can('deploy', $application)
                 <div id="application-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
@@ -146,10 +150,8 @@
                         @endif
                     </div>
                 </div>
+                @endcan
             @endif
-            <div class="resource-heading-menus w-full">
-                <x-applications.links :application="$application" full-width />
-            </div>
             <div class="hidden" aria-hidden="true">
                 <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
                     submitAction="stop" :checkboxes="$checkboxes" :actions="[
@@ -185,6 +187,7 @@
                         <div class="resource-heading-menus shrink-0">
                             <x-applications.links :application="$application" />
                         </div>
+                        @can('deploy', $application)
                         <div id="application-desktop-actions" class="relative" x-data="{ open: false }"
                             x-effect="$dispatch('resource-actions-toggled', { open })"
                             @click.outside="open = false" @keydown.escape.window="open = false">
@@ -279,6 +282,7 @@
                                 @endif
                             </div>
                         </div>
+                        @endcan
                     @endif
                 </div>
             </div>

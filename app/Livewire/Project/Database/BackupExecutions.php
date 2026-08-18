@@ -98,26 +98,34 @@ class BackupExecutions extends Component
             return;
         }
 
-        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class
-            ? $execution->scheduledDatabaseBackup->database->service->destination->server
-            : $execution->scheduledDatabaseBackup->database->destination->server;
-
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $server);
+            $deleteFromS3 = in_array('delete_backup_s3', $selectedActions, true);
 
-                if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
-                    deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+            if ($execution->filename && ! $execution->local_storage_deleted) {
+                $server = $this->backup->server();
+                if (! $server) {
+                    throw new \RuntimeException('The backup server is unavailable.');
                 }
+
+                deleteBackupsLocally($execution->filename, $server, throwError: true);
+            }
+
+            if ($deleteFromS3 && $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
+                if (! $execution->scheduledDatabaseBackup->s3) {
+                    throw new \RuntimeException('The S3 storage is unavailable.');
+                }
+
+                deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
             }
 
             $execution->delete();
+            $this->delete_backup_s3 = false;
             $this->dispatch('success', 'Backup deleted.');
             $this->refreshBackupExecutions();
         } catch (\Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
 
-            return true;
+            return false;
         }
 
         return true;

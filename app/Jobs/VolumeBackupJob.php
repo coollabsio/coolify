@@ -8,6 +8,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Rules\SafeWebhookUrl;
+use App\Support\BackupCompression;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -77,15 +78,14 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $source = $this->backup->sourcePath();
             $containerName = 'volume-backup-'.$this->execution->uuid;
             $image = coolifyHelperImage().':'.getHelperVersion();
-            $compressionCpuPercentage = $this->compressionCpuPercentage($server);
+            $compressionCpuPercentage = BackupCompression::cpuPercentage($server->settings->backup_compression_cpu_percentage);
             $this->logCompressorInDevelopment($image, $server, $compressionCpuPercentage);
             $verifySourceCommand = $target instanceof LocalPersistentVolume && blank($target->host_path)
                 ? 'docker volume inspect '.escapeshellarg($source).' >/dev/null'
                 : 'test -d '.escapeshellarg($source);
 
-            $archiveScript = "compressor='gzip -3'; "
-                ."if command -v pigz >/dev/null 2>&1; then compressor=\"pigz -3 -p \$(( (\$(nproc) * {$compressionCpuPercentage} + 99) / 100 ))\"; fi; "
-                .'tar -I "$compressor" -cf - -C /volume .';
+            $compressorCommand = BackupCompression::compressorCommand($compressionCpuPercentage);
+            $archiveScript = "compressor=\$({$compressorCommand}); tar -I \"\$compressor\" -cf - -C /volume .";
             $archiveCommand = 'docker run --rm --name '.escapeshellarg($containerName)
                 .' -v '.escapeshellarg($source.':/volume:ro')
                 .' '.escapeshellarg($image)
@@ -344,7 +344,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $script = "if command -v pigz >/dev/null 2>&1; then printf 'pigz -3 -p %s' \"\$(( (\$(nproc) * {$compressionCpuPercentage} + 99) / 100 ))\"; else printf 'gzip -3'; fi";
+        $script = BackupCompression::compressorCommand($compressionCpuPercentage);
         $compressor = instant_remote_process(
             ['docker run --rm '.escapeshellarg($image).' sh -c '.escapeshellarg($script)],
             $server,
@@ -359,13 +359,6 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             'helper_image' => $image,
             'cpu_percentage' => $compressionCpuPercentage,
         ]);
-    }
-
-    private function compressionCpuPercentage(Server $server): int
-    {
-        $percentage = (int) ($server->settings->backup_compression_cpu_percentage ?? 25);
-
-        return in_array($percentage, [25, 50, 75, 100], true) ? $percentage : 25;
     }
 
     private function removeExpiredBackups(Server $server): void

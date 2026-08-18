@@ -10,6 +10,7 @@
         <div x-data="{
             open: false,
             collapsed: localStorage.getItem('sidebarCollapsed') === 'true',
+            pageWidth: localStorage.getItem('pageWidth') || 'full',
             sidebarReady: false,
             init() {
                 this.$nextTick(() => {
@@ -22,7 +23,8 @@
                 this.collapsed = !this.collapsed;
                 localStorage.setItem('sidebarCollapsed', this.collapsed);
             }
-        }" @open-global-search.window="open = false" x-cloak class="dark:text-inherit text-black">
+        }" @open-global-search.window="open = false" @page-width-changed.window="pageWidth = $event.detail" x-cloak
+            class="dark:text-inherit text-black">
             <livewire:deployments-indicator />
 
             {{-- ============ DESKTOP TOP BAR ============ --}}
@@ -30,7 +32,7 @@
                 x-data="{ resourceActionsOpen: false }"
                 @resource-actions-toggled.window="resourceActionsOpen = $event.detail.open"
                 :class="{ 'z-[1000]': resourceActionsOpen }"
-                class="hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur border-b border-neutral-200 dark:border-white/[0.06]">
+                class="hidden lg:flex fixed top-0 inset-x-0 z-50 h-12 items-center bg-white/95 dark:bg-panel/95 backdrop-blur">
                 {{-- Brand (width tracks sidebar) --}}
                 <div class="flex items-center gap-2 h-full shrink-0 border-r border-neutral-200 dark:border-white/[0.06] transition-[width] duration-200"
                     :class="collapsed ? 'w-16 justify-center px-0' : 'w-56 px-4'">
@@ -53,7 +55,8 @@
                     @endif
                 </div>
                 {{-- Collapse toggle + team switcher --}}
-                <div class="flex items-center gap-0.5 min-w-0 flex-1 pl-3 pr-4">
+                <div
+                    class="flex h-full items-center gap-0.5 min-w-0 flex-1 border-b border-neutral-200 pl-3 pr-4 dark:border-white/[0.06]">
                     <div class="relative flex min-w-0 flex-1 items-center">
                         <x-top-breadcrumb />
                         <div id="server-topbar-context" class="min-w-0"></div>
@@ -80,6 +83,14 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
+                        </div>
+                        <div data-mobile-sidebar-brand
+                            class="flex h-12 shrink-0 items-center gap-1.5 border-b border-neutral-200 px-4 dark:border-white/[0.06]">
+                            <a href="/" {{ wireNavigate() }} title="Coolify"
+                                class="text-[15px] font-semibold tracking-tight text-black transition-opacity hover:opacity-80 dark:text-white">
+                                Coolify
+                            </a>
+                            <x-version class="!text-[10.5px] font-medium text-neutral-400 dark:text-fg-faint !opacity-100 hover:!opacity-100 hover:text-black dark:hover:text-fg" />
                         </div>
                         <div class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto pb-2 scrollbar">
                             <x-navbar />
@@ -128,7 +139,7 @@
             <main
                 class="min-h-screen bg-white dark:bg-panel px-5 py-6 sm:px-8 lg:px-10 lg:pt-[calc(3rem+1.75rem)] lg:pb-10"
                 :class="[collapsed ? 'lg:ml-16' : 'lg:ml-56', sidebarReady ? 'transition-[margin] duration-200' : '']">
-                <div class="mx-auto w-full max-w-[1400px]">
+                <div class="w-full" :class="pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'">
                     {{ $slot }}
                 </div>
             </main>

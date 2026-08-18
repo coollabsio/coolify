@@ -5,7 +5,7 @@
 
     <livewire:project.database.heading :database="$database" />
 
-    <div class="application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <div class="application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-database.configuration-sidebar :database="$database" current-route="project.database.backup.index" />
         <div class="application-settings-form flex min-w-0 flex-col gap-6">
             <x-application.settings-section title="Database backups"

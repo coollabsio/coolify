@@ -22,6 +22,15 @@ test('listbox trigger height matches shared inputs', function () {
         ->toMatch('/\.application-settings-workspace \.listbox-trigger[^}]*height: 2rem;/s');
 });
 
+test('disabled listboxes use the same colors as disabled inputs', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toMatch('/\.listbox-trigger:disabled \{[^}]*background-color: var\(--color-neutral-100\);[^}]*color: var\(--color-neutral-400\);/s')
+        ->toMatch('/\.dark \.listbox-trigger:disabled \{[^}]*background-color: color-mix\(in oklab, var\(--color-white\) 3%, transparent\);[^}]*color: var\(--color-fg-faint\);/s')
+        ->not->toMatch('/\.listbox-trigger:disabled \{[^}]*opacity:/s');
+});
+
 test('listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.listbox id="longOption" label="Example"
@@ -37,6 +46,36 @@ test('listbox component uses shared trigger label truncation', function () {
         ->toContain('listbox-trigger-label')
         ->toContain(':title="current"')
         ->not->toContain('class="truncate" x-text="current"');
+});
+
+test('listboxes stay in their local Alpine scope by default', function () {
+    $component = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+    $html = Blade::render('<x-forms.listbox id="region" :options="[]" :wire="false" />');
+
+    expect($component)->toContain("'portal' => false")
+        ->and($html)
+        ->toContain('x-data="{')
+        ->toContain('x-ref="panel"')
+        ->not->toContain('x-teleport="body"')
+        ->not->toContain('floatingDropdown(')
+        ->not->toContain('style="position: fixed');
+});
+
+test('mobile listbox panels stay anchored to their trigger', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->not->toContain('.listbox-panel:not([style*="position: fixed"])')
+        ->not->toContain('transform: translate(-50%, -50%) !important;');
+});
+
+test('portaled listboxes measure content without inheriting the viewport width', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain("panel.style.width = 'max-content';")
+        ->toContain('panel.style.minWidth = `${triggerRect.width}px`;')
+        ->toContain('Math.max(triggerRect.width, panel.offsetWidth)');
 });
 
 test('searchable listbox component uses shared trigger label truncation', function () {
@@ -84,7 +123,8 @@ test('listbox forwards dynamic disabled state to its trigger', function () {
         ->toContain('x-model="selectedCloneProject"')
         ->toContain('x-model="selectedCloneEnvironment"')
         ->toContain('$wire.cloneTo(selectedCloneDestination)')
-        ->toContain('$wire.cloneTo(@js($resource->destination->uuid), selectedCloneEnvironment)')
+        ->toContain('$wire.cloneTo(currentDestinationUuid, selectedCloneEnvironment)')
+        ->not->toContain('$wire.cloneTo(@js(')
         ->toContain('x-bind:disabled="!selectedMoveProject || availableEnvironments.length === 0"');
 });
 

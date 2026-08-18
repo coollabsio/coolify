@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>{{ data_get_str($environment, 'name')->limit(10) }} > Edit | Coolify</x-slot>
-    <div class="w-full max-w-[1180px]">
+    <div class="w-full max-w-none">
         <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div class="min-w-0">
                 <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $environment->name }}</h1>

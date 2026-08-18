@@ -75,10 +75,18 @@ it('renders deployment logs in a full-height layout', function () {
     $response->assertSee('logs-viewer-actions', false);
     $response->assertSee('logs-viewer-viewport', false);
     $response->assertSee('logs-viewer-line', false);
-    $response->assertSee('h-[calc(100dvh-7.5rem)]', false);
+    $response->assertSee('min-h-[calc(100dvh-7.5rem)] flex-col', false);
     $response->assertSee('flex flex-1 min-h-0 flex-col overflow-hidden', false);
+    $response->assertSee('h-[calc(100dvh-8rem)]', false);
+    $response->assertSee('xl:h-[32rem]', false);
+    $response->assertSee('xl:flex-none', false);
 
-    expect($response->getContent())->not->toContain('max-h-[30rem]');
+    expect($response->getContent())
+        ->not->toContain('max-h-[30rem]')
+        ->not->toContain('xl:h-[calc(100dvh-7.5rem)]')
+        ->not->toContain('xl:overflow-hidden')
+        ->not->toContain('h-[calc(100dvh-20rem)]')
+        ->not->toContain('deployment-logs-panel');
 });
 
 it('uses a mobile-friendly stacked logs toolbar markup', function () {
@@ -97,6 +105,11 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('logs-viewer-timestamp')
         ->toContain('logs-viewer-line-text')
         ->toContain('livewire:project.application.deployment-navbar')
+        ->not->toContain('xl:h-[calc(100dvh-7.5rem)]')
+        ->not->toContain('xl:overflow-hidden')
+        ->toContain('xl:h-[32rem]')
+        ->toContain('xl:flex-none')
+        ->not->toContain('h-[calc(100dvh-20rem)]')
         ->and($sharedLogsView)
         ->toContain('logs-viewer-toolbar')
         ->toContain('logs-viewer-toolbar-controls')
@@ -122,6 +135,13 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain(".logs-viewer-viewport::after {\n    content: \"\";\n    flex: 0 0 2rem;")
         ->toContain('flex-direction: column')
         ->toContain('@media (min-width: 640px)');
+
+    $actionsCss = str($appCss)
+        ->after('.logs-viewer-actions {')
+        ->before('}')
+        ->toString();
+
+    expect($actionsCss)->not->toContain('isolation: isolate');
 
     $primaryGroup = str($deploymentView)
         ->after('class="logs-viewer-primary"')

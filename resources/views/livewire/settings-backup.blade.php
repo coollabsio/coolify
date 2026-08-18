@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-settings.layout>
-    <div class="application-settings-form mx-auto flex w-full max-w-[1180px] min-w-0 flex-col gap-6">
+    <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
         @if ($server->isFunctional())
             @if (isset($database) && isset($backup))
                 <form wire:submit="submit">

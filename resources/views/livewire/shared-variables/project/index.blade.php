@@ -23,7 +23,13 @@
                             href="{{ route('shared-variables.project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}>
                             <div class="flex items-start gap-3">
                                 <div class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <x-reicon name="projects" class="size-4" />
+                                    @if ($project->icon_path)
+                                        <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                            alt="{{ $project->name }} icon"
+                                            class="h-full w-full rounded-lg object-cover">
+                                    @else
+                                        <x-reicon name="projects" class="size-4" />
+                                    @endif
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">{{ $project->name }}</h2>
@@ -42,7 +48,12 @@
                         <a x-show="matches(@js([$project->name, $project->description]))"
                             href="{{ route('shared-variables.project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}
                             class="flex min-h-14 items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
-                            <x-reicon name="projects" class="size-4 shrink-0 text-neutral-500 dark:text-fg-dim" />
+                            @if ($project->icon_path)
+                                <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                    alt="{{ $project->name }} icon" class="size-4 shrink-0 rounded object-cover">
+                            @else
+                                <x-reicon name="projects" class="size-4 shrink-0 text-neutral-500 dark:text-fg-dim" />
+                            @endif
                             <div class="min-w-0 flex-1"><div class="truncate text-[13px] font-medium">{{ $project->name }}</div><div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $project->description ?: 'No description' }}</div></div>
                             <span class="shrink-0 text-[11px] text-neutral-500 dark:text-fg-dim">{{ $project->environment_variables()->count() }} {{ Str::plural('variable', $project->environment_variables()->count()) }}</span>
                         </a>

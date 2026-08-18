@@ -398,3 +398,59 @@ YAML;
 
     expect(json_decode($plainApplication->docker_compose_domains, true))->toBeNull();
 });
+
+test('applicationParser selects the resource network for Traefik routed compose services', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())->toContain("traefik.docker.network={$application->uuid}");
+});
+
+test('applicationParser preserves a user-selected Traefik network', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    labels:
+      traefik.docker.network: custom-network
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())
+        ->toContain('traefik.docker.network=custom-network')
+        ->not->toContain("traefik.docker.network={$application->uuid}");
+});

@@ -31,6 +31,7 @@ class ServiceApplication extends BaseModel
         'is_include_timestamps',
         'is_gzip_enabled',
         'is_stripprefix_enabled',
+        'is_force_https_enabled',
         'last_online_at',
         'is_migrated',
     ];
@@ -44,11 +45,16 @@ class ServiceApplication extends BaseModel
         'domain_dns_statuses',
     ];
 
+    protected $attributes = [
+        'is_force_https_enabled' => true,
+    ];
+
     protected function casts(): array
     {
         return [
             'domain_dns_statuses' => 'array',
             'noindex_domains' => 'array',
+            'is_force_https_enabled' => 'boolean',
         ];
     }
 
@@ -122,6 +128,11 @@ class ServiceApplication extends BaseModel
     public function isGzipEnabled()
     {
         return data_get($this, 'is_gzip_enabled', true);
+    }
+
+    public function isForceHttpsEnabled(): bool
+    {
+        return $this->is_force_https_enabled;
     }
 
     public function type()

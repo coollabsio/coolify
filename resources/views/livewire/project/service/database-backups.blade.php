@@ -6,8 +6,8 @@
 
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
 
-    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             @if ($backup)
                 <x-backup-sidebar context="service" :parameters="$backupParameters" :section="$section" />
             @else

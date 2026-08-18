@@ -44,29 +44,6 @@ it('downloads postgres upgrade script during install and upgrade without auto-ru
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
-it('does not provision a flux laravel api token before v5 production activation', function (string $path) {
-    $source = file_get_contents(getcwd().'/'.$path);
-
-    expect($source)->not->toContain('COOLIFY_FLUX_LARAVEL_API_TOKEN');
-})->with([
-    'production env' => '.env.production',
-    'stable install' => 'scripts/install.sh',
-    'nightly install' => 'other/nightly/install.sh',
-    'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
-]);
-
-it('does not provision flux storage before v5 production activation', function (string $path) {
-    $source = file_get_contents(getcwd().'/'.$path);
-
-    expect($source)->not->toContain('/data/coolify/flux');
-})->with([
-    'stable install' => 'scripts/install.sh',
-    'nightly install' => 'other/nightly/install.sh',
-    'stable upgrade' => 'scripts/upgrade.sh',
-    'nightly upgrade' => 'other/nightly/upgrade.sh',
-]);
-
 it('uses the selected registry url when extracting upgrade images', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 

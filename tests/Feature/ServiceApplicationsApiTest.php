@@ -199,6 +199,20 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
         expect($ctx->serviceApplication->human_name)->toBe('Web UI');
     });
 
+    test('updates the HTTP to HTTPS redirect setting', function () {
+        config(['app.maintenance.driver' => 'file']);
+        $ctx = createServiceWithApplicationForApiTest($this);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'is_force_https_enabled' => false,
+        ]);
+
+        $response->assertSuccessful();
+        expect($ctx->serviceApplication->fresh()->is_force_https_enabled)->toBeFalse();
+    });
+
     test('returns 422 for invalid url scheme', function () {
         $ctx = createServiceWithApplicationForApiTest($this);
 

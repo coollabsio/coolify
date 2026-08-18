@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $databasePageItems = [
             [
@@ -69,6 +69,7 @@
 
         <div class="w-full xl:hidden">
             @if ($database->destination->server->isFunctional())
+                @can('manage', $database)
                 <div id="database-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
@@ -127,6 +128,7 @@
                         @endif
                     </div>
                 </div>
+                @endcan
             @endif
 
         </div>
@@ -137,6 +139,7 @@
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
                 <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
                     @if ($database->destination->server->isFunctional())
+                        @can('manage', $database)
                         <div id="database-desktop-actions" class="flex items-center gap-0.5">
                             @if (! $databaseStatus->startsWith('exited'))
                                 <button type="button" class="button button-highlighted"
@@ -156,6 +159,7 @@
                                 </x-forms.button>
                             @endif
                         </div>
+                        @endcan
                     @else
                         <x-status-badge status="Server unavailable" type="error" />
                     @endif

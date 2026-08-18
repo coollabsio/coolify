@@ -149,6 +149,16 @@ it('finishes after health recovers from observed downtime for older target relea
         ->toContain('return;');
 });
 
+it('finishes when the post-restart Livewire status response is undefined', function () {
+    $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
+
+    expect($upgradeView)
+        ->toContain('if (!data) {')
+        ->toContain('if (this.instanceWentDown) {')
+        ->toContain('this.showSuccess();')
+        ->toContain('return;');
+});
+
 it('tells users to reload manually if the automatic reload does not happen', function () {
     $upgradeView = file_get_contents(__DIR__.'/../../resources/views/livewire/upgrade.blade.php');
 

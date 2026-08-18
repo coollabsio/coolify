@@ -51,8 +51,8 @@
     <livewire:project.application.heading :application="$application"
         wire:key="application-heading-backup-index-{{ $application->id }}" />
 
-    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <x-application.configuration-sidebar :application="$application"
                 current-route="project.application.backup.index" />
 
@@ -111,20 +111,18 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <div class="relative" x-on:click.outside="filterOpen = false">
-                        <button type="button" class="button" x-on:click="filterOpen = !filterOpen; sortOpen = false">
+                    <x-table.dropdown panel-class="w-48!">
+                        <x-slot:trigger><button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
                                     stroke-linecap="round" />
                             </svg>
                             Filter
-                        </button>
-                        <div x-cloak x-show="filterOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                        </button></x-slot:trigger>
                             <template x-for="option in filterOptions" :key="option.value">
                                 <button type="button"
                                     class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="typeFilter = option.value; filterOpen = false">
+                                    x-on:click="typeFilter = option.value; close()">
                                     <span class="flex-1" x-text="option.label"></span>
                                     <svg x-show="typeFilter === option.value" class="size-3.5 text-warning"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -133,23 +131,20 @@
                                     </svg>
                                 </button>
                             </template>
-                        </div>
-                    </div>
+                    </x-table.dropdown>
 
-                    <div class="relative" x-on:click.outside="sortOpen = false">
-                        <button type="button" class="button" x-on:click="sortOpen = !sortOpen; filterOpen = false">
+                    <x-table.dropdown panel-class="w-48!">
+                        <x-slot:trigger><button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
                             <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3" stroke="currentColor"
                                     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
                             </svg>
                             Sort
-                        </button>
-                        <div x-cloak x-show="sortOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 min-w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                        </button></x-slot:trigger>
                             <template x-for="option in sortOptions" :key="option.value">
                                 <button type="button"
                                     class="flex h-8 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="sortBy = option.value; sortOpen = false">
+                                    x-on:click="sortBy = option.value; close()">
                                     <span class="flex-1" x-text="option.label"></span>
                                     <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -158,8 +153,7 @@
                                     </svg>
                                 </button>
                             </template>
-                        </div>
-                    </div>
+                    </x-table.dropdown>
                 </div>
             </div>
 

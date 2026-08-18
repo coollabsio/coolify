@@ -8,6 +8,9 @@
     $helperText = $isCompose
         ? 'Manage domains for every service in this Docker Compose application.'
         : 'Manage domains for this application.';
+    $hasHttpsDomains = collect($domainRows)->contains(
+        fn ($row) => ! ($row['is_suggested'] ?? false) && str_starts_with(strtolower($row['url']), 'https://')
+    );
 @endphp
 
 <div class="flex flex-col gap-4"
@@ -15,30 +18,14 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: @js($editingService ?? ''),
-        localEditingIndex: @js($editingIndex),
-        localEditingDomain: @js($editingDomain),
-        localEditingService: @js($editingService),
-        openEditDomain(index, url, service) {
-            this.localEditingIndex = index;
-            this.localEditingDomain = url;
-            this.localEditingService = service;
-            this.editingServiceLabel = service || '';
+        openEditDomain() {
+            this.editingServiceLabel = $wire.editingService || '';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
         },
         closeEditDomain() {
             this.modalOpen = false;
             this.editingServiceLabel = '';
-            this.localEditingIndex = null;
-            this.localEditingDomain = '';
-            this.localEditingService = null;
-        },
-        prepareEditSubmit() {
-            // Sync Alpine → Livewire only when the user actually saves (one request).
-            $wire.editingIndex = this.localEditingIndex;
-            $wire.editingDomain = this.localEditingDomain;
-            $wire.editingService = this.localEditingService;
-            $wire.showEditDomainModal = true;
         },
         matchesDomainSearch(value) {
             return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
@@ -47,7 +34,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service)"
+    @open-edit-domain.window="openEditDomain()"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="domains-section" title="Domains">
         @can('update', $application)
@@ -81,6 +68,18 @@
         <p class="text-sm text-neutral-500 dark:text-fg-dim">
             {{ $helperText }}
         </p>
+
+        @if ($hasHttpsDomains && ! $labelsAreWritable)
+            <div class="mt-4 max-w-md">
+                <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled" label="Redirect HTTP to HTTPS"
+                    onChange="updateForceHttps"
+                    helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                    :options="[
+                        ['value' => true, 'label' => 'Enabled'],
+                        ['value' => false, 'label' => 'Disabled'],
+                    ]" :disabled="! auth()->user()->can('update', $application)" />
+            </div>
+        @endif
 
     </x-application.settings-section>
 
@@ -120,7 +119,7 @@
                             </x-slot:content>
                             <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
                                 @if ($isCompose && count($composeServices) > 0)
-                                    <x-forms.listbox label="Service" id="newDomainService" required
+                                    <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
                                         :options="collect($composeServices)->map(fn ($serviceName) => [
                                             'value' => $serviceName,
                                             'label' => $serviceName,
@@ -128,7 +127,7 @@
                                         :disabled="! auth()->user()->can('update', $application)" />
                                 @endif
 
-                                <x-forms.domain-input id="newDomain" />
+                                <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
 
                                 @if ($addDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -237,7 +236,7 @@
                             <div class="data-table-header domains-table-grid-service">
                                 <span>Domain</span>
                                 <span>DNS Check</span>
-                                <span>Search engine indexing</span>
+                                <span class="whitespace-nowrap">Search engine indexing</span>
                                 <span></span>
                             </div>
                             @foreach ($rows as $row)
@@ -273,7 +272,7 @@
                 <div class="data-table-header domains-table-grid">
                     <span>Domain</span>
                     <span>DNS Check</span>
-                    <span>Search engine indexing</span>
+                    <span class="whitespace-nowrap">Search engine indexing</span>
                     <span>Direction</span>
                     <span></span>
                 </div>
@@ -320,7 +319,7 @@
                         </header>
                         <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
                             style="-webkit-overflow-scrolling: touch;">
-                            <form @submit.prevent="prepareEditSubmit(); $wire.updateDomain()" class="flex flex-col gap-4">
+                            <form wire:submit="updateDomain" class="flex flex-col gap-4">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service</label>
@@ -328,8 +327,7 @@
                                     <input type="text" class="input" readonly x-bind:value="editingServiceLabel" />
                                 </div>
 
-                                <x-forms.domain-input id="editingDomainLocal" errorId="editingDomain" :wire="false"
-                                    x-model="localEditingDomain" />
+                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -345,7 +343,7 @@
                                 <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
                                     @if ($editDomainDnsFailed)
                                         <x-forms.button type="button" isError
-                                            @click="prepareEditSubmit(); $wire.forceSaveEditDns = true; $wire.confirmUpdateDomainDespiteDns()">
+                                            wire:click="confirmUpdateDomainDespiteDns">
                                             Continue
                                         </x-forms.button>
                                     @else
