@@ -6,13 +6,16 @@
 
 <div class="relative" x-data="{
     open: false,
-    panelStyle: 'display: none;',
+    panelStyle: 'position: fixed; min-width: 0; visibility: hidden;',
     toggle() {
-        this.open = !this.open;
-
         if (this.open) {
-            this.$nextTick(() => this.updatePosition());
+            this.open = false;
+            return;
         }
+
+        this.panelStyle = 'position: fixed; min-width: 0; visibility: hidden;';
+        this.open = true;
+        this.$nextTick(() => this.updatePosition());
     },
     updatePosition() {
         const trigger = this.$refs.trigger.getBoundingClientRect();
@@ -24,7 +27,7 @@
             ? trigger.bottom + 4
             : Math.max(viewportPadding, trigger.top - panel.height - 4);
 
-        this.panelStyle = `position: fixed; left: ${left}px; top: ${top}px;`;
+        this.panelStyle = `position: fixed; left: ${left}px; top: ${top}px; min-width: 0;`;
     }
 }" @click.outside="open = false" @keydown.escape.window="open = false"
     x-on:resize.window="if (open) updatePosition()" x-on:scroll.window="if (open) updatePosition()">
