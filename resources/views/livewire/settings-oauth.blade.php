@@ -55,14 +55,39 @@
                     </x-slot:actions>
 
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.input canGate="update" :canResource="$settings"
-                            id="oauth_settings_map.{{ $provider }}.redirect_uri"
-                            placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
-                        <x-forms.input canGate="update" :canResource="$settings"
-                            id="oauth_settings_map.{{ $provider }}.client_id" label="Client ID" required />
-                        <x-forms.input canGate="update" :canResource="$settings"
-                            id="oauth_settings_map.{{ $provider }}.client_secret" type="password"
-                            label="Client secret" autocomplete="new-password" required />
+                        @if ($provider === 'oidc')
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.redirect_uri"
+                                placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.base_url" label="Issuer URL" required
+                                helper="OpenID Provider issuer URL, for example https://example.okta.com. Coolify uses it to discover the authorization, token, userinfo, and JWKS endpoints." />
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.client_id" label="Client ID" required />
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.client_secret" type="password"
+                                label="Client secret" autocomplete="new-password" required />
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.scopes" label="Scopes"
+                                helper="Must include openid. Common scopes are openid email profile groups." />
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.clock_skew_seconds" type="number"
+                                label="Clock skew (seconds)" />
+                            <div class="lg:col-span-2">
+                                <x-forms.input canGate="update" :canResource="$settings"
+                                    id="oauth_settings_map.{{ $provider }}.custom_label" label="Login button label"
+                                    placeholder="Login with SSO" />
+                            </div>
+                        @else
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.redirect_uri"
+                                placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.client_id" label="Client ID" required />
+                            <x-forms.input canGate="update" :canResource="$settings"
+                                id="oauth_settings_map.{{ $provider }}.client_secret" type="password"
+                                label="Client secret" autocomplete="new-password" required />
+                        @endif
 
                         @if ($provider === 'azure')
                             <x-forms.input canGate="update" :canResource="$settings"
@@ -82,20 +107,6 @@
                                 :required="in_array($provider, ['authentik', 'clerk'], true)" />
                         @endif
 
-                        @if ($provider === 'oidc')
-                            <x-forms.input canGate="update" :canResource="$settings"
-                                id="oauth_settings_map.{{ $provider }}.base_url" label="Issuer URL" required
-                                helper="OpenID Provider issuer URL, for example https://example.okta.com. Coolify uses it to discover the authorization, token, userinfo, and JWKS endpoints." />
-                            <x-forms.input canGate="update" :canResource="$settings"
-                                id="oauth_settings_map.{{ $provider }}.custom_label" label="Login button label"
-                                placeholder="Login with SSO" />
-                            <x-forms.input canGate="update" :canResource="$settings"
-                                id="oauth_settings_map.{{ $provider }}.scopes" label="Scopes"
-                                helper="Must include openid. Common scopes are openid email profile groups." />
-                            <x-forms.input canGate="update" :canResource="$settings"
-                                id="oauth_settings_map.{{ $provider }}.clock_skew_seconds" type="number"
-                                label="Clock skew (seconds)" />
-                        @endif
                     </div>
 
                     <div class="mt-4 grid gap-3 lg:grid-cols-2">

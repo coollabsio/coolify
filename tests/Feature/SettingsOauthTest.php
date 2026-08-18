@@ -94,6 +94,27 @@ it('shows oidc fields with a naked okta issuer url example', function () {
         ->assertDontSee('/oauth2/default', false);
 });
 
+it('groups oidc fields in the expected desktop order', function () {
+    $view = file_get_contents(resource_path('views/livewire/settings-oauth.blade.php'));
+    $fields = [
+        'redirect_uri',
+        'base_url',
+        'client_id',
+        'client_secret',
+        'scopes',
+        'clock_skew_seconds',
+        'custom_label',
+    ];
+    $positions = array_map(
+        fn (string $field): int|false => strpos($view, "id=\"oauth_settings_map.{{ \$provider }}.$field\""),
+        $fields,
+    );
+
+    expect($positions)->not->toContain(false)
+        ->and($positions)->toBe(collect($positions)->sort()->values()->all())
+        ->and($view)->toContain('<div class="lg:col-span-2">');
+});
+
 it('shows provider enable controls as settings section actions', function () {
     actingAsInstanceAdmin();
 
