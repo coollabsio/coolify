@@ -89,7 +89,7 @@
             <x-table.loading target="instantSave" text="Updating public access..." />
             <div class="grid gap-4 lg:grid-cols-2">
                 <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
-                    <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
+                    <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave" :onChangeArgs="[]"
                         :disabled="! auth()->user()->can('update', $database)" :options="[
                             ['value' => false, 'label' => 'Private'],
                             ['value' => true, 'label' => blank($publicPort) ? 'Public through TCP proxy (set public port first)' : 'Public through TCP proxy', 'disabled' => blank($publicPort)],
