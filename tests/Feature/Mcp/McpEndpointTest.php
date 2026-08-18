@@ -143,6 +143,15 @@ test('MCP endpoint lists tools for an authenticated token', function () {
     expect($toolNames)->toContain('coolify_help', 'control', 'deploy');
 });
 
+test('MCP endpoint accepts an authenticated token while REST API access is disabled', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false]);
+    Once::flush();
+
+    $token = $this->user->createToken('mcp-read', ['read'])->plainTextToken;
+
+    mcpListTools($token)->assertOk();
+});
+
 test('list_projects returns summary + pagination scoped to the token team', function () {
     $project = Project::create(['name' => 'Mine', 'team_id' => $this->team->id]);
 

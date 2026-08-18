@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Security;
 
-use App\Models\InstanceSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Laravel\Sanctum\PersonalAccessToken;
 use Livewire\Attributes\Locked;
@@ -28,8 +27,6 @@ class ApiTokens extends Component
         365 => '1 year',
     ];
 
-    public $isApiEnabled;
-
     #[Locked]
     public bool $canUseRootPermissions = false;
 
@@ -49,7 +46,6 @@ class ApiTokens extends Component
 
     public function mount()
     {
-        $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
         $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);

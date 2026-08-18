@@ -123,3 +123,19 @@ test('open API allowlist warning is shown when API access is enabled without all
         ->assertSet('is_api_enabled', true)
         ->assertSee('API access is open to every source');
 });
+
+test('MCP settings link to token management and explain the API allowlist scope', function () {
+    $path = resource_path('views/livewire/settings/advanced.blade.php');
+    $contents = file_get_contents($path);
+
+    expect($contents)
+        ->toContain("route('security.api-tokens')")
+        ->toContain('Security → API Tokens')
+        ->toContain('class="flex flex-wrap items-center gap-x-1 gap-y-1"')
+        ->toContain('label="Copy MCP endpoint" class="size-5!"')
+        ->toContain('<span>uses Sanctum bearer tokens from')
+        ->toContain('Security → API Tokens</a>.')
+        ->toContain('does not apply to the MCP endpoint')
+        ->not->toContain('size-7! border')
+        ->not->toContain('REST API access can remain disabled when using MCP.');
+});
