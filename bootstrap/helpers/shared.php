@@ -2094,7 +2094,11 @@ function validateDNSEntry(string $fqdn, Server $server)
 
 function createDnsQuery(string $dnsServer): DNSQuery
 {
-    return new DNSQuery($dnsServer, 53, 5);
+    return app()->make(DNSQuery::class, [
+        'server' => $dnsServer,
+        'port' => 53,
+        'timeout' => 5,
+    ]);
 }
 
 function isCloudflareIp(string $ip): bool
