@@ -1905,7 +1905,13 @@ html[data-theme="custom"] textarea:disabled {
 
 .listbox-trigger:disabled {
     cursor: not-allowed;
-    opacity: 0.5;
+    background-color: var(--color-neutral-100);
+    color: var(--color-neutral-400);
+}
+
+.dark .listbox-trigger:disabled {
+    background-color: color-mix(in oklab, var(--color-white) 3%, transparent);
+    color: var(--color-fg-faint);
 }
 
 .listbox-trigger:focus-visible {

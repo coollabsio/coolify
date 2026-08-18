@@ -1,8 +1,57 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
 
 uses(RefreshDatabase::class);
+
+it('auto-disables listboxes when the gate denies access', function () {
+    Gate::define('update-listbox-test', fn (): bool => false);
+
+    $html = Blade::render(<<<'BLADE'
+        <x-forms.listbox id="status" :wire="false" value="enabled"
+            canGate="update-listbox-test" :canResource="new stdClass"
+            :options="[['value' => 'enabled', 'label' => 'Enabled']]" />
+    BLADE);
+
+    expect($html)->toMatch('/<button[^>]*id="status-trigger"[^>]*\sdisabled(?:[=\s>])/');
+});
+
+it('declares gate attributes on form controls with update permission checks', function () {
+    $controlPattern = '/<x-forms\.(?:listbox|input|select|checkbox|textarea|button|toggle)\b.*?(?:\/>|<\/x-forms\.[^>]+>)/s';
+
+    foreach (File::allFiles(resource_path('views')) as $file) {
+        $path = $file->getPathname();
+        $source = file_get_contents($path);
+        preg_match_all($controlPattern, $source, $controls);
+
+        foreach ($controls[0] as $control) {
+            if (! preg_match('/can\(\s*[\'\"]update[\'\"]/', $control)) {
+                continue;
+            }
+
+            expect($control, $path)->toContain('canGate="update"')
+                ->toContain(':canResource=');
+        }
+    }
+});
+
+it('hides resource action menus when the user cannot manage the resource', function (string $path, string $ability, string $resource, string $prefix) {
+    $source = file_get_contents(resource_path($path));
+
+    foreach (['mobile', 'desktop'] as $viewport) {
+        expect($source)->toMatch(
+            "/@can\\('{$ability}', \\$".$resource."\\)[\\s\\S]*?<div id=\"{$prefix}-{$viewport}-actions\"/"
+        );
+    }
+})->with([
+    'application actions' => ['views/livewire/project/application/heading.blade.php', 'deploy', 'application', 'application'],
+    'service actions' => ['views/livewire/project/service/heading.blade.php', 'deploy', 'service', 'service'],
+    'database actions' => ['views/livewire/project/database/heading.blade.php', 'manage', 'database', 'database'],
+    'server actions' => ['views/livewire/server/navbar.blade.php', 'manageProxy', 'server', 'server'],
+]);
 
 it('keeps mutable Livewire components behind authorization checks', function (string $path, array $requiredNeedles) {
     $source = file_get_contents(base_path($path));
@@ -68,5 +117,39 @@ it('authorizes every volume backup form control', function (string $path, array 
             '/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")(?=[^>]*type="submit")[^>]*>/s',
             '/wire:click="checkAllDns"/s',
         ],
+    ],
+    'postgres public access control' => [
+        'resources/views/livewire/project/database/postgresql/general.blade.php',
+        [
+            '/<x-forms\.listbox id="isPublic"[\s\S]*?:disabled="! auth\(\)->user\(\)->can\(\'update\', \$database\)" canGate="update" :canResource="\$database" :options=/',
+        ],
+    ],
+    'redis public access control' => [
+        'resources/views/livewire/project/database/redis/general.blade.php',
+        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
+    ],
+    'mongodb public access control' => [
+        'resources/views/livewire/project/database/mongodb/general.blade.php',
+        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
+    ],
+    'clickhouse public access control' => [
+        'resources/views/livewire/project/database/clickhouse/general.blade.php',
+        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
+    ],
+    'mariadb public access control' => [
+        'resources/views/livewire/project/database/mariadb/general.blade.php',
+        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
+    ],
+    'dragonfly public access control' => [
+        'resources/views/livewire/project/database/dragonfly/general.blade.php',
+        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
+    ],
+    'mysql public access control' => [
+        'resources/views/livewire/project/database/mysql/general.blade.php',
+        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
+    ],
+    'keydb public access control' => [
+        'resources/views/livewire/project/database/keydb/general.blade.php',
+        ['/<x-forms\.listbox id="isPublic"[\s\S]*?canGate="update" :canResource="\$database" :options=/'],
     ],
 ]);
