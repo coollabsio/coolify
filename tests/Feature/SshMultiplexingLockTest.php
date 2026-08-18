@@ -87,26 +87,22 @@ it('reuses an existing healthy master without spawning a new one', function () {
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN'));
 });
 
-it('refreshes an expired master before reuse', function () {
+it('reuses a healthy master regardless of its absolute age', function () {
     config([
         'constants.ssh.mux_enabled' => true,
         'constants.ssh.mux_health_check_enabled' => false,
-        'constants.ssh.mux_max_age' => 10,
     ]);
     $server = makeMuxServer();
-    Cache::put("ssh_mux_connection_time_{$server->uuid}", time() - 30, 3600);
+    Cache::put("ssh_mux_connection_time_{$server->uuid}", time() - 7200, 10800);
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 0),
-        '*-O stop*' => Process::result(exitCode: 0),
-        '*-fN *' => Process::result(exitCode: 0),
     ]);
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
 });
 
 it('does not spawn a master when the per-server lock is already held', function () {
@@ -242,6 +238,49 @@ it('kills only old orphaned ssh masters whose control socket no longer exists', 
     File::delete($liveSocket);
 });
 
+it('does not reap an ssh master that is intentionally retiring', function () {
+    config(['constants.ssh.mux_orphan_reap_enabled' => true]);
+    $muxDir = storage_path('app/ssh/mux');
+    $retiringSocket = $muxDir.'/mux_retiring_'.uniqid();
+    SshMultiplexingHelper::markMuxProcessAsRetiring('222');
+
+    Process::fake([
+        'ps*' => Process::result(output: "222 1 5000 ssh -fN -o ControlMaster=auto -o ControlPath={$retiringSocket} root@1.2.3.4\n"),
+        'kill*' => Process::result(exitCode: 0),
+    ]);
+
+    $job = new CleanupStaleMultiplexedConnections;
+    $method = new ReflectionMethod($job, 'cleanupOrphanedSshProcesses');
+    $method->setAccessible(true);
+    $method->invoke($job);
+
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'kill'));
+});
+
+it('marks a successfully stopped mux process as retiring', function () {
+    $server = makeMuxServer();
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=222)', exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+
+    expect(SshMultiplexingHelper::isMuxProcessRetiring('222'))->toBeTrue();
+});
+
+it('does not mark a mux process as retiring when stop fails', function () {
+    $server = makeMuxServer();
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=444)', exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 1),
+    ]);
+
+    SshMultiplexingHelper::removeMuxFile($server);
+
+    expect(SshMultiplexingHelper::isMuxProcessRetiring('444'))->toBeFalse();
+});
+
 it('kills only old orphaned cloudflared proxies whose parent ssh is gone', function () {
     config(['constants.ssh.mux_orphan_reap_enabled' => true]);
 
@@ -295,7 +334,10 @@ it('removes mux files for non-existent servers when reaping is enabled', functio
     Storage::fake('ssh-mux');
     $file = 'mux_ghost'.uniqid();
     Storage::disk('ssh-mux')->put($file, 'x');
-    Process::fake();
+    Process::fake([
+        '*-O check*' => Process::result(errorOutput: 'Master running (pid=333)', exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
+    ]);
 
     $job = new CleanupStaleMultiplexedConnections;
     $method = new ReflectionMethod($job, 'cleanupNonExistentServerConnections');
@@ -303,8 +345,29 @@ it('removes mux files for non-existent servers when reaping is enabled', functio
     $method->invoke($job);
 
     expect(Storage::disk('ssh-mux')->exists($file))->toBeFalse();
+    expect(SshMultiplexingHelper::isMuxProcessRetiring('333'))->toBeTrue();
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
     Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
+});
+
+it('does not remove a healthy mux connection based on its absolute age', function () {
+    config(['constants.ssh.mux_orphan_reap_enabled' => true]);
+    Storage::fake('ssh-mux');
+    $server = makeMuxServer();
+    $file = "mux_{$server->uuid}";
+    Storage::disk('ssh-mux')->put($file, str_repeat('x', 37).now()->subHours(2)->toIso8601String());
+
+    Process::fake([
+        '*-O check*' => Process::result(exitCode: 0),
+    ]);
+
+    $job = new CleanupStaleMultiplexedConnections;
+    $method = new ReflectionMethod($job, 'cleanupStaleConnections');
+    $method->setAccessible(true);
+    $method->invoke($job);
+
+    expect(Storage::disk('ssh-mux')->exists($file))->toBeTrue();
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
 });
 
 it('keeps mux files for non-existent servers in dry-run mode', function () {
