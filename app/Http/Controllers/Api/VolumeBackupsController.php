@@ -34,7 +34,7 @@ use RuntimeException;
         new OA\Property(property: 'retention_amount_s3', type: 'integer', default: 7, minimum: 0, maximum: 10000),
         new OA\Property(property: 'retention_days_s3', type: 'integer', default: 0, maximum: 2147483647, minimum: 0),
         new OA\Property(property: 'retention_max_storage_s3', type: 'number', format: 'float', default: 0, maximum: 9999999999, minimum: 0),
-        new OA\Property(property: 'timeout', type: 'integer', default: 3600, minimum: 60, maximum: 36000),
+        new OA\Property(property: 'timeout', type: 'integer', default: ScheduledVolumeBackup::DEFAULT_TIMEOUT, minimum: 60, maximum: 36000),
     ],
     type: 'object',
     additionalProperties: false,
@@ -275,7 +275,7 @@ class VolumeBackupsController extends Controller
             'retention_amount_s3' => $request->integer('retention_amount_s3', 7),
             'retention_days_s3' => $request->integer('retention_days_s3'),
             'retention_max_storage_s3' => $request->float('retention_max_storage_s3'),
-            'timeout' => $request->integer('timeout', 3600),
+            'timeout' => $request->integer('timeout', ScheduledVolumeBackup::DEFAULT_TIMEOUT),
         ]);
         $created = $backup->wasRecentlyCreated;
 
