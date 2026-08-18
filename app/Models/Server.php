@@ -858,6 +858,33 @@ $siteAddress {
         return data_get($this->proxy, 'type');
     }
 
+    public function hasPendingProxyConfiguration(): bool
+    {
+        if ($this->proxy->get('status') !== 'running') {
+            return false;
+        }
+
+        $savedSettings = $this->proxy->get('last_saved_settings');
+        $appliedSettings = $this->proxy->get('last_applied_settings');
+
+        return filled($savedSettings) && filled($appliedSettings) && $savedSettings !== $appliedSettings;
+    }
+
+    public function hasCurrentTraefikOutdatedInfo(): bool
+    {
+        if ($this->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return false;
+        }
+
+        $detectedVersion = ltrim((string) $this->detected_traefik_version, 'v');
+        $storedVersion = ltrim((string) data_get($this->traefik_outdated_info, 'current'), 'v');
+        $type = data_get($this->traefik_outdated_info, 'type');
+
+        return filled($detectedVersion)
+            && $storedVersion === $detectedVersion
+            && in_array($type, ['patch_update', 'minor_upgrade'], true);
+    }
+
     public function scopeWithProxy(): Builder
     {
         return $this->proxy->modelScope();
