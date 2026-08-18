@@ -82,7 +82,7 @@
                     <x-forms.input canGate="update" :canResource="$gitlab_app" type="number" id="customPort"
                         label="SSH port" />
                     <div class="lg:col-span-2">
-                        <x-forms.listbox id="privateKeyId" label="SSH private key (optional)"
+                        <x-forms.listbox canGate="update" :canResource="$gitlab_app" id="privateKeyId" label="SSH private key (optional)"
                             :options="collect($privateKeys)->map(fn ($key) => [
                                 'value' => $key->id,
                                 'label' => $key->name,

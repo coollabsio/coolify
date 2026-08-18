@@ -236,7 +236,6 @@
                             @foreach ($checkboxes as $index => $checkbox)
                                 <div class="flex justify-between items-center mb-2">
                                     <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
-                                        :wire:model="$checkbox['id']"
                                         x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}"
                                         x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>

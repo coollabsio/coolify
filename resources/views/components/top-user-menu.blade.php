@@ -12,6 +12,7 @@
     open: false,
     appearanceOpen: false,
     theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
+    pageWidth: localStorage.getItem('pageWidth') || 'full',
     themeColor: localStorage.getItem('themeColor') || '#6b16ed',
     themeColorFrame: null,
     avatarUrl: @js($user?->avatar_path ? route('profile.avatar', ['v' => $user->updated_at->timestamp]) : null),
@@ -31,6 +32,11 @@
         document.documentElement.style.setProperty('--theme-base-color', localStorage.themeColor || '#6b16ed');
         document.documentElement.style.setProperty('--theme-accent-foreground', window.themeAccentForeground(this.themeColor));
         document.querySelector('meta[name=theme-color]')?.setAttribute('content', isDark ? '#101010' : '#ffffff');
+    },
+    setWidth(width) {
+        this.pageWidth = width;
+        localStorage.setItem('pageWidth', width);
+        window.dispatchEvent(new CustomEvent('page-width-changed', { detail: width }));
     },
     previewThemeColor(color) {
         this.themeColor = color;
@@ -81,14 +87,13 @@
         </svg>
     </button>
 
-    <template x-if="open">
-        <div @class([
-                'listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
-                'right-0! left-auto!' => ! $sidebar,
-                'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
-                'origin-bottom-left' => $sidebar,
-                'origin-top-right' => ! $sidebar,
-            ])>
+    <div x-show="open" x-cloak @class([
+            'top-user-menu-panel listbox-panel z-[90]! max-h-none! w-52! min-w-0! overflow-visible! animate-in fade-in zoom-in-95 duration-150',
+            'right-0! left-auto!' => ! $sidebar,
+            'bottom-full! left-0! right-auto! top-auto! mb-1!' => $sidebar,
+            'origin-bottom-left' => $sidebar,
+            'origin-top-right' => ! $sidebar,
+        ])>
         <div class="min-w-0 px-2 py-1.5">
             <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $userName }}</div>
             <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">{{ $userEmail }}</div>
@@ -151,6 +156,25 @@
                     </button>
                 @endif
             @endforeach
+            <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
+            <div class="px-2 pt-1 pb-0.5 text-[10px] font-medium tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
+                Page width
+            </div>
+            @foreach ([
+                ['value' => 'full', 'label' => 'Full width'],
+                ['value' => 'centered', 'label' => 'Centered'],
+            ] as $option)
+                <button type="button" @click="setWidth('{{ $option['value'] }}')"
+                    class="flex h-8 w-full items-center justify-between rounded-md px-2 text-left text-xs text-neutral-600 transition-colors hover:bg-neutral-200 hover:text-neutral-950 dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                    <span>{{ $option['label'] }}</span>
+                    <svg x-show="pageWidth === '{{ $option['value'] }}'"
+                        class="size-3.5 text-coollabs dark:text-warning" viewBox="0 0 12 12" fill="none"
+                        aria-hidden="true">
+                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor" stroke-width="1.4"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+            @endforeach
         </div>
 
         <div class="my-1 h-px bg-neutral-200 dark:bg-white/[0.07]"></div>
@@ -194,6 +218,5 @@
                 </span>
             </button>
         </form>
-        </div>
-    </template>
+    </div>
 </div>

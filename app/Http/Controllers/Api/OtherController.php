@@ -316,6 +316,6 @@ class OtherController extends Controller
     )]
     public function healthcheck(Request $request)
     {
-        return 'OK';
+        return response('OK');
     }
 }

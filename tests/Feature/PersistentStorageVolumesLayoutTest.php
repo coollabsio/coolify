@@ -50,6 +50,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -196,7 +197,9 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('@media (max-width: 768px)')
         ->toContain('.table-badge-success');
 
-    expect($css)->toContain('17.5rem');
+    expect($css)
+        ->toContain('12rem')
+        ->not->toContain('17.5rem');
 
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)
@@ -257,6 +260,82 @@ it('shows PR deployment suffix only for git-based applications', function () {
         ->assertSet('supportsPreviewSuffix', false)
         ->assertDontSee('Add suffix')
         ->assertDontSee('PR deployment suffix');
+
+    [$nonGitComposeApp] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'git_repository' => '',
+        'git_branch' => '',
+    ]);
+
+    Livewire::test(All::class, ['resource' => $nonGitComposeApp])
+        ->assertSet('supportsPreviewSuffix', false)
+        ->assertDontSee('Add suffix');
+});
+
+it('allows stale compose volume metadata to be deleted', function () {
+    [$application, $volume] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+YAML,
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSee('Delete stale volume entry')
+        ->call('delete', $volume->id, 'password');
+
+    expect($volume->fresh())->toBeNull();
+});
+
+it('deletes the Docker volume only when explicitly selected', function () {
+    Process::fake();
+    DB::table('private_keys')->where('id', $this->server->private_key_id)->update([
+        'private_key' => encrypt('test-key'),
+    ]);
+
+    [$application, $volume] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+YAML,
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSet('deleteDockerVolume', false)
+        ->call('delete', $volume->id, 'password', ['deleteDockerVolume'])
+        ->assertSet('deleteDockerVolume', true);
+
+    Process::assertRan(fn () => true);
+    expect($volume->fresh())->toBeNull();
+});
+
+it('does not allow compose volume metadata that is still declared to be deleted', function () {
+    [$application, $volume] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+    volumes:
+      - data:/data
+volumes:
+  data:
+YAML,
+    ]);
+
+    $volume->name = $application->uuid.'_data';
+    $volume->save();
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertDontSee('Delete stale volume entry')
+        ->call('delete', $volume->id, 'password')
+        ->assertDispatched('error');
+
+    expect($volume->fresh())->not->toBeNull();
 });
 
 it('hides PR deployment suffix for databases', function () {

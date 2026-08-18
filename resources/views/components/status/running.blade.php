@@ -33,7 +33,7 @@
             <x-helper
                 helper="No health check configured. <span class='dark:text-warning text-coollabs'>The resource may be functioning normally.</span><br><br>Traefik and Caddy will route traffic to this container even without a health check. However, configuring a health check is recommended to ensure the resource is ready before receiving traffic.<br><br>More details in the <a href='https://coolify.io/docs/knowledge-base/proxy/traefik/healthchecks' class='underline dark:text-warning text-coollabs' target='_blank'>documentation</a>.">
                 <x-slot:icon>
-                    <x-status-badge status="No health check" type="warning" class="cursor-help" />
+                    <x-status-badge status="No healthcheck" type="warning" class="cursor-help" />
                 </x-slot:icon>
             </x-helper>
         </div>

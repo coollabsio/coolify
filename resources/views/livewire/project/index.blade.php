@@ -49,22 +49,22 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <div class="relative" x-on:click.outside="sortOpen = false">
-                        <button type="button" class="button" x-on:click="sortOpen = !sortOpen">
-                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
-                                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                            </svg>
-                            Sort
-                        </button>
-                        <div x-cloak x-show="sortOpen" x-transition.origin.top.right
-                            class="absolute top-9 right-0 z-50 w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                    <x-table.dropdown panel-class="w-52!">
+                        <x-slot:trigger>
+                            <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
+                                <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none"
+                                    aria-hidden="true">
+                                    <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
+                                        stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                Sort
+                            </button>
+                        </x-slot:trigger>
                             <template x-for="option in sortOptions" :key="option.value">
                                 <button type="button"
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="sortBy = option.value; sortOpen = false; page = 1">
+                                    x-on:click="sortBy = option.value; close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
                                     <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -73,11 +73,10 @@
                                     </svg>
                                 </button>
                             </template>
-                        </div>
-                    </div>
+                    </x-table.dropdown>
 
                     <div
-                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                        class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
                         <button type="button" x-on:click="setViewMode('table')"
                             class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                             :class="viewMode === 'table'
@@ -110,7 +109,12 @@
                             <div class="flex items-start gap-3">
                                 <div
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <x-reicon name="projects" class="size-4" />
+                                    <template x-if="project.iconUrl">
+                                        <img :src="project.iconUrl" :alt="`${project.name} icon`" class="h-full w-full rounded-lg object-cover">
+                                    </template>
+                                    <template x-if="!project.iconUrl">
+                                        <x-reicon name="projects" class="size-4" />
+                                    </template>
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <h2
@@ -147,31 +151,9 @@
                         </article>
                     </template>
                 </div>
-
-                <footer x-show="totalPages > 1"
-                    class="mt-3 flex min-h-11 items-center justify-between rounded-xl border border-neutral-200 bg-white px-4 text-[11px] text-neutral-500 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
-                    <span x-text="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`"></span>
-                    <div class="flex items-center gap-1">
-                        <button type="button" x-on:click="previousPage" :disabled="page === 1"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Previous page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" x-on:click="nextPage" :disabled="page >= totalPages"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Next page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </footer>
+                <x-client-pagination x-show="filteredProjects.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]"
+                    summary="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`" page-size-model="pageSize"
+                    storage-key="coolify.page-size.projects" :options="[12, 24, 48, 96]" />
             </div>
 
             <div x-show="viewMode === 'table'"
@@ -191,7 +173,12 @@
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
-                                <x-reicon name="projects" class="size-4" />
+                                <template x-if="project.iconUrl">
+                                    <img :src="project.iconUrl" :alt="`${project.name} icon`" class="h-full w-full rounded-lg object-cover">
+                                </template>
+                                <template x-if="!project.iconUrl">
+                                    <x-reicon name="projects" class="size-4" />
+                                </template>
                             </div>
                             <a :href="project.href" {{ wireNavigate() }}
                                 class="truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
@@ -219,31 +206,9 @@
                         </div>
                     </div>
                 </template>
-
-                <footer x-show="totalPages > 1"
-                    class="flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
-                    <span x-text="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`"></span>
-                    <div class="flex items-center gap-1">
-                        <button type="button" x-on:click="previousPage" :disabled="page === 1"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Previous page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                        <button type="button" x-on:click="nextPage" :disabled="page >= totalPages"
-                            class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            aria-label="Next page">
-                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                    stroke-linecap="round" stroke-linejoin="round" />
-                            </svg>
-                        </button>
-                    </div>
-                </footer>
+                <x-client-pagination x-show="filteredProjects.length > 0"
+                    summary="`${rangeStart}-${rangeEnd} of ${filteredProjects.length}`" page-size-model="pageSize"
+                    storage-key="coolify.page-size.projects" :options="[12, 24, 48, 96]" />
             </div>
 
             <div x-show="filteredProjects.length === 0"

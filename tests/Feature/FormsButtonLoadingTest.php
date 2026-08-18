@@ -30,6 +30,12 @@ it('uses an explicit wire target for submit buttons without wire click', functio
         ->toContain('Validate and add');
 });
 
+it('targets the S3 connection validation submit action', function () {
+    $view = file_get_contents(resource_path('views/livewire/storage/create.blade.php'));
+
+    expect($view)->toContain('<x-forms.button class="mt-4" type="submit" wire:target="submit">');
+});
+
 it('keeps method arguments when deriving the loading target', function () {
     $html = Blade::render(
         '<x-forms.button wire:click="setPrivateKey(42)">Use this key</x-forms.button>'

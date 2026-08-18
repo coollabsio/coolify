@@ -11,6 +11,13 @@
 
 Release workflows never edit or commit versions. Set the intended version in `config/constants.php` before running a release workflow.
 
+## Where changes go
+
+- Fixes, security updates, and small improvements target `main`.
+- New features and larger changes target `next`.
+- Merge `main` into `next` regularly so every production fix is included in the next release.
+- Do not merge `next` into `main` until an RC is approved for a stable release.
+
 ## Feature and RC flow
 
 ```text
@@ -45,13 +52,14 @@ next → main → stable release
 main → hotfix/X.Y.Z → main → next
 ```
 
-1. Create `hotfix/X.Y.Z` from `main` and set the intended patch version.
-2. Implement and test the fix. SHA images report `X.Y.Z-dev.<short-sha>`.
-3. Merge the hotfix into `main`.
-4. Create a reviewed draft GitHub Release named `vX.Y.Z`.
-5. Run the stable release workflow from `main`.
-6. Merge `main` into `next`, resolve the version in favor of the next intended RC, and delete the hotfix branch.
-7. Update the CDN only after the release is approved.
+1. Create `hotfix/X.Y.Z` from `main` when a patch needs an integration branch. A single fix may use a normal branch from `main` instead.
+2. Set the intended patch version.
+3. Implement and test the fix. SHA images report `X.Y.Z-dev.<short-sha>`.
+4. Merge the fix into `main`.
+5. Create a reviewed draft GitHub Release named `vX.Y.Z`.
+6. Run the stable release workflow from `main`.
+7. Merge `main` into `next`, resolve the version in favor of the next intended RC, and delete the hotfix branch if one was used.
+8. Update the CDN only after the release is approved.
 
 ## Image tags
 

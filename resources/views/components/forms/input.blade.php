@@ -63,7 +63,18 @@
     @endif
     @error($modelBinding)
         <label class="label">
-            <span class="text-red-500 label-text-alt">{{ $message }}</span>
+            @php
+                preg_match('/(https?:\/\/\S+)$/', $message, $validationLinkMatches);
+                $validationLink = $validationLinkMatches[1] ?? null;
+            @endphp
+            <span class="text-red-500 label-text-alt">
+                @if ($validationLink)
+                    {{ str($message)->beforeLast($validationLink)->trim() }}
+                    <a class="font-medium underline" href="{{ $validationLink }}">Set them here.</a>
+                @else
+                    {{ $message }}
+                @endif
+            </span>
         </label>
     @enderror
 </div>

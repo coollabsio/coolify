@@ -121,6 +121,21 @@
                                     @else
                                         <span class="text-neutral-400 dark:text-fg-faint">—</span>
                                     @endif
+
+                                    @if ($form['canDeleteStale'])
+                                        <x-modal-confirmation title="Remove stale volume entry?" isErrorButton
+                                            buttonTitle="Delete stale volume entry" submitAction="delete({{ $id }})"
+                                            :checkboxes="[[
+                                                'id' => 'deleteDockerVolume',
+                                                'label' => 'Also permanently delete the Docker volume and all its data.',
+                                                'default_warning' => 'The Docker volume and its data will not be deleted.',
+                                            ]]"
+                                            :actions="[
+                                                'This removes only the stale volume entry from Coolify.',
+                                            ]" confirmationText="{{ $form['name'] }}"
+                                            confirmationLabel="Please confirm by entering the Storage Name below"
+                                            shortConfirmationLabel="Storage Name" />
+                                    @endif
                                 </div>
                             @endif
                         </div>

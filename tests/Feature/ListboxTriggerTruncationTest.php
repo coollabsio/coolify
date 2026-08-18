@@ -22,6 +22,15 @@ test('listbox trigger height matches shared inputs', function () {
         ->toMatch('/\.application-settings-workspace \.listbox-trigger[^}]*height: 2rem;/s');
 });
 
+test('disabled listboxes use the same colors as disabled inputs', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toMatch('/\.listbox-trigger:disabled \{[^}]*background-color: var\(--color-neutral-100\);[^}]*color: var\(--color-neutral-400\);/s')
+        ->toMatch('/\.dark \.listbox-trigger:disabled \{[^}]*background-color: color-mix\(in oklab, var\(--color-white\) 3%, transparent\);[^}]*color: var\(--color-fg-faint\);/s')
+        ->not->toMatch('/\.listbox-trigger:disabled \{[^}]*opacity:/s');
+});
+
 test('listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.listbox id="longOption" label="Example"
@@ -37,6 +46,36 @@ test('listbox component uses shared trigger label truncation', function () {
         ->toContain('listbox-trigger-label')
         ->toContain(':title="current"')
         ->not->toContain('class="truncate" x-text="current"');
+});
+
+test('listboxes stay in their local Alpine scope by default', function () {
+    $component = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+    $html = Blade::render('<x-forms.listbox id="region" :options="[]" :wire="false" />');
+
+    expect($component)->toContain("'portal' => false")
+        ->and($html)
+        ->toContain('x-data="{')
+        ->toContain('x-ref="panel"')
+        ->not->toContain('x-teleport="body"')
+        ->not->toContain('floatingDropdown(')
+        ->not->toContain('style="position: fixed');
+});
+
+test('mobile listbox panels stay anchored to their trigger', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->not->toContain('.listbox-panel:not([style*="position: fixed"])')
+        ->not->toContain('transform: translate(-50%, -50%) !important;');
+});
+
+test('portaled listboxes measure content without inheriting the viewport width', function () {
+    $listbox = file_get_contents(resource_path('views/components/forms/listbox.blade.php'));
+
+    expect($listbox)
+        ->toContain("panel.style.width = 'max-content';")
+        ->toContain('panel.style.minWidth = `${triggerRect.width}px`;')
+        ->toContain('Math.max(triggerRect.width, panel.offsetWidth)');
 });
 
 test('searchable listbox component uses shared trigger label truncation', function () {
@@ -84,7 +123,8 @@ test('listbox forwards dynamic disabled state to its trigger', function () {
         ->toContain('x-model="selectedCloneProject"')
         ->toContain('x-model="selectedCloneEnvironment"')
         ->toContain('$wire.cloneTo(selectedCloneDestination)')
-        ->toContain('$wire.cloneTo(@js($resource->destination->uuid), selectedCloneEnvironment)')
+        ->toContain('$wire.cloneTo(currentDestinationUuid, selectedCloneEnvironment)')
+        ->not->toContain('$wire.cloneTo(@js(')
         ->toContain('x-bind:disabled="!selectedMoveProject || availableEnvironments.length === 0"');
 });
 
@@ -131,4 +171,22 @@ test('notification event multiselect truncates long selected summaries', functio
         ->toContain('Docker cleanup failure, Disk usage warning, Server unreachable, Server patching')
         ->toContain('title="Docker cleanup failure, Disk usage warning, Server unreachable, Server patching"')
         ->toContain('4/4');
+});
+
+test('notification event multiselect uses the same panel animation as listboxes', function () {
+    $html = Blade::render(<<<'BLADE'
+        <x-notification.event-multiselect id="deployment-email-events" label="Deployments" :events="[
+            ['property' => 'deploymentSuccessEmailNotifications', 'label' => 'Deployment success', 'enabled' => false],
+            ['property' => 'deploymentFailureEmailNotifications', 'label' => 'Deployment failure', 'enabled' => true],
+            ['property' => 'statusChangeEmailNotifications', 'label' => 'Container status changes', 'enabled' => false],
+        ]" />
+    BLADE);
+
+    expect($html)
+        ->toContain('x-transition:enter="transition ease-out duration-100"')
+        ->toContain('x-transition:enter-start="opacity-0 -translate-y-1 scale-[0.98]"')
+        ->toContain('x-transition:enter-end="opacity-100 translate-y-0 scale-100"')
+        ->toContain('x-transition:leave="transition ease-in duration-75"')
+        ->toContain('x-transition:leave-start="opacity-100 translate-y-0 scale-100"')
+        ->toContain('x-transition:leave-end="opacity-0 -translate-y-1 scale-[0.98]"');
 });

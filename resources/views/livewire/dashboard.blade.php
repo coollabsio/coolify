@@ -65,7 +65,13 @@
                             <div class="flex min-w-0 items-start gap-3">
                                 <div
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
-                                    <x-reicon name="projects" class="size-4" />
+                                    @if ($project->icon_path)
+                                        <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                            alt="{{ $project->name }} icon"
+                                            class="h-full w-full rounded-lg object-cover">
+                                    @else
+                                        <x-reicon name="projects" class="size-4" />
+                                    @endif
                                 </div>
                                 <div class="min-w-0 flex-1">
                                     <h3
@@ -190,14 +196,9 @@
                                     :key="'dashboard-server-metrics-'.$server->uuid" />
                             @endif
 
-                            <div class="pointer-events-none relative z-10 flex min-w-0 items-start gap-3">
-                                <div title="{{ $serverStatus }}" aria-label="Server status: {{ $serverStatus }}"
-                                    @class([
-                                        'flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.04] dark:text-fg-dim',
-                                        'border-emerald-500/70' => $serverStatusType === 'success',
-                                        'border-amber-500/70' => $serverStatusType === 'warning',
-                                        'border-red-500/70' => $serverStatusType === 'error',
-                                    ])>
+                            <div class="relative z-10 flex min-w-0 items-start gap-3">
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                     <x-reicon name="servers" class="size-4" />
                                 </div>
                                 <div class="min-w-0 flex-1">
@@ -209,6 +210,17 @@
                                         {{ $server->description ?: 'No description' }}
                                     </p>
                                 </div>
+                                @if ($serverStatusType !== 'success')
+                                    <span data-tooltip="{{ $serverStatus }}"
+                                        aria-label="Server status: {{ $serverStatus }}"
+                                        @class([
+                                            'flex size-6 shrink-0 items-center justify-center rounded-md',
+                                            'text-orange-500 dark:text-warning' => $serverStatusType === 'warning',
+                                            'text-red-500 dark:text-red-400' => $serverStatusType === 'error',
+                                        ])>
+                                        <x-reicon name="alert-triangle" class="size-4" />
+                                    </span>
+                                @endif
                             </div>
                         </a>
                     @endforeach

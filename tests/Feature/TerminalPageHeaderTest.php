@@ -11,25 +11,61 @@ it('shows the initial terminal target launcher and keeps the header picker for s
         ->toContain('this.targetChosen = true;');
 });
 
-it('shows a centered themed target canvas before loading xterm', function () {
+it('shows the pre-session target list as a page card instead of a full-height console canvas', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+
+    $pickerBranch = str($view)
+        ->after("@if (\$selected_uuid === 'default')")
+        ->before("\n        @else")
+        ->toString();
 
     expect($view)
         ->toContain("@if (\$selected_uuid === 'default')")
         ->toContain('data-terminal-target-picker="page"')
         ->toContain('data-terminal-target-canvas')
-        ->toContain('items-center justify-center')
-        ->toContain(':data-console-theme="consoleTheme"')
-        ->toContain("@else\n        <div wire:key=\"terminal-session-canvas\" data-terminal-session-canvas");
+        ->toContain("@else\n        <div wire:key=\"terminal-session-canvas\" data-terminal-session-canvas")
+        ->and($pickerBranch)
+        ->toContain('<x-application.settings-section class="terminal-target-card"')
+        ->toContain('title="Start a terminal session"')
+        // The themed console canvas belongs to an open session, not to target selection.
+        ->not->toContain('application-console-shell')
+        ->not->toContain(':data-console-theme="consoleTheme"')
+        ->not->toContain('<x-terminal.theme-selector');
 });
 
-it('keeps the terminal target picker within the mobile canvas', function () {
+it('keeps the pre-session target list scrollable inside the full-width card', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
 
     expect($view)
         ->toContain('data-terminal-target-picker="page"')
-        ->toContain('flex max-h-full w-full max-w-lg flex-col')
-        ->toContain('class="terminal-target-list min-h-0 flex-1 overflow-y-auto p-2"');
+        ->toContain('aria-label="Filter terminal targets"')
+        ->toContain('class="application-settings-workspace flex w-full min-w-0 flex-col"')
+        ->toContain('class="terminal-target-card-list"')
+        ->and($styles)
+        ->toContain('.terminal-target-card .application-settings-section-body')
+        ->toMatch('/\.terminal-target-card-list\s*\{[^}]*max-height:\s*min\(70vh, 34rem\);/s')
+        ->toMatch('/\.terminal-target-group-label\s*\{[^}]*position:\s*sticky;/s')
+        // The wrapped filter needs the same gutter on both sides of the header, and the
+        // override must match the base header selector's specificity to win.
+        ->toMatch('/\.application-settings-section\.terminal-target-card > :is\(header, \.application-settings-section-header\)\s*\{\s*padding-right:\s*1rem;/s');
+});
+
+it('splits target rows into a name and a server column that only shows with several servers', function () {
+    $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($view)
+        ->toContain("'name' => \$container['name'],")
+        ->toContain("'server' => \$server->name,")
+        ->toContain('multipleServers: @js($servers->count() > 1)')
+        ->toContain('x-text="target.name"')
+        ->toContain('class="terminal-target-item-server" x-text="target.server"')
+        ->toContain('x-show="multipleServers"')
+        // The label keeps both parts so filtering still matches the server name.
+        ->toContain("'label' => \$server->name.' · '.\$container['name'],")
+        ->and($styles)
+        ->toContain('.terminal-target-item-server');
 });
 
 it('loads targets inside the themed session picker with an accent scrollbar', function () {
@@ -100,12 +136,12 @@ it('uses floating rounded controls instead of the legacy terminal header bar', f
         ->not->toContain('application-console-header flex h-[30px]');
 });
 
-it('keeps the theme selector identical before and during a terminal session', function () {
+it('offers the console theme selector only while a session owns the canvas', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
     $selector = file_get_contents(resource_path('views/components/terminal/theme-selector.blade.php'));
 
     expect(substr_count($view, '<x-terminal.theme-selector'))
-        ->toBe(2)
+        ->toBe(1)
         ->and($selector)
         ->toContain('terminal-theme-trigger flex h-8 items-center gap-2 rounded-md px-2.5 text-xs font-medium')
         ->and($view)
@@ -130,19 +166,20 @@ it('reuses one chevron theme selector before and during terminal sessions', func
     $selector = file_get_contents(resource_path('views/components/terminal/theme-selector.blade.php'));
 
     expect(substr_count($globalView.$resourceView, '<x-terminal.theme-selector'))
-        ->toBe(3)
+        ->toBe(2)
         ->and($selector)
         ->toContain('terminal-theme-trigger')
         ->toContain('viewBox="0 0 12 12"')
         ->toContain('m3.5 4.75 2.5 2.5 2.5-2.5');
 });
 
-it('keeps the pre-session theme selector out of the centered picker layout', function () {
+it('keeps the theme selector in the floating session toolbar', function () {
     $view = file_get_contents(resource_path('views/livewire/terminal/index.blade.php'));
 
     expect($view)
-        ->toContain('class="absolute top-3 right-3 z-20"')
-        ->toContain('<x-terminal.theme-selector');
+        ->toContain('terminal-session-toolbar absolute top-3 right-3 left-3')
+        ->toContain('<x-terminal.theme-selector')
+        ->not->toContain('class="absolute top-3 right-3 z-20"');
 });
 
 it('updates the owning terminal theme directly so its label and canvas stay synchronized', function () {
@@ -174,8 +211,9 @@ it('locks the terminal page to the viewport so the document does not scroll', fu
     $appCss = file_get_contents(resource_path('css/app.css'));
 
     expect($view)
-        ->toContain('class="terminal-page application-settings-form"')
-        ->toContain('class="terminal-page-console min-h-0 w-full flex-1 overflow-hidden"')
+        // The viewport lock only applies once a session owns the canvas.
+        ->toContain("class=\"{{ \$selected_uuid === 'default' ? '' : 'terminal-page' }} application-settings-form\"")
+        ->toContain("'terminal-page-console min-h-0 w-full flex-1 overflow-hidden'")
         ->not->toContain('h-[calc(100dvh-11rem)]')
         ->not->toContain('min-h-[32rem]')
         ->and($appCss)

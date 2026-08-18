@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\File;
 
 it('renders the standard table toolbar controls', function () {
     $html = Blade::render(<<<'BLADE'
@@ -21,10 +22,25 @@ it('renders the standard table toolbar controls', function () {
         ->toContain('table-toolbar')
         ->toContain('table-search')
         ->toContain('wire:model.live="search"')
+        ->not->toContain('x-teleport="body"')
+        ->not->toContain('floatingDropdown(')
+        ->toContain("panelStyle: 'position: fixed; min-width: 0; visibility: hidden;'")
+        ->toContain("this.panelStyle = 'position: fixed; min-width: 0; visibility: hidden;'")
+        ->toContain('position: fixed')
+        ->toContain('min-width: 0')
+        ->toContain('getBoundingClientRect()')
+        ->toContain('x-show="open"')
         ->toContain('aria-multiselectable="true"')
         ->toContain('Reset filters')
         ->toContain('wire:click="clearFilters"')
         ->toContain('Sort');
+});
+
+it('does not load a global floating dropdown positioning provider', function () {
+    $layout = file_get_contents(resource_path('views/layouts/base.blade.php'));
+
+    expect($layout)->not->toContain("@include('components.floating-dropdown-script')")
+        ->and(File::exists(resource_path('views/components/floating-dropdown-script.blade.php')))->toBeFalse();
 });
 
 it('renders the standard table loading overlay', function () {
@@ -60,4 +76,31 @@ it('uses the standard search control for frontend filtered infrastructure tables
         ->toContain('<x-table.search')
         ->toContain('clear-when="search"')
         ->toContain("clear-action=\"search = ''\"");
+});
+
+it('uses the collision aware dropdown on the projects page', function () {
+    $projects = file_get_contents(resource_path('views/livewire/project/index.blade.php'));
+
+    expect($projects)
+        ->toContain('<x-table.dropdown')
+        ->not->toContain('x-show="sortOpen"');
+});
+
+it('uses collision aware filter and sort dropdowns on the resources page', function () {
+    $resources = file_get_contents(resource_path('views/livewire/project/resource/index.blade.php'));
+
+    expect(substr_count($resources, '<x-table.dropdown'))->toBeGreaterThanOrEqual(2)
+        ->and($resources)
+        ->not->toContain('x-show="filterOpen"')
+        ->not->toContain('x-show="sortOpen"');
+});
+
+it('does not use legacy floating sort or filter panels', function () {
+    $views = collect(File::allFiles(resource_path('views')))
+        ->filter(fn (SplFileInfo $file): bool => $file->getExtension() === 'php')
+        ->map(fn (SplFileInfo $file): string => $file->getContents())
+        ->implode("\n");
+
+    expect($views)
+        ->not->toMatch('/x-show="(?:sortOpen|filterOpen|filtersOpen)"/');
 });

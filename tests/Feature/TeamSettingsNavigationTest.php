@@ -28,7 +28,9 @@ it('uses shared sidebar navigation for every team settings page', function () {
     expect(file_get_contents(resource_path('views/livewire/team/danger-zone.blade.php')))
         ->toContain('Delete team')
         ->toContain('status="Permanent"')
-        ->toContain('border-red-300');
+        ->toContain('border-red-300')
+        ->toContain("'Sources' => currentTeam()->sources()")
+        ->not->toContain("'Sources' => currentTeam()->sources,");
     expect(file_get_contents(resource_path('views/livewire/switch-team.blade.php')))
         ->toContain('New team')
         ->toContain('team-switcher-create-expanded')

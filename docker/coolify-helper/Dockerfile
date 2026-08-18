@@ -36,7 +36,7 @@ USER root
 WORKDIR /artifacts
 ENV RAILPACK_VERSION=${RAILPACK_VERSION}
 RUN apk upgrade --no-cache && \
-    apk add --no-cache bash curl git git-lfs openssh-client tar tini
+    apk add --no-cache bash curl git git-lfs openssh-client pigz tar tini
 RUN mkdir -p ~/.docker/cli-plugins
 
 # Install mise (musl build) at the path railpack expects (/tmp/railpack/mise/mise-VERSION).

@@ -68,10 +68,10 @@ class AvatarStorageService
         ]);
     }
 
-    private function disk(string $storageType, ?int $s3StorageId): FilesystemAdapter
+    protected function disk(string $storageType, ?int $s3StorageId): FilesystemAdapter
     {
         if ($storageType !== 's3') {
-            return Storage::disk('local');
+            return Storage::disk('images');
         }
 
         $storage = S3Storage::query()->whereKey($s3StorageId)->where('is_usable', true)->first();
@@ -82,7 +82,7 @@ class AvatarStorageService
         return $storage->filesystem();
     }
 
-    private function compress(UploadedFile $upload): string
+    protected function compress(UploadedFile $upload): string
     {
         $imageInfo = getimagesize($upload->getRealPath());
         if ($imageInfo && $imageInfo['mime'] === 'image/jpeg' && $imageInfo[0] <= 256 && $imageInfo[1] <= 256) {
