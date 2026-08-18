@@ -22,6 +22,7 @@ class OauthSettingSeeder extends Seeder
                 'github',
                 'gitlab',
                 'google',
+                'oidc',
                 'authentik',
                 'infomaniak',
                 'zitadel',
