@@ -398,9 +398,12 @@ html[data-theme="custom"] .animate-spin {
     color: var(--theme-bright-color) !important;
 }
 
-/* Opt out of the brand spinner when the surrounding surface is a selected/neutral control. */
+/* Opt out of the brand spinner when the surrounding surface is a selected/neutral control
+   or a highlighted button, whose accent surface would camouflage a brand-colored spinner. */
 .dark .animate-spin.spinner-current,
-html[data-theme="custom"] .animate-spin.spinner-current {
+html[data-theme="custom"] .animate-spin.spinner-current,
+html[data-theme="custom"] .button-highlighted .animate-spin,
+html[data-theme="custom"] button[isHighlighted] .animate-spin {
     color: inherit !important;
 }
 
@@ -993,8 +996,7 @@ html[data-theme="custom"] {
 }
 
 html[data-theme="custom"] .control-selected,
-html[data-theme="custom"] .logs-viewer-btn-active,
-html[data-theme="custom"] .button-highlighted:hover {
+html[data-theme="custom"] .logs-viewer-btn-active {
     color: var(--color-accent-foreground);
 }
 

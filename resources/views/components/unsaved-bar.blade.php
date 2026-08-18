@@ -67,7 +67,7 @@
             class="button-highlighted flex h-8 items-center gap-2 rounded-lg px-4 text-[13px] font-semibold transition-[transform,background-color] active:scale-[0.98]">
             <span>Save changes</span>
             <kbd
-                class="rounded border border-coollabs/20 bg-coollabs/10 px-1.5 py-0.5 text-[10px] leading-none font-medium text-coollabs-200 dark:border-white/20 dark:bg-white/10 dark:text-white/75">Enter</kbd>
+                class="rounded border border-current/20 bg-current/10 px-1.5 py-0.5 text-[10px] leading-none font-medium text-current">Enter</kbd>
         </button>
     </div>
 </div>
