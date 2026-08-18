@@ -520,10 +520,14 @@ class User extends Authenticatable implements SendsEmail
 
     /**
      * Check if the user has a password set.
-     * OAuth users are created without passwords.
      */
     public function hasPassword(): bool
     {
         return ! empty($this->password);
+    }
+
+    public function requiresPasswordConfirmation(): bool
+    {
+        return $this->hasPassword() && ! $this->hasSsoIdentity();
     }
 }
