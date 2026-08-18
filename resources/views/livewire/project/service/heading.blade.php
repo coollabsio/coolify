@@ -73,6 +73,7 @@
 
         <div class="w-full xl:hidden">
             @if ($service->isDeployable)
+                @can('deploy', $service)
                 <div id="service-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
@@ -165,6 +166,7 @@
                         @endif
                     </div>
                 </div>
+                @endcan
             @else
                 <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
                     class="mb-3 inline-flex" aria-label="Open required environment variables">
@@ -183,6 +185,7 @@
                         <div class="resource-heading-menus shrink-0">
                             <x-services.links :service="$service" />
                         </div>
+                        @can('deploy', $service)
                         <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
                                 x-effect="$dispatch('resource-actions-toggled', { open })"
                                 @click.outside="open = false" @keydown.escape.window="open = false">
@@ -247,6 +250,7 @@
                                     @endif
                                 </div>
                         </div>
+                        @endcan
                     @else
                         <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
                             aria-label="Open required environment variables">

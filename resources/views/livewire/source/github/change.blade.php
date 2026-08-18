@@ -127,7 +127,7 @@
 
                                         @if (!isCloud())
                                             <div class="lg:col-span-2">
-                                                <x-forms.listbox id="isSystemWide" label="Availability" :options="[
+                                                <x-forms.listbox canGate="update" :canResource="$github_app" id="isSystemWide" label="Availability" :options="[
                                                     ['value' => false, 'label' => 'Only this team'],
                                                     ['value' => true, 'label' => 'Every team on this instance'],
                                                 ]"
@@ -161,7 +161,7 @@
                                             label="Client secret" type="password" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="webhookSecret"
                                             label="Webhook secret" type="password" required />
-                                        <x-forms.listbox id="privateKeyId" label="Private key" required
+                                        <x-forms.listbox canGate="update" :canResource="$github_app" id="privateKeyId" label="Private key" required
                                             :options="$privateKeyOptions" :disabled="!auth()->user()->can('update', $github_app)" />
                                     </div>
                                 </x-application.settings-section>

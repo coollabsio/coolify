@@ -22,6 +22,15 @@ test('listbox trigger height matches shared inputs', function () {
         ->toMatch('/\.application-settings-workspace \.listbox-trigger[^}]*height: 2rem;/s');
 });
 
+test('disabled listboxes use the same colors as disabled inputs', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)
+        ->toMatch('/\.listbox-trigger:disabled \{[^}]*background-color: var\(--color-neutral-100\);[^}]*color: var\(--color-neutral-400\);/s')
+        ->toMatch('/\.dark \.listbox-trigger:disabled \{[^}]*background-color: color-mix\(in oklab, var\(--color-white\) 3%, transparent\);[^}]*color: var\(--color-fg-faint\);/s')
+        ->not->toMatch('/\.listbox-trigger:disabled \{[^}]*opacity:/s');
+});
+
 test('listbox component uses shared trigger label truncation', function () {
     $html = Blade::render(<<<'BLADE'
         <x-forms.listbox id="longOption" label="Example"

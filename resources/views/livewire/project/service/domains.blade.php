@@ -93,7 +93,7 @@
                         </x-slot:content>
                         <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
                             {{-- Always show which service receives the domain --}}
-                            <x-forms.listbox label="Service application" id="newServiceApplicationId" required
+                            <x-forms.listbox canGate="update" :canResource="$service" label="Service application" id="newServiceApplicationId" required
                                 helper="Domain will be assigned to this compose service application."
                                 :options="collect($serviceApps)->map(fn ($app) => [
                                     'value' => $app['id'],
@@ -170,7 +170,7 @@
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
                         @if ($hasHttpsDomains)
                             <div class="w-full sm:w-72">
-                                <x-forms.listbox id="forceHttpsRedirects.{{ $appId }}"
+                                <x-forms.listbox canGate="update" :canResource="$service" id="forceHttpsRedirects.{{ $appId }}"
                                     htmlId="service-force-https-{{ $appId }}"
                                     label="Redirect HTTP to HTTPS" onChange="updateForceHttps"
                                     :onChangeArgs="[(int) $appId]"

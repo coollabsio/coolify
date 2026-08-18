@@ -16,9 +16,16 @@
     'tooltip' => true,
     'portal' => false,
     'preserveValue' => false,
+    'canGate' => null,
+    'canResource' => null,
+    'autoDisable' => true,
 ])
 
 @php
+    if ($canGate && $canResource && $autoDisable && ! Illuminate\Support\Facades\Gate::allows($canGate, $canResource)) {
+        $disabled = true;
+    }
+
     $triggerId = ($htmlId ?? $id).'-trigger';
     $panelId = ($htmlId ?? $id).'-panel';
 @endphp

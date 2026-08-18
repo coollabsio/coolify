@@ -71,7 +71,7 @@
 
         @if ($hasHttpsDomains && ! $labelsAreWritable)
             <div class="mt-4 max-w-md">
-                <x-forms.listbox id="isForceHttpsEnabled" label="Redirect HTTP to HTTPS"
+                <x-forms.listbox canGate="update" :canResource="$application" id="isForceHttpsEnabled" label="Redirect HTTP to HTTPS"
                     onChange="updateForceHttps"
                     helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
                     :options="[
@@ -119,7 +119,7 @@
                             </x-slot:content>
                             <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
                                 @if ($isCompose && count($composeServices) > 0)
-                                    <x-forms.listbox label="Service" id="newDomainService" required
+                                    <x-forms.listbox canGate="update" :canResource="$application" label="Service" id="newDomainService" required
                                         :options="collect($composeServices)->map(fn ($serviceName) => [
                                             'value' => $serviceName,
                                             'label' => $serviceName,

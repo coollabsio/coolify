@@ -29,7 +29,7 @@
                     <x-application.settings-section id="server-new-relic-drain-section" title="New Relic"
                         helper="Send logs through the New Relic Log API.">
                         <div class="grid gap-4 lg:grid-cols-3">
-                            <x-forms.listbox id="isLogDrainNewRelicEnabled" label="Status"
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainNewRelicEnabled" label="Status"
                                 onChange="instantSave" :options="[
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
@@ -48,7 +48,7 @@
                     <x-application.settings-section id="server-axiom-drain-section" title="Axiom"
                         helper="Send logs to an Axiom dataset using its ingest API.">
                         <div class="grid gap-4 lg:grid-cols-3">
-                            <x-forms.listbox id="isLogDrainAxiomEnabled" label="Status"
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainAxiomEnabled" label="Status"
                                 onChange="instantSave" :options="[
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
@@ -65,7 +65,7 @@
                     <x-application.settings-section id="server-custom-drain-section" title="Custom Fluent Bit"
                         helper="Provide a custom Fluent Bit output and optional parser configuration.">
                         <div class="mb-4 max-w-sm">
-                            <x-forms.listbox id="isLogDrainCustomEnabled" label="Status"
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCustomEnabled" label="Status"
                                 onChange="instantSave" :options="[
                                     ['value' => false, 'label' => 'Disabled'],
                                     ['value' => true, 'label' => 'Enabled'],
