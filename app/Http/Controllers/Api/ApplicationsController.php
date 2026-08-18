@@ -50,6 +50,7 @@ class ApplicationsController extends Controller
         'docker_images_to_keep',
         'is_gzip_enabled',
         'is_stripprefix_enabled',
+        'is_redirect_permanent',
         'is_raw_compose_deployment_enabled',
         'is_log_drain_enabled',
         'is_gpu_enabled',
@@ -72,6 +73,7 @@ class ApplicationsController extends Controller
         'is_pr_deployments_public_enabled',
         'is_gzip_enabled',
         'is_stripprefix_enabled',
+        'is_redirect_permanent',
         'is_raw_compose_deployment_enabled',
         'is_log_drain_enabled',
         'is_gpu_enabled',
@@ -162,7 +164,9 @@ class ApplicationsController extends Controller
 
         $regenerateLabels = ! $application->wasRecentlyCreated
             && $application->settings->is_container_label_readonly_enabled
-            && (array_key_exists('is_gzip_enabled', $settings) || array_key_exists('is_stripprefix_enabled', $settings));
+            && (array_key_exists('is_gzip_enabled', $settings)
+                || array_key_exists('is_stripprefix_enabled', $settings)
+                || array_key_exists('is_redirect_permanent', $settings));
 
         $application->settings->fill($settings)->save();
 
@@ -382,6 +386,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_redirect_permanent' => ['type' => 'boolean', 'description' => 'Issue www<->non-www redirects as 301 instead of 302.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -576,6 +581,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_redirect_permanent' => ['type' => 'boolean', 'description' => 'Issue www<->non-www redirects as 301 instead of 302.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -770,6 +776,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_redirect_permanent' => ['type' => 'boolean', 'description' => 'Issue www<->non-www redirects as 301 instead of 302.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -935,6 +942,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_redirect_permanent' => ['type' => 'boolean', 'description' => 'Issue www<->non-www redirects as 301 instead of 302.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -1096,6 +1104,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_redirect_permanent' => ['type' => 'boolean', 'description' => 'Issue www<->non-www redirects as 301 instead of 302.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],
@@ -2693,6 +2702,7 @@ class ApplicationsController extends Controller
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
                             'is_gzip_enabled' => ['type' => 'boolean', 'description' => 'Enable gzip compression.'],
                             'is_stripprefix_enabled' => ['type' => 'boolean', 'description' => 'Enable path prefix stripping.'],
+                            'is_redirect_permanent' => ['type' => 'boolean', 'description' => 'Issue www<->non-www redirects as 301 instead of 302.'],
                             'is_raw_compose_deployment_enabled' => ['type' => 'boolean', 'description' => 'Deploy the raw Docker Compose definition.'],
                             'is_log_drain_enabled' => ['type' => 'boolean', 'description' => 'Enable log drain for the application.'],
                             'is_gpu_enabled' => ['type' => 'boolean', 'description' => 'Enable GPU support.'],

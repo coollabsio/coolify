@@ -8,6 +8,10 @@
     $helperText = $isCompose
         ? 'Manage domains for every service in this Docker Compose application.'
         : 'Manage domains for this application.';
+    // The redirect type only matters once a www/non-www direction is actually set.
+    $hasActiveRedirect = $isCompose
+        ? collect($serviceRedirects)->contains(fn ($direction) => $direction !== 'both')
+        : $redirect !== 'both';
 @endphp
 
 <div class="flex flex-col gap-4"
@@ -81,6 +85,19 @@
         <p class="text-sm text-neutral-500 dark:text-fg-dim">
             {{ $helperText }}
         </p>
+
+        @if ($hasActiveRedirect)
+            <div class="mt-4 w-full sm:max-w-xs">
+                <x-forms.listbox id="redirectPermanent" label="Redirect type"
+                    onChange="updateRedirectPermanent"
+                    helper="Permanent (301) is the canonical signal search engines expect. Browsers cache 301 responses for a long time, so visitors may keep following the old redirect after you change direction."
+                    :options="[
+                        ['value' => false, 'label' => 'Temporary (302)'],
+                        ['value' => true, 'label' => 'Permanent (301)'],
+                    ]"
+                    :disabled="! auth()->user()?->can('update', $application) || $labelsAreWritable" />
+            </div>
+        @endif
 
     </x-application.settings-section>
 

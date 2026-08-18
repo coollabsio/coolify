@@ -583,6 +583,14 @@ class Application extends BaseModel
         return data_get($this, 'settings.is_gzip_enabled', true);
     }
 
+    /**
+     * Whether www<->non-www redirects are issued as 301 instead of 302.
+     */
+    public function isRedirectPermanent(): bool
+    {
+        return (bool) data_get($this, 'settings.is_redirect_permanent', false);
+    }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {

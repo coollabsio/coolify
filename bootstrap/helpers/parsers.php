@@ -1359,6 +1359,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                 ? $composeRedirect
                 : 'both';
+            $redirectPermanent = $originalResource->isRedirectPermanent();
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -1375,7 +1376,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             service_name: $serviceName,
                             image: $image,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            is_redirect_permanent: $redirectPermanent
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1391,7 +1393,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             image: $image,
                             predefinedPort: $predefinedPort,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            is_redirect_permanent: $redirectPermanent
                         ));
                         break;
                 }
@@ -1406,7 +1409,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     service_name: $serviceName,
                     image: $image,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    is_redirect_permanent: $redirectPermanent
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
@@ -1420,7 +1424,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     image: $image,
                     predefinedPort: $predefinedPort,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    is_redirect_permanent: $redirectPermanent
                 ));
             }
         }
@@ -2636,6 +2641,7 @@ function serviceParser(Service $resource): Collection
             $redirectDirection = in_array(data_get($originalResource, 'redirect'), ['www', 'non-www', 'both'], true)
                 ? data_get($originalResource, 'redirect')
                 : 'both';
+            $redirectPermanent = (bool) data_get($resource, 'is_redirect_permanent', false);
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -2652,7 +2658,8 @@ function serviceParser(Service $resource): Collection
                             service_name: $serviceName,
                             image: $image,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            is_redirect_permanent: $redirectPermanent
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -2668,7 +2675,8 @@ function serviceParser(Service $resource): Collection
                             image: $image,
                             predefinedPort: $predefinedPort,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            is_redirect_permanent: $redirectPermanent
                         ));
                         break;
                 }
@@ -2683,7 +2691,8 @@ function serviceParser(Service $resource): Collection
                     service_name: $serviceName,
                     image: $image,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    is_redirect_permanent: $redirectPermanent
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $network,
@@ -2697,7 +2706,8 @@ function serviceParser(Service $resource): Collection
                     image: $image,
                     predefinedPort: $predefinedPort,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    is_redirect_permanent: $redirectPermanent
                 ));
             }
         }

@@ -22,6 +22,9 @@ class Domains extends Component
 
     public string $redirect = 'both';
 
+    /** Issue www<->non-www redirects as 301 instead of 302. */
+    public bool $redirectPermanent = false;
+
     /**
      * Per compose-service www/non-www redirect direction.
      * Keys are wire-safe (dots encoded) — use serviceRedirectWireKey().
@@ -100,6 +103,7 @@ class Domains extends Component
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
             'redirect' => 'string|required|in:both,www,non-www',
+            'redirectPermanent' => 'boolean',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
         ];
@@ -151,6 +155,23 @@ class Domains extends Component
         $this->setRedirect();
     }
 
+    /**
+     * Switch www<->non-www redirects between 301 and 302 for every domain of this application.
+     */
+    public function updateRedirectPermanent(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validateOnly('redirectPermanent');
+
+        $this->application->settings->is_redirect_permanent = $this->redirectPermanent;
+        $this->application->settings->save();
+        $this->application->refresh();
+
+        $this->resetDefaultLabels();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Redirect type updated.');
+    }
+
     public function loadDomainState(): void
     {
         $this->application->refresh();
@@ -159,6 +180,7 @@ class Domains extends Component
         $this->isCompose = $this->application->build_pack === 'dockercompose';
         $this->labelsAreWritable = $this->application->settings->is_container_label_readonly_enabled === false;
         $this->redirect = $this->application->redirect ?? 'both';
+        $this->redirectPermanent = $this->application->isRedirectPermanent();
 
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);
