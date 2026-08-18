@@ -35,16 +35,48 @@ class OauthLoginService
 
     private function resolveOauthUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
     {
-        $user = User::whereEmail($email)->first();
-        if ($user) {
+        $provider = $oauthSetting->provider;
+        $providerUserId = (string) $oauthUser->id;
+        $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
+
+        return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $providerUserId, $rawClaims) {
+            $identity = OauthIdentity::where([
+                'provider' => $provider,
+                'issuer' => $provider,
+                'provider_user_id' => $providerUserId,
+            ])->first();
+
+            if ($identity) {
+                $identity->update([
+                    'email' => $email,
+                    'raw_claims' => $rawClaims,
+                    'last_login_at' => now(),
+                ]);
+
+                return $identity->user;
+            }
+
+            $user = User::whereEmail($email)->first();
+            if (! $user) {
+                if (! $this->canCreateUser($oauthSetting)) {
+                    throw new HttpException(403, 'Registration is disabled');
+                }
+
+                $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
+            }
+
+            OauthIdentity::create([
+                'user_id' => $user->id,
+                'provider' => $provider,
+                'issuer' => $provider,
+                'provider_user_id' => $providerUserId,
+                'email' => $email,
+                'raw_claims' => $rawClaims,
+                'last_login_at' => now(),
+            ]);
+
             return $user;
-        }
-
-        if (! $this->canCreateUser($oauthSetting)) {
-            throw new HttpException(403, 'Registration is disabled');
-        }
-
-        return $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
+        });
     }
 
     private function resolveOidcUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User

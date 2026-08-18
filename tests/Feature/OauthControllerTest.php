@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\InstanceSettings;
+use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -50,6 +51,43 @@ it('logs in an existing user when the oauth provider returns a mixed-case email'
     $response->assertRedirect('/');
     $this->assertAuthenticatedAs($user);
     expect(User::count())->toBe(1);
+    expect(OauthIdentity::where([
+        'user_id' => $user->id,
+        'provider' => 'google',
+        'provider_user_id' => 'google-user-id',
+    ])->exists())->toBeTrue();
+});
+
+it('never moves an existing oauth identity when the provider email changes', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    $identityOwner = User::factory()->create(['email' => 'old@example.com']);
+    $otherUser = User::factory()->create(['email' => 'new@example.com']);
+    $identity = OauthIdentity::create([
+        'user_id' => $identityOwner->id,
+        'provider' => 'google',
+        'issuer' => 'google',
+        'provider_user_id' => 'google-user-id',
+        'email' => 'old@example.com',
+    ]);
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'new@example.com',
+        'name' => 'Example User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $this->get(route('auth.callback', 'google'))->assertRedirect('/');
+
+    $this->assertAuthenticatedAs($identityOwner);
+    expect($identity->refresh()->user_id)->toBe($identityOwner->id)
+        ->and($identity->email)->toBe('new@example.com')
+        ->and($identity->user_id)->not->toBe($otherUser->id);
 });
 
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
