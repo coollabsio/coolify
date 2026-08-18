@@ -95,9 +95,8 @@ class InstallDocker
                 "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
                 'mv /etc/docker/daemon.json.appended /etc/docker/daemon.json',
                 "echo 'Restarting Docker Engine...'",
-                'systemctl enable docker >/dev/null 2>&1 || true',
-                'systemctl restart docker',
             ]);
+            $command = $command->merge($this->getDockerServiceCommands($supported_os_type->contains('alpine')));
             if ($server->isSwarm()) {
                 $command = $command->merge([
                     'docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true',
@@ -159,10 +158,23 @@ class InstallDocker
     private function getAlpineDockerInstallCommand(): string
     {
         return 'apk update && '.
-            'apk add docker docker-cli-compose && '.
-            'mkdir -p /etc/docker && '.
-            'rc-update add docker default && '.
-            'service docker start';
+            'apk add docker docker-cli-buildx docker-cli-compose && '.
+            'mkdir -p /etc/docker';
+    }
+
+    private function getDockerServiceCommands(bool $usesOpenRc): array
+    {
+        if ($usesOpenRc) {
+            return [
+                'rc-update add docker default',
+                'rc-service docker restart',
+            ];
+        }
+
+        return [
+            'systemctl enable docker >/dev/null 2>&1 || true',
+            'systemctl restart docker',
+        ];
     }
 
     private function getGenericDockerInstallCommand(): string

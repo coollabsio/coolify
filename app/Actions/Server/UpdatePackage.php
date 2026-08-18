@@ -60,7 +60,7 @@ class UpdatePackage
                     break;
                 case 'apk':
                     $commandAll = 'apk update && apk upgrade';
-                    $commandInstall = 'apk upgrade '.$package;
+                    $commandInstall = 'apk upgrade '.$sanitizedPackage;
                     break;
                 default:
                     return [
