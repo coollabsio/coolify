@@ -37,9 +37,16 @@ services:
       - BASE_URL=$SERVICE_URL_BUGSINK
       - DATABASE_URL=mysql://${SERVICE_USER_MYSQL}:$SERVICE_PASSWORD_MYSQL@mysql:3306/${MYSQL_DATABASE:-bugsink}
       - BEHIND_HTTPS_PROXY=True
-    depends_on:
-      mysql:
-        condition: service_healthy
+      - SITE_TITLE=${SITE_TITLE:-Bugsink}
+      - TIME_ZONE=${TIME_ZONE:-UTC}
+      - PHONEHOME=${PHONEHOME:-False}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-False}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/\").raise_for_status()'"]
       interval: 5s
