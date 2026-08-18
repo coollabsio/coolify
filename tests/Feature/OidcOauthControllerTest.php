@@ -6,7 +6,11 @@ use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\Auth\OauthLoginService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Once;
 use Laravel\Socialite\Facades\Socialite;
@@ -70,6 +74,44 @@ it('logs in a user through an existing oidc identity', function () {
     $response = $this->get(route('auth.callback', 'oidc'));
 
     $response->assertRedirect('/');
+    $this->assertAuthenticatedAs($user);
+});
+
+it('continues oidc login when another request creates the identity first', function () {
+    $user = User::factory()->create(['email' => 'race@example.com']);
+    $eventName = 'eloquent.creating: '.OauthIdentity::class;
+
+    Event::listen($eventName, function (OauthIdentity $identity): void {
+        $attributes = $identity->getAttributes();
+
+        DB::afterRollBack(fn () => DB::table('oauth_identities')->insert($attributes));
+
+        throw new UniqueConstraintViolationException(
+            DB::getDefaultConnection(),
+            'insert into oauth_identities',
+            [],
+            new PDOException('duplicate identity'),
+        );
+    });
+
+    try {
+        $resolvedUser = app(OauthLoginService::class)->login('oidc', (new OidcUser)->setRaw([
+            'iss' => 'https://idp.example.com',
+            'sub' => 'oidc-race-id',
+            'email' => 'race@example.com',
+            'email_verified' => true,
+            'name' => 'Race User',
+        ])->map([
+            'id' => 'oidc-race-id',
+            'name' => 'Race User',
+            'email' => 'race@example.com',
+        ]), OauthSetting::where('provider', 'oidc')->firstOrFail());
+    } finally {
+        Event::forget($eventName);
+    }
+
+    expect($resolvedUser->is($user))->toBeTrue()
+        ->and(OauthIdentity::where('provider_user_id', 'oidc-race-id')->count())->toBe(1);
     $this->assertAuthenticatedAs($user);
 });
 

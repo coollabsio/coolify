@@ -7,6 +7,7 @@ use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -37,50 +38,59 @@ class OauthLoginService
     {
         $provider = $oauthSetting->provider;
         $providerUserId = $oauthUser->id ?? null;
-        if (! is_scalar($providerUserId) || trim((string) $providerUserId) === '') {
+        if (
+            (! is_string($providerUserId) && ! is_int($providerUserId))
+            || (is_string($providerUserId) && trim($providerUserId) === '')
+        ) {
             throw new HttpException(403, 'OAuth provider did not return a valid user ID');
         }
         $providerUserId = (string) $providerUserId;
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
 
-        return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $providerUserId, $rawClaims) {
-            $identity = OauthIdentity::where([
-                'provider' => $provider,
-                'issuer' => $provider,
-                'provider_user_id' => $providerUserId,
-            ])->first();
+        $identityKey = [
+            'provider' => $provider,
+            'issuer' => $provider,
+            'provider_user_id' => $providerUserId,
+        ];
 
-            if ($identity) {
-                $identity->update([
+        try {
+            return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $providerUserId, $rawClaims, $identityKey): User {
+                $identity = OauthIdentity::where($identityKey)->first();
+
+                if ($identity) {
+                    $identity->update([
+                        'email' => $email,
+                        'raw_claims' => $rawClaims,
+                        'last_login_at' => now(),
+                    ]);
+
+                    return $identity->user;
+                }
+
+                $user = User::whereEmail($email)->first();
+                if (! $user) {
+                    if (! $this->canCreateUser($oauthSetting)) {
+                        throw new HttpException(403, 'Registration is disabled');
+                    }
+
+                    $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
+                }
+
+                OauthIdentity::create([
+                    'user_id' => $user->id,
+                    'provider' => $provider,
+                    'issuer' => $provider,
+                    'provider_user_id' => $providerUserId,
                     'email' => $email,
                     'raw_claims' => $rawClaims,
                     'last_login_at' => now(),
                 ]);
 
-                return $identity->user;
-            }
-
-            $user = User::whereEmail($email)->first();
-            if (! $user) {
-                if (! $this->canCreateUser($oauthSetting)) {
-                    throw new HttpException(403, 'Registration is disabled');
-                }
-
-                $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
-            }
-
-            OauthIdentity::create([
-                'user_id' => $user->id,
-                'provider' => $provider,
-                'issuer' => $provider,
-                'provider_user_id' => $providerUserId,
-                'email' => $email,
-                'raw_claims' => $rawClaims,
-                'last_login_at' => now(),
-            ]);
-
-            return $user;
-        });
+                return $user;
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            return OauthIdentity::where($identityKey)->first()?->user ?? throw $exception;
+        }
     }
 
     private function resolveOidcUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
@@ -104,53 +114,59 @@ class OauthLoginService
 
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
 
-        return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $issuer, $subject, $emailVerified, $rawClaims) {
-            $identity = OauthIdentity::where([
-                'provider' => 'oidc',
-                'issuer' => $issuer,
-                'provider_user_id' => $subject,
-            ])->first();
+        $identityKey = [
+            'provider' => 'oidc',
+            'issuer' => $issuer,
+            'provider_user_id' => $subject,
+        ];
 
-            if ($identity) {
-                $identity->update([
+        try {
+            return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $issuer, $subject, $emailVerified, $rawClaims, $identityKey): User {
+                $identity = OauthIdentity::where($identityKey)->first();
+
+                if ($identity) {
+                    $identity->update([
+                        'email' => $email,
+                        'raw_claims' => $rawClaims,
+                        'last_login_at' => now(),
+                    ]);
+
+                    return $identity->user;
+                }
+
+                $user = User::whereEmail($email)->first();
+
+                // Linking a new OIDC identity to an existing local account by email
+                // is account takeover unless the provider attests the email. This
+                // guard is independent of the require_email_verified toggle, which
+                // only governs the broader login flow.
+                if ($user && ! $emailVerified) {
+                    throw new HttpException(403, 'OIDC provider must verify the email address before linking to an existing account');
+                }
+
+                if (! $user) {
+                    if (! $this->canCreateUser($oauthSetting)) {
+                        throw new HttpException(403, 'Registration is disabled');
+                    }
+
+                    $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
+                }
+
+                OauthIdentity::create([
+                    'user_id' => $user->id,
+                    'provider' => 'oidc',
+                    'issuer' => $issuer,
+                    'provider_user_id' => $subject,
                     'email' => $email,
                     'raw_claims' => $rawClaims,
                     'last_login_at' => now(),
                 ]);
 
-                return $identity->user;
-            }
-
-            $user = User::whereEmail($email)->first();
-
-            // Linking a new OIDC identity to an existing local account by email
-            // is account takeover unless the provider attests the email. This
-            // guard is independent of the require_email_verified toggle, which
-            // only governs the broader login flow.
-            if ($user && ! $emailVerified) {
-                throw new HttpException(403, 'OIDC provider must verify the email address before linking to an existing account');
-            }
-
-            if (! $user) {
-                if (! $this->canCreateUser($oauthSetting)) {
-                    throw new HttpException(403, 'Registration is disabled');
-                }
-
-                $user = $this->createUser($oauthUser->name ?: $email, $email, $oauthSetting);
-            }
-
-            OauthIdentity::create([
-                'user_id' => $user->id,
-                'provider' => 'oidc',
-                'issuer' => $issuer,
-                'provider_user_id' => $subject,
-                'email' => $email,
-                'raw_claims' => $rawClaims,
-                'last_login_at' => now(),
-            ]);
-
-            return $user;
-        });
+                return $user;
+            });
+        } catch (UniqueConstraintViolationException $exception) {
+            return OauthIdentity::where($identityKey)->first()?->user ?? throw $exception;
+        }
     }
 
     private function canCreateUser(OauthSetting $oauthSetting): bool

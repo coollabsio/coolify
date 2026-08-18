@@ -5,7 +5,10 @@ use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\User;
 use App\Services\Auth\OauthLoginService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Once;
 use Laravel\Socialite\Facades\Socialite;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -92,6 +95,38 @@ it('never moves an existing oauth identity when the provider email changes', fun
         ->and($identity->user_id)->not->toBe($otherUser->id);
 });
 
+it('continues oauth login when another request creates the identity first', function () {
+    $user = User::factory()->create(['email' => 'race@example.com']);
+    $eventName = 'eloquent.creating: '.OauthIdentity::class;
+
+    Event::listen($eventName, function (OauthIdentity $identity): void {
+        $attributes = $identity->getAttributes();
+
+        DB::afterRollBack(fn () => DB::table('oauth_identities')->insert($attributes));
+
+        throw new UniqueConstraintViolationException(
+            DB::getDefaultConnection(),
+            'insert into oauth_identities',
+            [],
+            new PDOException('duplicate identity'),
+        );
+    });
+
+    try {
+        $resolvedUser = app(OauthLoginService::class)->login('google', (object) [
+            'email' => 'race@example.com',
+            'name' => 'Race User',
+            'id' => 'google-race-id',
+        ], OauthSetting::where('provider', 'google')->firstOrFail());
+    } finally {
+        Event::forget($eventName);
+    }
+
+    expect($resolvedUser->is($user))->toBeTrue()
+        ->and(OauthIdentity::where('provider_user_id', 'google-race-id')->count())->toBe(1);
+    $this->assertAuthenticatedAs($user);
+});
+
 it('rejects oauth logins when the provider does not return an email address', function (?string $providerEmail) {
     config()->set('app.maintenance.driver', 'file');
     InstanceSettings::firstOrCreate([
@@ -150,4 +185,7 @@ it('rejects oauth logins when the provider does not return a valid user id', fun
     'missing id' => ['missing'],
     'blank id' => ['   '],
     'non-scalar id' => [[]],
+    'true id' => [true],
+    'false id' => [false],
+    'float id' => [1.0],
 ]);
