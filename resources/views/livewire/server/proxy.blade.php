@@ -61,10 +61,10 @@
                     helper="Control generated labels and requests that do not match a running resource.">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.listbox id="generateExactLabels" label="Generated labels"
-                            helper="Generate labels only for the selected proxy implementation."
+                            helper="<ul class='list-disc space-y-1 pl-4'><li><span class='font-semibold'>All supported proxies:</span> Traefik and Caddy labels are both generated, so switching the proxy keeps routing working.</li><li><span class='font-semibold'>Active proxy only:</span> generates fewer labels, but all resources must be redeployed to become accessible again after each proxy switch.</li></ul>"
                             onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Keep compatible labels'],
-                                ['value' => true, 'label' => 'Generate exact proxy labels'],
+                                ['value' => false, 'label' => 'Labels for all supported proxies'],
+                                ['value' => true, 'label' => 'Labels for the active proxy only'],
                             ]" />
                         <x-forms.listbox id="redirectEnabled" label="Unknown requests"
                             helper="Override the default 503 response for unknown hosts and stopped services."
