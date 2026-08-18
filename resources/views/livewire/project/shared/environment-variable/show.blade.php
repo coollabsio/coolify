@@ -83,7 +83,10 @@
                 @endif
             @endforeach
         @endif
-        <div class="justify-self-end">
+        <div class="flex items-center gap-0.5 justify-self-end">
+            @if (! $isLocked && ! $isValueHidden)
+                <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
+            @endif
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
                 wireOpen="editorOpen">
