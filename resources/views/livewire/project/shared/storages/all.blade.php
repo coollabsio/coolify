@@ -163,6 +163,8 @@
                                             buttonTitle="Remove" submitAction="clearHostPath({{ $id }})"
                                             :actions="[
                                                 'Are you sure you want to remove the source path?',
+                                                'The next deployment will use a named Docker volume instead.',
+                                                'Data from the existing host directory will not be copied to the named volume.',
                                                 'Use a Directory Mount when you need to mount a host directory.',
                                             ]" />
                                     </div>

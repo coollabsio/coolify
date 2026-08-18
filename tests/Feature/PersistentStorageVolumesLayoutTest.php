@@ -209,10 +209,14 @@ it('renders volumes as a data table with shared column headers', function () {
 
 it('keeps bind mount source paths out of the add volume form', function () {
     $storageView = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+    $volumesView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
 
     expect($storageView)
         ->not->toContain('id="host_path"')
-        ->not->toContain('Swarm Mode detected');
+        ->not->toContain('Swarm Mode detected')
+        ->and($volumesView)
+        ->toContain('The next deployment will use a named Docker volume instead.')
+        ->toContain('Data from the existing host directory will not be copied to the named volume.');
 });
 
 it('creates named volumes without a host path in swarm mode', function () {
