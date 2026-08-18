@@ -134,8 +134,13 @@ test('MCP endpoint lists tools for an authenticated token', function () {
         'get_database',
         'list_services',
         'get_service',
+        'get_project',
+        'list_deployments',
+        'get_logs',
+        'list_env_keys',
     );
     expect($toolNames)->not->toContain('get_resource_status');
+    expect($toolNames)->toContain('coolify_help', 'control', 'deploy');
 });
 
 test('list_projects returns summary + pagination scoped to the token team', function () {
@@ -195,14 +200,29 @@ test('get_infrastructure_overview returns counts', function () {
 
     $body = mcpToolJson($response);
     expect($body)->toHaveKey('data');
-    expect($body['data'])->toHaveKeys(['coolify_version', 'servers', 'projects', 'counts']);
+    expect($body['data'])->toHaveKeys(['coolify_version', 'servers', 'projects', 'counts', 'health_hints']);
     expect($body['data']['counts']['projects'])->toBe(2);
     expect($body['data']['projects'])->toHaveCount(2);
     expect($body['data']['projects'][0])->toHaveKey('counts');
+    expect($body['data']['projects'][0]['counts'])->toHaveKeys(['applications', 'services', 'databases']);
+    expect($body['data']['health_hints'])->toHaveKeys([
+        'unreachable_servers',
+        'applications_not_running',
+        'services_not_running',
+        'databases_not_running',
+        'next',
+    ]);
 });
 
 test('get_server scrubs sensitive nested data and exposes connection_timeout', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('last_saved_proxy_configuration', <<<'YAML'
+services:
+  traefik:
+    environment:
+      CF_DNS_API_TOKEN: plaintext-cloudflare-token
+YAML);
+    $server->saveQuietly();
     // creating hook auto-generates a sentinel_token; bump connection_timeout
     // via saveQuietly to avoid triggering restartSentinel.
     $server->settings->forceFill(['connection_timeout' => 42])->saveQuietly();
@@ -216,6 +236,9 @@ test('get_server scrubs sensitive nested data and exposes connection_timeout', f
     $raw = json_encode($body);
 
     expect($raw)->not->toContain('sentinel_token');
+    expect($raw)->not->toContain('last_saved_proxy_configuration');
+    expect($raw)->not->toContain('CF_DNS_API_TOKEN');
+    expect($raw)->not->toContain('plaintext-cloudflare-token');
     expect($raw)->not->toContain('"team_id"');
     expect($raw)->not->toContain('"private_key_id"');
     expect($body['data']['connection_timeout'])->toBe(42);

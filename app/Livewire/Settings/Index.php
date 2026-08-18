@@ -20,6 +20,9 @@ class Index extends Component
     #[Validate('nullable|string|max:255|url')]
     public ?string $fqdn = null;
 
+    #[Validate('boolean')]
+    public bool $is_dashboard_force_https_enabled = true;
+
     #[Validate('required|integer|min:1025|max:65535')]
     public int $public_port_min;
 
@@ -68,6 +71,7 @@ class Index extends Component
             $this->server = Server::findOrFail(0);
         }
         $this->fqdn = $this->settings->fqdn;
+        $this->is_dashboard_force_https_enabled = $this->settings->is_dashboard_force_https_enabled;
         $this->public_port_min = $this->settings->public_port_min;
         $this->public_port_max = $this->settings->public_port_max;
         $this->instance_name = $this->settings->instance_name;
@@ -91,6 +95,7 @@ class Index extends Component
         $this->authorize('update', $this->settings);
         $this->validate();
         $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
+        $this->settings->is_dashboard_force_https_enabled = $this->is_dashboard_force_https_enabled;
         $this->settings->public_port_min = $this->public_port_min;
         $this->settings->public_port_max = $this->public_port_max;
         $this->settings->instance_name = $this->instance_name;
@@ -141,7 +146,9 @@ class Index extends Component
 
             if ($this->settings->is_dns_validation_enabled && $this->fqdn && $this->server) {
                 if (! validateDNSEntry($this->fqdn, $this->server)) {
-                    $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                    $target = serverDnsTargetIp($this->server) ?? $this->server->ip;
+                    $guidance = dnsMismatchGuidanceMessage($target, $target);
+                    $this->dispatch('error', "Validating DNS failed.<br><br>{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $error_show = true;
                 }
             }

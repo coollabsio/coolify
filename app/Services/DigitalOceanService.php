@@ -28,7 +28,7 @@ class DigitalOceanService
                 }
 
                 return $attempt * 100;
-            })
+            }, throw: false)
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {

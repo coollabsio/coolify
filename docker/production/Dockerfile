@@ -2,9 +2,9 @@
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-05-21T01-59-54Z
+ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2025.7.0
+ARG CLOUDFLARED_VERSION=2026.7.3
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
@@ -76,7 +76,10 @@ ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
+ARG COOLIFY_VERSION
 ARG CI=true
+
+ENV COOLIFY_VERSION=${COOLIFY_VERSION}
 
 WORKDIR /var/www/html
 

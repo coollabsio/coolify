@@ -127,11 +127,52 @@ class SshMultiplexingHelper
 
         $scpCommand .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'), isScp: true);
 
+        // Upload: local source -> remote dest
         if ($server->isIpv6()) {
             return $scpCommand.escapeshellarg($source).' '.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($dest);
         }
 
         return $scpCommand.escapeshellarg($source).' '.self::escapedUserAtHost($server).':'.escapeshellarg($dest);
+    }
+
+    /**
+     * Build an SCP command that downloads a remote file onto the Coolify host.
+     */
+    public static function generateScpDownloadCommand(Server $server, string $remoteSource, string $localDest): string
+    {
+        $sshConfig = self::serverSshConfiguration($server);
+        $sshKeyLocation = $sshConfig['sshKeyLocation'];
+        $scpCommand = 'timeout '.config('constants.ssh.command_timeout').' scp ';
+
+        if ($server->isIpv6()) {
+            $scpCommand .= '-6 ';
+        }
+
+        if (self::isMultiplexingEnabled()) {
+            try {
+                if (self::ensureMultiplexedConnection($server)) {
+                    $scpCommand .= self::multiplexingOptions($server);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('SSH multiplexing failed for SCP download, falling back to non-multiplexed connection', [
+                    'server' => $server->name ?? $server->ip,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if (data_get($server, 'settings.is_cloudflare_tunnel')) {
+            $scpCommand .= '-o ProxyCommand="cloudflared access ssh --hostname %h" ';
+        }
+
+        $scpCommand .= self::getCommonSshOptions($server, $sshKeyLocation, self::getConnectionTimeout($server), config('constants.ssh.server_interval'), isScp: true);
+
+        // Download: remote source -> local dest
+        if ($server->isIpv6()) {
+            return $scpCommand.escapeshellarg($server->user).'@['.escapeshellarg($server->ip).']:'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
+        }
+
+        return $scpCommand.self::escapedUserAtHost($server).':'.escapeshellarg($remoteSource).' '.escapeshellarg($localDest);
     }
 
     public static function generateSshCommand(Server $server, string $command, bool $disableMultiplexing = false, ?int $commandTimeout = null): string
@@ -169,10 +210,16 @@ class SshMultiplexingHelper
 
         $delimiter = base64_encode(Hash::make($command));
         $command = str_replace($delimiter, '', $command);
+        $remoteShellCommand = self::remoteShellCommand();
 
-        return $sshCommand.self::escapedUserAtHost($server)." 'bash -se' << \\$delimiter".PHP_EOL
+        return $sshCommand.self::escapedUserAtHost($server)." '{$remoteShellCommand}' << \\$delimiter".PHP_EOL
             .$command.PHP_EOL
             .$delimiter;
+    }
+
+    private static function remoteShellCommand(): string
+    {
+        return 'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi';
     }
 
     public static function getConnectionTimeout(Server $server): int

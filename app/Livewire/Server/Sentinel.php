@@ -114,9 +114,10 @@ class Sentinel extends Component
 
                     return;
                 }
-                $this->isSentinelEnabled = true;
                 $customImage = isDev() ? $this->sentinelCustomDockerImage : null;
                 StartSentinel::run($this->server, true, null, $customImage);
+                $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
+                $this->isSentinelEnabled = true;
             } else {
                 $this->isSentinelEnabled = false;
                 $this->isMetricsEnabled = false;
@@ -145,7 +146,7 @@ class Sentinel extends Component
     {
         try {
             $this->syncData(true);
-            $this->dispatch('success', 'Sentinel settings updated.');
+            $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

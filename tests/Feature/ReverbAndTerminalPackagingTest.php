@@ -56,6 +56,7 @@ it('removes the dedicated realtime service from bundled compose files', function
     'production compose' => ['docker-compose.prod.yml', true],
     'development compose' => ['docker-compose.dev.yml', true],
     'maxio development compose' => ['docker-compose-maxio.dev.yml', true],
+    'multi-instance development compose' => ['docker-compose.dev-multi.yml', true],
     'windows compose' => ['docker-compose.windows.yml', true],
 ]);
 

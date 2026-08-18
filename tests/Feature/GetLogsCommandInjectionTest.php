@@ -3,6 +3,7 @@
 use App\Livewire\Project\Shared\GetLogs;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -10,6 +11,8 @@ use App\Models\Team;
 use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Process\FakeProcessResult;
+use Illuminate\Support\Facades\Process;
 use Livewire\Attributes\Locked;
 use Livewire\Livewire;
 
@@ -20,7 +23,11 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
     $this->user->teams()->attach($this->team, ['role' => 'owner']);
 
-    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+    $this->server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $privateKey->id,
+    ]);
     // Server::created auto-creates a StandaloneDocker, reuse it
     $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
@@ -67,6 +74,38 @@ describe('GetLogs locked properties', function () {
 });
 
 describe('GetLogs Livewire action validation', function () {
+    test('getLogs marks ANSI-colored output truncated based on raw bytes', function () {
+        $this->server->settings->fill([
+            'is_reachable' => true,
+            'is_usable' => true,
+            'force_disabled' => false,
+        ])->save();
+        $server = Server::with('settings')->findOrFail($this->server->id);
+        $output = "\e[31m".str_repeat('a', GetLogs::MAX_DISPLAY_SIZE_BYTES - 4);
+
+        expect(strlen($output))->toBe(GetLogs::MAX_DISPLAY_SIZE_BYTES + 1);
+
+        Process::shouldReceive('timeout')->once()->andReturnSelf();
+        Process::shouldReceive('run')->andReturnUsing(function (string $command, ?callable $callback = null) use ($output): FakeProcessResult {
+            if ($callback) {
+                $callback('out', $output);
+            }
+
+            return new FakeProcessResult(command: $command);
+        });
+
+        $component = new GetLogs;
+        $component->server = $server;
+        $component->resource = $this->application;
+        $component->container = 'test-container';
+        $component->showTimeStamps = false;
+        $component->getLogs(true);
+
+        expect($component->outputs)
+            ->toContain('[... Output truncated at 5MB limit ...]')
+            ->not->toContain("\e[31m");
+    });
+
     test('getLogs rejects invalid container name', function () {
         // Make server functional by setting settings directly
         $this->server->settings->fill([
@@ -75,7 +114,7 @@ describe('GetLogs Livewire action validation', function () {
             'force_disabled' => false,
         ])->save();
         // Reload server with fresh settings to ensure casted values
-        $server = Server::with('settings')->find($this->server->id);
+        $server = Server::with('settings')->findOrFail($this->server->id);
 
         Livewire::test(GetLogs::class, [
             'server' => $server,
@@ -105,7 +144,7 @@ describe('GetLogs Livewire action validation', function () {
             'is_usable' => true,
             'force_disabled' => false,
         ])->save();
-        $server = Server::with('settings')->find($this->server->id);
+        $server = Server::with('settings')->findOrFail($this->server->id);
 
         Livewire::test(GetLogs::class, [
             'server' => $server,

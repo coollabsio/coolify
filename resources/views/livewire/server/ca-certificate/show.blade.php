@@ -2,91 +2,88 @@
     <x-slot:title>
         {{ data_get_str($server, 'name')->limit(10) }} > CA Certificate | Coolify
     </x-slot>
+
     <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="ca-certificate" />
-        <div class="flex flex-col gap-4">
-            <div class="flex items-center gap-2">
-                <h2>CA Certificate</h2>
-                @can('update', $server)
-                    <div class="flex gap-2">
-                        <x-modal-confirmation title="Confirm changing of CA Certificate?" buttonTitle="Save"
-                            submitAction="saveCaCertificate" :actions="[
-                                'This will overwrite the existing CA certificate at /data/coolify/ssl/coolify-ca.crt with your custom CA certificate.',
-                                'This will regenerate all SSL certificates for databases on this server and it will sign them with your custom CA.',
-                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates signed with your new CA certificate.',
-                                'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
-                            ]"
-                            confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
-                            step3ButtonText="Save Certificate">
-                        </x-modal-confirmation>
-                        <x-modal-confirmation title="Confirm Regenerate Certificate?" buttonTitle="Regenerate "
-                            submitAction="regenerateCaCertificate" :actions="[
-                                'This will generate a new CA certificate at /data/coolify/ssl/coolify-ca.crt and replace the existing one.',
-                                'This will regenerate all SSL certificates for databases on this server and it will sign them with the new CA certificate.',
-                                'You must manually redeploy all your databases on this server so that they use the new SSL certificates signed with the new CA certificate.',
-                                'Because of caching, you probably also need to redeploy all your resources on this server that are using this CA certificate.',
-                            ]"
-                            confirmationText="/data/coolify/ssl/coolify-ca.crt" shortConfirmationLabel="CA Certificate Path"
-                            step3ButtonText="Regenerate Certificate">
-                        </x-modal-confirmation>
-                    </div>
-                @endcan
-            </div>
-            <div class="space-y-4">
-                <div class="text-sm">
-                    <p class="font-medium mb-2">Recommended Configuration:</p>
-                    <ul class="list-disc pl-5 space-y-1">
-                        <li>Mount this CA certificate of Coolify into all containers that need to connect to one of
-                            your databases over SSL. You can see and copy the bind mount below.</li>
-                        <li>Read more when and why this is needed <a class="underline dark:text-white"
-                                href="https://coolify.io/docs/databases/ssl" target="_blank">here</a>.</li>
-                    </ul>
+
+        <div class="application-settings-form flex w-full flex-col gap-6">
+            <x-application.settings-section id="server-ca-overview-section" title="CA certificate"
+                helper="Manage the certificate authority used to sign database certificates on this server.">
+                <x-slot:actions>
+                    @if ($certificateValidUntil)
+                        <x-status-badge
+                            :status="now()->gt($certificateValidUntil)
+                                ? 'Expired'
+                                : (now()->addDays(30)->gt($certificateValidUntil) ? 'Expiring soon' : 'Valid')"
+                            :type="now()->gt($certificateValidUntil) || now()->addDays(30)->gt($certificateValidUntil)
+                                ? 'error'
+                                : 'success'" />
+                    @endif
+                </x-slot:actions>
+
+                <x-callout type="info" title="Using this certificate">
+                    Mount the CA certificate into containers that connect to databases over SSL. Re-deploy affected
+                    databases and resources after replacing or regenerating it.
+                    <a class="font-medium underline" href="https://coolify.io/docs/databases/ssl" target="_blank">
+                        Read the SSL guide.
+                    </a>
+                </x-callout>
+
+                <div class="mt-4">
+                    <p class="mb-1.5 text-xs font-medium text-neutral-500 dark:text-fg-dim">Read-only bind mount</p>
+                    <x-forms.copy-button
+                        text="- /data/coolify/ssl/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro" />
                 </div>
-                <div class="relative">
-                    <x-forms.copy-button text="- /data/coolify/ssl/coolify-ca.crt:/etc/ssl/certs/coolify-ca.crt:ro" />
-                </div>
-            </div>
-            <div>
-                <div class="flex items-center justify-between mb-2">
+            </x-application.settings-section>
+
+            <x-application.settings-section id="server-ca-content-section" title="Certificate content"
+                helper="Review or replace the PEM certificate stored on this server.">
+                <x-slot:actions>
                     <div class="flex items-center gap-2">
-                        <span class="text-sm">CA Certificate</span>
-                        @if ($certificateValidUntil)
-                            <span class="text-sm">(Valid until:
-                                @if (now()->gt($certificateValidUntil))
-                                    <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} -
-                                        Expired)</span>
-                                @elseif(now()->addDays(30)->gt($certificateValidUntil))
-                                    <span class="text-red-500">{{ $certificateValidUntil->format('d.m.Y H:i:s') }} -
-                                        Expiring soon)</span>
-                                @else
-                                    <span>{{ $certificateValidUntil->format('d.m.Y H:i:s') }})</span>
-                                @endif
-                            </span>
-                        @endif
+                        @can('view', $server)
+                            <x-forms.button wire:click="toggleCertificate" type="button">
+                                {{ $showCertificate ? 'Hide certificate' : 'Show certificate' }}
+                            </x-forms.button>
+                        @endcan
+                        @can('update', $server)
+                            <x-modal-confirmation title="Confirm changing of CA Certificate?"
+                                buttonTitle="Save certificate" submitAction="saveCaCertificate" :actions="[
+                                    'This overwrites /data/coolify/ssl/coolify-ca.crt with your custom certificate.',
+                                    'Database certificates on this server will be regenerated and signed with the custom CA.',
+                                    'You must redeploy affected databases and resources.',
+                                ]" confirmationText="/data/coolify/ssl/coolify-ca.crt"
+                                shortConfirmationLabel="CA Certificate Path"
+                                step3ButtonText="Save Certificate" />
+                            <x-modal-confirmation title="Confirm Regenerate Certificate?"
+                                buttonTitle="Regenerate" submitAction="regenerateCaCertificate" :actions="[
+                                    'This replaces the current CA certificate with a newly generated certificate.',
+                                    'Database certificates on this server will be regenerated and signed with the new CA.',
+                                    'You must redeploy affected databases and resources.',
+                                ]" confirmationText="/data/coolify/ssl/coolify-ca.crt"
+                                shortConfirmationLabel="CA Certificate Path"
+                                step3ButtonText="Regenerate Certificate" />
+                        @endcan
                     </div>
-                    @can('view', $server)
-                        <x-forms.button wire:click="toggleCertificate" type="button" class="py-1! px-2! text-sm">
-                            {{ $showCertificate ? 'Hide' : 'Show' }}
-                        </x-forms.button>
-                    @endcan
-                </div>
+                </x-slot:actions>
+
                 @if ($showCertificate)
-                    <textarea class="w-full h-[370px] input" wire:model="certificateContent"
-                        placeholder="Paste or edit CA certificate content here..."></textarea>
+                    <x-forms.textarea canGate="update" :canResource="$server" id="certificateContent"
+                        rows="15" label="PEM certificate"
+                        placeholder="Paste or edit CA certificate content here…" />
                 @else
-                    <div class="w-full h-[370px] input">
-                        <div class="h-full flex flex-col items-center justify-center text-gray-300">
-                            <div class="mb-2">
-                                ━━━━━━━━ CERTIFICATE CONTENT ━━━━━━━━
-                            </div>
-                            <div class="text-sm">
-                                Click "Show" to view or edit
-                            </div>
-                        </div>
+                    <div
+                        class="flex min-h-72 flex-col items-center justify-center rounded-lg bg-neutral-100/70 px-6 text-center ring-1 ring-neutral-200 dark:bg-black/20 dark:ring-white/[0.08]">
+                        <x-reicon name="keys" class="size-8 text-neutral-300 dark:text-fg-faint" />
+                        <p class="mt-3 text-sm font-medium text-neutral-950 dark:text-fg">Certificate hidden</p>
+                        <p class="mt-1 text-xs text-neutral-500 dark:text-fg-dim">
+                            Show the certificate to review or edit its contents.
+                        </p>
                     </div>
                 @endif
-            </div>
+            </x-application.settings-section>
         </div>
     </div>
 </div>

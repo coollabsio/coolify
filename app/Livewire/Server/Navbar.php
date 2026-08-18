@@ -32,6 +32,8 @@ class Navbar extends Component
 
     public bool $restartInitiated = false;
 
+    public array $serverSwitcherOptions = [];
+
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
@@ -49,6 +51,29 @@ class Navbar extends Component
         $this->currentRoute = request()->route()->getName();
         $this->serverIp = $this->server->id === 0 ? base_ip() : $this->server->ip;
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $routeParameters = request()->route()?->parameters() ?? [];
+        $routeName = request()->route()?->getName();
+        $this->serverSwitcherOptions = auth()->user()->currentTeam()->servers()
+            ->orderBy('name')
+            ->get()
+            ->map(function (Server $server) use ($routeName, $routeParameters): array {
+                $parameters = [...$routeParameters, 'server_uuid' => $server->uuid];
+
+                try {
+                    $href = $routeName ? route($routeName, $parameters) : route('server.show', $server->uuid);
+                } catch (\Throwable) {
+                    $href = route('server.show', $server->uuid);
+                }
+
+                return [
+                    'uuid' => $server->uuid,
+                    'name' => $server->name,
+                    'href' => $href,
+                    'functional' => $server->isFunctional(),
+                ];
+            })
+            ->values()
+            ->all();
         $this->loadProxyConfiguration();
     }
 
@@ -138,6 +163,7 @@ class Navbar extends Component
         $previousStatus = $this->proxyStatus;
         $this->server->refresh();
         $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $this->dispatchProxyConfigurationState();
 
         // If event contains activityId, open activity monitor
         if ($event && isset($event['activityId'])) {
@@ -202,6 +228,16 @@ class Navbar extends Component
     {
         $this->server->refresh();
         $this->server->load('settings');
+        $this->dispatchProxyConfigurationState();
+    }
+
+    private function dispatchProxyConfigurationState(): void
+    {
+        $this->dispatch(
+            'proxy-configuration-state-changed',
+            pending: $this->server->hasPendingProxyConfiguration(),
+            traefikOutdated: $this->server->hasCurrentTraefikOutdatedInfo(),
+        );
     }
 
     public function refreshSentinelStatus($event = null): void
@@ -223,10 +259,12 @@ class Navbar extends Component
             return false;
         }
 
-        // Check if server has outdated info stored
-        $outdatedInfo = $this->server->traefik_outdated_info;
+        return $this->server->hasCurrentTraefikOutdatedInfo();
+    }
 
-        return ! empty($outdatedInfo) && isset($outdatedInfo['type']);
+    public function getHasPendingProxyConfigurationProperty(): bool
+    {
+        return $this->server->hasPendingProxyConfiguration();
     }
 
     public function render()

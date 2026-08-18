@@ -6,6 +6,8 @@ use App\Events\FileStorageChanged;
 use App\Jobs\ServerStorageSaveJob;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Symfony\Component\Yaml\Yaml;
 
 class LocalFileVolume extends BaseModel
@@ -57,6 +59,12 @@ class LocalFileVolume extends BaseModel
             $fileVolume->load(['service']);
             dispatch(new ServerStorageSaveJob($fileVolume));
         });
+
+        static::deleting(function (LocalFileVolume $fileVolume): void {
+            if ($fileVolume->scheduledBackups()->exists()) {
+                throw new \RuntimeException('Delete this directory backup schedule and its archives before deleting the directory.');
+            }
+        });
     }
 
     protected function isBinary(): Attribute
@@ -73,9 +81,26 @@ class LocalFileVolume extends BaseModel
         );
     }
 
-    public function service()
+    public function resource(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    public function service(): MorphTo
     {
         return $this->morphTo('resource');
+    }
+
+    public function scheduledBackups(): MorphMany
+    {
+        return $this->morphMany(ScheduledVolumeBackup::class, 'backupable');
+    }
+
+    public function abortIfScheduledBackupsExist(): void
+    {
+        if ($this->scheduledBackups()->exists()) {
+            abort(422, 'Delete this directory backup schedule and its archives before deleting the directory.');
+        }
     }
 
     public function loadStorageOnServer()
@@ -113,9 +138,9 @@ class LocalFileVolume extends BaseModel
 
                 return;
             }
-            $content = instant_remote_process(["cat {$escapedPath}"], $server, false);
+            $content = $this->readRemoteFileContent($escapedPath, $server);
             // Check if content contains binary data by looking for null bytes or non-printable characters
-            if (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content)) {
+            if ($content !== self::TOO_LARGE_PLACEHOLDER && (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content))) {
                 $content = self::BINARY_PLACEHOLDER;
             }
             $this->content = $content;
@@ -134,6 +159,27 @@ class LocalFileVolume extends BaseModel
         $size = (int) trim((string) $sizeOutput);
 
         return $size > self::MAX_CONTENT_SIZE;
+    }
+
+    /**
+     * Cap the remote read itself so a file that grows after the size check
+     * cannot be fully slurped into PHP memory.
+     */
+    protected function readRemoteFileContent(string $escapedPath, $server): string
+    {
+        $readLimit = self::MAX_CONTENT_SIZE + 1;
+        $content = instant_remote_process(["head -c {$readLimit} {$escapedPath}"], $server, false);
+
+        return self::contentFromBoundedRead($content);
+    }
+
+    public static function contentFromBoundedRead(?string $content): string
+    {
+        if (strlen((string) $content) > self::MAX_CONTENT_SIZE) {
+            return self::TOO_LARGE_PLACEHOLDER;
+        }
+
+        return (string) $content;
     }
 
     public function deleteStorageOnServer()
@@ -228,7 +274,7 @@ class LocalFileVolume extends BaseModel
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
-                $this->content = instant_remote_process(["cat {$escapedPath}"], $server, false);
+                $this->content = $this->readRemoteFileContent($escapedPath, $server);
             }
             $this->is_directory = false;
             $this->save();

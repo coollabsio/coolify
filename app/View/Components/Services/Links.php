@@ -12,7 +12,7 @@ class Links extends Component
 {
     public Collection $links;
 
-    public function __construct(public Service $service)
+    public function __construct(public Service $service, public bool $fullWidth = false, public bool $compact = false)
     {
         $this->links = collect([]);
         $service->applications()->get()->map(function ($application) {

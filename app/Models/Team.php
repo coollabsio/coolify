@@ -50,6 +50,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_mcp_server_enabled',
     ];
 
+    protected $attributes = [
+        'is_mcp_server_enabled' => true,
+    ];
+
     protected $casts = [
         'personal_team' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
@@ -87,7 +91,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()
-                ->merge(GitlabApp::where('team_id', $team->id)->get());
+                ->concat(GitlabApp::where('team_id', $team->id)->get());
             foreach ($teamSources as $source) {
                 $source->delete();
             }
@@ -219,13 +223,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('webhook')?->isEnabled();
     }
 
-    public function subscriptionEnded()
+    public function subscriptionEnded(?Subscription $subscription = null): void
     {
-        if (! $this->subscription) {
+        $subscription ??= $this->subscription;
+
+        if (! $subscription) {
             return;
         }
 
-        $this->subscription->update([
+        $subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,
@@ -296,6 +302,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function cloudProviderTokens()
     {
         return $this->hasMany(CloudProviderToken::class);
+    }
+
+    public function integrationTokens()
+    {
+        return $this->hasMany(IntegrationToken::class);
     }
 
     public function sources()

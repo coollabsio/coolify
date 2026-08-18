@@ -2,7 +2,7 @@
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
 ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
 # https://github.com/minio/mc/releases
-ARG MINIO_VERSION=RELEASE.2025-05-21T01-59-54Z
+ARG MINIO_VERSION=RELEASE.2025-08-13T08-35-41Z
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2025.7.0
 # https://www.postgresql.org/support/versioning/
@@ -24,6 +24,7 @@ FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
 ARG USER_ID
 ARG GROUP_ID
 ARG TARGETPLATFORM
+ARG TARGETARCH
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
@@ -63,6 +64,7 @@ RUN apk add --no-cache \
     g++ \
     python3 \
     openssh-client \
+    openssl \
     git \
     git-lfs \
     jq \
@@ -111,5 +113,8 @@ RUN mkdir -p /etc/nginx/conf.d && \
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
-# Switch to non-root user
-USER www-data
+# Stay as root for s6 init so bind-mounted workspaces work even when the host
+# tree is root-owned (CI, Jean, rootful Docker). PHP-FPM/nginx still run as
+# www-data via their service configs. Do NOT set USER www-data here — that
+# makes init-setup (composer install) fail with "vendor could not be created".
+USER root

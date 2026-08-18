@@ -4,6 +4,8 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\LocalFileVolume;
+use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Team;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
@@ -78,6 +80,35 @@ it('detects redeploy-only domain changes', function () {
         ->and($change['expandable'])->toBeTrue()
         ->and($change['new_full_value'])->toBe($domains);
 });
+
+it('detects added storage mounts as redeploy-only changes', function (string $type) {
+    $application = snapshotTestApplication();
+    markSnapshotTestApplicationDeployed($application);
+
+    if ($type === 'volume') {
+        LocalPersistentVolume::create([
+            'name' => $application->uuid.'-data',
+            'mount_path' => '/app/data',
+            'resource_id' => $application->id,
+            'resource_type' => $application->getMorphClass(),
+        ]);
+    } else {
+        LocalFileVolume::withoutEvents(fn () => LocalFileVolume::forceCreate([
+            'uuid' => (string) Str::uuid(),
+            'fs_path' => application_configuration_dir().'/'.$application->uuid.'/data',
+            'mount_path' => '/app/data',
+            'is_directory' => $type === 'directory',
+            'resource_id' => $application->id,
+            'resource_type' => $application->getMorphClass(),
+        ]));
+    }
+
+    $diff = $application->refresh()->pendingDeploymentConfigurationDiff();
+
+    expect($diff->isChanged())->toBeTrue()
+        ->and($diff->requiresBuild())->toBeFalse()
+        ->and(collect($diff->changes())->pluck('section'))->toContain('storage');
+})->with(['volume', 'directory', 'file']);
 
 it('detects Docker image reference changes as redeploy-only changes', function (string $field, string $label, string $newValue) {
     $application = snapshotTestApplication([
@@ -265,7 +296,7 @@ it('accepts the historical environment sorting default in older snapshots', func
     expect(app(ConfigurationDiffer::class)->diff($previousSnapshot, $currentSnapshot)->isChanged())->toBeFalse();
 });
 
-it('detects environment variable value changes without exposing secret values', function () {
+it('detects environment variable value changes for unlocked variables', function () {
     $application = snapshotTestApplication();
     EnvironmentVariable::create([
         'key' => 'API_TOKEN',
@@ -284,13 +315,13 @@ it('detects environment variable value changes without exposing secret values', 
     $change = collect($diff->changes())->firstWhere('label', 'API_TOKEN');
 
     expect($change)->not->toBeNull()
-        ->and($change['display_summary'])->toBe('Changed')
-        ->and($change['old_display_value'])->toBe('••••••••')
-        ->and($change['new_display_value'])->toBe('••••••••')
-        ->and(json_encode($diff->toArray()))->not->toContain('old-secret')->not->toContain('new-secret');
+        ->and($change['display_summary'])->toBeNull()
+        ->and($change['old_display_value'])->toBe('old-secret')
+        ->and($change['new_display_value'])->toBe('new-secret')
+        ->and(json_encode($diff->toArray()))->toContain('old-secret')->toContain('new-secret');
 });
 
-it('describes added environment variables as set without exposing secret values', function () {
+it('describes added unlocked environment variables with their value', function () {
     $application = snapshotTestApplication();
     markSnapshotTestApplicationDeployed($application);
 
@@ -311,6 +342,6 @@ it('describes added environment variables as set without exposing secret values'
     expect($change)->not->toBeNull()
         ->and($change['display_summary'])->toBeNull()
         ->and($change['old_display_value'])->toBe('-')
-        ->and($change['new_display_value'])->toBe('••••••••')
-        ->and(json_encode($diff->toArray()))->not->toContain('new-secret');
+        ->and($change['new_display_value'])->toBe('new-secret')
+        ->and(json_encode($diff->toArray()))->toContain('new-secret');
 });

@@ -812,14 +812,13 @@ EOD;
         // /* ... */ block comment (used to split keywords like FROM/**/PROGRAM).
         $sep = '([[:space:]]|/\\*[^*]*\\*/)';
 
-        $pattern = implode('|', [
-            "copy{$sep}+[^;]*(from|to){$sep}+program",
-            '(^|[[:space:]])\\\\!',
-            "(^|[[:space:]])\\\\(o|g){$sep}*\\|",
-        ]);
-        $escapedPattern = escapeshellarg($pattern);
+        $sqlPattern = "(^|;){$sep}*copy{$sep}+[^;]*(from|to){$sep}+program";
+        $psqlPattern = "^{$sep}*\\\\(!|copy{$sep}+[^[:space:]]+.*{$sep}+program|(o|g){$sep}*\\|)";
+        $escapedSqlPattern = escapeshellarg($sqlPattern);
+        $escapedPsqlPattern = escapeshellarg($psqlPattern);
+        $contents = "{ gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}; }";
 
-        return "if (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | sed 's/--.*//' | tr '\n\r\t' '   ' | grep -Eiq {$escapedPattern}; then echo 'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.'; exit 1; fi";
+        return "header=\$({$contents} | head -c 5); if [ \"\$header\" = 'PGDMP' ]; then exit 0; fi; if {$contents} | sed 's/--.*//' | grep -Eiq {$escapedPsqlPattern} || {$contents} | sed 's/--.*//' | tr '\n\r\t' '   ' | grep -Eiq {$escapedSqlPattern}; then echo 'Blocked PostgreSQL restore: COPY ... PROGRAM and psql shell commands are not allowed.'; exit 1; fi";
     }
 
     private function addRestoreSafetyCheckCommand(array &$commands, string $tmpPath): void

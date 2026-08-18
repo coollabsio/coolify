@@ -7,26 +7,42 @@
 
 services:
   sparkyfitness-frontend:
-    image: 'codewithcj/sparkyfitness:v0.15.7.3' # Released on Oct 18, 2025
+    image: 'codewithcj/sparkyfitness:v1.6.1'
     environment:
       - SERVICE_URL_SPARKYFITNESS_80
+      - 'SPARKY_FITNESS_FRONTEND_URL=${SERVICE_URL_SPARKYFITNESS_80}'
+      - SPARKY_FITNESS_SERVER_HOST=sparkyfitness-server
+      - SPARKY_FITNESS_SERVER_PORT=3010
     depends_on:
       - sparkyfitness-server
 
   sparkyfitness-server:
-    image: 'codewithcj/sparkyfitness_server:v0.15.7.3' # Released on Oct 18, 2025
+    image: 'codewithcj/sparkyfitness_server:v1.6.1'
     environment:
       - 'SPARKY_FITNESS_LOG_LEVEL=${SPARKY_FITNESS_LOG_LEVEL:-info}'
+      - 'NODE_ENV=${NODE_ENV:-production}'
+      - 'TZ=${TZ:-Etc/UTC}'
+      # Database — superuser (used for migrations only)
       - 'SPARKY_FITNESS_DB_USER=${SERVICE_USER_POSTGRES}'
       - SPARKY_FITNESS_DB_HOST=sparkyfitness-db
       - 'SPARKY_FITNESS_DB_NAME=${SPARKY_FITNESS_DB_NAME:-sparkyfitness}'
       - 'SPARKY_FITNESS_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
       - 'SPARKY_FITNESS_DB_PORT=${SPARKY_FITNESS_DB_PORT:-5432}'
+      # Database — application user (unprivileged, used at runtime)
+      - 'SPARKY_FITNESS_APP_DB_USER=${SPARKY_FITNESS_APP_DB_USER:-sparkyapp}'
+      - 'SPARKY_FITNESS_APP_DB_PASSWORD=${SERVICE_PASSWORD_64_APPDBPASSWORD}'
+      # Secrets
       - 'SPARKY_FITNESS_API_ENCRYPTION_KEY=${SERVICE_PASSWORD_64_SERVERAPIENCRYPTIONKEY}'
-      - 'JWT_SECRET=${SERVICE_PASSWORD_64_SERVERJWTSECRET}'
+      - 'BETTER_AUTH_SECRET=${SERVICE_PASSWORD_64_BETTERAUTHSECRET}'
+      # CORS / trusted origins
       - 'SPARKY_FITNESS_FRONTEND_URL=${SERVICE_URL_SPARKYFITNESS_80}'
+      - 'ALLOW_PRIVATE_NETWORK_CORS=${ALLOW_PRIVATE_NETWORK_CORS:-false}'
+      - 'SPARKY_FITNESS_EXTRA_TRUSTED_ORIGINS=${SPARKY_FITNESS_EXTRA_TRUSTED_ORIGINS:-}'
+      # Auth / signup
       - 'SPARKY_FITNESS_DISABLE_SIGNUP=${SPARKY_FITNESS_DISABLE_SIGNUP:-false}'
+      - 'SPARKY_FITNESS_FORCE_EMAIL_LOGIN=${SPARKY_FITNESS_FORCE_EMAIL_LOGIN:-true}'
       - 'SPARKY_FITNESS_ADMIN_EMAIL=${SPARKY_FITNESS_ADMIN_EMAIL:-admin@example.com}'
+      # Email (optional)
       - 'SPARKY_FITNESS_EMAIL_HOST=${SPARKY_FITNESS_EMAIL_HOST:-smtp.gmail.com}'
       - 'SPARKY_FITNESS_EMAIL_PORT=${SPARKY_FITNESS_EMAIL_PORT:-587}'
       - 'SPARKY_FITNESS_EMAIL_SECURE=${SPARKY_FITNESS_EMAIL_SECURE:-false}'
@@ -40,7 +56,7 @@ services:
       - 'sparkyfitness-server-uploads:/app/SparkyFitnessServer/uploads'
 
   sparkyfitness-db:
-    image: 'postgres:15-alpine'
+    image: 'postgres:18-alpine'
     environment:
       - 'POSTGRES_DB=${SPARKY_FITNESS_DB_NAME:-sparkyfitness}'
       - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
@@ -52,5 +68,5 @@ services:
       timeout: 20s
       retries: 10
     volumes:
-      - 'sparkyfitness-db-postgresql:/var/lib/postgresql/data'
+      - 'sparkyfitness-db-postgresql:/var/lib/postgresql'
 

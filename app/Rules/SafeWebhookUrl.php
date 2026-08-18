@@ -15,7 +15,10 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @param  (Closure(string): array<int, string>)|null  $resolver
      */
-    public function __construct(private ?Closure $resolver = null) {}
+    /**
+     * @param  array<int, string>  $trustedInternalHosts
+     */
+    public function __construct(private ?Closure $resolver = null, private array $trustedInternalHosts = []) {}
 
     /**
      * Run the validation rule.
@@ -59,7 +62,7 @@ class SafeWebhookUrl implements ValidationRule
 
         if ($this->isBlockedHostname($hostForDns) && ! $this->isAllowedHostname($hostForDns)) {
             $this->logBlockedHost($attribute, $host);
-            $fail('The :attribute must not point to localhost or internal hosts.');
+            $fail($this->privateTargetMessage($attribute));
 
             return;
         }
@@ -67,7 +70,9 @@ class SafeWebhookUrl implements ValidationRule
         if (filter_var($hostForIpCheck, FILTER_VALIDATE_IP)) {
             if (! $this->isAllowedIp($hostForIpCheck, $hostForDns)) {
                 $this->logBlockedIp($attribute, $host, $hostForIpCheck);
-                $fail('The :attribute must not point to private, reserved, loopback, or link-local addresses.');
+                $fail($this->isLinkLocalIp($hostForIpCheck)
+                    ? 'The :attribute must not point to link-local addresses.'
+                    : $this->privateTargetMessage($attribute));
 
                 return;
             }
@@ -85,11 +90,20 @@ class SafeWebhookUrl implements ValidationRule
         foreach ($resolvedIps as $resolvedIp) {
             if (! $this->isAllowedIp($resolvedIp, $hostForDns)) {
                 $this->logBlockedIp($attribute, $host, $resolvedIp);
-                $fail('The :attribute must not point to private, reserved, loopback, or link-local addresses.');
+                $fail($this->isLinkLocalIp($resolvedIp)
+                    ? 'The :attribute must not resolve to a link-local address.'
+                    : $this->privateTargetMessage($attribute));
 
                 return;
             }
         }
+    }
+
+    private function privateTargetMessage(string $attribute): string
+    {
+        $settingsUrl = route('settings.advanced').'#endpoint-section';
+
+        return "The {$attribute} points to a local or private address that is not allowed. Configure allowed internal targets: {$settingsUrl}";
     }
 
     /**
@@ -97,7 +111,7 @@ class SafeWebhookUrl implements ValidationRule
      *
      * @return array<string, mixed>
      */
-    public static function httpClientOptions(string $url): array
+    public static function httpClientOptions(string $url, array $trustedInternalHosts = []): array
     {
         $options = ['allow_redirects' => false];
 
@@ -105,17 +119,26 @@ class SafeWebhookUrl implements ValidationRule
             throw new \RuntimeException('Webhook URL DNS pinning is unavailable.');
         }
 
-        $target = self::resolveUrlForRequest($url);
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts);
 
         if ($target['ips'] === [] || filter_var($target['host'], FILTER_VALIDATE_IP)) {
             return $options;
         }
 
+        // libcurl keeps only the last CURLOPT_RESOLVE entry for a given
+        // host:port pair, so every resolved address must be pinned in a single
+        // comma-separated entry. Emitting one entry per address silently drops
+        // all but the last, which is an IPv6 address whenever the host has AAAA
+        // records -- and that fails instantly on hosts without IPv6 egress.
+        $addresses = implode(',', array_map(
+            fn (string $ip): string => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.$ip.']' : $ip,
+            $target['ips'],
+        ));
+
         $options['curl'] = [
-            CURLOPT_RESOLVE => array_map(
-                fn (string $ip): string => sprintf('%s:%d:%s', $target['host'], $target['port'], filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.$ip.']' : $ip),
-                $target['ips'],
-            ),
+            CURLOPT_RESOLVE => [
+                sprintf('%s:%d:%s', $target['host'], $target['port'], $addresses),
+            ],
         ];
 
         return $options;
@@ -126,18 +149,25 @@ class SafeWebhookUrl implements ValidationRule
      *
      * @return array<int, string>
      */
-    public static function minioClientResolveOptions(string $url): array
+    public static function minioClientResolveOptions(string $url, array $trustedInternalHosts = []): array
     {
-        $target = self::resolveUrlForRequest($url);
+        $target = self::resolveUrlForRequest($url, $trustedInternalHosts);
 
         if ($target['ips'] === [] || filter_var($target['host'], FILTER_VALIDATE_IP)) {
             return [];
         }
 
-        return array_map(
-            fn (string $ip): string => sprintf('%s:%d=%s', $target['host'], $target['port'], filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) ? '['.$ip.']' : $ip),
+        // The MinIO client keeps one --resolve IP per host and parses it with Go's
+        // netip.ParseAddr, which rejects bracketed IPv6. Emit a single entry, preferring
+        // IPv4 for reachability, without brackets.
+        $preferredIps = array_values(array_filter(
             $target['ips'],
-        );
+            fn (string $ip): bool => filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false,
+        ));
+
+        $ip = $preferredIps[0] ?? $target['ips'][0];
+
+        return [sprintf('%s:%d=%s', $target['host'], $target['port'], $ip)];
     }
 
     public static function redactedUrlForLog(string $url): string
@@ -156,9 +186,9 @@ class SafeWebhookUrl implements ValidationRule
     /**
      * @return array{host: string, port: int, ips: array<int, string>}
      */
-    private static function resolveUrlForRequest(string $url): array
+    private static function resolveUrlForRequest(string $url, array $trustedInternalHosts = []): array
     {
-        $rule = new self;
+        $rule = new self(trustedInternalHosts: $trustedInternalHosts);
         $host = parse_url($url, PHP_URL_HOST);
         if (! is_string($host) || $host === '') {
             throw new \RuntimeException('Webhook URL host could not be resolved.');
@@ -216,9 +246,23 @@ class SafeWebhookUrl implements ValidationRule
 
         $customDnsServers = $this->customDnsServers();
         if ($customDnsServers !== []) {
-            return $this->resolveHostWithCustomDnsServers($host, $customDnsServers);
+            $customResolvedIps = $this->resolveHostWithCustomDnsServers($host, $customDnsServers);
+            // Fall back to the system resolver when custom DNS has no answer so
+            // docker/internal hostnames (e.g. coolify-minio) still work with an
+            // instance-level public DNS server configured.
+            if ($customResolvedIps !== []) {
+                return $customResolvedIps;
+            }
         }
 
+        return $this->resolveHostWithSystemDns($host);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function resolveHostWithSystemDns(string $host): array
+    {
         $records = @dns_get_record($host, DNS_A | DNS_AAAA);
         if ($records === false) {
             $records = [];
@@ -249,7 +293,7 @@ class SafeWebhookUrl implements ValidationRule
      * @param  array<int, string>  $dnsServers
      * @return array<int, string>
      */
-    private function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
+    protected function resolveHostWithCustomDnsServers(string $host, array $dnsServers): array
     {
         $ips = [];
 
@@ -301,6 +345,10 @@ class SafeWebhookUrl implements ValidationRule
             $ip = $embeddedIpv4;
         }
 
+        if ($this->isLinkLocalIp($ip)) {
+            return false;
+        }
+
         if ($this->isPublicIp($ip)) {
             return true;
         }
@@ -315,6 +363,15 @@ class SafeWebhookUrl implements ValidationRule
         }
 
         return $this->isAllowlistedIp($ip);
+    }
+
+    private function isLinkLocalIp(string $ip): bool
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return $this->ipv4InCidr($ip, '169.254.0.0/16');
+        }
+
+        return $this->ipInCidr($ip, 'fe80::/10');
     }
 
     private function isPublicIp(string $ip): bool
@@ -428,6 +485,10 @@ class SafeWebhookUrl implements ValidationRule
 
     private function isAllowedHostname(string $host): bool
     {
+        if (in_array($host, array_map('strtolower', $this->trustedInternalHosts), true)) {
+            return true;
+        }
+
         foreach ($this->allowlistEntries() as $entry) {
             if (! str_contains($entry, '/') && strtolower($entry) === $host) {
                 return true;

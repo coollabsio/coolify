@@ -1,0 +1,5 @@
+<svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <title>OpenID Connect</title>
+    <path fill-rule="evenodd" d="M10 5.5a7.5 7.5 0 1 0 7.5 7.5c0-.9-.16-1.77-.45-2.57l-2.78 1.04c.15.48.23.99.23 1.53a4.5 4.5 0 1 1-4.5-4.5c.54 0 1.05.09 1.53.26l1.05-2.8A7.48 7.48 0 0 0 10 5.5Z" clip-rule="evenodd"/>
+    <path d="M16.5 1 12 5.5h3V10h3V5.5h3L16.5 1Z"/>
+</svg>

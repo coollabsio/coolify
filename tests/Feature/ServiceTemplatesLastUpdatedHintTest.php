@@ -36,21 +36,43 @@ it('returns each service template last updated timestamp from the generated bund
         ->toBe(CarbonImmutable::parse($templateTimestamp)->timezone(config('app.timezone'))->format('M j, Y H:i'));
 });
 
+it('uses a valid local icon or the default icon for every service', function () {
+    $services = (new Select)->loadServices()['services'];
+
+    expect($services['opnform']['logo'])->toBe(asset('svgs/opnform.svg'))
+        ->and($services['pydio-cells']['logo'])->toBe(asset('svgs/default.webp'));
+});
+
+it('crops wide database wordmarks to their icon artwork', function () {
+    $databases = collect((new Select)->loadServices()['databases'])->keyBy('id');
+
+    expect($databases['keydb']['logo'])->toContain('viewBox="0 0 160 182"')
+        ->and($databases['dragonfly']['logo'])->toContain('viewBox="0 0 44 44"', 'viewBox="0 0 88 88"')
+        ->and($databases['clickhouse']['logo'])->toContain('viewBox="0 0 24 26"');
+});
+
 it('prefers embedded service template git timestamps from the templates bundle', function () {
-    File::shouldReceive('get')
-        ->with(base_path('templates/'.config('constants.services.file_name')))
-        ->andReturn(json_encode([
-            'activepieces' => [
-                'documentation' => 'https://coolify.io/docs',
-                'slogan' => 'Open source no-code business automation.',
-                'compose' => '',
-                'tags' => null,
-                'category' => 'automation',
-                'logo' => 'images/default.webp',
-                'minversion' => '0.0.0',
-                'template_last_updated_at' => '2026-05-31T12:34:56+00:00',
-            ],
-        ]));
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $payload = json_encode([
+        'activepieces' => [
+            'documentation' => 'https://coolify.io/docs',
+            'slogan' => 'Open source no-code business automation.',
+            'compose' => '',
+            'tags' => null,
+            'category' => 'automation',
+            'logo' => 'images/default.webp',
+            'minversion' => '0.0.0',
+            'template_last_updated_at' => '2026-05-31T12:34:56+00:00',
+        ],
+    ]);
+
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn($payload);
 
     $resources = (new Select)->loadServices();
 
@@ -84,7 +106,7 @@ it('renders the shared loading indicator while resource choices load', function 
     ]);
 
     $view->assertSee('Loading resources...', false);
-    $view->assertSee('text-coollabs dark:text-warning animate-spin', false);
+    $view->assertSee('animate-spin', false);
     $view->assertDontSee('<div x-show="loading">Loading...</div>', false);
 });
 
@@ -96,9 +118,13 @@ it('renders the service templates last updated hint placeholder', function () {
         'environments' => collect(),
     ]);
 
-    $view->assertSee('Last Updated on Service Templates:');
+    $view->assertSee('Updated');
     $view->assertSee('serviceTemplatesLastUpdated');
     $view->assertSee('service.templateLastUpdated');
+    $view->assertSee('aria-controls="resource-type-filter-options"', false);
+    $view->assertSee('aria-controls="resource-category-options"', false);
+    $view->assertSee('@click.outside="closeCategoryFilter()"', false);
+    $view->assertSee('@keydown.escape.stop="closeCategoryFilter(true)"', false);
 });
 
 it('keeps service template keys for service selection and docs links', function () {

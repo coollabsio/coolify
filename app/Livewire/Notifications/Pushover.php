@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\PushoverNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 class Pushover extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -151,6 +152,34 @@ class Pushover extends Component
             $this->saveModel();
         } catch (\Throwable $e) {
             $this->pushoverEnabled = false;
+
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
+    public function togglePushoverEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->pushoverEnabled) {
+                $this->pushoverEnabled = false;
+            } else {
+                $this->validate([
+                    'pushoverUserKey' => 'required',
+                    'pushoverApiToken' => 'required',
+                ], [
+                    'pushoverUserKey.required' => 'Pushover User Key is required.',
+                    'pushoverApiToken.required' => 'Pushover API Token is required.',
+                ]);
+                $this->pushoverEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
 
             return handleError($e, $this);
         } finally {

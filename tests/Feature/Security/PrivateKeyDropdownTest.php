@@ -39,14 +39,14 @@ beforeEach(function () {
 
 test('private key index shows highlighted add dropdown actions', function () {
     Livewire::test(Index::class)
-        ->assertSee('+ Add')
+        ->assertSee('New private key')
         ->assertSee('Generate ED25519')
         ->assertSee('Generate RSA')
         ->assertSee('Add manually')
         ->assertDontSee('Manage your SSH keys for your servers and integrations.');
 });
 
-test('generating a private key from the index stores it and redirects to details', function () {
+test('generating a private key from the index stores it without redirecting to a detail page', function () {
     $component = Livewire::test(Index::class)
         ->call('generatePrivateKey', 'ed25519');
 
@@ -55,9 +55,25 @@ test('generating a private key from the index stores it and redirects to details
     expect($privateKey->team_id)->toBe($this->team->id)
         ->and($privateKey->public_key)->toStartWith('ssh-ed25519');
 
-    $component->assertRedirect(route('security.private-key.show', [
+    $component
+        ->assertDispatched('success')
+        ->assertNoRedirect();
+});
+
+test('saving a private key from its modal editor closes the modal', function () {
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id,
+    ]);
+
+    Livewire::test(Show::class, [
         'private_key_uuid' => $privateKey->uuid,
-    ]));
+        'modalMode' => true,
+    ])->set('name', 'Updated SSH key')
+        ->call('changePrivateKey')
+        ->assertDispatched('securityResourceChanged')
+        ->assertDispatched('close-modal');
+
+    expect($privateKey->fresh()->name)->toBe('Updated SSH key');
 });
 
 test('manual private key form does not expose key generation controls', function () {

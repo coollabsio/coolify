@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -13,7 +14,7 @@ use Livewire\Component;
 
 class Slack extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -142,6 +143,32 @@ class Slack extends Component
             $this->saveModel();
         } catch (\Throwable $e) {
             $this->slackEnabled = false;
+
+            return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
+    public function toggleSlackEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->slackEnabled) {
+                $this->slackEnabled = false;
+            } else {
+                $this->validate([
+                    'slackWebhookUrl' => 'required',
+                ], [
+                    'slackWebhookUrl.required' => 'Slack Webhook URL is required.',
+                ]);
+                $this->slackEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
 
             return handleError($e, $this);
         } finally {

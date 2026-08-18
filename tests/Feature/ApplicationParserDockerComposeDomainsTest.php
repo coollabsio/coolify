@@ -211,6 +211,117 @@ YAML;
         ->and($domains['backend']['domain'])->toStartWith('http://');
 });
 
+test('applicationParser stores domains under original hyphenated compose service names', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  another-service:
+    image: myapp/api:latest
+    environment:
+      - SERVICE_FQDN_ANOTHER_SERVICE=${API_URL}
+  analytics:
+    image: myapp/analytics:latest
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    expect($domains)->toBeArray()
+        ->and($domains)->toHaveKey('another-service')
+        ->and($domains)->not->toHaveKey('another_service')
+        ->and($domains['another-service']['domain'])->toStartWith('http://');
+});
+
+test('applicationParser preserves legacy underscore domain keys by matching hyphenated services', function () {
+    $dockerCompose = <<<'YAML'
+services:
+  another-service:
+    image: myapp/api:latest
+    environment:
+      - SERVICE_FQDN_ANOTHER_SERVICE=${API_URL}
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'another_service' => ['domain' => 'https://legacy.example.com'],
+        ]),
+    ]);
+
+    applicationParser($application);
+
+    $application->refresh();
+    $domains = json_decode($application->docker_compose_domains, true);
+
+    // Existing domain is preserved (not overwritten) even when stored under legacy underscore key.
+    expect(getComposeServiceDomainString($domains, 'another-service'))->toBe('https://legacy.example.com');
+});
+
+test('applicationParser reads redirect settings from the compose service domain', function () {
+    $this->server->proxy->set('type', 'TRAEFIK');
+    $this->server->save();
+    ServerSetting::query()
+        ->where('server_id', $this->server->id)
+        ->update(['generate_exact_labels' => true]);
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => [
+                'domain' => 'https://example.com,https://www.example.com',
+                'redirect' => 'www',
+            ],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_contains($label, 'redirectregex.replacement=$${1}://www.$${2}')))->toBeTrue();
+});
+
+test('compose domain reconciliation preserves stored domains when parsing returns no services', function () {
+    $storedDomains = json_encode([
+        'frontend' => ['domain' => 'https://frontend.example.com'],
+    ]);
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_domains' => $storedDomains,
+    ]);
+
+    $method = new ReflectionMethod($application, 'reconcileDockerComposeDomains');
+    $method->invoke($application, ['services' => []]);
+
+    expect($application->fresh()->docker_compose_domains)->toBe($storedDomains);
+});
+
 test('applicationParser handles other docker compose domain shapes without regressions', function () {
     $createApplication = function (string $dockerCompose, ?string $dockerComposeDomains = null): Application {
         return Application::factory()->create([
@@ -286,4 +397,60 @@ YAML;
     $plainApplication->refresh();
 
     expect(json_decode($plainApplication->docker_compose_domains, true))->toBeNull();
+});
+
+test('applicationParser selects the resource network for Traefik routed compose services', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())->toContain("traefik.docker.network={$application->uuid}");
+});
+
+test('applicationParser preserves a user-selected Traefik network', function () {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:latest
+    labels:
+      traefik.docker.network: custom-network
+    networks:
+      - custom-network
+networks:
+  custom-network: {}
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://example.com'],
+        ]),
+    ]);
+
+    $parsedCompose = applicationParser($application);
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->values()->all())
+        ->toContain('traefik.docker.network=custom-network')
+        ->not->toContain("traefik.docker.network={$application->uuid}");
 });

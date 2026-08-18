@@ -1,6 +1,8 @@
 <?php
 
-use App\Livewire\Team\Index;
+use App\Livewire\Team\DangerZone;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
@@ -10,7 +12,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
 
     $this->owner = User::factory()->create();
 
@@ -27,7 +29,7 @@ test('deleting a team switches session to another team without error', function 
     $this->actingAs($this->owner);
     session(['currentTeam' => $this->teamToDelete]);
 
-    Livewire::test(Index::class)
+    Livewire::test(DangerZone::class)
         ->call('delete')
         ->assertRedirect(route('team.index'));
 
@@ -51,4 +53,28 @@ test('refreshSession clears session when no team exists', function () {
     refreshSession(null);
 
     expect(session('currentTeam'))->toBeNull();
+});
+
+test('deleting a team deletes github and gitlab sources with the same primary key', function () {
+    $githubApp = GithubApp::forceCreate([
+        'id' => 42,
+        'name' => 'GitHub source',
+        'team_id' => $this->teamToDelete->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => false,
+    ]);
+    $gitlabApp = GitlabApp::forceCreate([
+        'id' => 42,
+        'name' => 'GitLab source',
+        'team_id' => $this->teamToDelete->id,
+        'api_url' => 'https://gitlab.com/api/v4',
+        'html_url' => 'https://gitlab.com',
+        'is_public' => false,
+    ]);
+
+    $this->teamToDelete->delete();
+
+    expect(GithubApp::find($githubApp->id))->toBeNull()
+        ->and(GitlabApp::find($gitlabApp->id))->toBeNull();
 });

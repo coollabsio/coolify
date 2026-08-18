@@ -39,6 +39,14 @@ class SharedEnvironmentVariable extends Model
         'value' => 'encrypted',
     ];
 
+    /**
+     * Scope shared environment variables to a team (API token team_id).
+     */
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::where('team_id', $teamId);
+    }
+
     protected function key(): Attribute
     {
         return Attribute::make(

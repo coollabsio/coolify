@@ -220,6 +220,7 @@ function clone_application(Application $source, $destination, array $overrides =
         'fqdn' => $url,
         'status' => 'exited',
         'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
     ], $overrides));
     $newApplication->save();
 

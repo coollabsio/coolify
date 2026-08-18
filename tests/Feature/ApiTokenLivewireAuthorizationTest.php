@@ -95,3 +95,16 @@ test('owner can create root token', function () {
     expect($token)->not->toBeNull()
         ->and($token->abilities)->toBe(['root']);
 });
+
+test('owner can deselect root and falls back to read permission', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)
+        ->set('permissions', ['root'])
+        ->set('permissions', [])
+        ->assertSet('permissions', ['read']);
+});

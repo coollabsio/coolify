@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -12,7 +13,7 @@ class DeployServiceApplication
 
     public string $jobQueue = 'high';
 
-    public function handle(ServiceApplication $serviceApplication, bool $pullLatestImages = false, bool $forceRebuild = false): Activity
+    public function handle(ServiceApplication|ServiceDatabase $serviceApplication, bool $pullLatestImages = false, bool $forceRebuild = false): Activity
     {
         $service = $serviceApplication->service;
         $composeServiceName = $serviceApplication->name;

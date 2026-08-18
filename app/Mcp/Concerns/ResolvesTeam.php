@@ -7,6 +7,19 @@ use Laravel\Mcp\Response;
 
 trait ResolvesTeam
 {
+    /**
+     * Abilities that team members must not exercise (parity with ApiAbility).
+     *
+     * @var array<int, string>
+     */
+    private const MEMBER_DISALLOWED_ABILITIES = [
+        'root',
+        'write',
+        'write:sensitive',
+        'deploy',
+        'read:sensitive',
+    ];
+
     protected function ensureAbility(Request $request, string $ability = 'read', ?string $tool = null): ?Response
     {
         $user = $request->user();
@@ -21,6 +34,26 @@ trait ResolvesTeam
             $this->auditMcpTool($request, $tool, 'denied', ['reason' => 'invalid_token']);
 
             return Response::error('Invalid token.');
+        }
+
+        $teamId = $token->team_id;
+        if ($teamId !== null) {
+            // Fresh pivot lookup (avoid stale $user->teams cache after role changes).
+            $role = $user->teams()->where('teams.id', $teamId)->first()?->pivot?->role;
+            $isAdminOrOwner = in_array($role, ['admin', 'owner'], true);
+
+            if (! $isAdminOrOwner) {
+                $tokenAbilities = $token->abilities ?? [];
+                $disallowed = array_intersect($tokenAbilities, self::MEMBER_DISALLOWED_ABILITIES);
+                if ($disallowed !== [] || in_array($ability, self::MEMBER_DISALLOWED_ABILITIES, true)) {
+                    $this->auditMcpTool($request, $tool, 'denied', [
+                        'reason' => 'member_role',
+                        'required_ability' => $ability,
+                    ]);
+
+                    return Response::error('Missing required team role.');
+                }
+            }
         }
 
         if ($token->can('root') || $token->can($ability)) {

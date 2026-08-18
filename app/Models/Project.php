@@ -159,13 +159,13 @@ class Project extends BaseModel
     public function databases(array $with = []): Collection
     {
         return $this->postgresqls()->with($with)->get()
-            ->merge($this->redis()->with($with)->get())
-            ->merge($this->mongodbs()->with($with)->get())
-            ->merge($this->mysqls()->with($with)->get())
-            ->merge($this->mariadbs()->with($with)->get())
-            ->merge($this->keydbs()->with($with)->get())
-            ->merge($this->dragonflies()->with($with)->get())
-            ->merge($this->clickhouses()->with($with)->get());
+            ->concat($this->redis()->with($with)->get())
+            ->concat($this->mongodbs()->with($with)->get())
+            ->concat($this->mysqls()->with($with)->get())
+            ->concat($this->mariadbs()->with($with)->get())
+            ->concat($this->keydbs()->with($with)->get())
+            ->concat($this->dragonflies()->with($with)->get())
+            ->concat($this->clickhouses()->with($with)->get());
     }
 
     public function navigateTo()

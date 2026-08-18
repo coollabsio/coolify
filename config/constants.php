@@ -2,8 +2,8 @@
 
 return [
     'coolify' => [
-        'version' => '4.2.0',
-        'helper_version' => '1.0.14',
+        'version' => env('COOLIFY_VERSION') ?: '4.3.9',
+        'helper_version' => '1.0.15',
         'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
@@ -25,6 +25,8 @@ return [
     'services' => [
         'official' => 'https://cdn.coollabs.io/coolify/service-templates-latest.json',
         'file_name' => 'service-templates-latest.json',
+        // Shared across HTTP/Horizon nodes when CACHE_DRIVER is redis (default).
+        'cache_key' => 'coolify:service-templates-bundle',
     ],
 
     'terminal' => [
@@ -59,6 +61,7 @@ return [
 
     'docker' => [
         'minimum_required_version' => '24.0',
+        'stop_timeout_flag_since' => '28.0.0',
     ],
 
     'ssh' => [
@@ -73,7 +76,7 @@ return [
         'mux_orphan_reap_enabled' => env('SSH_MUX_ORPHAN_REAP_ENABLED', false), // false = dry-run, only log orphans
         'connection_timeout' => 10,
         'server_interval' => 20,
-        'command_timeout' => 3600,
+        'command_timeout' => env('SSH_COMMAND_TIMEOUT', 3600),
         'max_retries' => env('SSH_MAX_RETRIES', 3),
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
@@ -95,6 +98,7 @@ return [
     ],
 
     'sentinel' => [
+        'dev_url' => env('DEV_SENTINEL_URL'),
         // How often (seconds) PushServerUpdateJob is force-dispatched even when
         // the container state hash is unchanged. Keeps exited-detection and
         // storage checks from going stale without writing every resource row on
