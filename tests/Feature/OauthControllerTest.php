@@ -4,9 +4,11 @@ use App\Models\InstanceSettings;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\User;
+use App\Services\Auth\OauthLoginService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Once;
 use Laravel\Socialite\Facades\Socialite;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
 
@@ -120,4 +122,32 @@ it('rejects oauth logins when the provider does not return an email address', fu
     'blank email' => ['   '],
     'malformed email' => ['not-an-email'],
     'missing domain' => ['user@'],
+]);
+
+it('rejects oauth logins when the provider does not return a valid user id', function (mixed $invalidId) {
+    $oauthUser = (object) [
+        'email' => 'user@example.edu',
+        'name' => 'Example User',
+    ];
+
+    if ($invalidId !== 'missing') {
+        $oauthUser->id = $invalidId;
+    }
+
+    try {
+        app(OauthLoginService::class)->login('google', $oauthUser, OauthSetting::where('provider', 'google')->firstOrFail());
+    } catch (HttpException $exception) {
+        expect($exception->getStatusCode())->toBe(403)
+            ->and(OauthIdentity::count())->toBe(0)
+            ->and(User::count())->toBe(0);
+
+        return;
+    }
+
+    $this->fail('Expected an invalid OAuth provider user ID to be rejected.');
+})->with([
+    'null id' => [null],
+    'missing id' => ['missing'],
+    'blank id' => ['   '],
+    'non-scalar id' => [[]],
 ]);

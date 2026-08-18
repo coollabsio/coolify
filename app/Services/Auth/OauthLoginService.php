@@ -36,7 +36,11 @@ class OauthLoginService
     private function resolveOauthUser(object $oauthUser, OauthSetting $oauthSetting, string $email): User
     {
         $provider = $oauthSetting->provider;
-        $providerUserId = (string) $oauthUser->id;
+        $providerUserId = $oauthUser->id ?? null;
+        if (! is_scalar($providerUserId) || trim((string) $providerUserId) === '') {
+            throw new HttpException(403, 'OAuth provider did not return a valid user ID');
+        }
+        $providerUserId = (string) $providerUserId;
         $rawClaims = is_array($oauthUser->user ?? null) ? $oauthUser->user : [];
 
         return DB::transaction(function () use ($oauthUser, $oauthSetting, $email, $provider, $providerUserId, $rawClaims) {
