@@ -3,6 +3,8 @@
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
+use App\Models\Service;
+use App\Models\ServiceApplication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
@@ -42,6 +44,35 @@ it('dedupes when both fs_path and mount_path are identical', function () {
         ->count();
 
     expect($count)->toBe(1);
+});
+
+it('stores sibling file mounts with different host paths and the same container path', function () {
+    $resourceId = fake()->unique()->numberBetween(10000, 99999);
+    $mountPath = '/usr/share/nginx/html/index.html';
+
+    foreach (['index1.html', 'index2.html'] as $fileName) {
+        LocalFileVolume::updateOrCreate(
+            [
+                'fs_path' => "/data/coolify/test/data/{$fileName}",
+                'mount_path' => $mountPath,
+                'resource_id' => $resourceId,
+                'resource_type' => Application::class,
+            ],
+            [
+                'is_directory' => false,
+            ]
+        );
+    }
+
+    expect(LocalFileVolume::query()
+        ->where('resource_id', $resourceId)
+        ->where('resource_type', Application::class)
+        ->where('mount_path', $mountPath)
+        ->pluck('fs_path')
+        ->all())->toEqualCanonicalizing([
+            '/data/coolify/test/data/index1.html',
+            '/data/coolify/test/data/index2.html',
+        ]);
 });
 
 function makeReadOnlyVolumeFixture(string $compose, string $fsPath, string $mountPath, ?string $appUuid = 'test-app-uuid'): LocalFileVolume
@@ -95,6 +126,20 @@ YAML;
     $vol = makeReadOnlyVolumeFixture($compose, '/data/coolify/test/data/index1.html', '/usr/share/nginx/html/index.html');
 
     expect($vol->isReadOnlyVolume())->toBeFalse();
+});
+
+it('isReadOnlyVolume detects ro in comma-delimited short syntax options', function () {
+    $compose = <<<'YAML'
+services:
+  web:
+    image: 'nginx:alpine'
+    volumes:
+      - '/data/coolify/test/data/index.html:/usr/share/nginx/html/index.html:ro,z'
+YAML;
+
+    $volume = makeReadOnlyVolumeFixture($compose, '/data/coolify/test/data/index.html', '/usr/share/nginx/html/index.html');
+
+    expect($volume->isReadOnlyVolume())->toBeTrue();
 });
 
 it('isReadOnlyVolume disambiguates sibling rows with different :ro flags', function () {
@@ -161,6 +206,35 @@ YAML;
     $vol = makeReadOnlyVolumeFixture($compose, '/some/other/host/file.html', '/usr/share/nginx/html/index.html');
 
     expect($vol->isReadOnlyVolume())->toBeFalse();
+});
+
+it('isReadOnlyVolume resolves service relative paths from the services directory', function () {
+    $service = new Service([
+        'uuid' => 'test-service-uuid',
+        'compose_parsing_version' => 4,
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: 'nginx:alpine'
+    volumes:
+      - './data/index.html:/usr/share/nginx/html/index.html:ro'
+YAML,
+    ]);
+    $service->id = 10;
+
+    $application = new ServiceApplication(['name' => 'web']);
+    $application->id = 11;
+    $application->setRelation('service', $service);
+
+    $volume = new LocalFileVolume([
+        'fs_path' => base_configuration_dir().'/services/test-service-uuid/data/index.html',
+        'mount_path' => '/usr/share/nginx/html/index.html',
+    ]);
+    $volume->resource_type = ServiceApplication::class;
+    $volume->resource_id = $application->id;
+    $volume->setRelation('service', $application);
+
+    expect($volume->isReadOnlyVolume())->toBeTrue();
 });
 
 it('updateOrCreate lookup arrays in parsers.php and shared.php include fs_path', function () {
