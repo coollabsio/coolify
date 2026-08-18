@@ -33,6 +33,9 @@ class Domains extends Component
      */
     public array $serviceRedirects = [];
 
+    /** @var array<int|string, bool> */
+    public array $forceHttpsRedirects = [];
+
     /** Service application id when a pending domain conflict belongs to setServiceRedirect. */
     public ?int $pendingRedirectServiceApplicationId = null;
 
@@ -110,6 +113,8 @@ class Domains extends Component
             'newServiceApplicationId' => 'nullable|integer',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
+            'forceHttpsRedirects' => 'array',
+            'forceHttpsRedirects.*' => 'boolean',
         ];
     }
 
@@ -143,6 +148,22 @@ class Domains extends Component
         $this->dispatch('success', 'Search engine indexing updated.');
     }
 
+    public function updateForceHttps(int $serviceApplicationId, bool $enabled): void
+    {
+        $application = $this->service->applications()->findOrFail($serviceApplicationId);
+        $this->authorize('update', $application);
+
+        $this->forceHttpsRedirects[$serviceApplicationId] = $enabled;
+        $this->validateOnly("forceHttpsRedirects.{$serviceApplicationId}");
+
+        $application->is_force_https_enabled = $enabled;
+        $application->save();
+        $this->service->parse();
+        $this->refreshDomains();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'HTTP to HTTPS redirect updated.');
+    }
+
     public function loadDomainState(): void
     {
         $this->service->loadMissing(['applications', 'server']);
@@ -166,6 +187,10 @@ class Domains extends Component
             $this->serverIp = null;
             $this->serverIpConfigured = null;
         }
+
+        $this->forceHttpsRedirects = $this->service->applications
+            ->mapWithKeys(fn (ServiceApplication $app) => [$app->id => $app->isForceHttpsEnabled()])
+            ->all();
 
         $this->serviceApps = $this->service->applications
             ->sortBy(fn (ServiceApplication $app) => strtolower($app->human_name ?: $app->name))
@@ -518,15 +543,20 @@ class Domains extends Component
 
     public function updatedNewDomain(): void
     {
-        $this->addDomainDnsFailed = false;
-        $this->addDomainDnsMessage = '';
-        $this->forceSaveDns = false;
+        $this->resetAddDomainDnsGate();
     }
 
     public function updatedNewDomainParts(): void
     {
         $this->newDomainPartsChanged = true;
         $this->resetAddDomainDnsGate();
+    }
+
+    public function resetAddDomainDnsGate(): void
+    {
+        $this->addDomainDnsFailed = false;
+        $this->addDomainDnsMessage = '';
+        $this->forceSaveDns = false;
     }
 
     public function updatedEditingDomain(): void

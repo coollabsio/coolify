@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
-it('selects the Coolify service network for Traefik routed compose services', function () {
+it('does not force the private service network for Traefik routed compose services', function () {
     Bus::fake();
 
     $team = Team::factory()->create();
@@ -45,5 +45,5 @@ YAML,
     $parsedCompose = serviceParser($service);
     $labels = collect(data_get($parsedCompose, 'services.app.labels'));
 
-    expect($labels->values()->all())->toContain("traefik.docker.network={$service->uuid}");
+    expect($labels->values()->all())->not->toContain("traefik.docker.network={$service->uuid}");
 });

@@ -64,7 +64,10 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $service->name }}
                 </h1>
-                <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                    <x-services.links :service="$service" compact />
+                </div>
             </div>
         </div>
 
@@ -169,9 +172,6 @@
                 </a>
             @endif
 
-            <div class="resource-heading-menus w-full">
-                <x-services.links :service="$service" full-width />
-            </div>
         </div>
 
         @teleport('#resource-action-hud-slot')

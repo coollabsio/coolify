@@ -159,12 +159,28 @@
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
                     $heading = \Illuminate\Support\Str::headline($app['name'] ?? $rows->first()['service_name'] ?? 'Service');
+                    $hasHttpsDomains = $rows->contains(
+                        fn ($row) => ! ($row['is_suggested'] ?? false) && str_starts_with(strtolower($row['url']), 'https://')
+                    );
                 @endphp
                 <section id="service-domain-group-{{ $appId }}" wire:key="service-domain-group-{{ $appId }}"
                     x-show="matchesDomainSearch(@js($heading.' '.$rows->pluck('url')->implode(' ')))"
                     class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
-                    <div class="flex w-full items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div class="flex w-full flex-wrap items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
+                        @if ($hasHttpsDomains)
+                            <div class="w-full sm:w-72">
+                                <x-forms.listbox id="forceHttpsRedirects.{{ $appId }}"
+                                    htmlId="service-force-https-{{ $appId }}"
+                                    label="Redirect HTTP to HTTPS" onChange="updateForceHttps"
+                                    :onChangeArgs="[(int) $appId]"
+                                    helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                                    :options="[
+                                        ['value' => true, 'label' => 'Enabled'],
+                                        ['value' => false, 'label' => 'Disabled'],
+                                    ]" :disabled="! auth()->user()->can('update', $service)" />
+                            </div>
+                        @endif
                     </div>
 
                     <div wire:key="service-domain-rows-{{ $appId }}-{{ md5(serialize($rows->all())) }}">

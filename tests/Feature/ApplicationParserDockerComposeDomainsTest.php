@@ -399,7 +399,7 @@ YAML;
     expect(json_decode($plainApplication->docker_compose_domains, true))->toBeNull();
 });
 
-test('applicationParser selects the Coolify network for Traefik routed compose services', function () {
+test('applicationParser does not force the private resource network for Traefik routed compose services', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
@@ -422,7 +422,7 @@ YAML,
     $parsedCompose = applicationParser($application);
     $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
-    expect($labels->values()->all())->toContain("traefik.docker.network={$application->uuid}");
+    expect($labels->values()->all())->not->toContain("traefik.docker.network={$application->uuid}");
 });
 
 test('applicationParser preserves a user-selected Traefik network', function () {

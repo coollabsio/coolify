@@ -114,7 +114,8 @@ test('listbox forwards dynamic disabled state to its trigger', function () {
         ->toContain('x-model="selectedCloneProject"')
         ->toContain('x-model="selectedCloneEnvironment"')
         ->toContain('$wire.cloneTo(selectedCloneDestination)')
-        ->toContain('$wire.cloneTo(@js($resource->destination->uuid), selectedCloneEnvironment)')
+        ->toContain('$wire.cloneTo(currentDestinationUuid, selectedCloneEnvironment)')
+        ->not->toContain('$wire.cloneTo(@js(')
         ->toContain('x-bind:disabled="!selectedMoveProject || availableEnvironments.length === 0"');
 });
 

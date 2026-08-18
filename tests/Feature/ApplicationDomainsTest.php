@@ -119,6 +119,27 @@ it('lists existing domains as individual rows', function () {
     expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(2);
 });
 
+it('shows the HTTP redirect control for HTTPS domains and persists changes', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('isForceHttpsEnabled', true)
+        ->assertSee('Redirect HTTP to HTTPS')
+        ->assertSee('Keep enabled when Cloudflare uses Full or Full (Strict) SSL.')
+        ->set('isForceHttpsEnabled', false)
+        ->call('updateForceHttps')
+        ->assertHasNoErrors();
+
+    expect($this->application->settings->fresh()->is_force_https_enabled)->toBeFalse();
+});
+
+it('hides the HTTP redirect control for HTTP-only domains', function () {
+    $this->application->update(['fqdn' => 'http://app.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('Redirect HTTP to HTTPS');
+});
+
 it('shows one redirect direction control in each compose service header', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
