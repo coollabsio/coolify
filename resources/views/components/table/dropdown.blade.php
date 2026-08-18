@@ -36,7 +36,7 @@
     </div>
 
     <div x-ref="panel" x-show="open" x-cloak :style="panelStyle"
-        class="listbox-panel fixed! top-auto! right-auto! bottom-auto! z-[90]! mt-0! {{ $panelClass }}" role="{{ $role }}"
+        class="listbox-panel fixed! right-auto! bottom-auto! z-[90]! mt-0! {{ $panelClass }}" role="{{ $role }}"
         @if ($multiselectable) aria-multiselectable="true" @endif>
         {{ $slot }}
     </div>
