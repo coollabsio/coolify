@@ -28,14 +28,14 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public int $maxExceptions = 1;
 
-    public int $timeout = 3600;
+    public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
 
     private ?ScheduledVolumeBackupExecution $execution = null;
 
     public function __construct(public ScheduledVolumeBackup $backup)
     {
         $this->onQueue(crons_queue());
-        $this->timeout = $backup->timeout ?? 3600;
+        $this->timeout = $backup->timeout ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT;
     }
 
     public function middleware(): array

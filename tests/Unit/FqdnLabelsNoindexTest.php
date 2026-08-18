@@ -17,13 +17,14 @@ function traefikLabels(array $domains, ?array $noindex = null, bool $forceHttps 
     )->values()->all();
 }
 
-function caddyLabels(array $domains, ?array $noindex = null): array
+function caddyLabels(array $domains, ?array $noindex = null, bool $forceHttps = false): array
 {
     return fqdnLabelsForCaddy(
         network: 'testnetwork',
         uuid: 'testuuid',
         domains: collect($domains),
         onlyPort: 3000,
+        is_force_https_enabled: $forceHttps,
         noindex_domains: $noindex === null ? null : collect($noindex),
     )->values()->all();
 }
@@ -43,6 +44,33 @@ function middlewaresOf(array $labels, string $router): array
 }
 
 describe('Traefik noindex middleware', function () {
+    test('the HTTP router inherits the HTTPS middleware chain when redirects are disabled', function () {
+        $labels = fqdnLabelsForTraefik(
+            uuid: 'testuuid',
+            domains: collect(['https://example.com/api']),
+            is_force_https_enabled: false,
+            onlyPort: 3000,
+            serviceLabels: collect(['coolify.traefik.middlewares=rate-limit']),
+            redirect_direction: 'www',
+            is_http_basic_auth_enabled: true,
+            http_basic_auth_username: 'user',
+            http_basic_auth_password: 'secret',
+            noindex_domains: collect(['https://example.com/api']),
+        )->values()->all();
+
+        expect(middlewaresOf($labels, 'http-0-testuuid'))
+            ->toBe(middlewaresOf($labels, 'https-0-testuuid'))
+            ->toContain(
+                'https-0-testuuid-stripprefix',
+                'gzip',
+                '0-testuuid-to-www',
+                'http-basic-auth-testuuid',
+                '0-testuuid-noindex',
+                'rate-limit',
+            )
+            ->not->toContain('redirect-to-https');
+    });
+
     test('only the flagged domain gets the header', function () {
         $labels = traefikLabels(
             domains: ['https://prod.example.com', 'https://staging.example.com'],
@@ -138,6 +166,44 @@ describe('Traefik noindex middleware', function () {
 });
 
 describe('Caddy noindex header', function () {
+    test('serves an HTTPS public domain over HTTP and HTTPS when the HTTPS redirect is disabled', function () {
+        expect(caddyLabels(['https://example.com'], forceHttps: false))
+            ->toContain('caddy_0=http://example.com, https://example.com');
+    });
+
+    test('serves an HTTPS public domain over HTTPS when the HTTPS redirect is enabled', function () {
+        expect(caddyLabels(['https://example.com'], forceHttps: true))
+            ->toContain('caddy_0=https://example.com');
+    });
+
+    test('canonical redirects preserve the request scheme when the HTTPS redirect is disabled', function (string $domain, string $redirectDirection, string $expectedRedirect, string $httpsRedirect) {
+        $labels = fqdnLabelsForCaddy(
+            network: 'testnetwork',
+            uuid: 'testuuid',
+            domains: collect([$domain]),
+            is_force_https_enabled: false,
+            onlyPort: 3000,
+            redirect_direction: $redirectDirection,
+        );
+
+        expect($labels)
+            ->toContain($expectedRedirect)
+            ->not->toContain($httpsRedirect);
+    })->with([
+        'www redirect' => [
+            'https://example.com',
+            'www',
+            'caddy_0.redir={scheme}://www.example.com{uri}',
+            'caddy_0.redir=https://www.example.com{uri}',
+        ],
+        'non-www redirect' => [
+            'https://www.example.com',
+            'non-www',
+            'caddy_0.redir={scheme}://example.com{uri}',
+            'caddy_0.redir=https://example.com{uri}',
+        ],
+    ]);
+
     test('the flagged domain uses the header block, the other keeps the inline form', function () {
         $labels = caddyLabels(
             domains: ['https://prod.example.com', 'https://staging.example.com'],

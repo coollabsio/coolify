@@ -11,11 +11,26 @@
                 targets="fqdn,instance_name,public_ipv4,public_ipv6,dev_helper_version" />
             <x-application.settings-section title="General">
                 <div class="grid gap-4 lg:grid-cols-2">
-                    <div class="lg:col-span-2">
+                    <div @class([
+                        'lg:col-span-2' => !str_starts_with(strtolower($fqdn ?? ''), 'https://'),
+                    ])>
                         <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
                             helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-warning'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS."
                             placeholder="https://coolify.yourdomain.com" />
                     </div>
+
+                    @if (str_starts_with(strtolower($fqdn ?? ''), 'https://'))
+                        <div>
+                            <x-forms.listbox canGate="update" :canResource="$settings"
+                                id="is_dashboard_force_https_enabled" label="Redirect HTTP to HTTPS"
+                                onChange="submit"
+                                helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                                :options="[
+                                    ['value' => true, 'label' => 'Enabled'],
+                                    ['value' => false, 'label' => 'Disabled'],
+                                ]" />
+                        </div>
+                    @endif
 
                     <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name"
                         placeholder="Coolify" helper="Custom name for this Coolify instance." />

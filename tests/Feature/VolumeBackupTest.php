@@ -51,6 +51,43 @@ it('provides the volume backup domain classes and relationship', function () {
         ->and(method_exists(LocalFileVolume::class, 'scheduledBackups'))->toBeTrue();
 });
 
+it('allows large volume backups to run for ten hours by default', function () {
+    $backup = new ScheduledVolumeBackup;
+    $job = new VolumeBackupJob($backup);
+
+    expect($job->timeout)->toBe(36000)
+        ->and((new VolumeBackups)->timeout)->toBe(36000)
+        ->and(config('horizon.defaults.s6.timeout'))->toBeGreaterThan($job->timeout)
+        ->and(config('queue.connections.redis.retry_after'))->toBeGreaterThan(config('horizon.defaults.s6.timeout'));
+});
+
+it('changes the default volume backup timeout without changing existing timeouts', function () {
+    $team = Team::factory()->create();
+    [$application, $defaultVolume] = createVolumeBackupApplication($team);
+    $customVolume = LocalPersistentVolume::create([
+        'name' => 'custom-timeout-data',
+        'mount_path' => '/custom-data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+    $defaultBackup = $defaultVolume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'timeout' => 3600,
+    ]);
+    $customBackup = $customVolume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'timeout' => 7200,
+    ]);
+
+    $migration = require database_path('migrations/2026_08_15_000000_increase_default_volume_backup_timeout.php');
+    $migration->up();
+
+    expect($defaultBackup->fresh()->timeout)->toBe(3600)
+        ->and($customBackup->fresh()->timeout)->toBe(7200);
+});
+
 it('includes parallel gzip support in the Coolify helper image', function () {
     $dockerfile = file_get_contents(base_path('docker/coolify-helper/Dockerfile'));
 
@@ -220,6 +257,18 @@ it('creates a scheduled backup for a preselected application directory', functio
         ->assertDispatched('success');
 
     expect(ScheduledVolumeBackup::query()->sole()->backupable->is($directory))->toBeTrue();
+});
+
+it('renders the backup form for an application with only a directory target', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $volume->delete();
+    $directory = createApplicationBackupDirectory($application);
+
+    Livewire::test(CreateScheduledVolumeBackup::class, ['application' => $application])
+        ->assertSet('targetKey', 'directory:'.$directory->id)
+        ->assertSuccessful();
 });
 
 it('rejects files and directory mounts owned by another application as backup targets', function () {

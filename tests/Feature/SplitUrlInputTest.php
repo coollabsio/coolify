@@ -1,51 +1,31 @@
 <?php
 
-use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\MessageBag;
-use Illuminate\Support\ViewErrorBag;
-
 it('renders configurable host copy for S3 endpoints', function () {
-    View::share('errors', new ViewErrorBag);
-
-    $html = Blade::render(<<<'BLADE'
-        <x-forms.domain-input id="endpoint" :wire="false" value="http://192.168.1.50:9000/s3"
-            host-label="Host" host-placeholder="minio.internal or 192.168.1.50" />
-    BLADE);
+    $html = file_get_contents(resource_path('views/components/forms/domain-input.blade.php'));
 
     expect($html)
-        ->toContain('Host')
-        ->toContain('minio.internal or 192.168.1.50')
-        ->toContain("scheme: 'https'")
-        ->toContain("host: ''")
-        ->toContain("port: ''")
-        ->toContain("path: ''");
+        ->toContain('{{ $hostLabel }}')
+        ->toContain('{{ $hostPlaceholder }}')
+        ->toContain('wire:model="{{ $id }}.host"')
+        ->toContain('wire:model="{{ $id }}.port"')
+        ->toContain('wire:model="{{ $id }}.path"');
 });
 
-it('does not reparse partial numeric hosts while typing', function () {
+it('binds URL parts directly to Livewire without Alpine synchronization', function () {
     $view = file_get_contents(resource_path('views/components/forms/domain-input.blade.php'));
-    $writeMethod = str($view)->between('write() {', "\n    },\n}")->value();
 
-    expect($writeMethod)
-        ->toContain('this.syncing = true;')
-        ->toContain('this.value = next;')
-        ->toContain('this.$nextTick(() => this.syncing = false);')
-        ->and(strpos($writeMethod, 'this.syncing = true;'))
-        ->toBeLessThan(strpos($writeMethod, 'this.value = next;'));
+    expect($view)
+        ->toContain('wire:model="{{ $id }}.host"')
+        ->toContain('wire:model="{{ $id }}.port"')
+        ->not->toContain('x-data=')
+        ->not->toContain('$watch');
 });
 
 it('keeps validation errors attached to the composed endpoint', function () {
-    $settingsUrl = route('settings.advanced').'#endpoint-section';
-    $errors = new ViewErrorBag;
-    $errors->put('default', new MessageBag([
-        'endpoint' => "The endpoint is invalid. Configure allowed internal targets: {$settingsUrl}",
-    ]));
-    View::share('errors', $errors);
-
-    $html = Blade::render('<x-forms.domain-input id="endpoint" :wire="false" />');
+    $html = file_get_contents(resource_path('views/components/forms/domain-input.blade.php'));
 
     expect($html)
-        ->toContain('The endpoint is invalid.')
-        ->toContain('href="'.$settingsUrl.'"')
+        ->toContain('@error($errorId ?? "{$id}.host")')
+        ->toContain('href="{{ $validationLink }}"')
         ->toContain('Set them here.');
 });

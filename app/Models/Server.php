@@ -731,11 +731,12 @@ class Server extends BaseModel
                 ];
 
                 if ($schema === 'https') {
-                    $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
-                        0 => 'redirect-to-https',
-                    ];
+                    $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = $this->dashboardHttpMiddlewares($settings);
 
                     $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
+                        'middlewares' => [
+                            0 => 'gzip',
+                        ],
                         'entryPoints' => [
                             0 => 'https',
                         ],
@@ -789,8 +790,10 @@ class Server extends BaseModel
                 $url = Url::fromString($settings->fqdn);
                 $host = $url->getHost();
                 $schema = $url->getScheme();
+                $siteAddress = $this->dashboardCaddySiteAddress($settings, $schema, $host);
                 $caddy_file = "
-$schema://$host {
+$siteAddress {
+    encode zstd gzip
     handle /app/* {
         reverse_proxy coolify-realtime:6001
     }
@@ -815,6 +818,24 @@ $schema://$host {
         ], $this);
     }
 
+    public function dashboardHttpMiddlewares(InstanceSettings $settings): array
+    {
+        if ($settings->is_dashboard_force_https_enabled) {
+            return ['redirect-to-https'];
+        }
+
+        return ['gzip'];
+    }
+
+    public function dashboardCaddySiteAddress(InstanceSettings $settings, string $schema, string $host): string
+    {
+        if ($schema === 'https' && ! $settings->is_dashboard_force_https_enabled) {
+            return "http://{$host}, https://{$host}";
+        }
+
+        return "{$schema}://{$host}";
+    }
+
     public function proxyPath()
     {
         $base_path = config('constants.coolify.base_config_path');
@@ -835,6 +856,33 @@ $schema://$host {
     public function proxyType()
     {
         return data_get($this->proxy, 'type');
+    }
+
+    public function hasPendingProxyConfiguration(): bool
+    {
+        if ($this->proxy->get('status') !== 'running') {
+            return false;
+        }
+
+        $savedSettings = $this->proxy->get('last_saved_settings');
+        $appliedSettings = $this->proxy->get('last_applied_settings');
+
+        return filled($savedSettings) && filled($appliedSettings) && $savedSettings !== $appliedSettings;
+    }
+
+    public function hasCurrentTraefikOutdatedInfo(): bool
+    {
+        if ($this->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return false;
+        }
+
+        $detectedVersion = ltrim((string) $this->detected_traefik_version, 'v');
+        $storedVersion = ltrim((string) data_get($this->traefik_outdated_info, 'current'), 'v');
+        $type = data_get($this->traefik_outdated_info, 'type');
+
+        return filled($detectedVersion)
+            && $storedVersion === $detectedVersion
+            && in_array($type, ['patch_update', 'minor_upgrade'], true);
     }
 
     public function scopeWithProxy(): Builder

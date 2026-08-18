@@ -635,20 +635,31 @@ it('shows application Links as a compact badge beside the mobile status', functi
         ->toContain('<x-reicon name="chevron-down"');
 });
 
-it('keeps service Links full width on mobile headings', function () {
+it('shows service Links as a compact badge beside the mobile status', function () {
     $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-    $mobileServiceSection = str($service)->between('class="w-full md:hidden"', 'class="hidden w-full items-center md:flex')->toString();
-
-    expect($mobileServiceSection)
-        ->toContain('<x-services.links')
-        ->toContain('full-width')
-        ->toContain('resource-heading-menus')
-        ->not->toContain('<x-resource-heading-tabs');
-
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
+    $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
+    $mobileServiceTitle = str($service)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+    $mobileServiceActions = str($service)->between('<div class="w-full xl:hidden">', '@teleport')->toString();
+
+    expect($mobileServiceTitle)
+        ->toContain('<x-status-summary')
+        ->toContain('<x-services.links')
+        ->toContain('relative flex w-full min-w-0 items-center gap-2')
+        ->toContain('compact')
+        ->not->toContain('full-width');
+
+    expect($mobileServiceActions)
+        ->not->toContain('<x-services.links');
+
+    expect($serviceLinksComponent)
+        ->toContain('public bool $compact = false');
+
     expect($serviceLinks)
-        ->toContain("'button w-full justify-between' => \$fullWidth")
-        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
+        ->toContain("'static' => \$compact")
+        ->toContain("'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => \$compact")
+        ->toContain('@unless ($compact)')
+        ->toContain("'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => \$compact")
         ->toContain('<x-reicon name="chevron-down"')
         ->toContain('No links available');
 

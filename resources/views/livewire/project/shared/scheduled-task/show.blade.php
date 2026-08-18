@@ -27,21 +27,21 @@
             </x-slot:actions>
 
             <div class="grid gap-4 md:grid-cols-2">
-                <x-forms.input :disabled="!auth()->user()->can('update', $resource)" placeholder="Name" id="name"
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" placeholder="Name" id="name"
                     label="Name" required />
-                <x-forms.input :disabled="!auth()->user()->can('update', $resource)"
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
                     placeholder="0 0 * * * or daily" id="frequency" label="Schedule"
                     helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression."
                     required />
-                <x-forms.input :disabled="!auth()->user()->can('update', $resource)" type="number"
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" type="number"
                     placeholder="300" id="timeout" helper="Maximum execution time from 60 to 36,000 seconds."
                     label="Timeout (seconds)" required />
-                <x-forms.input :disabled="!auth()->user()->can('update', $resource)" placeholder="php"
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)" placeholder="php"
                     helper="Leave empty when the resource only has one container." id="container"
                     label="{{ $type === 'service' ? 'Service' : 'Container' }}" />
             </div>
             <div class="mt-4">
-                <x-forms.input :disabled="!auth()->user()->can('update', $resource)"
+                <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
                     placeholder="php artisan schedule:run" id="command" label="Command" required />
             </div>
         </x-application.settings-section>

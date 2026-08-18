@@ -7,7 +7,7 @@
                 <x-forms.input required label="Name" id="name" />
                 <x-forms.input label="Description" id="description" />
             </div>
-            <x-forms.domain-input id="endpoint" host-label="Host"
+            <x-forms.domain-input id="endpointParts" errorId="endpoint" host-label="Host"
                 host-placeholder="minio.internal or 192.168.1.50" />
             <div class="flex gap-2">
                 <x-forms.input required label="Bucket" id="bucket" />

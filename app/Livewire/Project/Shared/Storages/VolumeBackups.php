@@ -56,7 +56,7 @@ class VolumeBackups extends Component
 
     public string $timezone = '';
 
-    public int $timeout = 3600;
+    public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
 
     public int $perPage = 10;
 

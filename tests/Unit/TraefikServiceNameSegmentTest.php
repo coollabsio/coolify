@@ -95,3 +95,15 @@ test('fqdnLabelsForTraefik hyphenated services also receive a hash suffix', func
 
     expect($routerLine)->toContain("https-0-{$uuid}-another-service-{$hash}.rule=");
 });
+
+test('application labels keep redirect capture groups single escaped before compose generation', function () {
+    $labels = fqdnLabelsForTraefik(
+        uuid: 'application-uuid',
+        domains: collect(['https://example.com']),
+        redirect_direction: 'www',
+        escape_redirect_replacement_for_compose: false,
+    );
+
+    expect($labels)
+        ->toContain('traefik.http.middlewares.0-application-uuid-to-www.redirectregex.replacement=${1}://www.${2}');
+});

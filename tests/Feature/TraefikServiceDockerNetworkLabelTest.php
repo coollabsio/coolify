@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Bus;
 
 uses(RefreshDatabase::class);
 
-it('selects the Coolify service network for Traefik routed compose services', function () {
+it('selects the private service network for Traefik routed compose services', function () {
     Bus::fake();
 
     $team = Team::factory()->create();
