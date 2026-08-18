@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SmtpTransportFactory;
 use Illuminate\Config\Repository;
 
 class ConfigurationRepository
@@ -25,12 +26,7 @@ class ConfigurationRepository
         }
 
         if ($settings->smtp_enabled) {
-            $encryption = match (strtolower($settings->smtp_encryption)) {
-                'starttls' => null,
-                'tls' => 'tls',
-                'none' => null,
-                default => null,
-            };
+            $mailerOptions = SmtpTransportFactory::mailerOptions($settings);
 
             $this->config->set('mail.default', 'smtp');
             $this->config->set('mail.from.address', $settings->smtp_from_address ?? 'test@example.com');
@@ -39,12 +35,12 @@ class ConfigurationRepository
                 'transport' => 'smtp',
                 'host' => $settings->smtp_host,
                 'port' => $settings->smtp_port,
-                'encryption' => $encryption,
+                'encryption' => $mailerOptions['encryption'],
                 'username' => $settings->smtp_username,
                 'password' => $settings->smtp_password,
                 'timeout' => $settings->smtp_timeout,
                 'local_domain' => null,
-                'auto_tls' => $settings->smtp_encryption === 'none' ? '0' : '',
+                'auto_tls' => $mailerOptions['auto_tls'],
             ]);
         }
     }
