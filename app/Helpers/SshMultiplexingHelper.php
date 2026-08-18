@@ -94,7 +94,7 @@ class SshMultiplexingHelper
 
     public static function removeMuxFile(Server $server): void
     {
-        Process::run(self::muxControlCommand($server, 'exit'));
+        Process::run(self::muxControlCommand($server, 'stop'));
         self::clearConnectionMetadata($server);
     }
 

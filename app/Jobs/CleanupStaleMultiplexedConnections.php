@@ -216,7 +216,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
         }
 
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
-        $closeCommand = "ssh -O exit -o ControlPath={$muxSocket} localhost 2>/dev/null";
+        $closeCommand = "ssh -O stop -o ControlPath={$muxSocket} localhost 2>/dev/null";
         Process::run($closeCommand);
         Storage::disk('ssh-mux')->delete($muxFile);
 

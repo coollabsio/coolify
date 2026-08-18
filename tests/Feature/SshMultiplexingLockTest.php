@@ -98,13 +98,14 @@ it('refreshes an expired master before reuse', function () {
 
     Process::fake([
         '*-O check*' => Process::result(exitCode: 0),
-        '*-O exit*' => Process::result(exitCode: 0),
+        '*-O stop*' => Process::result(exitCode: 0),
         '*-fN *' => Process::result(exitCode: 0),
     ]);
 
     expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));
 });
 
@@ -302,6 +303,8 @@ it('removes mux files for non-existent servers when reaping is enabled', functio
     $method->invoke($job);
 
     expect(Storage::disk('ssh-mux')->exists($file))->toBeFalse();
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -O stop'));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'ssh -O exit'));
 });
 
 it('keeps mux files for non-existent servers in dry-run mode', function () {
