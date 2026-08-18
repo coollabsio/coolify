@@ -63,6 +63,9 @@ it('renders frontend-only application backup search data for volume names and fr
         ->assertDontSee('class="font-mono text-xs">daily', false)
         ->assertDontSee('backup-type-filter-trigger', false)
         ->assertDontSee('backup-sort-trigger', false);
+
+    expect(file_get_contents(resource_path('views/livewire/project/application/backup/index.blade.php')))
+        ->toContain('wire:key="application-heading-backup-index-{{ $application->id }}"');
 });
 
 it('renders frontend-only database backup search data for database names and frequencies', function () {

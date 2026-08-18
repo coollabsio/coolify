@@ -293,9 +293,6 @@ class Domains extends Component
                     $configured[] = $row;
                 }
 
-                foreach ($this->buildSuggestedWwwRows($configured, $stored, $serviceName) as $suggested) {
-                    $rows[] = $suggested;
-                }
             }
 
             return $this->sortDomainRowsByDnsStatus($rows);
@@ -305,7 +302,7 @@ class Domains extends Component
             $rows[] = $this->domainRowFromStored($url, null, $stored);
         }
 
-        return $this->sortDomainRowsByDnsStatus(array_merge($rows, $this->buildSuggestedWwwRows($rows, $stored)));
+        return $this->sortDomainRowsByDnsStatus($rows);
     }
 
     /**

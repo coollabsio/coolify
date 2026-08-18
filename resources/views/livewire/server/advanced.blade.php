@@ -6,7 +6,7 @@
     <livewire:server.navbar :server="$server" />
 
     <div
-        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="advanced" />
 
         <form wire:submit="submit" class="application-settings-form flex w-full flex-col gap-6">
@@ -23,6 +23,18 @@
                         label="Notification threshold" required
                         helper="Notify the team when root filesystem usage exceeds this percentage." />
                 </div>
+            </x-application.settings-section>
+
+            <x-application.settings-section id="server-backups-section" title="Backups"
+                helper="Limit how much CPU volume backup compression may use on this server.">
+                <x-forms.listbox canGate="update" :canResource="$server" id="backupCompressionCpuPercentage"
+                    label="Backup compression CPU" onChange="instantSave"
+                    helper="Sets how many CPU threads can be used to compress volume backups, based on this server's available CPUs." :options="[
+                        ['value' => 25, 'label' => 'Low (25%)'],
+                        ['value' => 50, 'label' => 'Balanced (50%)'],
+                        ['value' => 75, 'label' => 'High (75%)'],
+                        ['value' => 100, 'label' => 'Maximum (100%)'],
+                    ]" />
             </x-application.settings-section>
 
             <x-application.settings-section id="server-builds-section" title="Builds"

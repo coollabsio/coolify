@@ -154,6 +154,21 @@ topbar instead of repeating its name or status summary in layer 2. Mobile
 resource navigation may repeat this context because the desktop global topbar
 is hidden there.
 
+Desktop resource lifecycle actions dock in `#resource-action-hud-slot` and
+use `<x-resource-heading-overflow>`. Show primary actions (Deploy, Redeploy,
+Restart, Stop) as sibling header buttons. Collapse that group into an Actions
+dropdown only when the remaining top-bar width cannot fit them (breadcrumb
+keeps a 200px floor). Infrequent operations live in a separate Advanced
+dropdown with the grid icon: force restart / force deploy / force cleanup
+on services, and Traefik dashboard / refresh proxy status on servers. Place
+Advanced immediately after Links, or first in the action cluster when there
+is no Links control. Application Deploy is a dropdown with Deploy and
+Deploy (without cache). A running service Restart control is a dropdown with
+Restart current version and Pull latest and restart. Mobile
+headings keep a full-width Actions dropdown because the desktop HUD is hidden
+below `xl`. Do not hide primary actions behind a menu on a wide desktop. Links
+stay a separate dropdown because the URL list is unbounded.
+
 Only add layer-2 tabs when they represent real sibling routes inside one
 context. Never repeat main-sidebar destinations such as Dashboard, Projects,
 Terminal, Servers, Sources, Destinations, or Storage as a second tab row. A
@@ -161,6 +176,14 @@ single collection page does not need a tab just to fill the bar; keep its
 primary action in the page header instead. When tabs are useful, their left edge
 uses the same compact `pl-2` alignment as application navigation rather than
 the content container's wide horizontal padding.
+
+A layer-2 tab must be active on the page that renders it. A bar whose only tab
+points at a different route reads as broken navigation, so project and
+environment pages (`project.show`, `project.edit`, `project.environment.edit`,
+`project.clone-me`) carry a plain page header with a 24px title and a 13px
+muted summary instead of a bar. The environment identity and the way back to
+its resources already live in `x-top-breadcrumb`; do not restate them in a
+sub-header.
 
 The dashboard is a compact overview, not a metrics wall. Use two full-width
 sections that follow the projects-page grid pattern: projects first, then
@@ -618,6 +641,16 @@ Do not bring back the old oversized dark rectangle.
 Application and server browser terminals use the same browser-oriented console
 shell, theme picker, compact header controls, and outline `browser-terminal`
 Reicon. Hide a container switcher when only one container exists.
+
+The themed console shell belongs to an open session. Before a target is
+selected, the global Terminal page stays a normal top-level destination: a
+full-width layer card titled `Start a terminal session`, its filter input in
+the card header actions, and grouped `Servers` / `Containers` rows reusing the
+command-palette row classes. Do not render an empty full-height console canvas
+just to host the target picker, and do not offer the console theme selector
+before a session owns that canvas. Rows show the target name, a muted server
+column that only appears when the team has more than one server, and the shared
+chevron. Group headers stick to the top of the scrolling list and carry a count.
 
 ### Logs
 

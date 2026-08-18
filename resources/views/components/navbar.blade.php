@@ -167,6 +167,16 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Keys & Tokens</span>
                 </a>
             </li>
+            @if (isCloud() && auth()->user()->isAdmin())
+                <li>
+                    <a title="Subscription" {{ wireNavigate() }}
+                        class="{{ request()->is('subscription*') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                        :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('subscription.show') }}">
+                        <x-reicon name="subscription" class="menu-item-icon" />
+                        <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Subscription</span>
+                    </a>
+                </li>
+            @endif
             <li>
                 <a title="Tags" {{ wireNavigate() }}
                     class="{{ request()->is('tags*') ? 'menu-item-active menu-item' : 'menu-item' }}"
@@ -185,8 +195,17 @@
                     </a>
                 </li>
             @endif
-
             <li class="flex-1" aria-hidden="true"></li>
+        @endif
+        @if (auth()->id() === 0 && (isCloud() || isDev()))
+            <li>
+                <a title="Admin" {{ wireNavigate() }}
+                    class="{{ request()->is('admin') ? 'menu-item-active menu-item' : 'menu-item' }}"
+                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('admin.index') }}">
+                    <x-reicon name="fire" class="menu-item-icon text-pink-500" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Admin</span>
+                </a>
+            </li>
         @endif
         @if (isCloud() && ! isSubscribed())
             {{-- Unsubscribed cloud has no workspace items — keep these at the top of the list. --}}
@@ -208,7 +227,7 @@
         @endif
     </ul>
     {{-- Sticky sidebar collapser (desktop only; mobile uses a temporary slide-over) --}}
-    <div class="sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 border-t border-neutral-200 bg-white px-2 py-2 dark:border-white/[0.06] dark:bg-panel lg:-mx-3 lg:flex lg:px-3"
+    <div class="sticky bottom-0 mt-auto -mx-2 hidden items-center gap-1 bg-white px-2 py-2 dark:bg-panel lg:-mx-3 lg:flex lg:px-3"
         :class="collapsed ? 'flex-col-reverse justify-center' : 'justify-between'">
         <x-top-user-menu sidebar />
         <button type="button" @click="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar"

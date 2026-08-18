@@ -82,7 +82,7 @@
             @endif
         </button>
     @elseif ($trigger === 'account-menu')
-        <button wire:click="openWhatsNewModal" @click="open = false" type="button"
+        <button wire:click="openWhatsNewModal" type="button"
             class="listbox-option relative w-full text-left">
             <span class="flex items-center gap-2">
                 <svg class="size-4 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -112,8 +112,8 @@
                 <section
                     class="application-settings-form application-settings-section relative flex max-h-[calc(100dvh-3rem)] !w-full max-w-5xl flex-col overflow-hidden"
                     style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
-                    <header>
-                    <div class="flex min-w-0 items-center gap-3">
+                    <header class="relative !pr-11">
+                        <div class="flex min-w-0 items-center gap-3">
                         <div
                             class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.05] dark:text-fg-dim">
                             <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -134,8 +134,8 @@
                                 Product updates, fixes, and improvements.
                             </p>
                         </div>
-                    </div>
-                    <div class="flex items-center gap-2">
+                        </div>
+                        <div class="flex items-center gap-2">
                         @if (isDev())
                             <x-forms.button wire:click="manualFetchChangelog" class="gap-1.5">
                                 <svg class="size-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -151,12 +151,12 @@
                                 Mark all read
                             </x-forms.button>
                         @endif
+                        </div>
                         <button wire:click="closeWhatsNewModal"
-                            class="flex size-7 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 hover:bg-neutral-100 hover:text-black focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                            class="absolute right-2 top-2 flex size-7 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 hover:bg-neutral-100 hover:text-black focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
                             aria-label="Close What's new">
                             <x-reicon name="x" class="size-4" />
                         </button>
-                    </div>
                     </header>
 
                     <div class="application-settings-section-body flex min-h-0 flex-1 flex-col !p-0">

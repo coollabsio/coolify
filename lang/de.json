@@ -13,7 +13,7 @@
     "auth.confirm_password": "Passwort bestätigen",
     "auth.forgot_password_link": "Passwort vergessen?",
     "auth.forgot_password_heading": "Passwort-Wiederherstellung",
-    "auth.forgot_password_send_email": "Passwort zurücksetzen E-Mail senden",
+    "auth.forgot_password_send_email": "E-Mail zum Zurücksetzen des Passworts senden",
     "auth.register_now": "Registrieren",
     "auth.logout": "Abmelden",
     "auth.register": "Registrieren",

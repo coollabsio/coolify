@@ -16,7 +16,6 @@ test('dashboard navbar hides family titles at lg to match the desktop shell', fu
 test('fixed layer-2 spacers match the fixed bar height', function () {
     $paths = [
         resource_path('views/components/dashboard/navbar.blade.php'),
-        resource_path('views/components/project/navbar.blade.php'),
         resource_path('views/livewire/server/navbar.blade.php'),
         resource_path('views/livewire/project/application/heading.blade.php'),
         resource_path('views/livewire/project/database/heading.blade.php'),

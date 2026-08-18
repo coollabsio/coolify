@@ -23,3 +23,25 @@ test('deployment logs use light surfaces in light mode and dark surfaces in dark
         ->toMatch('/\.logs-viewer\s*\{[^}]*background:\s*#fff;[^}]*color:\s*#262626;/s')
         ->toMatch('/\.dark \.logs-viewer\s*\{[^}]*background:\s*var\(--color-log\);/s');
 });
+
+test('log search hides lines that do not match', function () {
+    $styles = file_get_contents(resource_path('css/app.css'));
+
+    expect($styles)
+        ->toMatch('/\.logs-viewer-line\.hidden\s*\{[^}]*display:\s*none;/s');
+});
+
+test('turning off follow logs stays off at the bottom of the log viewer', function () {
+    $views = [
+        resource_path('views/livewire/project/application/deployment/show.blade.php'),
+        resource_path('views/livewire/project/shared/get-logs.blade.php'),
+    ];
+
+    foreach ($views as $view) {
+        expect(file_get_contents($view))
+            ->toContain('followManuallyDisabled: false')
+            ->toContain('!this.followManuallyDisabled && distanceFromBottom <= 10')
+            ->toContain('this.followManuallyDisabled = true')
+            ->toContain('this.followManuallyDisabled = false');
+    }
+});

@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -197,6 +198,70 @@ function checkMinimumDockerEngineVersion($dockerVersion)
     }
 
     return $dockerVersion;
+}
+
+function parseDockerEngineVersion(?string $rawVersion): ?string
+{
+    if ($rawVersion === null || trim($rawVersion) === '') {
+        return null;
+    }
+
+    if (preg_match('/\d+\.\d+(?:\.\d+)?/', $rawVersion, $matches) !== 1) {
+        return null;
+    }
+
+    $parts = explode('.', $matches[0]);
+
+    return sprintf('%d.%d.%d', (int) $parts[0], (int) ($parts[1] ?? 0), (int) ($parts[2] ?? 0));
+}
+
+function dockerEngineVersionFromJson(?string $raw): ?string
+{
+    if ($raw === null || trim($raw) === '') {
+        return null;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (! is_array($decoded)) {
+        return null;
+    }
+
+    $version = $decoded['Server']['Version'] ?? null;
+
+    return is_string($version) ? parseDockerEngineVersion($version) : null;
+}
+
+function dockerStopTimeoutOption(?string $dockerVersion): string
+{
+    $normalized = parseDockerEngineVersion($dockerVersion);
+    if ($normalized !== null && version_compare($normalized, '28.0.0', '>=')) {
+        return '--timeout';
+    }
+
+    return '--time';
+}
+
+function dockerStopCommand(int $timeout, string $containers, Server|string|null $dockerVersion = null): string
+{
+    $version = $dockerVersion instanceof Server
+        ? $dockerVersion->dockerVersion()
+        : $dockerVersion;
+
+    $option = dockerStopTimeoutOption($version);
+    $flag = $option === '--timeout'
+        ? "--timeout={$timeout}"
+        : "--time={$timeout}";
+
+    $command = "docker stop {$flag} {$containers}";
+
+    if (app()->bound('config') && isDev()) {
+        Log::info('docker stop command', [
+            'command' => $command,
+            'docker_version' => $version,
+        ]);
+    }
+
+    return $command;
 }
 function escapeShellValue(string $value): string
 {

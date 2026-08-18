@@ -49,7 +49,7 @@
     }"
     @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.service)"
     @edit-domain-saved.window="closeEditDomain()">
-    <x-application.settings-section id="domains-section" title="Domains" :helper="$helperText">
+    <x-application.settings-section id="domains-section" title="Domains">
         @can('update', $application)
             <x-slot:actions>
                 <x-forms.button wire:click="checkAllDns" wire:loading.attr="disabled" wire:target="checkAllDns,checkDomainDns">
@@ -77,6 +77,10 @@
                 You don't have permission to manage domains. Contact your team administrator for access.
             </x-callout>
         @endcannot
+
+        <p class="text-sm text-neutral-500 dark:text-fg-dim">
+            {{ $helperText }}
+        </p>
 
     </x-application.settings-section>
 
@@ -233,7 +237,7 @@
                             <div class="data-table-header domains-table-grid-service">
                                 <span>Domain</span>
                                 <span>DNS Check</span>
-                                <span>Search engine indexing</span>
+                                <span class="whitespace-nowrap">Search engine indexing</span>
                                 <span></span>
                             </div>
                             @foreach ($rows as $row)
@@ -269,7 +273,7 @@
                 <div class="data-table-header domains-table-grid">
                     <span>Domain</span>
                     <span>DNS Check</span>
-                    <span>Search engine indexing</span>
+                    <span class="whitespace-nowrap">Search engine indexing</span>
                     <span>Direction</span>
                     <span></span>
                 </div>

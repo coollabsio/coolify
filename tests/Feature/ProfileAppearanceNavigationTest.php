@@ -34,23 +34,23 @@ it('does not show a redundant enabled badge for two-factor authentication', func
         ->not->toContain('<x-status-badge status="Enabled" type="success" />');
 });
 
-it('keeps color theme preferences on the profile appearance view without page width or density controls', function () {
+it('offers full and centered page width preferences on the profile appearance view', function () {
     $appearanceView = file_get_contents(resource_path('views/livewire/profile/appearance.blade.php'));
+    $appLayout = file_get_contents(resource_path('views/layouts/app.blade.php'));
 
     expect($appearanceView)
         ->not->toContain('<x-profile.navbar />')
         ->toContain('Color theme')
-        ->toContain("setTheme('{{ \$option['value'] }}')")
-        ->toContain("['value' => 'light'")
-        ->toContain("['value' => 'system'")
-        ->toContain('to-[#050505]')
-        ->toContain("['value' => 'dark'")
-        ->not->toContain('Page width')
+        ->toContain('Page width')
+        ->toContain("pageWidth: localStorage.getItem('pageWidth') || 'full'")
+        ->toContain("['value' => 'full'")
+        ->toContain("['value' => 'centered'")
+        ->toContain("@click=\"setWidth('{{ \$option['value'] }}')\"")
+        ->toContain("localStorage.setItem('pageWidth', width)")
         ->not->toContain('Interface density')
-        ->not->toContain('setWidth(')
         ->not->toContain('setZoom(')
-        ->not->toContain('pageWidth')
-        ->not->toContain("localStorage.getItem('zoom')")
-        ->not->toContain("localStorage.setItem('pageWidth'")
-        ->not->toContain("localStorage.setItem('zoom'");
+        ->and($appLayout)
+        ->toContain("pageWidth: localStorage.getItem('pageWidth') || 'full'")
+        ->toContain('@page-width-changed.window="pageWidth = $event.detail"')
+        ->toContain("pageWidth === 'centered' ? 'mx-auto max-w-[1400px]' : 'max-w-none'");
 });

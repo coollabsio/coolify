@@ -20,17 +20,12 @@
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">
-                        <div class="relative" @click.outside="filterOpen = false">
-                            <button type="button" class="button" @click="filterOpen = !filterOpen"
-                                aria-haspopup="listbox" aria-controls="resource-type-filter-options"
-                                :aria-expanded="filterOpen">
+                        <x-table.dropdown panel-class="w-48!">
+                            <x-slot:trigger><button type="button" class="button"
+                                aria-haspopup="listbox" :aria-expanded="open">
                                 <x-reicon name="filter" class="size-3.5" />
                                 Filter
-                            </button>
-                            <div id="resource-type-filter-options" x-show="filterOpen" x-cloak
-                                x-transition.opacity.duration.120ms role="listbox" aria-label="Resource type"
-                                @keydown.escape.stop="filterOpen = false; $el.previousElementSibling.focus()"
-                                class="listbox-panel left-auto! right-0! z-[90]! min-w-48!">
+                            </button></x-slot:trigger>
                                 <div
                                     class="px-2 py-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
                                     Resource type
@@ -38,14 +33,13 @@
                                 <template x-for="option in resourceTypeOptions" :key="option.value">
                                     <button type="button" class="listbox-option" role="option"
                                         :aria-selected="resourceType === option.value"
-                                        @click="resourceType = option.value; filterOpen = false">
+                                        @click="resourceType = option.value; close()">
                                         <span x-text="option.label"></span>
                                         <x-reicon name="check-circle" class="size-3.5 text-accent"
                                             x-show="resourceType === option.value" />
                                     </button>
                                 </template>
-                            </div>
-                        </div>
+                        </x-table.dropdown>
 
                         <div class="relative w-48" @click.outside="closeCategoryFilter()">
                             <button type="button" class="listbox-trigger"
@@ -114,8 +108,10 @@
                     <div
                         class="application-settings-section-body grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
                         <template x-for="application in filteredGitBasedApplications" :key="application.name">
-                            <article
-                                class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
+                                @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
+                                @keydown.space.self.prevent="setType(application.id)"
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -146,21 +142,22 @@
                                 <div
                                     class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                     <a class="button" :href="application.documentation" target="_blank"
-                                        rel="noopener noreferrer">
+                                        rel="noopener noreferrer" @click.stop>
                                         Docs
                                     </a>
-                                    <button type="button"
-                                        class="button ml-auto button-highlighted"
-                                        :disabled="selecting" @click="setType(application.id)">
+                                    <span class="button button-highlighted ml-auto">
                                         Deploy
-                                    </button>
+                                        <x-reicon name="arrow-right" class="size-3.5" />
+                                    </span>
                                 </div>
                             </article>
                         </template>
 
                         <template x-for="application in filteredDockerBasedApplications" :key="application.name">
-                            <article
-                                class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <article role="button" tabindex="0" :aria-label="'Deploy ' + application.name"
+                                @click="setType(application.id)" @keydown.enter.self.prevent="setType(application.id)"
+                                @keydown.space.self.prevent="setType(application.id)"
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-start gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -181,14 +178,13 @@
                                 <div
                                     class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                     <a class="button" :href="application.documentation" target="_blank"
-                                        rel="noopener noreferrer">
+                                        rel="noopener noreferrer" @click.stop>
                                         Docs
                                     </a>
-                                    <button type="button"
-                                        class="button ml-auto button-highlighted"
-                                        :disabled="selecting" @click="setType(application.id)">
+                                    <span class="button button-highlighted ml-auto">
                                         Deploy
-                                    </button>
+                                        <x-reicon name="arrow-right" class="size-3.5" />
+                                    </span>
                                 </div>
                             </article>
                         </template>
@@ -207,8 +203,10 @@
                     <div
                         class="application-settings-section-body grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
                         <template x-for="database in filteredDatabases" :key="database.id">
-                            <article
-                                class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                            <article role="button" tabindex="0" :aria-label="'Deploy ' + database.name"
+                                @click="setType(database.id)" @keydown.enter.self.prevent="setType(database.id)"
+                                @keydown.space.self.prevent="setType(database.id)"
+                                class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                 <div class="flex min-w-0 items-center gap-3">
                                     <div
                                         class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -241,18 +239,17 @@
                                 <div
                                     class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                     <a :href="databaseDocsUrl(database)" target="_blank" rel="noopener noreferrer"
-                                        class="button">
+                                        class="button" @click.stop>
                                         Docs
                                     </a>
                                     <a :href="databaseWebsiteUrl(database)" target="_blank" rel="noopener noreferrer"
-                                        class="button">
+                                        class="button" @click.stop>
                                         Website
                                     </a>
-                                    <button type="button"
-                                        class="button ml-auto button-highlighted"
-                                        :disabled="selecting" @click="setType(database.id)">
+                                    <span class="button button-highlighted ml-auto">
                                         Deploy
-                                    </button>
+                                        <x-reicon name="arrow-right" class="size-3.5" />
+                                    </span>
                                 </div>
                             </article>
                         </template>
@@ -282,8 +279,11 @@
 
                         <div class="grid grid-cols-1 justify-start gap-3 text-left md:grid-cols-2 xl:grid-cols-3">
                             <template x-for="service in filteredServices" :key="service.name">
-                                <article
-                                    class="flex min-h-48 flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                                <article role="button" tabindex="0" :aria-label="'Deploy ' + service.name"
+                                    @click="setType('one-click-service-' + service.id)"
+                                    @keydown.enter.self.prevent="setType('one-click-service-' + service.id)"
+                                    @keydown.space.self.prevent="setType('one-click-service-' + service.id)"
+                                    class="group flex min-h-48 cursor-pointer flex-col rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
                                     <div class="flex min-w-0 items-start gap-3">
                                         <div
                                             class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
@@ -317,20 +317,18 @@
                                     <div
                                         class="mt-auto flex items-center gap-1.5 border-t border-neutral-200 pt-3 dark:border-white/[0.07]">
                                         <a :href="getDocLink(service) || coolifyDocsUrl(service)" target="_blank"
-                                            rel="noopener noreferrer" @mouseenter="resolveDocLink(service)"
+                                            rel="noopener noreferrer" @mouseenter="resolveDocLink(service)" @click.stop
                                             class="button" :class="{ 'opacity-60': docCheckInProgress[service.name] }">
                                             Docs
                                         </a>
                                         <a x-show="serviceWebsiteUrl(service)" :href="serviceWebsiteUrl(service)"
-                                            target="_blank" rel="noopener noreferrer" class="button">
+                                            target="_blank" rel="noopener noreferrer" class="button" @click.stop>
                                             Website
                                         </a>
-                                        <button type="button"
-                                            class="button ml-auto button-highlighted"
-                                            :disabled="selecting"
-                                            @click="setType('one-click-service-' + service.id)">
+                                        <span class="button button-highlighted ml-auto">
                                             Deploy
-                                        </button>
+                                            <x-reicon name="arrow-right" class="size-3.5" />
+                                        </span>
                                     </div>
                                 </article>
                             </template>

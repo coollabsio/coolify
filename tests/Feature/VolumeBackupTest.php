@@ -31,6 +31,7 @@ use Illuminate\Routing\Redirector;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Route;
@@ -48,6 +49,12 @@ it('provides the volume backup domain classes and relationship', function () {
         ->and(class_exists(VolumeBackups::class))->toBeTrue()
         ->and(method_exists(LocalPersistentVolume::class, 'scheduledBackups'))->toBeTrue()
         ->and(method_exists(LocalFileVolume::class, 'scheduledBackups'))->toBeTrue();
+});
+
+it('includes parallel gzip support in the Coolify helper image', function () {
+    $dockerfile = file_get_contents(base_path('docker/coolify-helper/Dockerfile'));
+
+    expect($dockerfile)->toContain('pigz');
 });
 
 it('keeps the volume backup script inside the Livewire root element', function () {
@@ -1563,11 +1570,12 @@ it('marks a running execution failed even when the job instance lost its executi
         && str_contains($process->command, 'timed-out.tar.gz'));
 });
 
-it('archives a named volume on its server', function () {
+it('archives a named volume using the server compression CPU percentage', function (int $compressionCpuPercentage) {
     config(['broadcasting.default' => 'null']);
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
     $team = Team::factory()->create();
-    [$application, $volume] = createVolumeBackupApplication($team);
+    [$application, $volume, $server] = createVolumeBackupApplication($team);
+    $server->settings->update(['backup_compression_cpu_percentage' => $compressionCpuPercentage]);
     $backup = $volume->scheduledBackups()->create([
         'team_id' => $team->id,
         'frequency' => 'daily',
@@ -1599,11 +1607,54 @@ it('archives a named volume on its server', function () {
     Process::assertRan(fn ($process) => str_contains($process->command, 'docker volume inspect')
         && str_contains($process->command, 'docker run --rm --name ')
         && str_contains($process->command, 'app-data:/volume:ro')
-        && str_contains($process->command, 'tar -czf -')
+        && str_contains($process->command, 'command -v pigz')
+        && str_contains($process->command, 'pigz -3 -p')
+        && str_contains($process->command, "\$(nproc) * {$compressionCpuPercentage} + 99")
+        && str_contains($process->command, 'gzip -3')
+        && str_contains($process->command, 'tar -I "$compressor" -cf -')
         && str_contains($process->command, '> ')
         && str_contains($process->command, '.tar.gz')
         && ! str_contains($process->command, ':/backup'));
-});
+})->with([
+    'low' => 25,
+    'high' => 75,
+]);
+
+it('logs the selected volume backup compressor in development', function (string $detectedCompressor) {
+    config(['app.env' => 'local', 'broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'retention_amount_locally' => 7,
+        'retention_days_locally' => 0,
+        'retention_max_storage_locally' => 0,
+        'retention_amount_s3' => 7,
+        'retention_days_s3' => 0,
+        'retention_max_storage_s3' => 0,
+    ]);
+
+    Process::fake([
+        '*command -v pigz*' => $detectedCompressor,
+        '*du -b*' => '128',
+        '*' => '',
+    ]);
+    Log::spy();
+
+    (new VolumeBackupJob($backup))->handle();
+
+    Log::shouldHaveReceived('info')->once()->with(
+        'Volume backup compressor selected',
+        Mockery::on(fn (array $context): bool => $context['compressor'] === $detectedCompressor
+            && $context['backup_id'] === $backup->id
+            && $context['cpu_percentage'] === 25),
+    );
+})->with([
+    'pigz' => 'pigz -3 -p 4',
+    'gzip fallback' => 'gzip -3',
+]);
 
 it('keeps the upload destination on the volume backup execution', function () {
     config(['broadcasting.default' => 'null']);

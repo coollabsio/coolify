@@ -54,15 +54,13 @@
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <div class="relative" @click.outside="sortOpen = false" @keydown.escape.window="sortOpen = false">
-                        <button type="button" class="button" @click="sortOpen = !sortOpen">
+                    <x-table.dropdown panel-class="w-48!">
+                        <x-slot:trigger><button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
                             <x-reicon name="sort-direction" class="size-3.5" />
                             Sort
-                        </button>
-                        <div x-show="sortOpen" x-cloak x-transition.opacity.duration.120ms
-                            class="listbox-panel left-auto! right-0! z-[90]! min-w-48!">
+                        </button></x-slot:trigger>
                             <button type="button" class="listbox-option"
-                                @click="sharedSort = 'alphabetical'; sortOpen = false">
+                                @click="sharedSort = 'alphabetical'; close()">
                                 <span>Alphabetical</span>
                                 <svg x-show="sharedSort === 'alphabetical'" class="size-3.5 shrink-0" viewBox="0 0 24 24"
                                     fill="none">
@@ -71,7 +69,7 @@
                                 </svg>
                             </button>
                             <button type="button" class="listbox-option"
-                                @click="sharedSort = 'creation'; sortOpen = false">
+                                @click="sharedSort = 'creation'; close()">
                                 <span>Creation order</span>
                                 <svg x-show="sharedSort === 'creation'" class="size-3.5 shrink-0" viewBox="0 0 24 24"
                                     fill="none">
@@ -79,8 +77,7 @@
                                         stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
                             </button>
-                        </div>
-                    </div>
+                    </x-table.dropdown>
 
                     @can('update', $resource)
                         <x-modal-input title="New Shared Variable">

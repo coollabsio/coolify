@@ -21,7 +21,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, hostPath: ?string, isPreviewSuffixEnabled: bool, isReadOnly: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, hostPath: ?string, isPreviewSuffixEnabled: bool, isReadOnly: bool, canDeleteStale: bool}>
      */
     public array $forms = [];
 
@@ -42,13 +42,16 @@ class All extends Component
 
     public bool $canUpdate = false;
 
+    public bool $deleteDockerVolume = false;
+
     protected $listeners = ['refreshStorages' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
 
     public function mount(): void
     {
         $this->canUpdate = (bool) auth()->user()?->can('update', $this->resource);
         $this->supportsPreviewSuffix = $this->resource instanceof Application
-            && $this->resource->git_based();
+            && $this->resource->git_based()
+            && filled($this->resource->git_repository);
         $this->showActionsColumn = $this->canUpdate;
         $this->showBackupAction = $this->resource instanceof Application
             || $this->resource instanceof ServiceApplication
@@ -129,10 +132,33 @@ class All extends Component
 
         $storage = $this->findStorageOrFail($storageId);
 
+        if ($this->isComposeOrService && $storage->isDeclaredInCompose()) {
+            $this->dispatch('error', 'This volume is managed by the current Docker Compose file.');
+
+            return false;
+        }
+
         if ($storage->scheduledBackups()->exists()) {
             $this->dispatch('error', 'Delete this volume backup schedule and its archives before deleting the volume.');
 
             return false;
+        }
+
+        $this->deleteDockerVolume = in_array('deleteDockerVolume', $selectedActions, true);
+        if ($this->deleteDockerVolume) {
+            $server = $this->resource instanceof Application
+                ? $this->resource->destination->server
+                : $this->resource->service->server;
+
+            try {
+                instant_remote_process([
+                    'docker volume rm -f '.escapeshellarg($storage->name),
+                ], $server);
+            } catch (\Throwable $exception) {
+                $this->dispatch('error', 'Failed to delete the Docker volume: '.$exception->getMessage());
+
+                return false;
+            }
         }
 
         $storage->delete();
@@ -169,6 +195,9 @@ class All extends Component
                 'hostPath' => $storage->host_path,
                 'isPreviewSuffixEnabled' => (bool) ($storage->is_preview_suffix_enabled ?? true),
                 'isReadOnly' => $storage->shouldBeReadOnlyInUI() || ! $this->canUpdate,
+                'canDeleteStale' => $this->canUpdate
+                    && ($storage->isServiceResource() || $storage->isDockerComposeResource())
+                    && ! $storage->isDeclaredInCompose(),
             ];
         }
         $this->forms = $forms;

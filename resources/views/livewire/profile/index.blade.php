@@ -7,7 +7,7 @@
 }"
     @close-email-change-modal.window="emailModalOpen = false">
     <x-slot:title>Profile | Coolify</x-slot>
-    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+    <div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
         <section class="application-settings-section" x-data="{
             preview: null,
             processing: false,

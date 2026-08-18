@@ -2,6 +2,7 @@
 
 namespace App\Actions\Service;
 
+use App\Events\ServiceStatusChanged;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -21,5 +22,8 @@ class StopServiceApplication
         instant_remote_process([
             "docker stop {$containerName}",
         ], $server);
+
+        $serviceApplication->update(['status' => 'exited']);
+        ServiceStatusChanged::dispatch($service->environment->project->team->id);
     }
 }

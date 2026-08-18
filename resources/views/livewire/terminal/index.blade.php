@@ -22,6 +22,8 @@
             $terminalOptions[] = [
                 'value' => $server->uuid,
                 'label' => $server->name.' · Server',
+                'name' => $server->name,
+                'server' => $server->name,
                 'type' => 'server',
             ];
 
@@ -30,6 +32,8 @@
                     $terminalOptions[] = [
                         'value' => $container['uuid'],
                         'label' => $server->name.' · '.$container['name'],
+                        'name' => $container['name'],
+                        'server' => $server->name,
                         'type' => 'container',
                     ];
                 }
@@ -41,7 +45,8 @@
         ?? 'Select a server or container';
 @endphp
 
-<div class="terminal-page application-settings-form" x-init="$wire.loadContainers()">
+<div class="{{ $selected_uuid === 'default' ? '' : 'terminal-page' }} application-settings-form"
+    x-init="$wire.loadContainers()">
     <x-slot:title>
         Terminal | Coolify
     </x-slot>
@@ -57,11 +62,12 @@
         </p>
     </header>
 
-    <section class="terminal-page-console min-h-0 w-full flex-1 overflow-hidden"
+    <section class="{{ $selected_uuid === 'default' ? 'w-full' : 'terminal-page-console min-h-0 w-full flex-1 overflow-hidden' }}"
         x-on:terminal-theme-selected="setTheme($event.detail.theme)"
         x-on:terminal-starting.window="syncTheme()"
         x-data="{
             targets: @js($terminalOptions),
+            multipleServers: @js($servers->count() > 1),
             currentTargetLabel: @js($terminalLabel),
             targetChosen: @js($selected_uuid !== 'default'),
             targetOpen: false,
@@ -106,72 +112,68 @@
             }
         }">
         @if ($selected_uuid === 'default')
-                <div wire:key="terminal-target-canvas" data-terminal-target-canvas
-                    class="application-console-shell relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden rounded-lg p-3 sm:p-6"
-                    :data-console-theme="consoleTheme"
-                    :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
-                    <div class="absolute top-3 right-3 z-20">
-                        <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
-                            :theme-accents="$consoleThemeAccents" />
-                    </div>
-                    <div data-terminal-target-picker="page"
-                        class="terminal-target-picker z-10 flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-lg border shadow-[0_18px_50px_rgba(0,0,0,0.28)]">
-                    <div class="shrink-0 border-b border-white/[0.08] p-4">
-                        <h2 class="text-base font-semibold text-white/85">Start a terminal session</h2>
-                        <p class="mt-1 text-sm text-white/55">
-                            {{ $isLoadingContainers ? 'Finding available servers and containers…' : 'Choose a server or container. The terminal will open after you select a target.' }}
-                        </p>
-                        @if (! $isLoadingContainers && $servers->isNotEmpty())
-                            <div class="relative mt-3">
+            <div wire:key="terminal-target-canvas" data-terminal-target-canvas
+                class="application-settings-workspace flex w-full min-w-0 flex-col">
+                <x-application.settings-section class="terminal-target-card" data-terminal-target-picker="page"
+                    title="Start a terminal session" flush>
+                    @if (! $isLoadingContainers && $servers->isNotEmpty())
+                        <x-slot:actions>
+                            <div class="relative w-full sm:w-64">
                                 <x-reicon name="search"
-                                    class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-white/40" />
-                                <input x-model.debounce.100ms="targetSearch" type="search" placeholder="Filter targets…"
-                                    class="w-full rounded-md! border-white/[0.1]! bg-black/15! py-2! pr-3! pl-9! text-sm! text-white! shadow-none! placeholder:text-white/35 focus:border-white/25! focus:ring-0!">
+                                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                                <input x-model.debounce.100ms="targetSearch" type="search" placeholder="Filter targets"
+                                    aria-label="Filter terminal targets"
+                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                                <button x-cloak x-show="targetSearch" x-on:click="targetSearch = ''" type="button"
+                                    class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                                    aria-label="Clear target filter">
+                                    <span class="text-sm leading-none">×</span>
+                                </button>
                             </div>
-                        @endif
-                    </div>
-                    <div class="terminal-target-list min-h-0 flex-1 overflow-y-auto p-2">
-                        @if ($isLoadingContainers)
-                            <div class="flex min-h-28 items-center justify-center">
-                                <div class="terminal-loading-label flex items-center gap-2">
-                                    <x-loading class="size-4" />
-                                    <span>Loading servers and containers…</span>
-                                </div>
-                            </div>
-                        @elseif ($servers->isEmpty())
-                            <div class="px-3 py-8 text-center">
-                                <div class="text-sm font-medium text-white/70">No terminal targets available</div>
-                                <div class="mt-1 text-xs text-white/45">Connect a reachable server and enable terminal access.</div>
-                            </div>
-                        @else
+                        </x-slot:actions>
+                    @endif
+
+                    @if ($isLoadingContainers)
+                        <div class="flex min-h-40 items-center justify-center gap-2 text-[13px] text-neutral-500 dark:text-fg-dim">
+                            <x-loading class="size-4" />
+                            <span>Finding available servers and containers…</span>
+                        </div>
+                    @elseif ($servers->isEmpty())
+                        <x-empty title="No terminal targets available"
+                            description="Connect a reachable server and enable terminal access to start a session."
+                            icon-name="browser-terminal" />
+                    @else
+                        <div class="terminal-target-card-list">
                             <template x-for="group in filteredTargetGroups" :key="group.type">
-                                <section class="not-last:mb-2">
-                                    <div class="px-3 py-2 text-[10px] font-semibold tracking-wider text-white/40 uppercase"
-                                        x-text="group.label"></div>
+                                <section class="command-palette-section">
+                                    <div class="terminal-target-group-label">
+                                        <span x-text="group.label"></span>
+                                        <span class="terminal-target-group-count" x-text="group.targets.length"></span>
+                                    </div>
                                     <template x-for="target in group.targets" :key="target.value">
-                                        <button type="button"
-                                            class="flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm text-white/70 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                        <button type="button" class="command-palette-item cursor-pointer"
                                             x-on:click="selectTarget(target)">
-                                            <x-reicon name="servers" x-show="target.type === 'server'"
-                                                class="size-4 shrink-0 text-white/40" />
-                                            <x-reicon name="layers" x-show="target.type === 'container'"
-                                                class="size-4 shrink-0 text-white/40" />
-                                            <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
-                                            <span class="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/40"
-                                                x-text="target.type"></span>
-                                            <x-reicon name="arrow-right" class="size-3.5 shrink-0 text-white/35" />
+                                            <x-reicon name="servers" x-cloak x-show="target.type === 'server'"
+                                                class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" />
+                                            <x-reicon name="layers" x-cloak x-show="target.type === 'container'"
+                                                class="size-3.5 shrink-0 text-neutral-400 dark:text-fg-faint" />
+                                            <span class="command-palette-item-name min-w-0 flex-1"
+                                                x-text="target.name"></span>
+                                            <span x-cloak x-show="multipleServers"
+                                                class="terminal-target-item-server" x-text="target.server"></span>
+                                            <x-reicon name="arrow-right" class="command-palette-item-chevron" />
                                         </button>
                                     </template>
                                 </section>
                             </template>
                             <div x-show="filteredTargetGroups.length === 0"
-                                class="px-3 py-8 text-center text-sm text-white/50">
+                                class="px-3 py-8 text-center text-[13px] text-neutral-500 dark:text-fg-dim">
                                 No matching targets
                             </div>
-                        @endif
-                    </div>
-                </div>
-                </div>
+                        </div>
+                    @endif
+                </x-application.settings-section>
+            </div>
         @else
         <div wire:key="terminal-session-canvas" data-terminal-session-canvas
             class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg p-3 sm:p-6"
@@ -237,8 +239,6 @@
                                                 <x-reicon name="layers" x-cloak x-show="target.type === 'container'"
                                                     class="size-3.5 shrink-0 text-white/35" />
                                                 <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
-                                                <span class="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/35"
-                                                    x-text="target.type"></span>
                                                 <svg x-show="$wire.selected_uuid === target.value"
                                                     class="size-3 text-[#fcd452]" viewBox="0 0 12 12" fill="none"
                                                     aria-hidden="true">
@@ -301,22 +301,22 @@
                                         class="h-8! w-full rounded-md! border-white/[0.08]! bg-white/[0.05]! py-0! pr-2! pl-7! text-[11px]! text-white! shadow-none! placeholder:text-white/30 focus:border-accent! focus:ring-0!">
                                 </div>
                             </div>
-                            <div class="max-h-72 overflow-y-auto p-1">
+                            <div class="terminal-target-list max-h-72 overflow-y-auto p-1">
                                 <template x-for="group in filteredTargetGroups" :key="group.type">
                                     <section class="not-last:mb-1">
                                         <div class="px-2 py-1.5 text-[9px] font-semibold tracking-wider text-white/35 uppercase"
                                             x-text="group.label"></div>
                                         <template x-for="target in group.targets" :key="target.value">
                                             <button type="button"
-                                                class="flex min-h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                                class="group flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
                                                 x-on:click="selectTarget(target)">
                                                 <x-reicon name="servers" x-show="target.type === 'server'"
                                                     class="size-3.5 shrink-0 text-white/35" />
                                                 <x-reicon name="layers" x-show="target.type === 'container'"
                                                     class="size-3.5 shrink-0 text-white/35" />
                                                 <span class="min-w-0 flex-1 truncate" x-text="target.label"></span>
-                                                <span class="rounded-full border border-white/10 px-1.5 py-0.5 text-[9px] text-white/35"
-                                                    x-text="target.type"></span>
+                                                <x-reicon name="arrow-right"
+                                                    class="size-3 shrink-0 text-white/40 opacity-0 transition-opacity group-hover:opacity-100" />
                                             </button>
                                         </template>
                                     </section>

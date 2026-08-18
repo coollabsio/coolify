@@ -12,7 +12,7 @@
                 <span>Service</span>
             @endif
             <span>DNS Check</span>
-            <span>Search engine indexing</span>
+            <span class="whitespace-nowrap">Search engine indexing</span>
             <span>Direction</span>
             <span></span>
         </div>

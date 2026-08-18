@@ -7,7 +7,7 @@
             @if (!$healthCheckEnabled)
                 <x-modal-confirmation title="Enable healthcheck?" buttonTitle="Enable healthcheck"
                     submitAction="toggleHealthcheck" :actions="['Enable healthcheck for this database.']"
-                    warningMessage="A failing probe marks the database unhealthy. Review the health check guide before enabling it."
+                    warningMessage="A failing probe marks the database unhealthy. Review the healthcheck guide before enabling it."
                     step2ButtonText="Enable healthcheck" :confirmWithText="false" :confirmWithPassword="false"
                     isHighlightedButton />
             @else

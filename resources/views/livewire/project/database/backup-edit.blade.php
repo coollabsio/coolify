@@ -1,5 +1,9 @@
 <div>
-    @if ($section === 'retention')
+    @if ($backup->database_id === 0)
+        @include('livewire.project.database.backup-edit.general')
+        @include('livewire.project.database.backup-edit.s3')
+        @include('livewire.project.database.backup-edit.retention')
+    @elseif ($section === 'retention')
         @include('livewire.project.database.backup-edit.retention')
     @elseif ($section === 's3')
         @include('livewire.project.database.backup-edit.s3')
