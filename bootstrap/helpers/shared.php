@@ -3044,6 +3044,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $redirectDirection = in_array(data_get($savedService, 'redirect'), ['www', 'non-www', 'both'], true)
                             ? data_get($savedService, 'redirect')
                             : 'both';
+                        $redirectPermanent = (bool) data_get($resource, 'is_redirect_permanent', false);
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3057,7 +3058,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
                                         noindex_domains: $noindexDomains,
-                                        redirect_direction: $redirectDirection
+                                        redirect_direction: $redirectDirection,
+                                        is_redirect_permanent: $redirectPermanent
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -3072,7 +3074,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
                                         noindex_domains: $noindexDomains,
-                                        redirect_direction: $redirectDirection
+                                        redirect_direction: $redirectDirection,
+                                        is_redirect_permanent: $redirectPermanent
                                     ));
                                     break;
                             }
@@ -3087,7 +3090,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
                                 noindex_domains: $noindexDomains,
-                                redirect_direction: $redirectDirection
+                                redirect_direction: $redirectDirection,
+                                is_redirect_permanent: $redirectPermanent
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -3100,7 +3104,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
                                 noindex_domains: $noindexDomains,
-                                redirect_direction: $redirectDirection
+                                redirect_direction: $redirectDirection,
+                                is_redirect_permanent: $redirectPermanent
                             ));
                         }
                     }
@@ -3832,6 +3837,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                             ? $composeRedirect
                             : 'both';
+                        $redirectPermanent = $resource->isRedirectPermanent();
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3847,6 +3853,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
+                                            is_redirect_permanent: $redirectPermanent,
                                         )
                                     );
                                     break;
@@ -3863,6 +3870,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
+                                            is_redirect_permanent: $redirectPermanent,
                                         )
                                     );
                                     break;
@@ -3880,6 +3888,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
+                                    is_redirect_permanent: $redirectPermanent,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
@@ -3894,6 +3903,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
+                                    is_redirect_permanent: $redirectPermanent,
                                 )
                             );
                         }

@@ -3,6 +3,8 @@
     $suggestedCount = collect($domainRows)->where('is_suggested', true)->count();
     $hasRows = count($domainRows) > 0;
     $serviceAppCount = count($serviceApps);
+    // The redirect type only matters once a www/non-www direction is actually set.
+    $hasActiveRedirect = collect($serviceRedirects)->contains(fn ($direction) => $direction !== 'both');
     $domainGroups = collect($domainRows)
         ->groupBy('service_application_id')
         ->filter(fn ($rows) => $rows->contains(fn ($row) => ! ($row['is_suggested'] ?? false)));
@@ -72,6 +74,19 @@
         <p class="text-sm text-neutral-500 dark:text-fg-dim">
             Manage domains and www/non-www redirects for applications in this stack.
         </p>
+
+        @if ($hasActiveRedirect)
+            <div class="mt-4 w-full sm:max-w-xs">
+                <x-forms.listbox id="redirectPermanent" label="Redirect type"
+                    onChange="updateRedirectPermanent"
+                    helper="Permanent (301) is the canonical signal search engines expect. Browsers cache 301 responses for a long time, so visitors may keep following the old redirect after you change direction."
+                    :options="[
+                        ['value' => false, 'label' => 'Temporary (302)'],
+                        ['value' => true, 'label' => 'Permanent (301)'],
+                    ]"
+                    :disabled="! auth()->user()?->can('update', $service)" />
+            </div>
+        @endif
 
     </x-application.settings-section>
 

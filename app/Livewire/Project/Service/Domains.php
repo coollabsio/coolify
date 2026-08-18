@@ -33,6 +33,9 @@ class Domains extends Component
      */
     public array $serviceRedirects = [];
 
+    /** Issue www<->non-www redirects as 301 instead of 302 for every application in this stack. */
+    public bool $redirectPermanent = false;
+
     /** Service application id when a pending domain conflict belongs to setServiceRedirect. */
     public ?int $pendingRedirectServiceApplicationId = null;
 
@@ -102,6 +105,7 @@ class Domains extends Component
             'newServiceApplicationId' => 'nullable|integer',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
+            'redirectPermanent' => 'boolean',
         ];
     }
 
@@ -133,6 +137,23 @@ class Domains extends Component
         $this->refreshDomains();
         $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
         $this->dispatch('success', 'Search engine indexing updated.');
+    }
+
+    /**
+     * Switch www<->non-www redirects between 301 and 302 for every application in this stack.
+     */
+    public function updateRedirectPermanent(): void
+    {
+        $this->authorize('update', $this->service);
+        $this->validateOnly('redirectPermanent');
+
+        $this->service->is_redirect_permanent = $this->redirectPermanent;
+        $this->service->save();
+        $this->service->parse();
+
+        $this->refreshDomains();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'Redirect type updated.');
     }
 
     public function loadDomainState(): void
@@ -174,6 +195,7 @@ class Domains extends Component
         foreach ($this->service->applications as $app) {
             $this->serviceRedirects[$app->id] = $this->normalizeRedirect($app->redirect ?? null);
         }
+        $this->redirectPermanent = (bool) $this->service->is_redirect_permanent;
 
         if ($this->newServiceApplicationId === null && count($this->serviceApps) > 0) {
             $this->newServiceApplicationId = $this->serviceApps[0]['id'];
