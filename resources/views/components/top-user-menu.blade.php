@@ -16,13 +16,19 @@
     themeColor: localStorage.getItem('themeColor') || '#6b16ed',
     themeColorFrame: null,
     avatarUrl: @js($user?->avatar_path ? route('profile.avatar', ['v' => $user->updated_at->timestamp]) : null),
+    openPanel() {
+        this.appearanceOpen = false;
+        this.open = true;
+    },
+    closePanel() {
+        this.open = false;
+    },
     setTheme(type, closeMenu = true) {
         this.theme = type;
         localStorage.setItem('theme', type);
 
         if (closeMenu) {
-            this.appearanceOpen = false;
-            this.open = false;
+            this.closePanel();
         }
 
         const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -62,9 +68,9 @@
         localStorage.setItem('themeColor', color);
         localStorage.setItem('theme', 'custom');
     },
-}" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="open = false; appearanceOpen = false"
-    @click.outside="open = false; appearanceOpen = false">
-    <button type="button" @click="open = !open"
+}" @avatar-updated.window="avatarUrl = $event.detail.url" @keydown.escape.window="closePanel()"
+    @click.outside="closePanel()">
+    <button type="button" @click="open ? closePanel() : openPanel()"
         title="{{ $userName }}" aria-label="Account menu for {{ $userName }}"
         @if ($sidebar) :class="collapsed && 'w-8 justify-center px-0'" @endif
         @class([
@@ -188,7 +194,7 @@
         </a>
         <x-modal-input title="How can we help?">
             <x-slot:content>
-                <div class="listbox-option cursor-pointer" @click="open = false">
+                <div class="listbox-option cursor-pointer" @click="closePanel()">
                     <span class="flex items-center gap-2">
                         <x-reicon name="feedback" class="size-4 opacity-80" />
                         Feedback
