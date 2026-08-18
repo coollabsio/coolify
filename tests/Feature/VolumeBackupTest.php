@@ -61,7 +61,7 @@ it('allows large volume backups to run for ten hours by default', function () {
         ->and(config('queue.connections.redis.retry_after'))->toBeGreaterThan(config('horizon.defaults.s6.timeout'));
 });
 
-it('upgrades existing default volume backup timeouts without changing custom timeouts', function () {
+it('changes the default volume backup timeout without changing existing timeouts', function () {
     $team = Team::factory()->create();
     [$application, $defaultVolume] = createVolumeBackupApplication($team);
     $customVolume = LocalPersistentVolume::create([
@@ -84,7 +84,7 @@ it('upgrades existing default volume backup timeouts without changing custom tim
     $migration = require database_path('migrations/2026_08_15_000000_increase_default_volume_backup_timeout.php');
     $migration->up();
 
-    expect($defaultBackup->fresh()->timeout)->toBe(36000)
+    expect($defaultBackup->fresh()->timeout)->toBe(3600)
         ->and($customBackup->fresh()->timeout)->toBe(7200);
 });
 
