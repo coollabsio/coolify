@@ -43,6 +43,16 @@ class EmailNotificationSettings extends Model
         'traefik_outdated_email_notifications',
     ];
 
+    protected $hidden = [
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_username',
+        'smtp_password',
+        'resend_api_key',
+    ];
+
     protected $casts = [
         'smtp_enabled' => 'boolean',
         'smtp_from_address' => 'encrypted',

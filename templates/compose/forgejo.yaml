@@ -7,7 +7,7 @@
 
 services:
   forgejo:
-    image: codeberg.org/forgejo/forgejo:8
+    image: codeberg.org/forgejo/forgejo:15
     environment:
       - SERVICE_URL_FORGEJO_3000
       - FORGEJO__server__ROOT_URL=${SERVICE_URL_FORGEJO}

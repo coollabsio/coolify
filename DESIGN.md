@@ -1,752 +1,747 @@
----
-version: alpha
-name: Coolify
-description: Self-hosted PaaS. Dark-first utilitarian UI. Purple (light) / yellow (dark) accent swap. Sharp 2px radii. Inset box-shadow inputs with 4px dirty-bar indicator.
-colors:
-  # Brand
-  coollabs: "#6b16ed"
-  coollabs-50: "#f5f0ff"
-  coollabs-100: "#7317ff"
-  coollabs-200: "#5a12c7"
-  coollabs-300: "#4a0fa3"
-  # Dark-mode accent (warning scale)
-  warning: "#fcd452"
-  warning-50: "#fefce8"
-  warning-100: "#fef9c3"
-  warning-200: "#fef08a"
-  warning-300: "#fde047"
-  warning-400: "#fcd452"
-  warning-500: "#facc15"
-  warning-600: "#ca8a04"
-  warning-700: "#a16207"
-  warning-800: "#854d0e"
-  warning-900: "#713f12"
-  # Dark surfaces
-  base: "#101010"
-  coolgray-100: "#181818"
-  coolgray-200: "#202020"
-  coolgray-300: "#242424"
-  coolgray-400: "#282828"
-  coolgray-500: "#323232"
-  # Light surfaces (Tailwind neutrals)
-  surface: "#ffffff"
-  background: "#f9fafb"
-  border: "#e5e5e5"
-  text: "#000000"
-  text-muted: "#737373"
-  text-placeholder: "#d4d4d4"
-  # Semantic
-  success: "#22C55E"
-  error: "#dc2626"
-  primary: "{colors.coollabs}"
-typography:
-  h1:
-    fontFamily: "'Geist Sans', Inter, sans-serif"
-    fontSize: 1.875rem
-    fontWeight: 700
-    lineHeight: 1.2
-  h2:
-    fontFamily: "'Geist Sans', Inter, sans-serif"
-    fontSize: 1.25rem
-    fontWeight: 700
-  h3:
-    fontFamily: "'Geist Sans', Inter, sans-serif"
-    fontSize: 1.125rem
-    fontWeight: 700
-  h4:
-    fontFamily: "'Geist Sans', Inter, sans-serif"
-    fontSize: 1rem
-    fontWeight: 700
-  body-md:
-    fontFamily: "'Geist Sans', Inter, sans-serif"
-    fontSize: 0.875rem
-    fontWeight: 400
-    lineHeight: 1.25rem
-  label-md:
-    fontFamily: "'Geist Sans', Inter, sans-serif"
-    fontSize: 0.875rem
-    fontWeight: 500
-  label-sm:
-    fontFamily: "'Geist Sans', Inter, sans-serif"
-    fontSize: 0.75rem
-    fontWeight: 700
-    lineHeight: 1rem
-  mono:
-    fontFamily: "'Geist Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace"
-    fontSize: 0.875rem
-    fontWeight: 400
-rounded:
-  sm: 0.125rem   # default — inputs, buttons, cards, modals
-  md: 0.25rem    # coolbox
-  lg: 0.5rem     # callouts
-  full: 9999px   # badges, pills
-spacing:
-  xs: 0.25rem
-  sm: 0.5rem
-  md: 1rem
-  lg: 1.5rem
-  xl: 2rem
-  section: 3rem
-  sidebar-width: 14rem
-  button-height: 2rem
-  card-min-height: 4rem
-  input-py: 0.375rem
-components:
-  button:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.sm}"
-    height: "{spacing.button-height}"
-    padding: 0 0.5rem
-  button-dark:
-    backgroundColor: "{colors.coolgray-100}"
-    textColor: "#ffffff"
-  button-hover:
-    backgroundColor: "#f5f5f5"
-  button-hover-dark:
-    backgroundColor: "{colors.coolgray-200}"
-  button-highlighted:
-    backgroundColor: "{colors.coollabs-50}"
-    textColor: "{colors.coollabs-200}"
-  button-highlighted-hover:
-    backgroundColor: "{colors.coollabs}"
-    textColor: "#ffffff"
-  button-error:
-    backgroundColor: "#fef2f2"
-    textColor: "#991b1b"
-  button-error-hover:
-    backgroundColor: "#fca5a5"
-    textColor: "#ffffff"
-  input:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.sm}"
-    padding: 0.375rem 0.5rem
-  input-dark:
-    backgroundColor: "{colors.coolgray-100}"
-    textColor: "#ffffff"
-  textarea:
-    typography: "{typography.mono}"
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.sm}"
-  box:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.text}"
-    rounded: "{rounded.sm}"
-    padding: "{spacing.sm}"
-    height: "{spacing.card-min-height}"
-  box-dark:
-    backgroundColor: "{colors.coolgray-100}"
-    textColor: "#ffffff"
-  box-hover:
-    backgroundColor: "#f5f5f5"
-  box-hover-dark:
-    backgroundColor: "{colors.coollabs-100}"
-    textColor: "#ffffff"
-  coolbox:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.sm}"
-    height: "{spacing.card-min-height}"
-  badge-success:
-    backgroundColor: "{colors.success}"
-    size: 0.75rem
-    rounded: "{rounded.full}"
-  badge-warning:
-    backgroundColor: "{colors.warning}"
-    size: 0.75rem
-    rounded: "{rounded.full}"
-  badge-error:
-    backgroundColor: "{colors.error}"
-    size: 0.75rem
-    rounded: "{rounded.full}"
-  deprecated-badge:
-    backgroundColor: "rgba(252, 212, 82, 0.15)"
-    textColor: "{colors.warning}"
-    rounded: "{rounded.full}"
-    padding: 0.125rem 0.5rem
-  callout-warning:
-    backgroundColor: "{colors.warning-50}"
-    textColor: "{colors.warning-800}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.md}"
-  callout-danger:
-    backgroundColor: "#fef2f2"
-    textColor: "#991b1b"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.md}"
-  callout-info:
-    backgroundColor: "#eff6ff"
-    textColor: "#1e40af"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.md}"
-  callout-success:
-    backgroundColor: "#f0fdf4"
-    textColor: "#166534"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.md}"
-  dropdown:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.sm}"
-    padding: "{spacing.xs}"
-  dropdown-dark:
-    backgroundColor: "{colors.coolgray-200}"
-  dropdown-item-hover:
-    backgroundColor: "#f5f5f5"
-  dropdown-item-hover-dark:
-    backgroundColor: "{colors.coollabs}"
-    textColor: "#ffffff"
-  menu-item-active:
-    backgroundColor: "#e5e5e5"
-    textColor: "{colors.text}"
-    rounded: "{rounded.sm}"
-  menu-item-active-dark:
-    backgroundColor: "{colors.coolgray-200}"
-    textColor: "{colors.warning}"
-  tag:
-    backgroundColor: "#f5f5f5"
-    textColor: "{colors.text-muted}"
-    padding: 0.25rem 0.5rem
-  kbd:
-    rounded: "{rounded.sm}"
-    padding: 0 0.5rem
-  toast:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.sm}"
-    padding: "{spacing.md}"
-    width: 20rem
-  modal-input:
-    backgroundColor: "{colors.surface}"
-    rounded: "{rounded.sm}"
-  modal-input-dark:
-    backgroundColor: "{colors.base}"
-  modal-confirmation:
-    backgroundColor: "#f5f5f5"
-    rounded: "{rounded.sm}"
-  modal-confirmation-dark:
-    backgroundColor: "{colors.base}"
+# Coolify UI design system
+
+This document defines Coolify's UI design system for its Livewire + Blade +
+Alpine + Tailwind v4 frontend. The visual system covers the global shell,
+project and environment pages, application navigation, settings surfaces,
+tables, modals, toasts, terminals, and metrics.
+
+Use this file as the source of truth for frontend design work. Update it in the
+same change whenever a new shared visual pattern or component is introduced.
+
+Onboarding validation and live server validation checkpoints share
+`<x-checkpoint-item>` (idle / pending / running / success / error) inside a
+compact divided list, not legacy green check SVGs or fixed-width status rows.
+
+> **Maintainer rules**
+>
+> - Keep the work frontend-focused unless existing data must be exposed to the
+>   view.
+> - Preserve routes, Livewire bindings, permissions, confirmations, and working
+>   interactions while changing layout and presentation.
+> - Add or update tests when a UI change affects behavior. Follow the testing
+>   requirements in `AGENTS.md`.
+> - Validate Blade with `docker exec coolify php artisan view:cache`, then clear
+>   it with `docker exec coolify php artisan view:clear`.
+> - Build frontend assets in the Vite container with
+>   `docker exec coolify-vite npm run build`.
+> - Use existing components before adding another styling abstraction.
+
 ---
 
-# Coolify Design System
+## 1. Visual direction
 
-## Overview
+The interface is compact and product-focused:
 
-Coolify is a self-hosted PaaS (Heroku/Netlify/Vercel alternative) built with Laravel 12, Livewire 3, and Tailwind CSS v4. UI is **dark-first, dense, utilitarian** — operators want information density over whitespace.
+- near-neutral layered surfaces instead of large bordered boxes;
+- 13–14px UI typography and 32px controls;
+- hairline rings instead of heavy borders;
+- full-width data tables for dense collections;
+- outline Reicon glyphs through `<x-reicon>`;
+- the Coolify purple brand accent in light mode;
+- the readable Coolify yellow accent in dark mode;
+- solid active-item fills (neutral black/white opacity), not accent gradients;
+  active state is the left accent rail plus a flat selected surface;
+- sentence-case labels and headings;
+- never use the em dash (`—`) in UI copy. Prefer a period, colon, comma, or
+  ASCII hyphen (`-`) for empty cells and separators.
 
-Brand personality: precise, engineered, no-nonsense. No flourish. No gradients outside a single branded upsell. Flat surfaces differentiated by tonal depth, not shadow.
+Avoid oversized titles, generic dashboard cards, strong shadows, thick
+dividers, native browser selects, and isolated colored buttons that do not
+match the current action styles.
 
-Two signature traits define the system:
+---
 
-1. **Purple/Yellow accent swap.** Light mode uses `coollabs` purple `#6b16ed`. Dark mode swaps to `warning` yellow `#fcd452` for focus rings, active nav items, helper icons, loading spinners, highlighted text, helper links. Never use purple as an accent in dark mode.
-2. **Inset box-shadow inputs with a 4px "dirty bar".** Inputs and selects have no border — they use `box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px <border>`. When the field is focused or has unsaved changes (`wire:dirty`), the left 4px becomes the accent color — a live visual indicator of modified state. This is the single most distinctive UI detail in Coolify.
+## 2. Development and cascade notes
 
-Sharp geometry everywhere: 2px corner radius by default (`rounded-sm`). 8px only on callouts. Shadows used sparingly — one `shadow-sm` on boxes, one drop-shadow on toasts. The rest is flat tonal layers.
+PHP runs in the `coolify` container. The development app is normally available
+at `http://localhost:8000`, with Vite on port `5173`.
 
-## Colors
+`resources/css/app.css` still contains unlayered global element rules for
+headings, labels, and tables. Tailwind utilities are layered, so the
+unlayered rules can win unexpectedly.
 
-Source of truth: `resources/css/app.css` `@theme` block (Tailwind v4).
-
-### Palettes
-
-- **Primary / Coollabs (`#6b16ed`)** — brand purple. Light-mode accent. Used for focus rings, active states, highlighted buttons, spinners, scrollbar thumb. Scale: `coollabs-50 #f5f0ff` (backgrounds), `coollabs #6b16ed` (base), `coollabs-100 #7317ff` (dark-mode button hover), `coollabs-200 #5a12c7` (light-mode text), `coollabs-300 #4a0fa3` (deepest).
-- **Warning (`#fcd452`)** — dark-mode accent + callout palette. Full yellow scale `warning-50` through `warning-900`. Swaps in for coollabs under `.dark`.
-- **Coolgray (dark surface ladder)** — five shades building dark-mode depth: `base #101010` (page) → `coolgray-100 #181818` (components) → `-200 #202020` (elevated / active nav) → `-300 #242424` (input borders, button borders) → `-400 #282828` (tooltips) → `-500 #323232` (subtle overlays).
-- **Semantic** — `success #22C55E` for running/healthy, `error #dc2626` for stopped/danger.
-- **Light surfaces** — `gray-50 #f9fafb` (page), `white` (components), `neutral-200 #e5e5e5` (borders), `neutral-500 #737373` (muted text), `neutral-300 #d4d4d4` (placeholders).
-
-### Dark-mode heading rule (critical)
-
-Body default text in dark mode is `neutral-400 #a3a3a3`. Headings and card titles MUST explicitly force `text-white` — otherwise they render near-invisible on `coolgray-100 #181818`. This is enforced globally: `h1–h4` all have `dark:text-white` in `app.css`.
-
-### Default border override
-
-Tailwind v4 defaults `border-color` to `currentcolor`. Coolify overrides it in `@layer base`:
-
-```css
-*, ::after, ::before, ::backdrop, ::file-selector-button {
-  border-color: var(--color-coolgray-200, currentcolor);
-}
-```
-
-So any `border` utility without an explicit color gets `coolgray-200 #202020` in dark mode.
-
-## Typography
-
-Fonts loaded in `resources/css/fonts.css` (all `woff2`, `font-display: swap`):
-
-- **Geist Sans** — primary UI font. Variable weight `100 900`. Inter as fallback (static weights 100–900).
-- **Geist Mono** — monospace for code, logs, textareas. Variable weight `100 900`.
-
-Applied via `@theme`:
+The settings and dense-surface CSS therefore lives as plain unlayered CSS near
+the end of `resources/css/app.css`, beginning at:
 
 ```css
---font-sans: 'Geist Sans', Inter, sans-serif;
---font-mono: 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
---font-logs: 'Geist Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+/* Coollabs layer-card settings surfaces */
 ```
 
-### Heading hierarchy (Tailwind utilities)
+Important consequences:
 
-| Element | Utility |
-|---|---|
-| `h1` | `text-3xl font-bold dark:text-white` |
-| `h2` | `text-xl font-bold dark:text-white` |
-| `h3` | `text-lg font-bold dark:text-white` |
-| `h4` | `text-base font-bold dark:text-white` |
+- scope settings forms with `.application-settings-form` or
+  `.application-settings-workspace`;
+- add shared surface overrides to the unlayered block instead of stacking
+  `!important` utilities;
+- listbox panels require ancestors with `overflow: visible`;
+- anchored cards use `scroll-margin-top: 7rem` to clear both fixed navigation
+  layers;
+- modal shells reuse the layer-card classes but keep content-width sizing on
+  desktop;
+- Alpine code inside quoted Blade attributes must not introduce conflicting
+  quote characters.
 
-### Body
+---
 
-| Context | Utility |
-|---|---|
-| Body default | `text-sm font-sans antialiased` |
-| Label | `text-sm font-medium` |
-| Badge / status text | `text-xs font-bold` |
-| Box description | `text-xs font-bold text-neutral-500` |
-| Caption / kbd | `text-xs` |
+## 3. Tokens and color behavior
 
-## Layout
+The surface ladder is defined in `resources/css/app.css`.
 
-Fixed left sidebar layout on desktop. Mobile collapses to a sticky top bar with hamburger menu overlay.
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--coollabs-canvas` | near white | 10% neutral | page canvas |
+| `--coollabs-elevated` | 98% neutral | 15% neutral | shells and card headers |
+| `--coollabs-base` | white | 17% neutral | nested card bodies |
+| `--coollabs-recessed` | 96% neutral | 20% neutral | inputs and listboxes |
+| `--coollabs-fill` | 92.2% neutral | 26.9% neutral | dividers and passive fills |
+| `--coollabs-line` | translucent dark | 32% neutral | control borders |
+| `--coollabs-hairline` | 93.5% neutral | 26.9% neutral | shell rings |
+| `--coollabs-subtle` | 55.6% neutral | 70.8% neutral | labels and muted titles |
 
-### Structure
+Accent behavior is intentionally theme-aware:
 
-- **Sidebar** — fixed, `w-56` (14rem / 224px), `hidden lg:flex`. Inner `flex flex-col overflow-y-auto gap-y-5 scrollbar`. Nav `bg-white dark:bg-base border-r`.
-- **Main content** — `lg:pl-56` offset. Inner padding `p-4 sm:px-6 lg:px-8 lg:py-6`.
-- **Mobile top bar** — `sticky top-0 z-40 lg:hidden` with `bg-white/95 dark:bg-base/95 backdrop-blur-sm`.
+- **Light mode:** Coolify purple (`coollabs`) for active controls, focus,
+  primary actions, and navigation accents.
+- **Dark mode:** Coolify yellow (`warning`) for the same states because the
+  original purple did not provide sufficient text and ring contrast.
 
-### Spacing scale
+Do not hard-code blue focus rings or leave yellow accent utilities active in
+light mode. Primary action patterns should normally follow:
 
-| Token | Value | Use |
-|---|---|---|
-| `p-2` | 0.5rem | Component internal padding |
-| `p-4` | 1rem | Callout padding |
-| `py-1.5` | 0.375rem | Input vertical padding |
-| `h-8` | 2rem | Button height |
-| `px-2` | 0.5rem | Button horizontal padding |
-| `gap-2` | 0.5rem | Button gap |
-| `px-2 py-1` | 0.25rem / 0.5rem | Menu item padding |
-| `gap-3` | 0.75rem | Menu item gap |
-| `mb-12` | 3rem | Section margin |
-| `min-h-[4rem]` | 4rem | Card min-height |
-
-No grid system — flex layouts everywhere.
-
-## Elevation & Depth
-
-**Flat + tonal.** Hierarchy comes from background color, not shadows.
-
-### Dark tonal ladder
-
-```
-#101010 (base)          page background
-  #181818 (coolgray-100) cards, inputs, components
-    #202020 (coolgray-200) elevated surfaces, borders, nav active
-      #242424 (coolgray-300) input borders, button borders
-        #282828 (coolgray-400) tooltips, hover states
-          #323232 (coolgray-500) subtle overlays
+```html
+bg-coollabs/10 text-coollabs ring-coollabs/25
+dark:bg-warning/15 dark:text-warning dark:ring-warning/25
 ```
 
-### Light tonal ladder
+The filled top-level action/tab treatment uses the same palette at a restrained
+opacity rather than a fully saturated fill.
 
-```
-#f9fafb (gray-50)       page background
-  #ffffff (white)        cards, inputs, components
-    #e5e5e5 (neutral-200) borders
-      #f5f5f5 (neutral-100) hover backgrounds
-        #d4d4d4 (neutral-300) deeper hover, nav active
-```
+---
 
-### Shadows (used sparingly)
+## 4. Page shells and navigation
 
-- Boxes: `shadow-sm` (`0 1px 2px 0 rgba(0,0,0,0.05)`)
-- Toasts: `shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)]`
-- Slide-over: `shadow-lg`
-- Modal-input: `drop-shadow-sm`
+### Global shell
 
-### Input inset box-shadow system (distinctive)
+- Main sidebar groups are compact, use outline Reicons, and keep a 32px row
+  height.
+- Active sidebar rows are rounded pills (`rounded-md`) with an accent rail on
+  the left plus a solid neutral selected fill (`bg-black/5` light,
+  `bg-white/6` dark). Hover rows use the same radius. Do not use accent-tinted
+  gradients on nav rows; yellow washes look muddy on dark UI.
+- Nested items use a thin guide line with a visible active segment, not a thick
+  box border.
+- The update badge sits on the version row and uses a tiny fully rounded
+  primary-action pill.
 
-Inputs and selects use `box-shadow` instead of `border` — this enables the 4px left dirty-bar indicator:
+### Layer-2 navigation
 
-```css
-/* default */  box-shadow: inset 4px 0 0 transparent, inset 0 0 0 2px #e5e5e5;
-/* default dark */  inset 4px 0 0 transparent, inset 0 0 0 2px #242424;
-/* focus light */  inset 4px 0 0 #6b16ed, inset 0 0 0 2px #e5e5e5;
-/* focus dark */  inset 4px 0 0 #fcd452, inset 0 0 0 2px #242424;
-/* dirty (same as focus) — set via wire:dirty.class */
-/* disabled / readonly */  box-shadow: none;
-```
+Application and server pages use the same fixed second navigation layer
+directly below the global topbar. Do not keep a large in-flow resource heading
+or legacy `.navbar-main` tabs on one resource type while using the compact
+layer-2 bar on another. Active tabs are a light brand fill:
 
-Variant `input-sticky` uses `1px` outer shadow instead of `2px`.
+- purple tint in light mode;
+- yellow tint in dark mode;
+- no fully saturated tab background.
 
-### Focus ring (buttons, links, checkboxes, non-input)
+Keep route-derived active state in Blade/Livewire. Do not rely only on Alpine
+state because it can disappear after polling or a Livewire morph.
 
-`focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base`
+The global topbar owns the current resource identity and its compact status
+badges. Layer 2 owns route tabs, resource links, and contextual action buttons
+only. If a resource is missing from `x-top-breadcrumb`, extend the global
+topbar instead of repeating its name or status summary in layer 2. Mobile
+resource navigation may repeat this context because the desktop global topbar
+is hidden there.
 
-## Shapes
+Desktop resource lifecycle actions dock in `#resource-action-hud-slot` and
+use `<x-resource-heading-overflow>`. Show primary actions (Deploy, Redeploy,
+Restart, Stop) as sibling header buttons. Collapse that group into an Actions
+dropdown only when the remaining top-bar width cannot fit them (breadcrumb
+keeps a 200px floor). Infrequent operations live in a separate Advanced
+dropdown with the grid icon: force restart / force deploy / force cleanup
+on services, and Traefik dashboard / refresh proxy status on servers. Place
+Advanced immediately after Links, or first in the action cluster when there
+is no Links control. Application Deploy is a dropdown with Deploy and
+Deploy (without cache). A running service Restart control is a dropdown with
+Restart current version and Pull latest and restart. Mobile
+headings keep a full-width Actions dropdown because the desktop HUD is hidden
+below `xl`. Do not hide primary actions behind a menu on a wide desktop. Links
+stay a separate dropdown because the URL list is unbounded.
 
-- **Default** — `rounded-sm` (2px). Everything: inputs, buttons, cards, modals, toasts, dropdowns.
-- **Coolbox** — `rounded` (4px). Alternate card style with ring-hover.
-- **Callouts** — `rounded-lg` (8px). Only exception to the sharp rule.
-- **Badges / deprecated badge / pills / avatars** — `rounded-full`.
+Only add layer-2 tabs when they represent real sibling routes inside one
+context. Never repeat main-sidebar destinations such as Dashboard, Projects,
+Terminal, Servers, Sources, Destinations, or Storage as a second tab row. A
+single collection page does not need a tab just to fill the bar; keep its
+primary action in the page header instead. When tabs are useful, their left edge
+uses the same compact `pl-2` alignment as application navigation rather than
+the content container's wide horizontal padding.
 
-Never mix radii within the same view.
+A layer-2 tab must be active on the page that renders it. A bar whose only tab
+points at a different route reads as broken navigation, so project and
+environment pages (`project.show`, `project.edit`, `project.environment.edit`,
+`project.clone-me`) carry a plain page header with a 24px title and a 13px
+muted summary instead of a bar. The environment identity and the way back to
+its resources already live in `x-top-breadcrumb`; do not restate them in a
+sub-header.
 
-## Components
+The dashboard is a compact overview, not a metrics wall. Use two full-width
+sections that follow the projects-page grid pattern: projects first, then
+servers. Keep one `New` action in the page header and let its modal choose the
+resource type. Place active deployments above the resource grids as a compact,
+live-updating table rather than a metric card. Communicate server health with
+the shared status badge.
 
-All component classes live in `resources/css/utilities.css` as `@utility` blocks, consumed by Blade components under `resources/views/components/`.
+### Top-level dashboard destinations
 
-### Forms
+Every page opened directly from the main sidebar uses the same compact content
+shell:
 
-#### Button
+- 24px page title and a 13px muted summary;
+- the primary action at the top right using the restrained brand fill;
+- no legacy `coolbox`, `.navbar-main`, or oversized subtitle block;
+- four-column compact cards for small browsable collections;
+- a dense table instead of cards when the collection is expected to grow;
+- `x-empty` anatomy for empty states;
+- `x-status-badge` for state and `x-reicon` for all interface icons.
 
-Utility `.button` (`resources/css/utilities.css`):
+Collection cards are `min-h-28` or `min-h-32`, use a 32px icon tile, and keep
+secondary metadata at 11px. They must not grow into dashboard-sized summary
+cards. Sources, destinations, S3 storage, private keys, and shared-variable
+scopes use this pattern.
 
-```
-flex gap-2 justify-center items-center px-2 h-8 text-sm text-black normal-case rounded-sm border-2 outline-0 cursor-pointer font-medium bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-coolgray-100 dark:text-white dark:hover:text-white dark:hover:bg-coolgray-200 dark:border-coolgray-300 hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-neutral-600 disabled:border-transparent disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base
-```
+Top-level settings families such as Team, Notifications, Keys & Tokens, and
+instance Settings use a compact header followed by a small route-derived tab
+strip. The active tab uses the same purple-light/yellow-dark tint as resource
+tabs. Do not nest `<button>` elements inside tab links.
 
-Attribute variants (in `app.css`):
+### Route-family consistency
 
-- `button[isHighlighted]` → `text-coollabs-200 dark:text-white bg-coollabs-50 dark:bg-coollabs/20 border-coollabs dark:border-coollabs-100 hover:bg-coollabs hover:text-white dark:hover:bg-coollabs-100 dark:hover:text-white`
-- `button[isError]` → `text-red-800 dark:text-red-300 bg-red-50 dark:bg-red-900/30 border-red-300 dark:border-red-800 hover:bg-red-300 hover:text-white dark:hover:bg-red-800 dark:hover:text-white`
+Treat every route family as one cohesive experience rather than styling only
+its index or most visible route:
 
-Loading: `<x-loading-on-button>` — inline `w-4 h-4 dark:text-warning animate-spin` SVG.
+- index, create, detail, settings, logs, metrics, backup, execution, and danger
+  routes must share the same navigation hierarchy and surface language;
+- main-sidebar collection routes use the global shell without duplicating those
+  destinations in a layer-2 tab row;
+- resource detail families use resource identity and status in the global
+  topbar, route tabs and actions in layer 2, and the grouped settings sidebar
+  only for the third level;
+- create and edit routes stay inside the same layer-2 family instead of
+  falling back to an isolated legacy page;
+- reusable partials, empty states, confirmation flows, and row editors must be
+  updated with the page that exposes them;
+- audit the whole family for native selects, legacy heading blocks, old Save
+  buttons, old status chips, and `coolbox`/`navbar-main`/`sub-menu-wrapper`
+  to keep the family consistent.
 
-#### Input
+Do not leave a sibling route using old tabs, a large in-flow title, a browser
+select, or a different modal anatomy.
 
-Utility chain `.input-select` → `.input`:
+The New Resource page keeps its filter controls in the top layer card, then
+renders Applications, Databases, and Services as separate layer-card sections.
+Do not leave category headings and resource grids floating as uncontained
+content below the filter card.
 
-```
-block py-1.5 w-full text-sm text-black rounded-sm border-0 dark:bg-coolgray-100 dark:text-white disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700 read-only:text-neutral-500 read-only:bg-neutral-200 dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 focus-visible:outline-none
-```
+### Settings workspace
 
-Plus the inset box-shadow system (see Elevation). Password variant: `.input[type="password"]` gets `pr-[2.4rem]` for the eye icon.
+Application and server configuration pages use the same 210px grouped,
+icon-led sidebar and a full-width content column. The workspace is capped at
+1180px, the sidebar becomes sticky at `xl`, and the sidebar label and first
+content card start on the same visual line. Do not use the legacy
+`sub-menu-wrapper`, native mobile page selects, or an in-flow row of top-level
+tabs. Only show nested section anchors when a page has at least four useful
+sections.
 
-**Dirty indicator.** Livewire sets the focus-colored shadow via `wire:dirty.class`:
+The shared workspace grid is:
 
 ```blade
-wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]"
+<div
+    class="application-settings-workspace mt-8 grid min-w-0 gap-8
+        xl:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <aside class="application-settings-navigation min-w-0 xl:sticky xl:top-26 xl:self-start">
+        ...
+    </aside>
+    <div class="min-w-0 xl:mt-3">
+        ...
+    </div>
+</div>
 ```
 
-Variant `.input-sticky` — same shape, `1px` outer shadow (thinner border).
+Instance Settings constrains both `x-settings.navbar` and the workspace to the
+same `max-w-[1180px]` shell.
 
-#### Select
+**Page titles (global):** family H1s (`x-dashboard.navbar` with
+`titleOnDesktop="false"`, the default) hide at **lg+**, the same breakpoint as
+the desktop shell (main sidebar + fixed layer-2 tabs). Below `lg` the mobile
+topbar is used and the page title stays visible. Collection indexes (Servers,
+Projects, …) always keep their H1; stack title above actions on narrow widths
+so they never overlap. Resource in-flow names only render below `md` (when the
+fixed resource tab bar is hidden). Fixed layer-2 spacers must be `lg:h-12` to
+match the bar height. Do not put the H1 beside the settings sidebar.
 
-Extends `.input-select` + custom SVG dropdown arrow:
+Standard content stack:
 
-```css
-background-image: url("data:image/svg+xml,...stroke='%23000000'...");
-padding-right: 2.5rem;
+```blade
+<div class="application-settings-workspace flex flex-col gap-6">
+    <x-application.settings-section ... />
+    <x-application.settings-section ... />
+</div>
 ```
 
-Dark mode swaps the SVG stroke to `%23ffffff`.
-
-#### Checkbox
-
-Input class:
-```
-dark:border-neutral-700 text-coolgray-400 dark:bg-coolgray-100 rounded-sm cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base
-```
-
-Container:
-```
-form-control flex max-w-full flex-row items-center gap-4 py-1 pr-2 dark:hover:bg-coolgray-100 cursor-pointer
-```
-
-#### Textarea
-
-Uses the same `input` utility + `font-mono` + dirty-bar via `wire:dirty.class` (identical to input). Optional `@keydown.tab=handleKeydown` inserts 2 spaces on Tab.
-
-#### Copy-Button
-
-`resources/views/components/forms/copy-button.blade.php` — readonly `.input` with an absolute-positioned copy icon right-side. Copied state shows a green check (`text-green-500`) for 1 second. Only renders in secure contexts (`window.isSecureContext`).
-
-### Containers
-
-#### Box
-
-Utility `.box`:
-```
-relative flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 shadow-sm bg-white border text-black dark:text-white hover:text-black border-neutral-200 dark:border-coolgray-300 hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline rounded-sm
-```
-
-**Critical child text rule.** On dark hover, background becomes purple `#7317ff` — description text `#737373` disappears. Utilities `.box-title` and `.box-description` include `dark:group-hover:text-white group-hover:text-black` to flip text contrast.
-
-Variants: `.box-boarding`, `.box-without-bg`, `.box-without-bg-without-border`.
-
-#### Coolbox
-
-Utility `.coolbox`:
-```
-relative flex transition-all duration-150 dark:bg-coolgray-100 bg-white p-2 rounded border border-neutral-200 dark:border-coolgray-400 hover:ring-2 dark:hover:ring-warning hover:ring-coollabs cursor-pointer min-h-[4rem]
-```
-
-Distinguished by `rounded` (4px, not 2px) and **ring-hover** instead of background change.
-
-### Status & Badges
-
-#### Badge base
-
-```
-inline-block w-3 h-3 text-xs font-bold rounded-full leading-none border border-neutral-200 dark:border-black
-```
-
-Fill utilities: `.badge-success` (`bg-success`), `.badge-warning` (`bg-warning`), `.badge-error` (`bg-error`). Dashboard variant `.badge-dashboard` is `absolute top-1 right-1 w-2.5 h-2.5`.
-
-#### Status indicator pattern
-
-Badge + label side-by-side. Components in `resources/views/components/status/`:
-
-| Component | Badge | Text color | Loading? |
-|---|---|---|---|
-| `status/running` | `badge-success` | `text-success` (`#22C55E`) | Swaps to `badge-warning` while checking proxy |
-| `status/degraded` | `badge-warning` | `dark:text-warning` (`#fcd452`) | `<x-loading>` + `wire:loading.delay.longer` |
-| `status/restarting` | `badge-warning` | `dark:text-warning` | `<x-loading>` |
-| `status/stopped` | `badge-error` | `text-error` (`#dc2626`) | `<x-loading>` |
-
-Layout: `<div class="flex items-center">` → badge → `<div class="pl-2 pr-1 text-xs font-bold {color}">{label}</div>` → optional `({health})` in same color.
-
-#### Deprecated Badge
-
-`resources/views/components/deprecated-badge.blade.php`:
-```
-px-2 py-0.5 text-xs font-medium leading-normal rounded-full bg-warning/15 text-warning border border-warning/30
-```
-
-#### Tag
-
-Utility `.tag`:
-```
-px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200
-```
-
-### Overlays
-
-#### Callout
-
-Four types (`warning`, `danger`, `info`, `success`). Base: `relative p-4 border rounded-lg`.
-
-| Type | Background | Border | Title text | Body text |
-|---|---|---|---|---|
-| warning | `bg-warning-50 dark:bg-warning-900/30` | `border-warning-300 dark:border-warning-800` | `text-warning-800 dark:text-warning-300` | `text-warning-700 dark:text-warning-200` |
-| danger | `bg-red-50 dark:bg-red-900/30` | `border-red-300 dark:border-red-800` | `text-red-800 dark:text-red-300` | `text-red-700 dark:text-red-200` |
-| info | `bg-blue-50 dark:bg-blue-900/30` | `border-blue-300 dark:border-blue-800` | `text-blue-800 dark:text-blue-300` | `text-blue-700 dark:text-blue-200` |
-| success | `bg-green-50 dark:bg-green-900/30` | `border-green-300 dark:border-green-800` | `text-green-800 dark:text-green-300` | `text-green-700 dark:text-green-200` |
-
-Icon colors (600 light / 400 dark) match type.
-
-#### Modal (input variant)
-
-`resources/views/components/modal.blade.php`:
-```
-relative w-full lg:w-auto lg:min-w-2xl lg:max-w-4xl border rounded-sm drop-shadow-sm bg-white border-neutral-200 dark:bg-base dark:border-coolgray-300 flex flex-col
-```
-
-Backdrop: `bg-black/20 backdrop-blur-xs`. Close button: `w-8 h-8 rounded-full hover:bg-neutral-100 dark:hover:bg-coolgray-300` top-right, 24px `stroke-width=1.5` X icon.
-
-#### Modal Confirmation
-
-`resources/views/components/modal-confirmation.blade.php` — destructive-action 2-or-3-step wizard (checkboxes → confirm text → password):
-```
-relative w-full border rounded-none sm:rounded-sm min-w-full lg:min-w-[36rem] max-w-full sm:max-w-[48rem] h-screen sm:h-auto max-h-screen sm:max-h-[calc(100vh-2rem)] bg-neutral-100 border-neutral-400 dark:bg-base dark:border-coolgray-300 flex flex-col
-```
-
-Uses `<x-callout type="danger">` for warning. Password step hidden for OAuth users.
-
-#### Confirm Modal
-
-`resources/views/components/confirm-modal.blade.php` — Livewire-bound simpler confirm dialog.
-
-#### Popup / Popup-Small
-
-Fixed bottom-right notification card with title / description / action button. `bg-white dark:bg-coolgray-100 border dark:border-coolgray-300 shadow-lg sm:rounded-sm`. Popup is responsive max-w-4xl, Popup-Small is `max-w-[46rem]`.
-
-#### Slide-Over
-
-`resources/views/components/slide-over.blade.php`:
-
-Outer: `fixed inset-y-0 right-0 flex max-w-full pl-10`
-
-Panel: `max-w-xl w-screen flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-neutral-50 dark:bg-base dark:border-neutral-800 border-neutral-200`
-
-#### Toast
-
-`resources/views/components/toast.blade.php` — Alpine-powered stacked toast system.
-
-- Container: `fixed ... sm:max-w-xs z-9999`, positioned via `position` param (`top-right` / `top-left` / `top-center` / `bottom-right` / `bottom-left` / `bottom-center`).
-- Toast shell: `relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full dark:bg-coolgray-100 bg-white dark:border dark:border-coolgray-200 rounded-sm sm:max-w-xs`.
-- Stacks up to 4 (oldest gets scale 82% then burns).
-- Auto-dismiss after 4 s. Hover on container pauses dismissal and expands stack.
-- HTML payload sanitized via `window.sanitizeHTML` (XSS guard).
-- Per-toast copy-to-clipboard + close buttons.
-
-Icon colors:
-
-| Type | Class |
-|---|---|
-| success | `text-green-500` |
-| info | `text-blue-500` |
-| warning | `text-orange-400` |
-| danger | `text-red-500` |
-| default | `text-gray-800` |
-
-#### Helper / Tooltip
-
-`resources/views/components/helper.blade.php`. Icon utility `.info-helper`:
-```
-cursor-pointer text-coollabs dark:text-warning
-```
-
-Popup utility `.info-helper-popup`:
-```
-hidden absolute z-40 text-xs rounded-sm text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300 max-w-sm whitespace-normal break-words
-```
-
-Shown on parent `.group:hover`. Supports rich HTML (links colored `text-coollabs dark:text-warning underline`).
-
-### Navigation
-
-#### Sidebar / Navbar
-
-Component: `resources/views/components/navbar.blade.php`.
-
-Root nav: `flex flex-col flex-1 px-2 bg-white border-r dark:border-coolgray-200 border-neutral-300 dark:bg-base`
-
-Menu list: `flex flex-col flex-1 gap-y-7` → inner `flex flex-col h-full space-y-1.5`.
-
-Utility `.menu-item`:
-```
-flex gap-3 items-center px-2 py-1 w-full text-sm dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300 rounded-sm truncate min-w-0
-```
-
-Utility `.menu-item-active`:
-```
-text-black rounded-sm dark:bg-coolgray-200 dark:text-warning bg-neutral-200 overflow-hidden
-```
-
-Icon `.menu-item-icon`: `flex-shrink-0 w-6 h-6 dark:hover:text-white`. Sub-items use `gap-2` + `w-4 h-4` icons.
-
-#### Breadcrumbs
-
-`resources/views/components/resources/breadcrumbs.blade.php` — project → environment → resource trail. Desktop: `<ol class="hidden flex-wrap items-center gap-y-1 md:flex">`. Each link `text-xs lg:text-sm hover:text-warning`. Chevron buttons `text-warning`. Dropdowns `absolute ... bg-white dark:bg-coolgray-100 rounded-md shadow-lg border`. Active item `dark:text-warning font-semibold`.
-
-#### External-Link
-
-Mini icon — `inline-flex w-3 h-3 dark:text-neutral-400 text-black` with arrow-out-of-box SVG. Appended to external anchors.
-
-#### Internal-Link
-
-Arrow SVG — `inline-flex w-4 h-4 text-black dark:text-white`. Used in CTA links ("go to deployment" etc).
-
-#### Banner
-
-`resources/views/components/banner.blade.php` — dismissible top bar:
-```
-relative z-999 w-full py-2 mx-auto duration-100 ease-out shadow-xs bg-coolgray-100 sm:py-0 sm:h-14
-```
-
-Close button: `w-6 h-6 rounded-full hover:bg-coolgray-500 text-neutral-200`. Reveals via Alpine `x-transition` after 100ms delay.
-
-### Feedback
-
-#### Loading Spinner
-
-`resources/views/components/loading.blade.php` — inline flex with optional text + spinning SVG:
-```
-w-4 h-4 mx-1 ml-3 text-coollabs dark:text-warning animate-spin
-```
-
-SVG has two paths at `opacity-25` (track) + `opacity-75` (arc).
-
-Utility `.loading`: `w-4 dark:text-warning text-coollabs`.
-
-#### Loading-On-Button
-
-`resources/views/components/loading-on-button.blade.php` — same SVG but **no light-mode color** (`w-4 h-4 mx-1 ml-3 dark:text-warning animate-spin`), meant to inherit button text color.
-
-#### Page-Loading
-
-Full-page loader overlay (variant of `loading` component, fills viewport).
-
-### Text
-
-#### Highlighted text
-
-`resources/views/components/highlighted.blade.php` / utility `.text-helper`:
-```
-inline-block font-bold text-coollabs dark:text-warning
-```
-
-Also used for required-field asterisks via `<x-highlighted text="*" />`.
-
-#### Kbd
-
-Utility `.kbd-custom`:
-```
-px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-warning
-```
-
-### Chrome
-
-#### Scrollbar
-
-Utility `.scrollbar` (uses `tailwind-scrollbar` plugin):
-```
-scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-track-coolgray-200 scrollbar-thin
-```
-
-Applied globally to `<body>` in `app.css`.
-
-#### Table
-
-Styled via base element rules in `app.css` (not a reusable component):
-
-```css
-table       { @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300; }
-thead       { @apply uppercase; }
-tbody       { @apply divide-y dark:divide-coolgray-200 divide-neutral-300; }
-tr          { @apply text-black dark:text-neutral-400 dark:hover:bg-coolgray-300 hover:bg-neutral-100; }
-tr th       { @apply px-3 py-3.5 text-left text-black dark:text-white; }
-tr th:first-child { @apply py-3.5 pr-3 pl-4 sm:pl-6; }
-tr td       { @apply px-3 py-4 whitespace-nowrap; }
-tr td:first-child { @apply pr-3 pl-4 font-bold sm:pl-6; }
-```
-
-#### Dropdown
-
-`resources/views/components/dropdown.blade.php`. Container:
-```
-border border-neutral-300 bg-white p-1 shadow-sm dark:border-coolgray-300 dark:bg-coolgray-200
-```
-
-Utility `.dropdown-item`:
-```
-flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs
-```
-
-Touch variant adds `min-h-10 px-3 py-2 text-sm`.
-
-## Do's and Don'ts
-
-- **Do** force `dark:text-white` on h1–h4 and card titles. Default body text `#a3a3a3` is unreadable on `coolgray-100`.
-- **Do** swap the accent: `coollabs` in light, `warning` in dark. For focus rings, active nav, helpers, spinners, highlighted text, scrollbar thumb, helper links.
-- **Do** use the inset box-shadow system on inputs, selects, and textareas — not a border. It enables the 4px left dirty-bar.
-- **Do** wire the dirty indicator via `wire:dirty.class` so Livewire flips the bar color on modified state.
-- **Do** flip `.box-title` and `.box-description` to the contrast color on hover. On dark hover the card goes purple `#7317ff`; `text-neutral-500` description becomes invisible.
-- **Do** maintain WCAG AA contrast (4.5:1 for normal text).
-- **Do** sanitize HTML passed into toasts via `window.sanitizeHTML`.
-- **Do** use `<x-loading>` for in-button spinners and as `wire:loading.delay.longer` indicators in status components.
-- **Don't** use purple `coollabs` as the dark-mode accent. Always use yellow `warning` in dark.
-- **Don't** mix corner radii — 2px everywhere except callouts (8px) and pills (full).
-- **Don't** use shadows for elevation in dark mode. Use tonal layers from the coolgray ladder.
-- **Don't** set `border` utilities without expecting `coolgray-200` in dark (default override in base layer).
-- **Don't** add gradients. The one exception is the `.bg-coollabs-gradient` upsell strip.
-- **Don't** use more than two font weights on a single screen (typically 400 body + 700 bold).
+The current cross-page section gap is `gap-6`. Do not introduce extra top
+padding on an individual page unless its toolbar is intentionally separated
+from the first card.
+
+Use a flex or grid stack with `gap-6`; do not use `space-y-*` between layer
+cards. The layer-card root intentionally resets its own margin, so margin-based
+spacing utilities can silently collapse.
 
 ---
 
-Source files:
-- Theme tokens: `resources/css/app.css` (`@theme` block)
-- Fonts: `resources/css/fonts.css`
-- Component utilities: `resources/css/utilities.css`
-- Blade components: `resources/views/components/**/*.blade.php`
+## 5. Layer cards
+
+Use `resources/views/components/application/settings-section.blade.php`.
+Older manual shells may use `.application-settings-section-header` and
+`.application-settings-section-body`; both must retain the same padded,
+action-aligned anatomy as the component. Use the component for new work and
+replace a manual shell when modifying it instead of creating another variant.
+
+```blade
+<x-application.settings-section
+    id="public-access-section"
+    title="Public access"
+    helper="How this section affects the resource.">
+    <x-slot:actions>
+        <x-forms.button>Action</x-forms.button>
+    </x-slot:actions>
+
+    ...
+</x-application.settings-section>
+```
+
+Anatomy:
+
+- 8px shell radius;
+- elevated header strip;
+- no divider below the header;
+- nested base-color body with its own fill ring;
+- 16px body padding;
+- optional `flush` mode for full-bleed tables;
+- card-level actions belong in the header slot.
+
+Header actions use an 8px top/right inset while the title keeps its 16px left
+inset. Do not leave a larger empty strip between the final action and the
+card's top-right corner.
+
+Do not split one collection into a summary card followed by a table or log
+card. Keep its status/action in the header, its view switcher or toolbar at the
+top of a flush body, and its data in that same layer card. Repeated file
+editors are the opposite case: each file gets its own titled layer card so its
+content and actions remain clearly associated.
+
+### Nested radii
+
+Concentric boxes must follow:
+
+```text
+outer radius = inner radius + visible inset
+```
+
+Examples:
+
+- a 6px tab or listbox option inside 4px padding uses a 10px outer well;
+- an 8px button inside the unsaved pill's 8px padding uses a 16px outer pill.
+
+Do not give visibly inset parent and child boxes the same radius. Flush or
+edge-to-edge children are exempt because there is no visible inset to add.
+
+Use an empty state when the section has no usable controls:
+
+```blade
+<x-empty size="sm" title="Nothing here" description="Explain what enables it.">
+    <x-slot:icon>
+        <x-reicon name="layers" class="size-8" />
+    </x-slot:icon>
+</x-empty>
+```
+
+---
+
+## 6. Controls
+
+All normal controls are 32px high with an 8px radius.
+
+### Field grids
+
+The grid must match the controls visible in the current state:
+
+- two visible peer controls use two columns, not a three-column grid with an
+  empty track;
+- three visible peer controls may use three columns when their content stays
+  readable;
+- conditional fields remain in the same grid when they are part of that field
+  group, so a URL or text input does not become wider than its peer column;
+- collapse to one column at smaller breakpoints.
+
+Do not pick a column count from the maximum possible state if the normal state
+shows fewer controls.
+
+### Inputs
+
+Use `x-forms.input` and `x-forms.textarea`. Fields need visible vertical spacing
+between the label and control. Password visibility uses the outline Reicon
+`eye`/`eye-off` treatment from the shared input component.
+
+### Dropdowns
+
+Do not use native `<select>` on application routes, including mobile fallbacks.
+Use:
+
+```blade
+<x-forms.listbox id="property" label="Setting" :options="[
+    ['value' => true, 'label' => 'Enabled'],
+    ['value' => false, 'label' => 'Disabled'],
+]" onChange="instantSave" />
+```
+
+Boolean checkboxes should normally become descriptive two-option listboxes.
+Use `.live` behavior only when the selection needs an immediate server
+rerender.
+
+Keep checkboxes for compact permission matrices and multi-select lists. Those
+controls must use the shared `x-forms.checkbox` anatomy: an 18px rounded custom
+box, purple checked fill in light mode, yellow checked fill in dark mode, and a
+high-contrast check mark. Never expose the browser or Tailwind Forms default
+checkbox on application pages.
+
+The popup panel uses a 10px radius around 6px options with a 4px inset. Keep
+the option content left-aligned and size the panel to its content or trigger;
+do not create an unnecessarily wide menu.
+
+Toolbar filter and sort buttons keep static labels (`Filter`, `Sort`). The
+selected option is indicated inside the menu, not repeated on the trigger.
+
+#### Livewire dropdown state synchronization
+
+Instant-save listboxes must not flash back to an older value while Livewire is
+saving or morphing the DOM. Treat the Alpine selection as the current visual
+state until its request finishes:
+
+- await the Livewire change handler and prevent overlapping selections while
+  it is running;
+- when a client-managed listbox can be rerendered by an unrelated or stale
+  Livewire response, use the listbox's `preserveValue` option so the morph does
+  not replace its newer Alpine value;
+- scope `preserveValue` to controls whose value is owned by that interaction;
+  do not use it when external server events must replace the displayed value;
+- after saving through a related model, refresh the parent component's loaded
+  relationship before rendering the response. A database write alone does not
+  update an already-loaded Eloquent collection;
+- use stable `wire:key` values for rows containing listboxes. Do not include the
+  selected value in the key, because recreating the Alpine component causes a
+  visible reset;
+- remember that a portalled options panel is teleported outside its visual
+  wrapper. Guard selection in the Alpine handler itself rather than relying
+  only on `pointer-events` or a disabled wrapper.
+
+The failure mode to avoid is: selection B is shown optimistically, selection A
+is chosen next, the response for B morphs the listbox back to B, then the later
+response finally shows A. The control should remain on the newest accepted
+selection throughout the save sequence.
+
+#### Multi-select filter dropdowns
+
+Toolbar filters that can combine criteria use one multi-select listbox rather
+than separate dropdowns or a single selected value. Follow the deployment
+history filter in
+`resources/views/livewire/project/application/deployment/index.blade.php`:
+
+- set `aria-multiselectable="true"` on the listbox;
+- group related options under compact uppercase labels;
+- keep the dropdown open while options are toggled;
+- use the shared 16px custom checkbox treatment: purple checked fill in light
+  mode, yellow checked fill in dark mode, and a high-contrast check mark;
+- show the number of active selections in a small count pill on the static
+  `Filter` trigger;
+- combine selections within one group with OR logic and combine different
+  groups with AND logic;
+- constrain only the options area with `max-h-80 overflow-y-auto`;
+- place a persistent `Reset filters` action in a separate footer below the
+  scrollable options, divided by a top border;
+- disable the reset action when no filter is active, and close the dropdown
+  after resetting.
+
+Do not represent the empty state as a selectable `All` option. The footer reset
+action is the single way to return the multi-select to its unfiltered state.
+
+### Standard table controls
+
+Dense tables use the shared `x-table.*` components so search, filters, sorting,
+and backend loading states remain visually and behaviorally consistent:
+
+- `<x-table.toolbar>` owns the responsive search-left/actions-right layout;
+- `<x-table.search>` owns the search icon, optional loading indicator, clear
+  action, sizing, and input anatomy;
+- `<x-table.filter>` owns the static Filter trigger, active-count pill,
+  multi-select panel, scrollable options area, and Reset filters footer;
+- `<x-table.sort>` owns the static Sort trigger and single-select panel;
+- `<x-table.loading>` overlays only the changing table data for backend search,
+  filter, sort, and pagination requests.
+
+Tables continue to own their filter options, sort choices, headers, rows,
+queries, permissions, and empty states. Backend-filtered or paginated tables
+must use `x-table.loading`; frontend-only Alpine tables reuse the same toolbar
+and control anatomy but do not show an artificial loading state.
+
+### Buttons
+
+- neutral actions use the shared `.button`;
+- primary actions use the theme-aware purple/yellow tint;
+- destructive actions use the existing error treatment;
+- use outline Reicons where a matching glyph exists;
+- avoid raw browser-default buttons and old dark-mode purple fills.
+
+### Unsaved changes
+
+`resources/views/components/unsaved-bar.blade.php` is a compact floating
+bottom-center pill. It contains:
+
+- “You have changes that haven't been saved yet.”
+- a subtle Reset action;
+- a theme-aware Save changes button matching the tab accent.
+
+On small viewports the pill is inset (`inset-x-3`) and stacks: full label on
+the first line, Reset / Save on the second (right-aligned). From `sm` up it
+returns to the centered single-row nowrap pill.
+
+Do not restore the old full-width footer.
+
+Deferred fields in one Livewire component use one floating unsaved bar and one
+submit action. Do not add a separate “Save configuration” button to every
+card. Selectors that are safe to persist independently should use the existing
+instant-save pattern.
+
+---
+
+## 7. Dense tables
+
+Collections with many rows should use the Cloudflare-inspired table pattern:
+
+- toolbar above the table;
+- search on the left;
+- filters, sort, view toggles, and Add on the right;
+- 40px header row and roughly 48px data rows;
+- subtle row hover;
+- plain text or the shared status badge rather than large colored chips;
+- compact action at the far right;
+- no separate layer card for each item.
+
+Do not add a summary card above a table when it only repeats the row count,
+current page, or refresh interval. Keep counts and pagination in the footer.
+Background polling stays silent unless its state is actionable; do not add a
+“Live updates” badge just to explain that a table refreshes. Filters only
+render meaningful values; use the shared listbox instead of a number input or
+browser-native control.
+
+The footer is always inside the table shell:
+
+- `Showing X–Y of Z` on the left;
+- first, previous, current page, next, and last controls on the right.
+
+Hide the entire pagination footer when there is only one page (`totalPages > 1`).
+A lone “1–2 of 2” bar with disabled controls adds noise and is unnecessary.
+
+Use `x-status-badge` for resource and execution state. It is a small neutral
+pill with a semantic dot, not a full colored rectangle.
+
+Relevant classes:
+
+- `.data-table`
+- `.data-table-header`
+- `.data-table-row`
+- `.table-badge`
+
+Create a page-specific grid class when columns differ. Add responsive rules
+that hide secondary columns before allowing horizontal overflow.
+
+---
+
+## 8. Modals, confirmations, and toasts
+
+### Modals
+
+`x-modal-input` and confirmation dialogs reuse the layer-card shell:
+
+- compact elevated header;
+- nested base-color body;
+- content-width desktop sizing;
+- shared 32px controls;
+- no redundant description below a self-explanatory title;
+- custom listboxes instead of native browser selects;
+- listbox and dropdown panels must render above the modal body and escape its
+  scroll container. Never clip a panel at the modal boundary or make users
+  scroll the modal to see its options;
+- when there is not enough viewport space below the trigger, open the panel
+  above it while keeping the panel visually on top of the modal;
+- right-aligned footer actions below a divider;
+- compact action buttons, never a submit button stretched by a column layout.
+
+Edit modals should use the same field layout and option set as their matching
+create modal.
+
+### Command palette
+
+The global search command palette (`livewire:global-search`) is a compact
+top-anchored overlay:
+
+- elevated shell with hairline ring and modal shadow (not a heavy floating card);
+- recessed-neutral header strip with outline search glyph and 14px input;
+- compact OS-aware mod+K (`⌘K` on macOS, `Ctrl+K` on Windows/Linux) / `/` / `ESC` kbd chips matching the sidebar search trigger;
+- nested base-color results body with group labels in sentence case;
+- dense result rows as inset 6px-radius pills (listbox anatomy), not full-bleed
+  bars with global focus rings;
+- hover uses neutral fill; keyboard focus uses a soft accent wash plus a 2px
+  left rail — never the global `ring-2` / ring-offset treatment;
+- create rows use a neutral plus tile that only picks up the accent when the
+  row is focused;
+- type pills and quickcommand chips stay recessed; they tint with the accent
+  only on the focused row;
+- neutral thin scrollbar inside the results body (not brand-colored);
+- create-resource modals opened from the palette reuse the standard
+  `application-settings-section` layer-card shell.
+
+Preserve keyboard navigation (arrow keys, Enter via focused links, Escape to
+clear then close), `/` and mod+K (⌘K / Ctrl+K by OS) open shortcuts, and the multi-step
+server → destination → project → environment create flow.
+
+### Toasts
+
+`resources/views/components/toast.blade.php` provides the global
+`window.toast(message, options)` API and Livewire event handling.
+
+Current toast behavior:
+
+- compact layered card, maximum width 26rem;
+- Reicon status tile for success, info, warning, danger, or default;
+- title plus optional description;
+- dismiss and copy-details actions;
+- up to four stacked notifications;
+- four-second dismissal, paused while hovered;
+- support for all six screen positions and sanitized custom HTML.
+
+Do not bring back the old oversized dark rectangle.
+
+---
+
+## 9. Terminals, logs, and metrics
+
+### Terminals
+
+Application and server browser terminals use the same browser-oriented console
+shell, theme picker, compact header controls, and outline `browser-terminal`
+Reicon. Hide a container switcher when only one container exists.
+
+The themed console shell belongs to an open session. Before a target is
+selected, the global Terminal page stays a normal top-level destination: a
+full-width layer card titled `Start a terminal session`, its filter input in
+the card header actions, and grouped `Servers` / `Containers` rows reusing the
+command-palette row classes. Do not render an empty full-height console canvas
+just to host the target picker, and do not offer the console theme selector
+before a session owns that canvas. Rows show the target name, a muted server
+column that only appears when the team has more than one server, and the shared
+chevron. Group headers stick to the top of the scrolling list and carry a count.
+
+### Logs
+
+Runtime and deployment logs should feel like a clean terminal surface:
+
+- keep a single log stream inside one layer card instead of adding an
+  introductory card above it;
+- one compact toolbar;
+- a recessed monospace log viewport;
+- search and line-count controls aligned with icon actions;
+- clear live/follow state;
+- fullscreen support without changing the control language;
+- custom listbox-style menus instead of browser dropdowns.
+
+### Metrics
+
+Metrics pages use separate layer cards for range selection, CPU, and memory.
+Charts follow the application metrics implementation:
+
+- 240px area chart;
+- smooth 2px stroke and restrained gradient fill;
+- dashed neutral grid;
+- no ApexCharts toolbar;
+- tooltip positioned at the hovered point;
+- UTC on both axes and tooltip;
+- 20% headroom above observed values;
+- downsample long time ranges before rendering.
+
+Only add a metric if Sentinel exposes historical data for it. Current Sentinel
+history endpoints store CPU and memory. Root filesystem usage is included in
+the periodic push payload for threshold notifications, but it is not stored as
+a historical Sentinel metric and has no history endpoint, so it cannot power a
+disk-usage graph yet.
+
+---
+
+## 10. Current reference surfaces
+
+Use these as implementation references:
+
+| Surface | Reference |
+|---|---|
+| Dashboard overview | `resources/views/livewire/dashboard.blade.php` |
+| Top-level collection cards | `resources/views/livewire/project/index.blade.php`, `resources/views/source/all.blade.php` |
+| Top-level family tabs | `resources/views/components/team/navbar.blade.php`, `resources/views/components/notification/navbar.blade.php` |
+| General settings and form anatomy | `resources/views/livewire/project/application/general.blade.php` |
+| Advanced settings | `resources/views/livewire/project/application/advanced.blade.php` |
+| Fixed layer-2 resource navigation | `resources/views/livewire/project/application/heading.blade.php`, `resources/views/livewire/server/navbar.blade.php` |
+| Grouped settings sidebar | `resources/views/livewire/project/application/configuration.blade.php`, `resources/views/components/server/sidebar.blade.php` |
+| Dense environment table and footer | `resources/views/livewire/project/shared/environment-variable/all.blade.php` |
+| Standard table toolbar controls | `resources/views/components/table/*` |
+| Application metrics charts | `resources/views/livewire/project/shared/metrics.blade.php` |
+| Browser terminal workspace | `resources/views/livewire/terminal/index.blade.php` |
+| Layer card | `resources/views/components/application/settings-section.blade.php` |
+| Custom dropdown | `resources/views/components/forms/listbox.blade.php` |
+| Empty state | `resources/views/components/empty.blade.php` |
+| Status pill | `resources/views/components/status-badge.blade.php` |
+| Floating save pill | `resources/views/components/unsaved-bar.blade.php` |
+| Global toast | `resources/views/components/toast.blade.php` |
+| Command palette / global search | `resources/views/livewire/global-search.blade.php` |
+| Outline icons | `resources/views/components/reicon.blade.php` |
+| Shared styling | `resources/css/app.css`, `resources/css/utilities.css` |
+| HTTP error pages | `resources/views/components/error-page.blade.php`, `resources/views/errors/*` |
+
+HTTP error pages (400, 401, 402, 403, 404, 419, 429, 500, 503) use the shared
+`<x-error-page>` component on the public auth-style canvas: theme-aware status
+code, compact title and muted description, neutral `.button` actions, and an
+`auth-text-link`-style Contact support link. Keep copy sentence-case and avoid
+oversized 200px status numbers.
+
+---
+
+## 11. UI implementation checklist
+
+1. Inventory every route and reusable partial in the family before editing.
+2. Read the current Blade and Livewire class before changing presentation.
+3. Preserve every existing action, authorization check, loading state, and
+   confirmation.
+4. Add the correct dual navigation and scoped workspace/form class.
+5. Convert meaningful groups to layer cards and use `gap-6`.
+6. Make the responsive column count match the controls visible in every state.
+7. Replace native selects and checkbox-style configuration with listboxes.
+8. Use one save model per component: instant-save or one floating dirty bar.
+9. Check nested radii using `outer = inner + inset`.
+10. Keep modal descriptions purposeful and footer actions compact/right-aligned.
+11. Use tables for dense collections and cards for forms or summaries.
+12. Use `x-status-badge`, `x-empty`, and `x-reicon`.
+13. Confirm light and dark accent behavior.
+14. Check fixed-nav anchor offsets and responsive stacking.
+15. Sweep every sibling route for legacy controls and shells.
+16. Run `git diff --check`.
+17. Compile Blade views in the `coolify` container.
+18. Build assets in `coolify-vite`.
+19. Hard-refresh and inspect the family routes in both themes.

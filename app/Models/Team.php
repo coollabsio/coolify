@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\User\RevokeUserTeamTokens;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
@@ -46,10 +47,16 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'personal_team',
         'show_boarding',
         'custom_server_limit',
+        'is_mcp_server_enabled',
+    ];
+
+    protected $attributes = [
+        'is_mcp_server_enabled' => true,
     ];
 
     protected $casts = [
         'personal_team' => 'boolean',
+        'is_mcp_server_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -65,13 +72,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $team->webhookNotificationSettings()->create();
         });
 
-        static::saving(function ($team) {
+        static::updating(function ($team) {
             if (auth()->user()?->isMember()) {
                 throw new \Exception('You are not allowed to update this team.');
             }
         });
 
         static::deleting(function (Team $team) {
+            RevokeUserTeamTokens::forTeam($team->id);
+
             foreach ($team->privateKeys as $key) {
                 $key->delete();
             }
@@ -82,7 +91,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()
-                ->merge(GitlabApp::where('team_id', $team->id)->get());
+                ->concat(GitlabApp::where('team_id', $team->id)->get());
             foreach ($teamSources as $source) {
                 $source->delete();
             }
@@ -214,13 +223,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('webhook')?->isEnabled();
     }
 
-    public function subscriptionEnded()
+    public function subscriptionEnded(?Subscription $subscription = null): void
     {
-        if (! $this->subscription) {
+        $subscription ??= $this->subscription;
+
+        if (! $subscription) {
             return;
         }
 
-        $this->subscription->update([
+        $subscription->update([
             'stripe_subscription_id' => null,
             'stripe_cancel_at_period_end' => false,
             'stripe_invoice_paid' => false,

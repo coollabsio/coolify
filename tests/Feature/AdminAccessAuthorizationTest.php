@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -156,4 +157,29 @@ test('admin route has auth middleware applied', function () {
     $middleware = $route->gatherMiddleware();
 
     expect($middleware)->toContain('auth');
+});
+
+test('root user sees the admin link in the navbar', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    $rootUser = User::factory()->create(['id' => 0]);
+    $this->actingAs($rootUser);
+
+    $navbar = Blade::render('<x-navbar />');
+
+    expect($navbar)
+        ->toContain('href="'.route('admin.index').'"')
+        ->toContain('title="Admin"')
+        ->toContain('text-pink-500');
+});
+
+test('non-root user does not see the admin link in the navbar', function () {
+    config()->set('constants.coolify.self_hosted', false);
+
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $navbar = Blade::render('<x-navbar />');
+
+    expect($navbar)->not->toContain('href="'.route('admin.index').'"');
 });

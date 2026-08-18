@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\PushoverNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 class Pushover extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -113,8 +114,13 @@ class Pushover extends Component
             refreshSession();
         } else {
             $this->pushoverEnabled = $this->settings->pushover_enabled;
-            $this->pushoverUserKey = $this->settings->pushover_user_key;
-            $this->pushoverApiToken = $this->settings->pushover_api_token;
+            if (auth()->user()->can('update', $this->settings)) {
+                $this->pushoverUserKey = $this->settings->pushover_user_key;
+                $this->pushoverApiToken = $this->settings->pushover_api_token;
+            } else {
+                $this->pushoverUserKey = null;
+                $this->pushoverApiToken = null;
+            }
 
             $this->deploymentSuccessPushoverNotifications = $this->settings->deployment_success_pushover_notifications;
             $this->deploymentFailurePushoverNotifications = $this->settings->deployment_failure_pushover_notifications;

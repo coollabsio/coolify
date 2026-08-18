@@ -1,68 +1,59 @@
-@props(['type' => 'warning', 'title' => 'Warning', 'class' => '', 'dismissible' => false, 'onDismiss' => null])
+@props([
+    'type' => 'warning',
+    'title' => 'Warning',
+    'class' => '',
+    'dismissible' => false,
+    'onDismiss' => null,
+])
 
 @php
-    $icons = [
-        'warning' => '<svg class="w-5 h-5 text-warning-600 dark:text-warning-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>',
-
-        'danger' => '<svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>',
-
-        'info' => '<svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>',
-
-        'success' => '<svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>'
-    ];
-
-    $colors = [
+    $styles = [
         'warning' => [
-            'bg' => 'bg-warning-50 dark:bg-warning-900/30',
-            'border' => 'border-warning-300 dark:border-warning-800',
-            'title' => 'text-warning-800 dark:text-warning-300',
-            'text' => 'text-warning-700 dark:text-warning-200'
+            'icon' => 'alert-triangle',
+            'shell' => 'border-warning/25 bg-warning/[0.07] dark:border-warning/20 dark:bg-warning/[0.06]',
+            'iconClass' => 'text-warning-700 dark:text-warning',
+            'titleClass' => 'text-warning-900 dark:text-warning',
+            'textClass' => 'text-warning-900/75 dark:text-warning/70',
         ],
         'danger' => [
-            'bg' => 'bg-red-50 dark:bg-red-900/30',
-            'border' => 'border-red-300 dark:border-red-800',
-            'title' => 'text-red-800 dark:text-red-300',
-            'text' => 'text-red-700 dark:text-red-200'
+            'icon' => 'alert-circle',
+            'shell' => 'border-red-300/60 bg-red-50 dark:border-red-500/20 dark:bg-red-500/[0.07]',
+            'iconClass' => 'text-red-600 dark:text-red-400',
+            'titleClass' => 'text-red-800 dark:text-red-300',
+            'textClass' => 'text-red-700/80 dark:text-red-300/75',
         ],
         'info' => [
-            'bg' => 'bg-blue-50 dark:bg-blue-900/30',
-            'border' => 'border-blue-300 dark:border-blue-800',
-            'title' => 'text-blue-800 dark:text-blue-300',
-            'text' => 'text-blue-700 dark:text-blue-200'
+            'icon' => 'info-circle',
+            'shell' => 'border-coollabs/20 bg-coollabs/[0.055] dark:border-warning/15 dark:bg-warning/[0.045]',
+            'iconClass' => 'text-coollabs dark:text-warning',
+            'titleClass' => 'text-coollabs dark:text-warning',
+            'textClass' => 'text-neutral-600 dark:text-fg-dim',
         ],
         'success' => [
-            'bg' => 'bg-green-50 dark:bg-green-900/30',
-            'border' => 'border-green-300 dark:border-green-800',
-            'title' => 'text-green-800 dark:text-green-300',
-            'text' => 'text-green-700 dark:text-green-200'
-        ]
+            'icon' => 'check-circle',
+            'shell' => 'border-emerald-300/60 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/[0.07]',
+            'iconClass' => 'text-emerald-600 dark:text-emerald-400',
+            'titleClass' => 'text-emerald-800 dark:text-emerald-300',
+            'textClass' => 'text-emerald-700/80 dark:text-emerald-300/75',
+        ],
     ];
 
-    $colorScheme = $colors[$type] ?? $colors['warning'];
-    $icon = $icons[$type] ?? $icons['warning'];
+    $style = $styles[$type] ?? $styles['warning'];
 @endphp
 
-<div {{ $attributes->merge(['class' => 'relative p-4 border rounded-lg ' . $colorScheme['bg'] . ' ' . $colorScheme['border'] . ' ' . $class]) }}>
-    <div class="flex items-start">
-        <div class="flex-shrink-0">
-            {!! $icon !!}
+<div
+    {{ $attributes->merge(['class' => 'relative rounded-lg border px-3 py-2.5 ' . $style['shell'] . ' ' . $class]) }}>
+    <div class="flex items-start gap-2.5">
+        <x-reicon :name="$style['icon']" class="mt-0.5 size-4 shrink-0 {{ $style['iconClass'] }}" />
+        <div class="min-w-0 flex-1 {{ $dismissible ? 'pr-7' : '' }}">
+            <div class="text-[12px] font-semibold {{ $style['titleClass'] }}">{{ $title }}</div>
+            <div class="mt-0.5 text-[12px] leading-5 {{ $style['textClass'] }}">{{ $slot }}</div>
         </div>
-        <div class="ml-3 {{ $dismissible ? 'pr-8' : '' }}">
-            <div class="text-base font-bold {{ $colorScheme['title'] }}">
-                {{ $title }}
-            </div>
-            <div class="mt-2 text-sm {{ $colorScheme['text'] }}">
-                {{ $slot }}
-            </div>
-        </div>
-        @if($dismissible && $onDismiss)
+        @if ($dismissible && $onDismiss)
             <button type="button" @click.stop="{{ $onDismiss }}"
-                    class="absolute top-2 right-2 p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-                    aria-label="Dismiss">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
-                     stroke="currentColor" class="w-4 h-4 {{ $colorScheme['text'] }}">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                class="absolute top-1.5 right-1.5 flex size-7 items-center justify-center rounded-md transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.06]"
+                aria-label="Dismiss">
+                <x-reicon name="x" class="size-3.5 {{ $style['iconClass'] }}" />
             </button>
         @endif
     </div>

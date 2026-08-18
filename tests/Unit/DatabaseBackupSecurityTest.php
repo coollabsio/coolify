@@ -182,7 +182,7 @@ test('escapeshellarg neutralizes command injection in mariadb password', functio
     $escaped = escapeshellarg($maliciousPassword);
 
     // Single quotes in the value get escaped as '\''
-    expect($escaped)->toBe("'pass'\\'''; whoami; echo '\\'''");
+    expect($escaped)->toBe("'pass'\\''; whoami; echo '\\'''");
     $command = "docker exec container mariadb-dump -u root -p$escaped db";
     // Verify the command doesn't contain an unescaped semicolon outside quotes
     expect($command)->toContain("-p'pass'");

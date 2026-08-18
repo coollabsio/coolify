@@ -2,6 +2,9 @@
 
 namespace App\Livewire\Security;
 
+use App\Livewire\Server\CloudProviderToken\Show as ServerCloudProviderTokenShow;
+use App\Livewire\Server\New\ByDigitalOcean;
+use App\Livewire\Server\New\ByHetzner;
 use App\Models\CloudProviderToken;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Http;
@@ -15,21 +18,33 @@ class CloudProviderTokenForm extends Component
 
     public string $provider = 'hetzner';
 
+    public bool $provider_locked = false;
+
     public string $token = '';
 
     public string $name = '';
 
-    public function mount()
+    public ?string $description = null;
+
+    public function mount(?string $provider = null): void
     {
-        $this->authorize('create', CloudProviderToken::class);
+        $this->provider_locked = filled($provider);
+        $this->provider = $provider ?? 'hetzner';
+
+        try {
+            $this->authorize('create', CloudProviderToken::class);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     protected function rules(): array
     {
         return [
-            'provider' => 'required|string|in:hetzner,digitalocean',
+            'provider' => 'required|string|in:hetzner,digitalocean,vultr',
             'token' => 'required|string',
             'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:1000',
         ];
     }
 
@@ -50,13 +65,26 @@ class CloudProviderTokenForm extends Component
                 $response = Http::withHeaders([
                     'Authorization' => 'Bearer '.$token,
                 ])->timeout(10)->get('https://api.hetzner.cloud/v1/servers');
-                ray($response);
 
                 return $response->successful();
             }
 
-            // Add other providers here in the future
-            // if ($provider === 'digitalocean') { ... }
+            if ($provider === 'digitalocean') {
+                $response = Http::withToken($token)
+                    ->acceptJson()
+                    ->timeout(10)
+                    ->get('https://api.digitalocean.com/v2/account');
+
+                return $response->successful();
+            }
+
+            if ($provider === 'vultr') {
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer '.$token,
+                ])->timeout(10)->get('https://api.vultr.com/v2/account');
+
+                return $response->successful();
+            }
 
             return false;
         } catch (\Throwable $e) {
@@ -74,17 +102,41 @@ class CloudProviderTokenForm extends Component
                 return $this->dispatch('error', 'Invalid API token. Please check your token and try again.');
             }
 
+            $description = trim($this->description ?? '');
+
             $savedToken = CloudProviderToken::create([
                 'team_id' => currentTeam()->id,
                 'provider' => $this->provider,
                 'token' => $this->token,
                 'name' => $this->name,
+                'description' => $description === '' ? null : $description,
             ]);
 
-            $this->reset(['token', 'name']);
+            auditLog('ui.cloud_token.created', [
+                'team_id' => currentTeam()->id,
+                'cloud_token_uuid' => $savedToken->uuid,
+                'cloud_token_name' => $savedToken->name,
+                'provider' => $savedToken->provider,
+            ]);
+
+            $this->reset(['token', 'name', 'description']);
 
             // Dispatch event with token ID so parent components can react
             $this->dispatch('tokenAdded', tokenId: $savedToken->id);
+            $this->dispatch('tokenAdded', tokenId: $savedToken->id)->to(CloudProviderTokens::class);
+
+            if ($savedToken->provider === 'digitalocean') {
+                $this->dispatch('tokenAdded.digitalocean', tokenId: $savedToken->id)->to(ByDigitalOcean::class);
+            }
+
+            if ($savedToken->provider === 'hetzner') {
+                $this->dispatch('tokenAdded.hetzner', tokenId: $savedToken->id)->to(ByHetzner::class);
+                $this->dispatch('tokenAdded.hetzner', tokenId: $savedToken->id)->to(ServerCloudProviderTokenShow::class);
+            }
+
+            if ($this->modal_mode) {
+                $this->dispatch('close-modal');
+            }
 
             $this->dispatch('success', 'Cloud provider token added successfully.');
         } catch (\Throwable $e) {

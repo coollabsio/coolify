@@ -5,11 +5,14 @@ namespace App\Livewire\Project;
 use App\Models\Application;
 use App\Models\Project;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class EnvironmentEdit extends Component
 {
+    use AuthorizesRequests;
+
     public Project $project;
 
     public Application $application;
@@ -62,6 +65,7 @@ class EnvironmentEdit extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->environment);
             $this->syncData(true);
             redirectRoute($this, 'project.environment.edit', [
                 'environment_uuid' => $this->environment->uuid,

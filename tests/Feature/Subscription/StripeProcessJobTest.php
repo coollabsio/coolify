@@ -2,10 +2,14 @@
 
 use App\Jobs\ServerLimitCheckJob;
 use App\Jobs\StripeProcessJob;
+use App\Jobs\SubscriptionInvoiceFailedJob;
+use App\Jobs\VerifyStripeSubscriptionStatusJob;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -139,7 +143,51 @@ describe('checkout.session.completed', function () {
     });
 });
 
-describe('customer.subscription.updated clamps quantity to MAX_SERVER_LIMIT', function () {
+describe('customer.subscription.updated clamps quantity to subscription bounds', function () {
+    test('quantity below MIN is clamped to 2', function () {
+        Queue::fake();
+
+        Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_subscription_id' => 'sub_existing',
+            'stripe_customer_id' => 'cus_min_clamp_test',
+            'stripe_invoice_paid' => true,
+        ]);
+
+        $event = [
+            'type' => 'customer.subscription.updated',
+            'data' => [
+                'object' => [
+                    'customer' => 'cus_min_clamp_test',
+                    'id' => 'sub_existing',
+                    'status' => 'active',
+                    'metadata' => [
+                        'team_id' => $this->team->id,
+                        'user_id' => $this->user->id,
+                    ],
+                    'items' => [
+                        'data' => [[
+                            'subscription' => 'sub_existing',
+                            'plan' => ['id' => 'price_dynamic_monthly'],
+                            'price' => ['lookup_key' => 'dynamic_monthly'],
+                            'quantity' => 1,
+                        ]],
+                    ],
+                    'cancel_at_period_end' => false,
+                    'cancellation_details' => ['feedback' => null, 'comment' => null],
+                ],
+            ],
+        ];
+
+        $job = new StripeProcessJob($event);
+        $job->handle();
+
+        $this->team->refresh();
+        expect($this->team->custom_server_limit)->toBe(2);
+
+        Queue::assertPushed(ServerLimitCheckJob::class);
+    });
+
     test('quantity exceeding MAX is clamped to 100', function () {
         Queue::fake();
 
@@ -227,4 +275,66 @@ describe('ServerLimitCheckJob dispatch is guarded by team check', function () {
 
         Queue::assertNotPushed(ServerLimitCheckJob::class);
     });
+});
+
+describe('missing subscription Stripe webhooks are ignored', function () {
+    test('does not send internal notifications or queue follow-up jobs', function (array $event) {
+        Queue::fake();
+
+        $rootTeam = Team::factory()->create(['id' => 0]);
+        $rootTeam->discordNotificationSettings()->update(['discord_enabled' => true]);
+
+        Notification::fake();
+
+        $job = new StripeProcessJob($event);
+        $job->handle();
+
+        Notification::assertNothingSent();
+        Notification::assertNotSentTo($rootTeam, GeneralNotification::class);
+        Queue::assertNotPushed(SubscriptionInvoiceFailedJob::class);
+        Queue::assertNotPushed(VerifyStripeSubscriptionStatusJob::class);
+    })->with([
+        'invoice paid' => [[
+            'type' => 'invoice.paid',
+            'data' => [
+                'object' => [
+                    'customer' => 'cus_missing_invoice_paid',
+                    'amount_paid' => 1000,
+                    'subscription' => 'sub_missing_invoice_paid',
+                    'lines' => [
+                        'data' => [[
+                            'plan' => ['id' => 'price_dynamic_monthly'],
+                        ]],
+                    ],
+                ],
+            ],
+        ]],
+        'invoice payment failed' => [[
+            'type' => 'invoice.payment_failed',
+            'data' => [
+                'object' => [
+                    'customer' => 'cus_missing_invoice_payment_failed',
+                    'id' => 'in_missing_invoice_payment_failed',
+                    'payment_intent' => null,
+                ],
+            ],
+        ]],
+        'payment intent payment failed' => [[
+            'type' => 'payment_intent.payment_failed',
+            'data' => [
+                'object' => [
+                    'customer' => 'cus_missing_payment_intent_failed',
+                ],
+            ],
+        ]],
+        'customer subscription deleted' => [[
+            'type' => 'customer.subscription.deleted',
+            'data' => [
+                'object' => [
+                    'customer' => 'cus_missing_subscription_deleted',
+                    'id' => 'sub_missing_subscription_deleted',
+                ],
+            ],
+        ]],
+    ]);
 });

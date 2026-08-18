@@ -5,11 +5,14 @@ namespace App\Livewire\Project\New;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Service;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 
 class DockerCompose extends Component
 {
+    use AuthorizesRequests;
+
     public string $dockerComposeRaw = '';
 
     public string $envFile = '';
@@ -30,6 +33,8 @@ class DockerCompose extends Component
     public function submit()
     {
         try {
+            $this->authorize('create', Service::class);
+
             $this->validate([
                 'dockerComposeRaw' => 'required',
             ]);
@@ -42,19 +47,20 @@ class DockerCompose extends Component
             $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
 
             $destination_uuid = $this->query['destination'] ?? null;
-            $destination = find_destination_for_current_team($destination_uuid);
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
                 throw new \Exception('Destination not found.');
             }
             $destination_class = $destination->getMorphClass();
 
-            $service = Service::create([
+            $service = new Service([
                 'docker_compose_raw' => $this->dockerComposeRaw,
                 'environment_id' => $environment->id,
                 'server_id' => $destination->server_id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
             ]);
+            $service->save();
 
             $variables = parseEnvFormatToArray($this->envFile);
             foreach ($variables as $key => $data) {

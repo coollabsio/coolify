@@ -33,10 +33,19 @@ class ValidHostname implements ValidationRule
             return;
         }
 
+        // Reject ASCII control characters (including embedded newlines, which
+        // would otherwise slip through the trailing-newline-tolerant `$` anchor
+        // in the per-label regex below).
+        if (preg_match('/[\x00-\x1f\x7f]/', $hostname) === 1) {
+            $fail('The :attribute contains invalid characters. Only letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.) are allowed.');
+
+            return;
+        }
+
         // Check for dangerous shell metacharacters
         $dangerousChars = [
             ';', '|', '&', '$', '`', '(', ')', '{', '}',
-            '<', '>', '\n', '\r', '\0', '"', "'", '\\',
+            '<', '>', "\n", "\r", "\0", '"', "'", '\\',
             '!', '*', '?', '[', ']', '~', '^', ':', '#',
             '@', '%', '=', '+', ',', ' ',
         ];
@@ -104,7 +113,7 @@ class ValidHostname implements ValidationRule
             }
 
             // Check if label contains only valid characters (letters, digits, hyphens)
-            if (! preg_match('/^[a-z0-9-]+$/', $label)) {
+            if (! preg_match('/^[a-z0-9-]+$/D', $label)) {
                 $fail('The :attribute contains invalid characters. Only letters (a-z, A-Z), numbers (0-9), hyphens (-), and dots (.) are allowed.');
 
                 return;

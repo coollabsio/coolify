@@ -16,6 +16,10 @@ class SecurityController extends Controller
             $team->makeHidden([
                 'private_key',
             ]);
+        } else {
+            $team->makeVisible([
+                'private_key',
+            ]);
         }
 
         return serializeApiResponse($team);
@@ -110,6 +114,7 @@ class SecurityController extends Controller
                 'message' => 'Private Key not found.',
             ], 404);
         }
+        $this->authorize('view', $key);
 
         return response()->json($this->removeSensitiveData($key));
     }
@@ -176,6 +181,7 @@ class SecurityController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $this->authorize('create', [PrivateKey::class]);
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
@@ -338,6 +344,7 @@ class SecurityController extends Controller
                 'message' => 'Private Key not found.',
             ], 404);
         }
+        $this->authorize('update', $foundKey);
         $foundKey->update($request->only($allowedFields));
 
         auditLog('api.private_key.updated', [
@@ -421,6 +428,7 @@ class SecurityController extends Controller
         if (is_null($key)) {
             return response()->json(['message' => 'Private Key not found.'], 404);
         }
+        $this->authorize('delete', $key);
 
         if ($key->isInUse()) {
             return response()->json([

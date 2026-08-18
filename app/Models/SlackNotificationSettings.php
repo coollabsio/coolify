@@ -33,6 +33,10 @@ class SlackNotificationSettings extends Model
         'traefik_outdated_slack_notifications',
     ];
 
+    protected $hidden = [
+        'slack_webhook_url',
+    ];
+
     protected $casts = [
         'slack_enabled' => 'boolean',
         'slack_webhook_url' => 'encrypted',

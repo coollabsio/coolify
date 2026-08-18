@@ -5,11 +5,43 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
+
+/**
+ * Stable short hash for compose service names used in Traefik router/service IDs.
+ * Keeps api.test vs api-test distinct after label-safe normalization.
+ */
+function traefikServiceNameHash(string $serviceName): string
+{
+    return substr(md5($serviceName), 0, 4);
+}
+
+/**
+ * Label-safe Traefik router/service name segment for a compose service.
+ * Dots (and other non [a-zA-Z0-9-]) break Docker/Traefik label paths; always append a hash
+ * so normalized names like api.test and api-test never collide.
+ */
+function traefikSafeServiceNameSegment(string $serviceName): string
+{
+    $normalized = str($serviceName)
+        ->replace('.', '-')
+        ->replace('_', '-')
+        ->replaceMatches('/[^a-zA-Z0-9-]+/', '-')
+        ->replaceMatches('/-+/', '-')
+        ->trim('-')
+        ->toString();
+
+    if ($normalized === '') {
+        $normalized = 'service';
+    }
+
+    return $normalized.'-'.traefikServiceNameHash($serviceName);
+}
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
@@ -73,6 +105,36 @@ function getCurrentServiceContainerStatus(Server $server, int $id): Collection
     return $containers;
 }
 
+function getCurrentDatabaseContainerStatus(Server $server, int $id): Collection
+{
+    $containers = collect([]);
+    if (! $server->isSwarm()) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.databaseId={$id}' --format '{{json .}}' "], $server);
+        $containers = format_docker_command_output_to_json($containers);
+
+        return $containers->filter();
+    }
+
+    return $containers;
+}
+
+function getCurrentServiceSubContainerStatus(Server $server, int $id, string $name): Collection
+{
+    return filterServiceSubContainersByName(getCurrentServiceContainerStatus($server, $id), $name);
+}
+
+function filterServiceSubContainersByName(Collection $containers, string $name): Collection
+{
+    return $containers->filter(function ($container) use ($name) {
+        $labels = data_get($container, 'Labels', []);
+        if (is_string($labels)) {
+            $labels = format_docker_labels_to_json($labels);
+        }
+
+        return collect($labels)->get('coolify.name') === $name;
+    })->values();
+}
+
 function format_docker_command_output_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);
@@ -86,7 +148,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         return $outputLines
             ->reject(fn ($line) => empty($line))
             ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return collect([]);
     }
 }
@@ -123,7 +185,7 @@ function format_docker_envs_to_json($rawOutput)
 
             return [$env[0] => $env[1]];
         });
-    } catch (\Throwable) {
+    } catch (Throwable) {
         return collect([]);
     }
 }
@@ -137,6 +199,70 @@ function checkMinimumDockerEngineVersion($dockerVersion)
 
     return $dockerVersion;
 }
+
+function parseDockerEngineVersion(?string $rawVersion): ?string
+{
+    if ($rawVersion === null || trim($rawVersion) === '') {
+        return null;
+    }
+
+    if (preg_match('/\d+\.\d+(?:\.\d+)?/', $rawVersion, $matches) !== 1) {
+        return null;
+    }
+
+    $parts = explode('.', $matches[0]);
+
+    return sprintf('%d.%d.%d', (int) $parts[0], (int) ($parts[1] ?? 0), (int) ($parts[2] ?? 0));
+}
+
+function dockerEngineVersionFromJson(?string $raw): ?string
+{
+    if ($raw === null || trim($raw) === '') {
+        return null;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (! is_array($decoded)) {
+        return null;
+    }
+
+    $version = $decoded['Server']['Version'] ?? null;
+
+    return is_string($version) ? parseDockerEngineVersion($version) : null;
+}
+
+function dockerStopTimeoutOption(?string $dockerVersion): string
+{
+    $normalized = parseDockerEngineVersion($dockerVersion);
+    if ($normalized !== null && version_compare($normalized, '28.0.0', '>=')) {
+        return '--timeout';
+    }
+
+    return '--time';
+}
+
+function dockerStopCommand(int $timeout, string $containers, Server|string|null $dockerVersion = null): string
+{
+    $version = $dockerVersion instanceof Server
+        ? $dockerVersion->dockerVersion()
+        : $dockerVersion;
+
+    $option = dockerStopTimeoutOption($version);
+    $flag = $option === '--timeout'
+        ? "--timeout={$timeout}"
+        : "--time={$timeout}";
+
+    $command = "docker stop {$flag} {$containers}";
+
+    if (app()->bound('config') && isDev()) {
+        Log::info('docker stop command', [
+            'command' => $command,
+            'docker_version' => $version,
+        ]);
+    }
+
+    return $command;
+}
 function escapeShellValue(string $value): string
 {
     return "'".str_replace("'", "'\\''", $value)."'";
@@ -149,13 +275,18 @@ function executeInDocker(string $containerId, string $command)
     return "docker exec {$containerId} bash -c '{$escapedCommand}'";
 }
 
-function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
+function buildContainerStatusCommand(Server $server, string $container_id): string
 {
     if ($server->isSwarm()) {
-        $container = instant_remote_process(["docker service ls --filter 'name={$container_id}' --format '{{json .}}' "], $server, $throwError);
-    } else {
-        $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
+        return 'docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ";
     }
+
+    return "docker inspect --format '{{json .}}' ".escapeshellarg($container_id);
+}
+
+function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
+{
+    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError);
     if (! $container) {
         return 'exited';
     }
@@ -255,12 +386,12 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, st
 
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
-    if ($resource->getMorphClass() === \App\Models\ServiceApplication::class) {
+    if ($resource->getMorphClass() === ServiceApplication::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'service.server');
         $environment_variables = data_get($resource, 'service.environment_variables');
         $type = $resource->serviceType();
-    } elseif ($resource->getMorphClass() === \App\Models\Application::class) {
+    } elseif ($resource->getMorphClass() === Application::class) {
         $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'destination.server');
         $environment_variables = data_get($resource, 'environment_variables');
@@ -353,7 +484,21 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
     return $payload;
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+/**
+ * @param  Collection<int, string>|null  $noindex_domains
+ */
+function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
+{
+    if (blank($noindex_domains)) {
+        return false;
+    }
+
+    return $noindex_domains
+        ->map(fn (string $noindex_domain) => ValidationPatterns::normalizeApplicationDomainUrl($noindex_domain))
+        ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
+}
+
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -373,6 +518,10 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $path = $url->getPath();
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
+        $siteAddress = "{$schema}://{$host}";
+        if ($schema === 'https' && ! $is_force_https_enabled) {
+            $siteAddress = "http://{$host}, https://{$host}";
+        }
         $port = $url->getPort();
         $handle = 'handle_path';
         if (! $is_stripprefix_enabled) {
@@ -384,8 +533,15 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if (is_null($port) && $predefinedPort) {
             $port = $predefinedPort;
         }
-        $labels->push("caddy_{$loop}={$schema}://{$host}");
-        $labels->push("caddy_{$loop}.header=-Server");
+        $labels->push("caddy_{$loop}={$siteAddress}");
+        if (isNoindexDomain($domain, $noindex_domains)) {
+            // Caddy's header directive takes either inline arguments or a block,
+            // never both, so -Server has to move into the block alongside it.
+            $labels->push("caddy_{$loop}.header.0_-Server=");
+            $labels->push("caddy_{$loop}.header.1_X-Robots-Tag=\"noindex, nofollow\"");
+        } else {
+            $labels->push("caddy_{$loop}.header=-Server");
+        }
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
         if ($port) {
@@ -397,11 +553,12 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
+        $redirect_schema = $is_force_https_enabled ? $schema : '{scheme}';
         if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$schema}://www.{$host}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://www.{$host}{uri}");
         }
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$schema}://{$host_without_www}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://{$host_without_www}{uri}");
         }
         if ($is_http_basic_auth_enabled) {
             $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$hashedPassword}\"");
@@ -411,7 +568,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -459,7 +616,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     foreach ($domains as $loop => $domain) {
         try {
             if ($generate_unique_uuid) {
-                $uuid = new Cuid2;
+                $uuid = new_public_id();
             }
 
             $url = Url::fromString($domain);
@@ -473,8 +630,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";
             if ($service_name) {
-                $http_label = "http-{$loop}-{$uuid}-{$service_name}";
-                $https_label = "https-{$loop}-{$uuid}-{$service_name}";
+                // Dots in service names split Traefik label paths; hash avoids api.test/api-test collisions.
+                $safeServiceName = traefikSafeServiceNameSegment($service_name);
+                $http_label = "http-{$loop}-{$uuid}-{$safeServiceName}";
+                $https_label = "https-{$loop}-{$uuid}-{$safeServiceName}";
             }
             if (str($image)->contains('ghost')) {
                 $labels->push("traefik.http.middlewares.redir-ghost-{$uuid}.redirectregex.regex=^{$path}/(.*)");
@@ -484,16 +643,23 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $labels->push("caddy_{$loop}.handle_path.{$loop}_redir-ghost-{$uuid}.rewrite.replacement=/$1");
             }
 
+            $noindex_name = "{$loop}-{$uuid}-noindex";
+            $is_noindex = isNoindexDomain($domain, $noindex_domains);
+            if ($is_noindex) {
+                $labels->push("traefik.http.middlewares.{$noindex_name}.headers.customresponseheaders.X-Robots-Tag=noindex, nofollow");
+            }
+
             $to_www_name = "{$loop}-{$uuid}-to-www";
             $to_non_www_name = "{$loop}-{$uuid}-to-non-www";
+            $redirect_capture_prefix = $escape_redirect_replacement_for_compose ? '$$' : '$';
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\${1}://\${2}",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://{$redirect_capture_prefix}{2}",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\${1}://www.\${2}",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://www.{$redirect_capture_prefix}{2}",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
             ];
             if ($schema === 'https') {
@@ -528,12 +694,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
                     if ($middlewares->isNotEmpty()) {
-                        $middlewares = $middlewares->join(',');
-                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares->join(',')}");
                     }
                 } else {
                     $middlewares = collect([]);
@@ -554,12 +722,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
                     if ($middlewares->isNotEmpty()) {
-                        $middlewares = $middlewares->join(',');
-                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares->join(',')}");
                     }
                 }
                 $labels->push("traefik.http.routers.{$https_label}.tls=true");
@@ -573,7 +743,16 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($is_force_https_enabled) {
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+                    $httpMiddlewares = collect([]);
+                    if ($is_noindex) {
+                        $httpMiddlewares->push($noindex_name);
+                    }
+                    $httpMiddlewares->push('redirect-to-https');
+                } else {
+                    $httpMiddlewares = $middlewares;
+                }
+                if ($httpMiddlewares->isNotEmpty()) {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$httpMiddlewares->join(',')}");
                 }
             } else {
                 // Set labels for http
@@ -606,6 +785,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -632,6 +814,9 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     if ($is_http_basic_auth_enabled) {
                         $middlewares->push($http_basic_auth_label);
                     }
+                    if ($is_noindex) {
+                        $middlewares->push($noindex_name);
+                    }
                     $middlewares_from_labels->each(function ($middleware_name) use ($middlewares) {
                         $middlewares->push($middleware_name);
                     });
@@ -641,7 +826,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     }
                 }
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             continue;
         }
     }
@@ -664,6 +849,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id === 0) {
         if ($application->fqdn) {
             $domains = str(data_get($application, 'fqdn'))->explode(',');
+            $noindexDomains = $application->noindexDomains();
             $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
             if ($shouldGenerateLabelsExactly) {
                 switch ($application->destination->server->proxyType()) {
@@ -679,6 +865,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            noindex_domains: $noindexDomains,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -694,6 +881,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
+                            noindex_domains: $noindexDomains,
+                            escape_redirect_replacement_for_compose: false,
                         ));
                         break;
                 }
@@ -709,6 +898,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    noindex_domains: $noindexDomains,
+                    escape_redirect_replacement_for_compose: false,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -722,6 +913,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
+                    noindex_domains: $noindexDomains,
                 ));
             }
         }
@@ -731,6 +923,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         } else {
             $domains = collect([]);
         }
+        // Previews are ephemeral: every domain is noindex.
+        $noindexDomains = $domains;
         $shouldGenerateLabelsExactly = $application->destination->server->settings->generate_exact_labels;
         if ($shouldGenerateLabelsExactly) {
             switch ($application->destination->server->proxyType()) {
@@ -745,6 +939,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        noindex_domains: $noindexDomains,
+                        escape_redirect_replacement_for_compose: false,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -759,6 +955,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
+                        noindex_domains: $noindexDomains,
                     ));
                     break;
             }
@@ -773,6 +970,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                noindex_domains: $noindexDomains,
+                escape_redirect_replacement_for_compose: false,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -785,6 +984,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 is_http_basic_auth_enabled: $application->is_http_basic_auth_enabled,
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
+                noindex_domains: $noindexDomains,
             ));
         }
     }
@@ -1000,6 +1200,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ulimit',
         '--device',
         '--shm-size',
+        '--dns',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
@@ -1013,6 +1214,7 @@ function convertDockerRunToCompose(?string $custom_docker_run_options = null)
         '--ip' => 'ip',
         '--ip6' => 'ip6',
         '--shm-size' => 'shm_size',
+        '--dns' => 'dns',
         '--gpus' => 'gpus',
         '--hostname' => 'hostname',
         '--entrypoint' => 'entrypoint',
@@ -1219,7 +1421,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     $server = Server::ownedByCurrentTeam()->find($server_id);
     try {
         if (! $server) {
-            throw new \Exception('Server not found');
+            throw new Exception('Server not found');
         }
         $yaml_compose = Yaml::parse($compose);
 
@@ -1235,7 +1437,7 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
         ], $server);
 
         return 'OK';
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return $e->getMessage();
     } finally {
         if (filled($server)) {
@@ -1246,18 +1448,38 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable
     }
 }
 
-function getContainerLogs(Server $server, string $container_id, int $lines = 100): string
+function normalizeLogLines(mixed $lines, int $default = 100, int $max = 10000): int
 {
-    if ($server->isSwarm()) {
-        $output = instant_remote_process([
-            "docker service logs -n {$lines} {$container_id} 2>&1",
-        ], $server);
-    } else {
-        $output = instant_remote_process([
-            "docker logs -n {$lines} {$container_id} 2>&1",
-        ], $server);
+    $lines = filter_var($lines, FILTER_VALIDATE_INT);
+    if ($lines === false || $lines <= 0) {
+        return $default;
     }
 
+    return min($lines, $max);
+}
+
+function parseLogTimestampFlag(mixed $showTimestamps): bool
+{
+    return filter_var($showTimestamps, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? false;
+}
+
+function buildContainerLogsCommand(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+{
+    $command = "docker logs -n {$lines}";
+    if ($server->isSwarm()) {
+        $command = "docker service logs -n {$lines}";
+    }
+
+    if ($showTimestamps) {
+        $command .= ' --timestamps';
+    }
+
+    return "{$command} ".escapeshellarg($container_id).' 2>&1';
+}
+
+function getContainerLogs(Server $server, string $container_id, int $lines = 100, bool $showTimestamps = false): string
+{
+    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
     $output = removeAnsiColors($output);
 
     return $output;
@@ -1351,10 +1573,10 @@ function escapeBashDoubleQuoted(?string $value): string
  * Generate Docker build arguments from environment variables collection
  * Returns only keys (no values) since values are sourced from environment via export
  *
- * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
- * @return \Illuminate\Support\Collection Collection of formatted --build-arg strings (keys only)
+ * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @return Collection Collection of formatted --build-arg strings (keys only)
  */
-function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
+function generateDockerBuildArgs($variables): Collection
 {
     $variables = collect($variables);
 
@@ -1362,14 +1584,14 @@ function generateDockerBuildArgs($variables): \Illuminate\Support\Collection
         $key = is_array($var) ? data_get($var, 'key') : $var->key;
 
         // Only return the key - Docker will get the value from the environment
-        return "--build-arg {$key}";
+        return '--build-arg '.escapeshellarg((string) $key);
     });
 }
 
 /**
  * Generate Docker environment flags from environment variables collection
  *
- * @param  \Illuminate\Support\Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
+ * @param  Collection|array  $variables  Collection of variables with 'key', 'value', and optionally 'is_multiline'
  * @return string Space-separated environment flags
  */
 function generateDockerEnvFlags($variables): string

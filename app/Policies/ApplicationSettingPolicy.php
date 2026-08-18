@@ -20,8 +20,9 @@ class ApplicationSettingPolicy
      */
     public function view(User $user, ApplicationSetting $applicationSetting): bool
     {
-        // return $user->teams->contains('id', $applicationSetting->application->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($applicationSetting);
+
+        return $teamId !== null && $user->teams->contains('id', $teamId);
     }
 
     /**
@@ -29,8 +30,7 @@ class ApplicationSettingPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -38,8 +38,9 @@ class ApplicationSettingPolicy
      */
     public function update(User $user, ApplicationSetting $applicationSetting): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationSetting->application->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($applicationSetting);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -47,8 +48,9 @@ class ApplicationSettingPolicy
      */
     public function delete(User $user, ApplicationSetting $applicationSetting): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationSetting->application->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($applicationSetting);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -56,8 +58,7 @@ class ApplicationSettingPolicy
      */
     public function restore(User $user, ApplicationSetting $applicationSetting): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationSetting->application->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -65,7 +66,11 @@ class ApplicationSettingPolicy
      */
     public function forceDelete(User $user, ApplicationSetting $applicationSetting): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationSetting->application->team()->first()->id);
-        return true;
+        return false;
+    }
+
+    private function getTeamId(ApplicationSetting $applicationSetting): ?int
+    {
+        return $applicationSetting->application?->team()?->id;
     }
 }

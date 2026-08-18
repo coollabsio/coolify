@@ -16,10 +16,29 @@ beforeEach(function () {
     Cache::flush();
 });
 
-it('dispatches storage check when disk percentage changes', function () {
+it('dispatches storage check when disk percentage changes above threshold', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
 
+    // Default notification threshold is 80%.
+    $data = [
+        'containers' => [],
+        'filesystem_usage_root' => ['used_percentage' => 85],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    Queue::assertPushed(ServerStorageCheckJob::class, function ($job) use ($server) {
+        return $job->server->id === $server->id && $job->percentage === 85;
+    });
+});
+
+it('does not dispatch storage check when disk usage is below threshold', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+
+    // 45% is well below the default 80% notification threshold — nothing to do.
     $data = [
         'containers' => [],
         'filesystem_usage_root' => ['used_percentage' => 45],
@@ -28,8 +47,39 @@ it('dispatches storage check when disk percentage changes', function () {
     $job = new PushServerUpdateJob($server, $data);
     $job->handle();
 
+    Queue::assertNotPushed(ServerStorageCheckJob::class);
+});
+
+it('clears stale storage cache when disk usage drops below threshold', function () {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $storageCacheKey = 'storage-check:'.$server->id;
+
+    Cache::put($storageCacheKey, 85, 600);
+
+    $belowThresholdData = [
+        'containers' => [],
+        'filesystem_usage_root' => ['used_percentage' => 45],
+    ];
+
+    $job = new PushServerUpdateJob($server, $belowThresholdData);
+    $job->handle();
+
+    Queue::assertNotPushed(ServerStorageCheckJob::class);
+    expect(Cache::missing($storageCacheKey))->toBeTrue();
+
+    Queue::fake();
+
+    $aboveThresholdData = [
+        'containers' => [],
+        'filesystem_usage_root' => ['used_percentage' => 85],
+    ];
+
+    $job = new PushServerUpdateJob($server, $aboveThresholdData);
+    $job->handle();
+
     Queue::assertPushed(ServerStorageCheckJob::class, function ($job) use ($server) {
-        return $job->server->id === $server->id && $job->percentage === 45;
+        return $job->server->id === $server->id && $job->percentage === 85;
     });
 });
 
@@ -37,12 +87,12 @@ it('does not dispatch storage check when disk percentage is unchanged', function
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
 
-    // Simulate a previous push that cached the percentage
-    Cache::put('storage-check:'.$server->id, 45, 600);
+    // Simulate a previous push that cached the percentage (above threshold).
+    Cache::put('storage-check:'.$server->id, 85, 600);
 
     $data = [
         'containers' => [],
-        'filesystem_usage_root' => ['used_percentage' => 45],
+        'filesystem_usage_root' => ['used_percentage' => 85],
     ];
 
     $job = new PushServerUpdateJob($server, $data);
@@ -55,19 +105,19 @@ it('dispatches storage check when disk percentage changes from cached value', fu
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
 
-    // Simulate a previous push that cached 45%
-    Cache::put('storage-check:'.$server->id, 45, 600);
+    // Simulate a previous push that cached 85% (above threshold).
+    Cache::put('storage-check:'.$server->id, 85, 600);
 
     $data = [
         'containers' => [],
-        'filesystem_usage_root' => ['used_percentage' => 50],
+        'filesystem_usage_root' => ['used_percentage' => 90],
     ];
 
     $job = new PushServerUpdateJob($server, $data);
     $job->handle();
 
     Queue::assertPushed(ServerStorageCheckJob::class, function ($job) use ($server) {
-        return $job->server->id === $server->id && $job->percentage === 50;
+        return $job->server->id === $server->id && $job->percentage === 90;
     });
 });
 
@@ -137,6 +187,36 @@ it('dispatches ConnectProxyToNetworksJob again after cache expires', function ()
     $job2 = new PushServerUpdateJob($server, $data);
     $job2->handle();
 
+    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
+});
+
+it('respects the configured proxy connect interval', function () {
+    // Interval 0 → the connect-proxy gate key expires immediately, so every
+    // push re-dispatches without a manual Cache::forget. Proves the TTL is
+    // driven by config('constants.proxy.connect_networks_interval_seconds').
+    config(['constants.proxy.connect_networks_interval_seconds' => 0]);
+
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+
+    $data = [
+        'containers' => [
+            [
+                'name' => 'coolify-proxy',
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => ['coolify.managed' => true],
+            ],
+        ],
+        'filesystem_usage_root' => ['used_percentage' => 10],
+    ];
+
+    (new PushServerUpdateJob($server, $data))->handle();
+    Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
+
+    Queue::fake();
+    (new PushServerUpdateJob($server, $data))->handle();
     Queue::assertPushed(ConnectProxyToNetworksJob::class, 1);
 });
 

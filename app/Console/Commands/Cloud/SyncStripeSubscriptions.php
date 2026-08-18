@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands\Cloud;
 
-use App\Jobs\SyncStripeSubscriptionsJob;
+use App\Actions\Stripe\SyncStripeSubscriptions as SyncStripeSubscriptionsAction;
 use Illuminate\Console\Command;
 
 class SyncStripeSubscriptions extends Command
@@ -35,14 +35,18 @@ class SyncStripeSubscriptions extends Command
 
         $this->newLine();
 
-        $job = new SyncStripeSubscriptionsJob($fix);
-        $fetched = 0;
-        $result = $job->handle(function (int $count) use (&$fetched): void {
-            $fetched = $count;
-            $this->output->write("\r  Fetching subscriptions from Stripe... {$fetched}");
+        $progressShown = false;
+        $result = SyncStripeSubscriptionsAction::run($fix, function (string $stage, int $current, ?int $total) use (&$progressShown): void {
+            $progressShown = true;
+            $message = match ($stage) {
+                'checking' => "  Checking stale subscriptions against Stripe... {$current}/{$total}",
+                default => "  Fetching valid subscriptions from Stripe... {$current}",
+            };
+
+            $this->output->write("\r".str_pad($message, 80));
         });
-        if ($fetched > 0) {
-            $this->output->write("\r".str_repeat(' ', 60)."\r");
+        if ($progressShown) {
+            $this->output->write("\r".str_repeat(' ', 80)."\r");
         }
 
         if (isset($result['error'])) {
@@ -63,13 +67,22 @@ class SyncStripeSubscriptions extends Command
                 $this->line("    Team ID: {$discrepancy['team_id']}");
                 $this->line("    Stripe ID: {$discrepancy['stripe_subscription_id']}");
                 $this->line("    Stripe Status: {$discrepancy['stripe_status']}");
+                $resolution = match ($discrepancy['resolution']) {
+                    'delete_stale' => 'Delete stale local row',
+                    'manual_review' => 'Manual review required',
+                    default => 'End local subscription',
+                };
+                $this->line("    Resolution: {$resolution}");
                 $this->newLine();
             }
 
             if ($fix) {
-                $this->info('All discrepancies have been fixed.');
+                $this->info("Automatic corrections applied: {$result['fixed_count']}");
+                if ($result['manual_review_count'] > 0) {
+                    $this->warn("Skipped for manual review: {$result['manual_review_count']}");
+                }
             } else {
-                $this->comment('Run with --fix to correct these discrepancies.');
+                $this->comment('Run with --fix to apply automatic corrections.');
             }
         } else {
             $this->info('No discrepancies found. All subscriptions are in sync.');
@@ -84,6 +97,7 @@ class SyncStripeSubscriptions extends Command
                 $this->line("  - Team ID: {$resub['team_id']} | Email: {$resub['email']}");
                 $this->line("    Old: {$resub['old_stripe_subscription_id']} (cus: {$resub['old_stripe_customer_id']})");
                 $this->line("    New: {$resub['new_stripe_subscription_id']} (cus: {$resub['new_stripe_customer_id']}) [{$resub['new_status']}]");
+                $this->line('    Linked to this team: '.($resub['linked_to_team'] ? 'Yes' : 'No'));
                 $this->newLine();
             }
         }

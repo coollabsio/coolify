@@ -12,14 +12,15 @@ services:
       - data:/convex/data
     environment:
       - SERVICE_URL_BACKEND_3210
+      - SERVICE_URL_SITE_3211
       - INSTANCE_NAME=${INSTANCE_NAME:-self-hosted-convex}
-      - INSTANCE_SECRET=${SERVICE_HEX_32_SECRET}
+      - INSTANCE_SECRET=${SERVICE_HEX_64_SECRET}
       - CONVEX_RELEASE_VERSION_DEV=${CONVEX_RELEASE_VERSION_DEV:-}
       - ACTIONS_USER_TIMEOUT_SECS=${ACTIONS_USER_TIMEOUT_SECS:-}
       # URL of the Convex API as accessed by the client/frontend.
-      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_DASHBOARD}
+      - CONVEX_CLOUD_ORIGIN=${SERVICE_URL_BACKEND}
       # URL of Convex HTTP actions as accessed by the client/frontend.
-      - CONVEX_SITE_ORIGIN=${SERVICE_URL_BACKEND}
+      - CONVEX_SITE_ORIGIN=${SERVICE_URL_SITE}
       - DATABASE_URL=${DATABASE_URL:-}
       - DISABLE_BEACON=${DISABLE_BEACON:?false}
       - REDACT_LOGS_TO_CLIENT=${REDACT_LOGS_TO_CLIENT:?false}
