@@ -219,7 +219,8 @@
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"
-                                    :isPreview="$row['scope'] === 'preview'" :showEnvironmentType="$showEnvironmentType" />
+                                    :isPreview="$row['scope'] === 'preview'" :showEnvironmentType="$showEnvironmentType"
+                                    :resourceableType="get_class($resource)" :resourceableId="$resource->id" />
                             @endif
                             @endforeach
                             </div>

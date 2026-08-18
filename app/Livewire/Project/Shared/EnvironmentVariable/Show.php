@@ -161,6 +161,22 @@ class Show extends Component
         $this->valuesLoaded = true;
     }
 
+    public function copyValue(): ?string
+    {
+        if ($this->env->is_shown_once || (auth()->user()?->isMember() ?? true)) {
+            return null;
+        }
+
+        if (! $this->env instanceof ModelsEnvironmentVariable) {
+            return $this->env->value;
+        }
+
+        return $this->env->get_real_environment_variables_with_server(
+            $this->env->resolveReferencedValue(),
+            $this->env->resourceable,
+        );
+    }
+
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
