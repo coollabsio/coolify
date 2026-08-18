@@ -6,6 +6,7 @@ use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
+use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -22,6 +23,8 @@ class Domains extends Component
 
     public string $redirect = 'both';
 
+    public bool $isForceHttpsEnabled = true;
+
     /**
      * Per compose-service www/non-www redirect direction.
      * Keys are wire-safe (dots encoded) — use serviceRedirectWireKey().
@@ -35,11 +38,19 @@ class Domains extends Component
 
     public string $newDomain = '';
 
+    public array $newDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $newDomainPartsChanged = false;
+
     public ?string $newDomainService = null;
 
     public ?int $editingIndex = null;
 
     public string $editingDomain = '';
+
+    public array $editingDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
+
+    public bool $editingDomainPartsChanged = false;
 
     public ?string $editingService = null;
 
@@ -100,6 +111,7 @@ class Domains extends Component
             'newDomain' => ValidationPatterns::applicationDomainRules(),
             'editingDomain' => ValidationPatterns::applicationDomainRules(),
             'redirect' => 'string|required|in:both,www,non-www',
+            'isForceHttpsEnabled' => 'boolean',
             'serviceRedirects' => 'array',
             'serviceRedirects.*' => 'string|in:both,www,non-www',
         ];
@@ -151,6 +163,18 @@ class Domains extends Component
         $this->setRedirect();
     }
 
+    public function updateForceHttps(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validateOnly('isForceHttpsEnabled');
+
+        $this->application->settings->is_force_https_enabled = $this->isForceHttpsEnabled;
+        $this->application->settings->save();
+        $this->resetDefaultLabels();
+        $this->dispatch('configurationChanged')->to(ConfigurationChecker::class);
+        $this->dispatch('success', 'HTTP to HTTPS redirect updated.');
+    }
+
     public function loadDomainState(): void
     {
         $this->application->refresh();
@@ -159,6 +183,7 @@ class Domains extends Component
         $this->isCompose = $this->application->build_pack === 'dockercompose';
         $this->labelsAreWritable = $this->application->settings->is_container_label_readonly_enabled === false;
         $this->redirect = $this->application->redirect ?? 'both';
+        $this->isForceHttpsEnabled = $this->application->isForceHttpsEnabled();
 
         $settings = instanceSettings();
         $this->dnsValidationEnabled = (bool) data_get($settings, 'is_dns_validation_enabled', true);
@@ -662,6 +687,12 @@ class Domains extends Component
         $this->resetAddDomainDnsGate();
     }
 
+    public function updatedNewDomainParts(): void
+    {
+        $this->newDomainPartsChanged = true;
+        $this->resetAddDomainDnsGate();
+    }
+
     public function updatedNewDomainService(): void
     {
         $this->resetAddDomainDnsGate();
@@ -677,6 +708,8 @@ class Domains extends Component
     public function resetAddDomainForm(): void
     {
         $this->newDomain = '';
+        $this->newDomainParts = DomainUrlParts::empty();
+        $this->newDomainPartsChanged = false;
         $this->resetAddDomainDnsGate();
         $this->resetErrorBag('newDomain');
     }
@@ -743,6 +776,9 @@ class Domains extends Component
                 return;
             }
 
+            if ($this->newDomainPartsChanged) {
+                $this->newDomain = DomainUrlParts::compose(...$this->newDomainParts);
+            }
             $this->validateOnly('newDomain');
 
             $normalized = ValidationPatterns::normalizeApplicationDomains($this->newDomain);
@@ -893,6 +929,12 @@ class Domains extends Component
         $this->resetEditDomainDnsGate();
     }
 
+    public function updatedEditingDomainParts(): void
+    {
+        $this->editingDomainPartsChanged = true;
+        $this->resetEditDomainDnsGate();
+    }
+
     public function resetEditDomainDnsGate(): void
     {
         $this->editDomainDnsFailed = false;
@@ -908,10 +950,13 @@ class Domains extends Component
 
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
+        $this->editingDomainParts = DomainUrlParts::split($this->editingDomain);
+        $this->editingDomainPartsChanged = false;
         $this->editingService = $this->domainRows[$index]['service'];
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
         $this->showEditDomainModal = true;
+        $this->dispatch('open-edit-domain');
     }
 
     public function addSuggestedDomain(int $index): void
@@ -990,6 +1035,8 @@ class Domains extends Component
         $this->showEditDomainModal = false;
         $this->editingIndex = null;
         $this->editingDomain = '';
+        $this->editingDomainParts = DomainUrlParts::empty();
+        $this->editingDomainPartsChanged = false;
         $this->editingService = null;
         $this->resetEditDomainDnsGate();
         $this->resetErrorBag('editingDomain');
@@ -1021,6 +1068,9 @@ class Domains extends Component
                 return;
             }
 
+            if ($this->editingDomainPartsChanged) {
+                $this->editingDomain = DomainUrlParts::compose(...$this->editingDomainParts);
+            }
             $this->validateOnly('editingDomain');
 
             $normalized = ValidationPatterns::normalizeApplicationDomains($this->editingDomain);

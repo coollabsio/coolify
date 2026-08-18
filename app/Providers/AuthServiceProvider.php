@@ -19,6 +19,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
 use App\Models\S3Storage;
+use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -56,6 +57,7 @@ use App\Policies\PrivateKeyPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\ResourceCreatePolicy;
 use App\Policies\S3StoragePolicy;
+use App\Policies\ScheduledTaskPolicy;
 use App\Policies\ServerPolicy;
 use App\Policies\ServiceApplicationPolicy;
 use App\Policies\ServiceDatabasePolicy;
@@ -117,6 +119,9 @@ class AuthServiceProvider extends ServiceProvider
 
         // S3 storage policy
         S3Storage::class => S3StoragePolicy::class,
+
+        // Scheduled task policy
+        ScheduledTask::class => ScheduledTaskPolicy::class,
 
         // Team policy
         Team::class => TeamPolicy::class,

@@ -16,9 +16,16 @@
     'tooltip' => true,
     'portal' => false,
     'preserveValue' => false,
+    'canGate' => null,
+    'canResource' => null,
+    'autoDisable' => true,
 ])
 
 @php
+    if ($canGate && $canResource && $autoDisable && ! Illuminate\Support\Facades\Gate::allows($canGate, $canResource)) {
+        $disabled = true;
+    }
+
     $triggerId = ($htmlId ?? $id).'-trigger';
     $panelId = ($htmlId ?? $id).'-panel';
 @endphp
@@ -90,6 +97,9 @@
             const gap = 4;
             const edge = 12;
             const triggerRect = trigger.getBoundingClientRect();
+            panel.style.width = 'max-content';
+            panel.style.minWidth = `${triggerRect.width}px`;
+            panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`;
             const panelWidth = Math.min(
                 Math.max(triggerRect.width, panel.offsetWidth),
                 window.innerWidth - (edge * 2),
@@ -107,8 +117,6 @@
             panel.style.top = `${top}px`;
             panel.style.left = `${left}px`;
             panel.style.width = `${panelWidth}px`;
-            panel.style.maxWidth = `${window.innerWidth - (edge * 2)}px`;
-            panel.style.minWidth = `${triggerRect.width}px`;
             this.positioned = true;
         },
     }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"

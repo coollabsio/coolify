@@ -126,24 +126,46 @@
 
             <div x-cloak x-show="viewMode === 'grid'"
                 class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <template x-for="server in filteredServers" :key="server.uuid">
-                    <a :href="server.href" {{ wireNavigate() }}
+                @foreach ($servers as $server)
+                    @php
+                        $serverRow = $serverRows->firstWhere('uuid', $server->uuid);
+                    @endphp
+                    <a x-cloak
+                        x-show="filteredServers.some(server => server.uuid === @js($server->uuid))"
+                        href="{{ $serverRow['href'] }}" {{ wireNavigate() }}
                         class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
-                        <div class="flex items-start gap-3">
-                            <div :title="server.status" :aria-label="`Server status: ${server.status}`"
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.04] dark:text-fg-dim"
-                                :class="server.statusType === 'success' ? 'border-emerald-500/70' : server.statusType === 'warning' ? 'border-amber-500/70' : 'border-red-500/70'">
+                        @if ($server->isMetricsEnabled())
+                            <livewire:dashboard.server-metrics-chart :server="$server"
+                                :key="'server-index-metrics-'.$server->uuid" />
+                        @endif
+
+                        <div class="relative z-10 flex items-start gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0 flex-1">
-                                <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
-                                    x-text="server.name"></h2>
-                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
-                                    x-text="server.description"></p>
+                                <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg">
+                                    {{ $serverRow['name'] }}
+                                </h2>
+                                <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    {{ $serverRow['description'] }}
+                                </p>
                             </div>
+                            @if ($serverRow['statusType'] !== 'success')
+                                <span data-tooltip="{{ $serverRow['status'] }}"
+                                    aria-label="Server status: {{ $serverRow['status'] }}"
+                                    @class([
+                                        'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md',
+                                        'text-orange-500 dark:text-warning' => $serverRow['statusType'] === 'warning',
+                                        'text-red-500 dark:text-red-400' => $serverRow['statusType'] === 'error',
+                                    ])>
+                                    <x-reicon name="alert-triangle" class="size-4" />
+                                </span>
+                            @endif
                         </div>
                     </a>
-                </template>
+                @endforeach
             </div>
 
             <div x-show="viewMode === 'table'"
@@ -157,9 +179,8 @@
                     <a :href="server.href" {{ wireNavigate() }}
                         class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
-                            <div :title="server.status" :aria-label="`Server status: ${server.status}`"
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.035] dark:text-fg-dim"
-                                :class="server.statusType === 'success' ? 'border-emerald-500/70' : server.statusType === 'warning' ? 'border-amber-500/70' : 'border-red-500/70'">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0">
@@ -168,6 +189,12 @@
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                     x-text="server.description"></p>
                             </div>
+                            <span x-show="server.statusType !== 'success'" :data-tooltip="server.status"
+                                :aria-label="`Server status: ${server.status}`"
+                                class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md"
+                                :class="server.statusType === 'warning' ? 'text-orange-500 dark:text-warning' : 'text-red-500 dark:text-red-400'">
+                                <x-reicon name="alert-triangle" class="size-4" />
+                            </span>
                         </div>
                         <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
                             <span x-text="server.status"></span>

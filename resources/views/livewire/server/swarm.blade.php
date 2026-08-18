@@ -23,14 +23,14 @@
                 </x-callout>
 
                 <div class="mt-4 grid gap-4 lg:grid-cols-2">
-                    <x-forms.listbox id="isSwarmManager" label="Manager role"
+                    <x-forms.listbox canGate="update" :canResource="$server" id="isSwarmManager" label="Manager role"
                         helper="Managers control scheduling and cluster state." onChange="instantSave"
                         :options="[
                             ['value' => false, 'label' => 'Not a Swarm manager'],
                             ['value' => true, 'label' => 'Swarm manager'],
                         ]"
                         :disabled="$server->settings->is_swarm_worker || !auth()->user()->can('update', $server)" />
-                    <x-forms.listbox id="isSwarmWorker" label="Worker role"
+                    <x-forms.listbox canGate="update" :canResource="$server" id="isSwarmWorker" label="Worker role"
                         helper="Workers run tasks assigned by a Swarm manager." onChange="instantSave"
                         :options="[
                             ['value' => false, 'label' => 'Not a Swarm worker'],

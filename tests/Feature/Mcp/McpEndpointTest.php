@@ -216,6 +216,13 @@ test('get_infrastructure_overview returns counts', function () {
 
 test('get_server scrubs sensitive nested data and exposes connection_timeout', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->proxy->set('last_saved_proxy_configuration', <<<'YAML'
+services:
+  traefik:
+    environment:
+      CF_DNS_API_TOKEN: plaintext-cloudflare-token
+YAML);
+    $server->saveQuietly();
     // creating hook auto-generates a sentinel_token; bump connection_timeout
     // via saveQuietly to avoid triggering restartSentinel.
     $server->settings->forceFill(['connection_timeout' => 42])->saveQuietly();
@@ -229,6 +236,9 @@ test('get_server scrubs sensitive nested data and exposes connection_timeout', f
     $raw = json_encode($body);
 
     expect($raw)->not->toContain('sentinel_token');
+    expect($raw)->not->toContain('last_saved_proxy_configuration');
+    expect($raw)->not->toContain('CF_DNS_API_TOKEN');
+    expect($raw)->not->toContain('plaintext-cloudflare-token');
     expect($raw)->not->toContain('"team_id"');
     expect($raw)->not->toContain('"private_key_id"');
     expect($body['data']['connection_timeout'])->toBe(42);

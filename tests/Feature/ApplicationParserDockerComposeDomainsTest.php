@@ -399,7 +399,7 @@ YAML;
     expect(json_decode($plainApplication->docker_compose_domains, true))->toBeNull();
 });
 
-test('applicationParser selects the Coolify network for Traefik routed compose services', function () {
+test('applicationParser selects the resource network for Traefik routed compose services', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,

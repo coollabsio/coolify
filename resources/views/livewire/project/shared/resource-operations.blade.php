@@ -246,7 +246,7 @@
                     {{ data_get($resource, 'destination.network') }}.
                 </p>
                 <x-forms.button
-                    @click="$wire.cloneTo(@js($resource->destination->uuid), selectedCloneEnvironment)">
+                    @click="$wire.cloneTo(currentDestinationUuid, selectedCloneEnvironment)">
                     Clone resource
                 </x-forms.button>
             </div>

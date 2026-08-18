@@ -43,7 +43,7 @@
                 'route' => 'server.proxy',
                 'active' => request()->routeIs('server.proxy', 'server.proxy.*'),
                 'visible' => ! $server->isSwarmWorker() && ! $server->settings->is_build_server,
-                'warning' => $this->hasTraefikOutdated,
+                'warning' => $this->hasTraefikOutdated || $this->hasPendingProxyConfiguration,
             ],
             [
                 'label' => 'Sentinel',
@@ -88,6 +88,20 @@
         $showSentinelStatus = $server->isFunctional() && $server->isSentinelEnabled();
         $proxyCanBeStopped = in_array($proxyStatus, ['running', 'starting', 'restarting'], true);
     @endphp
+
+    @if ($this->hasPendingProxyConfiguration)
+        @teleport('#configuration-warning-hud-slot')
+            <div>
+                <x-proxy-configuration-warning :can-restart="auth()->user()?->can('manageProxy', $server) ?? false" />
+            </div>
+        @endteleport
+
+        @teleport('#configuration-warning-hud-slot-mobile')
+            <div>
+                <x-proxy-configuration-warning :can-restart="auth()->user()?->can('manageProxy', $server) ?? false" />
+            </div>
+        @endteleport
+    @endif
 
     @teleport('#server-topbar-context')
         <div data-testid="server-topbar-context"

@@ -109,18 +109,7 @@
             @if (session()->has('token'))
                 <x-application.settings-section title="Copy your token"
                     description="This value will not be shown again after you leave this page.">
-                    <div class="relative" x-data="{ copied: false }">
-                        <input type="text" value="{{ session('token') }}" readonly
-                            class="input w-full pr-12! font-mono text-[12px] text-black dark:text-fg">
-                        <button type="button"
-                            x-on:click="copied = true; navigator.clipboard.writeText(@js(session('token'))); setTimeout(() => copied = false, 1200)"
-                            class="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                            title="Copy token">
-                            <x-reicon name="file-content" class="size-3.5" />
-                        </button>
-                        <span x-cloak x-show="copied"
-                            class="absolute top-full right-0 mt-1 text-[10px] text-success">Copied</span>
-                    </div>
+                    <x-forms.copy-button :text="session('token')" />
                 </x-application.settings-section>
             @endif
 

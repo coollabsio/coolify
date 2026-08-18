@@ -201,13 +201,7 @@
                                 </x-forms.button>
                             @endif
                         @else
-                            <button type="button"
-                                @click="$dispatch('open-edit-domain', {
-                                    index: {{ $index }},
-                                    url: @js($row['url']),
-                                serviceApplicationId: {{ (int) ($row['service_application_id'] ?? 0) }},
-                                serviceLabel: @js($serviceLabel),
-                            })"
+                            <button type="button" wire:click="startEdit({{ $index }})"
                                 class="icon-button shrink-0" title="Edit domain" aria-label="Edit domain">
                                 <x-reicon name="settings" class="size-3.5" />
                             </button>

@@ -122,6 +122,8 @@ class Application extends BaseModel
 {
     use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, SoftDeletes;
 
+    public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
+
     private static $parserVersion = '5';
 
     protected $fillable = [
@@ -2109,6 +2111,9 @@ class Application extends BaseModel
         $workdir = rtrim($this->base_directory, '/');
         $composeFile = $this->docker_compose_location;
         $fileList = collect([".$workdir$composeFile"]);
+        $composeFilePath = escapeshellarg(".$workdir$composeFile");
+        $composeReadLimit = self::MAX_DOCKER_COMPOSE_SIZE_BYTES + 1;
+        $readComposeFile = "if [ \"$(wc -c < {$composeFilePath})\" -gt ".self::MAX_DOCKER_COMPOSE_SIZE_BYTES." ]; then echo '__COOLIFY_COMPOSE_TOO_LARGE__'; else head -c {$composeReadLimit} {$composeFilePath}; fi";
         $gitRemoteStatus = $this->getGitRemoteStatus(deployment_uuid: $uuid);
         if (! $gitRemoteStatus['is_accessible']) {
             throw new RuntimeException('Failed to read Git source. Please verify repository access and try again.');
@@ -2139,7 +2144,7 @@ class Application extends BaseModel
                 'git sparse-checkout init',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
+                $readComposeFile,
             ]);
         } else {
             $commands = collect([
@@ -2151,11 +2156,14 @@ class Application extends BaseModel
                 'git sparse-checkout init --cone',
                 "git sparse-checkout set {$fileList->implode(' ')}",
                 'git read-tree -mu HEAD',
-                "cat .$workdir$composeFile",
+                $readComposeFile,
             ]);
         }
         try {
             $composeFileContent = instant_remote_process($commands, $this->destination->server);
+            if ($composeFileContent === '__COOLIFY_COMPOSE_TOO_LARGE__' || strlen($composeFileContent) > self::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
+                throw new RuntimeException('Docker Compose file exceeds the 5 MiB size limit.');
+            }
         } catch (\Exception $e) {
             // Restore original values on failure only
             $this->docker_compose_location = $initialDockerComposeLocation;
@@ -2170,6 +2178,9 @@ class Application extends BaseModel
                     throw new RuntimeException('Your deploy key does not have access to the repository. Please check your deploy key and try again.');
                 }
                 throw new RuntimeException('Repository does not exist. Please check your repository URL and try again.');
+            }
+            if (str($e->getMessage())->contains('exceeds the 5 MiB size limit')) {
+                throw $e;
             }
             throw new RuntimeException('Failed to read the Docker Compose file from the repository.');
         } finally {
