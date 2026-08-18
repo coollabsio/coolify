@@ -154,7 +154,21 @@
 
                             <div class="volumes-col-source min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Source Path</span>
-                                <x-forms.input id="forms.{{ $id }}.hostPath" placeholder="Host path (optional)" />
+                                @if (filled($form['hostPath']))
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="min-w-0 flex-1">
+                                            <x-forms.input id="forms.{{ $id }}.hostPath" />
+                                        </div>
+                                        <x-modal-confirmation title="Remove Source Path?" isErrorButton
+                                            buttonTitle="Remove" submitAction="clearHostPath({{ $id }})"
+                                            :actions="[
+                                                'Are you sure you want to remove the source path?',
+                                                'Use a Directory Mount when you need to mount a host directory.',
+                                            ]" />
+                                    </div>
+                                @else
+                                    <span class="data-table-cell-dash">-</span>
+                                @endif
                             </div>
 
                             <div class="volumes-cell-dest min-w-0">

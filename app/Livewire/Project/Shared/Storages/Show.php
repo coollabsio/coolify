@@ -197,13 +197,4 @@ class Show extends Component
 
         return true;
     }
-
-    public function clearHostPath()
-    {
-        $this->authorize('update', $this->resource);
-        $this->hostPath = null;
-        $this->storage->host_path = null;
-        $this->storage->save();
-        $this->dispatch('success', 'Source path removed. Use Directory Mount for host directory bindings.');
-    }
 }
