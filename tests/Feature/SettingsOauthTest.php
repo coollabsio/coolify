@@ -36,31 +36,33 @@ beforeEach(function () {
     OauthSetting::create(['provider' => 'bitbucket']);
 });
 
-it('shows oauth general settings with provider subnavigation', function () {
+it('uses the standard settings design and keeps every oauth provider on one page', function () {
     actingAsInstanceAdmin();
 
     $this->withoutMiddleware(DecideWhatToDoWithUser::class)
         ->get(route('settings.oauth'))
         ->assertSuccessful()
-        ->assertSee('General')
+        ->assertSee('Authentication')
+        ->assertSee('Registration')
         ->assertSee('Authentik')
         ->assertSee('Bitbucket')
-        ->assertSee(route('settings.oauth.provider', 'authentik'), false)
-        ->assertSee(route('settings.oauth.provider', 'bitbucket'), false)
+        ->assertSee('OpenID Connect')
         ->assertSee('Disable password registration when OAuth is enabled')
-        ->assertDontSee('Client Secret');
+        ->assertSee('Client secret')
+        ->assertSee('application-settings-form', false)
+        ->assertDontSee(route('settings.oauth.provider', 'authentik'), false);
 });
 
-it('shows the registration helper next to the section title in a wider row', function () {
+it('lists openid connect before the other oauth providers', function () {
     actingAsInstanceAdmin();
 
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('flex items-center gap-2', false)
-        ->assertSee('max-w-2xl', false)
-        ->assertSee('Disable password registration when OAuth is enabled')
-        ->assertDontSee('md:w-96', false);
+    $providers = array_keys(Livewire::test(SettingsOauth::class)->get('oauth_settings_map'));
+
+    expect($providers[0])->toBe('oidc');
+});
+
+it('has an icon for openid connect', function () {
+    expect(public_path('svgs/oidc.svg'))->toBeFile();
 });
 
 it('auto saves registration policy without a general save button', function () {
@@ -81,24 +83,24 @@ it('auto saves registration policy without a general save button', function () {
     expect(instanceSettings()->fresh()->disable_registration_when_oauth_enabled)->toBeTrue();
 });
 
-it('shows a provider settings page with a naked okta issuer url example', function () {
+it('shows oidc fields with a naked okta issuer url example', function () {
     actingAsInstanceAdmin();
 
     $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth.provider', 'oidc'))
+        ->get(route('settings.oauth'))
         ->assertSuccessful()
         ->assertSee('OpenID Connect')
         ->assertSee('https://example.okta.com', false)
         ->assertDontSee('/oauth2/default', false);
 });
 
-it('shows provider enable controls as actions without boxed sections', function () {
+it('shows provider enable controls as settings section actions', function () {
     actingAsInstanceAdmin();
 
     $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth.provider', 'authentik'))
+        ->get(route('settings.oauth'))
         ->assertSuccessful()
-        ->assertSee('Enable Authentik')
+        ->assertSee('Enable')
         ->assertDontSee('label="Enabled"', false)
         ->assertDontSee('p-4 border dark:border-coolgray-300 border-neutral-200', false);
 });
@@ -107,7 +109,7 @@ it('stacks oidc option checkboxes vertically', function () {
     actingAsInstanceAdmin();
 
     $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth.provider', 'oidc'))
+        ->get(route('settings.oauth'))
         ->assertSuccessful()
         ->assertSee('Allow OIDC user creation')
         ->assertSee('Require verified email')

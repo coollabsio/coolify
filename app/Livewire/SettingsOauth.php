@@ -66,11 +66,13 @@ class SettingsOauth extends Component
         $this->settings = instanceSettings();
         $this->selectedProvider = $provider;
         $this->disable_registration_when_oauth_enabled = (bool) $this->settings->disable_registration_when_oauth_enabled;
-        $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function ($carry, $setting) {
-            $carry[$setting->provider] = $this->oauthSettingToArray($setting);
+        $this->oauth_settings_map = OauthSetting::all()
+            ->sortBy(fn (OauthSetting $setting): string => $setting->isOidc() ? '' : $setting->provider)
+            ->reduce(function ($carry, $setting) {
+                $carry[$setting->provider] = $this->oauthSettingToArray($setting);
 
-            return $carry;
-        }, []);
+                return $carry;
+            }, []);
 
         if ($this->selectedProvider !== null && ! array_key_exists($this->selectedProvider, $this->oauth_settings_map)) {
             abort(404);
