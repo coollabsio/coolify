@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class OauthController extends Controller
@@ -26,14 +27,13 @@ class OauthController extends Controller
             $email = strtolower($email);
             $user = User::whereEmail($email)->first();
             if (! $user) {
-                $settings = instanceSettings();
-                if (! $settings->is_registration_enabled) {
-                    abort(403, 'Registration is disabled');
-                }
-
+                // Allow OAuth registration even when general registration is disabled.
+                // This enables users logging in with OAUTH2 accounts to self-register
+                // even when general self-register is disabled.
                 $user = User::create([
                     'name' => $oauthUser->name,
                     'email' => $email,
+                    'password' => bcrypt(Str::random(32)),
                 ]);
             }
             Auth::login($user);

@@ -77,3 +77,27 @@ it('rejects oauth logins when the provider does not return an email address', fu
     'null email' => [null],
     'blank email' => ['   '],
 ]);
+
+it('registers a new oauth user even when general registration is disabled', function () {
+    config()->set('app.maintenance.driver', 'file');
+
+    $provider = Mockery::mock();
+    $provider->shouldReceive('setConfig')->once()->andReturnSelf();
+    $provider->shouldReceive('with')->once()->with(['hd' => 'example.com'])->andReturnSelf();
+    $provider->shouldReceive('user')->once()->andReturn((object) [
+        'email' => 'newuser@example.com',
+        'name' => 'New User',
+        'id' => 'google-user-id',
+    ]);
+
+    Socialite::shouldReceive('driver')->once()->with('google')->andReturn($provider);
+
+    $response = $this->get(route('auth.callback', 'google'));
+
+    $response->assertRedirect('/');
+    $this->assertAuthenticated();
+    expect(User::count())->toBe(1);
+    $user = User::first();
+    expect($user->email)->toBe('newuser@example.com');
+    expect($user->name)->toBe('New User');
+});
