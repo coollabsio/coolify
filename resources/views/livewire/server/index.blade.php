@@ -139,15 +139,9 @@
                                 :key="'server-index-metrics-'.$server->uuid" />
                         @endif
 
-                        <div class="pointer-events-none relative z-10 flex items-start gap-3">
-                            <div title="{{ $serverRow['status'] }}"
-                                aria-label="Server status: {{ $serverRow['status'] }}"
-                                @class([
-                                    'flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.04] dark:text-fg-dim',
-                                    'border-emerald-500/70' => $serverRow['statusType'] === 'success',
-                                    'border-amber-500/70' => $serverRow['statusType'] === 'warning',
-                                    'border-red-500/70' => $serverRow['statusType'] === 'error',
-                                ])>
+                        <div class="relative z-10 flex items-start gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.04] dark:text-fg-dim">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0 flex-1">
@@ -158,6 +152,17 @@
                                     {{ $serverRow['description'] }}
                                 </p>
                             </div>
+                            @if ($serverRow['statusType'] !== 'success')
+                                <span data-tooltip="{{ $serverRow['status'] }}"
+                                    aria-label="Server status: {{ $serverRow['status'] }}"
+                                    @class([
+                                        'ml-auto flex size-6 shrink-0 items-center justify-center rounded-md',
+                                        'text-orange-500 dark:text-warning' => $serverRow['statusType'] === 'warning',
+                                        'text-red-500 dark:text-red-400' => $serverRow['statusType'] === 'error',
+                                    ])>
+                                    <x-reicon name="alert-triangle" class="size-4" />
+                                </span>
+                            @endif
                         </div>
                     </a>
                 @endforeach
@@ -174,9 +179,8 @@
                     <a :href="server.href" {{ wireNavigate() }}
                         class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
                         <div class="flex min-w-0 items-center gap-3">
-                            <div :title="server.status" :aria-label="`Server status: ${server.status}`"
-                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.035] dark:text-fg-dim"
-                                :class="server.statusType === 'success' ? 'border-emerald-500/70' : server.statusType === 'warning' ? 'border-amber-500/70' : 'border-red-500/70'">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.1] dark:bg-white/[0.035] dark:text-fg-dim">
                                 <x-reicon name="servers" class="size-4" />
                             </div>
                             <div class="min-w-0">
@@ -185,6 +189,12 @@
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                     x-text="server.description"></p>
                             </div>
+                            <span x-show="server.statusType !== 'success'" :data-tooltip="server.status"
+                                :aria-label="`Server status: ${server.status}`"
+                                class="ml-auto flex size-6 shrink-0 items-center justify-center rounded-md"
+                                :class="server.statusType === 'warning' ? 'text-orange-500 dark:text-warning' : 'text-red-500 dark:text-red-400'">
+                                <x-reicon name="alert-triangle" class="size-4" />
+                            </span>
                         </div>
                         <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
                             <span x-text="server.status"></span>
