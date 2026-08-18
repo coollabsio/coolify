@@ -41,7 +41,8 @@ it('positions table dropdown panels outside overflowing containers', function ()
     expect($html)
         ->toContain('position: fixed')
         ->toContain('getBoundingClientRect()')
-        ->toContain('x-on:scroll.window');
+        ->toContain('x-on:scroll.window')
+        ->not->toContain('top-auto!');
 });
 
 it('renders compact client-side pagination', function () {
