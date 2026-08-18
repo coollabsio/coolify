@@ -20,9 +20,13 @@ test('highlighted buttons use the shared coollabs style in every color scheme', 
 
 test('custom theme highlighted buttons use the computed contrasting foreground', function () {
     $utilities = file_get_contents(resource_path('css/utilities.css'));
+    $appStyles = file_get_contents(resource_path('css/app.css'));
 
     expect($utilities)
         ->toContain('text-accent-foreground!')
         ->toContain('hover:text-accent-foreground!')
-        ->not->toContain('text-white! hover:');
+        ->not->toContain('text-white! hover:')
+        ->and($appStyles)
+        ->toContain('html[data-theme="custom"] .button-highlighted .animate-spin')
+        ->toContain('html[data-theme="custom"] button[isHighlighted] .animate-spin');
 });
