@@ -80,7 +80,7 @@ describe('GetLogs Livewire action validation', function () {
             'is_usable' => true,
             'force_disabled' => false,
         ])->save();
-        $server = Server::with('settings')->find($this->server->id);
+        $server = Server::with('settings')->findOrFail($this->server->id);
         $output = "\e[31m".str_repeat('a', GetLogs::MAX_DISPLAY_SIZE_BYTES - 4);
 
         expect(strlen($output))->toBe(GetLogs::MAX_DISPLAY_SIZE_BYTES + 1);
@@ -114,7 +114,7 @@ describe('GetLogs Livewire action validation', function () {
             'force_disabled' => false,
         ])->save();
         // Reload server with fresh settings to ensure casted values
-        $server = Server::with('settings')->find($this->server->id);
+        $server = Server::with('settings')->findOrFail($this->server->id);
 
         Livewire::test(GetLogs::class, [
             'server' => $server,
@@ -144,7 +144,7 @@ describe('GetLogs Livewire action validation', function () {
             'is_usable' => true,
             'force_disabled' => false,
         ])->save();
-        $server = Server::with('settings')->find($this->server->id);
+        $server = Server::with('settings')->findOrFail($this->server->id);
 
         Livewire::test(GetLogs::class, [
             'server' => $server,

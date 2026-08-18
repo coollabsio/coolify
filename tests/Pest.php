@@ -27,6 +27,23 @@ uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser', 'v5/Browser');
 
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
 
+function remoteOutputSource(string $path): string
+{
+    $fixturePath = dirname(__DIR__).'/'.$path;
+
+    if (! is_readable($fixturePath)) {
+        throw new RuntimeException("Unable to read source fixture: {$fixturePath}");
+    }
+
+    $source = file_get_contents($fixturePath);
+
+    if ($source === false) {
+        throw new RuntimeException("Unable to read source fixture: {$fixturePath}");
+    }
+
+    return $source;
+}
+
 /*
 |--------------------------------------------------------------------------
 | Test Hooks
