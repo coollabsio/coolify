@@ -249,9 +249,10 @@
                                 </p>
                             </div>
                             <form action="/user/confirmed-two-factor-authentication" method="POST"
-                                class="flex items-end gap-2">
+                                class="flex items-end gap-2"
+                                x-init="$nextTick(() => $el.querySelector('input[name=code]')?.focus())">
                                 @csrf
-                                <x-forms.input type="text" inputmode="numeric" pattern="[0-9]*" id="code"
+                                <x-forms.input name="code" type="text" inputmode="numeric" pattern="[0-9]*" id="code"
                                     label="One-time code" required />
                                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
                             </form>
