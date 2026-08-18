@@ -53,7 +53,7 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
 
             if ($process['etimes'] >= $minAge
                 && ! file_exists($pathMatch[1])
-                && ! SshMultiplexingHelper::isMuxProcessRetiring($process['pid'])) {
+                && ! SshMultiplexingHelper::isMuxProcessRetiring($process['pid'], $pathMatch[1])) {
                 $this->reapOrphan('ssh', $process);
             }
         }
@@ -211,10 +211,18 @@ class CleanupStaleMultiplexedConnections implements ShouldQueue
 
         $muxSocket = "/var/www/html/storage/app/ssh/mux/{$muxFile}";
         $checkProcess = Process::run("ssh -O check -o ControlPath={$muxSocket} localhost");
+        $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
+            ? $matches[1]
+            : null;
+
+        if ($pid !== null) {
+            SshMultiplexingHelper::markMuxProcessAsRetiring($pid, $muxSocket);
+        }
+
         $closeCommand = "ssh -O stop -o ControlPath={$muxSocket} localhost 2>/dev/null";
         $stopProcess = Process::run($closeCommand);
-        if ($stopProcess->successful() && preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)) {
-            SshMultiplexingHelper::markMuxProcessAsRetiring($matches[1]);
+        if ($pid !== null && ! $stopProcess->successful()) {
+            SshMultiplexingHelper::unmarkMuxProcessAsRetiring($pid, $muxSocket);
         }
         Storage::disk('ssh-mux')->delete($muxFile);
 

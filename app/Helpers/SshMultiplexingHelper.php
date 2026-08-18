@@ -93,21 +93,42 @@ class SshMultiplexingHelper
     public static function removeMuxFile(Server $server): void
     {
         $checkProcess = Process::run(self::muxControlCommand($server, 'check'));
+        $pid = preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)
+            ? $matches[1]
+            : null;
+
+        if ($pid !== null) {
+            self::markMuxProcessAsRetiring($pid, self::muxSocket($server));
+        }
+
         $stopProcess = Process::run(self::muxControlCommand($server, 'stop'));
 
-        if ($stopProcess->successful() && preg_match('/pid=(\d+)/', $checkProcess->output().$checkProcess->errorOutput(), $matches)) {
-            self::markMuxProcessAsRetiring($matches[1]);
+        if ($pid !== null && ! $stopProcess->successful()) {
+            self::unmarkMuxProcessAsRetiring($pid, self::muxSocket($server));
         }
     }
 
-    public static function markMuxProcessAsRetiring(string $pid): void
+    public static function markMuxProcessAsRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): void
     {
-        Cache::forever(self::muxProcessRetirementKey($pid), true);
+        $processStartTime ??= self::processStartTime($pid);
+        Cache::forever(self::muxProcessRetirementKey($pid, $muxSocket, $processStartTime), true);
     }
 
-    public static function isMuxProcessRetiring(string $pid): bool
+    public static function isMuxProcessRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): bool
     {
-        return Cache::has(self::muxProcessRetirementKey($pid));
+        $processStartTime ??= self::processStartTime($pid);
+        $key = self::muxProcessRetirementKey($pid, $muxSocket, $processStartTime);
+        if (! Cache::has($key)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function unmarkMuxProcessAsRetiring(string $pid, string $muxSocket, ?string $processStartTime = null): void
+    {
+        $processStartTime ??= self::processStartTime($pid);
+        Cache::forget(self::muxProcessRetirementKey($pid, $muxSocket, $processStartTime));
     }
 
     public static function generateScpCommand(Server $server, string $source, string $dest): string
@@ -266,9 +287,26 @@ class SshMultiplexingHelper
         return 'ssh_mux_lock_'.(gethostname() ?: 'unknown').'_'.$server->uuid;
     }
 
-    private static function muxProcessRetirementKey(string $pid): string
+    private static function muxProcessRetirementKey(string $pid, string $muxSocket, ?string $processStartTime): string
     {
-        return "ssh_mux_retiring_pid_{$pid}";
+        return 'ssh_mux_retiring_'.hash('sha256', self::processScope().'|'.$pid.'|'.$processStartTime.'|'.$muxSocket);
+    }
+
+    private static function processScope(): string
+    {
+        return (gethostname() ?: 'unknown').'|'.(@readlink('/proc/self/ns/pid') ?: 'unknown');
+    }
+
+    private static function processStartTime(string $pid): ?string
+    {
+        $stat = @file_get_contents("/proc/{$pid}/stat");
+        if ($stat === false || ! preg_match('/^\d+ \(.*\) (.*)$/', trim($stat), $matches)) {
+            return null;
+        }
+
+        $fields = preg_split('/\s+/', $matches[1]);
+
+        return $fields[19] ?? null;
     }
 
     private static function masterConnectionExists(Server $server): bool
