@@ -72,10 +72,11 @@
             <div class="application-settings-section-body">
                 @if ($repositories->isNotEmpty())
                     <div class="flex items-end gap-2">
-                        <x-forms.listbox id="selected_repository_id" label="Repository" required live
+                        <x-forms.searchable-listbox id="selected_repository_id" label="Repository" required live
+                            searchPlaceholder="Search repositories…"
                             :options="$repositories->map(fn ($repository) => [
                                 'value' => data_get($repository, 'id'),
-                                'label' => data_get($repository, 'name'),
+                                'label' => data_get($repository, 'full_name', data_get($repository, 'name')),
                             ])->values()->all()" />
                         <x-forms.button :showLoadingIndicator="false" wire:click.prevent="loadBranches"
                             wire:loading.attr="disabled"
@@ -104,7 +105,8 @@
                     </div>
                     <div class="application-settings-section-body space-y-5">
                         <div class="grid gap-4 sm:grid-cols-2">
-                            <x-forms.listbox id="selected_branch_name" label="Branch" required
+                            <x-forms.searchable-listbox id="selected_branch_name" label="Branch" required
+                                searchPlaceholder="Search branches…"
                                 :options="$branches->map(fn ($branch) => [
                                     'value' => data_get($branch, 'name'),
                                     'label' => data_get($branch, 'name'),
