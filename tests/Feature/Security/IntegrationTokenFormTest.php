@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Security\IntegrationTokenEditor;
 use App\Livewire\Security\IntegrationTokenForm;
 use App\Livewire\Security\IntegrationTokens;
 use App\Models\InstanceSettings;
@@ -140,4 +141,113 @@ test('submit button uses the shared highlighted loading state', function () {
     expect($view)
         ->toContain('wire:target="addToken" isHighlighted')
         ->not->toContain('class="button-highlighted"');
+});
+
+test('saved integration token rows render modal editors with a gear button', function () {
+    IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'original-token',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokens::class)
+        ->assertSee('Edit Integration Token')
+        ->assertSee('Production DNS')
+        ->assertSeeHtml(':aria-label="`Edit ${tokenName}`"');
+});
+
+test('an integration token can be rotated after validating its capabilities', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
+            'success' => true,
+            'result' => ['status' => 'active'],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id']],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response([
+            'success' => true,
+            'result' => [],
+        ]),
+    ]);
+
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'original-token',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('name', 'Rotated DNS')
+        ->set('newToken', 'rotated-token')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $savedToken->refresh();
+
+    expect($savedToken->name)->toBe('Rotated DNS')
+        ->and($savedToken->token)->toBe('rotated-token');
+});
+
+test('leaving the token field blank keeps the existing integration token', function () {
+    Http::fake();
+
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'original-token',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('name', 'Renamed DNS')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $savedToken->refresh();
+
+    expect($savedToken->name)->toBe('Renamed DNS')
+        ->and($savedToken->token)->toBe('original-token');
+
+    Http::assertNothingSent();
+});
+
+test('an invalid replacement does not rotate the integration token', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
+            'success' => false,
+        ], 403),
+    ]);
+
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'original-token',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('newToken', 'invalid-token')
+        ->call('save')
+        ->assertDispatched('error');
+
+    expect($savedToken->fresh()->token)->toBe('original-token');
+});
+
+test('editor updates its row without rerendering the teleported parent modal', function () {
+    $component = file_get_contents(app_path('Livewire/Security/IntegrationTokenEditor.php'));
+
+    expect($component)
+        ->toContain("'integration-token-updated'")
+        ->toContain("'integration-token-deleted'")
+        ->not->toContain('integrationTokenChanged');
 });

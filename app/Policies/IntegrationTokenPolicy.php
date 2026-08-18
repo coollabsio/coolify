@@ -17,6 +17,16 @@ class IntegrationTokenPolicy
         return $user->isAdmin();
     }
 
+    public function view(User $user, IntegrationToken $integrationToken): bool
+    {
+        return $user->isAdmin() && $integrationToken->team_id === currentTeam()->id;
+    }
+
+    public function update(User $user, IntegrationToken $integrationToken): bool
+    {
+        return $user->isAdmin() && $integrationToken->team_id === currentTeam()->id;
+    }
+
     public function delete(User $user, IntegrationToken $integrationToken): bool
     {
         return $user->isAdmin() && $integrationToken->team_id === currentTeam()->id;
