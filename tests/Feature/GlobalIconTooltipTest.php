@@ -36,12 +36,11 @@ it('keeps a tooltip hidden until its measured position is applied', function () 
         ->toContain("positioned ? 'visible' : 'invisible'");
 });
 
-it('anchors tooltips to the trigger and lets them grow toward the right', function () {
+it('centers tooltips on the trigger and keeps them within the viewport', function () {
     $tooltip = file_get_contents(resource_path('views/components/icon-tooltip.blade.php'));
 
     expect($tooltip)
-        ->toContain('this.x = rect.left;')
-        ->toContain('Math.min(window.innerWidth - width - 8, this.x)')
-        ->not->toContain('rect.left + rect.width / 2')
+        ->toContain('this.x = rect.left + rect.width / 2;')
+        ->toContain('Math.min(window.innerWidth - width - 8, this.x - width / 2)')
         ->not->toContain('-translate-x-1/2');
 });
