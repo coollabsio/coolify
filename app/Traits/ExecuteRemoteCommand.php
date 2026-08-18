@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Exceptions\DeploymentException;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Carbon\Carbon;
@@ -77,6 +78,8 @@ trait ExecuteRemoteCommand
             $customType = data_get($single_command, 'type');
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $append = data_get($single_command, 'append', true);
+            $command_hidden = data_get($single_command, 'command_hidden', false);
+            $skip_command_log = data_get($single_command, 'skip_command_log', false);
             $this->save = data_get($single_command, 'save');
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
@@ -89,7 +92,7 @@ trait ExecuteRemoteCommand
             // Check for cancellation before executing commands
             if (isset($this->application_deployment_queue)) {
                 $this->application_deployment_queue->refresh();
-                if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
                     throw new \RuntimeException('Deployment cancelled by user', 69420);
                 }
             }
@@ -101,9 +104,9 @@ trait ExecuteRemoteCommand
 
             while ($attempt < $maxRetries && ! $commandExecuted) {
                 try {
-                    $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors);
+                    $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden, $skip_command_log);
                     $commandExecuted = true;
-                } catch (\RuntimeException $e) {
+                } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
@@ -111,20 +114,13 @@ trait ExecuteRemoteCommand
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
-                        // Track SSH retry event in Sentry
-                        $this->trackSshRetryEvent($attempt, $maxRetries, $delay, $errorMessage, [
-                            'server' => $this->server->name ?? $this->server->ip ?? 'unknown',
-                            'command' => $this->redact_sensitive_info($command),
-                            'trait' => 'ExecuteRemoteCommand',
-                        ]);
-
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
                             $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
 
                             // Check for cancellation during retry wait
                             $this->application_deployment_queue->refresh();
-                            if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                            if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
                                 throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
                             }
                         }
@@ -158,10 +154,14 @@ trait ExecuteRemoteCommand
     /**
      * Execute the actual command with process handling
      */
-    private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors)
+    private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden = false, $skip_command_log = false)
     {
+        if ($command_hidden && ! $skip_command_log && isset($this->application_deployment_queue)) {
+            $this->application_deployment_queue->addLogEntry('[CMD]: '.$this->redact_sensitive_info($command), hidden: true);
+        }
+
         $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
-        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log) {
             $output = str($output)->trim();
             if ($output->startsWith('╔')) {
                 $output = "\n".$output;
@@ -171,9 +171,9 @@ trait ExecuteRemoteCommand
             $sanitized_output = sanitize_utf8_text($output);
 
             $new_log_entry = [
-                'command' => $this->redact_sensitive_info($command),
+                'command' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),
                 'output' => $this->redact_sensitive_info($sanitized_output),
-                'type' => $customType ?? $type === 'err' ? 'stderr' : 'stdout',
+                'type' => $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
                 'timestamp' => Carbon::now('UTC'),
                 'hidden' => $hidden,
                 'batch' => static::$batch_counter,
@@ -228,7 +228,7 @@ trait ExecuteRemoteCommand
                 // Check if deployment was cancelled while command was running
                 if (isset($this->application_deployment_queue)) {
                     $this->application_deployment_queue->refresh();
-                    if ($this->application_deployment_queue->status === \App\Enums\ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                    if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
                         throw new \RuntimeException('Deployment cancelled by user', 69420);
                     }
                 }
@@ -240,7 +240,7 @@ trait ExecuteRemoteCommand
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
                 $redactedCommand = $this->redact_sensitive_info($command);
-                throw new \RuntimeException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
+                throw new DeploymentException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
             }
         }
     }

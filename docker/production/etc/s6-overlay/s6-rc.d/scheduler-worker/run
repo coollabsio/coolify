@@ -1,10 +1,11 @@
-#!/command/execlineb -P
+#!/bin/sh
 
-# Use with-contenv to ensure environment variables are available
-with-contenv
 cd /var/www/html
-foreground {
-    php
-    artisan
-    start:scheduler
-}
+
+if grep -qE '^SCHEDULER_ENABLED=false' .env 2>/dev/null; then
+    echo "   INFO  Scheduler is disabled, sleeping."
+    exec sleep infinity
+fi
+
+echo "   INFO  Scheduler is enabled, starting..."
+exec php artisan schedule:work

@@ -1,0 +1,27 @@
+# documentation: https://electric-sql.com/docs/guides/deployment
+# slogan: Sync shape-based subsets of your Postgres data over HTTP.
+# category: backend
+# tags: electric,electricsql,realtime,sync,postgresql
+# logo: svgs/electricsql.svg
+# port: 3000
+
+## This template intentionally does not deploy PostgreSQL.
+## Set DATABASE_URL to an existing Postgres instance with logical replication enabled.
+## If ELECTRIC_SECRET is set, your own backend/proxy must append it to shape requests.
+
+services:
+  electric:
+    image: electricsql/electric:1.4.2
+    environment:
+      - SERVICE_URL_ELECTRIC_3000
+      - DATABASE_URL=${DATABASE_URL:?}
+      - ELECTRIC_SECRET=${SERVICE_PASSWORD_64_ELECTRIC}
+      - ELECTRIC_STORAGE_DIR=/app/persistent
+      - ELECTRIC_USAGE_REPORTING=${ELECTRIC_USAGE_REPORTING:-false}
+    volumes:
+      - electric_data:/app/persistent
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

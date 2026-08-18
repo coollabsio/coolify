@@ -25,12 +25,48 @@ class ValidateServer
 
     public function handle(Server $server)
     {
+        if (! $server->canBeValidated()) {
+            $this->error = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
+            $server->update([
+                'validation_logs' => $this->error,
+                'is_validating' => false,
+            ]);
+            throw new \Exception($this->error);
+        }
+
         $server->update([
             'validation_logs' => null,
         ]);
+        if ($server->vultr_instance_id) {
+            $status = $server->refreshVultrState();
+            if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+                $this->error = $status === 'deleted'
+                    ? 'Vultr instance is deleted or no longer accessible. Relink this server before validating.'
+                    : 'Vultr instance is '.($status ?? 'not running').'. Power it on before validating.';
+                $server->update([
+                    'validation_logs' => $this->error,
+                ]);
+                throw new \Exception($this->error);
+            }
+        }
+
+        if ($server->digitalocean_droplet_id) {
+            $status = $server->refreshDigitalOceanState();
+            if (in_array($status, ['off', 'archive', 'deleted'], true)) {
+                $this->error = $status === 'deleted'
+                    ? 'DigitalOcean droplet is deleted or no longer accessible. Relink this server before validating.'
+                    : 'DigitalOcean droplet is '.($status ?? 'not running').'. Power it on before validating.';
+                $server->update([
+                    'validation_logs' => $this->error,
+                ]);
+                throw new \Exception($this->error);
+            }
+        }
+
         ['uptime' => $this->uptime, 'error' => $error] = $server->validateConnection();
         if (! $this->uptime) {
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$error.'</div>';
+            $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$sanitizedError.'</div>';
             $server->update([
                 'validation_logs' => $this->error,
             ]);

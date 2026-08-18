@@ -107,6 +107,15 @@ class CheckUpdates
                     $out['package_manager'] = $packageManager;
 
                     return $out;
+                case 'apk':
+                    instant_remote_process(['apk update -q'], $server);
+                    $output = instant_remote_process(['LANG=C apk list --upgradable 2>/dev/null'], $server);
+
+                    $out = $this->parseApkOutput($output);
+                    $out['osId'] = $osId;
+                    $out['package_manager'] = $packageManager;
+
+                    return $out;
                 default:
                     return [
                         'osId' => $osId,
@@ -272,5 +281,33 @@ class CheckUpdates
         }
 
         return $result;
+    }
+
+    private function parseApkOutput(string $output): array
+    {
+        $updates = [];
+        $lines = explode("\n", $output);
+
+        foreach ($lines as $line) {
+            // Skip empty lines
+            if (empty($line)) {
+                continue;
+            }
+
+            // Example line: docker-cli-compose-2.31.0-r5 x86_64 {docker-cli-compose} (Apache-2.0) [upgradable from: docker-cli-compose-2.31.0-r4]
+            if (preg_match('/^(.+)-([0-9]\S*) (\S+) \{\S+\} \([^)]+\) \[upgradable from: .+?-([0-9][^\]]+)\]$/', $line, $matches)) {
+                $updates[] = [
+                    'package' => $matches[1],
+                    'new_version' => $matches[2],
+                    'architecture' => $matches[3],
+                    'current_version' => $matches[4],
+                ];
+            }
+        }
+
+        return [
+            'total_updates' => count($updates),
+            'updates' => $updates,
+        ];
     }
 }

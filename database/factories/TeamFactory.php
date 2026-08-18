@@ -6,7 +6,7 @@ use App\Models\Team;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Team>
+ * @extends Factory<Team>
  */
 class TeamFactory extends Factory
 {
@@ -24,6 +24,7 @@ class TeamFactory extends Factory
             'description' => $this->faker->sentence(),
             'personal_team' => false,
             'show_boarding' => false,
+            'is_mcp_server_enabled' => true,
         ];
     }
 

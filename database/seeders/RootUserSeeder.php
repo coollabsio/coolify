@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\InstanceSettings;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -45,12 +46,19 @@ class RootUserSeeder extends Seeder
             }
 
             try {
-                User::create([
+                $user = (new User)->forceFill([
                     'id' => 0,
                     'name' => env('ROOT_USERNAME', 'Root User'),
                     'email' => env('ROOT_USER_EMAIL'),
                     'password' => Hash::make(env('ROOT_USER_PASSWORD')),
                 ]);
+                $user->save();
+
+                $team = Team::find(0);
+                if ($team !== null && ! $user->teams()->where('team_id', 0)->exists()) {
+                    $user->teams()->attach($team, ['role' => 'owner']);
+                }
+
                 echo "\n  SUCCESS  Root user created successfully.\n\n";
             } catch (\Exception $e) {
                 echo "\n  ERROR  Failed to create root user: {$e->getMessage()}\n\n";

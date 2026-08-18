@@ -1,6 +1,64 @@
 <?php
 
 use Illuminate\Support\Str;
+use Pdo\Pgsql;
+
+$parseDatabaseHosts = function (mixed $hosts, mixed $fallback = 'coolify-db'): array {
+    $parsedHosts = array_values(array_filter(
+        array_map('trim', explode(',', (string) $hosts)),
+        'strlen',
+    ));
+
+    if ($parsedHosts !== []) {
+        return $parsedHosts;
+    }
+
+    $fallbackHosts = array_values(array_filter(
+        array_map('trim', explode(',', (string) $fallback)),
+        'strlen',
+    ));
+
+    return $fallbackHosts === [] ? ['coolify-db'] : $fallbackHosts;
+};
+
+$pgsql = [
+    'driver' => 'pgsql',
+    'url' => env('DATABASE_URL'),
+    'host' => env('DB_HOST', 'coolify-db'),
+    'port' => env('DB_PORT', '5432'),
+    'database' => env('DB_DATABASE', 'coolify'),
+    'username' => env('DB_USERNAME', 'coolify'),
+    'password' => env('DB_PASSWORD', ''),
+    'charset' => 'utf8',
+    'prefix' => '',
+    'prefix_indexes' => true,
+    'search_path' => 'public',
+    'sslmode' => 'prefer',
+    'options' => [
+        (defined('Pdo\Pgsql::ATTR_DISABLE_PREPARES') ? Pgsql::ATTR_DISABLE_PREPARES : PDO::PGSQL_ATTR_DISABLE_PREPARES) => env('DB_DISABLE_PREPARES', false),
+    ],
+];
+
+/*
+ * Opt-in read/write replica split. Activates only when DB_READ_HOST is set.
+ * When unset, the pgsql connection is identical to a single-primary setup.
+ * Hosts may be comma-separated; Laravel random-picks one per connection.
+ */
+if (env('DB_READ_HOST')) {
+    $pgsql['read'] = [
+        'host' => $parseDatabaseHosts(env('DB_READ_HOST'), env('DB_HOST', 'coolify-db')),
+        'port' => env('DB_READ_PORT', env('DB_PORT', '5432')),
+        'username' => env('DB_READ_USERNAME', env('DB_USERNAME', 'coolify')),
+        'password' => env('DB_READ_PASSWORD', env('DB_PASSWORD', '')),
+    ];
+    $pgsql['write'] = [
+        'host' => $parseDatabaseHosts(env('DB_WRITE_HOST'), env('DB_HOST', 'coolify-db')),
+        'port' => env('DB_WRITE_PORT', env('DB_PORT', '5432')),
+        'username' => env('DB_WRITE_USERNAME', env('DB_USERNAME', 'coolify')),
+        'password' => env('DB_WRITE_PASSWORD', env('DB_PASSWORD', '')),
+    ];
+    $pgsql['sticky'] = (bool) env('DB_STICKY', true);
+}
 
 return [
 
@@ -35,34 +93,13 @@ return [
 
     'connections' => [
 
-        'pgsql' => [
-            'driver' => 'pgsql',
-            'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', 'coolify-db'),
-            'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'coolify'),
-            'username' => env('DB_USERNAME', 'coolify'),
-            'password' => env('DB_PASSWORD', ''),
-            'charset' => 'utf8',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => 'public',
-            'sslmode' => 'prefer',
-        ],
+        'pgsql' => $pgsql,
 
         'testing' => [
-            'driver' => 'pgsql',
-            'url' => env('DATABASE_TEST_URL'),
-            'host' => env('DB_TEST_HOST', 'postgres'),
-            'port' => env('DB_TEST_PORT', '5432'),
-            'database' => env('DB_TEST_DATABASE', 'coolify_test'),
-            'username' => env('DB_TEST_USERNAME', 'coolify'),
-            'password' => env('DB_TEST_PASSWORD', 'password'),
-            'charset' => 'utf8',
+            'driver' => 'sqlite',
+            'database' => ':memory:',
             'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => 'public',
-            'sslmode' => 'prefer',
+            'foreign_key_constraints' => true,
         ],
 
     ],

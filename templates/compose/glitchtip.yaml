@@ -1,9 +1,9 @@
 # documentation: https://glitchtip.com
-# slogan: GlitchTip is a self-hosted, open-source error tracking system.
+# slogan: GlitchTip is a error tracking system.
 # category: monitoring
-# tags: error, tracking, open-source, self-hosted, sentry
+# tags: error, tracking, sentry
 # logo: svgs/glitchtip.png
-# port: 8080
+# port: 8000
 
 services:
   postgres:
@@ -29,14 +29,14 @@ services:
       retries: 10
 
   web:
-    image: glitchtip/glitchtip
+    image: glitchtip/glitchtip:6.0
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     environment:
-      - SERVICE_URL_GLITCHTIP_8080
+      - SERVICE_URL_GLITCHTIP_8000
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
       - SECRET_KEY=$SERVICE_BASE64_64_ENCRYPTION
       - EMAIL_URL=${EMAIL_URL:-consolemail://}
@@ -53,7 +53,7 @@ services:
       retries: 10
 
   worker:
-    image: glitchtip/glitchtip
+    image: glitchtip/glitchtip:6.0
     command: ./bin/run-celery-with-beat.sh
     depends_on:
       postgres:
@@ -77,7 +77,7 @@ services:
       retries: 10
 
   migrate:
-    image: glitchtip/glitchtip
+    image: glitchtip/glitchtip:6.0
     restart: "no"
     depends_on:
       postgres:

@@ -12,9 +12,9 @@ use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 /**
  * Validates a Docker Compose YAML string for command injection vulnerabilities.
@@ -22,25 +22,25 @@ use Visus\Cuid2\Cuid2;
  *
  * @param  string  $composeYaml  The raw Docker Compose YAML content
  *
- * @throws \Exception If the compose file contains command injection attempts
+ * @throws Exception If the compose file contains command injection attempts
  */
 function validateDockerComposeForInjection(string $composeYaml): void
 {
     try {
         $parsed = Yaml::parse($composeYaml);
-    } catch (\Exception $e) {
-        throw new \Exception('Invalid YAML format: '.$e->getMessage(), 0, $e);
+    } catch (Exception $e) {
+        throw new Exception('Invalid YAML format: '.$e->getMessage(), 0, $e);
     }
 
     if (! is_array($parsed) || ! isset($parsed['services']) || ! is_array($parsed['services'])) {
-        throw new \Exception('Docker Compose file must contain a "services" section');
+        throw new Exception('Docker Compose file must contain a "services" section');
     }
     // Validate service names
     foreach ($parsed['services'] as $serviceName => $serviceConfig) {
         try {
             validateShellSafePath($serviceName, 'service name');
-        } catch (\Exception $e) {
-            throw new \Exception(
+        } catch (Exception $e) {
+            throw new Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
                 ' Service names must not contain shell metacharacters.',
                 0,
@@ -68,8 +68,8 @@ function validateDockerComposeForInjection(string $composeYaml): void
                             if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
                                 try {
                                     validateShellSafePath($source, 'volume source');
-                                } catch (\Exception $e) {
-                                    throw new \Exception(
+                                } catch (Exception $e) {
+                                    throw new Exception(
                                         'Invalid Docker volume definition (array syntax): '.$e->getMessage().
                                         ' Please use safe path names without shell metacharacters.',
                                         0,
@@ -84,8 +84,8 @@ function validateDockerComposeForInjection(string $composeYaml): void
                         if (is_string($target)) {
                             try {
                                 validateShellSafePath($target, 'volume target');
-                            } catch (\Exception $e) {
-                                throw new \Exception(
+                            } catch (Exception $e) {
+                                throw new Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
                                     ' Please use safe path names without shell metacharacters.',
                                     0,
@@ -105,7 +105,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
  *
  * @param  string  $volumeString  The volume string to validate
  *
- * @throws \Exception If the volume string contains command injection attempts
+ * @throws Exception If the volume string contains command injection attempts
  */
 function validateVolumeStringForInjection(string $volumeString): void
 {
@@ -325,9 +325,9 @@ function parseDockerVolumeString(string $volumeString): array
         if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
             try {
                 validateShellSafePath($sourceStr, 'volume source');
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 // Re-throw with more context about the volume string
-                throw new \Exception(
+                throw new Exception(
                     'Invalid Docker volume definition: '.$e->getMessage().
                     ' Please use safe path names without shell metacharacters.'
                 );
@@ -343,8 +343,8 @@ function parseDockerVolumeString(string $volumeString): array
         // Still, defense in depth is important
         try {
             validateShellSafePath($targetStr, 'volume target');
-        } catch (\Exception $e) {
-            throw new \Exception(
+        } catch (Exception $e) {
+            throw new Exception(
                 'Invalid Docker volume definition: '.$e->getMessage().
                 ' Please use safe path names without shell metacharacters.'
             );
@@ -356,6 +356,19 @@ function parseDockerVolumeString(string $volumeString): array
         'target' => $target !== null ? str($target) : null,
         'mode' => $mode !== null ? str($mode) : null,
     ];
+}
+
+function addTraefikDockerNetworkLabel(Collection $labels, string $network): Collection
+{
+    $hasUserDefinedNetwork = $labels->contains(
+        fn ($label): bool => is_string($label) && str($label)->before('=')->is('traefik.docker.network')
+    );
+
+    if (! $hasUserDefinedNetwork) {
+        $labels->push("traefik.docker.network={$network}");
+    }
+
+    return $labels;
 }
 
 function applicationParser(Application $resource, int $pull_request_id = 0, ?int $preview_id = null, ?string $commit = null): Collection
@@ -371,11 +384,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $pullRequestId = $pull_request_id;
     $isPullRequest = $pullRequestId == 0 ? false : true;
     $server = data_get($resource, 'destination.server');
-    $fileStorages = $resource->fileStorages();
-
     try {
         $yaml = Yaml::parse($compose);
-    } catch (\Exception) {
+    } catch (Exception) {
         return collect([]);
     }
     $services = data_get($yaml, 'services', collect([]));
@@ -409,8 +420,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         // Validate service name for command injection
         try {
             validateShellSafePath($serviceName, 'service name');
-        } catch (\Exception $e) {
-            throw new \Exception(
+        } catch (Exception $e) {
+            throw new Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
                 ' Service names must not contain shell metacharacters.'
             );
@@ -442,9 +453,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $value = str($value);
             $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
             preg_match_all($regex, $value, $valueMatches);
-            if (count($valueMatches[1]) > 0) {
-                foreach ($valueMatches[1] as $match) {
-                    $match = replaceVariables($match);
+            if (count($valueMatches[2]) > 0) {
+                foreach ($valueMatches[2] as $match) {
+                    $match = str($match);
                     if ($match->startsWith('SERVICE_')) {
                         if ($magicEnvironments->has($match->value())) {
                             continue;
@@ -465,7 +476,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $fqdn = generateFqdn(server: $server, random: "$uuid", parserVersion: $resource->compose_parsing_version);
                 }
 
-                if ($value && get_class($value) === \Illuminate\Support\Stringable::class && $value->startsWith('/')) {
+                if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
                     $path = $value->value();
                     if ($path !== '/') {
                         $fqdn = "$fqdn$path";
@@ -504,6 +515,38 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         'is_preview' => false,
                     ]);
                 }
+
+            }
+
+            // Also populate docker_compose_domains for dockercompose apps from direct SERVICE_* declarations.
+            if ($resource->build_pack === 'dockercompose' && ($key->startsWith('SERVICE_FQDN_') || $key->startsWith('SERVICE_URL_'))) {
+                $parsed = parseServiceEnvironmentVariable($key->value());
+                $normalizedServiceName = normalizeComposeServiceName((string) $parsed['service_name']);
+                $originalServiceName = findComposeServiceName($normalizedServiceName, array_keys($services));
+                if ($originalServiceName !== null) {
+                    $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
+                    $domainExists = getComposeServiceDomainString($domains, $originalServiceName);
+                    if (is_null($domainExists)) {
+                        $serviceNameForDomain = str($parsed['service_name'])->replace('_', '-')->value();
+                        $domainValue = generateUrl(server: $server, random: "$serviceNameForDomain-$uuid");
+                        if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
+                            $path = $value->value();
+                            if ($path !== '/') {
+                                $domainValue = "$domainValue$path";
+                            }
+                        }
+                        if ($parsed['port'] && is_numeric($parsed['port'])) {
+                            $domainValue = "$domainValue:{$parsed['port']}";
+                        }
+                        $resource->docker_compose_domains = json_encode(putComposeServiceDomain(
+                            $domains,
+                            $originalServiceName,
+                            $domainValue,
+                            array_keys($services),
+                        ));
+                        $resource->save();
+                    }
+                }
             }
         }
 
@@ -537,8 +580,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     }
 
                     $originalServiceName = str($serviceName)->replace('_', '-')->value();
-                    // Always normalize service names to match docker_compose_domains lookup
-                    $serviceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
+                    // Env var SERVICE_* names still use underscores; domain map keys use original compose names.
+                    $serviceName = normalizeComposeServiceName((string) $serviceName);
 
                     // Generate BOTH FQDN & URL
                     $fqdn = generateFqdn(server: $server, random: "$originalServiceName-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -599,29 +642,24 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     }
 
                     if ($resource->build_pack === 'dockercompose') {
-                        // Check if a service with this name actually exists
-                        $serviceExists = false;
-                        foreach ($services as $serviceNameKey => $service) {
-                            $transformedServiceName = str($serviceNameKey)->replace('-', '_')->replace('.', '_')->value();
-                            if ($transformedServiceName === $serviceName) {
-                                $serviceExists = true;
-                                break;
-                            }
-                        }
+                        // Match env-derived name to the real compose service key (hyphens/dots preserved).
+                        $composeServiceName = findComposeServiceName($serviceName, array_keys($services));
 
                         // Only add domain if the service exists
-                        if ($serviceExists) {
-                            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
-                            $domainExists = data_get($domains->get($serviceName), 'domain');
+                        if ($composeServiceName !== null) {
+                            $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
+                            $domainExists = getComposeServiceDomainString($domains, $composeServiceName);
 
                             // Update domain using URL with port if applicable
                             $domainValue = $port ? $urlWithPort : $url;
 
                             if (is_null($domainExists)) {
-                                $domains->put($serviceName, [
-                                    'domain' => $domainValue,
-                                ]);
-                                $resource->docker_compose_domains = $domains->toJson();
+                                $resource->docker_compose_domains = json_encode(putComposeServiceDomain(
+                                    $domains,
+                                    $composeServiceName,
+                                    $domainValue,
+                                    array_keys($services),
+                                ));
                                 $resource->save();
                             }
                         }
@@ -704,14 +742,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -738,8 +773,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
                             try {
                                 validateShellSafePath($sourceValue, 'volume source');
-                            } catch (\Exception $e) {
-                                throw new \Exception(
+                            } catch (Exception $e) {
+                                throw new Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
                                     ' Please use safe path names without shell metacharacters.'
                                 );
@@ -749,20 +784,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');
-                        } catch (\Exception $e) {
-                            throw new \Exception(
+                        } catch (Exception $e) {
+                            throw new Exception(
                                 'Invalid Docker volume definition (array syntax): '.$e->getMessage().
                                 ' Please use safe path names without shell metacharacters.'
                             );
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
@@ -789,7 +821,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = replaceLocalSource($source, $mainDirectory);
-                        if ($isPullRequest) {
+                        $isPreviewSuffixEnabled = $foundConfig
+                            ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
+                            : true;
+                        if ($isPullRequest && $isPreviewSuffixEnabled) {
                             $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                         }
                         LocalFileVolume::updateOrCreate(
@@ -986,65 +1021,155 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {
-                $value = null;
+                // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
+                // Ensure the variable exists in DB for .env generation and UI display
                 $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
-                    'value' => $value,
                     'is_preview' => false,
                 ]);
+                // Keep the ${VAR} reference in compose — Docker Compose resolves from .env at deploy time.
+                // Do NOT replace with DB value: if user updates env var without re-parsing compose,
+                // a stale resolved value in environment: would override the correct .env value.
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
-                    if ($value->contains(':-')) {
-                        $value = replaceVariables($value);
-                        $key = $value->before(':');
-                        $value = $value->after(':-');
-                    } elseif ($value->contains('-')) {
-                        $value = replaceVariables($value);
 
-                        $key = $value->before('-');
-                        $value = $value->after('-');
-                    } elseif ($value->contains(':?')) {
-                        $value = replaceVariables($value);
+                    // Extract variable content between ${...} using balanced brace matching
+                    $result = extractBalancedBraceContent($value->value(), 0);
 
-                        $key = $value->before(':');
-                        $value = $value->after(':?');
-                        $isRequired = true;
-                    } elseif ($value->contains('?')) {
-                        $value = replaceVariables($value);
+                    if ($result !== null) {
+                        $content = $result['content'];
+                        $split = splitOnOperatorOutsideNested($content);
 
-                        $key = $value->before('?');
-                        $value = $value->after('?');
-                        $isRequired = true;
-                    }
-                    if ($originalValue->value() === $value->value()) {
-                        // This means the variable does not have a default value, so it needs to be created in Coolify
-                        $parsedKeyValue = replaceVariables($value);
+                        if ($split !== null) {
+                            // Has default value syntax (:-,  -,  :?, or ?)
+                            $varName = $split['variable'];
+                            $operator = $split['operator'];
+                            $defaultValue = $split['default'];
+                            $isRequired = str_contains($operator, '?');
+
+                            // Create the primary variable with its default (only if it doesn't exist)
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $varName,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $defaultValue,
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                            ]);
+
+                            // Add the variable to the environment so it will be shown in the deployable compose file
+                            $environment[$varName] = $envVar->value;
+
+                            // Recursively process nested variables in default value
+                            if (str_contains($defaultValue, '${')) {
+                                $searchPos = 0;
+                                $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                while ($nestedResult !== null) {
+                                    $nestedContent = $nestedResult['content'];
+                                    $nestedSplit = splitOnOperatorOutsideNested($nestedContent);
+
+                                    // Determine the nested variable name
+                                    $nestedVarName = $nestedSplit !== null ? $nestedSplit['variable'] : $nestedContent;
+
+                                    // Skip SERVICE_URL_* and SERVICE_FQDN_* variables - they are handled by magic variable system
+                                    $isMagicVariable = str_starts_with($nestedVarName, 'SERVICE_URL_') || str_starts_with($nestedVarName, 'SERVICE_FQDN_');
+
+                                    if (! $isMagicVariable) {
+                                        if ($nestedSplit !== null) {
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedSplit['variable'],
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'value' => $nestedSplit['default'],
+                                                'is_preview' => false,
+                                            ]);
+                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
+                                        } else {
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedContent,
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'is_preview' => false,
+                                            ]);
+                                            $environment[$nestedContent] = $nestedEnvVar->value;
+                                        }
+                                    }
+
+                                    $searchPos = $nestedResult['end'] + 1;
+                                    if ($searchPos >= strlen($defaultValue)) {
+                                        break;
+                                    }
+                                    $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                }
+                            }
+                        } else {
+                            // Simple variable reference without default
+                            $parsedKeyValue = replaceVariables($value);
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $content,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                            ]);
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$content] = $envVar->value;
+                        }
+                    } else {
+                        // Fallback to old behavior for malformed input (backward compatibility)
+                        if ($value->contains(':-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':-');
+                        } elseif ($value->contains('-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('-');
+                            $value = $value->after('-');
+                        } elseif ($value->contains(':?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':?');
+                            $isRequired = true;
+                        } elseif ($value->contains('?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('?');
+                            $value = $value->after('?');
+                            $isRequired = true;
+                        }
+                        if ($originalValue->value() === $value->value()) {
+                            // This means the variable does not have a default value
+                            $parsedKeyValue = replaceVariables($value);
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $parsedKeyValue,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                            ]);
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$parsedKeyValue->value()] = $envVar->value;
+
+                            continue;
+                        }
                         $resource->environment_variables()->firstOrCreate([
-                            'key' => $parsedKeyValue,
+                            'key' => $key,
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
+                            'value' => $value,
                             'is_preview' => false,
                             'is_required' => $isRequired,
                         ]);
-                        // Add the variable to the environment so it will be shown in the deployable compose file
-                        $environment[$parsedKeyValue->value()] = $value;
-
-                        continue;
                     }
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => $key,
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $value,
-                        'is_preview' => false,
-                        'is_required' => $isRequired,
-                    ]);
                 }
             }
         }
@@ -1068,21 +1193,21 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
         if ($isPullRequest) {
             $preview = $resource->previews()->find($preview_id);
-            $domains = collect(json_decode(data_get($preview, 'docker_compose_domains'))) ?? collect([]);
+            $domains = collect(json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: []);
         } else {
-            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains'))) ?? collect([]);
+            $domains = collect(json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: []);
         }
 
         // Only process domains for dockercompose applications to prevent SERVICE variable recreation
         if ($resource->build_pack !== 'dockercompose') {
             $domains = collect([]);
         }
-        $changedServiceName = str($serviceName)->replace('-', '_')->replace('.', '_')->value();
-        $fqdns = data_get($domains, "$changedServiceName.domain");
+        // Prefer original compose service key; fall back to legacy underscore storage keys.
+        $fqdns = getComposeServiceDomainString($domains, (string) $serviceName);
         // Generate SERVICE_FQDN & SERVICE_URL for dockercompose
         if ($resource->build_pack === 'dockercompose') {
             foreach ($domains as $forServiceName => $domain) {
-                $parsedDomain = data_get($domain, 'domain');
+                $parsedDomain = composeDomainEntryString($domain);
                 $serviceNameFormatted = str($serviceName)->upper()->replace('-', '_')->replace('.', '_');
 
                 if (filled($parsedDomain)) {
@@ -1091,12 +1216,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $coolifyScheme = $coolifyUrl->getScheme();
                     $coolifyFqdn = $coolifyUrl->getHost();
                     $coolifyUrl = $coolifyUrl->withScheme($coolifyScheme)->withHost($coolifyFqdn)->withPort(null);
-                    $coolifyEnvironments->put('SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'), $coolifyUrl->__toString());
-                    $coolifyEnvironments->put('SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'), $coolifyFqdn);
+                    $serviceEnvKey = str(normalizeComposeServiceName((string) $forServiceName))->upper();
+                    $coolifyEnvironments->put('SERVICE_URL_'.$serviceEnvKey, $coolifyUrl->__toString());
+                    $coolifyEnvironments->put('SERVICE_FQDN_'.$serviceEnvKey, $coolifyFqdn);
                     $resource->environment_variables()->updateOrCreate([
                         'resourceable_type' => Application::class,
                         'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_URL_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'),
+                        'key' => 'SERVICE_URL_'.$serviceEnvKey,
                     ], [
                         'value' => $coolifyUrl->__toString(),
                         'is_preview' => false,
@@ -1104,7 +1230,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $resource->environment_variables()->updateOrCreate([
                         'resourceable_type' => Application::class,
                         'resourceable_id' => $resource->id,
-                        'key' => 'SERVICE_FQDN_'.str($forServiceName)->upper()->replace('-', '_')->replace('.', '_'),
+                        'key' => 'SERVICE_FQDN_'.$serviceEnvKey,
                     ], [
                         'value' => $coolifyFqdn,
                         'is_preview' => false,
@@ -1130,9 +1256,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $fqdns = str($fqdns)->explode(',');
             if ($isPullRequest) {
                 $preview = $resource->previews()->find($preview_id);
-                $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
+                $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: []);
                 if ($docker_compose_domains->count() > 0) {
-                    $found_fqdn = data_get($docker_compose_domains, "$changedServiceName.domain");
+                    $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                     if ($found_fqdn) {
                         $fqdns = collect($found_fqdn);
                     } else {
@@ -1147,7 +1273,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $schema = $url->getScheme();
                         $portInt = $url->getPort();
                         $port = $portInt !== null ? ':'.$portInt : '';
-                        $random = new Cuid2;
+                        $random = new_public_id();
                         $preview_fqdn = str_replace('{{random}}', $random, $template);
                         $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
                         $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
@@ -1173,15 +1299,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $isDatabase = isDatabaseImage($image, $service);
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
-            $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
-            });
-            $coolifyEnvironments->put('COOLIFY_URL', $fqdnsWithoutPort->implode(','));
-
-            $urls = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
-            });
-            $coolifyEnvironments->put('COOLIFY_FQDN', $urls->implode(','));
+            $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
+            $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
         }
         add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
         if ($environment->count() > 0) {
@@ -1205,6 +1324,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // Otherwise keep empty string as-is
                 }
 
+                // Resolve shared variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}
+                // Without this, literal {{...}} strings end up in the compose environment: section,
+                // which takes precedence over the resolved values in the .env file (env_file:)
+                if (is_string($value) && str_contains($value, '{{')) {
+                    $value = resolveSharedEnvironmentVariables($value, $resource);
+                }
+
                 return $value;
             });
         }
@@ -1219,65 +1345,82 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
             $shouldGenerateLabelsExactly = $resource->destination->server->settings->generate_exact_labels;
-            $uuid = $resource->uuid;
-            $network = data_get($resource, 'destination.network');
+            $labelUuid = $resource->uuid;
+            $labelNetwork = data_get($resource, 'destination.network');
             if ($isPullRequest) {
-                $uuid = "{$resource->uuid}-{$pullRequestId}";
+                $labelUuid = "{$resource->uuid}-{$pullRequestId}";
             }
             if ($isPullRequest) {
-                $network = "{$resource->destination->network}-{$pullRequestId}";
+                $labelNetwork = "{$resource->destination->network}-{$pullRequestId}";
+            }
+            $noindexDomains = $isPullRequest ? $fqdns : $originalResource->noindexDomains();
+            $domainServiceName = findComposeServiceName((string) $serviceName, $domains->keys());
+            $composeRedirect = data_get($domains->get($domainServiceName), 'redirect');
+            $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
+                ? $composeRedirect
+                : 'both';
+            if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
+                $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $uuid,
+                            uuid: $labelUuid,
                             domains: $fqdns,
-                            is_force_https_enabled: true,
-                            serviceLabels: $serviceLabels,
-                            is_gzip_enabled: $originalResource->isGzipEnabled(),
-                            is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
-                            service_name: $serviceName,
-                            image: $image
-                        ));
-                        break;
-                    case ProxyTypes::CADDY->value:
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                            network: $network,
-                            uuid: $uuid,
-                            domains: $fqdns,
-                            is_force_https_enabled: true,
+                            is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            predefinedPort: $predefinedPort
+                            noindex_domains: $noindexDomains,
+                            redirect_direction: $redirectDirection
+                        ));
+                        break;
+                    case ProxyTypes::CADDY->value:
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                            network: $labelNetwork,
+                            uuid: $labelUuid,
+                            domains: $fqdns,
+                            is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                            serviceLabels: $serviceLabels,
+                            is_gzip_enabled: $originalResource->isGzipEnabled(),
+                            is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
+                            service_name: $serviceName,
+                            image: $image,
+                            predefinedPort: $predefinedPort,
+                            noindex_domains: $noindexDomains,
+                            redirect_direction: $redirectDirection
                         ));
                         break;
                 }
             } else {
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                    uuid: $uuid,
+                    uuid: $labelUuid,
                     domains: $fqdns,
-                    is_force_https_enabled: true,
-                    serviceLabels: $serviceLabels,
-                    is_gzip_enabled: $originalResource->isGzipEnabled(),
-                    is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
-                    service_name: $serviceName,
-                    image: $image
-                ));
-                $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                    network: $network,
-                    uuid: $uuid,
-                    domains: $fqdns,
-                    is_force_https_enabled: true,
+                    is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    predefinedPort: $predefinedPort
+                    noindex_domains: $noindexDomains,
+                    redirect_direction: $redirectDirection
+                ));
+                $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                    network: $labelNetwork,
+                    uuid: $labelUuid,
+                    domains: $fqdns,
+                    is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    serviceLabels: $serviceLabels,
+                    is_gzip_enabled: $originalResource->isGzipEnabled(),
+                    is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
+                    service_name: $serviceName,
+                    image: $image,
+                    predefinedPort: $predefinedPort,
+                    noindex_domains: $noindexDomains,
+                    redirect_direction: $redirectDirection
                 ));
             }
         }
@@ -1389,9 +1532,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
-    } catch (\Exception $e) {
+    } catch (Exception) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in applicationParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');
@@ -1411,15 +1553,30 @@ function serviceParser(Service $resource): Collection
         return collect([]);
     }
 
+    // Extract inline comments from raw YAML before Symfony parser discards them
+    $envComments = extractYamlEnvironmentComments($compose);
+
     $server = data_get($resource, 'server');
     $allServices = get_service_templates();
 
     try {
         $yaml = Yaml::parse($compose);
-    } catch (\Exception) {
+    } catch (Exception) {
         return collect([]);
     }
     $services = data_get($yaml, 'services', collect([]));
+
+    // Clean up corrupted environment variables from previous parser bugs
+    // (keys starting with $ or ending with } should not exist as env var names)
+    $resource->environment_variables()
+        ->where('resourceable_type', get_class($resource))
+        ->where('resourceable_id', $resource->id)
+        ->where(function ($q) {
+            $q->where('key', 'LIKE', '$%')
+                ->orWhere('key', 'LIKE', '%}');
+        })
+        ->delete();
+
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -1451,8 +1608,8 @@ function serviceParser(Service $resource): Collection
         // Validate service name for command injection
         try {
             validateShellSafePath($serviceName, 'service name');
-        } catch (\Exception $e) {
-            throw new \Exception(
+        } catch (Exception $e) {
+            throw new Exception(
                 'Invalid Docker Compose service name: '.$e->getMessage().
                 ' Service names must not contain shell metacharacters.'
             );
@@ -1478,20 +1635,25 @@ function serviceParser(Service $resource): Collection
             // Use image detection for non-migrated services
             $isDatabase = isDatabaseImage($image, $service);
             if ($isDatabase) {
-                $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
-                if ($applicationFound) {
-                    $savedService = $applicationFound;
+                $databaseFound = ServiceDatabase::where('name', $serviceName)->where('service_id', $resource->id)->first();
+                if ($databaseFound) {
+                    $savedService = $databaseFound;
                 } else {
-                    $savedService = ServiceDatabase::firstOrCreate([
+                    $savedService = ServiceDatabase::create([
                         'name' => $serviceName,
                         'service_id' => $resource->id,
                     ]);
                 }
             } else {
-                $savedService = ServiceApplication::firstOrCreate([
-                    'name' => $serviceName,
-                    'service_id' => $resource->id,
-                ]);
+                $applicationFound = ServiceApplication::where('name', $serviceName)->where('service_id', $resource->id)->first();
+                if ($applicationFound) {
+                    $savedService = $applicationFound;
+                } else {
+                    $savedService = ServiceApplication::create([
+                        'name' => $serviceName,
+                        'service_id' => $resource->id,
+                    ]);
+                }
             }
         }
         // Update image if it changed
@@ -1597,9 +1759,9 @@ function serviceParser(Service $resource): Collection
             $value = str($value);
             $regex = '/\$(\{?([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)\}?)/';
             preg_match_all($regex, $value, $valueMatches);
-            if (count($valueMatches[1]) > 0) {
-                foreach ($valueMatches[1] as $match) {
-                    $match = replaceVariables($match);
+            if (count($valueMatches[2]) > 0) {
+                foreach ($valueMatches[2] as $match) {
+                    $match = str($match);
                     if ($match->startsWith('SERVICE_')) {
                         if ($magicEnvironments->has($match->value())) {
                             continue;
@@ -1644,8 +1806,10 @@ function serviceParser(Service $resource): Collection
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
-                    $fqdn = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
-                    $url = str($savedService->fqdn)->after('://')->before(':')->prepend(str($savedService->fqdn)->before('://')->append('://'))->value();
+                    // FQDN may be a comma-separated list; use the first entry (same as updateCompose).
+                    $firstFqdn = firstDomainFromList($savedService->fqdn);
+                    $fqdn = getFqdnWithoutPort($firstFqdn);
+                    $url = $fqdn;
                 } else {
                     // For ServiceDatabase, generate fqdn/url without saving to the model
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
@@ -1657,7 +1821,7 @@ function serviceParser(Service $resource): Collection
                 // Strip scheme for environment variable values
                 $fqdnValueForEnv = str($fqdn)->after('://')->value();
 
-                if ($value && get_class($value) === \Illuminate\Support\Stringable::class && $value->startsWith('/')) {
+                if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
                     $path = $value->value();
                     if ($path !== '/') {
                         // Only add path if it's not already present (prevents duplication on subsequent parse() calls)
@@ -1694,51 +1858,60 @@ function serviceParser(Service $resource): Collection
                 }
 
                 // ALWAYS create BOTH base SERVICE_URL and SERVICE_FQDN pairs (without port)
+                $fqdnKey = "SERVICE_FQDN_{$serviceName}";
                 $resource->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_FQDN_{$serviceName}",
+                    'key' => $fqdnKey,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $fqdnValueForEnv,
                     'is_preview' => false,
+                    'comment' => $envComments[$fqdnKey] ?? null,
                 ]);
 
+                $urlKey = "SERVICE_URL_{$serviceName}";
                 $resource->environment_variables()->updateOrCreate([
-                    'key' => "SERVICE_URL_{$serviceName}",
+                    'key' => $urlKey,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $url,
                     'is_preview' => false,
+                    'comment' => $envComments[$urlKey] ?? null,
                 ]);
 
                 // For port-specific variables, ALSO create port-specific pairs
                 // If template variable has port, create both URL and FQDN with port suffix
                 if ($parsed['has_port'] && $port) {
+                    $fqdnPortKey = "SERVICE_FQDN_{$serviceName}_{$port}";
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_FQDN_{$serviceName}_{$port}",
+                        'key' => $fqdnPortKey,
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $fqdnValueForEnvWithPort,
                         'is_preview' => false,
+                        'comment' => $envComments[$fqdnPortKey] ?? null,
                     ]);
 
+                    $urlPortKey = "SERVICE_URL_{$serviceName}_{$port}";
                     $resource->environment_variables()->updateOrCreate([
-                        'key' => "SERVICE_URL_{$serviceName}_{$port}",
+                        'key' => $urlPortKey,
                         'resourceable_type' => get_class($resource),
                         'resourceable_id' => $resource->id,
                     ], [
                         'value' => $urlWithPort,
                         'is_preview' => false,
+                        'comment' => $envComments[$urlPortKey] ?? null,
                     ]);
                 }
             }
         }
         $allMagicEnvironments = $allMagicEnvironments->merge($magicEnvironments);
         if ($magicEnvironments->count() > 0) {
-            foreach ($magicEnvironments as $key => $value) {
-                $key = str($key);
+            foreach ($magicEnvironments as $magicKey => $value) {
+                $originalMagicKey = $magicKey; // Preserve original key for comment lookup
+                $key = str($magicKey);
                 $value = replaceVariables($value);
                 $command = parseCommandFromMagicEnvVariable($key);
                 if ($command->value() === 'FQDN') {
@@ -1752,16 +1925,18 @@ function serviceParser(Service $resource): Collection
                         ->where('key', 'LIKE', $key->value().'_%')
                         ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
                         ->exists();
-                    $serviceExists = ServiceApplication::where('name', str($fqdnFor)->replace('_', '-')->value())->where('service_id', $resource->id)->first();
+                    $serviceExists = findServiceApplicationForEnvName($resource, (string) $fqdnFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
                     // Only set FQDN if it's for the current service being processed (prevent race conditions)
                     $isCurrentService = $serviceExists && $serviceExists->id === $savedService->id;
-                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService && (data_get($serviceExists, 'name') === str($fqdnFor)->replace('_', '-')->value())) {
+                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService) {
                         // Save URL otherwise it won't work.
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
                     }
+                    // Create FQDN variable (use firstOrCreate to avoid overwriting values
+                    // already set by direct template declarations or updateCompose)
                     $resource->environment_variables()->firstOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
@@ -1769,11 +1944,25 @@ function serviceParser(Service $resource): Collection
                     ], [
                         'value' => $fqdn,
                         'is_preview' => false,
+                        'comment' => $envComments[$originalMagicKey] ?? null,
+                    ]);
+
+                    // Also create the paired SERVICE_URL_* variable
+                    $urlKey = 'SERVICE_URL_'.strtoupper($fqdnFor);
+                    $resource->environment_variables()->firstOrCreate([
+                        'key' => $urlKey,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'value' => $url,
+                        'is_preview' => false,
+                        'comment' => $envComments[$urlKey] ?? null,
                     ]);
 
                 } elseif ($command->value() === 'URL') {
                     $urlFor = $key->after('SERVICE_URL_')->lower()->value();
                     $url = generateUrl(server: $server, random: str($urlFor)->replace('_', '-')->value()."-$uuid");
+                    $fqdn = generateFqdn(server: $server, random: str($urlFor)->replace('_', '-')->value()."-$uuid", parserVersion: $resource->compose_parsing_version);
 
                     $envExists = $resource->environment_variables()->where('key', $key->value())->first();
                     // Also check if a port-suffixed version exists (e.g., SERVICE_URL_DASHBOARD_6791)
@@ -1781,15 +1970,17 @@ function serviceParser(Service $resource): Collection
                         ->where('key', 'LIKE', $key->value().'_%')
                         ->whereRaw('key ~ ?', ['^'.$key->value().'_[0-9]+$'])
                         ->exists();
-                    $serviceExists = ServiceApplication::where('name', str($urlFor)->replace('_', '-')->value())->where('service_id', $resource->id)->first();
+                    $serviceExists = findServiceApplicationForEnvName($resource, (string) $urlFor);
                     // Check if FQDN already has a port set (contains ':' after the domain)
                     $fqdnHasPort = $serviceExists && str($serviceExists->fqdn)->contains(':') && str($serviceExists->fqdn)->afterLast(':')->isMatch('/^\d+$/');
                     // Only set FQDN if it's for the current service being processed (prevent race conditions)
                     $isCurrentService = $serviceExists && $serviceExists->id === $savedService->id;
-                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService && (data_get($serviceExists, 'name') === str($urlFor)->replace('_', '-')->value())) {
+                    if (! $envExists && ! $portSuffixedExists && ! $fqdnHasPort && $isCurrentService) {
                         $serviceExists->fqdn = $url;
                         $serviceExists->save();
                     }
+                    // Create URL variable (use firstOrCreate to avoid overwriting values
+                    // already set by direct template declarations or updateCompose)
                     $resource->environment_variables()->firstOrCreate([
                         'key' => $key->value(),
                         'resourceable_type' => get_class($resource),
@@ -1797,6 +1988,19 @@ function serviceParser(Service $resource): Collection
                     ], [
                         'value' => $url,
                         'is_preview' => false,
+                        'comment' => $envComments[$originalMagicKey] ?? null,
+                    ]);
+
+                    // Also create the paired SERVICE_FQDN_* variable
+                    $fqdnKey = 'SERVICE_FQDN_'.strtoupper($urlFor);
+                    $resource->environment_variables()->firstOrCreate([
+                        'key' => $fqdnKey,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
+                    ], [
+                        'value' => $fqdn,
+                        'is_preview' => false,
+                        'comment' => $envComments[$fqdnKey] ?? null,
                     ]);
 
                 } else {
@@ -1808,6 +2012,7 @@ function serviceParser(Service $resource): Collection
                     ], [
                         'value' => $value,
                         'is_preview' => false,
+                        'comment' => $envComments[$originalMagicKey] ?? null,
                     ]);
                 }
             }
@@ -1910,7 +2115,6 @@ function serviceParser(Service $resource): Collection
                 'service_id' => $resource->id,
             ]);
         }
-        $fileStorages = $savedService->fileStorages();
         if ($savedService->image !== $image) {
             $savedService->image = $image;
             $savedService->save();
@@ -1930,14 +2134,11 @@ function serviceParser(Service $resource): Collection
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
-                            $contentNotNull_temp = data_get($foundConfig, 'content');
-                            if ($contentNotNull_temp) {
-                                $content = $contentNotNull_temp;
-                            }
+                            $content = data_get($foundConfig, 'content');
                             $isDirectory = data_get($foundConfig, 'is_directory');
                         } else {
                             // By default, we cannot determine if the bind is a directory or not, so we set it to directory
@@ -1964,8 +2165,8 @@ function serviceParser(Service $resource): Collection
                         if (! $isSimpleEnvVar && ! $isEnvVarWithDefault && ! $isEnvVarWithPath) {
                             try {
                                 validateShellSafePath($sourceValue, 'volume source');
-                            } catch (\Exception $e) {
-                                throw new \Exception(
+                            } catch (Exception $e) {
+                                throw new Exception(
                                     'Invalid Docker volume definition (array syntax): '.$e->getMessage().
                                     ' Please use safe path names without shell metacharacters.'
                                 );
@@ -1975,20 +2176,17 @@ function serviceParser(Service $resource): Collection
                     if ($target !== null && ! empty($target->value())) {
                         try {
                             validateShellSafePath($target->value(), 'volume target');
-                        } catch (\Exception $e) {
-                            throw new \Exception(
+                        } catch (Exception $e) {
+                            throw new Exception(
                                 'Invalid Docker volume definition (array syntax): '.$e->getMessage().
                                 ' Please use safe path names without shell metacharacters.'
                             );
                         }
                     }
 
-                    $foundConfig = $fileStorages->whereMountPath($target)->first();
+                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if ($foundConfig) {
-                        $contentNotNull_temp = data_get($foundConfig, 'content');
-                        if ($contentNotNull_temp) {
-                            $content = $contentNotNull_temp;
-                        }
+                        $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
                     } else {
                         // if isDirectory is not set (or false) & content is also not set, we assume it is a directory
@@ -2163,18 +2361,20 @@ function serviceParser(Service $resource): Collection
             return ! str($value)->startsWith('SERVICE_');
         });
         foreach ($normalEnvironments as $key => $value) {
+            $originalKey = $key; // Preserve original key for comment lookup
             $key = str($key);
             $value = str($value);
             $originalValue = $value;
             $parsedValue = replaceVariables($value);
             if ($parsedValue->startsWith('SERVICE_')) {
-                $resource->environment_variables()->firstOrCreate([
+                $resource->environment_variables()->updateOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
                     'value' => $value,
                     'is_preview' => false,
+                    'comment' => $envComments[$originalKey] ?? null,
                 ]);
 
                 continue;
@@ -2183,65 +2383,170 @@ function serviceParser(Service $resource): Collection
                 continue;
             }
             if ($key->value() === $parsedValue->value()) {
-                $value = null;
+                // Simple variable reference (e.g. DATABASE_URL: ${DATABASE_URL})
+                // Ensure the variable exists in DB for .env generation and UI display
                 $resource->environment_variables()->firstOrCreate([
                     'key' => $key,
                     'resourceable_type' => get_class($resource),
                     'resourceable_id' => $resource->id,
                 ], [
-                    'value' => $value,
                     'is_preview' => false,
+                    'comment' => $envComments[$originalKey] ?? null,
                 ]);
+                // Keep the ${VAR} reference in compose — Docker Compose resolves from .env at deploy time.
+                // Do NOT replace with DB value: if user updates env var without re-parsing compose,
+                // a stale resolved value in environment: would override the correct .env value.
             } else {
                 if ($value->startsWith('$')) {
                     $isRequired = false;
-                    if ($value->contains(':-')) {
-                        $value = replaceVariables($value);
-                        $key = $value->before(':');
-                        $value = $value->after(':-');
-                    } elseif ($value->contains('-')) {
-                        $value = replaceVariables($value);
 
-                        $key = $value->before('-');
-                        $value = $value->after('-');
-                    } elseif ($value->contains(':?')) {
-                        $value = replaceVariables($value);
+                    // Extract variable content between ${...} using balanced brace matching
+                    $result = extractBalancedBraceContent($value->value(), 0);
 
-                        $key = $value->before(':');
-                        $value = $value->after(':?');
-                        $isRequired = true;
-                    } elseif ($value->contains('?')) {
-                        $value = replaceVariables($value);
+                    if ($result !== null) {
+                        $content = $result['content'];
+                        $split = splitOnOperatorOutsideNested($content);
 
-                        $key = $value->before('?');
-                        $value = $value->after('?');
-                        $isRequired = true;
-                    }
-                    if ($originalValue->value() === $value->value()) {
-                        // This means the variable does not have a default value, so it needs to be created in Coolify
-                        $parsedKeyValue = replaceVariables($value);
+                        if ($split !== null) {
+                            // Has default value syntax (:-,  -,  :?, or ?)
+                            $varName = $split['variable'];
+                            $operator = $split['operator'];
+                            $defaultValue = $split['default'];
+                            $isRequired = str_contains($operator, '?');
+
+                            // Create the primary variable with its default (only if it doesn't exist)
+                            // Use firstOrCreate instead of updateOrCreate to avoid overwriting user edits
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $varName,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'value' => $defaultValue,
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                                'comment' => $envComments[$originalKey] ?? null,
+                            ]);
+
+                            // Add the variable to the environment so it will be shown in the deployable compose file
+                            $environment[$varName] = $envVar->value;
+
+                            // Recursively process nested variables in default value
+                            if (str_contains($defaultValue, '${')) {
+                                // Extract and create nested variables
+                                $searchPos = 0;
+                                $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                while ($nestedResult !== null) {
+                                    $nestedContent = $nestedResult['content'];
+                                    $nestedSplit = splitOnOperatorOutsideNested($nestedContent);
+
+                                    // Determine the nested variable name
+                                    $nestedVarName = $nestedSplit !== null ? $nestedSplit['variable'] : $nestedContent;
+
+                                    // Skip SERVICE_URL_* and SERVICE_FQDN_* variables - they are handled by magic variable system
+                                    $isMagicVariable = str_starts_with($nestedVarName, 'SERVICE_URL_') || str_starts_with($nestedVarName, 'SERVICE_FQDN_');
+
+                                    if (! $isMagicVariable) {
+                                        if ($nestedSplit !== null) {
+                                            // Create nested variable with its default (only if it doesn't exist)
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedSplit['variable'],
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'value' => $nestedSplit['default'],
+                                                'is_preview' => false,
+                                            ]);
+                                            // Add nested variable to environment
+                                            $environment[$nestedSplit['variable']] = $nestedEnvVar->value;
+                                        } else {
+                                            // Simple nested variable without default (only if it doesn't exist)
+                                            $nestedEnvVar = $resource->environment_variables()->firstOrCreate([
+                                                'key' => $nestedContent,
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
+                                            ], [
+                                                'is_preview' => false,
+                                            ]);
+                                            // Add nested variable to environment
+                                            $environment[$nestedContent] = $nestedEnvVar->value;
+                                        }
+                                    }
+
+                                    // Look for more nested variables
+                                    $searchPos = $nestedResult['end'] + 1;
+                                    if ($searchPos >= strlen($defaultValue)) {
+                                        break;
+                                    }
+                                    $nestedResult = extractBalancedBraceContent($defaultValue, $searchPos);
+                                }
+                            }
+                        } else {
+                            // Simple variable reference without default
+                            // Use firstOrCreate to avoid overwriting user-saved values on redeploy
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $content,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                                'comment' => $envComments[$originalKey] ?? null,
+                            ]);
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$content] = $envVar->value;
+                        }
+                    } else {
+                        // Fallback to old behavior for malformed input (backward compatibility)
+                        if ($value->contains(':-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':-');
+                        } elseif ($value->contains('-')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('-');
+                            $value = $value->after('-');
+                        } elseif ($value->contains(':?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before(':');
+                            $value = $value->after(':?');
+                            $isRequired = true;
+                        } elseif ($value->contains('?')) {
+                            $value = replaceVariables($value);
+                            $key = $value->before('?');
+                            $value = $value->after('?');
+                            $isRequired = true;
+                        }
+
+                        if ($originalValue->value() === $value->value()) {
+                            // This means the variable does not have a default value
+                            // Use firstOrCreate to avoid overwriting user-saved values on redeploy
+                            $parsedKeyValue = replaceVariables($value);
+                            $envVar = $resource->environment_variables()->firstOrCreate([
+                                'key' => $parsedKeyValue,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
+                            ], [
+                                'is_preview' => false,
+                                'is_required' => $isRequired,
+                                'comment' => $envComments[$originalKey] ?? null,
+                            ]);
+                            // Add the variable to the environment using the saved DB value
+                            $environment[$parsedKeyValue->value()] = $envVar->value;
+
+                            continue;
+                        }
+                        // Variable with a default value from compose — use firstOrCreate to preserve user edits
                         $resource->environment_variables()->firstOrCreate([
-                            'key' => $parsedKeyValue,
+                            'key' => $key,
                             'resourceable_type' => get_class($resource),
                             'resourceable_id' => $resource->id,
                         ], [
+                            'value' => $value,
                             'is_preview' => false,
                             'is_required' => $isRequired,
+                            'comment' => $envComments[$originalKey] ?? null,
                         ]);
-                        // Add the variable to the environment so it will be shown in the deployable compose file
-                        $environment[$parsedKeyValue->value()] = $value;
-
-                        continue;
                     }
-                    $resource->environment_variables()->firstOrCreate([
-                        'key' => $key,
-                        'resourceable_type' => get_class($resource),
-                        'resourceable_id' => $resource->id,
-                    ], [
-                        'value' => $value,
-                        'is_preview' => false,
-                        'is_required' => $isRequired,
-                    ]);
                 }
             }
         }
@@ -2261,6 +2566,10 @@ function serviceParser(Service $resource): Collection
         } else {
             $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
         }
+        // Flags live on the ServiceApplication; a ServiceDatabase has no domains.
+        $noindexDomains = $savedService instanceof ServiceApplication
+            ? $savedService->noindexDomains()
+            : collect([]);
 
         $defaultLabels = defaultLabels(
             id: $resource->id,
@@ -2276,14 +2585,8 @@ function serviceParser(Service $resource): Collection
 
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
         if (! $isDatabase && $fqdns instanceof Collection && $fqdns->count() > 0) {
-            $fqdnsWithoutPort = $fqdns->map(function ($fqdn) {
-                return str($fqdn)->replace('http://', '')->replace('https://', '')->before(':');
-            });
-            $coolifyEnvironments->put('COOLIFY_FQDN', $fqdnsWithoutPort->implode(','));
-            $urls = $fqdns->map(function ($fqdn): Stringable {
-                return str($fqdn)->after('://')->before(':')->prepend(str($fqdn)->before('://')->append('://'));
-            });
-            $coolifyEnvironments->put('COOLIFY_URL', $urls->implode(','));
+            $coolifyEnvironments->put('COOLIFY_FQDN', $fqdns->map(fn ($fqdn) => getHostWithoutPort($fqdn))->implode(','));
+            $coolifyEnvironments->put('COOLIFY_URL', $fqdns->map(fn ($fqdn) => getFqdnWithoutPort($fqdn))->implode(','));
         }
         add_coolify_default_environment_variables($resource, $coolifyEnvironments, $resource->environment_variables);
         if ($environment->count() > 0) {
@@ -2307,6 +2610,13 @@ function serviceParser(Service $resource): Collection
                     // Otherwise keep empty string as-is
                 }
 
+                // Resolve shared variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}
+                // Without this, literal {{...}} strings end up in the compose environment: section,
+                // which takes precedence over the resolved values in the .env file (env_file:)
+                if (is_string($value) && str_contains($value, '{{')) {
+                    $value = resolveSharedEnvironmentVariables($value, $resource);
+                }
+
                 return $value;
             });
         }
@@ -2323,18 +2633,26 @@ function serviceParser(Service $resource): Collection
             $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
             $uuid = $resource->uuid;
             $network = data_get($resource, 'destination.network');
+            $redirectDirection = in_array(data_get($originalResource, 'redirect'), ['www', 'non-www', 'both'], true)
+                ? data_get($originalResource, 'redirect')
+                : 'both';
+            if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
+                $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
+            }
             if ($shouldGenerateLabelsExactly) {
                 switch ($server->proxyType()) {
                     case ProxyTypes::TRAEFIK->value:
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                             uuid: $uuid,
                             domains: $fqdns,
-                            is_force_https_enabled: true,
+                            is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
-                            image: $image
+                            image: $image,
+                            noindex_domains: $noindexDomains,
+                            redirect_direction: $redirectDirection
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -2342,13 +2660,15 @@ function serviceParser(Service $resource): Collection
                             network: $network,
                             uuid: $uuid,
                             domains: $fqdns,
-                            is_force_https_enabled: true,
+                            is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $originalResource->isGzipEnabled(),
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            predefinedPort: $predefinedPort
+                            predefinedPort: $predefinedPort,
+                            noindex_domains: $noindexDomains,
+                            redirect_direction: $redirectDirection
                         ));
                         break;
                 }
@@ -2356,24 +2676,28 @@ function serviceParser(Service $resource): Collection
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                     uuid: $uuid,
                     domains: $fqdns,
-                    is_force_https_enabled: true,
-                    serviceLabels: $serviceLabels,
-                    is_gzip_enabled: $originalResource->isGzipEnabled(),
-                    is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
-                    service_name: $serviceName,
-                    image: $image
-                ));
-                $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                    network: $network,
-                    uuid: $uuid,
-                    domains: $fqdns,
-                    is_force_https_enabled: true,
+                    is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
                     serviceLabels: $serviceLabels,
                     is_gzip_enabled: $originalResource->isGzipEnabled(),
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    predefinedPort: $predefinedPort
+                    noindex_domains: $noindexDomains,
+                    redirect_direction: $redirectDirection
+                ));
+                $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                    network: $network,
+                    uuid: $uuid,
+                    domains: $fqdns,
+                    is_force_https_enabled: $originalResource->isForceHttpsEnabled(),
+                    serviceLabels: $serviceLabels,
+                    is_gzip_enabled: $originalResource->isGzipEnabled(),
+                    is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
+                    service_name: $serviceName,
+                    image: $image,
+                    predefinedPort: $predefinedPort,
+                    noindex_domains: $noindexDomains,
+                    redirect_direction: $redirectDirection
                 ));
             }
         }
@@ -2471,9 +2795,8 @@ function serviceParser(Service $resource): Collection
             }
         }
         $resource->docker_compose_raw = Yaml::dump($originalYaml, 10, 2);
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // If parsing fails, keep the original docker_compose_raw unchanged
-        ray('Failed to update docker_compose_raw in serviceParser: '.$e->getMessage());
     }
 
     data_forget($resource, 'environment_variables');

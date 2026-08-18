@@ -7,7 +7,7 @@
 
 services:
   ryot:
-    image: ignisda/ryot:v8
+    image: ignisda/ryot:v10.3.0
     environment:
       - SERVICE_URL_RYOT_8000
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB}

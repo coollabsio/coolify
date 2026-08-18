@@ -1,0 +1,19 @@
+# documentation: https://imgcompress.karimzouine.com
+# slogan: Offline image compression, conversion, and AI background removal for Docker homelabs.
+# category: media
+# tags: compress,photo,server,metadata
+# logo: svgs/imgcompress.png
+# port: 5000
+
+services:
+  imgcompress:
+    image: karimz1/imgcompress:0.6.0
+    environment:
+      - SERVICE_URL_IMGCOMPRESS_5000
+      - DISABLE_LOGO=${DISABLE_LOGO:-false}
+      - DISABLE_STORAGE_MANAGEMENT=${DISABLE_STORAGE_MANAGEMENT:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

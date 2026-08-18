@@ -1,47 +1,48 @@
-# documentation: https://bluewavelabs.gitbook.io/checkmate
-# slogan: An open source server monitoring application
+# documentation: https://docs.checkmate.so/
+# slogan: An open source server and websites monitoring application
 # category: monitoring
 # tags: monitoring,server,uptime,healthcheck
 # logo: svgs/checkmate.png
-# port: 80
+# port: 52345
 
 services:
-  client:
-    image: bluewaveuptime/uptime_client:latest
+  checkmate:
+    image: 'ghcr.io/bluewave-labs/checkmate-backend-mono-multiarch:v3.2.0'
     environment:
-      - SERVICE_URL_CHECKMATE_80
-      - UPTIME_APP_API_BASE_URL=${SERVICE_URL_CHECKMATESERVER_5000}/api/v1
+      - SERVICE_URL_CHECKMATE_52345
+      - 'UPTIME_APP_API_BASE_URL=${SERVICE_URL_CHECKMATE}/api/v1'
+      - 'UPTIME_APP_CLIENT_HOST=${SERVICE_URL_CHECKMATE}'
+      - 'DB_CONNECTION_STRING=mongodb://mongodb:27017/uptime_db'
+      - 'CLIENT_HOST=${SERVICE_URL_CHECKMATE}'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
     depends_on:
-      - server
-  server:
-    image: bluewaveuptime/uptime_server:latest
-    environment:
-      - SERVICE_URL_CHECKMATESERVER_5000
-      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
-      - REFRESH_TOKEN_SECRET=${SERVICE_PASSWORD_64_REFRESH}
-      - SYSTEM_EMAIL_ADDRESS=${SYSTEM_EMAIL_ADDRESS:-test@example.com}
-      - SYSTEM_EMAIL_PASSWORD=${SERVICE_PASSWORD_64_EMAIL}
-      - SYSTEM_EMAIL_HOST=${SYSTEM_EMAIL_HOST}
-      - SYSTEM_EMAIL_PORT=${SYSTEM_EMAIL_PORT}
-      - PAGESPEED_API_KEY=${PAGESPEED_API_KEY}
-      - DB_CONNECTION_STRING=${DB_CONNECTION_STRING:-mongodb://mongodb:27017/uptime_db}
-      - REDIS_HOST=${REDIS_HOST:-redis}
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - DB_TYPE=${DB_TYPE:-MongoDB}
-      - TOKEN_TTL=${TOKEN_TTL:-99d}
-      - REFRESH_TOKEN_TTL=${REFRESH_TOKEN_TTL:-99d}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    depends_on:
-      - redis
       - mongodb
-  redis:
-    image: bluewaveuptime/uptime_redis:latest
-    volumes:
-      - redis:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://127.0.0.1:52345/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
   mongodb:
-    image: bluewaveuptime/uptime_database_mongo:latest
+    image: 'ghcr.io/bluewave-labs/checkmate-mongo:v3.2.0'
+    command:
+      - mongod
+      - '--quiet'
+      - '--bind_ip_all'
     volumes:
-      - mongodb:/data/db
-    command: ["mongod", "--quiet"]
+      - 'checkmate-mongo:/data/db'
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - '--eval'
+        - "db.adminCommand('ping')"
+        - '--quiet'
+      interval: 5s
+      timeout: 30s
+      start_period: 10s
+
 

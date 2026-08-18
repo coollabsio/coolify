@@ -17,15 +17,129 @@ function collectRegex(string $name)
 {
     return "/{$name}\w+/";
 }
+
+/**
+ * Extract content between balanced braces, handling nested braces properly.
+ *
+ * @param  string  $str  The string to search
+ * @param  int  $startPos  Position to start searching from
+ * @return array|null Array with 'content', 'start', and 'end' keys, or null if no balanced braces found
+ */
+function extractBalancedBraceContent(string $str, int $startPos = 0): ?array
+{
+    // Find opening brace
+    if ($startPos >= strlen($str)) {
+        return null;
+    }
+    $openPos = strpos($str, '{', $startPos);
+    if ($openPos === false) {
+        return null;
+    }
+
+    // Track depth to find matching closing brace
+    $depth = 1;
+    $pos = $openPos + 1;
+    $len = strlen($str);
+
+    while ($pos < $len && $depth > 0) {
+        if ($str[$pos] === '{') {
+            $depth++;
+        } elseif ($str[$pos] === '}') {
+            $depth--;
+        }
+        $pos++;
+    }
+
+    if ($depth !== 0) {
+        // Unbalanced braces
+        return null;
+    }
+
+    return [
+        'content' => substr($str, $openPos + 1, $pos - $openPos - 2),
+        'start' => $openPos,
+        'end' => $pos - 1,
+    ];
+}
+
+/**
+ * Split variable expression on operators (:-,  -,  :?,  ?) while respecting nested braces.
+ *
+ * @param  string  $content  The content to split (without outer ${...})
+ * @return array|null Array with 'variable', 'operator', and 'default' keys, or null if no operator found
+ */
+function splitOnOperatorOutsideNested(string $content): ?array
+{
+    $operators = [':-', '-', ':?', '?'];
+    $depth = 0;
+    $len = strlen($content);
+
+    for ($i = 0; $i < $len; $i++) {
+        if ($content[$i] === '{') {
+            $depth++;
+        } elseif ($content[$i] === '}') {
+            $depth--;
+        } elseif ($depth === 0) {
+            // Check for operators only at depth 0 (outside nested braces)
+            foreach ($operators as $op) {
+                if (substr($content, $i, strlen($op)) === $op) {
+                    return [
+                        'variable' => substr($content, 0, $i),
+                        'operator' => $op,
+                        'default' => substr($content, $i + strlen($op)),
+                    ];
+                }
+            }
+        }
+    }
+
+    return null;
+}
+
 function replaceVariables(string $variable): Stringable
 {
-    return str($variable)->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
+    // Handle ${VAR} syntax with proper brace matching
+    $str = str($variable);
+
+    // Handle ${VAR} format
+    if ($str->startsWith('${')) {
+        $result = extractBalancedBraceContent($variable, 0);
+        if ($result !== null) {
+            return str($result['content']);
+        }
+
+        // Fallback to old behavior for malformed input
+        return $str->before('}')->replaceFirst('$', '')->replaceFirst('{', '');
+    }
+
+    // Handle {VAR} format (from regex capture group without $)
+    if ($str->startsWith('{') && $str->endsWith('}')) {
+        return str(substr($variable, 1, -1));
+    }
+
+    // Handle {VAR format (from regex capture group, may be truncated)
+    if ($str->startsWith('{')) {
+        $result = extractBalancedBraceContent('$'.$variable, 0);
+        if ($result !== null) {
+            return str($result['content']);
+        }
+
+        // Fallback: remove { and get content before }
+        return $str->replaceFirst('{', '')->before('}');
+    }
+
+    // Handle bare $VAR format (no braces)
+    if ($str->startsWith('$')) {
+        return $str->replaceFirst('$', '');
+    }
+
+    return $str;
 }
 
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
-        if ($oneService->getMorphClass() === \App\Models\Application::class) {
+        if ($oneService->getMorphClass() === Application::class) {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
         } else {
@@ -53,13 +167,11 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
 
             if ($isFile === 'OK') {
-                // If its a file & exists
-                $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
-                if ($fileVolume->is_based_on_git) {
-                    $fileVolume->content = $filesystemContent;
-                }
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
+                if ($fileVolume->is_based_on_git) {
+                    $fileVolume->loadStorageOnServer();
+                }
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
@@ -90,7 +202,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 instant_remote_process(["mkdir -p $fileLocation"], $server);
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
@@ -100,7 +212,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
         if (! $dockerComposeRaw) {
-            throw new \Exception('No compose file found or not a valid YAML file.');
+            throw new Exception('No compose file found or not a valid YAML file.');
         }
         $dockerCompose = Yaml::parse($dockerComposeRaw);
 
@@ -211,22 +323,13 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         }
 
         if ($resource->fqdn) {
-            $resourceFqdns = str($resource->fqdn)->explode(',');
-            $resourceFqdns = $resourceFqdns->first();
-            $url = Url::fromString($resourceFqdns);
+            $firstFqdn = firstDomainFromList($resource->fqdn);
+            $url = Url::fromString($firstFqdn);
             $port = $url->getPort();
-            $path = $url->getPath();
 
-            // Prepare URL value (with scheme and host)
-            $urlValue = $url->getScheme().'://'.$url->getHost();
-            $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
-
-            // Prepare FQDN value (host only, no scheme)
-            $fqdnHost = $url->getHost();
-            $fqdnValue = str($fqdnHost)->after('://');
-            if ($path !== '/') {
-                $fqdnValue = $fqdnValue.$path;
-            }
+            // Same helpers as application/service parsers (COOLIFY_URL / COOLIFY_FQDN).
+            $urlValue = getFqdnWithoutPort($firstFqdn);
+            $fqdnValue = getHostWithoutPort($firstFqdn);
 
             // For each service name found in template, create BOTH SERVICE_URL and SERVICE_FQDN pairs
             foreach ($serviceNamesToProcess as $serviceInfo) {
@@ -282,7 +385,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
@@ -381,7 +484,7 @@ function applyServiceApplicationPrerequisites(Service $service): void
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Log error but don't throw - prerequisites are nice-to-have, not critical
         Log::error('Failed to apply service application prerequisites', [
             'service_id' => $service->id,

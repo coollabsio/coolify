@@ -8,13 +8,14 @@ use App\Events\ServerReachabilityChanged;
 use App\Events\ServerValidated;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class ValidateAndInstallServerJob implements ShouldQueue
+class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -32,6 +33,19 @@ class ValidateAndInstallServerJob implements ShouldQueue
     public function handle(): void
     {
         try {
+            if (! $this->server->canBeValidated()) {
+                $message = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
+                $this->server->update([
+                    'validation_logs' => $message,
+                    'is_validating' => false,
+                ]);
+                Log::warning('ValidateAndInstallServer: blocked for transferred server', [
+                    'server_id' => $this->server->id,
+                ]);
+
+                return;
+            }
+
             // Mark validation as in progress
             $this->server->update(['is_validating' => true]);
 
@@ -44,7 +58,8 @@ class ValidateAndInstallServerJob implements ShouldQueue
             // Validate connection
             ['uptime' => $uptime, 'error' => $error] = $this->server->validateConnection();
             if (! $uptime) {
-                $errorMessage = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$error;
+                $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+                $errorMessage = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br>Error: '.$sanitizedError;
                 $this->server->update([
                     'validation_logs' => $errorMessage,
                     'is_validating' => false,
@@ -178,6 +193,9 @@ class ValidateAndInstallServerJob implements ShouldQueue
             // Mark validation as complete
             $this->server->update(['is_validating' => false]);
 
+            // Auto-fetch server details now that validation passed
+            $this->server->gatherServerMetadata();
+
             // Refresh server to get latest state
             $this->server->refresh();
 
@@ -193,7 +211,7 @@ class ValidateAndInstallServerJob implements ShouldQueue
             ]);
 
             $this->server->update([
-                'validation_logs' => 'An error occurred during validation: '.$e->getMessage(),
+                'validation_logs' => 'An error occurred during validation: '.htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'),
                 'is_validating' => false,
             ]);
         }

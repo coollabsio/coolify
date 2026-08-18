@@ -22,6 +22,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         foreach ($this->indexes as [$table, $columns, $indexName]) {
             if (! $this->indexExists($indexName)) {
                 $columnList = implode(', ', array_map(fn ($col) => "\"$col\"", $columns));
@@ -32,6 +36,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::connection()->getDriverName() !== 'pgsql') {
+            return;
+        }
+
         foreach ($this->indexes as [, , $indexName]) {
             DB::statement("DROP INDEX IF EXISTS \"{$indexName}\"");
         }

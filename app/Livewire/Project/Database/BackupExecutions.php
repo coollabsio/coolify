@@ -3,12 +3,16 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ServiceDatabase;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class BackupExecutions extends Component
 {
+    use AuthorizesRequests;
+
     public ?ScheduledDatabaseBackup $backup = null;
 
     public $database;
@@ -44,31 +48,47 @@ class BackupExecutions extends Component
 
     public function cleanupFailed()
     {
-        if ($this->backup) {
-            $this->backup->executions()->where('status', 'failed')->delete();
-            $this->refreshBackupExecutions();
-            $this->dispatch('success', 'Failed backups cleaned up.');
+        try {
+            $this->authorize('manageBackups', $this->database);
+            if ($this->backup) {
+                $this->backup->executions()->where('status', 'failed')->delete();
+                $this->refreshBackupExecutions();
+                $this->dispatch('success', 'Failed backups cleaned up.');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
     public function cleanupDeleted()
     {
-        if ($this->backup) {
-            $deletedCount = $this->backup->executions()->where('local_storage_deleted', true)->count();
-            if ($deletedCount > 0) {
-                $this->backup->executions()->where('local_storage_deleted', true)->delete();
-                $this->refreshBackupExecutions();
-                $this->dispatch('success', "Cleaned up {$deletedCount} backup entries deleted from local storage.");
-            } else {
-                $this->dispatch('info', 'No backup entries found that are deleted from local storage.');
+        try {
+            $this->authorize('manageBackups', $this->database);
+            if ($this->backup) {
+                $deletedCount = $this->backup->executions()->where('local_storage_deleted', true)->count();
+                if ($deletedCount > 0) {
+                    $this->backup->executions()->where('local_storage_deleted', true)->delete();
+                    $this->refreshBackupExecutions();
+                    $this->dispatch('success', "Cleaned up {$deletedCount} backup entries deleted from local storage.");
+                } else {
+                    $this->dispatch('info', 'No backup entries found that are deleted from local storage.');
+                }
             }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
-    public function deleteBackup($executionId, $password)
+    public function deleteBackup($executionId, $password, $selectedActions = [])
     {
+        try {
+            $this->authorize('manageBackups', $this->database);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
         if (! verifyPasswordConfirmation($password, $this)) {
-            return;
+            return 'The provided password is incorrect.';
         }
 
         $execution = $this->backup->executions()->where('id', $executionId)->first();
@@ -78,25 +98,37 @@ class BackupExecutions extends Component
             return;
         }
 
-        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === \App\Models\ServiceDatabase::class
-            ? $execution->scheduledDatabaseBackup->database->service->destination->server
-            : $execution->scheduledDatabaseBackup->database->destination->server;
-
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $server);
+            $deleteFromS3 = in_array('delete_backup_s3', $selectedActions, true);
 
-                if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
-                    deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+            if ($execution->filename && ! $execution->local_storage_deleted) {
+                $server = $this->backup->server();
+                if (! $server) {
+                    throw new \RuntimeException('The backup server is unavailable.');
                 }
+
+                deleteBackupsLocally($execution->filename, $server, throwError: true);
+            }
+
+            if ($deleteFromS3 && $execution->s3_uploaded && ! $execution->s3_storage_deleted) {
+                if (! $execution->scheduledDatabaseBackup->s3) {
+                    throw new \RuntimeException('The S3 storage is unavailable.');
+                }
+
+                deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
             }
 
             $execution->delete();
+            $this->delete_backup_s3 = false;
             $this->dispatch('success', 'Backup deleted.');
             $this->refreshBackupExecutions();
         } catch (\Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
+
+            return false;
         }
+
+        return true;
     }
 
     public function download_file($exeuctionId)
@@ -181,7 +213,7 @@ class BackupExecutions extends Component
         if ($this->database) {
             $server = null;
 
-            if ($this->database instanceof \App\Models\ServiceDatabase) {
+            if ($this->database instanceof ServiceDatabase) {
                 $server = $this->database->service->destination->server;
             } elseif ($this->database->destination && $this->database->destination->server) {
                 $server = $this->database->destination->server;

@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class ResourceLimits extends Component
@@ -16,24 +17,24 @@ class ResourceLimits extends Component
 
     public ?string $limitsCpuset = null;
 
-    public ?int $limitsCpuShares = null;
+    public mixed $limitsCpuShares = null;
 
     public string $limitsMemory;
 
     public string $limitsMemorySwap;
 
-    public int $limitsMemorySwappiness;
+    public mixed $limitsMemorySwappiness = 0;
 
     public string $limitsMemoryReservation;
 
     protected $rules = [
-        'limitsMemory' => 'required|string',
-        'limitsMemorySwap' => 'required|string',
+        'limitsMemory' => ['required', 'string', 'regex:/^(0|\d+[bBkKmMgG])$/'],
+        'limitsMemorySwap' => ['required', 'string', 'regex:/^(0|\d+[bBkKmMgG])$/'],
         'limitsMemorySwappiness' => 'required|integer|min:0|max:100',
-        'limitsMemoryReservation' => 'required|string',
-        'limitsCpus' => 'nullable',
-        'limitsCpuset' => 'nullable',
-        'limitsCpuShares' => 'nullable',
+        'limitsMemoryReservation' => ['required', 'string', 'regex:/^(0|\d+[bBkKmMgG])$/'],
+        'limitsCpus' => ['nullable', 'regex:/^\d*\.?\d+$/'],
+        'limitsCpuset' => ['nullable', 'regex:/^\d+([,-]\d+)*$/'],
+        'limitsCpuShares' => 'nullable|integer|min:0',
     ];
 
     protected $validationAttributes = [
@@ -44,6 +45,19 @@ class ResourceLimits extends Component
         'limitsCpus' => 'cpus',
         'limitsCpuset' => 'cpuset',
         'limitsCpuShares' => 'cpu shares',
+    ];
+
+    protected $messages = [
+        'limitsMemory.regex' => 'Maximum Memory Limit must be a number followed by a unit (b, k, m, g). Example: 256m, 1g. Use 0 for unlimited.',
+        'limitsMemorySwap.regex' => 'Maximum Swap Limit must be a number followed by a unit (b, k, m, g). Example: 256m, 1g. Use 0 for unlimited.',
+        'limitsMemoryReservation.regex' => 'Soft Memory Limit must be a number followed by a unit (b, k, m, g). Example: 256m, 1g. Use 0 for unlimited.',
+        'limitsCpus.regex' => 'Number of CPUs must be a number (integer or decimal). Example: 0.5, 2.',
+        'limitsCpuset.regex' => 'CPU sets must be a comma-separated list of CPU numbers or ranges. Example: 0-2 or 0,1,3.',
+        'limitsMemorySwappiness.integer' => 'Swappiness must be a whole number between 0 and 100.',
+        'limitsMemorySwappiness.min' => 'Swappiness must be between 0 and 100.',
+        'limitsMemorySwappiness.max' => 'Swappiness must be between 0 and 100.',
+        'limitsCpuShares.integer' => 'CPU Weight must be a whole number.',
+        'limitsCpuShares.min' => 'CPU Weight must be a positive number.',
     ];
 
     /**
@@ -57,10 +71,10 @@ class ResourceLimits extends Component
             // Sync TO model (before save)
             $this->resource->limits_cpus = $this->limitsCpus;
             $this->resource->limits_cpuset = $this->limitsCpuset;
-            $this->resource->limits_cpu_shares = $this->limitsCpuShares;
+            $this->resource->limits_cpu_shares = (int) $this->limitsCpuShares;
             $this->resource->limits_memory = $this->limitsMemory;
             $this->resource->limits_memory_swap = $this->limitsMemorySwap;
-            $this->resource->limits_memory_swappiness = $this->limitsMemorySwappiness;
+            $this->resource->limits_memory_swappiness = (int) $this->limitsMemorySwappiness;
             $this->resource->limits_memory_reservation = $this->limitsMemoryReservation;
         } else {
             // Sync FROM model (on load/refresh)
@@ -91,7 +105,7 @@ class ResourceLimits extends Component
             if (! $this->limitsMemorySwap) {
                 $this->limitsMemorySwap = '0';
             }
-            if (is_null($this->limitsMemorySwappiness)) {
+            if ($this->limitsMemorySwappiness === '' || is_null($this->limitsMemorySwappiness)) {
                 $this->limitsMemorySwappiness = 60;
             }
             if (! $this->limitsMemoryReservation) {
@@ -103,7 +117,7 @@ class ResourceLimits extends Component
             if ($this->limitsCpuset === '') {
                 $this->limitsCpuset = null;
             }
-            if (is_null($this->limitsCpuShares)) {
+            if ($this->limitsCpuShares === '' || is_null($this->limitsCpuShares)) {
                 $this->limitsCpuShares = 1024;
             }
 
@@ -112,6 +126,12 @@ class ResourceLimits extends Component
             $this->syncData(true);
             $this->resource->save();
             $this->dispatch('success', 'Resource limits updated.');
+        } catch (ValidationException $e) {
+            foreach ($e->validator->errors()->all() as $message) {
+                $this->dispatch('error', $message);
+            }
+
+            return;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

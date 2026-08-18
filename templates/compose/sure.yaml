@@ -1,0 +1,93 @@
+# documentation: https://github.com/we-promise/sure
+# slogan: An all-in-one personal finance platform.
+# category: finance
+# tags: budgeting,budget,money,expenses,income
+# logo: svgs/sure.png
+# port: 3000
+
+services:
+  web:
+    image: ghcr.io/we-promise/sure:0.6.7
+    environment:
+      - SERVICE_URL_SURE_3000
+      - APP_DOMAIN=$SERVICE_FQDN_SURE
+      - SECRET_KEY_BASE=$SERVICE_BASE64_BASE
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-sure}
+      - 'REDIS_URL=redis://valkey:6379'
+      - DB_HOST=postgresql
+      - DB_PORT=5432
+      - 'SELF_HOSTED=true'
+      - 'RAILS_FORCE_SSL=false'
+      - 'RAILS_ASSUME_SSL=false'
+      - ONBOARDING_STATE=${ONBOARDING_STATE:-open}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - sure-app-storage:/rails/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 15s
+      timeout: 20s
+      retries: 5
+      
+  worker:
+    image: ghcr.io/we-promise/sure:0.6.7
+    command: bundle exec sidekiq
+    environment:
+      - APP_DOMAIN=$SERVICE_FQDN_SURE
+      - SECRET_KEY_BASE=$SERVICE_BASE64_BASE
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-sure}
+      - 'REDIS_URL=redis://valkey:6379'
+      - DB_HOST=postgresql
+      - DB_PORT=5432
+      - 'SELF_HOSTED=true'
+      - 'RAILS_FORCE_SSL=false'
+      - 'RAILS_ASSUME_SSL=false'
+      - ONBOARDING_STATE=${ONBOARDING_STATE:-open}
+    volumes:
+      - sure-app-storage:/rails/storage
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 15s
+      timeout: 20s
+      retries: 5
+      
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - sure-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-sure}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    volumes:
+      - sure-valkey:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'valkey-cli ping | grep PONG'
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 3s

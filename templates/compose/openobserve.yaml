@@ -1,0 +1,25 @@
+# documentation: https://openobserve.ai/docs/
+# slogan: Cloud-native observability platform for logs, metrics, traces, RUM, errors and session replays — a 140x cheaper alternative to Elasticsearch, Splunk and Datadog.
+# category: monitoring
+# tags: logs, metrics, traces, observability, monitoring, opentelemetry, otel, elasticsearch, splunk, datadog
+# logo: svgs/openobserve.svg
+# port: 5080
+
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:v0.90.0
+    environment:
+      - SERVICE_URL_OPENOBSERVE_5080
+      - ZO_DATA_DIR=/data
+      - ZO_ROOT_USER_EMAIL=${ZO_ROOT_USER_EMAIL:-root@example.com}
+      - ZO_ROOT_USER_PASSWORD=${SERVICE_PASSWORD_OPENOBSERVE}
+      - ZO_TELEMETRY=${ZO_TELEMETRY:-false}
+      - ZO_COOKIE_SECURE_ONLY=${ZO_COOKIE_SECURE_ONLY:-true}
+    volumes:
+      - openobserve-data:/data
+    healthcheck:
+      test: ["CMD", "/openobserve", "node", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s

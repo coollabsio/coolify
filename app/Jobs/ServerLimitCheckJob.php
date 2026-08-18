@@ -38,7 +38,7 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
                     $server->forceDisableServer();
                     $this->team->notify(new ForceDisabled($server));
                 });
-            } elseif ($number_of_servers_to_disable === 0) {
+            } elseif ($number_of_servers_to_disable <= 0) {
                 $servers->each(function ($server) {
                     if ($server->isForceDisabled()) {
                         $server->forceEnableServer();

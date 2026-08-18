@@ -4,15 +4,20 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class StackForm extends Component
 {
+    use AuthorizesRequests;
+
     public Service $service;
 
     public Collection $fields;
+
+    public bool $isPasswordHiddenForMember = false;
 
     protected $listeners = ['saveCompose'];
 
@@ -52,8 +57,6 @@ class StackForm extends Component
             ValidationPatterns::combinedMessages(),
             [
                 'name.required' => 'The Name field is required.',
-                'name.regex' => 'The Name may only contain letters, numbers, spaces, dashes (-), underscores (_), dots (.), slashes (/), colons (:), and parentheses ().',
-                'description.regex' => 'The Description contains invalid characters. Only letters, numbers, spaces, and common punctuation (- _ . : / () \' " , ! ? @ # % & + = [] {} | ~ ` *) are allowed.',
                 'dockerComposeRaw.required' => 'The Docker Compose Raw field is required.',
                 'dockerCompose.required' => 'The Docker Compose field is required.',
             ]
@@ -98,6 +101,7 @@ class StackForm extends Component
                 $rules = data_get($field, 'rules', 'nullable');
                 $isPassword = data_get($field, 'isPassword', false);
                 $customHelper = data_get($field, 'customHelper', false);
+                $sortOrder = data_get($field, 'sortOrder');
                 $this->fields->put($key, [
                     'serviceName' => $serviceName,
                     'key' => $key,
@@ -106,6 +110,7 @@ class StackForm extends Component
                     'isPassword' => $isPassword,
                     'rules' => $rules,
                     'customHelper' => $customHelper,
+                    'sortOrder' => $sortOrder,
                 ]);
 
                 $this->validationAttributes["fields.$key.value"] = $fieldKey;
@@ -113,31 +118,49 @@ class StackForm extends Component
         }
         $this->fields = $this->fields->groupBy('serviceName')->map(function ($group) {
             return $group->sortBy(function ($field) {
-                return data_get($field, 'isPassword') ? 1 : 0;
+                return data_get($field, 'sortOrder') ?? (data_get($field, 'isPassword') ? 1 : 0);
             })->mapWithKeys(function ($field) {
                 return [$field['key'] => $field];
             });
         })->flatMap(function ($group) {
             return $group;
         });
+
+        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        if ($this->isPasswordHiddenForMember) {
+            $this->fields = $this->fields->map(function ($field) {
+                if (data_get($field, 'isPassword')) {
+                    $field['value'] = null;
+                }
+
+                return $field;
+            });
+        }
     }
 
     public function saveCompose($raw)
     {
         $this->dockerComposeRaw = $raw;
         $this->submit(notify: true);
+        $this->dispatch('compose-save-finished');
     }
 
     public function instantSave()
     {
-        $this->syncData(true);
-        $this->service->save();
-        $this->dispatch('success', 'Service settings saved.');
+        try {
+            $this->authorize('update', $this->service);
+            $this->syncData(true);
+            $this->service->save();
+            $this->dispatch('success', 'Service settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit($notify = true)
     {
         try {
+            $this->authorize('update', $this->service);
             $this->validate();
             $this->syncData(true);
 

@@ -31,7 +31,7 @@ class TerminalAccess extends Component
         }
     }
 
-    public function toggleTerminal($password)
+    public function toggleTerminal($password, $selectedActions = [])
     {
         try {
             $this->authorize('update', $this->server);
@@ -43,7 +43,7 @@ class TerminalAccess extends Component
 
             // Verify password
             if (! verifyPasswordConfirmation($password, $this)) {
-                return;
+                return 'The provided password is incorrect.';
             }
 
             // Toggle the terminal setting
@@ -55,6 +55,8 @@ class TerminalAccess extends Component
 
             $status = $this->isTerminalEnabled ? 'enabled' : 'disabled';
             $this->dispatch('success', "Terminal access has been {$status}.");
+
+            return true;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

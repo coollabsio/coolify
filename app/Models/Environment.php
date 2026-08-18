@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -21,9 +22,15 @@ use OpenApi\Attributes as OA;
 class Environment extends BaseModel
 {
     use ClearsGlobalSearchCache;
+    use HasFactory;
     use HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'description',
+        'project_id',
+        'uuid',
+    ];
 
     protected static function booted()
     {
@@ -38,6 +45,11 @@ class Environment extends BaseModel
     public static function ownedByCurrentTeam()
     {
         return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Environment::whereRelation('project.team', 'id', $teamId)->orderBy('name');
     }
 
     public function isEmpty()
@@ -56,7 +68,7 @@ class Environment extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'environment');
     }
 
     public function applications()

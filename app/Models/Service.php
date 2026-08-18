@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
+use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
     description: 'Service model',
@@ -47,15 +47,41 @@ class Service extends BaseModel
 
     private static $parserVersion = '5';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'docker_compose_raw',
+        'docker_compose',
+        'connect_to_docker_network',
+        'service_type',
+        'config_hash',
+        'compose_parsing_version',
+        'is_container_label_escape_enabled',
+        'environment_id',
+        'server_id',
+        'destination_id',
+        'destination_type',
+    ];
 
     protected $appends = ['server_status', 'status'];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability. Internal compose generators
+     * must makeVisible explicitly before toArray().
+     */
+    protected $hidden = [
+        'docker_compose',
+        'docker_compose_raw',
+    ];
 
     protected static function booted()
     {
         static::creating(function ($service) {
             if (blank($service->name)) {
-                $service->name = 'service-'.(new Cuid2);
+                $service->name = 'service-'.new_public_id();
             }
         });
         static::created(function ($service) {
@@ -68,6 +94,7 @@ class Service extends BaseModel
     {
         $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
+        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
 
         $applicationImages = $this->applications()->get()->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
@@ -78,8 +105,8 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -515,6 +542,31 @@ class Service extends BaseModel
                     }
                     $fields->put('RabbitMQ', $data->toArray());
                     break;
+                case $image->is('registry'):
+                    $data = collect([]);
+                    $registry_user = $this->environment_variables()->where('key', 'SERVICE_USER_REGISTRY')->first();
+                    $registry_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_REGISTRY')->first();
+                    if ($registry_user) {
+                        $data = $data->merge([
+                            'Registry User' => [
+                                'key' => data_get($registry_user, 'key'),
+                                'value' => data_get($registry_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($registry_password) {
+                        $data = $data->merge([
+                            'Registry Password' => [
+                                'key' => data_get($registry_password, 'key'),
+                                'value' => data_get($registry_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Docker Registry', $data->toArray());
+                    break;
                 case $image->contains('tolgee'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
@@ -585,7 +637,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case $image->contains('grafana'):
+                case $this->isGrafanaImage($image->toString()):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -737,7 +789,8 @@ class Service extends BaseModel
                     }
                     $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
                     if (is_null($rpc_secret)) {
-                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_64_RPCSECRET')->first()
+                            ?? $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
                     }
                     $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
                     if (is_null($metrics_token)) {
@@ -843,6 +896,30 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Meilisearch', $data->toArray());
+                    break;
+                case $image->contains('linkding'):
+                    $data = collect([]);
+                    $SERVICE_USER_LINKDING = $this->environment_variables()->where('key', 'SERVICE_USER_LINKDING')->first();
+                    $SERVICE_PASSWORD_LINKDING = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LINKDING')->first();
+                    if ($SERVICE_USER_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Name' => [
+                                'key' => data_get($SERVICE_USER_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_USER_LINKDING, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($SERVICE_PASSWORD_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Password' => [
+                                'key' => data_get($SERVICE_PASSWORD_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_PASSWORD_LINKDING, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Linkding', $data->toArray());
                     break;
                 case $image->contains('ghost'):
                     $data = collect([]);
@@ -1043,6 +1120,86 @@ class Service extends BaseModel
                     }
 
                     $fields->put('Strapi', $data->toArray());
+                    break;
+                case $image->contains('marckohlbrugge/sessy'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_SESSY')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SESSY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'HTTP Auth Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'HTTP Auth Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Sessy', $data->toArray());
+                    break;
+                case $image->contains('coollabsio/openclaw'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
+                    $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'readonly' => true,
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($gateway_token) {
+                        $data = $data->merge([
+                            'Gateway Token' => [
+                                'key' => data_get($gateway_token, 'key'),
+                                'value' => data_get($gateway_token, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Openclaw', $data->toArray());
+                    break;
+                case $image->contains('coollabsio/jean-server'):
+                    $data = collect([]);
+                    $settings = [
+                        'Token' => ['key' => 'SERVICE_PASSWORD_64_JEAN', 'rules' => 'required', 'isPassword' => true, 'sortOrder' => 1, 'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN'],
+                        'Allowed Origins' => ['key' => 'JEAN_ALLOWED_ORIGINS', 'rules' => 'nullable|string', 'sortOrder' => 2, 'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS'],
+                    ];
+
+                    foreach ($settings as $label => $setting) {
+                        $variable = $this->environment_variables()->where('key', $setting['key'])->first();
+                        if (! $variable) {
+                            continue;
+                        }
+
+                        $data->put($label, [
+                            ...$setting,
+                            'value' => data_get($variable, 'value'),
+                        ]);
+                    }
+
+                    $fields->put('', $data->toArray());
                     break;
                 default:
                     $data = collect([]);
@@ -1255,6 +1412,15 @@ class Service extends BaseModel
         return $fields;
     }
 
+    private function isGrafanaImage(string $image): bool
+    {
+        return in_array($image, [
+            'grafana/grafana',
+            'grafana/grafana-oss',
+            'grafana/grafana-enterprise',
+        ], true);
+    }
+
     public function saveExtraFields($fields)
     {
         foreach ($fields as $field) {
@@ -1408,15 +1574,7 @@ class Service extends BaseModel
 
     public function environment_variables()
     {
-        return $this->morphMany(EnvironmentVariable::class, 'resourceable')
-            ->orderByRaw("
-                CASE
-                    WHEN is_required = true THEN 1
-                    WHEN LOWER(key) LIKE 'service_%' THEN 2
-                    ELSE 3
-                END,
-                LOWER(key) ASC
-            ");
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function workdir()
@@ -1438,7 +1596,7 @@ class Service extends BaseModel
             "cd $workdir",
         ], $this->server);
 
-        $filename = new Cuid2.'-docker-compose.yml';
+        $filename = new_public_id().'-docker-compose.yml';
         Storage::disk('local')->put("tmp/{$filename}", $this->docker_compose);
         $path = Storage::path("tmp/{$filename}");
         instant_scp($path, "{$workdir}/docker-compose.yml", $this->server);
@@ -1452,13 +1610,12 @@ class Service extends BaseModel
         // Generate SERVICE_NAME_* environment variables from docker-compose services
         if ($this->docker_compose) {
             try {
-                $dockerCompose = \Symfony\Component\Yaml\Yaml::parse($this->docker_compose);
+                $dockerCompose = Yaml::parse($this->docker_compose);
                 $services = data_get($dockerCompose, 'services', []);
                 foreach ($services as $serviceName => $_) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             } catch (\Exception $e) {
-                ray($e->getMessage());
             }
         }
 
@@ -1505,16 +1662,16 @@ class Service extends BaseModel
     protected function isDeployable(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $envs = $this->environment_variables()->where('is_required', true)->get();
-                foreach ($envs as $env) {
-                    if ($env->is_really_required) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
+            get: fn (): bool => $this->missingRequiredEnvironmentVariables()->isEmpty()
         );
+    }
+
+    public function missingRequiredEnvironmentVariables(): Collection
+    {
+        return $this->environment_variables()
+            ->where('is_required', true)
+            ->get()
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)
+            ->values();
     }
 }

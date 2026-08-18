@@ -39,18 +39,26 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
         public bool $manualCleanup = false,
         public bool $deleteUnusedVolumes = false,
         public bool $deleteUnusedNetworks = false
-    ) {}
+    ) {
+        $this->onQueue('high');
+    }
 
     public function handle(): void
     {
         try {
-            if (! $this->server->isFunctional()) {
-                return;
-            }
-
             $this->execution_log = DockerCleanupExecution::create([
                 'server_id' => $this->server->id,
             ]);
+
+            if (! $this->server->isFunctional()) {
+                $this->execution_log->update([
+                    'status' => 'failed',
+                    'message' => 'Server is not functional (unreachable, unusable, or disabled)',
+                    'finished_at' => Carbon::now()->toImmutable(),
+                ]);
+
+                return;
+            }
 
             $this->usageBefore = $this->server->getDiskUsage();
 
@@ -91,6 +99,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
 
                 $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
                 event(new DockerCleanupDone($this->execution_log));
+
+                return;
             }
 
             if ($this->usageBefore >= $this->server->settings->docker_cleanup_threshold) {

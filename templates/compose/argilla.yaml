@@ -4,7 +4,6 @@
 # tags: workflow, orchestration, data-pipeline, python, argilla, ai, elasticsearch, datasets, data, machine-learning, data-science, nlp
 # logo: svgs/argilla.png
 # port: 6900
-# category: productivity
 
 services:
   argilla:

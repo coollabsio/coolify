@@ -80,17 +80,33 @@ class Logs extends Component
                 ]);
 
                 return $containers->toArray();
-            } else {
-                $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
-                if ($containers && $containers->count() > 0) {
-                    return $containers->sort()->toArray();
-                }
-
-                return [];
             }
+
+            // Docker labels differ by resource type:
+            // applications → coolify.applicationId, services → coolify.serviceId, databases → coolify.databaseId
+            $containers = match (true) {
+                $this->resource instanceof Application => getCurrentApplicationContainerStatus(
+                    $server,
+                    $this->resource->id,
+                    includePullrequests: true
+                ),
+                $this->resource instanceof Service => getCurrentServiceContainerStatus(
+                    $server,
+                    $this->resource->id
+                ),
+                default => getCurrentDatabaseContainerStatus(
+                    $server,
+                    $this->resource->id
+                ),
+            };
+
+            if ($containers && $containers->count() > 0) {
+                return $containers->sort()->toArray();
+            }
+
+            return [];
         } catch (\Exception $e) {
             // Log error but don't fail the entire operation
-            ray("Error loading containers for server {$server->name}: ".$e->getMessage());
 
             return [];
         }
@@ -106,7 +122,7 @@ class Logs extends Component
             $this->query = request()->query();
             if (data_get($this->parameters, 'application_uuid')) {
                 $this->type = 'application';
-                $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
+                $this->resource = Application::ownedByCurrentTeam()->where('uuid', $this->parameters['application_uuid'])->firstOrFail();
                 $this->status = $this->resource->status;
                 if ($this->resource->destination->server->isFunctional()) {
                     $server = $this->resource->destination->server;
@@ -133,7 +149,7 @@ class Logs extends Component
                 $this->containers->push($this->container);
             } elseif (data_get($this->parameters, 'service_uuid')) {
                 $this->type = 'service';
-                $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
                 $this->resource->applications()->get()->each(function ($application) {
                     $this->containers->push(data_get($application, 'name').'-'.data_get($this->resource, 'uuid'));
                 });

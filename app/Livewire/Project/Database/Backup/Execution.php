@@ -15,6 +15,10 @@ class Execution extends Component
 
     public $s3s;
 
+    public array $parameters = [];
+
+    public string $section = 'general';
+
     public function mount()
     {
         $backup_uuid = request()->route('backup_uuid');
@@ -22,10 +26,11 @@ class Execution extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
         if (! $environment) {
-            return redirect()->route('dashboard');
+            abort(404);
         }
+        $environment->load(['applications']);
         $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (! $database) {
             return redirect()->route('dashboard');
@@ -39,6 +44,14 @@ class Execution extends Component
         $this->backup = $backup;
         $this->executions = $executions;
         $this->s3s = currentTeam()->s3s;
+        $this->parameters = get_route_parameters();
+        $this->section = match (request()->route()?->getName()) {
+            'project.database.backup.s3' => 's3',
+            'project.database.backup.retention' => 'retention',
+            'project.database.backup.executions' => 'executions',
+            'project.database.backup.danger' => 'danger',
+            default => 'general',
+        };
     }
 
     public function render()

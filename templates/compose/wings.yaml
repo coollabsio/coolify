@@ -1,5 +1,5 @@
 # documentation: https://pterodactyl.io/
-# slogan: Wings is Pterodactyl's server control plane
+# slogan: The server control plane for Pterodactyl Panel. Written from the ground-up with security, speed, and stability in mind.
 # category: devtools
 # tags: game, game server, management, panel, minecraft
 # logo: svgs/pterodactyl.png
@@ -7,7 +7,7 @@
 
 services:
   wings:
-    image: "ghcr.io/pterodactyl/wings:latest"
+    image: "ghcr.io/pterodactyl/wings:v1.12.1"
     environment:
       - SERVICE_URL_WINGS_8443
       - "TZ=${TIMEZONE:-UTC}"

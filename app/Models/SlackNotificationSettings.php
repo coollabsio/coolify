@@ -24,12 +24,17 @@ class SlackNotificationSettings extends Model
         'backup_failure_slack_notifications',
         'scheduled_task_success_slack_notifications',
         'scheduled_task_failure_slack_notifications',
-        'docker_cleanup_slack_notifications',
+        'docker_cleanup_success_slack_notifications',
+        'docker_cleanup_failure_slack_notifications',
         'server_disk_usage_slack_notifications',
         'server_reachable_slack_notifications',
         'server_unreachable_slack_notifications',
         'server_patch_slack_notifications',
         'traefik_outdated_slack_notifications',
+    ];
+
+    protected $hidden = [
+        'slack_webhook_url',
     ];
 
     protected $casts = [

@@ -4,12 +4,14 @@ namespace App\Jobs;
 
 use App\Models\Subscription;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Stripe\StripeClient;
 
-class VerifyStripeSubscriptionStatusJob implements ShouldQueue
+class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -28,7 +30,7 @@ class VerifyStripeSubscriptionStatusJob implements ShouldQueue
         if (! $this->subscription->stripe_subscription_id &&
             $this->subscription->stripe_customer_id) {
             try {
-                $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+                $stripe = app(StripeClient::class);
                 $subscriptions = $stripe->subscriptions->all([
                     'customer' => $this->subscription->stripe_customer_id,
                     'limit' => 1,
@@ -49,7 +51,7 @@ class VerifyStripeSubscriptionStatusJob implements ShouldQueue
         }
 
         try {
-            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+            $stripe = app(StripeClient::class);
             $stripeSubscription = $stripe->subscriptions->retrieve(
                 $this->subscription->stripe_subscription_id
             );
@@ -81,12 +83,9 @@ class VerifyStripeSubscriptionStatusJob implements ShouldQueue
                         'stripe_past_due' => false,
                     ]);
 
-                    // Trigger subscription ended logic if canceled
-                    if ($stripeSubscription->status === 'canceled') {
-                        $team = $this->subscription->team;
-                        if ($team) {
-                            $team->subscriptionEnded();
-                        }
+                    $team = $this->subscription->team;
+                    if ($team) {
+                        $team->subscriptionEnded();
                     }
                     break;
 

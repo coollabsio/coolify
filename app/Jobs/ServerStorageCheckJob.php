@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Horizon\Contracts\Silenced;
 
@@ -27,6 +28,19 @@ class ServerStorageCheckJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     }
 
     public function __construct(public Server $server, public int|string|null $percentage = null) {}
+
+    public function failed(?\Throwable $exception): void
+    {
+        if ($exception instanceof \Illuminate\Queue\TimeoutExceededException) {
+            Log::warning('ServerStorageCheckJob timed out', [
+                'server_id' => $this->server->id,
+                'server_name' => $this->server->name,
+            ]);
+
+            // Delete the queue job so it doesn't appear in Horizon's failed list.
+            $this->job?->delete();
+        }
+    }
 
     public function handle()
     {

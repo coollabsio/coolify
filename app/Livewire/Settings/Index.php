@@ -4,18 +4,24 @@ namespace App\Livewire\Settings;
 
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Index extends Component
 {
+    use AuthorizesRequests;
+
     public InstanceSettings $settings;
 
-    public Server $server;
+    public ?Server $server = null;
 
-    #[Validate('nullable|string|max:255')]
+    #[Validate('nullable|string|max:255|url')]
     public ?string $fqdn = null;
+
+    #[Validate('boolean')]
+    public bool $is_dashboard_force_https_enabled = true;
 
     #[Validate('required|integer|min:1025|max:65535')]
     public int $public_port_min;
@@ -26,16 +32,16 @@ class Index extends Component
     #[Validate('nullable|string|max:255')]
     public ?string $instance_name = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv4')]
     public ?string $public_ipv4 = null;
 
-    #[Validate('nullable|string')]
+    #[Validate('nullable|ipv6')]
     public ?string $public_ipv6 = null;
 
     #[Validate('required|string|timezone')]
     public string $instance_timezone;
 
-    #[Validate('nullable|string|max:50')]
+    #[Validate(['nullable', 'string', 'max:128', 'regex:/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/'])]
     public ?string $dev_helper_version = null;
 
     public array $domainConflicts = [];
@@ -44,7 +50,11 @@ class Index extends Component
 
     public bool $forceSaveDomains = false;
 
-    public $buildActivityId = null;
+    protected array $messages = [
+        'fqdn.url' => 'Invalid instance URL.',
+        'fqdn.max' => 'URL must not exceed 255 characters.',
+        'dev_helper_version.regex' => 'Dev helper version must match Docker tag format (alphanumeric, _, ., -; first char cannot be . or -).',
+    ];
 
     public function render()
     {
@@ -57,8 +67,11 @@ class Index extends Component
             return redirect()->route('dashboard');
         }
         $this->settings = instanceSettings();
-        $this->server = Server::findOrFail(0);
+        if (! isCloud()) {
+            $this->server = Server::findOrFail(0);
+        }
         $this->fqdn = $this->settings->fqdn;
+        $this->is_dashboard_force_https_enabled = $this->settings->is_dashboard_force_https_enabled;
         $this->public_port_min = $this->settings->public_port_min;
         $this->public_port_max = $this->settings->public_port_max;
         $this->instance_name = $this->settings->instance_name;
@@ -79,8 +92,10 @@ class Index extends Component
 
     public function instantSave($isSave = true)
     {
+        $this->authorize('update', $this->settings);
         $this->validate();
-        $this->settings->fqdn = $this->fqdn;
+        $this->settings->fqdn = $this->fqdn ? trim($this->fqdn) : $this->fqdn;
+        $this->settings->is_dashboard_force_https_enabled = $this->is_dashboard_force_https_enabled;
         $this->settings->public_port_min = $this->public_port_min;
         $this->settings->public_port_max = $this->public_port_max;
         $this->settings->instance_name = $this->instance_name;
@@ -96,6 +111,7 @@ class Index extends Component
 
     public function confirmDomainUsage()
     {
+        $this->authorize('update', $this->settings);
         $this->forceSaveDomains = true;
         $this->showDomainConflictModal = false;
         $this->submit();
@@ -104,6 +120,7 @@ class Index extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->settings);
             $error_show = false;
             $this->resetErrorBag();
 
@@ -119,11 +136,19 @@ class Index extends Component
 
                 return;
             }
+
+            // Trim FQDN to remove leading/trailing whitespace before validation
+            if ($this->fqdn) {
+                $this->fqdn = trim($this->fqdn);
+            }
+
             $this->validate();
 
-            if ($this->settings->is_dns_validation_enabled && $this->fqdn) {
+            if ($this->settings->is_dns_validation_enabled && $this->fqdn && $this->server) {
                 if (! validateDNSEntry($this->fqdn, $this->server)) {
-                    $this->dispatch('error', "Validating DNS failed.<br><br>Make sure you have added the DNS records correctly.<br><br>{$this->fqdn}->{$this->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                    $target = serverDnsTargetIp($this->server) ?? $this->server->ip;
+                    $guidance = dnsMismatchGuidanceMessage($target, $target);
+                    $this->dispatch('error', "Validating DNS failed.<br><br>{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
                     $error_show = true;
                 }
             }
@@ -145,7 +170,9 @@ class Index extends Component
             $this->instantSave(isSave: false);
 
             $this->settings->save();
-            $this->server->setupDynamicProxyConfiguration();
+            if ($this->server) {
+                $this->server->setupDynamicProxyConfiguration();
+            }
             if (! $error_show) {
                 $this->dispatch('success', 'Instance settings updated successfully!');
             }
@@ -157,11 +184,20 @@ class Index extends Component
     public function buildHelperImage()
     {
         try {
+            $this->authorize('update', $this->settings);
             if (! isDev()) {
                 $this->dispatch('error', 'Building helper image is only available in development mode.');
 
                 return;
             }
+
+            if (! $this->server) {
+                $this->dispatch('error', 'Server not available.');
+
+                return;
+            }
+
+            $this->validateOnly('dev_helper_version');
 
             $version = $this->dev_helper_version ?: config('constants.coolify.helper_version');
             if (empty($version)) {
@@ -170,7 +206,14 @@ class Index extends Component
                 return;
             }
 
-            $buildCommand = "docker build -t ghcr.io/coollabsio/coolify-helper:{$version} -f docker/coolify-helper/Dockerfile .";
+            if (! preg_match('/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/', (string) $version)) {
+                $this->dispatch('error', 'Invalid helper version format.');
+
+                return;
+            }
+
+            $imageRef = escapeshellarg("ghcr.io/coollabsio/coolify-helper:{$version}");
+            $buildCommand = "docker build -t {$imageRef} -f docker/coolify-helper/Dockerfile .";
 
             $activity = remote_process(
                 command: [$buildCommand],

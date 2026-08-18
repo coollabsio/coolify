@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\DatabaseBackupFileValidator;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
@@ -11,12 +13,37 @@ use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
 class UploadController extends BaseController
 {
+    use AuthorizesRequests;
+
+    private const MAX_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
+
+    private const ALLOWED_EXTENSIONS = DatabaseBackupFileValidator::ALLOWED_EXTENSIONS;
+
     public function upload(Request $request)
     {
-        $resource = getResourceByUuid(request()->route('databaseUuid'), data_get(auth()->user()->currentTeam(), 'id'));
+        $databaseIdentifier = request()->route('databaseUuid');
+        $resource = getResourceByUuid($databaseIdentifier, data_get(auth()->user()->currentTeam(), 'id'));
         if (is_null($resource)) {
             return response()->json(['error' => 'You do not have permission for this database'], 500);
         }
+
+        $this->authorize('uploadBackup', $resource);
+
+        $chunk = $request->file('file');
+        $originalName = $chunk instanceof UploadedFile ? $chunk->getClientOriginalName() : null;
+        if (blank($originalName) || ! self::hasAllowedExtension($originalName)) {
+            return response()->json([
+                'error' => 'Unsupported file type. Allowed extensions: '.implode(', ', self::ALLOWED_EXTENSIONS),
+            ], 422);
+        }
+
+        $declaredTotalSize = (int) $request->input('dzTotalFilesize', 0);
+        if ($declaredTotalSize > self::MAX_BYTES) {
+            return response()->json([
+                'error' => 'File exceeds maximum allowed size of '.self::formatMaxSize().'.',
+            ], 422);
+        }
+
         $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
@@ -26,7 +53,10 @@ class UploadController extends BaseController
         $save = $receiver->receive();
 
         if ($save->isFinished()) {
-            return $this->saveFile($save->getFile(), $resource);
+            // Use the original identifier from the route to maintain path consistency
+            // For ServiceDatabase: {name}-{service_uuid}
+            // For standalone databases: {uuid}
+            return $this->saveFile($save->getFile(), $databaseIdentifier);
         }
 
         $handler = $save->handler();
@@ -36,31 +66,19 @@ class UploadController extends BaseController
             'status' => true,
         ]);
     }
-    // protected function saveFileToS3($file)
-    // {
-    //     $fileName = $this->createFilename($file);
 
-    //     $disk = Storage::disk('s3');
-    //     // It's better to use streaming Streaming (laravel 5.4+)
-    //     $disk->putFileAs('photos', $file, $fileName);
-
-    //     // for older laravel
-    //     // $disk->put($fileName, file_get_contents($file), 'public');
-    //     $mime = str_replace('/', '-', $file->getMimeType());
-
-    //     // We need to delete the file when uploaded to s3
-    //     unlink($file->getPathname());
-
-    //     return response()->json([
-    //         'path' => $disk->url($fileName),
-    //         'name' => $fileName,
-    //         'mime_type' => $mime
-    //     ]);
-    // }
-    protected function saveFile(UploadedFile $file, $resource)
+    protected function saveFile(UploadedFile $file, string $resourceIdentifier)
     {
+        if (! DatabaseBackupFileValidator::isUploadAllowed($file, self::MAX_BYTES)) {
+            @unlink($file->getPathname());
+
+            return response()->json([
+                'error' => 'Uploaded file failed validation.',
+            ], 422);
+        }
+
         $mime = str_replace('/', '-', $file->getMimeType());
-        $filePath = "upload/{$resource->uuid}";
+        $filePath = "upload/{$resourceIdentifier}";
         $finalPath = storage_path('app/'.$filePath);
         $file->move($finalPath, 'restore');
 
@@ -69,13 +87,13 @@ class UploadController extends BaseController
         ]);
     }
 
-    protected function createFilename(UploadedFile $file)
+    private static function hasAllowedExtension(string $name): bool
     {
-        $extension = $file->getClientOriginalExtension();
-        $filename = str_replace('.'.$extension, '', $file->getClientOriginalName()); // Filename without extension
+        return DatabaseBackupFileValidator::hasAllowedExtension($name);
+    }
 
-        $filename .= '_'.md5(time()).'.'.$extension;
-
-        return $filename;
+    private static function formatMaxSize(): string
+    {
+        return (self::MAX_BYTES / (1024 * 1024 * 1024)).' GiB';
     }
 }

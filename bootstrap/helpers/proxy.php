@@ -4,6 +4,8 @@ use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\Server;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -105,26 +107,31 @@ function collectDockerNetworksByServer(Server $server)
 }
 function connectProxyToNetworks(Server $server)
 {
-    ['networks' => $networks] = collectDockerNetworksByServer($server);
     if ($server->isSwarm()) {
+        ['networks' => $networks] = collectDockerNetworksByServer($server);
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
+
             return [
-                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
-                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to $network network.'",
+                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --driver overlay --attachable {$safe} >/dev/null",
+                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
+                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
-    } else {
-        $commands = $networks->map(function ($network) {
-            return [
-                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
-                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to $network network.'",
-            ];
-        });
+
+        return $commands->flatten();
     }
 
-    return $commands->flatten();
+    return collect([
+        'for network in $(docker inspect $(docker ps --filter label=coolify.managed=true --format "{{.ID}}") --format=\'{{range $network, $_ := .NetworkSettings.Networks}}{{println $network}}{{end}}\' 2>/dev/null | sort -u); do',
+        '    if [ -z "$network" ] || [ "$network" = "bridge" ] || [ "$network" = "host" ] || [ "$network" = "none" ] || [ "$network" = "default" ]; then',
+        '        continue',
+        '    fi',
+        '    if docker network inspect "$network" >/dev/null 2>&1; then',
+        '        docker network connect "$network" coolify-proxy >/dev/null 2>&1 || true',
+        '    fi',
+        'done',
+    ]);
 }
 
 /**
@@ -132,7 +139,7 @@ function connectProxyToNetworks(Server $server)
  * This must be called BEFORE docker compose up since the compose file declares networks as external.
  *
  * @param  Server  $server  The server to ensure networks on
- * @return \Illuminate\Support\Collection Commands to create networks if they don't exist
+ * @return Collection Commands to create networks if they don't exist
  */
 function ensureProxyNetworksExist(Server $server)
 {
@@ -140,16 +147,20 @@ function ensureProxyNetworksExist(Server $server)
 
     if ($server->isSwarm()) {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
+
             return [
-                "echo 'Ensuring network $network exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable $network",
+                "echo 'Ensuring network {$safe} exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --driver overlay --attachable {$safe}",
             ];
         });
     } else {
         $commands = $networks->map(function ($network) {
+            $safe = escapeshellarg($network);
+
             return [
-                "echo 'Ensuring network $network exists...'",
-                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable $network",
+                "echo 'Ensuring network {$safe} exists...'",
+                "docker network ls --format '{{.Name}}' | grep -q '^{$network}$' || docker network create --attachable {$safe}",
             ];
         });
     }
@@ -206,7 +217,7 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
                 $custom_commands[] = $command;
             }
         }
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // If we can't parse the config, return empty array
         // Silently fail to avoid breaking the proxy regeneration
     }
@@ -215,6 +226,13 @@ function extractCustomProxyCommands(Server $server, string $existing_config): ar
 }
 function generateDefaultProxyConfiguration(Server $server, array $custom_commands = [])
 {
+    Log::info('Generating default proxy configuration', [
+        'server_id' => $server->id,
+        'server_name' => $server->name,
+        'custom_commands_count' => count($custom_commands),
+        'caller' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3)[1]['class'] ?? 'unknown',
+    ]);
+
     $proxy_path = $server->proxyPath();
     $proxy_type = $server->proxyType();
 
@@ -420,7 +438,7 @@ function getExactTraefikVersionFromContainer(Server $server): ?string
         Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Could not detect exact version");
 
         return null;
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         Log::error("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
 
         return null;
@@ -467,7 +485,7 @@ function getTraefikVersionFromDockerCompose(Server $server): ?string
         Log::debug("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Image format doesn't match expected pattern: {$image}");
 
         return null;
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         Log::error("getTraefikVersionFromDockerCompose: Server '{$server->name}' (ID: {$server->id}) - Error: ".$e->getMessage());
 
         return null;

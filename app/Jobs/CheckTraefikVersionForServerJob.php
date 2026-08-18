@@ -6,12 +6,13 @@ use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Notifications\Server\TraefikVersionOutdated;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class CheckTraefikVersionForServerJob implements ShouldQueue
+class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -32,10 +33,11 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
      */
     public function handle(): void
     {
+        $this->clearOutdatedInfo();
+
         // Detect current version (makes SSH call)
         $currentVersion = getTraefikVersionFromDockerCompose($this->server);
 
-        // Update detected version in database
         $this->server->update(['detected_traefik_version' => $currentVersion]);
 
         if (! $currentVersion) {
@@ -110,6 +112,11 @@ class CheckTraefikVersionForServerJob implements ShouldQueue
 
         // Dispatch UI update event so warning state refreshes in real-time
         ProxyStatusChangedUI::dispatch($this->server->team_id);
+    }
+
+    private function clearOutdatedInfo(): void
+    {
+        $this->server->update(['traefik_outdated_info' => null]);
     }
 
     /**

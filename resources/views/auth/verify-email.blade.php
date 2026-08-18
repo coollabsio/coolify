@@ -1,12 +1,19 @@
-<x-layout>
-    <section class="flex flex-col h-full lg:items-center lg:justify-center">
-        <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto max-w-7xl lg:py-0">
-            <h1> Verification Email Sent </h1>
-            <div class="flex justify-center gap-2 text-center">
-                <br>To activate your account, please open the email and follow the
-                instructions.
+<x-layout-simple>
+    <x-auth.shell title="Coolify" description="Verify your email address to activate your account.">
+        <div class="flex flex-col gap-4">
+            <div class="auth-guidance">
+                <x-reicon name="mail" class="mt-0.5 size-4 shrink-0" />
+                <p>We sent a verification link to your email address. Open it to continue to Coolify.</p>
             </div>
+
             <livewire:verify-email />
         </div>
-    </section>
-</x-layout>
+
+        <x-slot:footer>
+            <span class="text-center">
+                <span class="block sm:inline">Didn’t receive the email?</span>
+                <span class="block sm:ml-1 sm:inline">Check your spam folder or resend it.</span>
+            </span>
+        </x-slot:footer>
+    </x-auth.shell>
+</x-layout-simple>

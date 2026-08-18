@@ -7,16 +7,18 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
+    use AuthorizesRequests;
+
     public $current_step = 'private_keys';
 
     public $parameters;
@@ -45,7 +47,7 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public string $branch;
 
-    public $build_pack = 'nixpacks';
+    public $build_pack = 'railpack';
 
     public bool $show_is_static = true;
 
@@ -57,15 +59,6 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private ?string $git_repository = null;
 
-    protected $rules = [
-        'repository_url' => ['required', 'string'],
-        'branch' => ['required', 'string'],
-        'port' => 'required|numeric',
-        'is_static' => 'required|boolean',
-        'publish_directory' => 'nullable|string',
-        'build_pack' => 'required|string',
-    ];
-
     protected function rules()
     {
         return [
@@ -75,6 +68,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             'is_static' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
+            'docker_compose_location' => ValidationPatterns::filePathRules(),
         ];
     }
 
@@ -103,9 +97,11 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function updatedBuildPack()
     {
-        if ($this->build_pack === 'nixpacks') {
+        if ($this->build_pack === 'nixpacks' || $this->build_pack === 'railpack') {
             $this->show_is_static = true;
-            $this->port = 3000;
+            if (! $this->is_static) {
+                $this->port = 3000;
+            }
         } elseif ($this->build_pack === 'static') {
             $this->show_is_static = false;
             $this->is_static = false;
@@ -135,15 +131,14 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function submit()
     {
+        $this->authorize('create', Application::class);
+
         $this->validate();
         try {
-            $destination_uuid = $this->query['destination'];
-            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            $destination_uuid = $this->query['destination'] ?? null;
+            $destination = find_resource_destination_for_current_team($destination_uuid);
             if (! $destination) {
-                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-            }
-            if (! $destination) {
-                throw new \Exception('Destination not found. What?!');
+                throw new \Exception('Destination not found.');
             }
             $destination_class = $destination->getMorphClass();
 
@@ -152,8 +147,8 @@ class GithubPrivateRepositoryDeployKey extends Component
             // Note: git_repository has already been validated and transformed in get_git_source()
             // It may now be in SSH format (git@host:repo.git) which is valid for deploy keys
 
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('uuid', $this->parameters['environment_uuid'])->first();
+            $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+            $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
             if ($this->git_source === 'other') {
                 $application_init = [
                     'name' => generate_random_name(),
@@ -190,7 +185,8 @@ class GithubPrivateRepositoryDeployKey extends Component
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
                 $application_init['base_directory'] = $this->base_directory;
             }
-            $application = Application::create($application_init);
+            $application = new Application($application_init);
+            $application->save();
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 

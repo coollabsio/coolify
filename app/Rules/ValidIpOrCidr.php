@@ -45,7 +45,10 @@ class ValidIpOrCidr implements ValidationRule
 
                 [$ip, $mask] = $parts;
 
-                if (! filter_var($ip, FILTER_VALIDATE_IP) || ! is_numeric($mask) || $mask < 0 || $mask > 32) {
+                $isIpv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+                $maxMask = $isIpv6 ? 128 : 32;
+
+                if (! filter_var($ip, FILTER_VALIDATE_IP) || ! is_numeric($mask) || $mask < 0 || $mask > $maxMask) {
                     $invalidEntries[] = $entry;
                 }
             } else {
