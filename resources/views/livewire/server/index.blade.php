@@ -55,6 +55,7 @@
                 'uuid' => $server->uuid,
                 'name' => $server->name,
                 'description' => $server->description ?: 'No description',
+                'ip' => $server->ip,
                 'href' => route('server.show', ['server_uuid' => $server->uuid]),
                 'status' => $status,
                 'statusType' => $statusType,
@@ -62,17 +63,32 @@
         })->values();
     @endphp
 
+    {{--
+        Server addresses stay masked until they are explicitly revealed, so the list can be
+        shown or screenshotted without leaking every host. Copying does not require revealing,
+        and reveals are per row and never persisted, so a reload masks everything again.
+    --}}
     <div x-data="{
         search: '',
         viewMode: localStorage.getItem('coolify-servers-view') || 'table',
         servers: @js($serverRows),
+        ipMask: '{{ str_repeat('•', 10) }}',
+        revealedIps: [],
         get filteredServers() {
             const query = this.search.trim().toLowerCase();
             if (!query) return this.servers;
             return this.servers.filter(server =>
-                [server.name, server.description, server.status]
+                [server.name, server.description, server.ip, server.status]
                     .some(value => String(value || '').toLowerCase().includes(query))
             );
+        },
+        isIpRevealed(uuid) {
+            return this.revealedIps.includes(uuid);
+        },
+        toggleIp(uuid) {
+            this.revealedIps = this.isIpRevealed(uuid)
+                ? this.revealedIps.filter(revealed => revealed !== uuid)
+                : [...this.revealedIps, uuid];
         },
         setViewMode(mode) {
             this.viewMode = mode;
@@ -127,8 +143,10 @@
             <div x-cloak x-show="viewMode === 'grid'"
                 class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <template x-for="server in filteredServers" :key="server.uuid">
-                    <a :href="server.href" {{ wireNavigate() }}
-                        class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:no-underline hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                    <article
+                        class="group relative flex min-h-32 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.025] dark:hover:border-white/[0.14]">
+                        <a :href="server.href" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
+                            :aria-label="`Open ${server.name}`"></a>
                         <div class="flex items-start gap-3">
                             <div :title="server.status" :aria-label="`Server status: ${server.status}`"
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.04] dark:text-fg-dim"
@@ -142,20 +160,41 @@
                                     x-text="server.description"></p>
                             </div>
                         </div>
-                    </a>
+
+                        <div class="relative z-10 mt-auto flex items-center gap-1.5 pt-4">
+                            <span class="shrink-0 text-[11px] text-neutral-400 dark:text-fg-faint">IP address</span>
+                            <span class="min-w-0 flex-1 truncate font-mono text-[11px] text-neutral-500 dark:text-fg-dim"
+                                :class="{ 'tracking-[0.15em]': !isIpRevealed(server.uuid) }"
+                                x-text="isIpRevealed(server.uuid) ? (server.ip || '-') : ipMask"></span>
+                            <button type="button" x-on:click.prevent.stop="toggleIp(server.uuid)"
+                                class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-white"
+                                :aria-pressed="isIpRevealed(server.uuid) ? 'true' : 'false'"
+                                :title="isIpRevealed(server.uuid) ? 'Hide IP address' : 'Show IP address'"
+                                :aria-label="isIpRevealed(server.uuid) ? `Hide IP address of ${server.name}` : `Show IP address of ${server.name}`">
+                                <x-reicon name="eye" x-show="!isIpRevealed(server.uuid)" class="size-3.5" />
+                                <x-reicon name="eye-off2" x-cloak x-show="isIpRevealed(server.uuid)"
+                                    class="size-3.5" />
+                            </button>
+                            <x-copy-button expression="server.ip" label="Copy IP address"
+                                x-bind:aria-label="`Copy IP address of ${server.name}`" />
+                        </div>
+                    </article>
                 </template>
             </div>
 
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
                 <div
-                    class="grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="grid min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                     <div>Server</div>
+                    <div>IP address</div>
                     <div>Status</div>
                 </div>
                 <template x-for="server in filteredServers" :key="server.uuid">
-                    <a :href="server.href" {{ wireNavigate() }}
-                        class="grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                    <div
+                        class="group relative grid min-h-14 min-w-[680px] grid-cols-[minmax(0,1fr)_minmax(10rem,.7fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        <a :href="server.href" {{ wireNavigate() }} class="absolute inset-0"
+                            :aria-label="`Open ${server.name}`"></a>
                         <div class="flex min-w-0 items-center gap-3">
                             <div :title="server.status" :aria-label="`Server status: ${server.status}`"
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border bg-neutral-50 text-neutral-500 dark:bg-white/[0.035] dark:text-fg-dim"
@@ -169,10 +208,26 @@
                                     x-text="server.description"></p>
                             </div>
                         </div>
+                        <div class="relative z-10 flex min-w-0 items-center gap-1">
+                            <span class="min-w-0 truncate font-mono text-neutral-600 dark:text-fg-dim"
+                                :class="{ 'tracking-[0.15em]': !isIpRevealed(server.uuid) }"
+                                x-text="isIpRevealed(server.uuid) ? (server.ip || '-') : ipMask"></span>
+                            <button type="button" x-on:click.prevent.stop="toggleIp(server.uuid)"
+                                class="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-white"
+                                :aria-pressed="isIpRevealed(server.uuid) ? 'true' : 'false'"
+                                :title="isIpRevealed(server.uuid) ? 'Hide IP address' : 'Show IP address'"
+                                :aria-label="isIpRevealed(server.uuid) ? `Hide IP address of ${server.name}` : `Show IP address of ${server.name}`">
+                                <x-reicon name="eye" x-show="!isIpRevealed(server.uuid)" class="size-3.5" />
+                                <x-reicon name="eye-off2" x-cloak x-show="isIpRevealed(server.uuid)"
+                                    class="size-3.5" />
+                            </button>
+                            <x-copy-button expression="server.ip" label="Copy IP address"
+                                x-bind:aria-label="`Copy IP address of ${server.name}`" />
+                        </div>
                         <div class="text-[11px] font-medium text-neutral-600 dark:text-fg-dim">
                             <span x-text="server.status"></span>
                         </div>
-                    </a>
+                    </div>
                 </template>
             </div>
 
