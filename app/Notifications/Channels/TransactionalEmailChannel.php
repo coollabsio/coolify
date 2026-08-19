@@ -27,10 +27,12 @@ class TransactionalEmailChannel
         }
         $this->bootConfigs();
         $mailMessage = $notification->toMail($notifiable);
+        $from = mail_from_identity($settings);
         Mail::send(
             [],
             [],
             fn (Message $message) => $message
+                ->from($from['address'], $from['name'])
                 ->to($email)
                 ->subject($mailMessage->subject)
                 ->html((string) $mailMessage->render())

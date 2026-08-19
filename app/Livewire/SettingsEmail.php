@@ -296,10 +296,19 @@ class SettingsEmail extends Component
             $this->authorize('update', $this->settings);
             $this->validate([
                 'testEmailAddress' => 'required|email',
+                'smtpFromAddress' => 'required|email',
+                'smtpFromName' => 'required|string',
             ], [
                 'testEmailAddress.required' => 'Test email address is required.',
                 'testEmailAddress.email' => 'Please enter a valid email address.',
+                'smtpFromAddress.required' => 'From Address is required.',
+                'smtpFromAddress.email' => 'Please enter a valid email address.',
+                'smtpFromName.required' => 'From Name is required.',
             ]);
+
+            $this->settings->smtp_from_address = $this->smtpFromAddress;
+            $this->settings->smtp_from_name = $this->smtpFromName;
+            $this->settings->save();
 
             $executed = RateLimiter::attempt(
                 'test-email:'.$this->team->id,
