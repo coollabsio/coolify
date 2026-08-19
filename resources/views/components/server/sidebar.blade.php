@@ -70,6 +70,7 @@
             'icon' => 'shield-star',
             'group' => 'Platform',
             'visible' => $server->isFunctional() && ! $server->isSwarm() && ! $server->settings->is_build_server && auth()->user()?->can('viewSentinel', $server),
+            'warning' => $server->isSentinelEnabled() && ! $server->isSentinelLive(),
             'children' => [
                 ['label' => 'Configuration', 'route' => 'server.sentinel', 'active' => request()->routeIs('server.sentinel'), 'icon' => 'settings'],
                 ['label' => 'Logs', 'route' => 'server.sentinel.logs', 'active' => request()->routeIs('server.sentinel.logs'), 'icon' => 'file-content'],

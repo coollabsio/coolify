@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
+use App\Http\Controllers\Api\InstanceEmailSettingsController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
@@ -83,6 +84,8 @@ Route::group([
     Route::patch('/notifications/pushover', [NotificationsController::class, 'update_pushover'])->middleware(['api.ability:write']);
     Route::get('/notifications/webhook', [NotificationsController::class, 'webhook'])->middleware(['api.ability:read']);
     Route::patch('/notifications/webhook', [NotificationsController::class, 'update_webhook'])->middleware(['api.ability:write']);
+    Route::get('/settings/email', [InstanceEmailSettingsController::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/settings/email', [InstanceEmailSettingsController::class, 'update'])->middleware(['api.ability:write:sensitive']);
     Route::get('/team/envs', [SharedEnvironmentVariablesController::class, 'team_envs'])->middleware(['api.ability:read']);
     Route::post('/team/envs', [SharedEnvironmentVariablesController::class, 'team_create_env'])->middleware(['api.ability:write']);
     Route::patch('/team/envs/{env_id}', [SharedEnvironmentVariablesController::class, 'team_update_env'])->middleware(['api.ability:write']);

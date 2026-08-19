@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class CheckUpdates
@@ -275,7 +276,7 @@ class CheckUpdates
         // Include unparsed lines in the result for debugging if any exist
         if (! empty($unparsedLines)) {
             $result['unparsed_lines'] = $unparsedLines;
-            \Illuminate\Support\Facades\Log::debug('Pacman output contained unparsed lines', [
+            Log::debug('Pacman output contained unparsed lines', [
                 'unparsed_lines' => $unparsedLines,
             ]);
         }
