@@ -124,6 +124,9 @@
                     <div id="server-timing-hud-slot-mobile" data-server-timing-hud-slot
                         class="hidden shrink-0 items-center"></div>
                     <div id="configuration-warning-hud-slot-mobile" class="relative shrink-0"></div>
+                    @if (isInstanceAdmin() && !isCloud())
+                        <livewire:upgrade key="mobile-upgrade" />
+                    @endif
                     <x-top-user-menu />
                     <button type="button" class="-m-1 p-2 text-neutral-500 dark:text-fg-dim" x-on:click="open = !open">
                         <span class="sr-only">Open sidebar</span>

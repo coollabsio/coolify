@@ -20,6 +20,8 @@ class Upgrade extends Component
 
     public bool $devMode = false;
 
+    public bool $fullButton = false;
+
     protected $listeners = ['updateAvailable' => 'checkUpdate'];
 
     public function mount()
