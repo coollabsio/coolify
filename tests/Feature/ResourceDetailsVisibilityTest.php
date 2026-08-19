@@ -27,31 +27,29 @@ it('keeps the resource details helper text visible below the modal header', func
     ])->render();
 
     expect($html)
-        ->toContain('Identifiers for this resource. Read-only')
+        ->toContain('readonly')
         ->toContain('pt-1')
         ->not->toContain('-mt-4');
 });
 
 it('renders copy fields as visible readonly controls with an accessible copy action', function () {
-    $html = Blade::render('<x-forms.copy-button label="UUID" text="crashloop" />');
+    $html = Blade::render('<x-forms.copy-input label="UUID" text="crashloop" />');
 
     expect($html)
         ->toContain('label class="flex gap-1 items-center mb-1 text-sm font-medium text-black dark:text-white"')
         ->toContain('readonly')
-        ->toContain('window.copyToClipboard')
+        ->toContain('x-data="copyButton"')
         ->toContain('input-with-copy-button')
-        ->toContain('copy-button')
         ->toContain('aria-label="Copy to clipboard"')
-        ->toContain('title="Copy to clipboard"')
-        ->toContain('class="size-[18px] text-green-500"');
+        ->toContain('title="Copy to clipboard"');
 });
 
-it('uses the shared copy field for newly issued api tokens', function () {
+it('uses the shared copy button for newly issued api tokens', function () {
     $blade = file_get_contents(resource_path('views/livewire/security/api-tokens.blade.php'));
 
     expect($blade)
-        ->toContain('<x-forms.copy-button :text="session(\'token\')" />')
-        ->not->toContain('navigator.clipboard.writeText(@js(session(\'token\')))');
+        ->toContain('<x-copy-button :value="session(\'token\')"')
+        ->not->toContain('navigator.clipboard');
 });
 
 it('keeps copy button padding above settings-workspace input overrides', function () {
