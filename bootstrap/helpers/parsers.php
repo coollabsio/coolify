@@ -742,7 +742,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, $pull_request_id);
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -792,7 +792,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, $pull_request_id);
                     if ($foundConfig) {
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
@@ -2135,7 +2135,7 @@ function serviceParser(Service $resource): Collection
                     $source = $parsed['source'];
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target);
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -2185,7 +2185,7 @@ function serviceParser(Service $resource): Collection
                         }
                     }
 
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target);
                     if ($foundConfig) {
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');

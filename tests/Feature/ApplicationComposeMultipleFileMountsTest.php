@@ -78,6 +78,32 @@ it('stores sibling file mounts with different host paths and the same container 
         ]);
 });
 
+it('finds existing file mount configuration by source and target', function () {
+    $application = new Application(['uuid' => 'source-aware-config-test']);
+    $application->id = fake()->unique()->numberBetween(10000, 99999);
+
+    foreach (['first', 'second'] as $name) {
+        $volume = new LocalFileVolume([
+            'fs_path' => base_configuration_dir()."/applications/source-aware-config-test/{$name}.html",
+            'mount_path' => '/usr/share/nginx/html/index.html',
+            'content' => "{$name} content",
+            'is_directory' => false,
+        ]);
+        $volume->resource_type = Application::class;
+        $volume->resource_id = $application->id;
+        $volume->save();
+    }
+
+    $found = findLocalFileVolumeConfig(
+        $application,
+        str('./second.html'),
+        str('/usr/share/nginx/html/index.html'),
+    );
+
+    expect($found?->fs_path)->toEndWith('/second.html')
+        ->and($found?->content)->toBe('second content');
+});
+
 function makeReadOnlyVolumeFixture(string $compose, string $fsPath, string $mountPath, ?string $appUuid = 'test-app-uuid'): LocalFileVolume
 {
     $app = new Application([
