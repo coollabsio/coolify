@@ -148,8 +148,6 @@ set_env_var() {
 
 log "Checking environment variables..."
 set_env_var "REGISTRY_URL" "$REGISTRY_URL"
-set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"
-set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"
 update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
 update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
@@ -230,6 +228,9 @@ done
 
 log "All images pulled successfully"
 echo "     All images pulled successfully."
+
+set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"
+set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"
 
 log_section "Step 4/6: Stopping and restarting containers"
 write_status "4" "Stopping containers"

@@ -67,10 +67,13 @@ it('persists the target image and runtime version before recreating containers',
 
     $latestImagePosition = strpos($script, 'set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"');
     $coolifyVersionPosition = strpos($script, 'set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"');
+    $imagesPulledPosition = strpos($script, 'log "All images pulled successfully"');
     $composeUpPosition = strpos($script, 'docker compose --env-file /data/coolify/source/.env');
 
     expect($latestImagePosition)->not->toBeFalse()
         ->and($coolifyVersionPosition)->not->toBeFalse()
+        ->and($latestImagePosition)->toBeGreaterThan($imagesPulledPosition)
+        ->and($coolifyVersionPosition)->toBeGreaterThan($imagesPulledPosition)
         ->and($latestImagePosition)->toBeLessThan($composeUpPosition)
         ->and($coolifyVersionPosition)->toBeLessThan($composeUpPosition);
 })->with([
