@@ -215,6 +215,7 @@ it('keeps bind mount source paths out of the add volume form', function () {
         ->not->toContain('id="host_path"')
         ->not->toContain('Swarm Mode detected')
         ->and($volumesView)
+        ->toMatch('/<x-modal-confirmation title="Remove Source Path\?"[^>]*canGate="update"[^>]*:canResource="\$resource"/')
         ->toContain('The next deployment will use a named Docker volume instead.')
         ->toContain('Data from the existing host directory will not be copied to the named volume.');
 });
@@ -240,6 +241,13 @@ it('uses a resource based default name for new volumes', function () {
 
     Livewire::test(Storage::class, ['resource' => $application])
         ->assertSet('name', 'storage-app-data');
+});
+
+it('uses a valid fallback default volume name when the resource name has no slug characters', function () {
+    [$application] = createApplicationWithVolume(['name' => '---']);
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->assertSet('name', 'volume-data');
 });
 
 it('removes existing bind mount source paths from the volume table', function () {

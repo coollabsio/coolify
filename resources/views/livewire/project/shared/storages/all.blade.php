@@ -160,6 +160,7 @@
                                             <x-forms.input id="forms.{{ $id }}.hostPath" />
                                         </div>
                                         <x-modal-confirmation title="Remove Source Path?" isErrorButton
+                                            canGate="update" :canResource="$resource"
                                             buttonTitle="Remove" submitAction="clearHostPath({{ $id }})"
                                             :actions="[
                                                 'Are you sure you want to remove the source path?',

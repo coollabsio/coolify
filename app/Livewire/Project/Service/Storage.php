@@ -374,10 +374,9 @@ class Storage extends Component
 
     private function generateDefaultVolumeName(): string
     {
-        return str($this->resource->name ?? 'volume')
-            ->slug()
-            ->append('-data')
-            ->value();
+        $name = str($this->resource->name)->slug()->value();
+
+        return ($name ?: 'volume').'-data';
     }
 
     public function fileStoragePreviewPath(): string
