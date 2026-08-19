@@ -33,3 +33,11 @@ it('treats a blank from name as missing instead of sending an unnamed address', 
     expect($identity['name'])->not->toBeEmpty()
         ->and($identity['name'])->not->toBe('admin');
 });
+
+it('rejects enabled email settings without a from address', function () {
+    mail_from_identity((object) [
+        'smtp_enabled' => true,
+        'smtp_from_address' => null,
+        'smtp_from_name' => 'Coolify',
+    ]);
+})->throws(InvalidArgumentException::class, 'Transactional email sender address is not configured.');

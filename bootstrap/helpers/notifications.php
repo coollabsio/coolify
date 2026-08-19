@@ -19,9 +19,11 @@ function is_transactional_emails_enabled(): bool
  */
 function mail_from_identity(object $settings): array
 {
-    $address = filled($settings->smtp_from_address ?? null)
-        ? (string) $settings->smtp_from_address
-        : 'noreply@localhost';
+    if (blank($settings->smtp_from_address ?? null)) {
+        throw new InvalidArgumentException('Transactional email sender address is not configured.');
+    }
+
+    $address = (string) $settings->smtp_from_address;
 
     $name = trim((string) ($settings->smtp_from_name ?? ''));
 
