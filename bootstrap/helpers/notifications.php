@@ -42,7 +42,7 @@ function mail_from_address(object $settings): Address
 
 function mail_from_formatted(object $settings): string
 {
-    return (string) mail_from_address($settings);
+    return mail_from_address($settings)->toString();
 }
 
 function send_internal_notification(string $message): void
