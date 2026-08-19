@@ -165,7 +165,7 @@ jobs:
     needs: [validate, build]
     runs-on: ubuntu-24.04
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Revalidate draft prerelease
         uses: actions/github-script@v8

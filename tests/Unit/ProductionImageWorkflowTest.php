@@ -141,6 +141,7 @@ it('requires a reviewed draft prerelease before publishing an exact rc', functio
         ->toContain('!release.prerelease')
         ->toContain('release.body?.trim()')
         ->toContain('revalidate:')
+        ->toMatch('/revalidate:.*?permissions:\s+contents: write/s')
         ->toContain('needs: [validate, build, revalidate]')
         ->toContain('COOLIFY_VERSION=${{ needs.validate.outputs.version }}')
         ->toContain('--tag "${IMAGE}:${VERSION}"')
