@@ -1857,12 +1857,7 @@ function getRealtime()
     $envDefined = config('constants.pusher.port');
     if (empty($envDefined)) {
         $url = Url::fromString(Request::getSchemeAndHttpHost());
-        $port = $url->getPort();
-        if ($port) {
-            return '6001';
-        } else {
-            return null;
-        }
+        return $url->getPort();
     } else {
         return $envDefined;
     }
