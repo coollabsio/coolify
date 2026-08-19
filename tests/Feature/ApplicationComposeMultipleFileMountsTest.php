@@ -68,6 +68,9 @@ it('stores sibling file mounts with different host paths and the same container 
         ->where('resource_id', $resourceId)
         ->where('resource_type', Application::class)
         ->where('mount_path', $mountPath)
+        ->get(['fs_path', 'fs_path_hash'])
+        ->each(fn (LocalFileVolume $volume) => expect($volume->fs_path_hash)
+            ->toBe(hash('sha256', $volume->fs_path)))
         ->pluck('fs_path')
         ->all())->toEqualCanonicalizing([
             '/data/coolify/test/data/index1.html',

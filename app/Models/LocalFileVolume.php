@@ -52,6 +52,10 @@ class LocalFileVolume extends BaseModel
 
     protected static function booted()
     {
+        static::saving(function (LocalFileVolume $fileVolume): void {
+            $fileVolume->fs_path_hash = hash('sha256', $fileVolume->fs_path);
+        });
+
         static::created(function (LocalFileVolume $fileVolume) {
             if ($fileVolume->is_host_file) {
                 return;
