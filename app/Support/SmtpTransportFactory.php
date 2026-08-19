@@ -7,7 +7,7 @@ use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
 
 class SmtpTransportFactory
 {
-    public static function fromSettings(object $settings): EsmtpTransport
+    public static function fromSettings(object $settings, ?string $localDomain = null): EsmtpTransport
     {
         $mode = self::encryptionMode($settings);
 
@@ -27,6 +27,11 @@ class SmtpTransportFactory
 
         $transport->setUsername($settings->smtp_username ?? '');
         $transport->setPassword($settings->smtp_password ?? '');
+
+        $localDomain = $settings->smtp_ehlo_domain ?? $localDomain;
+        if ($localDomain !== null && $localDomain !== '') {
+            $transport->setLocalDomain($localDomain);
+        }
 
         $stream = $transport->getStream();
         if (isset($settings->smtp_timeout) && $stream instanceof SocketStream) {
