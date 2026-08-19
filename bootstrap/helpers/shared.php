@@ -4553,7 +4553,7 @@ function formatContainerStatus(string $status): string
  * Check if password confirmation should be skipped.
  * Returns true if:
  * - Two-step confirmation is globally disabled
- * - User has no usable local password confirmation (including SSO users)
+ * - User has no password (OAuth users)
  *
  * Used by modal-confirmation.blade.php to determine if password step should be shown.
  *
@@ -4566,9 +4566,8 @@ function shouldSkipPasswordConfirmation(): bool
         return true;
     }
 
-    // OAuth users may have an unusable generated password, so the linked
-    // identity is the source of truth for whether confirmation is possible.
-    if (! Auth::user()?->requiresPasswordConfirmation()) {
+    // Skip if user has no password (OAuth users)
+    if (! Auth::user()?->hasPassword()) {
         return true;
     }
 
@@ -4579,7 +4578,7 @@ function shouldSkipPasswordConfirmation(): bool
  * Verify password for two-step confirmation.
  * Skips verification if:
  * - Two-step confirmation is globally disabled
- * - User has no usable local password confirmation (including SSO users)
+ * - User has no password (OAuth users)
  *
  * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
  * @param  Component|null  $component  Optional Livewire component to add errors to

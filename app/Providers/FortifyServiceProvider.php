@@ -48,7 +48,7 @@ class FortifyServiceProvider extends ServiceProvider
             $isFirstUser = User::count() === 0;
 
             $settings = instanceSettings();
-            if (! $settings->isPasswordRegistrationAllowed()) {
+            if (! $settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
 
@@ -61,13 +61,13 @@ class FortifyServiceProvider extends ServiceProvider
             $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
-            if ($users == 0 && $settings->isPasswordRegistrationAllowed()) {
-                // If there are no users and password registration is allowed, redirect to registration.
+            if ($users == 0) {
+                // If there are no users, redirect to registration
                 return redirect()->route('register');
             }
 
             return view('auth.login', [
-                'is_registration_enabled' => $settings->isPasswordRegistrationAllowed(),
+                'is_registration_enabled' => $settings->is_registration_enabled,
                 'enabled_oauth_providers' => $enabled_oauth_providers,
             ]);
         });

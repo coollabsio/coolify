@@ -15,7 +15,6 @@ use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
-use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
@@ -53,7 +52,6 @@ use App\Policies\EnvironmentVariablePolicy;
 use App\Policies\GithubAppPolicy;
 use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
-use App\Policies\IntegrationTokenPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
 use App\Policies\ProjectPolicy;
@@ -134,7 +132,6 @@ class AuthServiceProvider extends ServiceProvider
 
         // Cloud provider policies
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
-        IntegrationToken::class => IntegrationTokenPolicy::class,
         CloudInitScript::class => CloudInitScriptPolicy::class,
         Tag::class => TagPolicy::class,
 

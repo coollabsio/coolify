@@ -14,7 +14,6 @@
         "php": "^8.4",
         "danharrin/livewire-rate-limiting": "^2.2.1",
         "doctrine/dbal": "^4.4.4",
-        "firebase/php-jwt": "7.1.0",
         "guzzlehttp/guzzle": "^7.15.3",
         "laravel/fortify": "^1.37.3",
         "laravel/framework": "^12.65.0",

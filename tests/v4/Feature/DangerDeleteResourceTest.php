@@ -4,7 +4,6 @@ use App\Livewire\Project\Shared\Danger;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
-use App\Models\OauthIdentity;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -19,7 +18,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::forceCreate(['id' => 0]);
+    InstanceSettings::create(['id' => 0]);
     Queue::fake();
 
     $this->user = User::factory()->create([
@@ -68,21 +67,6 @@ test('delete succeeds with correct password and redirects', function () {
         ->assertHasNoErrors();
 
     // Resource should be soft-deleted
-    expect(Application::find($this->application->id))->toBeNull();
-});
-
-test('delete succeeds without password for an oauth user', function () {
-    OauthIdentity::create([
-        'user_id' => $this->user->id,
-        'provider' => 'oidc',
-        'issuer' => 'https://idp.example.com',
-        'provider_user_id' => 'oauth-user-id',
-    ]);
-
-    Livewire::test(Danger::class, ['resource' => $this->application])
-        ->call('delete', '')
-        ->assertHasNoErrors();
-
     expect(Application::find($this->application->id))->toBeNull();
 });
 

@@ -153,7 +153,7 @@ it('adds mux options to ssh commands only after the explicit master is ready', f
         ->toContain('-o ControlMaster=auto')
         ->toContain("-o ControlPath=/var/www/html/storage/app/ssh/mux/mux_{$server->uuid}")
         ->toContain('-o ControlPersist=3600')
-        ->toContain("'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi' << \\")
+        ->toContain("'bash -se' << \\")
         ->not->toContain('<< $delimiter');
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -fN '));

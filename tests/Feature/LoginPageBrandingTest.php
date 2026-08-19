@@ -37,28 +37,6 @@ test('auth pages use the Coollabs purple background glow', function () {
         ->not->toMatch('/\.auth-shell\s*\{[^}]*color-mix\(in oklab, var\(--color-accent\) 9%, transparent\)/s');
 });
 
-test('external login providers are centered and full width', function () {
-    $login = file_get_contents(resource_path('views/auth/login.blade.php'));
-
-    expect($login)
-        ->toContain('class="flex flex-col gap-2"')
-        ->toContain('class="w-full justify-center"')
-        ->not->toContain('sm:w-[calc(50%-0.25rem)]');
-});
-
-test('external login providers display their icons except oidc', function () {
-    $login = file_get_contents(resource_path('views/auth/login.blade.php'));
-
-    expect($login)
-        ->toContain("@if (\$provider_setting->provider !== 'oidc')")
-        ->toContain("asset('svgs/'.\$provider_setting->provider.'.svg')")
-        ->toContain('class="size-5 shrink-0 dark:invert"');
-
-    foreach (['authentik', 'azure', 'bitbucket', 'clerk', 'discord', 'github', 'gitlab', 'google', 'infomaniak', 'zitadel'] as $provider) {
-        expect(public_path("svgs/{$provider}.svg"))->toBeFile();
-    }
-});
-
 test('error pages use the Coollabs purple background glow', function () {
     $styles = file_get_contents(resource_path('css/app.css'));
 
