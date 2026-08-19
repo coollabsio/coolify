@@ -175,7 +175,7 @@
                 <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     @foreach ($dashboardServers as $server)
                         @php
-                            $proxyNeedsAttention = $server->proxySet() && $server->proxy->status !== 'running';
+                            $proxyNeedsAttention = $server->proxySet() && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
                             $sentinelNeedsAttention = $server->isSentinelEnabled() && ! $server->isSentinelLive();
 
                             [$serverStatus, $serverStatusType] = match (true) {

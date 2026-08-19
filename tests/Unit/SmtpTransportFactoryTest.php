@@ -86,6 +86,24 @@ it('applies a configured SMTP timeout to the transport stream', function () {
     expect($transport->getStream()->getTimeout())->toBe(15.0);
 });
 
+it('applies the configured ehlo domain to the transport', function () {
+    $transport = SmtpTransportFactory::fromSettings(
+        smtpSettings(['smtp_ehlo_domain' => 'team.example.com']),
+        'instance.example.com'
+    );
+
+    expect($transport->getLocalDomain())->toBe('team.example.com');
+});
+
+it('falls back to the instance ehlo domain for legacy smtp settings', function () {
+    $transport = SmtpTransportFactory::fromSettings(
+        smtpSettings(),
+        'instance.example.com'
+    );
+
+    expect($transport->getLocalDomain())->toBe('instance.example.com');
+});
+
 it('maps none encryption to laravel mailer options that disable auto tls', function () {
     expect(SmtpTransportFactory::mailerOptions(smtpSettings([
         'smtp_encryption' => 'none',

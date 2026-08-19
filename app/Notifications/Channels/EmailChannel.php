@@ -82,7 +82,10 @@ class EmailChannel
                     'html' => (string) $mailMessage->render(),
                 ]);
             } elseif ($isSmtpEnabled) {
-                $transport = SmtpTransportFactory::fromSettings($settings);
+                $transport = SmtpTransportFactory::fromSettings(
+                    $settings,
+                    config('mail.mailers.smtp.local_domain')
+                );
                 $mailer = new Mailer($transport);
 
                 $email = (new Email)

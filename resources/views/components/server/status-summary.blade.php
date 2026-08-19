@@ -6,7 +6,10 @@
 
 @php
     $serverReady = $server->isFunctional();
-    $proxyNeedsAttention = $server->proxySet() && ! in_array($proxyStatus, ['running'], true);
+    $proxyUpdateAvailable = $server->proxySet()
+        && ($server->hasCurrentTraefikOutdatedInfo() || $server->hasPendingProxyConfiguration());
+    $proxyNeedsAttention = $server->proxySet()
+        && (! in_array($proxyStatus, ['running'], true) || $proxyUpdateAvailable);
     $sentinelNeedsAttention = $showSentinelStatus && ! $server->isSentinelLive();
 
     [$summaryLabel, $summaryType] = match (true) {
@@ -58,9 +61,9 @@
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
                 <span @class([
                     'size-1.5 shrink-0 rounded-full',
-                    'bg-success' => $proxyStatus === 'running',
-                    'bg-warning' => in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true),
-                    'bg-error' => ! in_array($proxyStatus, ['running', 'starting', 'restarting', 'stopping'], true),
+                    'bg-success' => $proxyStatus === 'running' && ! $proxyUpdateAvailable,
+                    'bg-warning' => $proxyNeedsAttention && ($proxyUpdateAvailable || in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true)),
+                    'bg-error' => $proxyNeedsAttention && ! $proxyUpdateAvailable && ! in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true),
                 ])></span>
                 <span class="flex-1">Proxy</span>
                 <span>{{ str($proxyStatus ?: 'unknown')->headline() }}</span>
@@ -69,7 +72,11 @@
         @if ($showSentinelStatus)
             <a href="{{ route('server.sentinel', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
-                <span class="size-1.5 shrink-0 rounded-full {{ $server->isSentinelLive() ? 'bg-success' : 'bg-error' }}"></span>
+                <span @class([
+                    'size-1.5 shrink-0 rounded-full',
+                    'bg-success' => ! $sentinelNeedsAttention,
+                    'bg-warning' => $sentinelNeedsAttention,
+                ])></span>
                 <span class="flex-1">Sentinel</span>
                 <span>{{ $server->isSentinelLive() ? 'In sync' : 'Out of sync' }}</span>
             </a>
