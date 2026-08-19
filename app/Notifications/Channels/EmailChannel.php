@@ -11,7 +11,6 @@ use Resend;
 use Resend\Exceptions\ErrorException;
 use Resend\Exceptions\TransporterException;
 use Symfony\Component\Mailer\Mailer;
-use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 
 class EmailChannel
@@ -76,9 +75,8 @@ class EmailChannel
 
             if ($isResendEnabled) {
                 $resend = Resend::client($settings->resend_api_key);
-                $from = "{$settings->smtp_from_name} <{$settings->smtp_from_address}>";
                 $resend->emails->send([
-                    'from' => $from,
+                    'from' => mail_from_formatted($settings),
                     'to' => $recipients,
                     'subject' => $mailMessage->subject,
                     'html' => (string) $mailMessage->render(),
@@ -87,11 +85,8 @@ class EmailChannel
                 $transport = SmtpTransportFactory::fromSettings($settings);
                 $mailer = new Mailer($transport);
 
-                $fromEmail = $settings->smtp_from_address ?? 'noreply@localhost';
-                $fromName = $settings->smtp_from_name ?? 'System';
-                $from = new Address($fromEmail, $fromName);
                 $email = (new Email)
-                    ->from($from)
+                    ->from(mail_from_address($settings))
                     ->to(...$recipients)
                     ->subject($mailMessage->subject)
                     ->html((string) $mailMessage->render());
