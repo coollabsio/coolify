@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Support\ValidationPatterns;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use OpenApi\Attributes as OA;
@@ -361,7 +362,11 @@ class EnvironmentVariable extends BaseModel
             return null;
         }
 
-        return trim(decrypt($environment_variable));
+        try {
+            return trim(decrypt($environment_variable));
+        } catch (DecryptException) {
+            return trim($environment_variable);
+        }
     }
 
     private function set_environment_variables(?string $environment_variable = null): ?string
