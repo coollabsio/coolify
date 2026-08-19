@@ -17,6 +17,7 @@ use Visus\Cuid2\Cuid2;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->withoutVite();
     $this->withoutMiddleware([DecideWhatToDoWithUser::class, CheckForcePasswordReset::class]);
     Once::flush();
     Config::set('app.maintenance.driver', 'file');
@@ -56,10 +57,55 @@ function createInvitationLinkFixture(array $invitationAttributes = []): array
     return [$team, $user, $password, $token, $invitation];
 }
 
-it('accepts a valid magic link invitation only once and rotates the temporary password', function () {
+it('shows a valid magic link invitation without consuming it', function () {
     [$team, $user, $password, $token] = createInvitationLinkFixture();
 
     $this->get(route('auth.link', ['token' => $token]))
+        ->assertSuccessful()
+        ->assertViewIs('invitation.accept')
+        ->assertSee($team->name)
+        ->assertSee('Accept invitation');
+
+    $this->assertGuest();
+    $this->assertDatabaseHas('team_invitations', ['email' => $user->email]);
+    expect($user->teams()->where('team_id', $team->id)->exists())->toBeFalse();
+
+    $user->refresh();
+    expect(Hash::check($password, $user->password))->toBeTrue();
+});
+
+it('does not count confirmation requests against the acceptance throttle', function () {
+    [, $user, , $token] = createInvitationLinkFixture();
+
+    foreach (range(1, 5) as $attempt) {
+        $this->get(route('auth.link', ['token' => $token]))
+            ->assertSuccessful();
+    }
+
+    $this->post(route('auth.link.accept'), ['token' => $token])
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+it('throttles acceptance independently for different magic link tokens from the same IP', function () {
+    [, $user, , $token] = createInvitationLinkFixture();
+
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('auth.link.accept'), ['token' => 'another-token'])
+            ->assertRedirect(route('login'));
+    }
+
+    $this->post(route('auth.link.accept'), ['token' => $token])
+        ->assertRedirect(route('dashboard'));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+it('accepts a valid magic link invitation on post only once and rotates the temporary password', function () {
+    [$team, $user, $password, $token] = createInvitationLinkFixture();
+
+    $this->post(route('auth.link.accept'), ['token' => $token])
         ->assertRedirect(route('dashboard'));
 
     $this->assertAuthenticatedAs($user);
@@ -72,7 +118,7 @@ it('accepts a valid magic link invitation only once and rotates the temporary pa
     auth()->logout();
     session()->flush();
 
-    $this->get(route('auth.link', ['token' => $token]))
+    $this->post(route('auth.link.accept'), ['token' => $token])
         ->assertRedirect(route('login'));
 
     $this->assertGuest();
@@ -81,7 +127,7 @@ it('accepts a valid magic link invitation only once and rotates the temporary pa
 it('accepts a magic link when opened from a different public origin', function () {
     [$team, $user, $password, $token] = createInvitationLinkFixture();
 
-    $this->get('https://coolify.example.com/auth/link?token='.urlencode($token))
+    $this->post('https://coolify.example.com/auth/link', ['token' => $token])
         ->assertRedirect(route('dashboard'));
 
     $this->assertAuthenticatedAs($user);
@@ -98,7 +144,7 @@ it('keeps the invited user authenticated after rotating the temporary password w
 
     [$team, $user, $password, $token] = createInvitationLinkFixture();
 
-    $this->get(route('auth.link', ['token' => $token]))
+    $this->post(route('auth.link.accept'), ['token' => $token])
         ->assertRedirect(route('dashboard'));
 
     expect(DB::table('sessions')->where('user_id', $user->id)->exists())->toBeTrue();
@@ -170,7 +216,7 @@ it('rejects a magic link when the invitation expired', function () {
         ->assertRedirect(route('login'));
 
     $this->assertGuest();
-    $this->assertDatabaseMissing('team_invitations', ['id' => $invitation->id]);
+    $this->assertDatabaseHas('team_invitations', ['id' => $invitation->id]);
 });
 
 it('rejects a malformed magic link token', function () {

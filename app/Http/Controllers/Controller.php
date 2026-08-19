@@ -98,58 +98,81 @@ class Controller extends BaseController
     public function link()
     {
         $token = request()->get('token');
-        if (is_string($token) && $token !== '') {
-            try {
-                $decrypted = Crypt::decryptString($token);
-            } catch (DecryptException) {
-                return redirect()->route('login')->with('error', 'Invalid credentials.');
-            }
-
-            if (! str_contains($decrypted, '@@@')) {
-                return redirect()->route('login')->with('error', 'Invalid credentials.');
-            }
-
-            $payload = explode('@@@', $decrypted, 3);
-            if (count($payload) === 3) {
-                [$email, $invitationUuid, $password] = $payload;
-            } else {
-                [$email, $password] = $payload;
-                $invitationUuid = null;
-            }
-
-            $email = Str::lower($email);
-            $user = User::whereEmail($email)->first();
-            if (! $user) {
-                return redirect()->route('login');
-            }
-
-            $invitation = TeamInvitation::query()
-                ->where('email', $email)
-                ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
-                ->first();
-            if (! $invitation || ! $this->invitationLinkMatchesToken($invitation, $token) || ! $invitation->isValid()) {
-                return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
-            }
-
-            if (Hash::check($password, $user->password)) {
-                $team = $invitation->team;
-                if (! $user->teams()->where('team_id', $team->id)->exists()) {
-                    $user->teams()->attach($team->id, ['role' => $invitation->role]);
-                }
-                $invitation->delete();
-
-                $user->forceFill([
-                    'password' => Hash::make(Str::random(64)),
-                ])->save();
-
-                Auth::login($user);
-                session(['currentTeam' => $team]);
-
-                return redirect()->route('dashboard');
-            }
+        $credentials = is_string($token) ? $this->magicLinkCredentials($token) : null;
+        if (! $credentials) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
         }
 
-        return redirect()->route('login')->with('error', 'Invalid credentials.');
+        [$user, $invitation] = $credentials;
+
+        return view('invitation.accept', [
+            'invitation' => $invitation,
+            'team' => $invitation->team,
+            'alreadyMember' => $user->teams()->where('team_id', $invitation->team_id)->exists(),
+            'formAction' => route('auth.link.accept'),
+            'token' => $token,
+        ]);
+    }
+
+    public function acceptLink(Request $request)
+    {
+        $token = $request->input('token');
+        $credentials = is_string($token) ? $this->magicLinkCredentials($token) : null;
+        if (! $credentials) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+        }
+
+        [$user, $invitation] = $credentials;
+        $team = $invitation->team;
+        if (! $user->teams()->where('team_id', $team->id)->exists()) {
+            $user->teams()->attach($team->id, ['role' => $invitation->role]);
+        }
+        $invitation->delete();
+
+        $user->forceFill([
+            'password' => Hash::make(Str::random(64)),
+        ])->save();
+
+        Auth::login($user);
+        session(['currentTeam' => $team]);
+
+        return redirect()->route('dashboard');
+    }
+
+    private function magicLinkCredentials(string $token): ?array
+    {
+        if ($token === '') {
+            return null;
+        }
+
+        try {
+            $decrypted = Crypt::decryptString($token);
+        } catch (DecryptException) {
+            return null;
+        }
+
+        $payload = explode('@@@', $decrypted, 3);
+        if (count($payload) === 3) {
+            [$email, $invitationUuid, $password] = $payload;
+        } elseif (count($payload) === 2) {
+            [$email, $password] = $payload;
+            $invitationUuid = null;
+        } else {
+            return null;
+        }
+
+        $email = Str::lower($email);
+        $user = User::whereEmail($email)->first();
+        $invitation = TeamInvitation::query()
+            ->where('email', $email)
+            ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
+            ->first();
+
+        if (! $user || ! $invitation || $invitation->hasExpired() || ! $this->invitationLinkMatchesToken($invitation, $token)) {
+            return null;
+        }
+
+        return Hash::check($password, $user->password) ? [$user, $invitation] : null;
     }
 
     private function invitationLinkMatchesToken(TeamInvitation $invitation, string $token): bool
@@ -185,6 +208,7 @@ class Controller extends BaseController
             'invitation' => $invitation,
             'team' => $invitation->team,
             'alreadyMember' => $alreadyMember,
+            'formAction' => route('team.invitation.accept', $invitation->uuid),
         ]);
     }
 
