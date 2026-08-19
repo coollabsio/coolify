@@ -2375,7 +2375,7 @@ class ApplicationsController extends Controller
 
     #[OA\Get(
         summary: 'Get application logs.',
-        description: 'Get application logs by UUID.',
+        description: 'Get application logs by UUID. Multi-container (compose) applications return the logs of every running container, each prefixed by its container name.',
         path: '/applications/{uuid}/logs',
         operationId: 'get-application-logs-by-uuid',
         security: [
@@ -2456,7 +2456,8 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $containers = getCurrentApplicationContainerStatus($application->destination->server, $application->id);
+        $server = $application->destination->server;
+        $containers = getCurrentApplicationContainerStatus($server, $application->id);
 
         if ($containers->count() == 0) {
             return response()->json([
@@ -2464,10 +2465,16 @@ class ApplicationsController extends Controller
             ], 400);
         }
 
-        $container = $containers->first();
+        // A compose-based application runs one container per service. Reading
+        // only $containers->first() silently dropped every other service's logs,
+        // and answered "Application is not running." whenever that first
+        // container happened to be an exited one-shot (migrations, seeders)
+        // while the rest of the stack was healthy.
+        $runningContainers = $containers->filter(
+            fn ($container) => getContainerStatus($server, data_get($container, 'Names')) === 'running'
+        )->values();
 
-        $status = getContainerStatus($application->destination->server, $container['Names']);
-        if ($status !== 'running') {
+        if ($runningContainers->isEmpty()) {
             return response()->json([
                 'message' => 'Application is not running.',
             ], 400);
@@ -2475,7 +2482,18 @@ class ApplicationsController extends Controller
 
         $lines = normalizeLogLines($request->query('lines'));
         $showTimestamps = parseLogTimestampFlag($request->query('show_timestamps'));
-        $logs = getContainerLogs($application->destination->server, $container['ID'], $lines, $showTimestamps);
+
+        // Single-container applications keep the exact previous payload, so
+        // existing API consumers are unaffected. Multi-container ones get every
+        // container, each prefixed by its name to stay readable.
+        if ($runningContainers->count() === 1) {
+            $logs = getContainerLogs($server, data_get($runningContainers->first(), 'ID'), $lines, $showTimestamps);
+        } else {
+            $logs = $runningContainers->map(
+                fn ($container) => '===== '.data_get($container, 'Names')." =====\n".
+                    getContainerLogs($server, data_get($container, 'ID'), $lines, $showTimestamps)
+            )->implode("\n");
+        }
 
         return response()->json([
             'logs' => $logs,
