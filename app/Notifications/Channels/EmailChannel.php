@@ -80,8 +80,8 @@ class EmailChannel
             } elseif ($isSmtpEnabled) {
                 $encryption = match (strtolower($settings->smtp_encryption)) {
                     'starttls' => null,
-                    'tls' => 'tls',
-                    'none' => null,
+                    'tls' => true,
+                    'none' => false,
                     default => null,
                 };
 
