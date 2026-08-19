@@ -233,7 +233,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // IMPORTANT: Only extract variables that are DIRECTLY DECLARED for this service,
         // not variables that are merely referenced from other services
         $serviceConfig = data_get($dockerCompose, "services.{$name}");
-        $environment = data_get($serviceConfig, 'environment', []);
+        $environment = data_get($serviceConfig, 'environment') ?? [];
         $templateVariableNames = [];
 
         foreach ($environment as $key => $value) {
