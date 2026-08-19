@@ -25,6 +25,21 @@ it('disables opportunistic STARTTLS when encryption is none', function () {
         ->and($transport->getStream()->isTLS())->toBeFalse();
 });
 
+it('does not issue STARTTLS for the issue 5877 anonymous port 25 relay', function () {
+    $transport = SmtpTransportFactory::fromSettings(smtpSettings([
+        'smtp_encryption' => 'none',
+        'smtp_port' => 25,
+        'smtp_username' => '',
+        'smtp_password' => '',
+    ]));
+
+    expect($transport->isAutoTls())->toBeFalse()
+        ->and($transport->getStream()->isTLS())->toBeFalse()
+        ->and($transport->getStream()->getPort())->toBe(25)
+        ->and($transport->getUsername())->toBe('')
+        ->and($transport->getPassword())->toBe('');
+});
+
 it('does not enable implicit TLS on port 465 when encryption is none', function () {
     $transport = SmtpTransportFactory::fromSettings(smtpSettings([
         'smtp_encryption' => 'none',
