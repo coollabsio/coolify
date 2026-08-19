@@ -12,6 +12,7 @@ use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasSafeStringAttribute;
+use Database\Factories\ApplicationFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -120,7 +121,10 @@ use Symfony\Component\Yaml\Yaml;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasFactory, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasConfiguration, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, SoftDeletes;
+
+    /** @use HasFactory<ApplicationFactory> */
+    use HasFactory;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 

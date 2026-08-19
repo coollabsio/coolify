@@ -21,7 +21,7 @@ test('generates exact Caddy labels for an application with a domain', function (
     ]);
     $server->settings->update(['generate_exact_labels' => true]);
     $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
-    $application = Application::factory()->create([
+    $application = Application::factory()->createOne([
         'environment_id' => $environment->id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
