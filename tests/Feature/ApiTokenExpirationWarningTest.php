@@ -127,4 +127,14 @@ describe('ApiTokenExpirationWarningJob', function () {
 
         Notification::assertNothingSent();
     });
+
+    test('skips tokens whose owner is no longer a team member', function () {
+        $token = createTokenExpiring($this->user, $this->team, now()->addHours(12));
+        $this->team->members()->detach($this->user);
+
+        (new ApiTokenExpirationWarningJob)->handle();
+
+        Notification::assertNothingSent();
+        expect($token->fresh()->api_token_expiration_warning_sent_at)->toBeNull();
+    });
 });
