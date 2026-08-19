@@ -29,6 +29,8 @@ class ConfigurationRepository
 
         if ($settings->smtp_enabled) {
             $mailerOptions = SmtpTransportFactory::mailerOptions($settings);
+            $localDomain = $settings->smtp_ehlo_domain
+                ?? $this->config->get('mail.mailers.smtp.local_domain');
 
             $this->config->set('mail.default', 'smtp');
             $this->applyMailFrom($from);
@@ -41,7 +43,7 @@ class ConfigurationRepository
                 'username' => $settings->smtp_username,
                 'password' => $settings->smtp_password,
                 'timeout' => $settings->smtp_timeout,
-                'local_domain' => null,
+                'local_domain' => $localDomain,
                 'auto_tls' => $mailerOptions['auto_tls'],
             ]);
         }
