@@ -1870,6 +1870,72 @@ html[data-theme="custom"] textarea:disabled {
     flex-shrink: 0;
 }
 
+.split-action {
+    display: inline-flex;
+    align-items: stretch;
+}
+
+.split-action-main,
+.split-action-caret {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    height: 2rem;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    border: none;
+    background: linear-gradient(to bottom, var(--color-coollabs-100), var(--color-coollabs-200));
+    color: #ffffff;
+    transition: background-color 0.15s, color 0.15s, filter 0.15s;
+}
+
+.split-action-main {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0 0.625rem;
+    border-radius: 6px 0 0 6px;
+}
+
+.split-action-caret {
+    flex-shrink: 0;
+    width: 1.75rem;
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 0 6px 6px 0;
+}
+
+.split-action > .split-action-main:only-of-type {
+    border-radius: 6px;
+}
+
+.split-action-main:hover:not(:disabled),
+.split-action-caret:hover:not(:disabled) {
+    background: linear-gradient(to bottom, var(--color-coollabs-100), var(--color-coollabs));
+    color: #ffffff;
+}
+
+.split-action-main:disabled,
+.split-action-caret:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.split-action-main:focus-visible,
+.split-action-caret:focus-visible {
+    outline: none;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+/* Compact height inside the fixed heading action bar */
+.application-heading-actions .split-action-main,
+.application-heading-actions .split-action-caret {
+    height: 1.75rem;
+}
+
 /* Custom listbox (replaces native <select>) */
 .listbox-trigger {
     display: flex;

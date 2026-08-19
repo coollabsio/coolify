@@ -163,14 +163,14 @@ it('keeps advanced operations in a dedicated Advanced dropdown', function () {
     expect(substr_count($application, 'resource-heading-navbar'))->toBe(1);
 });
 
-it('groups desktop application lifecycle controls in one Actions dropdown', function () {
+it('groups desktop application lifecycle controls in one split control', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
 
     expect($desktop)
         ->toContain('application-desktop-actions')
-        ->toContain('Actions')
-        ->toContain('listbox-panel top-full! right-0! left-auto!')
+        ->toContain('<x-split-action')
+        ->toContain('<x-slot:main')
         ->toContain('listbox-option')
         ->toContain('Deploy')
         ->toContain('Restart')
@@ -217,8 +217,8 @@ it('groups service restart options in the Actions dropdown', function () {
     $mobile = str($heading)->before("@teleport('#resource-action-hud-slot')")->toString();
 
     expect($mobile)
-        ->toContain('Restart current version')
-        ->toContain('Pull latest and restart')
+        ->toContain('Restart')
+        ->toContain('Restart (pull latest)')
         ->not->toContain('Pull Latest Images & Restart');
 });
 
@@ -232,21 +232,17 @@ it('orders service restart actions before stop and advanced operations', functio
         ->toBeLessThan(strpos($actions, 'Stop'));
 });
 
-it('groups application lifecycle options in an Actions dropdown', function () {
+it('promotes the primary application action in the desktop split control', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $desktop = str($heading)->after('resource-heading-actions flex')->toString();
-    $trigger = str($desktop)->after('id="application-desktop-actions"')->before('<div x-cloak')->toString();
 
     expect($desktop)
         ->toContain('id="application-desktop-actions"')
-        ->toContain('Actions')
+        ->toContain('<x-slot:main wire:click="deploy">')
         ->toContain('Deploy')
         ->toContain('Deploy (without cache)')
         ->toContain('force_deploy_without_cache')
-        ->toContain('deploy(true)')
-        ->and($trigger)
-        ->toContain('button button-highlighted')
-        ->not->toContain('play-circle');
+        ->toContain('deploy(true)');
 
     $mobile = str($heading)->before("@teleport('#resource-action-hud-slot')")->toString();
 
@@ -277,18 +273,17 @@ it('uses the shared Coollabs gradient for primary resource actions in the deskto
         ->toContain('@apply button-highlighted;');
 });
 
-it('uses iconless highlighted Actions dropdowns for service and proxy lifecycle controls', function () {
+it('promotes a primary action for service and proxy lifecycle controls', function () {
     foreach ([
         resource_path('views/livewire/project/service/heading.blade.php') => 'service-desktop-actions',
         resource_path('views/livewire/server/navbar.blade.php') => 'server-desktop-actions',
     ] as $path => $id) {
         $heading = file_get_contents($path);
-        $trigger = str($heading)->after("id=\"{$id}\"")->before('<div x-cloak')->toString();
+        $control = str($heading)->after("id=\"{$id}\"")->before('</x-split-action>')->toString();
 
-        expect($trigger)
-            ->toContain('button button-highlighted')
-            ->toContain('Actions')
-            ->not->toContain('play-circle');
+        expect($control)
+            ->toContain('<x-slot:main')
+            ->toContain('listbox-option');
     }
 });
 
@@ -305,10 +300,10 @@ it('keeps database lifecycle controls direct and highlights the primary action',
     $desktop = str($heading)->after('resource-heading-actions flex')->before('@endteleport')->toString();
 
     expect($desktop)
+        ->toContain('<x-split-action')
+        ->toContain('<x-slot:main')
         ->toContain('Restart')
         ->toContain('Stop')
-        ->toContain('button button-highlighted')
-        ->not->toContain('<x-reicon')
         ->not->toContain('<x-resource-heading-overflow');
 });
 
@@ -498,7 +493,7 @@ it('uses the same mobile heading gap on deployment pages as application settings
     $deploymentShow = file_get_contents(resource_path('views/livewire/project/application/deployment/show.blade.php'));
 
     expect($configuration)->toContain('application-settings-workspace mt-4')
-        ->and($deploymentIndex)->toContain("'mt-4 max-w-[1180px] lg:mt-0' => ! \$embedded")
+        ->and($deploymentIndex)->toContain("'mt-4 max-w-none lg:mt-0' => ! \$embedded")
         ->and($deploymentShow)->toContain('application-settings-workspace mt-4')
         ->toContain('lg:mt-0');
 });
@@ -536,9 +531,9 @@ it('fits the combined deployment history and logs within the desktop viewport', 
 
     expect($indexClass)->toContain('$this->defaultTake = 3;')
         ->and($showView)
-        ->toContain('xl:h-[calc(100dvh-7.5rem)]')
-        ->toContain('xl:overflow-hidden')
-        ->toContain('xl:flex-1');
+        ->toContain('min-h-[calc(100dvh-7.5rem)]')
+        ->toContain('xl:h-[32rem] xl:min-h-0 xl:flex-none')
+        ->toContain('overflow-hidden');
 });
 
 it('uses only the healthcheck toggle action to communicate enabled state', function () {
