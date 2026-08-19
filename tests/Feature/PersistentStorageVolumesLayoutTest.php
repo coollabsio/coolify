@@ -184,7 +184,7 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toMatch('/<x-callout[^>]*title="File-level consistency"[\s\S]*id="stopDuringBackup"[\s\S]*<\/x-callout>/');
     expect(file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php')))
         ->toContain('<span>Time</span>')
-        ->toContain('x-forms.copy-button')
+        ->toContain('x-forms.copy-input')
         ->toContain('col-span-6');
 
     $css = file_get_contents(resource_path('css/app.css'));
