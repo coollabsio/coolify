@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SmtpTransportFactory;
 use Illuminate\Config\Repository;
 use Illuminate\Support\Facades\Mail;
 
@@ -27,25 +28,21 @@ class ConfigurationRepository
         }
 
         if ($settings->smtp_enabled) {
-            $encryption = match (strtolower($settings->smtp_encryption)) {
-                'starttls' => null,
-                'tls' => 'tls',
-                'none' => null,
-                default => null,
-            };
+            $mailerOptions = SmtpTransportFactory::mailerOptions($settings);
 
             $this->config->set('mail.default', 'smtp');
             $this->applyMailFrom($from);
             $this->config->set('mail.mailers.smtp', [
                 'transport' => 'smtp',
+                'scheme' => $mailerOptions['scheme'],
                 'host' => $settings->smtp_host,
                 'port' => $settings->smtp_port,
-                'encryption' => $encryption,
+                'encryption' => $mailerOptions['encryption'],
                 'username' => $settings->smtp_username,
                 'password' => $settings->smtp_password,
                 'timeout' => $settings->smtp_timeout,
                 'local_domain' => null,
-                'auto_tls' => $settings->smtp_encryption === 'none' ? '0' : '',
+                'auto_tls' => $mailerOptions['auto_tls'],
             ]);
         }
     }

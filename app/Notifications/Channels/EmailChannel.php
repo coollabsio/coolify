@@ -4,13 +4,13 @@ namespace App\Notifications\Channels;
 
 use App\Exceptions\NonReportableException;
 use App\Models\Team;
+use App\Support\SmtpTransportFactory;
 use Exception;
 use Illuminate\Notifications\Notification;
 use Resend;
 use Resend\Exceptions\ErrorException;
 use Resend\Exceptions\TransporterException;
 use Symfony\Component\Mailer\Mailer;
-use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Symfony\Component\Mime\Email;
 
 class EmailChannel
@@ -82,21 +82,7 @@ class EmailChannel
                     'html' => (string) $mailMessage->render(),
                 ]);
             } elseif ($isSmtpEnabled) {
-                $encryption = match (strtolower($settings->smtp_encryption)) {
-                    'starttls' => null,
-                    'tls' => 'tls',
-                    'none' => null,
-                    default => null,
-                };
-
-                $transport = new EsmtpTransport(
-                    $settings->smtp_host,
-                    $settings->smtp_port,
-                    $encryption
-                );
-                $transport->setUsername($settings->smtp_username ?? '');
-                $transport->setPassword($settings->smtp_password ?? '');
-
+                $transport = SmtpTransportFactory::fromSettings($settings);
                 $mailer = new Mailer($transport);
 
                 $email = (new Email)
