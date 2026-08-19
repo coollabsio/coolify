@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Config\Repository;
+use Illuminate\Support\Facades\Mail;
 
 class ConfigurationRepository
 {
@@ -15,10 +16,11 @@ class ConfigurationRepository
 
     public function updateMailConfig($settings): void
     {
+        $from = mail_from_identity($settings);
+
         if ($settings->resend_enabled) {
             $this->config->set('mail.default', 'resend');
-            $this->config->set('mail.from.address', $settings->smtp_from_address ?? 'test@example.com');
-            $this->config->set('mail.from.name', $settings->smtp_from_name ?? 'Test');
+            $this->applyMailFrom($from);
             $this->config->set('resend.api_key', $settings->resend_api_key);
 
             return;
@@ -33,8 +35,7 @@ class ConfigurationRepository
             };
 
             $this->config->set('mail.default', 'smtp');
-            $this->config->set('mail.from.address', $settings->smtp_from_address ?? 'test@example.com');
-            $this->config->set('mail.from.name', $settings->smtp_from_name ?? 'Test');
+            $this->applyMailFrom($from);
             $this->config->set('mail.mailers.smtp', [
                 'transport' => 'smtp',
                 'host' => $settings->smtp_host,
@@ -46,6 +47,19 @@ class ConfigurationRepository
                 'local_domain' => null,
                 'auto_tls' => $settings->smtp_encryption === 'none' ? '0' : '',
             ]);
+        }
+    }
+
+    /**
+     * @param  array{address: string, name: string}  $from
+     */
+    private function applyMailFrom(array $from): void
+    {
+        $this->config->set('mail.from.address', $from['address']);
+        $this->config->set('mail.from.name', $from['name']);
+
+        if (app()->bound('mail.manager')) {
+            Mail::purge();
         }
     }
 
