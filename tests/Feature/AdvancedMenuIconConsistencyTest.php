@@ -37,6 +37,7 @@ test('advanced action dropdown menus use the grid icon', function () {
     $files = [
         resource_path('views/components/applications/advanced.blade.php'),
         resource_path('views/components/services/advanced.blade.php'),
+        resource_path('views/components/server/advanced.blade.php'),
     ];
 
     foreach ($files as $path) {

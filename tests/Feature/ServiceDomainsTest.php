@@ -125,6 +125,24 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });
 
+it('shows and persists the HTTP redirect control for HTTPS service applications', function () {
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSee('Redirect HTTP to HTTPS')
+        ->assertSee('Keep enabled when Cloudflare uses Full or Full (Strict) SSL.')
+        ->call('updateForceHttps', $this->apiApp->id, false)
+        ->assertHasNoErrors();
+
+    expect($this->apiApp->fresh()->is_force_https_enabled)->toBeFalse();
+    expect($this->service->fresh()->docker_compose)->not->toContain('middlewares=redirect-to-https');
+});
+
+it('hides the HTTP redirect control for HTTP-only service applications', function () {
+    $this->apiApp->update(['fqdn' => 'http://api.example.com']);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertDontSee('Redirect HTTP to HTTPS');
+});
+
 it('shows one redirect control for each www and non-www pair', function () {
     $this->apiApp->update([
         'fqdn' => 'https://api.example.com,https://www.api.example.com,https://admin.example.com,https://www.admin.example.com',
@@ -141,9 +159,21 @@ it('uses segmented fields when adding and editing service domains', function () 
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
 
     expect($view)
-        ->toContain('<x-forms.domain-input id="newDomain"')
-        ->toContain('<x-forms.domain-input id="editingDomainLocal"')
+        ->toContain('<x-forms.domain-input id="newDomainParts"')
+        ->toContain('<x-forms.domain-input id="editingDomainParts"')
         ->not->toContain('placeholder="https://app.example.com"');
+});
+
+it('resets the add domain dns gate when segmented domain fields change', function () {
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('addDomainDnsFailed', true)
+        ->set('addDomainDnsMessage', 'DNS validation failed.')
+        ->set('forceSaveDns', true)
+        ->set('newDomainParts.host', 'web.example.com')
+        ->assertSet('newDomainPartsChanged', true)
+        ->assertSet('addDomainDnsFailed', false)
+        ->assertSet('addDomainDnsMessage', '')
+        ->assertSet('forceSaveDns', false);
 });
 
 it('shows dns entries control next to Add', function () {

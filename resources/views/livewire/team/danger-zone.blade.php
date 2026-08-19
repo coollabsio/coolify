@@ -75,7 +75,7 @@
                             'Projects' => currentTeam()->projects,
                             'Servers' => currentTeam()->servers,
                             'Private keys' => currentTeam()->privateKeys,
-                            'Sources' => currentTeam()->sources,
+                            'Sources' => currentTeam()->sources(),
                         ] as $label => $resources)
                             @if ($resources->isNotEmpty())
                                 <div class="rounded-lg border border-neutral-200 p-3 dark:border-white/[0.08]">

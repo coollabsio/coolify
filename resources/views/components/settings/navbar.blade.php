@@ -4,7 +4,7 @@
 ])
 
 {{-- Same 1180px shell as the workspace. Title hidden only at xl+ (full desktop). --}}
-<div class="mx-auto w-full max-w-[1180px]">
+<div class="mx-auto w-full max-w-none">
     <x-dashboard.navbar section="settings" :title="$title" :subtitle="$subtitle" :titleOnDesktop="false">
         @isset($titleActions)
             <x-slot:titleActions>

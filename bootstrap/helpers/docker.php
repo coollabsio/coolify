@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\ServiceApplication;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -197,6 +198,70 @@ function checkMinimumDockerEngineVersion($dockerVersion)
     }
 
     return $dockerVersion;
+}
+
+function parseDockerEngineVersion(?string $rawVersion): ?string
+{
+    if ($rawVersion === null || trim($rawVersion) === '') {
+        return null;
+    }
+
+    if (preg_match('/\d+\.\d+(?:\.\d+)?/', $rawVersion, $matches) !== 1) {
+        return null;
+    }
+
+    $parts = explode('.', $matches[0]);
+
+    return sprintf('%d.%d.%d', (int) $parts[0], (int) ($parts[1] ?? 0), (int) ($parts[2] ?? 0));
+}
+
+function dockerEngineVersionFromJson(?string $raw): ?string
+{
+    if ($raw === null || trim($raw) === '') {
+        return null;
+    }
+
+    $decoded = json_decode($raw, true);
+    if (! is_array($decoded)) {
+        return null;
+    }
+
+    $version = $decoded['Server']['Version'] ?? null;
+
+    return is_string($version) ? parseDockerEngineVersion($version) : null;
+}
+
+function dockerStopTimeoutOption(?string $dockerVersion): string
+{
+    $normalized = parseDockerEngineVersion($dockerVersion);
+    if ($normalized !== null && version_compare($normalized, '28.0.0', '>=')) {
+        return '--timeout';
+    }
+
+    return '--time';
+}
+
+function dockerStopCommand(int $timeout, string $containers, Server|string|null $dockerVersion = null): string
+{
+    $version = $dockerVersion instanceof Server
+        ? $dockerVersion->dockerVersion()
+        : $dockerVersion;
+
+    $option = dockerStopTimeoutOption($version);
+    $flag = $option === '--timeout'
+        ? "--timeout={$timeout}"
+        : "--time={$timeout}";
+
+    $command = "docker stop {$flag} {$containers}";
+
+    if (app()->bound('config') && isDev()) {
+        Log::info('docker stop command', [
+            'command' => $command,
+            'docker_version' => $version,
+        ]);
+    }
+
+    return $command;
 }
 function escapeShellValue(string $value): string
 {
@@ -453,6 +518,10 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $path = $url->getPath();
         $host_without_www = str($host)->replace('www.', '');
         $schema = $url->getScheme();
+        $siteAddress = "{$schema}://{$host}";
+        if ($schema === 'https' && ! $is_force_https_enabled) {
+            $siteAddress = "http://{$host}, https://{$host}";
+        }
         $port = $url->getPort();
         $handle = 'handle_path';
         if (! $is_stripprefix_enabled) {
@@ -464,7 +533,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if (is_null($port) && $predefinedPort) {
             $port = $predefinedPort;
         }
-        $labels->push("caddy_{$loop}={$schema}://{$host}");
+        $labels->push("caddy_{$loop}={$siteAddress}");
         if (isNoindexDomain($domain, $noindex_domains)) {
             // Caddy's header directive takes either inline arguments or a block,
             // never both, so -Server has to move into the block alongside it.
@@ -484,11 +553,12 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
+        $redirect_schema = $is_force_https_enabled ? $schema : '{scheme}';
         if ($redirect_direction === 'www' && ! str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$schema}://www.{$host}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://www.{$host}{uri}");
         }
         if ($redirect_direction === 'non-www' && str($host)->startsWith('www.')) {
-            $labels->push("caddy_{$loop}.redir={$schema}://{$host_without_www}{uri}");
+            $labels->push("caddy_{$loop}.redir={$redirect_schema}://{$host_without_www}{uri}");
         }
         if ($is_http_basic_auth_enabled) {
             $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$hashedPassword}\"");
@@ -498,7 +568,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -581,14 +651,15 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
             $to_www_name = "{$loop}-{$uuid}-to-www";
             $to_non_www_name = "{$loop}-{$uuid}-to-non-www";
+            $redirect_capture_prefix = $escape_redirect_replacement_for_compose ? '$$' : '$';
             $redirect_to_non_www = [
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.regex=^(http|https)://www\.(.+)",
-                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement=\$\${1}://\$\${2}",
+                "traefik.http.middlewares.{$to_non_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://{$redirect_capture_prefix}{2}",
                 "traefik.http.middlewares.{$to_non_www_name}.redirectregex.permanent=false",
             ];
             $redirect_to_www = [
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.regex=^(http|https)://(?:www\.)?(.+)",
-                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement=\$\${1}://www.\$\${2}",
+                "traefik.http.middlewares.{$to_www_name}.redirectregex.replacement={$redirect_capture_prefix}{1}://www.{$redirect_capture_prefix}{2}",
                 "traefik.http.middlewares.{$to_www_name}.redirectregex.permanent=false",
             ];
             if ($schema === 'https') {
@@ -630,8 +701,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push($middleware_name);
                     });
                     if ($middlewares->isNotEmpty()) {
-                        $middlewares = $middlewares->join(',');
-                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares->join(',')}");
                     }
                 } else {
                     $middlewares = collect([]);
@@ -659,8 +729,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push($middleware_name);
                     });
                     if ($middlewares->isNotEmpty()) {
-                        $middlewares = $middlewares->join(',');
-                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares->join(',')}");
                     }
                 }
                 $labels->push("traefik.http.routers.{$https_label}.tls=true");
@@ -673,15 +742,17 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
-                $middlewares = collect([]);
-                if ($is_noindex) {
-                    $middlewares->push($noindex_name);
-                }
                 if ($is_force_https_enabled) {
-                    $middlewares->push('redirect-to-https');
+                    $httpMiddlewares = collect([]);
+                    if ($is_noindex) {
+                        $httpMiddlewares->push($noindex_name);
+                    }
+                    $httpMiddlewares->push('redirect-to-https');
+                } else {
+                    $httpMiddlewares = $middlewares;
                 }
-                if ($middlewares->isNotEmpty()) {
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares->join(',')}");
+                if ($httpMiddlewares->isNotEmpty()) {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$httpMiddlewares->join(',')}");
                 }
             } else {
                 // Set labels for http
@@ -811,6 +882,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
+                            escape_redirect_replacement_for_compose: false,
                         ));
                         break;
                 }
@@ -827,6 +899,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
                     noindex_domains: $noindexDomains,
+                    escape_redirect_replacement_for_compose: false,
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -867,6 +940,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
                         noindex_domains: $noindexDomains,
+                        escape_redirect_replacement_for_compose: false,
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -897,6 +971,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
                 noindex_domains: $noindexDomains,
+                escape_redirect_replacement_for_compose: false,
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,

@@ -133,30 +133,14 @@
                             @endif
                         </div>
                     @endforeach
-
-                    <footer
-                        class="flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
-                        <span>{{ $executionCount }} {{ Str::plural('execution', $executionCount) }}</span>
-                        <div class="flex items-center gap-1">
-                            <button type="button" wire:click="previousPage" @disabled($currentPage === 1)
-                                class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                aria-label="Previous page">
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
-                                    <path d="m15 5-7 7 7 7" stroke="currentColor" stroke-width="1.7"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                            <span class="min-w-14 text-center tabular-nums">{{ $currentPage }} / {{ $lastPage }}</span>
-                            <button type="button" wire:click="nextPage" @disabled($currentPage === $lastPage)
-                                class="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:pointer-events-none disabled:opacity-35 dark:border-white/[0.08] dark:text-fg-dim dark:hover:bg-white/[0.06]"
-                                aria-label="Next page">
-                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none">
-                                    <path d="m9 5 7 7-7 7" stroke="currentColor" stroke-width="1.7"
-                                        stroke-linecap="round" stroke-linejoin="round" />
-                                </svg>
-                            </button>
-                        </div>
-                    </footer>
+                    <x-table-pagination :from="$executions->firstItem() ?? 0" :to="$executions->lastItem() ?? 0"
+                        :total="$executionCount" :current-page="$currentPage" :last-page="$lastPage"
+                        wire-target="previousPage,nextPage" previous-action="previousPage" next-action="nextPage">
+                        <x-slot:pageSize>
+                            <x-page-size-select model="perPage" livewire
+                                storage-key="coolify.page-size.volume-backup-executions" />
+                        </x-slot:pageSize>
+                    </x-table-pagination>
                 </div>
             @else
                 <x-empty size="sm" title="No executions"

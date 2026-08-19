@@ -209,10 +209,14 @@ class General extends Component
         }
     }
 
-    public function instantSave()
+    public function instantSave(?bool $isPublic = null)
     {
         try {
             $this->authorize('update', $this->database);
+
+            if ($isPublic !== null) {
+                $this->isPublic = $isPublic;
+            }
 
             if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');

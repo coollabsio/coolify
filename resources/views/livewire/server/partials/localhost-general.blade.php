@@ -3,6 +3,12 @@
                     <x-application.settings-section id="server-overview-section" title="Server overview"
                         helper="Operating system and hardware details for the server running this Coolify instance.">
                         <x-slot:actions>
+                            @if ($server->server_metadata)
+                                <x-forms.button type="button" class="size-8! px-0!"
+                                    wire:click="refreshServerMetadata" title="Refresh server details">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                </x-forms.button>
+                            @endif
                             <x-status-badge :status="$server->isFunctional() ? 'Ready' : 'Validation required'"
                                 :type="$server->isFunctional() ? 'success' : 'warning'" />
                         </x-slot:actions>
@@ -25,27 +31,14 @@
                         </div>
 
                         @if ($server->server_metadata)
-                            @php($meta = $server->server_metadata)
-                            <dl
-                                class="mt-4 grid gap-x-6 gap-y-5 border-t border-neutral-200 pt-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-white/[0.08]">
-                                @foreach ([
-                                    'Operating system' => $meta['os'] ?? 'N/A',
-                                    'Architecture' => $meta['arch'] ?? 'N/A',
-                                    'Kernel' => $meta['kernel'] ?? 'N/A',
-                                    'CPU cores' => $meta['cpus'] ?? 'N/A',
-                                    'Memory' => isset($meta['memory_bytes']) ? round($meta['memory_bytes'] / 1073741824, 1) . ' GB' : 'N/A',
-                                    'Up since' => $meta['uptime_since'] ?? 'N/A',
-                                ] as $detailLabel => $detailValue)
-                                    <div>
-                                        <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">
-                                            {{ $detailLabel }}
-                                        </dt>
-                                        <dd class="mt-1 text-sm font-medium text-neutral-950 dark:text-fg">
-                                            {{ $detailValue }}
-                                        </dd>
-                                    </div>
-                                @endforeach
-                            </dl>
+                            @include('livewire.server.partials.server-details', ['server' => $server])
+                        @else
+                            <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Fetch server details
+                                </x-forms.button>
+                            </div>
                         @endif
                     </x-application.settings-section>
 

@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\Queue;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config(['app.maintenance.driver' => 'file']);
+
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();
@@ -134,6 +136,53 @@ test('proxy settings regenerate managed labels', function () {
         ->assertOk();
 
     expect(base64_decode($this->application->fresh()->custom_labels))->not->toContain('sentinel-label=true');
+});
+
+test('http basic auth updates regenerate managed labels', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'is_http_basic_auth_enabled' => false,
+        'http_basic_auth_username' => null,
+        'http_basic_auth_password' => null,
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_http_basic_auth_enabled' => true,
+            'http_basic_auth_username' => 'api-user',
+            'http_basic_auth_password' => 'api-password',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect((bool) $application->is_http_basic_auth_enabled)->toBeTrue()
+        ->and($application->http_basic_auth_username)->toBe('api-user')
+        ->and($application->http_basic_auth_password)->toBe('api-password')
+        ->and($labels)->toContain('basicauth')
+        ->and($labels)->toContain('api-user')
+        ->and($labels)->not->toContain('sentinel-label=true');
+});
+
+test('http basic auth updates preserve user-managed labels', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => false]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_http_basic_auth_enabled' => true,
+            'http_basic_auth_username' => 'api-user',
+            'http_basic_auth_password' => 'api-password',
+        ])
+        ->assertOk();
+
+    expect(base64_decode($this->application->fresh()->custom_labels))->toBe('sentinel-label=true');
 });
 
 test('rejects invalid boolean application settings', function () {

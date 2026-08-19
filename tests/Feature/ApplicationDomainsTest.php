@@ -119,6 +119,27 @@ it('lists existing domains as individual rows', function () {
     expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(2);
 });
 
+it('shows the HTTP redirect control for HTTPS domains and persists changes', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('isForceHttpsEnabled', true)
+        ->assertSee('Redirect HTTP to HTTPS')
+        ->assertSee('Keep enabled when Cloudflare uses Full or Full (Strict) SSL.')
+        ->set('isForceHttpsEnabled', false)
+        ->call('updateForceHttps')
+        ->assertHasNoErrors();
+
+    expect($this->application->settings->fresh()->is_force_https_enabled)->toBeFalse();
+});
+
+it('hides the HTTP redirect control for HTTP-only domains', function () {
+    $this->application->update(['fqdn' => 'http://app.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertDontSee('Redirect HTTP to HTTPS');
+});
+
 it('shows one redirect direction control in each compose service header', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
@@ -234,6 +255,22 @@ it('adds a domain to the application', function () {
 
     expect(explode(',', (string) $this->application->fqdn))
         ->toBe(['https://app.example.com', 'https://www.app.example.com']);
+});
+
+it('composes the complete port on the server without duplicating an existing www domain', function () {
+    $this->application->update(['fqdn' => 'https://www.example.com:3000']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'example.com')
+        ->set('newDomainParts.port', '3000')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect(explode(',', (string) $this->application->fresh()->fqdn))->toBe([
+        'https://www.example.com:3000',
+        'https://example.com:3000',
+    ]);
 });
 
 it('adds multiple domains without replacing existing ones', function () {
@@ -780,7 +817,7 @@ it('normalizes domains before saving', function () {
     ]);
 });
 
-it('shows the missing www counterpart as a suggested domain row', function () {
+it('does not suggest a missing www counterpart', function () {
     $this->application->update([
         'fqdn' => 'https://example.com',
         'redirect' => 'both',
@@ -789,31 +826,19 @@ it('shows the missing www counterpart as a suggested domain row', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSet('domainRows.0.url', 'https://example.com')
         ->assertSet('domainRows.0.is_suggested', false)
-        ->assertSet('domainRows.1.url', 'https://www.example.com')
-        ->assertSet('domainRows.1.is_suggested', true)
-        ->assertSet('domainRows.1.suggestion_label', null)
-        ->assertSet('domainRows.1.dns_message', 'Not configured yet.')
-        ->assertSee('Add domain')
-        ->assertSee('Not configured yet.')
-        ->assertDontSee('Not added ·')
-        ->assertDontSee('click Add domain')
-        ->assertDontSee('does not add this automatically')
-        ->assertSee('https://www.example.com');
+        ->assertCount('domainRows', 1)
+        ->assertDontSee('Not configured yet.')
+        ->assertDontSee('https://www.example.com');
 });
 
-it('does not change suggested domain role or persist until Set Direction saves', function () {
+it('does not persist redirect until Set Direction saves', function () {
     $this->application->update([
         'fqdn' => 'https://example.com',
         'redirect' => 'both',
     ]);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->assertSet('domainRows.1.suggestion_label', null)
-        ->assertSet('domainRows.1.suggestion_role', 'pair')
-        ->set('redirect', 'www')
-        // Dropdown alone must not rebuild suggestions or persist redirect.
-        ->assertSet('domainRows.1.suggestion_label', null)
-        ->assertSet('domainRows.1.suggestion_role', 'pair');
+        ->set('redirect', 'www');
 
     expect($this->application->fresh()->redirect)->toBe('both');
 
@@ -1058,47 +1083,6 @@ it('recovers when serviceRedirects.api is corrupted to a nested array by dotted 
         ->toContain('https://www.api.example.com');
 });
 
-it('checks dns on suggested www domain rows', function () {
-    $settings = InstanceSettings::get();
-    $settings->is_dns_validation_enabled = true;
-    $settings->save();
-
-    $this->application->update([
-        'fqdn' => 'https://coolify-dns-pair-test.invalid',
-        'redirect' => 'both',
-    ]);
-
-    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->assertSet('domainRows.1.url', 'https://www.coolify-dns-pair-test.invalid')
-        ->assertSet('domainRows.1.is_suggested', true)
-        ->call('checkDomainDns', 1);
-
-    expect(in_array($component->get('domainRows.1.dns_status'), ['failed', 'ok', 'skipped'], true))->toBeTrue()
-        ->and($component->get('domainRows.1.checked_at'))->not->toBeNull();
-
-    $this->application->refresh();
-    $entry = $this->application->domain_dns_statuses['https://www.coolify-dns-pair-test.invalid'] ?? null;
-    expect($entry)->toBeArray()
-        ->and($entry['status'] ?? null)->toBe($component->get('domainRows.1.dns_status'))
-        ->and($entry['checked_at'] ?? null)->not->toBeNull();
-});
-
-it('adds a suggested domain to the application', function () {
-    $this->application->update([
-        'fqdn' => 'https://example.com',
-        'redirect' => 'both',
-    ]);
-
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->call('addSuggestedDomain', 1)
-        ->assertDispatched('success');
-
-    $this->application->refresh();
-    expect(explode(',', (string) $this->application->fqdn))
-        ->toContain('https://example.com')
-        ->toContain('https://www.example.com');
-});
-
 it('saves after confirming a domain conflict on add', function () {
     Application::factory()->create([
         'uuid' => (string) Str::uuid(),
@@ -1123,39 +1107,6 @@ it('saves after confirming a domain conflict on add', function () {
         ->assertDispatched('success');
 
     expect($this->application->fresh()->fqdn)->toBe('https://shared.example.com');
-});
-
-it('saves a suggested domain after confirming a domain conflict', function () {
-    Application::factory()->create([
-        'uuid' => (string) Str::uuid(),
-        'name' => 'WWW Conflicting App',
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => $this->destination->getMorphClass(),
-        'fqdn' => 'https://www.example.com',
-        'build_pack' => 'nixpacks',
-    ]);
-
-    $this->application->update([
-        'fqdn' => 'https://example.com',
-        'redirect' => 'both',
-    ]);
-
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->call('addSuggestedDomain', 1)
-        ->assertSet('showDomainConflictModal', true)
-        ->assertSet('pendingAction', 'suggested')
-        ->assertSet('forceSaveDomains', false)
-        ->call('confirmDomainUsage')
-        ->assertSet('showDomainConflictModal', false)
-        ->assertSet('pendingAction', null)
-        ->assertSet('forceSaveDomains', false)
-        ->assertDispatched('success');
-
-    $this->application->refresh();
-    expect(explode(',', (string) $this->application->fqdn))
-        ->toContain('https://example.com')
-        ->toContain('https://www.example.com');
 });
 
 it('saves after confirming a domain conflict on edit', function () {
@@ -1254,13 +1205,31 @@ it('uses the compact service domains layout for compose applications', function 
         ->toContain('bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]')
         ->toContain('class="data-table-header domains-table-grid-service"')
         ->toContain('<span>Direction</span>')
-        ->toContain('<span>Search engine indexing</span>')
+        ->toContain('<span class="whitespace-nowrap">Search engine indexing</span>')
         ->not->toContain('<span>Last checked</span>')
         ->not->toContain('id="edit-domain-direction"')
         ->toContain('id="domain-direction-service-{{ $redirectWireKey }}"')
         ->toContain('onChange="updateServiceRedirect"')
         ->toContain("'showDirectionControl' => false")
         ->not->toContain('title="No domains for this service"');
+});
+
+it('keeps search engine indexing table headers on one line', function () {
+    $applicationView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+    $serviceView = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
+
+    expect(substr_count($applicationView, '<span class="whitespace-nowrap">Search engine indexing</span>'))
+        ->toBe(2)
+        ->and($serviceView)
+        ->toContain('<span class="whitespace-nowrap">Search engine indexing</span>');
+});
+
+it('shows domain guidance in the application domains section', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+
+    expect($view)
+        ->toContain('<p class="text-sm text-neutral-500 dark:text-fg-dim">')
+        ->toContain('{{ $helperText }}');
 });
 
 it('does not render a last checked column in the domains table', function () {
@@ -1290,16 +1259,16 @@ it('uses segmented fields when adding and editing application domains', function
     $component = file_get_contents(resource_path('views/components/forms/domain-input.blade.php'));
 
     expect($view)
-        ->toContain('<x-forms.domain-input id="newDomain"')
-        ->toContain('<x-forms.domain-input id="editingDomainLocal"')
+        ->toContain('<x-forms.domain-input id="newDomainParts"')
+        ->toContain('<x-forms.domain-input id="editingDomainParts"')
         ->not->toContain('placeholder="https://app.example.com"')
         ->and($component)
         ->toContain('Protocol')
         ->toContain('Domain')
         ->toContain('Port')
         ->toContain('Path')
-        ->toContain("scheme: 'https'")
-        ->toContain('<x-forms.listbox id="{{ $id }}-protocol"')
+        ->toContain('wire:model="{{ $id }}.host"')
+        ->toContain('<x-forms.listbox id="{{ $id }}.scheme"')
         ->not->toContain('<select id="{{ $id }}-protocol"')
         ->toContain("['value' => 'https', 'label' => 'https']")
         ->toContain("['value' => 'http', 'label' => 'http']")
@@ -1408,34 +1377,6 @@ it('auto-adds missing www pair for a single compose service redirect', function 
     expect(data_get($domains, 'web.redirect'))->toBe('www')
         ->and($webDomains)->toContain('https://web.example.com')
         ->and($webDomains)->toContain('https://www.web.example.com');
-});
-
-it('uses compose service redirect for suggested domain messaging when direction is both', function () {
-    $this->application->update([
-        'build_pack' => 'dockercompose',
-        'fqdn' => null,
-        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
-        'docker_compose_domains' => json_encode([
-            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
-        ]),
-    ]);
-
-    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('isCompose', true)
-        ->set('composeServices', ['web'])
-        ->set('serviceRedirects.web', 'both');
-
-    $component->instance()->domainRows = (function () use ($component) {
-        $method = new ReflectionMethod($component->instance(), 'buildDomainRows');
-
-        return $method->invoke($component->instance());
-    })();
-
-    $suggested = collect($component->get('domainRows'))->firstWhere('is_suggested', true);
-
-    expect($suggested)->not->toBeNull()
-        ->and($suggested['suggestion_role'] ?? null)->toBe('pair')
-        ->and($suggested['url'] ?? null)->toBe('https://www.web.example.com');
 });
 
 it('updates search engine indexing from the domains view', function () {

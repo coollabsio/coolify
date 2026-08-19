@@ -2884,6 +2884,10 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
+        $requestHasHttpBasicAuth = $request->has('is_http_basic_auth_enabled')
+            || $request->has('http_basic_auth_username')
+            || $request->has('http_basic_auth_password');
+
         if ($request->has('is_http_basic_auth_enabled') && $request->is_http_basic_auth_enabled === true) {
             if (blank($application->http_basic_auth_username) || blank($application->http_basic_auth_password)) {
                 $validationErrors = [];
@@ -2900,10 +2904,6 @@ class ApplicationsController extends Controller
                     ], 422);
                 }
             }
-        }
-        if ($request->has('is_http_basic_auth_enabled') && $application->is_container_label_readonly_enabled === false) {
-            $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
-            $application->save();
         }
 
         // For dockercompose applications, domains (fqdn) field should not be used
@@ -3119,7 +3119,7 @@ class ApplicationsController extends Controller
             // Must run after fqdn is filled: flags are kept only for domains the app still has.
             $application->setNoindexDomains($request->input('noindex_domains') ?? []);
         }
-        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains) && $server->isProxyShouldRun()) {
+        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth) && $server->isProxyShouldRun()) {
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
         $application->save();

@@ -77,7 +77,7 @@ test('database status is updated when container status changes', function () {
     expect($database->status)->toBe('running:healthy');
 });
 
-test('database is not marked exited when containers list is empty', function () {
+test('database is not marked exited when an incomplete containers snapshot is empty', function () {
     $team = Team::factory()->create();
     $database = createPushUpdatePostgresql($team, [
         'status' => 'running:healthy',
@@ -88,6 +88,7 @@ test('database is not marked exited when containers list is empty', function () 
     // Empty containers = Sentinel might have failed, should NOT mark as exited
     $data = [
         'containers' => [],
+        'snapshot' => ['complete' => false],
     ];
 
     $job = new PushServerUpdateJob($server, $data);
@@ -97,6 +98,22 @@ test('database is not marked exited when containers list is empty', function () 
 
     // Status should remain running, NOT be set to exited
     expect($database->status)->toBe('running:healthy');
+});
+
+test('database is marked exited when a complete containers snapshot is empty', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'running:healthy',
+    ]);
+
+    $data = [
+        'containers' => [],
+        'snapshot' => ['complete' => true],
+    ];
+
+    (new PushServerUpdateJob($database->destination->server, $data))->handle();
+
+    expect($database->refresh()->status)->toBe('exited:unhealthy');
 });
 
 function createPushUpdatePostgresql(Team $team, array $attributes = []): StandalonePostgresql

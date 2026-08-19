@@ -256,6 +256,7 @@ class ServiceApplicationsController extends Controller
                         'is_log_drain_enabled' => new OA\Property(property: 'is_log_drain_enabled', type: 'boolean', nullable: true),
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
+                        'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
                     ]
                 )
             )
@@ -328,6 +329,7 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled',
             'is_gzip_enabled',
             'is_stripprefix_enabled',
+            'is_force_https_enabled',
         ];
 
         $validationRules = [
@@ -341,6 +343,7 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled' => 'sometimes|boolean',
             'is_gzip_enabled' => 'sometimes|boolean',
             'is_stripprefix_enabled' => 'sometimes|boolean',
+            'is_force_https_enabled' => 'sometimes|boolean',
         ];
 
         $validator = Validator::make($payload, $validationRules);

@@ -15,7 +15,7 @@
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.listbox id="discordPingEnabled" label="Critical event mention"
+                    <x-forms.listbox canGate="update" :canResource="$settings" id="discordPingEnabled" label="Critical event mention"
                         helper="Mention @here when a critical event occurs."
                         onChange="instantSaveDiscordPingEnabled"
                         :disabled="!auth()->user()->can('update', $settings)" :options="[

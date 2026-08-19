@@ -54,8 +54,8 @@
             ]);
     @endphp
 
-    <section class="application-settings-workspace mt-4 w-full max-w-[1180px] lg:mt-0">
-        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <aside class="application-settings-navigation min-w-0 xl:self-start">
                 <nav aria-label="Service settings"
                     class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
@@ -116,7 +116,7 @@
                             </div>
                             <div class="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
                                 <div
-                                    class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.035]">
+                                    class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]">
                                     <button type="button" x-on:click="setViewMode('table')"
                                         class="flex size-7.5 items-center justify-center rounded-md transition-colors"
                                         :class="viewMode === 'table'

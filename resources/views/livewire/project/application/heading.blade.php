@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $routeIs = fn (string|array $routes): bool => \Illuminate\Support\Str::is($routes, $activeRouteName);
         // Settings covers all configuration sub-pages (General, Webhooks, Domains, …),
@@ -30,19 +30,22 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $application->name }}
                 </h1>
-                <x-status-summary :status="$application->status" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$application->status" />
+                    <x-applications.links :application="$application" compact />
+                </div>
             </div>
         </div>
 
         <div class="w-full xl:hidden">
             @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
+                @can('deploy', $application)
                 <div id="application-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
                     <button type="button" class="button w-full justify-between" @click="open = !open"
                         :aria-expanded="open" aria-haspopup="menu">
                         <span class="inline-flex items-center gap-2">
-                            <x-reicon name="play-circle" class="size-3.5 text-warning" />
                             Actions
                         </span>
                         <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
@@ -58,13 +61,13 @@
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         wire:click="deploy" @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                        Redeploy
+                                        Deploy
                                     </button>
                                 @else
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
                                         role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                        Redeploy
+                                        Deploy
                                     </button>
                                 @endcan
                             @endif
@@ -135,22 +138,20 @@
                                     wire:click="{{ $application->status === 'running' ? 'force_deploy_without_cache' : 'deploy(true)' }}"
                                     @click="open = false" role="menuitem">
                                     <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Force deploy without cache
+                                    Deploy (without cache)
                                 </button>
                             @else
                                 <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
                                     role="menuitem">
                                     <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Force deploy without cache
+                                    Deploy (without cache)
                                 </button>
                             @endcan
                         @endif
                     </div>
                 </div>
+                @endcan
             @endif
-            <div class="resource-heading-menus w-full">
-                <x-applications.links :application="$application" full-width />
-            </div>
             <div class="hidden" aria-hidden="true">
                 <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
                     submitAction="stop" :checkboxes="$checkboxes" :actions="[
@@ -186,11 +187,12 @@
                         <div class="resource-heading-menus shrink-0">
                             <x-applications.links :application="$application" />
                         </div>
+                        @can('deploy', $application)
                         <div id="application-desktop-actions" class="relative" x-data="{ open: false }"
+                            x-effect="$dispatch('resource-actions-toggled', { open })"
                             @click.outside="open = false" @keydown.escape.window="open = false">
-                            <button type="button" class="button" @click="open = !open" :aria-expanded="open"
+                            <button type="button" class="button button-highlighted" @click="open = !open" :aria-expanded="open"
                                 aria-haspopup="menu">
-                                <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                 Actions
                                 <x-reicon name="chevron-down" class="size-3 opacity-55" />
                             </button>
@@ -204,6 +206,14 @@
                                         <x-reicon name="play-circle" class="size-3.5 opacity-70" />
                                         Deploy
                                     </button>
+                                    @if (!$application->destination->server->isSwarm())
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @disabled(!auth()->user()->can('deploy', $application))
+                                            wire:click="deploy(true)" @click="open = false" role="menuitem">
+                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                            Deploy (without cache)
+                                        </button>
+                                    @endif
                                 @else
                                     @if (!$application->destination->server->isSwarm())
                                         @can('deploy', $application)
@@ -218,6 +228,13 @@
                                                 Redeploy
                                             </button>
                                         @endcan
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @disabled(!auth()->user()->can('deploy', $application))
+                                            wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                            @click="open = false" role="menuitem">
+                                            <x-reicon name="refresh" class="size-3.5 opacity-70" />
+                                            {{ str($application->status)->startsWith('running') ? 'Redeploy (without cache)' : 'Deploy (without cache)' }}
+                                        </button>
                                     @endif
                                     @if ($application->build_pack !== 'dockercompose')
                                         @if ($application->destination->server->isSwarm())
@@ -263,18 +280,9 @@
                                         </button>
                                     @endcan
                                 @endif
-                                @if (!$application->destination->server->isSwarm())
-                                    <div class="my-1 border-t border-coolgray-200 dark:border-coolgray-300" role="separator"></div>
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                        @disabled(!auth()->user()->can('deploy', $application))
-                                        wire:click="{{ $application->status === 'running' ? 'force_deploy_without_cache' : 'deploy(true)' }}"
-                                        @click="open = false" role="menuitem">
-                                        <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                        Force deploy without cache
-                                    </button>
-                                @endif
                             </div>
                         </div>
+                        @endcan
                     @endif
                 </div>
             </div>

@@ -158,12 +158,15 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             ])
             ->get();
 
+        $cancelledDeployments = 0;
+
         foreach ($activeDeployments as $activeDeployment) {
             try {
                 // Mark deployment as cancelled
                 $activeDeployment->update([
                     'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
                 ]);
+                $cancelledDeployments++;
 
                 // Add cancellation log entry
                 $activeDeployment->addLogEntry('Deployment cancelled: Pull request closed.', 'stderr');
@@ -183,6 +186,14 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
             } catch (\Throwable $e) {
                 // Silently handle errors during deployment cancellation
+            }
+        }
+
+        if ($cancelledDeployments > 0) {
+            try {
+                next_after_cancel($server);
+            } catch (\Throwable $e) {
+                \Log::warning("Failed to advance deployment queue after deleting preview {$this->resource->id}: {$e->getMessage()}");
             }
         }
 
@@ -216,7 +227,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
 
         $containerList = implode(' ', array_map('escapeshellarg', $containerNames));
         $commands = [
-            "docker stop -t $timeout $containerList",
+            dockerStopCommand($timeout, $containerList, $server),
             "docker rm -f $containerList",
         ];
         instant_remote_process(

@@ -80,16 +80,25 @@ test('resource environment variables table has a Managed column and no name-cell
     expect($show)->toContain('<x-helper :helper="e($comment)" />');
 });
 
-test('resource environment variables table remains horizontally scrollable on mobile', function () {
+test('resource environment variables expose their settings action without horizontal scrolling on mobile', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/all.blade.php'));
+    $show = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show.blade.php'));
+    $hardcoded = file_get_contents(resource_path('views/livewire/project/shared/environment-variable/show-hardcoded.blade.php'));
     $css = file_get_contents(resource_path('css/app.css'));
 
     expect($view)
         ->toContain('environment-table-scroll')
+        ->and($show)
+        ->toContain('data-env-name-trigger')
+        ->toContain('data-env-settings-trigger')
+        ->and($hardcoded)
+        ->toContain('data-env-name-trigger')
+        ->toContain('data-env-settings-trigger')
         ->and($css)
         ->toContain(".environment-table-scroll {\n    overflow-x: auto;")
         ->toContain(".environment-table-scroll .env-table-grid {\n    min-width: 53rem;")
-        ->not->toContain('.data-table-row.env-table-grid > :nth-child')
+        ->toContain('.data-table-header.env-table-grid')
+        ->toContain('.data-table-row.env-table-grid > :last-child')
         ->not->toContain(".env-type-desktop {\n        display: none");
 });
 

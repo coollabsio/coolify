@@ -104,6 +104,13 @@ class CancelDeployment extends Tool
             'server_id' => $deployment->server_id,
         ]);
 
+        try {
+            $deploymentServer = Server::whereTeamId($teamId)->find($deployment->server_id);
+            next_after_cancel($deploymentServer);
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
+        }
+
         return $this->mcpSuccess($request, $this->respond([
             'ok' => true,
             'message' => 'Deployment cancelled successfully.',

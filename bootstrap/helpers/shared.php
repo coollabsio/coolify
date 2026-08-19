@@ -3050,7 +3050,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
-                                        is_force_https_enabled: true,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3065,7 +3065,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         network: $resource->destination->network,
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
-                                        is_force_https_enabled: true,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3080,7 +3080,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
-                                is_force_https_enabled: true,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3093,7 +3093,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 network: $resource->destination->network,
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
-                                is_force_https_enabled: true,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -4722,6 +4722,23 @@ function downsampleLTTB(array $data, int $threshold): array
     $sampled[] = $data[$dataLength - 1]; // Always keep last point
 
     return $sampled;
+}
+
+/**
+ * Convert Sentinel container memory samples from bytes to megabytes.
+ *
+ * Sentinel stores container `used` memory in bytes. Application and database
+ * metric charts label the series as megabytes, so the values must be converted
+ * before they are sent to the frontend.
+ *
+ * @param  array<int, array{0: int|float, 1: int|float}>  $metrics
+ * @return array<int, array{0: int, 1: float}>
+ */
+function convertContainerMemoryBytesToMegabytes(array $metrics): array
+{
+    return array_map(static function (array $point): array {
+        return [(int) $point[0], round(((float) $point[1]) / 1024 / 1024, 2)];
+    }, $metrics);
 }
 
 /**

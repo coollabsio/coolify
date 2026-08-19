@@ -107,8 +107,8 @@ function collectDockerNetworksByServer(Server $server)
 }
 function connectProxyToNetworks(Server $server)
 {
-    ['networks' => $networks] = collectDockerNetworksByServer($server);
     if ($server->isSwarm()) {
+        ['networks' => $networks] = collectDockerNetworksByServer($server);
         $commands = $networks->map(function ($network) {
             $safe = escapeshellarg($network);
 
@@ -118,19 +118,20 @@ function connectProxyToNetworks(Server $server)
                 "echo 'Successfully connected coolify-proxy to {$safe} network.'",
             ];
         });
-    } else {
-        $commands = $networks->map(function ($network) {
-            $safe = escapeshellarg($network);
 
-            return [
-                "docker network ls --format '{{.Name}}' | grep '^{$network}$' >/dev/null || docker network create --attachable {$safe} >/dev/null",
-                "docker network connect {$safe} coolify-proxy >/dev/null 2>&1 || true",
-                "echo 'Successfully connected coolify-proxy to {$safe} network.'",
-            ];
-        });
+        return $commands->flatten();
     }
 
-    return $commands->flatten();
+    return collect([
+        'for network in $(docker inspect $(docker ps --filter label=coolify.managed=true --format "{{.ID}}") --format=\'{{range $network, $_ := .NetworkSettings.Networks}}{{println $network}}{{end}}\' 2>/dev/null | sort -u); do',
+        '    if [ -z "$network" ] || [ "$network" = "bridge" ] || [ "$network" = "host" ] || [ "$network" = "none" ] || [ "$network" = "default" ]; then',
+        '        continue',
+        '    fi',
+        '    if docker network inspect "$network" >/dev/null 2>&1; then',
+        '        docker network connect "$network" coolify-proxy >/dev/null 2>&1 || true',
+        '    fi',
+        'done',
+    ]);
 }
 
 /**

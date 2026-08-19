@@ -89,7 +89,11 @@
                     :current-page="$users->currentPage()" :last-page="$users->lastPage()"
                     wire-target="setPage,previousPage,nextPage" first-action="setPage(1)"
                     previous-action="previousPage" next-action="nextPage"
-                    last-action="setPage({{ $users->lastPage() }})" />
+                    last-action="setPage({{ $users->lastPage() }})">
+                    <x-slot:pageSize>
+                        <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.team-admin" />
+                    </x-slot:pageSize>
+                </x-table-pagination>
             @else
                 <x-empty title="No users found" description="Try a different name or email address."
                     icon-name="teams" size="sm" />
