@@ -318,6 +318,21 @@ it('adds a domain to a selected service application', function () {
         ->not->toBeNull();
 });
 
+it('adds a domain when the compose service has an empty environment section', function () {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    environment:\n  api:\n    image: node:alpine\n",
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->webApp->id)
+        ->set('newDomain', 'https://web.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
+});
+
 it('keeps a stable key for the rendered domain list', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
 
