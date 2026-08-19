@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# Restore a PostgreSQL custom-format dump into this worktree's dev database.
+#
+# Usage:
+#   scripts/dev-import-database-backup /path/to/backup.gz
+#
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.dev.yml)
+POSTGRES_STARTED=false
+
+usage() {
+    echo "Usage: $0 /path/to/postgres-custom-dump[.gz]" >&2
+    exit "${1:-1}"
+}
+
+compose() {
+    docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
+stop_postgres() {
+    if [[ "$POSTGRES_STARTED" == true ]]; then
+        compose stop postgres >/dev/null
+    fi
+}
+
+stream_dump() {
+    if [[ "$IS_GZIP" == true ]]; then
+        gzip -dc "$DUMP_PATH"
+    else
+        cat "$DUMP_PATH"
+    fi
+}
+
+[[ $# -eq 1 ]] || usage
+DUMP_PATH="$(realpath "$1")"
+[[ -f "$DUMP_PATH" ]] || {
+    echo "Dump file not found: $DUMP_PATH" >&2
+    exit 1
+}
+
+IS_GZIP=false
+if [[ "$(dd if="$DUMP_PATH" bs=2 count=1 status=none | od -An -tx1 | tr -d ' \n')" == "1f8b" ]]; then
+    IS_GZIP=true
+    gzip -t "$DUMP_PATH"
+fi
+
+dump_header="$(stream_dump | dd bs=5 count=1 status=none || true)"
+[[ "$dump_header" == "PGDMP" ]] || {
+    echo "Expected a PostgreSQL custom-format dump (PGDMP), optionally gzip-compressed." >&2
+    exit 1
+}
+
+running_services="$(compose ps --services --status running)"
+other_services="$(printf '%s\n' "$running_services" | grep -v -E '^(|postgres)$' || true)"
+[[ -z "$other_services" ]] || {
+    echo "Stop the full dev environment before importing. Running services:" >&2
+    printf '%s\n' "$other_services" >&2
+    exit 1
+}
+
+trap stop_postgres EXIT
+
+echo "Starting this worktree's PostgreSQL service..."
+compose up -d postgres
+POSTGRES_STARTED=true
+POSTGRES_CONTAINER="$(compose ps -q postgres)"
+[[ -n "$POSTGRES_CONTAINER" ]] || {
+    echo "Could not find the PostgreSQL container." >&2
+    exit 1
+}
+
+for attempt in $(seq 1 60); do
+    if docker exec "$POSTGRES_CONTAINER" sh -c 'pg_isready -U "$POSTGRES_USER" -d postgres' >/dev/null 2>&1; then
+        break
+    fi
+
+    if [[ "$attempt" -eq 60 ]]; then
+        echo "PostgreSQL did not become ready in time." >&2
+        exit 1
+    fi
+
+    sleep 2
+done
+
+echo "Recreating the dev database..."
+docker exec "$POSTGRES_CONTAINER" sh -c 'dropdb --if-exists --force -U "$POSTGRES_USER" "$POSTGRES_DB"'
+docker exec "$POSTGRES_CONTAINER" sh -c 'createdb -U "$POSTGRES_USER" -O "$POSTGRES_USER" "$POSTGRES_DB"'
+
+echo "Restoring $DUMP_PATH..."
+stream_dump | docker exec -i "$POSTGRES_CONTAINER" sh -c 'pg_restore --exit-on-error --no-owner --no-privileges -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+
+docker exec "$POSTGRES_CONTAINER" sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT count(*) AS restored_migrations FROM migrations;"'
+
+echo "Restore completed. PostgreSQL will now stop."
+echo "Start the full dev environment normally to run pending migrations."
