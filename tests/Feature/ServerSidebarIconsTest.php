@@ -36,6 +36,13 @@ it('uses the shield-star reicon for sentinel in the server sidebar', function ()
         ->toMatch("/'label' => 'Sentinel',\s*'route' => 'server\.sentinel',\s*'active' => request\(\)->routeIs\('server\.sentinel', 'server\.sentinel\.\*'\),\s*'icon' => 'shield-star'/s");
 });
 
+it('shows a warning icon when sentinel is enabled but not working', function () {
+    $contents = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
+
+    expect($contents)
+        ->toContain("'warning' => \$server->isSentinelEnabled() && ! \$server->isSentinelLive()");
+});
+
 it('uses the network reicon for proxy in the server sidebar', function () {
     $contents = file_get_contents(resource_path('views/components/server/sidebar.blade.php'));
 
