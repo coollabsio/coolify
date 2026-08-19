@@ -9,9 +9,6 @@
         "helper": {
             "version": "1.0.15"
         },
-        "realtime": {
-            "version": "1.0.17"
-        },
         "sentinel": {
             "version": "0.0.22"
         }

@@ -59,8 +59,7 @@ beforeEach(function () {
     // Flush the Server identity map cache to ensure tests get fresh data
     Server::flushIdentityMap();
 
-    // Browser Livewire actions often dispatch events; the Soketi host is not
-    // resolvable from host-side Pest runs (docker DNS name coolify-realtime).
+    // Browser Livewire actions often dispatch events; disable broadcasting for host-side runs.
     config(['broadcasting.default' => 'null']);
 });
 
