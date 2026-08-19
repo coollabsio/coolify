@@ -89,8 +89,16 @@ class ApiTokenPolicy
 
     private function belongsToUserAndCurrentTeam(User $user, PersonalAccessToken $token): bool
     {
-        return $user->id === $token->tokenable_id
-            && $token->tokenable_type === User::class
-            && (string) $user->currentTeam()?->id === (string) $token->team_id;
+        if ($user->id !== $token->tokenable_id || $token->tokenable_type !== User::class) {
+            return false;
+        }
+
+        $currentTeamId = $user->currentTeam()?->id;
+
+        if ($currentTeamId === null || $token->team_id === null) {
+            return false;
+        }
+
+        return (string) $currentTeamId === (string) $token->team_id;
     }
 }

@@ -124,6 +124,20 @@ it('denies access to an owned api token from another team', function (string $ab
     expect($policy->{$ability}($user, $token))->toBeFalse();
 })->with(['view', 'update', 'delete']);
 
+it('denies access to an owned api token without team identifiers', function (string $ability) {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->id = 1;
+    $user->shouldReceive('currentTeam')->andReturnNull();
+
+    $token = Mockery::mock(PersonalAccessToken::class)->makePartial();
+    $token->tokenable_id = 1;
+    $token->tokenable_type = User::class;
+    $token->team_id = null;
+
+    $policy = new ApiTokenPolicy;
+    expect($policy->{$ability}($user, $token))->toBeFalse();
+})->with(['view', 'update', 'delete']);
+
 it('allows admin to use root permissions', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(true);
