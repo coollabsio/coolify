@@ -1,0 +1,22 @@
+# documentation: https://docs.comfy.org
+# slogan: The most powerful and modular AI engine for content creation — image, video, 3D, and audio generation.
+# category: ai
+# tags: comfyui, stable-diffusion, image-generation, ai-art, text-to-image, flux, video-generation, gpu, node-based
+# logo: svgs/comfyui.svg
+# port: 8188
+
+services:
+  comfyui:
+    image: yanwk/comfyui-boot:cu124-slim
+    volumes:
+      - comfyui-data:/root
+    environment:
+      - SERVICE_URL_COMFYUI_8188
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
