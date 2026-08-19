@@ -33,7 +33,8 @@
                 && $server->settings->is_usable
                 && ! $server->settings->force_disabled
                 && ! $isTransferredAway;
-            $proxyNeedsAttention = $isReady && $server->proxySet() && $server->proxy->status !== 'running';
+            $proxyNeedsAttention = $isReady && $server->proxySet()
+                && ($server->proxy->status !== 'running' || $server->hasCurrentTraefikOutdatedInfo());
             $sentinelNeedsAttention = $isReady && $server->isSentinelEnabled() && ! $server->isSentinelLive();
 
             $status = match (true) {

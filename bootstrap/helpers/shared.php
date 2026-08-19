@@ -2068,7 +2068,7 @@ function validateDNSEntry(string $fqdn, Server $server)
     $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            $query = new DNSQuery($dns_server);
+            $query = createDnsQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
             } else {
@@ -2076,11 +2076,11 @@ function validateDNSEntry(string $fqdn, Server $server)
                     if ($result->getType() == $type) {
                         if (isCloudflareIp($result->getData())) {
                             $found_matching_ip = true;
-                            break;
+                            break 2;
                         }
                         if ($ip && $result->getData() === $ip) {
                             $found_matching_ip = true;
-                            break;
+                            break 2;
                         }
                     }
                 }
@@ -2090,6 +2090,15 @@ function validateDNSEntry(string $fqdn, Server $server)
     }
 
     return $found_matching_ip;
+}
+
+function createDnsQuery(string $dnsServer): DNSQuery
+{
+    return app()->make(DNSQuery::class, [
+        'server' => $dnsServer,
+        'port' => 53,
+        'timeout' => 5,
+    ]);
 }
 
 function isCloudflareIp(string $ip): bool

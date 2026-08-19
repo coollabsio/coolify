@@ -33,6 +33,7 @@ it('keeps storage backup schedule tables horizontally scrollable on mobile', fun
         ->and($css)->toMatch('/\.backup-table-grid\s*\{[^}]*min-width:\s*50rem;/');
 });
 
+use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
@@ -204,6 +205,62 @@ it('renders volumes as a data table with shared column headers', function () {
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)
         ->toMatch('/\.application-settings-form label\s*\{[^}]*font-size:\s*13px/s');
+});
+
+it('keeps bind mount source paths out of the add volume form', function () {
+    $storageView = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+    $volumesView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+
+    expect($storageView)
+        ->not->toContain('id="host_path"')
+        ->not->toContain('Swarm Mode detected')
+        ->and($volumesView)
+        ->toMatch('/<x-modal-confirmation title="Remove Source Path\?"[^>]*canGate="update"[^>]*:canResource="\$resource"/')
+        ->toContain('The next deployment will use a named Docker volume instead.')
+        ->toContain('Data from the existing host directory will not be copied to the named volume.');
+});
+
+it('creates named volumes without a host path in swarm mode', function () {
+    [$application] = createApplicationWithVolume();
+    $application->persistentStorages()->delete();
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->set('isSwarm', true)
+        ->set('name', 'storage-app-data')
+        ->set('mount_path', '/data')
+        ->call('submitPersistentVolume')
+        ->assertHasNoErrors();
+
+    expect($application->persistentStorages()->first())
+        ->name->toBe($application->uuid.'-storage-app-data')
+        ->host_path->toBeNull();
+});
+
+it('uses a resource based default name for new volumes', function () {
+    [$application] = createApplicationWithVolume(['name' => 'Storage App']);
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->assertSet('name', 'storage-app-data');
+});
+
+it('uses a valid fallback default volume name when the resource name has no slug characters', function () {
+    [$application] = createApplicationWithVolume(['name' => '---']);
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->assertSet('name', 'volume-data');
+});
+
+it('removes existing bind mount source paths from the volume table', function () {
+    [$application, $volume] = createApplicationWithVolume(volumeAttributes: [
+        'host_path' => '/srv/storage',
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSet("forms.{$volume->id}.hostPath", '/srv/storage')
+        ->call('clearHostPath', $volume->id)
+        ->assertHasNoErrors();
+
+    expect($volume->refresh()->host_path)->toBeNull();
 });
 
 it('creates and exposes volume backups for service storage', function () {

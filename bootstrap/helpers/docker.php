@@ -891,7 +891,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
-                            escape_redirect_replacement_for_compose: false,
                         ));
                         break;
                 }

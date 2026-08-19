@@ -216,6 +216,9 @@ done
 log "All images pulled successfully"
 echo "     All images pulled successfully."
 
+set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"
+set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"
+
 log_section "Step 4/6: Stopping and restarting containers"
 write_status "4" "Stopping containers"
 echo ""
