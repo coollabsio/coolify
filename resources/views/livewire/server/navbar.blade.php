@@ -156,8 +156,17 @@
                     class="min-w-0 truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $server->name }}
                 </h1>
-                <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
-                    :show-sentinel-status="$showSentinelStatus" />
+                <div class="flex w-full min-w-0 items-center gap-2">
+                    <x-server.status-summary :server="$server" :proxy-status="$proxyStatus"
+                        :show-sentinel-status="$showSentinelStatus" />
+                    @if ($traefikDashboardAvailable)
+                        <a target="_blank" href="http://{{ $serverIp }}:8080" title="Open Traefik dashboard"
+                            class="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white">
+                            <x-reicon name="external-link" class="size-3" />
+                            Traefik
+                        </a>
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -191,13 +200,6 @@
                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                             Refresh Proxy Status
                         </button>
-                            @if ($traefikDashboardAvailable)
-                                <a class="listbox-option justify-start! gap-2.5!" target="_blank"
-                                    href="http://{{ $serverIp }}:8080" @click="open = false" role="menuitem">
-                                    <x-reicon name="external-link" class="size-3.5 opacity-70" />
-                                    Traefik Dashboard
-                                </a>
-                            @endif
                     </x-split-action>
 
                     {{-- Programmatic open only (clicked from the Actions menu). Keep fully
@@ -273,6 +275,15 @@
 
                 @if ($server->proxySet())
                     @can('manageProxy', $server)
+                        @if ($traefikDashboardAvailable)
+                            <div class="resource-heading-menus shrink-0">
+                                <a class="app-tab shrink-0 gap-1" target="_blank" title="Open Traefik dashboard"
+                                    href="http://{{ $serverIp }}:8080">
+                                    <x-reicon name="external-link" class="size-3.5 shrink-0 opacity-70" />
+                                    Traefik Dashboard
+                                </a>
+                            </div>
+                        @endif
                         <x-split-action id="server-desktop-actions" class="resource-heading-actions shrink-0">
                             @if ($proxyCanBeStopped)
                                 <x-slot:main wire:loading.attr="disabled" wire:loading.class="is-loading"
@@ -299,13 +310,6 @@
                                 <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                 Refresh Proxy Status
                             </button>
-                                @if ($traefikDashboardAvailable)
-                                    <a class="listbox-option justify-start! gap-2.5!" target="_blank"
-                                        href="http://{{ $serverIp }}:8080" @click="open = false" role="menuitem">
-                                        <x-reicon name="external-link" class="size-3.5 opacity-70" />
-                                        Traefik Dashboard
-                                    </a>
-                                @endif
                         </x-split-action>
                     @endcan
                 @endif

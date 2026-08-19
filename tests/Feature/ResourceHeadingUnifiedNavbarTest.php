@@ -287,12 +287,14 @@ it('promotes a primary action for service and proxy lifecycle controls', functio
     }
 });
 
-it('places the Traefik dashboard last in the server Actions menu', function () {
+it('links the Traefik dashboard beside the server actions instead of inside the dropdown', function () {
     $navbar = file_get_contents(resource_path('views/livewire/server/navbar.blade.php'));
-    $actions = str($navbar)->after('id="server-desktop-actions"')->before('@endcan')->toString();
+    $desktopActions = str($navbar)->after('id="server-desktop-actions"')->before('</x-split-action>')->toString();
+    $mobileActions = str($navbar)->after('id="server-mobile-actions"')->before('</x-split-action>')->toString();
 
-    expect(strpos($actions, 'Refresh Proxy Status'))
-        ->toBeLessThan(strpos($actions, 'Traefik Dashboard'));
+    expect($desktopActions)->not->toContain('Traefik')
+        ->and($mobileActions)->not->toContain('Traefik')
+        ->and($navbar)->toContain('Traefik Dashboard');
 });
 
 it('keeps database lifecycle controls direct and highlights the primary action', function () {
