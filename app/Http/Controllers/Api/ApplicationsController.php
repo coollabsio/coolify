@@ -3119,7 +3119,7 @@ class ApplicationsController extends Controller
             // Must run after fqdn is filled: flags are kept only for domains the app still has.
             $application->setNoindexDomains($request->input('noindex_domains') ?? []);
         }
-        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth) && $server->isProxyShouldRun()) {
+        if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth || $request->has('ports_exposes')) && $server->isProxyShouldRun()) {
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
         $application->save();
