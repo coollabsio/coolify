@@ -54,7 +54,9 @@ class ResetPassword extends Notification
 
     protected function buildMailMessage($url)
     {
+        $from = mail_from_identity($this->settings);
         $mail = new MailMessage;
+        $mail->from($from['address'], $from['name']);
         $mail->subject('Coolify: Reset Password');
         $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
 

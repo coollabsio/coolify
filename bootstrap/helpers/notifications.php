@@ -5,12 +5,42 @@ use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mime\Address;
 
 function is_transactional_emails_enabled(): bool
 {
     $settings = instanceSettings();
 
     return $settings->smtp_enabled || $settings->resend_enabled;
+}
+
+/**
+ * @return array{address: string, name: string}
+ */
+function mail_from_identity(object $settings): array
+{
+    $address = filled($settings->smtp_from_address ?? null)
+        ? (string) $settings->smtp_from_address
+        : 'noreply@localhost';
+
+    $name = trim((string) ($settings->smtp_from_name ?? ''));
+
+    return [
+        'address' => $address,
+        'name' => $name !== '' ? $name : 'Coolify',
+    ];
+}
+
+function mail_from_address(object $settings): Address
+{
+    $identity = mail_from_identity($settings);
+
+    return new Address($identity['address'], $identity['name']);
+}
+
+function mail_from_formatted(object $settings): string
+{
+    return (string) mail_from_address($settings);
 }
 
 function send_internal_notification(string $message): void
@@ -29,11 +59,14 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
     if (blank($type)) {
         throw new Exception('No email settings found.');
     }
+    $from = mail_from_identity($settings);
+
     if ($cc) {
         Mail::send(
             [],
             [],
             fn (Message $message) => $message
+                ->from($from['address'], $from['name'])
                 ->to($email)
                 ->replyTo($email)
                 ->cc($cc)
@@ -45,6 +78,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
             [],
             [],
             fn (Message $message) => $message
+                ->from($from['address'], $from['name'])
                 ->to($email)
                 ->subject($mail->subject)
                 ->html((string) $mail->render())
