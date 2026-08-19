@@ -220,7 +220,7 @@ class Show extends Component
             $this->is_required = (bool) ($this->env->is_required ?? false);
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
-            $this->isValueHidden = auth()->user()?->isMember() ?? false;
+            $this->isValueHidden = auth()->user()?->isMember() ?? true;
 
             if ($this->valuesLoaded) {
                 $this->hydrateValueFields();
@@ -247,12 +247,12 @@ class Show extends Component
             $this->is_really_required = $this->is_required && blank($this->value);
         }
 
-        if ($this->env->is_shown_once || auth()->user()?->isMember()) {
+        if ($this->env->is_shown_once || (auth()->user()?->isMember() ?? true)) {
             $this->value = null;
             $this->real_value = null;
         }
 
-        $this->isValueHidden = auth()->user()?->isMember() ?? false;
+        $this->isValueHidden = auth()->user()?->isMember() ?? true;
     }
 
     public function checkEnvs()
