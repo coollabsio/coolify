@@ -62,6 +62,22 @@ it('persists the selected registry url during upgrades', function (string $path)
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
+it('persists the target image and runtime version before recreating containers', function (string $path) {
+    $script = file_get_contents(getcwd().'/'.$path);
+
+    $latestImagePosition = strpos($script, 'set_env_var "LATEST_IMAGE" "$LATEST_IMAGE"');
+    $coolifyVersionPosition = strpos($script, 'set_env_var "COOLIFY_VERSION" "$LATEST_IMAGE"');
+    $composeUpPosition = strpos($script, 'docker compose --env-file /data/coolify/source/.env');
+
+    expect($latestImagePosition)->not->toBeFalse()
+        ->and($coolifyVersionPosition)->not->toBeFalse()
+        ->and($latestImagePosition)->toBeLessThan($composeUpPosition)
+        ->and($coolifyVersionPosition)->toBeLessThan($composeUpPosition);
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
 it('uses the existing env registry url when old callers do not pass a registry argument', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 
