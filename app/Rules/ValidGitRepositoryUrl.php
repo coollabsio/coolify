@@ -31,7 +31,7 @@ class ValidGitRepositoryUrl implements ValidationRule
         $dangerousChars = [
             ';', '|', '&', '$', '`', '(', ')', '{', '}',
             '[', ']', '<', '>', '\n', '\r', '\0', '"', "'",
-            '\\', '!', '?', '*', '^', '%', '=', '+',
+            '\\', '!', '?', '*', '^', '=', '+',
             '#', // Comment character that could hide commands
         ];
 
@@ -85,9 +85,15 @@ class ValidGitRepositoryUrl implements ValidationRule
             }
 
             // Validate SSH URL format (git@host:user/repo.git)
-            if (! preg_match('/^git@[a-zA-Z0-9\.\-]+:[a-zA-Z0-9\-_\/\.~]+$/', $value)) {
+            if (! preg_match('/^git@[a-zA-Z0-9\.\-]+:[a-zA-Z0-9\-_\/\.~%]+$/', $value)) {
                 $fail('The :attribute is not a valid SSH repository URL.');
 
+                return;
+            }
+
+            // Ensure any percent signs are valid percent-encodings like %20
+            if (! empty($value) && preg_match('/%(?![0-9A-Fa-f]{2})/', $value)) {
+                $fail('The :attribute path contains invalid percent encoding.');
                 return;
             }
         } elseif (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
