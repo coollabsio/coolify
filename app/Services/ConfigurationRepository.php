@@ -33,6 +33,7 @@ class ConfigurationRepository
             $this->config->set('mail.from.name', $settings->smtp_from_name ?? 'Test');
             $this->config->set('mail.mailers.smtp', [
                 'transport' => 'smtp',
+                'scheme' => $mailerOptions['scheme'],
                 'host' => $settings->smtp_host,
                 'port' => $settings->smtp_port,
                 'encryption' => $mailerOptions['encryption'],

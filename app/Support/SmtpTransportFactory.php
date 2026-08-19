@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
+use Symfony\Component\Mailer\Transport\Smtp\Stream\SocketStream;
 
 class SmtpTransportFactory
 {
@@ -27,17 +28,27 @@ class SmtpTransportFactory
         $transport->setUsername($settings->smtp_username ?? '');
         $transport->setPassword($settings->smtp_password ?? '');
 
+        $stream = $transport->getStream();
+        if (isset($settings->smtp_timeout) && $stream instanceof SocketStream) {
+            $stream->setTimeout((float) $settings->smtp_timeout);
+        }
+
         return $transport;
     }
 
     /**
-     * @return array{encryption: ?string, auto_tls: string}
+     * @return array{scheme: ?string, encryption: ?string, auto_tls: string}
      */
     public static function mailerOptions(object $settings): array
     {
         $mode = self::encryptionMode($settings);
 
         return [
+            'scheme' => match ($mode) {
+                'none', 'starttls' => 'smtp',
+                'tls' => 'smtps',
+                default => null,
+            },
             'encryption' => $mode === 'tls' ? 'tls' : null,
             'auto_tls' => $mode === 'none' ? '0' : '',
         ];

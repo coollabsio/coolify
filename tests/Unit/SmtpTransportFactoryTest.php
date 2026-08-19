@@ -78,23 +78,35 @@ it('infers implicit TLS on port 465 when encryption is null', function () {
     expect($transport->getStream()->isTLS())->toBeTrue();
 });
 
+it('applies a configured SMTP timeout to the transport stream', function () {
+    $transport = SmtpTransportFactory::fromSettings(smtpSettings([
+        'smtp_timeout' => 15,
+    ]));
+
+    expect($transport->getStream()->getTimeout())->toBe(15.0);
+});
+
 it('maps none encryption to laravel mailer options that disable auto tls', function () {
     expect(SmtpTransportFactory::mailerOptions(smtpSettings([
         'smtp_encryption' => 'none',
     ])))->toBe([
+        'scheme' => 'smtp',
         'encryption' => null,
         'auto_tls' => '0',
     ]);
 });
 
-it('maps starttls and tls encryption to laravel mailer options', function (string $mode, ?string $encryption) {
+it('maps encryption to laravel mailer options', function (?string $mode, ?string $scheme, ?string $encryption) {
     expect(SmtpTransportFactory::mailerOptions(smtpSettings([
         'smtp_encryption' => $mode,
     ])))->toBe([
+        'scheme' => $scheme,
         'encryption' => $encryption,
-        'auto_tls' => '',
+        'auto_tls' => $mode === 'none' ? '0' : '',
     ]);
 })->with([
-    'starttls' => ['starttls', null],
-    'tls' => ['tls', 'tls'],
+    'none' => ['none', 'smtp', null],
+    'starttls' => ['starttls', 'smtp', null],
+    'tls' => ['tls', 'smtps', 'tls'],
+    'unset' => [null, null, null],
 ]);

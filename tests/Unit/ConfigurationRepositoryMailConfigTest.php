@@ -3,16 +3,16 @@
 use App\Services\ConfigurationRepository;
 use Illuminate\Config\Repository;
 
-it('disables auto tls in laravel mail config when smtp encryption is none', function () {
+it('configures the laravel smtp scheme from encryption', function (string $mode, int $port, string $scheme, ?string $encryption, string $autoTls) {
     $config = new Repository;
     $repository = new ConfigurationRepository($config);
 
     $repository->updateMailConfig((object) [
         'resend_enabled' => false,
         'smtp_enabled' => true,
-        'smtp_encryption' => 'none',
+        'smtp_encryption' => $mode,
         'smtp_host' => 'smtp.example.com',
-        'smtp_port' => 25,
+        'smtp_port' => $port,
         'smtp_username' => 'user',
         'smtp_password' => 'secret',
         'smtp_timeout' => null,
@@ -20,6 +20,10 @@ it('disables auto tls in laravel mail config when smtp encryption is none', func
         'smtp_from_name' => 'Coolify',
     ]);
 
-    expect($config->get('mail.mailers.smtp.encryption'))->toBeNull()
-        ->and($config->get('mail.mailers.smtp.auto_tls'))->toBe('0');
-});
+    expect($config->get('mail.mailers.smtp.scheme'))->toBe($scheme)
+        ->and($config->get('mail.mailers.smtp.encryption'))->toBe($encryption)
+        ->and($config->get('mail.mailers.smtp.auto_tls'))->toBe($autoTls);
+})->with([
+    'none on port 465' => ['none', 465, 'smtp', null, '0'],
+    'tls on a non-465 port' => ['tls', 587, 'smtps', 'tls', ''],
+]);
