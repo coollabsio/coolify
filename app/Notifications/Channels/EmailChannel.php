@@ -88,8 +88,7 @@ class EmailChannel
                 );
                 $mailer = new Mailer($transport);
 
-                $email = (new Email)
-                    ->from(mail_from_address($settings))
+                $email = mail_from_email(new Email, $settings)
                     ->to(...$recipients)
                     ->subject($mailMessage->subject)
                     ->html((string) $mailMessage->render());
