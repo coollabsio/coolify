@@ -1294,6 +1294,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             pull_request_id: $pullRequestId,
             type: 'application',
             environment: $resource->environment->name,
+            tags: $resource->tags,
         );
 
         $isDatabase = isDatabaseImage($image, $service);
@@ -2581,6 +2582,7 @@ function serviceParser(Service $resource): Collection
             subId: $savedService->id,
             subName: $savedService->human_name ?? $savedService->name,
             environment: $resource->environment->name,
+            tags: $resource->tags,
         );
 
         // Add COOLIFY_FQDN & COOLIFY_URL to environment
