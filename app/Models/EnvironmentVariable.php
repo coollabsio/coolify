@@ -302,6 +302,23 @@ class EnvironmentVariable extends BaseModel
         return $real_value;
     }
 
+    public function resolveReferencedValue(): ?string
+    {
+        $value = $this->value;
+
+        if ($this->is_literal || blank($value) || ! str($value)->startsWith('$')) {
+            return $value;
+        }
+
+        $referencedKey = str($value)->after('$')->trim('{}')->value();
+
+        return static::where('resourceable_type', $this->resourceable_type)
+            ->where('resourceable_id', $this->resourceable_id)
+            ->where('is_preview', (bool) $this->is_preview)
+            ->where('key', $referencedKey)
+            ->first()?->value ?? $value;
+    }
+
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
         return $this->get_real_environment_variables_internal($environment_variable, $resource);

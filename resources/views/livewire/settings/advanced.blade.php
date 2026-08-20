@@ -13,12 +13,19 @@
 
             <x-application.settings-section id="access-section" title="Access">
                 <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.listbox id="is_registration_enabled" label="Registration"
+                     <x-forms.listbox id="is_registration_enabled" label="Registration"
                         helper="Allow users to create their own account. When disabled, only administrators can create accounts."
                         onChange="instantSave" :options="[
                             ['value' => true, 'label' => 'Anyone can register'],
                             ['value' => false, 'label' => 'Registration disabled'],
-                        ]" />
+                         ]" />
+                     <x-forms.listbox canGate="update" :canResource="$settings"
+                         id="disable_registration_when_oauth_enabled" label="Password registration with OAuth"
+                         helper="Hide password registration whenever at least one OAuth provider is enabled."
+                         onChange="instantSave" :options="[
+                             ['value' => false, 'label' => 'Allow password registration'],
+                             ['value' => true, 'label' => 'Disable when OAuth is enabled'],
+                         ]" />
                     <x-forms.listbox id="disable_two_step_confirmation" label="Destructive action confirmation"
                         helper="Choose whether destructive actions require password and text confirmation."
                         onChange="instantSave" :options="[
@@ -135,8 +142,8 @@
                 </div>
             </x-application.settings-section>
 
-            <x-application.settings-section id="avatar-storage-section" title="Profile picture storage"
-                helper="Choose where compressed user profile pictures are stored. Use S3 for multi-instance or cloud deployments so every application replica can access the same files.">
+            <x-application.settings-section id="avatar-storage-section" title="Image storage"
+                helper="Choose where compressed profile pictures and project icons are stored. Use S3 for multi-instance or cloud deployments so every application replica can access the same files.">
                 <div class="max-w-md">
                     <x-forms.listbox id="avatar_storage" label="Storage destination" onChange="instantSave"
                         :options="$avatar_storage_options" />

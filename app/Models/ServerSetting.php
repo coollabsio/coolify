@@ -15,6 +15,7 @@ use OpenApi\Attributes as OA;
         'id' => ['type' => 'integer'],
         'concurrent_builds' => ['type' => 'integer'],
         'deployment_queue_limit' => ['type' => 'integer'],
+        'backup_compression_cpu_percentage' => ['type' => 'integer'],
         'dynamic_timeout' => ['type' => 'integer'],
         'force_disabled' => ['type' => 'boolean'],
         'force_server_cleanup' => ['type' => 'boolean'],
@@ -58,6 +59,10 @@ use OpenApi\Attributes as OA;
         'delete_unused_volumes' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused volumes should be deleted.'],
         'delete_unused_networks' => ['type' => 'boolean', 'description' => 'The flag to indicate if the unused networks should be deleted.'],
         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds.'],
+        'docker_version' => ['type' => 'string', 'nullable' => true, 'description' => 'Detected Docker Engine version on the server.'],
+        'docker_version_checked_at' => ['type' => 'string', 'nullable' => true, 'description' => 'When Docker Engine version was last detected.'],
+        'compose_version' => ['type' => 'string', 'nullable' => true, 'description' => 'Detected Docker Compose plugin version on the server.'],
+        'compose_version_checked_at' => ['type' => 'string', 'nullable' => true, 'description' => 'When Docker Compose version was last detected.'],
     ]
 )]
 class ServerSetting extends Model
@@ -105,6 +110,7 @@ class ServerSetting extends Model
         'server_disk_usage_check_frequency',
         'is_terminal_enabled',
         'deployment_queue_limit',
+        'backup_compression_cpu_percentage',
         'disable_application_image_retention',
         'connection_timeout',
         'is_traffic_analytics_enabled',
@@ -115,6 +121,10 @@ class ServerSetting extends Model
         'is_geoip_enabled',
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
+        'docker_version',
+        'docker_version_checked_at',
+        'compose_version',
+        'compose_version_checked_at',
     ];
 
     protected $casts = [
@@ -136,6 +146,9 @@ class ServerSetting extends Model
         'is_geoip_enabled' => 'boolean',
         'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
+        'docker_version_checked_at' => 'datetime',
+        'compose_version_checked_at' => 'datetime',
+        'backup_compression_cpu_percentage' => 'integer',
     ];
 
     /**

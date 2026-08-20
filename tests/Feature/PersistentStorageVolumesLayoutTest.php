@@ -33,6 +33,7 @@ it('keeps storage backup schedule tables horizontally scrollable on mobile', fun
         ->and($css)->toMatch('/\.backup-table-grid\s*\{[^}]*min-width:\s*50rem;/');
 });
 
+use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
 use App\Models\Application;
@@ -50,6 +51,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -182,7 +184,7 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toMatch('/<x-callout[^>]*title="File-level consistency"[\s\S]*id="stopDuringBackup"[\s\S]*<\/x-callout>/');
     expect(file_get_contents(resource_path('views/livewire/project/shared/storages/volume-backups/executions.blade.php')))
         ->toContain('<span>Time</span>')
-        ->toContain('x-forms.copy-button')
+        ->toContain('x-forms.copy-input')
         ->toContain('col-span-6');
 
     $css = file_get_contents(resource_path('css/app.css'));
@@ -196,11 +198,69 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('@media (max-width: 768px)')
         ->toContain('.table-badge-success');
 
-    expect($css)->toContain('17.5rem');
+    expect($css)
+        ->toContain('12rem')
+        ->not->toContain('17.5rem');
 
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)
         ->toMatch('/\.application-settings-form label\s*\{[^}]*font-size:\s*13px/s');
+});
+
+it('keeps bind mount source paths out of the add volume form', function () {
+    $storageView = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+    $volumesView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+
+    expect($storageView)
+        ->not->toContain('id="host_path"')
+        ->not->toContain('Swarm Mode detected')
+        ->and($volumesView)
+        ->toMatch('/<x-modal-confirmation title="Remove Source Path\?"[^>]*canGate="update"[^>]*:canResource="\$resource"/')
+        ->toContain('The next deployment will use a named Docker volume instead.')
+        ->toContain('Data from the existing host directory will not be copied to the named volume.');
+});
+
+it('creates named volumes without a host path in swarm mode', function () {
+    [$application] = createApplicationWithVolume();
+    $application->persistentStorages()->delete();
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->set('isSwarm', true)
+        ->set('name', 'storage-app-data')
+        ->set('mount_path', '/data')
+        ->call('submitPersistentVolume')
+        ->assertHasNoErrors();
+
+    expect($application->persistentStorages()->first())
+        ->name->toBe($application->uuid.'-storage-app-data')
+        ->host_path->toBeNull();
+});
+
+it('uses a resource based default name for new volumes', function () {
+    [$application] = createApplicationWithVolume(['name' => 'Storage App']);
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->assertSet('name', 'storage-app-data');
+});
+
+it('uses a valid fallback default volume name when the resource name has no slug characters', function () {
+    [$application] = createApplicationWithVolume(['name' => '---']);
+
+    Livewire::test(Storage::class, ['resource' => $application])
+        ->assertSet('name', 'volume-data');
+});
+
+it('removes existing bind mount source paths from the volume table', function () {
+    [$application, $volume] = createApplicationWithVolume(volumeAttributes: [
+        'host_path' => '/srv/storage',
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSet("forms.{$volume->id}.hostPath", '/srv/storage')
+        ->call('clearHostPath', $volume->id)
+        ->assertHasNoErrors();
+
+    expect($volume->refresh()->host_path)->toBeNull();
 });
 
 it('creates and exposes volume backups for service storage', function () {
@@ -257,6 +317,82 @@ it('shows PR deployment suffix only for git-based applications', function () {
         ->assertSet('supportsPreviewSuffix', false)
         ->assertDontSee('Add suffix')
         ->assertDontSee('PR deployment suffix');
+
+    [$nonGitComposeApp] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'git_repository' => '',
+        'git_branch' => '',
+    ]);
+
+    Livewire::test(All::class, ['resource' => $nonGitComposeApp])
+        ->assertSet('supportsPreviewSuffix', false)
+        ->assertDontSee('Add suffix');
+});
+
+it('allows stale compose volume metadata to be deleted', function () {
+    [$application, $volume] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+YAML,
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSee('Delete stale volume entry')
+        ->call('delete', $volume->id, 'password');
+
+    expect($volume->fresh())->toBeNull();
+});
+
+it('deletes the Docker volume only when explicitly selected', function () {
+    Process::fake();
+    DB::table('private_keys')->where('id', $this->server->private_key_id)->update([
+        'private_key' => encrypt('test-key'),
+    ]);
+
+    [$application, $volume] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+YAML,
+    ]);
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertSet('deleteDockerVolume', false)
+        ->call('delete', $volume->id, 'password', ['deleteDockerVolume'])
+        ->assertSet('deleteDockerVolume', true);
+
+    Process::assertRan(fn () => true);
+    expect($volume->fresh())->toBeNull();
+});
+
+it('does not allow compose volume metadata that is still declared to be deleted', function () {
+    [$application, $volume] = createApplicationWithVolume([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  app:
+    image: nginx
+    volumes:
+      - data:/data
+volumes:
+  data:
+YAML,
+    ]);
+
+    $volume->name = $application->uuid.'_data';
+    $volume->save();
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->assertDontSee('Delete stale volume entry')
+        ->call('delete', $volume->id, 'password')
+        ->assertDispatched('error');
+
+    expect($volume->fresh())->not->toBeNull();
 });
 
 it('hides PR deployment suffix for databases', function () {

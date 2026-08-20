@@ -67,7 +67,7 @@
     <template x-if="!iconOnly">
     <div class="relative flex items-start gap-2.5 rounded-lg p-3 pr-10"
         :class="compact
-            ? 'w-[calc(100vw-2rem)] cursor-pointer sm:w-auto sm:max-w-[calc(100vw-2rem)]'
+            ? 'w-[calc(100vw-2rem)] max-w-sm cursor-pointer'
             : 'w-[calc(100vw-2rem)] max-w-sm'"
         @click="restore()"
         style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);">

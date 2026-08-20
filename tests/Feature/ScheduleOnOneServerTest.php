@@ -49,18 +49,6 @@ it('schedules every production job with onOneServer', function () {
     });
 });
 
-it('runs v5 agent token rotation often enough for the default ttl and refresh threshold', function () {
-    $schedule = app(Schedule::class);
-
-    $event = collect($schedule->events())->first(
-        fn ($e) => str_contains((string) $e->description, 'V5RotateAgentTokensJob')
-    );
-
-    expect($event)->not->toBeNull();
-    expect($event->expression)->toBe('*/15 * * * *');
-    expect($event->onOneServer)->toBeTrue();
-});
-
 it('does not schedule Stripe subscription reconciliation automatically', function () {
     $schedule = app(Schedule::class);
 

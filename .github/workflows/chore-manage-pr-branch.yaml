@@ -1,0 +1,182 @@
+name: Manage PR Branch
+
+# Runs *after* the "PR Quality" workflow finishes. This is required because
+# PR Quality may close a PR that fails its checks, so we must wait for it to
+# complete before deciding whether to retarget the PR's base branch.
+on:
+  workflow_run:
+    workflows: ["PR Quality"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: manage-pr-branch-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  manage-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retarget PR base branch based on category
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+
+            // Branch routing based on the "Category" section of the PR body.
+            // Bug fixes and one-click service changes ship in patch releases -> main.
+            // Everything else (features, improvements) -> next.
+            const MAIN_BRANCH = 'main';
+            const NEXT_BRANCH = 'next';
+
+            // Maintainers/collaborators are trusted to pick their own base branch.
+            const EXEMPT_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+
+            // Resolve the open PR from the triggering run.
+            //
+            // PR Quality runs on `pull_request_target`, so `run.head_sha` is the
+            // *base* branch tip, not the PR head — a commit-based lookup finds
+            // nothing. Instead match on the source branch (`head_branch`) and its
+            // owner (`head_repository.owner.login`), which uniquely identify the PR
+            // via the `owner:branch` head filter. This also works for forked PRs,
+            // where `workflow_run.pull_requests` is empty.
+            const headOwner = run.head_repository?.owner?.login;
+            const headBranch = run.head_branch;
+
+            let prRef;
+            if (headOwner && headBranch) {
+              const { data: openPrs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                head: `${headOwner}:${headBranch}`,
+                per_page: 100,
+              });
+              prRef = openPrs[0];
+            }
+
+            // Fallback: same-repo PRs may also be resolvable by commit association.
+            if (!prRef) {
+              const { data: associated } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: run.head_sha,
+              });
+              prRef = associated.find(pr => pr.state === 'open');
+            }
+
+            if (!prRef) {
+              core.info('No open PR associated with this run (possibly closed by PR Quality). Skipping.');
+              return;
+            }
+
+            // Fetch the full PR to get an up-to-date body, base ref, and state.
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prRef.number,
+            });
+
+            if (pr.state !== 'open') {
+              core.info(`PR #${pr.number} is not open. Skipping.`);
+              return;
+            }
+
+            // Skip PRs opened by owners/members/collaborators — they choose their own base.
+            if (EXEMPT_ASSOCIATIONS.has(pr.author_association)) {
+              core.info(`PR #${pr.number} author association is ${pr.author_association}. Skipping.`);
+              return;
+            }
+
+            // Skip if a maintainer has already changed the base branch manually.
+            const timeline = await github.paginate(github.rest.issues.listEventsForTimeline, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+
+            const baseChanges = timeline.filter(e => e.event === 'base_ref_changed');
+            for (const change of baseChanges) {
+              const actor = change.actor?.login;
+              if (!actor) {
+                continue;
+              }
+              try {
+                const { data: perm } = await github.rest.repos.getCollaboratorPermissionLevel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  username: actor,
+                });
+                // admin/maintain/write => trusted maintainer.
+                if (['admin', 'maintain', 'write'].includes(perm.permission)) {
+                  core.info(`Base branch was changed manually by ${actor} (${perm.permission}). Skipping.`);
+                  return;
+                }
+              } catch (error) {
+                core.info(`Could not resolve permission for ${actor}: ${error.message}`);
+              }
+            }
+
+            // Parse the checked category checkboxes from the PR body.
+            const body = pr.body ?? '';
+            const checked = [];
+            const checkboxRegex = /^\s*-\s*\[([ xX])\]\s*(.+?)\s*$/gm;
+            let match;
+            while ((match = checkboxRegex.exec(body)) !== null) {
+              if (match[1].toLowerCase() === 'x') {
+                checked.push(match[2].toLowerCase());
+              }
+            }
+
+            const includesAny = (labels) => labels.some(label => checked.some(c => c.includes(label)));
+
+            const mainCategories = ['bug fix', 'adding new one click service', 'fixing or updating existing one click service'];
+            const nextCategories = ['improvement', 'new feature'];
+
+            const wantsMain = includesAny(mainCategories);
+            const wantsNext = includesAny(nextCategories);
+
+            if (!wantsMain && !wantsNext) {
+              core.info('No category selected in the PR body. Skipping.');
+              return;
+            }
+
+            // If categories from both groups are checked, prefer next: features and
+            // improvements can only be released from the development branch.
+            const targetBranch = wantsNext ? NEXT_BRANCH : MAIN_BRANCH;
+
+            if (pr.base.ref === targetBranch) {
+              core.info(`PR #${pr.number} already targets ${targetBranch}. Nothing to do.`);
+              return;
+            }
+
+            const previousBranch = pr.base.ref;
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              base: targetBranch,
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: [
+                `Based on the selected category, this PR's base branch was automatically changed from \`${previousBranch}\` to \`${targetBranch}\`.`,
+                '',
+                targetBranch === MAIN_BRANCH
+                  ? 'Bug fixes and one-click service changes target `main`.'
+                  : 'New features and improvements target `next`.',
+                '',
+                'If you believe this is incorrect, please let a maintainer know.',
+              ].join('\n'),
+            });
+
+            core.info(`Retargeted PR #${pr.number}: ${previousBranch} -> ${targetBranch}.`);

@@ -21,6 +21,7 @@ class EmailNotificationSettings extends Model
         'smtp_username',
         'smtp_password',
         'smtp_timeout',
+        'smtp_ehlo_domain',
 
         'resend_enabled',
         'resend_api_key',

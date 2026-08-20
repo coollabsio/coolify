@@ -52,7 +52,7 @@
 
     <x-application.settings-section title="Network"
         description="Control whether this Compose stack joins Coolify's predefined network.">
-        <x-forms.listbox id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
+        <x-forms.listbox canGate="update" :canResource="$service" id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
             :disabled="! auth()->user()->can('update', $service)" :options="[
                 ['value' => false, 'label' => 'Use the stack network only'],
                 ['value' => true, 'label' => 'Connect to the predefined Coolify network'],
@@ -66,7 +66,12 @@
                 @foreach ($fields as $serviceName => $field)
                     <div>
                         <div class="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium">
-                            <span>{{ data_get($field, 'serviceName') }} · {{ data_get($field, 'name') }}</span>
+                            <span>
+                                @if (filled(data_get($field, 'serviceName')))
+                                    {{ data_get($field, 'serviceName') }} ·
+                                @endif
+                                {{ data_get($field, 'name') }}
+                            </span>
                             @if (data_get($field, 'customHelper'))
                                 <x-helper helper="{{ data_get($field, 'customHelper') }}" />
                             @else

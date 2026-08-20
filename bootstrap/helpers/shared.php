@@ -2068,7 +2068,7 @@ function validateDNSEntry(string $fqdn, Server $server)
     $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DNSTypes::NAME_AAAA : DNSTypes::NAME_A;
     foreach ($dns_servers as $dns_server) {
         try {
-            $query = new DNSQuery($dns_server);
+            $query = createDnsQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
             } else {
@@ -2076,11 +2076,11 @@ function validateDNSEntry(string $fqdn, Server $server)
                     if ($result->getType() == $type) {
                         if (isCloudflareIp($result->getData())) {
                             $found_matching_ip = true;
-                            break;
+                            break 2;
                         }
                         if ($ip && $result->getData() === $ip) {
                             $found_matching_ip = true;
-                            break;
+                            break 2;
                         }
                     }
                 }
@@ -2090,6 +2090,15 @@ function validateDNSEntry(string $fqdn, Server $server)
     }
 
     return $found_matching_ip;
+}
+
+function createDnsQuery(string $dnsServer): DNSQuery
+{
+    return app()->make(DNSQuery::class, [
+        'server' => $dnsServer,
+        'port' => 53,
+        'timeout' => 5,
+    ]);
 }
 
 function isCloudflareIp(string $ip): bool
@@ -3050,7 +3059,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
-                                        is_force_https_enabled: true,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3065,7 +3074,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         network: $resource->destination->network,
                                         uuid: $resource->uuid,
                                         domains: $fqdns,
-                                        is_force_https_enabled: true,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                         serviceLabels: $serviceLabels,
                                         is_gzip_enabled: $savedService->isGzipEnabled(),
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3080,7 +3089,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
-                                is_force_https_enabled: true,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -3093,7 +3102,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 network: $resource->destination->network,
                                 uuid: $resource->uuid,
                                 domains: $fqdns,
-                                is_force_https_enabled: true,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
                                 serviceLabels: $serviceLabels,
                                 is_gzip_enabled: $savedService->isGzipEnabled(),
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
@@ -4566,7 +4575,7 @@ function formatContainerStatus(string $status): string
  * Check if password confirmation should be skipped.
  * Returns true if:
  * - Two-step confirmation is globally disabled
- * - User has no password (OAuth users)
+ * - User has no usable local password confirmation (including SSO users)
  *
  * Used by modal-confirmation.blade.php to determine if password step should be shown.
  *
@@ -4579,8 +4588,9 @@ function shouldSkipPasswordConfirmation(): bool
         return true;
     }
 
-    // Skip if user has no password (OAuth users)
-    if (! Auth::user()?->hasPassword()) {
+    // OAuth users may have an unusable generated password, so the linked
+    // identity is the source of truth for whether confirmation is possible.
+    if (! Auth::user()?->requiresPasswordConfirmation()) {
         return true;
     }
 
@@ -4591,7 +4601,7 @@ function shouldSkipPasswordConfirmation(): bool
  * Verify password for two-step confirmation.
  * Skips verification if:
  * - Two-step confirmation is globally disabled
- * - User has no password (OAuth users)
+ * - User has no usable local password confirmation (including SSO users)
  *
  * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
  * @param  Component|null  $component  Optional Livewire component to add errors to
@@ -4744,6 +4754,23 @@ function downsampleLTTB(array $data, int $threshold): array
     $sampled[] = $data[$dataLength - 1]; // Always keep last point
 
     return $sampled;
+}
+
+/**
+ * Convert Sentinel container memory samples from bytes to megabytes.
+ *
+ * Sentinel stores container `used` memory in bytes. Application and database
+ * metric charts label the series as megabytes, so the values must be converted
+ * before they are sent to the frontend.
+ *
+ * @param  array<int, array{0: int|float, 1: int|float}>  $metrics
+ * @return array<int, array{0: int, 1: float}>
+ */
+function convertContainerMemoryBytesToMegabytes(array $metrics): array
+{
+    return array_map(static function (array $point): array {
+        return [(int) $point[0], round(((float) $point[1]) / 1024 / 1024, 2)];
+    }, $metrics);
 }
 
 /**

@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>Admin | Coolify</x-slot>
-    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+    <div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
         <section class="grid gap-3 sm:grid-cols-3">
             <div class="rounded-[10px] border border-neutral-200 bg-white p-4 dark:border-white/[0.07] dark:bg-surface">
                 <div class="text-xs font-medium text-neutral-500 dark:text-fg-dim">Current user</div>

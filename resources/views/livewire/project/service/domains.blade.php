@@ -19,29 +19,14 @@
         domainSearch: '',
         modalOpen: @js($showEditDomainModal || $editDomainDnsFailed),
         editingServiceLabel: '',
-        localEditingIndex: @js($editingIndex),
-        localEditingDomain: @js($editingDomain),
-        localEditingServiceApplicationId: @js($editingServiceApplicationId),
-        openEditDomain(index, url, serviceApplicationId, serviceLabel) {
-            this.localEditingIndex = index;
-            this.localEditingDomain = url;
-            this.localEditingServiceApplicationId = serviceApplicationId;
-            this.editingServiceLabel = serviceLabel || '';
+        openEditDomain() {
+            this.editingServiceLabel = $wire.serviceApps.find(app => app.id === $wire.editingServiceApplicationId)?.name || '';
             this.modalOpen = true;
             this.$nextTick(() => document.getElementById('editingDomainLocal')?.focus?.());
         },
         closeEditDomain() {
             this.modalOpen = false;
             this.editingServiceLabel = '';
-            this.localEditingIndex = null;
-            this.localEditingDomain = '';
-            this.localEditingServiceApplicationId = null;
-        },
-        prepareEditSubmit() {
-            $wire.editingIndex = this.localEditingIndex;
-            $wire.editingDomain = this.localEditingDomain;
-            $wire.editingServiceApplicationId = this.localEditingServiceApplicationId;
-            $wire.showEditDomainModal = true;
         },
         matchesDomainSearch(value) {
             return !this.domainSearch.trim() || value.toLowerCase().includes(this.domainSearch.trim().toLowerCase());
@@ -50,7 +35,7 @@
             return values.some((value) => this.matchesDomainSearch(value));
         },
     }"
-    @open-edit-domain.window="openEditDomain($event.detail.index, $event.detail.url, $event.detail.serviceApplicationId, $event.detail.serviceLabel)"
+    @open-edit-domain.window="openEditDomain()"
     @edit-domain-saved.window="closeEditDomain()">
     <x-application.settings-section id="service-domains-section" title="Domains">
         @can('update', $service)
@@ -108,7 +93,7 @@
                         </x-slot:content>
                         <form wire:submit="addDomain" class="application-settings-form flex flex-col gap-4">
                             {{-- Always show which service receives the domain --}}
-                            <x-forms.listbox label="Service application" id="newServiceApplicationId" required
+                            <x-forms.listbox canGate="update" :canResource="$service" label="Service application" id="newServiceApplicationId" required
                                 helper="Domain will be assigned to this compose service application."
                                 :options="collect($serviceApps)->map(fn ($app) => [
                                     'value' => $app['id'],
@@ -116,7 +101,7 @@
                                 ])->values()->all()"
                                 :disabled="! auth()->user()->can('update', $service)" />
 
-                            <x-forms.domain-input id="newDomain" />
+                            <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
 
                             @if ($addDomainDnsFailed)
                                 <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -174,12 +159,28 @@
                 @php
                     $app = collect($serviceApps)->firstWhere('id', (int) $appId);
                     $heading = \Illuminate\Support\Str::headline($app['name'] ?? $rows->first()['service_name'] ?? 'Service');
+                    $hasHttpsDomains = $rows->contains(
+                        fn ($row) => ! ($row['is_suggested'] ?? false) && str_starts_with(strtolower($row['url']), 'https://')
+                    );
                 @endphp
                 <section id="service-domain-group-{{ $appId }}" wire:key="service-domain-group-{{ $appId }}"
                     x-show="matchesDomainSearch(@js($heading.' '.$rows->pluck('url')->implode(' ')))"
                     class="border-b border-neutral-200 last:border-b-0 dark:border-white/10">
-                    <div class="flex w-full items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div class="flex w-full flex-wrap items-center gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
                         <span class="min-w-0 flex-1 truncate text-sm font-medium text-black dark:text-white">{{ $heading }}</span>
+                        @if ($hasHttpsDomains)
+                            <div class="w-full sm:w-72">
+                                <x-forms.listbox canGate="update" :canResource="$service" id="forceHttpsRedirects.{{ $appId }}"
+                                    htmlId="service-force-https-{{ $appId }}"
+                                    label="Redirect HTTP to HTTPS" onChange="updateForceHttps"
+                                    :onChangeArgs="[(int) $appId]"
+                                    helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                                    :options="[
+                                        ['value' => true, 'label' => 'Enabled'],
+                                        ['value' => false, 'label' => 'Disabled'],
+                                    ]" :disabled="! auth()->user()->can('update', $service)" />
+                            </div>
+                        @endif
                     </div>
 
                     <div wire:key="service-domain-rows-{{ $appId }}-{{ md5(serialize($rows->all())) }}">
@@ -232,7 +233,7 @@
                         </header>
                         <div class="application-settings-section-body relative min-h-0 flex-1 overflow-y-auto"
                             style="-webkit-overflow-scrolling: touch;">
-                            <form @submit.prevent="prepareEditSubmit(); $wire.updateDomain()" class="flex flex-col gap-4">
+                            <form wire:submit="updateDomain" class="flex flex-col gap-4">
                                 <div x-show="editingServiceLabel" x-cloak class="w-full">
                                     <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
                                         <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">Service application</label>
@@ -243,8 +244,7 @@
                                     </p>
                                 </div>
 
-                                <x-forms.domain-input id="editingDomainLocal" errorId="editingDomain" :wire="false"
-                                    x-model="localEditingDomain" />
+                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -260,7 +260,7 @@
                                 <div class="flex flex-wrap items-center justify-end gap-2 pt-2">
                                     @if ($editDomainDnsFailed)
                                         <x-forms.button type="button" isError
-                                            @click="prepareEditSubmit(); $wire.forceSaveEditDns = true; $wire.confirmUpdateDomainDespiteDns()">
+                                            wire:click="confirmUpdateDomainDespiteDns">
                                             Continue
                                         </x-forms.button>
                                     @else

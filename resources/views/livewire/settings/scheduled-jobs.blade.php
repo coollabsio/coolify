@@ -4,7 +4,7 @@
     </x-slot>
 
     <x-settings.layout>
-    <div class="application-settings-form mx-auto w-full max-w-[1180px] min-w-0" x-data="{
+    <div class="application-settings-form mx-auto w-full max-w-none min-w-0" x-data="{
         activeTab: ['executions', 'scheduler-runs', 'skipped-jobs'].includes(location.hash.slice(1))
             ? location.hash.slice(1)
             : 'executions',
@@ -56,14 +56,11 @@
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <div class="relative" @click.outside="filterOpen = false"
-                            @keydown.escape.window="filterOpen = false">
-                            <button type="button" class="button" @click="filterOpen = !filterOpen">
+                        <x-table.dropdown panel-class="w-52!">
+                            <x-slot:trigger><button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
                                 <x-reicon name="filter" class="size-3.5" />
                                 Filter
-                            </button>
-                            <div x-show="filterOpen" x-cloak x-transition.opacity.duration.120ms
-                                class="listbox-panel left-auto! right-0! z-[90]! min-w-52!">
+                            </button></x-slot:trigger>
                                 <div
                                     class="px-2 py-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
                                     Type
@@ -71,7 +68,7 @@
                                 @foreach (['all' => 'All types', 'backup' => 'Backups', 'task' => 'Tasks', 'cleanup' => 'Docker cleanup'] as $value => $label)
                                     <button type="button" class="listbox-option"
                                         wire:click="$set('filterType', '{{ $value }}')"
-                                        @click="filterOpen = false">
+                                        @click="close()">
                                         <span>{{ $label }}</span>
                                         @if ($filterType === $value)
                                             <span class="text-accent">✓</span>
@@ -85,36 +82,31 @@
                                 @foreach (['last_24h' => 'Last 24 hours', 'last_7d' => 'Last 7 days', 'last_30d' => 'Last 30 days', 'all' => 'All time'] as $value => $label)
                                     <button type="button" class="listbox-option"
                                         wire:click="$set('filterDate', '{{ $value }}')"
-                                        @click="filterOpen = false">
+                                        @click="close()">
                                         <span>{{ $label }}</span>
                                         @if ($filterDate === $value)
                                             <span class="text-accent">✓</span>
                                         @endif
                                     </button>
                                 @endforeach
-                            </div>
-                        </div>
+                        </x-table.dropdown>
 
-                        <div class="relative" @click.outside="sortOpen = false"
-                            @keydown.escape.window="sortOpen = false">
-                            <button type="button" class="button" @click="sortOpen = !sortOpen">
+                        <x-table.dropdown panel-class="w-44!">
+                            <x-slot:trigger><button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
                                 <x-reicon name="sort-direction" class="size-3.5" />
                                 Sort
-                            </button>
-                            <div x-show="sortOpen" x-cloak x-transition.opacity.duration.120ms
-                                class="listbox-panel left-auto! right-0! z-[90]! min-w-44!">
+                            </button></x-slot:trigger>
                                 @foreach (['newest' => 'Newest first', 'oldest' => 'Oldest first'] as $value => $label)
                                     <button type="button" class="listbox-option"
                                         wire:click="$set('sortOrder', '{{ $value }}')"
-                                        @click="sortOpen = false">
+                                        @click="close()">
                                         <span>{{ $label }}</span>
                                         @if ($sortOrder === $value)
                                             <span class="text-accent">✓</span>
                                         @endif
                                     </button>
                                 @endforeach
-                            </div>
-                        </div>
+                        </x-table.dropdown>
                     </div>
                 </div>
             </div>
@@ -191,26 +183,11 @@
                                 </div>
                             @endforeach
                         </div>
-                        <div
-                            class="flex min-h-12 items-center justify-between gap-3 border-t border-neutral-200 px-4 dark:border-white/[0.08]">
-                            <span class="whitespace-nowrap text-[11px] text-neutral-500 dark:text-fg-faint">
-                                Showing <span x-text="`${firstVisibleRow}–${lastVisibleRow}`"></span> of
-                                {{ $executions->count() }}
-                            </span>
-                            <div class="flex items-center gap-2">
-                                <span class="text-[11px] text-neutral-500 dark:text-fg-dim">
-                                    Page <span x-text="page"></span> of <span x-text="lastPage"></span>
-                                </span>
-                                <button type="button" class="button size-8! px-0!" x-on:click="goToPage(page - 1)"
-                                    x-bind:disabled="page === 1" aria-label="Previous page">
-                                    <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
-                                </button>
-                                <button type="button" class="button size-8! px-0!" x-on:click="goToPage(page + 1)"
-                                    x-bind:disabled="page === lastPage" aria-label="Next page">
-                                    <x-reicon name="arrow-right" class="size-3.5" />
-                                </button>
-                            </div>
-                        </div>
+                        <x-client-pagination
+                            summary="`${firstVisibleRow}-${lastVisibleRow} of ${total}`"
+                            page-size-model="perPage" storage-key="coolify.page-size.scheduled-jobs"
+                            previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"
+                            next-disabled="page >= lastPage" />
                     </div>
                 @endif
             </div>
@@ -260,26 +237,11 @@
                                 </div>
                             @endforeach
                         </div>
-                        <div
-                            class="flex min-h-12 items-center justify-between gap-3 border-t border-neutral-200 px-4 dark:border-white/[0.08]">
-                            <span class="whitespace-nowrap text-[11px] text-neutral-500 dark:text-fg-faint">
-                                Showing <span x-text="`${firstVisibleRow}–${lastVisibleRow}`"></span> of
-                                {{ $managerRuns->count() }}
-                            </span>
-                            <div class="flex items-center gap-2">
-                                <span class="text-[11px] text-neutral-500 dark:text-fg-dim">
-                                    Page <span x-text="page"></span> of <span x-text="lastPage"></span>
-                                </span>
-                                <button type="button" class="button size-8! px-0!" x-on:click="goToPage(page - 1)"
-                                    x-bind:disabled="page === 1" aria-label="Previous page">
-                                    <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
-                                </button>
-                                <button type="button" class="button size-8! px-0!" x-on:click="goToPage(page + 1)"
-                                    x-bind:disabled="page === lastPage" aria-label="Next page">
-                                    <x-reicon name="arrow-right" class="size-3.5" />
-                                </button>
-                            </div>
-                        </div>
+                        <x-client-pagination
+                            summary="`${firstVisibleRow}-${lastVisibleRow} of ${total}`"
+                            page-size-model="perPage" storage-key="coolify.page-size.scheduled-jobs"
+                            previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"
+                            next-disabled="page >= lastPage" />
                     </div>
                 @endif
             </div>
@@ -337,27 +299,12 @@
                             </div>
                         @endforeach
                     </div>
-                    <div
-                        class="flex min-h-12 items-center justify-between gap-3 border-t border-neutral-200 px-4 dark:border-white/[0.08]">
-                        <span class="whitespace-nowrap text-[11px] text-neutral-500 dark:text-fg-faint">
-                            {{ $skipTotalCount }} {{ Str::plural('skipped job', $skipTotalCount) }}
-                        </span>
-                        @if ($skipTotalCount > $skipDefaultTake)
-                            <div class="flex items-center gap-2">
-                                <span class="text-[11px] text-neutral-500 dark:text-fg-dim">
-                                    Page {{ $skipCurrentPage }} of {{ ceil($skipTotalCount / $skipDefaultTake) }}
-                                </span>
-                                <button type="button" class="button size-8! px-0!" wire:click="skipPreviousPage"
-                                    @disabled(!$showSkipPrev) aria-label="Previous page">
-                                    <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
-                                </button>
-                                <button type="button" class="button size-8! px-0!" wire:click="skipNextPage"
-                                    @disabled(!$showSkipNext) aria-label="Next page">
-                                    <x-reicon name="arrow-right" class="size-3.5" />
-                                </button>
-                            </div>
-                        @endif
-                    </div>
+                    <x-table-pagination :from="$skipTotalCount === 0 ? 0 : $skipPage + 1"
+                        :to="min($skipPage + $skipLogs->count(), $skipTotalCount)" :total="$skipTotalCount"
+                        :current-page="$skipCurrentPage"
+                        :last-page="max(1, (int) ceil($skipTotalCount / $skipDefaultTake))"
+                        wire-target="skipPreviousPage,skipNextPage" previous-action="skipPreviousPage"
+                        next-action="skipNextPage" />
                 @endif
             </div>
         </x-application.settings-section>

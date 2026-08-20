@@ -15,7 +15,7 @@
     </x-process-dialog>
 
     <div
-        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="security" />
 
         <div class="application-settings-form flex w-full flex-col gap-6">
@@ -35,8 +35,8 @@
                 </x-slot:actions>
 
                 <x-callout type="info" title="Supported package managers">
-                    Automated package discovery currently supports apt, dnf, and zypper. Weekly status notifications
-                    can be managed from
+                    Automated package discovery currently supports apk, apt, dnf, pacman, and zypper. Weekly status
+                    notifications can be managed from
                     <a class="font-medium underline" href="{{ route('notifications.email') }}"
                         {{ wireNavigate() }}>notification settings</a>.
                 </x-callout>

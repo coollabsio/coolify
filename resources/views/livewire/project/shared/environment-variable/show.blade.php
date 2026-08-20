@@ -24,8 +24,12 @@
                     </g>
                 </svg>
             @endif
-            <span class="env-key-label min-w-0 truncate font-mono text-[13px] text-black dark:text-fg"
-                title="{{ $env->key }}">{{ $env->key }}</span>
+            <button type="button" data-env-name-trigger
+                class="env-key-label min-w-0 truncate text-left font-mono text-[13px] text-black dark:text-fg"
+                title="{{ $env->key }}"
+                @click="$el.closest('.data-table-row').querySelector('[data-env-settings-trigger]').click()">
+                {{ $env->key }}
+            </button>
             @if (! $isSharedVariable && filled($comment))
                 <x-helper :helper="e($comment)" />
             @endif
@@ -79,12 +83,15 @@
                 @endif
             @endforeach
         @endif
-        <div class="justify-self-end">
+        <div class="flex items-center gap-0.5 justify-self-end">
+            @if (! $isLocked && ! $isValueHidden)
+                <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
+            @endif
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
                 wireOpen="editorOpen">
                 <x-slot:content>
-                    <button type="button" wire:click="loadValues" class="icon-button shrink-0"
+                    <button type="button" wire:click="loadValues" data-env-settings-trigger class="icon-button shrink-0"
                         title="Edit environment variable" aria-label="Edit environment variable">
                         <x-reicon name="settings" class="size-3.5" />
                     </button>

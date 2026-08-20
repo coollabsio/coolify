@@ -205,7 +205,7 @@ class Sentinel extends Component
     {
         try {
             $this->syncData(true);
-            $this->dispatch('success', 'Sentinel settings updated.');
+            $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

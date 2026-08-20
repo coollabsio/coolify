@@ -1,10 +1,38 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Rules\SafeExternalUrl;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 
-uses(TestCase::class);
+uses(TestCase::class, RefreshDatabase::class);
+
+it('accepts allowlisted private targets', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['192.168.1.0/24'],
+    ]));
+
+    $validator = Validator::make(
+        ['url' => 'http://192.168.1.23/api/v4'],
+        ['url' => new SafeExternalUrl],
+    );
+
+    expect($validator->passes())->toBeTrue();
+});
+
+it('rejects allowlisted link-local targets', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->updateOrCreate(['id' => 0], [
+        'webhook_allowed_internal_hosts' => ['169.254.0.0/16'],
+    ]));
+
+    $validator = Validator::make(
+        ['url' => 'http://169.254.169.254/latest/meta-data'],
+        ['url' => new SafeExternalUrl],
+    );
+
+    expect($validator->fails())->toBeTrue();
+});
 
 it('accepts valid public URLs', function () {
     $rule = new SafeExternalUrl;
@@ -42,6 +70,16 @@ it('rejects private IPv4 addresses', function (string $url) {
     '172.16.x range' => 'http://172.16.0.1',
     '192.168.x range' => 'http://192.168.1.1',
 ]);
+
+it('links private target errors to the outbound endpoint settings', function () {
+    $validator = Validator::make(
+        ['url' => 'http://192.168.1.23'],
+        ['url' => new SafeExternalUrl],
+    );
+
+    expect($validator->errors()->first('url'))
+        ->toContain(route('settings.advanced').'#endpoint-section');
+});
 
 it('rejects cloud metadata IP', function () {
     $rule = new SafeExternalUrl;

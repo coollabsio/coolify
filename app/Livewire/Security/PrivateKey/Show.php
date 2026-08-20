@@ -151,6 +151,9 @@ class Show extends Component
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
             $this->dispatch('securityResourceChanged');
+            if ($this->modalMode) {
+                $this->dispatch('close-modal');
+            }
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

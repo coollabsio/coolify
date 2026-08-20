@@ -18,6 +18,7 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Rules\SafeWebhookUrl;
+use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -278,33 +279,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     return;
                 }
-            } else {
-                if (str($databaseType)->contains('postgres')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif (str($databaseType)->contains('mongo')) {
-                    // Format: db1:collection1,collection2|db2:collection3,collection4
-                    // Only explode if it's a string, not if it's already an array
-                    if (is_string($databasesToBackup)) {
-                        $databasesToBackup = explode('|', $databasesToBackup);
-                        $databasesToBackup = array_map('trim', $databasesToBackup);
-                    }
-                } elseif (str($databaseType)->contains('mysql')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif (str($databaseType)->contains('mariadb')) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } elseif ($this->database instanceof StandaloneClickhouse) {
-                    // Format: db1,db2,db3
-                    $databasesToBackup = explode(',', $databasesToBackup);
-                    $databasesToBackup = array_map('trim', $databasesToBackup);
-                } else {
-                    return;
-                }
+            }
+            $databasesToBackup = $this->databasesToBackup($databaseType, $databasesToBackup);
+            if ($databasesToBackup === []) {
+                return;
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
             if ($this->database->name === 'coolify-db') {
@@ -599,6 +577,30 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /** @return array<int, string> */
+    private function databasesToBackup(string $databaseType, string|array $databases): array
+    {
+        $type = str($databaseType);
+
+        if ($this->backup->dump_all && $type->contains(['postgres', 'mysql', 'mariadb'])) {
+            return ['all'];
+        }
+
+        if (is_array($databases)) {
+            return $databases;
+        }
+
+        if ($type->contains('mongo')) {
+            return array_map('trim', explode('|', $databases));
+        }
+
+        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse'])) {
+            return array_map('trim', explode(',', $databases));
+        }
+
+        return [];
+    }
+
     private function backup_standalone_postgresql(string $database): void
     {
         try {
@@ -609,7 +611,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             $escapedUsername = escapeshellarg($this->database->postgres_user);
             if ($this->backup->dump_all) {
-                $backupCommand .= " $this->container_name pg_dumpall --username $escapedUsername | gzip > $this->backup_location";
+                $backupCommand .= " $this->container_name pg_dumpall --username $escapedUsername";
+                $backupCommand = $this->buildCompressedDumpCommand($backupCommand).' > '.escapeshellarg($this->backup_location);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
@@ -635,7 +638,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = 'mkdir -p '.$this->backup_dir;
             $escapedPassword = escapeshellarg($this->database->mysql_root_password);
             if ($this->backup->dump_all) {
-                $commands[] = "docker exec $this->container_name mysqldump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false --compress | gzip > $this->backup_location";
+                $dumpCommand = "docker exec $this->container_name mysqldump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
+                $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.escapeshellarg($this->backup_location);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
@@ -659,7 +663,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = 'mkdir -p '.$this->backup_dir;
             $escapedPassword = escapeshellarg($this->database->mariadb_root_password);
             if ($this->backup->dump_all) {
-                $commands[] = "docker exec $this->container_name mariadb-dump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false --compress > $this->backup_location";
+                $dumpCommand = "docker exec $this->container_name mariadb-dump -u root -p$escapedPassword --all-databases --single-transaction --quick --lock-tables=false";
+                $commands[] = $this->buildCompressedDumpCommand($dumpCommand).' > '.escapeshellarg($this->backup_location);
             } else {
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
@@ -785,7 +790,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set{$resolveOptions} temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
             $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp {$escapedBackupLocation} {$escapedS3Destination}";
-            instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
+            instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
 
             $this->s3_uploaded = true;
         } catch (Throwable $e) {
@@ -804,6 +809,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $latestVersion = getHelperVersion();
 
         return "{$helperImage}:{$latestVersion}";
+    }
+
+    private function buildCompressedDumpCommand(string $dumpCommand): string
+    {
+        $cpuPercentage = BackupCompression::cpuPercentage($this->server->settings->backup_compression_cpu_percentage);
+        $compressorCommand = BackupCompression::compressorCommand($cpuPercentage);
+        $script = "compressor=\$({$compressorCommand}); exec \$compressor";
+
+        return $dumpCommand.' | docker run --rm -i '.escapeshellarg($this->getFullImageName()).' sh -c '.escapeshellarg($script);
     }
 
     private function markStaleExecutionsAsFailed(): void

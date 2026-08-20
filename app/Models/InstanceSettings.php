@@ -9,6 +9,10 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
+    protected $attributes = [
+        'is_dashboard_force_https_enabled' => true,
+    ];
+
     protected $fillable = [
         'public_ipv4',
         'public_ipv6',
@@ -18,6 +22,7 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
+        'disable_registration_when_oauth_enabled',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
@@ -29,6 +34,7 @@ class InstanceSettings extends Model
         'smtp_username',
         'smtp_password',
         'smtp_timeout',
+        'smtp_ehlo_domain',
         'resend_enabled',
         'resend_api_key',
         'is_dns_validation_enabled',
@@ -51,6 +57,7 @@ class InstanceSettings extends Model
         'webhook_allow_localhost',
         'avatar_storage_type',
         'avatar_s3_storage_id',
+        'is_dashboard_force_https_enabled',
     ];
 
     protected $hidden = [
@@ -82,6 +89,8 @@ class InstanceSettings extends Model
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
+        'is_registration_enabled' => 'boolean',
+        'disable_registration_when_oauth_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
@@ -89,6 +98,7 @@ class InstanceSettings extends Model
         'is_mcp_server_enabled' => 'boolean',
         'webhook_allowed_internal_hosts' => 'array',
         'webhook_allow_localhost' => 'boolean',
+        'is_dashboard_force_https_enabled' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -106,6 +116,19 @@ class InstanceSettings extends Model
                 \Cache::forget('instance_settings_fqdn_host');
             }
         });
+    }
+
+    public function isPasswordRegistrationAllowed(): bool
+    {
+        if (! $this->is_registration_enabled) {
+            return false;
+        }
+
+        if (! $this->disable_registration_when_oauth_enabled) {
+            return true;
+        }
+
+        return ! OauthSetting::where('enabled', true)->exists();
     }
 
     public function fqdn(): Attribute

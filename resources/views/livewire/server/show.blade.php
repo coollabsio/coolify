@@ -7,7 +7,7 @@
     <livewire:server.navbar :server="$server" />
 
     <div
-        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="general" />
         <div class="w-full min-w-0">
             @if ($server->isLocalhost())
@@ -89,6 +89,12 @@
                                     </x-forms.button>
                                 @endif
                             @endif
+                            @if ($server->server_metadata)
+                                <x-forms.button type="button" class="size-8! px-0!"
+                                    wire:click="refreshServerMetadata" title="Refresh server details">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                </x-forms.button>
+                            @endif
                             @if ($server->isTransferredAway())
                                 <x-status-badge label="Transferred away" type="warning" />
                             @else
@@ -119,27 +125,7 @@
                         </div>
 
                         @if ($server->server_metadata)
-                            @php($meta = $server->server_metadata)
-                            <dl
-                                class="mt-4 grid gap-x-6 gap-y-5 border-t border-neutral-200 pt-4 sm:grid-cols-2 lg:grid-cols-3 dark:border-white/[0.08]">
-                                @foreach ([
-                                    'Operating system' => $meta['os'] ?? 'N/A',
-                                    'Architecture' => $meta['arch'] ?? 'N/A',
-                                    'Kernel' => $meta['kernel'] ?? 'N/A',
-                                    'CPU cores' => $meta['cpus'] ?? 'N/A',
-                                    'Memory' => isset($meta['memory_bytes']) ? round($meta['memory_bytes'] / 1073741824, 1) . ' GB' : 'N/A',
-                                    'Up since' => $meta['uptime_since'] ?? 'N/A',
-                                ] as $detailLabel => $detailValue)
-                                    <div>
-                                        <dt class="text-xs font-medium text-neutral-500 dark:text-fg-dim">
-                                            {{ $detailLabel }}
-                                        </dt>
-                                        <dd class="mt-1 text-sm font-medium text-neutral-950 dark:text-fg">
-                                            {{ $detailValue }}
-                                        </dd>
-                                    </div>
-                                @endforeach
-                            </dl>
+                            @include('livewire.server.partials.server-details', ['server' => $server])
                         @else
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.button type="button" wire:click="refreshServerMetadata">
@@ -198,7 +184,7 @@
                                 </div>
                             @endif
 
-                            <x-process-dialog closeWithX size="xl" :open="$isValidating">
+                            <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
                                 <x-slot:title>Validate and configure</x-slot:title>
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$server"

@@ -219,7 +219,8 @@
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"
-                                    :isPreview="$row['scope'] === 'preview'" :showEnvironmentType="$showEnvironmentType" />
+                                    :isPreview="$row['scope'] === 'preview'" :showEnvironmentType="$showEnvironmentType"
+                                    :resourceableType="get_class($resource)" :resourceableId="$resource->id" />
                             @endif
                             @endforeach
                             </div>
@@ -233,7 +234,11 @@
                             first-action="setEnvironmentVariablePage(1)"
                             previous-action="previousEnvironmentVariablePage"
                             next-action="nextEnvironmentVariablePage"
-                            last-action="setEnvironmentVariablePage({{ $lastPage }})" />
+                            last-action="setEnvironmentVariablePage({{ $lastPage }})">
+                            <x-slot:pageSize>
+                                <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.environment-variables" />
+                            </x-slot:pageSize>
+                        </x-table-pagination>
                     </div>
                 @else
                     <div class="relative min-h-40">

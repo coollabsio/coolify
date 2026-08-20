@@ -6,6 +6,9 @@
             <form wire:submit="submit" class="contents">
                 <x-unsaved-bar action="submit" />
 
+                <fieldset class="contents" wire:loading.attr="disabled"
+                    wire:target="submit,resetProxyConfiguration">
+
                 <x-application.settings-section id="server-proxy-overview-section" title="Proxy configuration"
                     helper="Configure the reverse proxy and request handling for this server.">
                     <x-slot:actions>
@@ -58,10 +61,10 @@
                     helper="Control generated labels and requests that do not match a running resource.">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.listbox id="generateExactLabels" label="Generated labels"
-                            helper="Generate labels only for the selected proxy implementation."
+                            helper="<ul class='list-disc space-y-1 pl-4'><li><span class='font-semibold'>All supported proxies:</span> Traefik and Caddy labels are both generated, so switching the proxy keeps routing working.</li><li><span class='font-semibold'>Active proxy only:</span> generates fewer labels, but all resources must be redeployed to become accessible again after each proxy switch.</li></ul>"
                             onChange="instantSave" :options="[
-                                ['value' => false, 'label' => 'Keep compatible labels'],
-                                ['value' => true, 'label' => 'Generate exact proxy labels'],
+                                ['value' => false, 'label' => 'Labels for all supported proxies'],
+                                ['value' => true, 'label' => 'Labels for the active proxy only'],
                             ]" />
                         <x-forms.listbox id="redirectEnabled" label="Unknown requests"
                             helper="Override the default 503 response for unknown hosts and stopped services."
@@ -126,7 +129,16 @@
                         @endif
 
                         @if ($proxySettings)
-                            <div class="mt-4">
+                            <div class="relative mt-4" wire:loading.class="pointer-events-none opacity-50"
+                                wire:target="submit,resetProxyConfiguration" aria-live="polite">
+                                <div wire:loading.flex wire:target="submit,resetProxyConfiguration"
+                                    class="absolute inset-0 z-20 hidden items-center justify-center rounded-lg bg-white/75 backdrop-blur-[1px] dark:bg-black/55">
+                                    <div
+                                        class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs font-medium text-neutral-700 shadow-sm ring-1 ring-neutral-200 dark:bg-coolgray-100 dark:text-fg dark:ring-white/10">
+                                        <x-loading />
+                                        Updating proxy configuration…
+                                    </div>
+                                </div>
                                 <x-forms.textarea canGate="update" :canResource="$server" useMonacoEditor
                                     monacoEditorLanguage="yaml"
                                     label="Configuration file · {{ $this->configurationFilePath }}"
@@ -135,6 +147,7 @@
                         @endif
                     </x-application.settings-section>
                 @endif
+                </fieldset>
             </form>
         @elseif($selectedProxy === 'NONE')
             <x-application.settings-section title="Custom proxy"

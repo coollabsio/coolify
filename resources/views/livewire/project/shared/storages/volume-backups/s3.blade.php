@@ -39,13 +39,13 @@
                 @endif
             </div>
             <div class="application-settings-section-body grid gap-4 sm:grid-cols-2">
-                <x-forms.listbox id="s3StorageId" label="S3 storage" :required="$saveToS3"
+                <x-forms.listbox canGate="update" :canResource="$resource" id="s3StorageId" label="S3 storage" :required="$saveToS3"
                     :disabled="! auth()->user()?->can('update', $resource)"
                     :options="$availableS3Storages->map(fn ($s3Storage) => [
                         'value' => $s3Storage->id,
                         'label' => $s3Storage->name,
                     ])->values()->all()" />
-                <x-forms.listbox id="disableLocalBackup" label="Local copy"
+                <x-forms.listbox canGate="update" :canResource="$resource" id="disableLocalBackup" label="Local copy"
                     :disabled="! $saveToS3 || ! auth()->user()?->can('update', $resource)" :options="[
                         ['value' => false, 'label' => 'Keep local backup'],
                         ['value' => true, 'label' => 'Delete after S3 upload'],

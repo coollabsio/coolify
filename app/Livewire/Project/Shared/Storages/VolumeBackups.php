@@ -56,7 +56,16 @@ class VolumeBackups extends Component
 
     public string $timezone = '';
 
-    public int $timeout = 3600;
+    public int $timeout = ScheduledVolumeBackup::DEFAULT_TIMEOUT;
+
+    public int $perPage = 10;
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+
+        $this->resetPage();
+    }
 
     public bool $delete_backup_s3 = false;
 
@@ -316,7 +325,7 @@ class VolumeBackups extends Component
 
     public function render()
     {
-        $executions = $this->backup?->executions()->paginate(10);
+        $executions = $this->backup?->executions()->paginate($this->perPage);
 
         return view('livewire.project.shared.storages.volume-backups', [
             'executions' => $executions ?? collect(),

@@ -41,7 +41,7 @@
                     <div class="lg:col-span-2">
                         @if (isCloud())
                             <div class="w-full sm:w-72">
-                                <x-forms.listbox id="useInstanceEmailSettings" label="Email service"
+                                <x-forms.listbox canGate="update" :canResource="$settings" id="useInstanceEmailSettings" label="Email service"
                                     onChange="instantSave"
                                     :disabled="!auth()->user()->can('update', $settings)" :options="[
                                         ['value' => true, 'label' => 'Use hosted email service'],
@@ -50,7 +50,7 @@
                             </div>
                         @else
                             <div class="w-full sm:w-72">
-                                <x-forms.listbox id="useInstanceEmailSettings" label="Email service"
+                                <x-forms.listbox canGate="update" :canResource="$settings" id="useInstanceEmailSettings" label="Email service"
                                     onChange="instantSave"
                                     :disabled="!auth()->user()->can('update', $settings)" :options="[
                                         ['value' => true, 'label' => 'Use system-wide settings'],
@@ -85,7 +85,7 @@
                     <div class="grid gap-4 lg:grid-cols-3">
                         <div class="lg:col-span-3">
                             <div class="w-full sm:w-72">
-                                <x-forms.listbox id="smtpEnabled" label="SMTP delivery"
+                                <x-forms.listbox canGate="update" :canResource="$settings" id="smtpEnabled" label="SMTP delivery"
                                     onChange="submitSmtp"
                                     :disabled="!auth()->user()->can('update', $settings)" :options="[
                                         ['value' => true, 'label' => 'Enabled'],
@@ -97,7 +97,7 @@
                             placeholder="smtp.mailgun.org" label="Host" />
                         <x-forms.input canGate="update" :canResource="$settings" required id="smtpPort"
                             type="number" placeholder="587" label="Port" />
-                        <x-forms.listbox id="smtpEncryption" label="Encryption" required
+                        <x-forms.listbox canGate="update" :canResource="$settings" id="smtpEncryption" label="Encryption" required
                             :disabled="!auth()->user()->can('update', $settings)" :options="[
                             ['value' => 'starttls', 'label' => 'StartTLS'],
                             ['value' => 'tls', 'label' => 'TLS / SSL'],
@@ -113,27 +113,27 @@
                         @endcan
                         <x-forms.input canGate="update" :canResource="$settings" id="smtpTimeout" type="number"
                             helper="Timeout value for sending emails." label="Timeout" />
+                        <x-forms.input canGate="update" :canResource="$settings" id="smtpEhloDomain"
+                            placeholder="coolify.example.com"
+                            helper="Fully qualified domain sent in the SMTP EHLO command. Uses the system default when empty."
+                            label="EHLO domain" />
                     </div>
                 </x-application.settings-section>
             </div>
 
             <div class="application-settings-form">
-                <x-application.settings-section title="Resend"
-                    description="Use Resend as an alternative email delivery provider.">
+                <x-application.settings-section title="Resend">
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <div class="lg:col-span-2">
-                            <div class="w-full sm:w-72">
-                                <x-forms.listbox id="resendEnabled" label="Resend delivery"
-                                    onChange="submitResend"
-                                    :disabled="!auth()->user()->can('update', $settings)" :options="[
-                                        ['value' => true, 'label' => 'Enabled'],
-                                        ['value' => false, 'label' => 'Disabled'],
-                                    ]" />
-                            </div>
-                        </div>
+                        <x-forms.listbox canGate="update" :canResource="$settings" id="resendEnabled" label="Resend delivery"
+                            onChange="submitResend"
+                            :disabled="!auth()->user()->can('update', $settings)" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
                         @can('update', $settings)
-                            <x-forms.input canGate="update" :canResource="$settings" required type="password"
-                                id="resendApiKey" placeholder="API key" label="API key" />
+                            <x-forms.input canGate="update" :canResource="$settings" :required="$resendEnabled"
+                                type="password" id="resendApiKey" placeholder="API key" label="API key"
+                                autocomplete="new-password" />
                         @else
                             <x-forms.input disabled label="API key" value="Hidden (only admins can view)" />
                         @endcan
