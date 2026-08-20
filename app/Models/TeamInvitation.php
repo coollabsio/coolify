@@ -33,7 +33,7 @@ class TeamInvitation extends Model
         return TeamInvitation::whereTeamId(currentTeam()->id);
     }
 
-    public function isValid()
+    public function isValid(): bool
     {
         if (! $this->hasExpired()) {
             return true;

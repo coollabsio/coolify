@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Controller;
 use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Models\InstanceSettings;
@@ -74,6 +75,37 @@ it('shows a valid magic link invitation without consuming it', function () {
     expect(Hash::check($password, $user->password))->toBeTrue();
 });
 
+it('finds the matching invitation for a legacy token when the email has multiple invitations', function () {
+    $team = Team::factory()->create();
+    $user = User::factory()->create([
+        'email' => 'legacy-invitee@example.com',
+        'password' => Hash::make($password = 'temporary-password-123'),
+    ]);
+    $legacyToken = Crypt::encryptString("{$user->email}@@@{$password}");
+
+    TeamInvitation::create([
+        'team_id' => Team::factory()->create()->id,
+        'uuid' => (string) new Cuid2(32),
+        'email' => $user->email,
+        'role' => 'member',
+        'link' => route('auth.link', ['token' => Crypt::encryptString("{$user->email}@@@another-password")]),
+        'via' => 'link',
+    ]);
+
+    TeamInvitation::create([
+        'team_id' => $team->id,
+        'uuid' => (string) new Cuid2(32),
+        'email' => $user->email,
+        'role' => 'member',
+        'link' => route('auth.link', ['token' => $legacyToken]),
+        'via' => 'link',
+    ]);
+
+    $this->get(route('auth.link', ['token' => $legacyToken]))
+        ->assertSuccessful()
+        ->assertViewHas('team', $team);
+});
+
 it('does not count confirmation requests against the acceptance throttle', function () {
     [, $user, , $token] = createInvitationLinkFixture();
 
@@ -121,6 +153,27 @@ it('accepts a valid magic link invitation on post only once and rotates the temp
     $this->post(route('auth.link.accept'), ['token' => $token])
         ->assertRedirect(route('login'));
 
+    $this->assertGuest();
+});
+
+it('rolls back invitation redemption when password rotation fails', function () {
+    [$team, $user, $password, $token, $invitation] = createInvitationLinkFixture();
+    $this->withoutExceptionHandling();
+
+    User::updating(function (User $updatingUser) use ($user) {
+        if ($updatingUser->is($user)) {
+            throw new RuntimeException('Password rotation failed.');
+        }
+    });
+
+    expect(fn () => $this->post(route('auth.link.accept'), ['token' => $token]))
+        ->toThrow(RuntimeException::class, 'Password rotation failed.');
+
+    $this->assertDatabaseHas('team_invitations', ['id' => $invitation->id]);
+    expect($user->teams()->where('team_id', $team->id)->exists())->toBeFalse();
+
+    $user->refresh();
+    expect(Hash::check($password, $user->password))->toBeTrue();
     $this->assertGuest();
 });
 
@@ -224,4 +277,17 @@ it('rejects a malformed magic link token', function () {
         ->assertRedirect(route('login'));
 
     $this->assertGuest();
+});
+
+it('declares the magic link method contracts', function () {
+    $linkReturnType = (new ReflectionMethod(Controller::class, 'link'))->getReturnType();
+    $acceptLinkReturnType = (new ReflectionMethod(Controller::class, 'acceptLink'))->getReturnType();
+    $credentialsMethod = new ReflectionMethod(Controller::class, 'magicLinkCredentials');
+    $isValidReturnType = (new ReflectionMethod(TeamInvitation::class, 'isValid'))->getReturnType();
+
+    expect((string) $linkReturnType)->toContain('Illuminate\\Contracts\\View\\View')
+        ->and((string) $linkReturnType)->toContain('Illuminate\\Http\\RedirectResponse')
+        ->and((string) $acceptLinkReturnType)->toBe('Illuminate\\Http\\RedirectResponse')
+        ->and($credentialsMethod->getDocComment())->toContain('@return array{0: User, 1: TeamInvitation}|null')
+        ->and((string) $isValidReturnType)->toBe('bool');
 });

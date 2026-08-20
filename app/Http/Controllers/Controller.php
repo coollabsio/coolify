@@ -8,12 +8,15 @@ use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -95,7 +98,7 @@ class Controller extends BaseController
         return response()->json(['message' => 'Transactional emails are not active'], 400);
     }
 
-    public function link()
+    public function link(): View|RedirectResponse
     {
         $token = request()->get('token');
         $credentials = is_string($token) ? $this->magicLinkCredentials($token) : null;
@@ -114,24 +117,38 @@ class Controller extends BaseController
         ]);
     }
 
-    public function acceptLink(Request $request)
+    public function acceptLink(Request $request): RedirectResponse
     {
         $token = $request->input('token');
-        $credentials = is_string($token) ? $this->magicLinkCredentials($token) : null;
-        if (! $credentials) {
+        if (! is_string($token)) {
             return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
         }
 
-        [$user, $invitation] = $credentials;
-        $team = $invitation->team;
-        if (! $user->teams()->where('team_id', $team->id)->exists()) {
-            $user->teams()->attach($team->id, ['role' => $invitation->role]);
-        }
-        $invitation->delete();
+        $acceptedInvitation = DB::transaction(function () use ($token) {
+            $credentials = $this->magicLinkCredentials($token, lockForUpdate: true);
+            if (! $credentials) {
+                return null;
+            }
 
-        $user->forceFill([
-            'password' => Hash::make(Str::random(64)),
-        ])->save();
+            [$user, $invitation] = $credentials;
+            $team = $invitation->team;
+            if (! $user->teams()->where('team_id', $team->id)->exists()) {
+                $user->teams()->attach($team->id, ['role' => $invitation->role]);
+            }
+
+            $user->forceFill([
+                'password' => Hash::make(Str::random(64)),
+            ])->save();
+            $invitation->delete();
+
+            return [$user, $team];
+        });
+
+        if (! $acceptedInvitation) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+        }
+
+        [$user, $team] = $acceptedInvitation;
 
         Auth::login($user);
         session(['currentTeam' => $team]);
@@ -139,7 +156,10 @@ class Controller extends BaseController
         return redirect()->route('dashboard');
     }
 
-    private function magicLinkCredentials(string $token): ?array
+    /**
+     * @return array{0: User, 1: TeamInvitation}|null
+     */
+    private function magicLinkCredentials(string $token, bool $lockForUpdate = false): ?array
     {
         if ($token === '') {
             return null;
@@ -162,11 +182,15 @@ class Controller extends BaseController
         }
 
         $email = Str::lower($email);
-        $user = User::whereEmail($email)->first();
-        $invitation = TeamInvitation::query()
+        $user = User::query()->where('email', $email)->first();
+        $invitationQuery = TeamInvitation::query()
             ->where('email', $email)
-            ->when($invitationUuid, fn ($query) => $query->where('uuid', $invitationUuid))
-            ->first();
+            ->when($lockForUpdate, fn ($query) => $query->lockForUpdate());
+        $invitation = $invitationUuid
+            ? $invitationQuery->where('uuid', $invitationUuid)->first()
+            : $invitationQuery->get()->first(
+                fn (TeamInvitation $invitation) => $this->invitationLinkMatchesToken($invitation, $token)
+            );
 
         if (! $user || ! $invitation || $invitation->hasExpired() || ! $this->invitationLinkMatchesToken($invitation, $token)) {
             return null;
