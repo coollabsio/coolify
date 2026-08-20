@@ -5,6 +5,7 @@
     // appears when those fields differ from the last server snapshot — not on
     // incidental component state (e.g. $wire.set from x-init, display-only props).
     'targets' => null,
+    'wireKey' => null,
 ])
 
 {{-- Floating "unsaved changes" pill (bottom center). Reveals itself via
@@ -19,7 +20,7 @@
      Mobile: stacked layout (full label, buttons on the next line) inset from
      the viewport edges so body overflow-x-clip cannot clip it.
      Desktop: compact single-row centered pill. --}}
-<div x-data="{
+<div @if ($wireKey) wire:key="{{ $wireKey }}" @endif x-data="{
     keyboardInset: 0,
     updateKeyboardInset: null,
     init() {

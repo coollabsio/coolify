@@ -36,6 +36,18 @@ test('unsaved changes ignore compose initialization state', function () {
         ->not->toContain('dockerCompose,');
 });
 
+test('unsaved bar remounts when label management mode changes', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+    $unsavedBar = str($view)
+        ->after('<x-unsaved-bar action="submit"')
+        ->before('/>')
+        ->toString();
+
+    expect($unsavedBar)
+        ->toContain('wireKey="application-general-unsaved-bar-{{ $isContainerLabelReadonlyEnabled ? \'managed\' : \'manual\' }}"')
+        ->toContain('customLabels');
+});
+
 test('onboarding uses the reusable advanced settings component', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
     $onboarding = file_get_contents(resource_path('views/livewire/boarding/index.blade.php'));

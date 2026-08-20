@@ -1,7 +1,7 @@
 <div wire:key="{{ random_int(0, PHP_INT_MAX) }}" class="coolify-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{
         monacoVersion: '0.52.2',
-        monacoContent: @entangle($id),
+        monacoContent: $wire.{{ $id }} ?? '',
         monacoLanguage: '',
         monacoPlaceholder: true,
         monacoPlaceholderText: 'Start typing here',
@@ -13,8 +13,9 @@
         },
         monacoEditor(editor) {
             editor.onDidChangeModelContent((e) => {
-                this.monacoContent = editor.getValue();
-                this.updatePlaceholder(editor.getValue());
+                const value = editor.getValue();
+                this.monacoContent = value;
+                this.updatePlaceholder(value);
             });
             editor.onDidBlurEditorWidget(() => {
                 this.updatePlaceholder(editor.getValue());
@@ -44,7 +45,7 @@
                 document.head.appendChild(script);
             }
         }
-    }" x-modelable="monacoContent">
+    }" x-modelable="monacoContent" wire:model="{{ $id }}">
         <div x-cloak x-init="if (typeof _amdLoaderGlobal == 'undefined' && !window.__coolifyMonacoLoaderAdding) {
             monacoEditorAddLoaderScriptToHead();
         }
