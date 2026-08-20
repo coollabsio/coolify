@@ -1061,13 +1061,14 @@ html[data-theme="custom"] textarea:disabled {
     color: var(--color-fg-dim) !important;
 }
 
-/* Public authentication surfaces */
+/* Public authentication surfaces.
+   Anatomy mirrors the layer card (.application-settings-section): flat canvas,
+   elevated shell with a hairline ring, a compact 3rem brand strip that echoes
+   the application top bar, and a nested base-color body with its own fill ring. */
 .auth-shell {
     min-height: 100dvh;
     display: flex;
-    background:
-        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-coollabs) 9%, transparent), transparent 34rem),
-        var(--coollabs-canvas);
+    background: var(--coollabs-canvas);
     color: #171717;
 }
 
@@ -1085,23 +1086,53 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 .auth-card {
-    width: min(100%, 27rem);
-    overflow: hidden;
-    border-radius: 10px;
+    width: min(100%, 25rem);
+    display: flex;
+    flex-direction: column;
+    border-radius: 8px;
     background: var(--coollabs-elevated);
-    box-shadow: 0 0 0 1px var(--coollabs-hairline), 0 20px 60px rgb(0 0 0 / 0.14);
+    box-shadow:
+        0 0 0 1px var(--coollabs-hairline),
+        0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+/* Brand strip: same 3rem height, inset, and wordmark treatment as the app top bar. */
+.auth-card-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 3rem;
+    padding: 0.5rem 1rem;
+    border-radius: 8px 8px 0 0;
+}
+
+.auth-card-brand img {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.auth-card-brand span {
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: #171717;
+}
+
+.dark .auth-card-brand span {
+    color: var(--color-fg);
 }
 
 .auth-card-heading {
-    padding: 1.25rem 1.25rem 1rem;
+    margin-bottom: 1rem;
 }
 
 .auth-card-heading h1 {
     margin: 0;
-    font-size: 1.25rem;
-    line-height: 1.75rem;
+    font-size: 1rem;
+    line-height: 1.5rem;
     font-weight: 600;
-    letter-spacing: -0.015em;
+    letter-spacing: -0.01em;
     color: #171717;
 }
 
@@ -1110,7 +1141,7 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 .auth-card-heading p {
-    margin-top: 0.25rem;
+    margin-top: 0.125rem;
     max-width: 38ch;
     font-size: 0.8125rem;
     line-height: 1.25rem;
@@ -1118,8 +1149,8 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 .auth-card-body {
-    border-radius: 10px;
-    padding: 1.25rem;
+    border-radius: 8px;
+    padding: 1rem;
     background: var(--coollabs-base);
     box-shadow: 0 0 0 1px var(--coollabs-fill);
 }
@@ -1130,7 +1161,7 @@ html[data-theme="custom"] textarea:disabled {
     justify-content: center;
     gap: 0.375rem;
     min-height: 3rem;
-    padding: 0.75rem 1.25rem;
+    padding: 0.75rem 1rem;
     font-size: 0.8125rem;
     color: var(--coollabs-subtle);
 }
@@ -1180,7 +1211,7 @@ html[data-theme="custom"] textarea:disabled {
     line-height: 1rem;
 }
 
-/* Public error surfaces (401/404/500/…). Match auth shell canvas + accent. */
+/* Public error surfaces (401/404/500/…). Match the auth shell canvas. */
 .error-page-body {
     width: 100vw;
     height: 100dvh;
@@ -1194,9 +1225,7 @@ html[data-theme="custom"] textarea:disabled {
     justify-content: center;
     width: 100%;
     padding: 2rem 1rem;
-    background:
-        radial-gradient(circle at 50% 0%, color-mix(in oklab, var(--color-coollabs) 9%, transparent), transparent 34rem),
-        var(--coollabs-canvas);
+    background: var(--coollabs-canvas);
     color: #171717;
 }
 

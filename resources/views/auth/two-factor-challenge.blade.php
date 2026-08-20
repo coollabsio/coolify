@@ -1,5 +1,5 @@
 <x-layout-simple>
-    <x-auth.shell title="Coolify" description="Verify your identity to finish signing in.">
+    <x-auth.shell title="Two-factor authentication" description="Verify your identity to finish signing in.">
         <div class="flex flex-col gap-4" x-data="{
             showRecovery: false,
             submitAuthenticatorCode(event) {

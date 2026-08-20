@@ -1,5 +1,5 @@
 <x-layout-simple>
-    <x-auth.shell title="Coolify"
+    <x-auth.shell title="Reset your password"
         description="Enter your account email and we’ll send you a secure reset link.">
         <div class="flex flex-col gap-4">
             @if (session('status'))

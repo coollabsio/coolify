@@ -1,5 +1,5 @@
 <x-layout-simple>
-    <x-auth.shell title="Coolify" description="Sign in to manage your applications and infrastructure.">
+    <x-auth.shell title="Welcome back" description="Sign in to manage your applications and infrastructure.">
         <div class="flex flex-col gap-4">
             @if (session('status'))
                 <x-auth.alert type="success">{{ session('status') }}</x-auth.alert>
@@ -33,7 +33,7 @@
                         label="{{ __('input.password') }}" />
                 @endenv
 
-                <div class="flex justify-end">
+                <div class="-mt-1 flex justify-end">
                     @if (is_transactional_emails_enabled())
                         <a href="/forgot-password" class="auth-text-link">
                             {{ __('auth.forgot_password_link') }}

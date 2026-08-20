@@ -11,7 +11,7 @@ $email = getOldOrLocal('email', 'test3@example.com');
 ?>
 
 <x-layout-simple>
-    <x-auth.shell title="Coolify"
+    <x-auth.shell :title="$isFirstUser ? 'Set up your instance' : 'Create your account'"
         :description="$isFirstUser ? 'Create the root account for this instance.' : 'Create your account to get started.'">
         <div class="flex flex-col gap-4">
             @if ($isFirstUser)

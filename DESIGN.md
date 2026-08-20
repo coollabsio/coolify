@@ -714,6 +714,17 @@ Use these as implementation references:
 | Outline icons | `resources/views/components/reicon.blade.php` |
 | Shared styling | `resources/css/app.css`, `resources/css/utilities.css` |
 | HTTP error pages | `resources/views/components/error-page.blade.php`, `resources/views/errors/*` |
+| Public auth surfaces | `resources/views/components/auth/shell.blade.php`, `resources/views/auth/*` |
+
+Public auth surfaces (login, register, password reset, two-factor, email
+verification) share `<x-auth.shell>`, which repeats the layer-card anatomy on a
+flat canvas: an 8px shell with a hairline ring, a 3rem brand strip carrying the
+Coolify mark and wordmark at the same height and treatment as the application
+top bar, and a nested base-color body with its own fill ring and 16px padding.
+The title slot is the page's own heading (`Welcome back`, `Set up your
+instance`), not the product name, and the optional footer slot holds the single
+cross-link. Do not reintroduce an accent glow behind the card or a drop shadow
+heavier than the shell ring.
 
 HTTP error pages (400, 401, 402, 403, 404, 419, 429, 500, 503) use the shared
 `<x-error-page>` component on the public auth-style canvas: theme-aware status
