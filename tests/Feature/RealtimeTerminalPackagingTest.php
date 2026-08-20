@@ -2,20 +2,28 @@
 
 it('proxies realtime websocket traffic through the bundled nginx server', function (string $environment) {
     $nginxConfiguration = file_get_contents(base_path("docker/{$environment}/etc/nginx/site-opts.d/http.conf"));
+    $locationFound = preg_match('/location \^~ \/app \{(?<body>.*?)\n\}/s', $nginxConfiguration, $location);
 
-    expect($nginxConfiguration)
-        ->toContain('location ^~ /app')
+    expect($locationFound)
+        ->toBe(1)
+        ->and($location['body'])
         ->toContain('proxy_pass http://coolify-realtime:6001;')
+        ->toContain('proxy_http_version 1.1;')
         ->toContain('proxy_set_header Upgrade $http_upgrade;')
         ->toContain('proxy_set_header Connection "upgrade";');
 })->with(['development', 'production']);
 
 it('proxies terminal websocket traffic through the bundled nginx server', function (string $environment) {
     $nginxConfiguration = file_get_contents(base_path("docker/{$environment}/etc/nginx/site-opts.d/http.conf"));
+    $locationFound = preg_match('/location = \/terminal\/ws \{(?<body>.*?)\n\}/s', $nginxConfiguration, $location);
 
-    expect($nginxConfiguration)
-        ->toContain('location = /terminal/ws')
+    expect($locationFound)
+        ->toBe(1)
+        ->and($location['body'])
         ->toContain('proxy_pass http://coolify-realtime:6002;')
+        ->toContain('proxy_http_version 1.1;')
+        ->toContain('proxy_set_header Upgrade $http_upgrade;')
+        ->toContain('proxy_set_header Connection "upgrade";')
         ->toContain('proxy_read_timeout 3600s;')
         ->toContain('proxy_send_timeout 3600s;');
 })->with(['development', 'production']);
