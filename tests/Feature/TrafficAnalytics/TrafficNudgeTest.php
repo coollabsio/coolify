@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Analytics;
 use App\Livewire\Dashboard\TrafficAnalytics as DashboardTrafficAnalytics;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -32,15 +33,23 @@ function disabledServer(): Server
     return $server;
 }
 
-it('shows the dashboard nudge when an eligible server has analytics disabled', function () {
+it('does not show a traffic nudge on the dashboard', function () {
     disabledServer();
 
     Livewire::test(DashboardTrafficAnalytics::class)
         ->assertOk()
+        ->assertDontSee('can start collecting traffic analytics');
+});
+
+it('shows the analytics-page nudge when an eligible server has analytics disabled', function () {
+    disabledServer();
+
+    Livewire::test(Analytics::class)
+        ->assertOk()
         ->assertSee('can start collecting traffic analytics');
 });
 
-it('does not count swarm or build servers in the dashboard nudge', function () {
+it('does not count swarm or build servers in the analytics-page nudge', function () {
     $swarm = disabledServer();
     $swarm->settings->is_swarm_manager = true;
     $swarm->settings->save();
@@ -49,7 +58,7 @@ it('does not count swarm or build servers in the dashboard nudge', function () {
     $build->settings->is_build_server = true;
     $build->settings->save();
 
-    Livewire::test(DashboardTrafficAnalytics::class)
+    Livewire::test(Analytics::class)
         ->assertOk()
         ->assertDontSee('can start collecting traffic analytics');
 });

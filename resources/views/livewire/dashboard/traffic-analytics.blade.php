@@ -36,47 +36,12 @@ $spark = 'refreshChartData-'.$chartId.'-status';
                 </div>
             @endif
             <a href="{{ route('analytics') }}" {{ wireNavigate() }}
-                class="inline-flex h-7 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium text-neutral-500 ring-1 ring-neutral-200 transition-colors hover:text-black dark:text-fg-faint dark:ring-white/[0.08] dark:hover:text-fg">
+                class="inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg">
                 Open analytics
-                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
+                <x-reicon name="arrow-right" class="size-3" />
             </a>
         </div>
     </div>
-
-    @if (! empty($eligibleDisabledServers))
-        <div x-data="{ dismissed: localStorage.getItem('traffic-nudge-{{ $nudgeKey }}') === '1' }" x-show="!dismissed" x-cloak
-            class="mb-3 flex items-start gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
-            <div class="min-w-0 flex-1">
-                <p class="text-[12px] font-semibold text-black dark:text-fg">
-                    {{ count($eligibleDisabledServers) === 1 ? '1 server can start collecting traffic analytics' : count($eligibleDisabledServers).' servers can start collecting traffic analytics' }}
-                </p>
-                <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-dim">
-                    Enabling regenerates the proxy config and restarts the proxy + Sentinel (a brief blip).
-                    Works with Traefik &amp; Caddy.
-                </p>
-            </div>
-            <div class="flex shrink-0 items-center gap-2">
-                @if (count($eligibleDisabledServers) === 1)
-                    <a class="button" href="{{ route('server.sentinel', ['server_uuid' => $eligibleDisabledServers[0]['uuid']]) }}" {{ wireNavigate() }}>
-                        Enable on {{ \Illuminate\Support\Str::limit($eligibleDisabledServers[0]['name'], 16) }}
-                    </a>
-                @else
-                    <a class="button" href="{{ route('server.index') }}" {{ wireNavigate() }}>
-                        View servers
-                    </a>
-                @endif
-                <button type="button" title="Dismiss"
-                    @click="dismissed = true; localStorage.setItem('traffic-nudge-{{ $nudgeKey }}', '1')"
-                    class="flex h-6 w-6 items-center justify-center rounded-md text-neutral-400 transition-colors hover:text-black dark:text-fg-faint dark:hover:text-fg">
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M6 18L18 6" />
-                    </svg>
-                </button>
-            </div>
-        </div>
-    @endif
 
     @if ($servers->isEmpty())
         <x-empty size="sm" title="Traffic analytics is not enabled"
