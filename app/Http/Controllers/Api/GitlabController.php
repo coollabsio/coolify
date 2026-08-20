@@ -13,9 +13,9 @@ use OpenApi\Attributes as OA;
 
 class GitlabController extends Controller
 {
-    private function removeSensitiveData(GitlabApp $gitlabApp)
+    private function removeSensitiveData(GitlabApp $gitlabApp, int $teamId)
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (request()->attributes->get('can_read_sensitive', false) === true && $gitlabApp->team_id === $teamId) {
             $gitlabApp->makeVisible([
                 'client_secret',
                 'webhook_token',
@@ -108,8 +108,8 @@ class GitlabController extends Controller
                 ->orWhere('is_system_wide', true);
         })->get();
 
-        $gitlabApps = $gitlabApps->map(function ($app) {
-            return $this->removeSensitiveData($app);
+        $gitlabApps = $gitlabApps->map(function ($app) use ($teamId) {
+            return $this->removeSensitiveData($app, $teamId);
         });
 
         return response()->json($gitlabApps);
@@ -280,7 +280,7 @@ class GitlabController extends Controller
                 'gitlab_app_name' => $gitlabApp->name,
             ]);
 
-            return response()->json($this->removeSensitiveData($gitlabApp->fresh()), 201);
+            return response()->json($this->removeSensitiveData($gitlabApp->fresh(), $teamId), 201);
         } catch (\Throwable $e) {
             return handleError($e);
         }
@@ -441,7 +441,7 @@ class GitlabController extends Controller
 
             return response()->json([
                 'message' => 'GitLab app updated successfully',
-                'data' => $this->removeSensitiveData($gitlabApp->fresh()),
+                'data' => $this->removeSensitiveData($gitlabApp->fresh(), $teamId),
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([

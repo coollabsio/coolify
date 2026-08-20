@@ -64,6 +64,36 @@ describe('GET /api/v1/gitlab-apps', function () {
         expect($response->json('0'))->not->toHaveKey('client_secret')
             ->and($response->json('0'))->not->toHaveKey('webhook_token');
     });
+
+    test('does not return system-wide gitlab app secrets owned by another team', function () {
+        $otherTeam = Team::factory()->create();
+        GitlabApp::create([
+            'name' => 'Foreign System GitLab',
+            'api_url' => 'https://gitlab.com/api/v4',
+            'html_url' => 'https://gitlab.com',
+            'client_id' => 'foreign-client-id',
+            'client_secret' => 'foreign-client-secret',
+            'webhook_token' => 'foreign-webhook-token',
+            'access_token' => 'foreign-access-token',
+            'refresh_token' => 'foreign-refresh-token',
+            'team_id' => $otherTeam->id,
+            'is_system_wide' => true,
+        ]);
+
+        session(['currentTeam' => $this->team]);
+        $sensitiveToken = $this->user->createToken('sensitive-token', ['read', 'read:sensitive'])->plainTextToken;
+
+        $response = $this->withToken($sensitiveToken)
+            ->getJson('/api/v1/gitlab-apps')
+            ->assertSuccessful()
+            ->assertJsonFragment(['name' => 'Foreign System GitLab']);
+
+        expect($response->json('0'))
+            ->not->toHaveKey('client_secret')
+            ->not->toHaveKey('webhook_token')
+            ->not->toHaveKey('access_token')
+            ->not->toHaveKey('refresh_token');
+    });
 });
 
 describe('POST /api/v1/gitlab-apps', function () {
