@@ -44,8 +44,11 @@ class StandaloneDocker extends BaseModel
 
             $server = $newStandaloneDocker->server;
             $safeNetwork = escapeshellarg($newStandaloneDocker->network);
+            $createNetwork = $server->isSwarm()
+                ? "docker network create --driver overlay --attachable {$safeNetwork}"
+                : "docker network create --attachable {$safeNetwork}";
             instant_remote_process([
-                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --driver overlay --attachable {$safeNetwork} >/dev/null",
+                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || {$createNetwork} >/dev/null",
             ], $server, false);
             ConnectProxyToNetworksJob::dispatchSync($server);
         });
