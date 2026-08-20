@@ -4887,6 +4887,8 @@ class DatabasesController extends Controller
                 'id',
                 'created_at',
                 'updated_at',
+                'last_execution_at',
+                'missing_backup_notification_sent_at',
             ])->fill([
                 'uuid' => new_public_id(),
                 'database_id' => $newDatabase->id,

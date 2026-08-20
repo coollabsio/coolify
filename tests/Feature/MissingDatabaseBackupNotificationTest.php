@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
+afterEach(fn () => Carbon::setTestNow());
+
 function missingBackupSchedule(Team $team, array $attributes = []): ScheduledDatabaseBackup
 {
     $backup = ScheduledDatabaseBackup::create(array_merge([
