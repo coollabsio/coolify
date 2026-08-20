@@ -3,9 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\DB;
 
 class GithubApp extends BaseModel
 {
+    public function delete(): ?bool
+    {
+        return DB::transaction(fn () => parent::delete());
+    }
+
     protected $fillable = [
         'team_id',
         'private_key_id',
