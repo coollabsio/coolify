@@ -8,6 +8,7 @@
     "auth.login.github": "Login with GitHub",
     "auth.login.gitlab": "Login with Gitlab",
     "auth.login.google": "Login with Google",
+    "auth.login.oidc": "Login with SSO",
     "auth.login.infomaniak": "Login with Infomaniak",
     "auth.login.zitadel": "Login with Zitadel",
     "auth.already_registered": "Already registered?",
