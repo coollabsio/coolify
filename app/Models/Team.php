@@ -304,6 +304,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return $this->hasMany(CloudProviderToken::class);
     }
 
+    public function integrationTokens()
+    {
+        return $this->hasMany(IntegrationToken::class);
+    }
+
     public function sources()
     {
         $sources = collect([]);

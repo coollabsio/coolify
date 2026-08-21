@@ -71,7 +71,7 @@
                             </span>
 
                             <span class="min-w-0">
-                                <x-forms.copy-button :text="$execution->filename ?? 'No archive name'" />
+                                <x-forms.copy-input :text="$execution->filename ?? 'No archive name'" />
                             </span>
 
                             <span class="text-[11px] text-neutral-500 dark:text-fg-faint">

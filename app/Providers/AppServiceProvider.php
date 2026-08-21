@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Auth\Oidc\OidcDiscoveryService;
+use App\Auth\Oidc\OidcTokenValidator;
+use App\Auth\Oidc\Socialite\OidcProvider;
 use App\Models\PersonalAccessToken;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\App;
@@ -10,6 +13,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
+use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,12 +26,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureCommands();
-
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();
         $this->configureGitHubHttp();
-
+        $this->configureOidcSocialite();
     }
 
     private function configureCommands(): void
@@ -62,6 +65,24 @@ class AppServiceProvider extends ServiceProvider
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
     }
 
+    private function configureOidcSocialite(): void
+    {
+        if (! $this->app->bound(SocialiteFactory::class)) {
+            return;
+        }
+
+        $this->app->make(SocialiteFactory::class)->extend('oidc', function ($app) {
+            return new OidcProvider(
+                $app['request'],
+                $app->make(OidcDiscoveryService::class),
+                $app->make(OidcTokenValidator::class),
+                '',
+                '',
+                '',
+            );
+        });
+    }
+
     private function configureGitHubHttp(): void
     {
         Http::macro('GitHub', function (string $api_url, ?string $github_access_token = null) {
@@ -76,17 +97,6 @@ class AppServiceProvider extends ServiceProvider
                     'Accept' => 'application/vnd.github.v3+json',
                 ])->baseUrl($api_url);
             }
-        });
-
-        Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
-            $client = Http::withHeaders([
-                'Accept' => 'application/json',
-            ])->baseUrl($api_url);
-            if ($access_token) {
-                $client = $client->withToken($access_token);
-            }
-
-            return $client;
         });
     }
 }
