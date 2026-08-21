@@ -45,15 +45,17 @@ jobs:
             exit 1
           fi
 
-          existing_pr=$(gh pr list --base next --head main --state open --json url --jq '.[0].url')
+          sync_branch='automation/sync-main-to-next'
+          existing_pr=$(gh pr list --base next --head "$sync_branch" --state open --json url --jq '.[0].url')
           if [ -n "$existing_pr" ]; then
             echo "A main to next pull request already exists: $existing_pr"
           else
+            git push --force origin origin/main:"refs/heads/$sync_branch"
             gh pr create \
               --base next \
-              --head main \
+              --head "$sync_branch" \
               --title 'chore: merge main into next' \
-              --body 'This pull request was created automatically because main could not be merged into next without conflicts.'
+              --body 'This pull request was created automatically because main could not be merged into next without conflicts. Resolve conflicts on this temporary branch; never update main with next.'
           fi
 
           echo 'main could not be merged into next without conflicts.'
