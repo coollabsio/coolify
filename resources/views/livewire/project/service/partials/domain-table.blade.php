@@ -35,6 +35,7 @@
                 'ok' => 'DNS OK',
                 'failed' => 'DNS mismatch',
                 'skipped' => 'DNS skipped',
+                'checking' => 'Checking DNS...',
                 'pending' => 'DNS pending',
                 default => 'DNS unknown',
             };
