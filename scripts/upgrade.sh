@@ -53,6 +53,39 @@ echo "Helper Version: ${LATEST_HELPER_VERSION}" >>"$LOGFILE"
 echo "Registry URL: ${REGISTRY_URL}" >>"$LOGFILE"
 echo "============================================================" >>"$LOGFILE"
 
+# Pre-flight: ensure there is enough free disk space before pulling images and
+# migrating. A disk that fills up mid-upgrade corrupts migrations and leaves the
+# instance broken, so abort early with a clear, recoverable error instead.
+MINIMUM_REQUIRED_DISK_GB="${MINIMUM_REQUIRED_DISK_GB:-3}"
+if [ -f "$ENV_FILE" ] && grep -q "^MINIMUM_REQUIRED_DISK_GB=" "$ENV_FILE"; then
+    MINIMUM_REQUIRED_DISK_GB=$(grep "^MINIMUM_REQUIRED_DISK_GB=" "$ENV_FILE" | cut -d '=' -f2- | head -n1)
+fi
+# Fall back to the default when the configured value is not a positive integer,
+# otherwise a malformed value would break the arithmetic and disable the guard.
+case "$MINIMUM_REQUIRED_DISK_GB" in
+    '' | *[!0-9]*) MINIMUM_REQUIRED_DISK_GB=3 ;;
+esac
+REQUIRED_MB=$((MINIMUM_REQUIRED_DISK_GB * 1024))
+
+# Check the filesystems that actually fill up during an upgrade: Coolify's data
+# directory (backups + source) and Docker's storage (images + the coolify-db
+# volume). These are usually the same disk, but not always, so use the smaller.
+available_mb() { df -Pm "$1" 2>/dev/null | awk 'NR==2 {print $4}'; }
+DOCKER_ROOT=$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)
+[ -z "$DOCKER_ROOT" ] && DOCKER_ROOT="/var/lib/docker"
+AVAILABLE_MB=$(available_mb /data/coolify)
+DOCKER_MB=$(available_mb "$DOCKER_ROOT")
+if [ -n "$DOCKER_MB" ] && { [ -z "$AVAILABLE_MB" ] || [ "$DOCKER_MB" -lt "$AVAILABLE_MB" ]; }; then
+    AVAILABLE_MB="$DOCKER_MB"
+fi
+if [ -n "$AVAILABLE_MB" ] && [ "$AVAILABLE_MB" -lt "$REQUIRED_MB" ]; then
+    DISK_MESSAGE="Not enough disk space to upgrade safely: ${AVAILABLE_MB}MB free, ${REQUIRED_MB}MB required. Free up disk space (or lower MINIMUM_REQUIRED_DISK_GB) and try again."
+    write_status "error" "$DISK_MESSAGE"
+    log "ERROR: $DISK_MESSAGE"
+    echo "     ERROR: $DISK_MESSAGE"
+    exit 1
+fi
+
 log_section "Step 1/6: Downloading configuration files"
 write_status "1" "Downloading configuration files"
 echo "1/6 Downloading latest configuration files..."
