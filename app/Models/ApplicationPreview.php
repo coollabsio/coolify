@@ -28,9 +28,9 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
     ];
 
-    protected static function booted()
+    protected static function booted(): void
     {
-        static::forceDeleting(function ($preview) {
+        static::forceDeleting(function (ApplicationPreview $preview): void {
             $server = $preview->application->destination->server;
             $application = $preview->application;
 
@@ -57,11 +57,14 @@ class ApplicationPreview extends BaseModel
                 });
             } else {
                 // Regular application volume cleanup
-                $persistentStorages = $preview->persistentStorages()->get() ?? collect();
-                if ($persistentStorages->count() > 0) {
-                    foreach ($persistentStorages as $storage) {
-                        instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
-                    }
+                $persistentStorages = $application->persistentStorages()
+                    ->get()
+                    ->filter(fn (LocalPersistentVolume $storage): bool => blank($storage->host_path)
+                        && $storage->is_preview_suffix_enabled);
+
+                foreach ($persistentStorages as $storage) {
+                    $volumeName = addPreviewDeploymentSuffix($storage->name, $preview->pull_request_id);
+                    instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server);
                 }
             }
 
