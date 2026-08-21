@@ -17,6 +17,29 @@ test('extractTargetHost normalizes quoted IPv4 hosts from generated ssh commands
     assert.equal(extractTargetHost(sshArgs), '10.0.0.5');
 });
 
+// The PHP generator wraps the remote shell in a bash/sh fallback so `sh`-only
+// containers still work: `'if command -v bash …; then exec bash -se; else exec sh -se; fi'`.
+// The parser must extract the target host from that form, not only `'bash -se'`.
+const FALLBACK_REMOTE_SHELL = "if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi";
+
+test('extractTargetHost handles the bash/sh fallback remote shell wrapper', () => {
+    const sshArgs = extractSshArgs(
+        `timeout 3600 ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 'root'@'10.0.0.5' '${FALLBACK_REMOTE_SHELL}' << \\\\$abc\ndocker exec -it foo sh\nabc`
+    );
+
+    assert.equal(extractTargetHost(sshArgs), '10.0.0.5');
+    assert.ok(sshArgs.includes('root@10.0.0.5'));
+});
+
+test('extractSshArgs keeps proxy command intact with the fallback remote shell wrapper', () => {
+    const sshArgs = extractSshArgs(
+        `timeout 3600 ssh -o ProxyCommand='cloudflared access ssh --hostname %h' -o StrictHostKeyChecking=no 'root'@'example.com' '${FALLBACK_REMOTE_SHELL}' << \\\\$abc\ndocker exec -it foo sh\nabc`
+    );
+
+    assert.equal(sshArgs[1], 'ProxyCommand=cloudflared access ssh --hostname %h');
+    assert.equal(extractTargetHost(sshArgs), 'example.com');
+});
+
 test('extractSshArgs strips shell quotes from port and user host arguments before spawning ssh', () => {
     const sshArgs = extractSshArgs(
         "timeout 3600 ssh -p '22' -o StrictHostKeyChecking=no 'root'@'10.0.0.5' 'bash -se' << \\\\$abc\necho hi\nabc"

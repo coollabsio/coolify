@@ -76,6 +76,7 @@
             themeAccents: @js($consoleThemeAccents),
             consoleTheme: 'system',
             themeOpen: false,
+            ...window.terminalRendererToolbar(),
             get filteredTargetGroups() {
                 const query = this.targetSearch.trim().toLowerCase();
                 const targets = query
@@ -91,6 +92,7 @@
                 const savedTheme = localStorage.getItem('coolify-console-theme');
                 this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';
                 localStorage.setItem('coolify-console-theme', this.consoleTheme);
+                this.initRenderer();
             },
             setTheme(theme) {
                 this.consoleTheme = theme;
@@ -260,8 +262,11 @@
                     @endif
                 </div>
 
-                <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
+                <div class="ml-auto flex items-center gap-2">
+                    <x-terminal.renderer-selector />
+                    <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
                         :theme-accents="$consoleThemeAccents" />
+                </div>
             </header>
 
             <div class="terminal-session-panel mt-8 flex min-h-0 flex-1 flex-col overflow-hidden">
