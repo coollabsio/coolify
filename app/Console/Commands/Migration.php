@@ -13,14 +13,15 @@ class Migration extends Command
 
     protected $description = 'Start Migration';
 
-    public function handle()
+    public function handle(): int
     {
         if (! config('constants.migration.is_migration_enabled')) {
             $this->info('Migration is disabled on this server.');
             // Migrations are not managed here, so drop any stale failure marker
             // to avoid surfacing a permanent, unresolvable error in the UI.
             MigrationFailure::clear();
-            exit(0);
+
+            return self::SUCCESS;
         }
 
         $this->info('Migration is enabled on this server.');
@@ -32,16 +33,19 @@ class Migration extends Command
         } catch (\Throwable $e) {
             MigrationFailure::record($e->getMessage());
             $this->error('Migration failed: '.$e->getMessage());
-            exit(1);
+
+            return self::FAILURE;
         }
 
-        if ($exitCode !== 0) {
+        if ($exitCode !== self::SUCCESS) {
             MigrationFailure::record("Migration command exited with code {$exitCode}.");
-            exit($exitCode);
+
+            return $exitCode;
         }
 
         MigrationFailure::clear();
-        exit(0);
+
+        return self::SUCCESS;
     }
 
     /**
@@ -65,8 +69,21 @@ class Migration extends Command
             }
 
             $this->info('Taking a database backup before running migrations...');
+
+            // DatabaseBackupJob records its own failures (and skips itself when a
+            // backup is already running) instead of throwing, so inspect the newest
+            // execution to report honestly rather than assuming success.
+            $previousExecutionId = $backup->executions()->max('id');
             DatabaseBackupJob::dispatchSync($backup);
-            $this->info('Pre-migration database backup finished (skipped automatically if one was already in progress).');
+            $latestExecution = $backup->executions()->first();
+
+            if (! $latestExecution || $latestExecution->id === $previousExecutionId) {
+                $this->warn('Pre-migration database backup was skipped (another backup may already be running); continuing with migration.');
+            } elseif ($latestExecution->status === 'success') {
+                $this->info('Pre-migration database backup completed.');
+            } else {
+                $this->warn("Pre-migration database backup did not succeed (status: {$latestExecution->status}); continuing with migration.");
+            }
         } catch (\Throwable $e) {
             $this->warn('Pre-migration database backup failed (continuing with migration): '.$e->getMessage());
         }

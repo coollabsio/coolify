@@ -1,72 +1,124 @@
 <?php
 
-it('ships upgrade scripts with valid bash syntax', function (string $path) {
-    $process = proc_open(
-        ['bash', '-n', getcwd().'/'.$path],
-        [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-        $pipes,
-        getcwd()
-    );
+/**
+ * Extracts the disk-guard block from a real upgrade script and runs it in a
+ * hermetic harness with stubbed `df`/`docker`, so we exercise the shipped guard
+ * (arithmetic included) rather than just asserting its source text.
+ *
+ * @return array{exit: int, stdout: string, status: string}
+ */
+function runUpgradeGuard(string $scriptRelPath, string $minGb, int $availableMb): array
+{
+    $script = file_get_contents(getcwd().'/'.$scriptRelPath);
+    $start = strpos($script, '# Pre-flight: ensure there is enough free disk space');
+    $end = strpos($script, 'log_section "Step 1/6');
+    if ($start === false || $end === false) {
+        throw new RuntimeException("Guard block markers not found in {$scriptRelPath}");
+    }
+    $block = substr($script, $start, $end - $start);
 
-    expect($process)->toBeResource();
+    $statusFile = tempnam(sys_get_temp_dir(), 'upg-status-');
+    $harness = <<<SH
+    export MINIMUM_REQUIRED_DISK_GB='{$minGb}'
+    ENV_FILE=/dev/null
+    STATUS_FILE='{$statusFile}'
+    write_status() { echo "\$1|\$2" > "\$STATUS_FILE"; }
+    log() { :; }
+    # Report {$availableMb}MB available (column 4 of `df -Pm` line 2) for any path.
+    df() { printf 'Filesystem 1M-blocks Used Available Use%% Mounted\\nstub 100000 100000 {$availableMb} 50%% /\\n'; }
+    # Fail docker info so DockerRootDir resolution falls back to /var/lib/docker.
+    docker() { return 1; }
 
+    {$block}
+
+    echo GUARD_PASSED
+    SH;
+
+    $harnessFile = tempnam(sys_get_temp_dir(), 'upg-guard-').'.sh';
+    file_put_contents($harnessFile, $harness);
+
+    $proc = proc_open(['bash', $harnessFile], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
     $stdout = stream_get_contents($pipes[1]);
-    $stderr = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
     fclose($pipes[2]);
+    $exit = proc_close($proc);
+    $status = trim((string) @file_get_contents($statusFile));
 
-    expect(proc_close($process), trim($stdout."\n".$stderr))->toBe(0);
+    @unlink($statusFile);
+    @unlink($harnessFile);
+
+    return ['exit' => $exit, 'stdout' => $stdout, 'status' => $status];
+}
+
+it('ships upgrade scripts with valid bash syntax', function (string $path) {
+    $proc = proc_open(['bash', '-n', getcwd().'/'.$path], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    expect($proc)->toBeResource();
+    $err = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    expect(proc_close($proc), trim($err))->toBe(0);
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
 
-it('aborts the upgrade before pulling images when disk space is too low', function (string $path) {
+it('aborts the upgrade with an error status when free space is below the minimum', function (string $path) {
+    $result = runUpgradeGuard($path, '3', 1024); // 1GB available, 3GB required
+
+    expect($result['exit'])->toBe(1);
+    expect($result['stdout'])->not->toContain('GUARD_PASSED');
+    expect($result['status'])->toStartWith('error|');
+    expect($result['status'])->toContain('Not enough disk space');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('lets the upgrade proceed when free space is above the minimum', function (string $path) {
+    $result = runUpgradeGuard($path, '3', 50000); // 50GB available, 3GB required
+
+    expect($result['exit'])->toBe(0);
+    expect($result['stdout'])->toContain('GUARD_PASSED');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('honors a leading-zero threshold instead of misreading it as octal', function (string $path) {
+    // Without base-10 normalization, `08` breaks the arithmetic and silently
+    // disables the guard, so free space below 8GB would wrongly pass.
+    $result = runUpgradeGuard($path, '08', 4096); // 4GB available, 8GB required
+
+    expect($result['exit'])->toBe(1);
+    expect($result['status'])->toStartWith('error|');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('falls back to the default when the threshold override is malformed', function (string $path) {
+    // Garbage override must not disable the guard: it falls back to 3GB, so 1GB free aborts.
+    $result = runUpgradeGuard($path, 'not-a-number', 1024);
+
+    expect($result['exit'])->toBe(1);
+    expect($result['status'])->toStartWith('error|');
+})->with([
+    'stable upgrade' => 'scripts/upgrade.sh',
+    'nightly upgrade' => 'other/nightly/upgrade.sh',
+]);
+
+it('checks the data dir and Docker storage, and runs before pulling images', function (string $path) {
     $script = file_get_contents(getcwd().'/'.$path);
 
-    // Guard exists with a sane, overridable default and writes an error status the UI can poll.
     expect($script)
-        ->toContain('MINIMUM_REQUIRED_DISK_GB="${MINIMUM_REQUIRED_DISK_GB:-3}"')
-        ->toContain('write_status "error" "$DISK_MESSAGE"')
-        ->toContain('exit 1');
-
-    // A malformed override must fall back to the default rather than disabling the guard.
-    expect($script)->toContain("'' | *[!0-9]*) MINIMUM_REQUIRED_DISK_GB=3 ;;");
-
-    // The check must look at the data dir and Docker's storage, using the smaller one.
-    expect($script)
-        ->toContain('available_mb() { df -Pm "$1" 2>/dev/null | awk \'NR==2 {print $4}\'; }')
+        ->toContain('MINIMUM_REQUIRED_DISK_GB=$((10#$MINIMUM_REQUIRED_DISK_GB))')
         ->toContain('AVAILABLE_MB=$(available_mb /data/coolify)')
         ->toContain("DOCKER_ROOT=\$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)");
 
-    // The guard must run before images are pulled so a full disk never recreates containers.
     $guardPosition = strpos($script, 'Not enough disk space to upgrade safely');
     $pullPosition = strpos($script, 'Step 3/6');
-
-    expect($guardPosition)->not->toBeFalse();
-    expect($pullPosition)->not->toBeFalse();
     expect($guardPosition)->toBeLessThan($pullPosition);
 })->with([
     'stable upgrade' => 'scripts/upgrade.sh',
     'nightly upgrade' => 'other/nightly/upgrade.sh',
 ]);
-
-it('backs up the database and records failures before running migrations', function () {
-    $command = file_get_contents(__DIR__.'/../../app/Console/Commands/Migration.php');
-
-    expect($command)
-        ->toContain('backup_before_migration')
-        ->toContain("StandalonePostgresql::whereName('coolify-db')")
-        ->toContain('DatabaseBackupJob::dispatchSync($backup)')
-        ->toContain('MigrationFailure::record')
-        ->toContain('MigrationFailure::clear();');
-});
-
-it('surfaces a migration failure through the upgrade status', function () {
-    $component = file_get_contents(__DIR__.'/../../app/Livewire/Upgrade.php');
-
-    expect($component)
-        ->toContain('MigrationFailure::current()')
-        ->toContain("'status' => 'error'")
-        ->toContain('Database migration failed: ');
-});

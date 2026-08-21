@@ -10,6 +10,9 @@ use DateTimeInterface;
  * The web server (php-fpm/nginx) starts independently of the s6 migration chain,
  * so a broken migration still passes the health check and the upgrade reports
  * success. This persistent marker lets the app surface the real failure instead.
+ *
+ * Kept free of framework dependencies so it can run at container boot and be unit
+ * tested without booting Laravel; filesystem problems are reported via error_log.
  */
 class MigrationFailure
 {
@@ -22,22 +25,32 @@ class MigrationFailure
     {
         $path = $path ?? self::path();
         $directory = dirname($path);
-        if (! is_dir($directory)) {
-            @mkdir($directory, 0755, true);
+
+        if (! is_dir($directory) && ! @mkdir($directory, 0755, true) && ! is_dir($directory)) {
+            error_log("MigrationFailure: unable to create directory {$directory}; migration failure not recorded.");
+
+            return;
         }
 
         $now = $now ?? new \DateTime;
-        @file_put_contents($path, json_encode([
+        $payload = json_encode([
             'message' => $message,
             'failed_at' => $now->format(DateTimeInterface::ATOM),
-        ], JSON_PRETTY_PRINT));
+        ], JSON_PRETTY_PRINT);
+
+        // Write to a temp file and rename so a reader never sees a half-written marker.
+        $temporary = $path.'.'.getmypid().'.tmp';
+        if (@file_put_contents($temporary, $payload) === false || ! @rename($temporary, $path)) {
+            @unlink($temporary);
+            error_log("MigrationFailure: unable to write marker at {$path}; migration failure not recorded.");
+        }
     }
 
     public static function clear(?string $path = null): void
     {
         $path = $path ?? self::path();
-        if (is_file($path)) {
-            @unlink($path);
+        if (is_file($path) && ! @unlink($path)) {
+            error_log("MigrationFailure: unable to remove stale marker at {$path}.");
         }
     }
 
@@ -52,7 +65,12 @@ class MigrationFailure
         }
 
         $raw = @file_get_contents($path);
-        if ($raw === false || trim($raw) === '') {
+        if ($raw === false) {
+            error_log("MigrationFailure: marker at {$path} exists but could not be read.");
+
+            return null;
+        }
+        if (trim($raw) === '') {
             return null;
         }
 

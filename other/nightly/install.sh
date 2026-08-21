@@ -230,6 +230,8 @@ MINIMUM_REQUIRED_DISK_GB="${MINIMUM_REQUIRED_DISK_GB:-5}"
 case "$MINIMUM_REQUIRED_DISK_GB" in
     '' | *[!0-9]*) MINIMUM_REQUIRED_DISK_GB=5 ;;
 esac
+# Force base-10 so a validated leading-zero value (e.g. 08) is not read as octal.
+MINIMUM_REQUIRED_DISK_GB=$((10#$MINIMUM_REQUIRED_DISK_GB))
 if [ -n "$AVAILABLE_SPACE" ] && [ "$AVAILABLE_SPACE" -lt "$MINIMUM_REQUIRED_DISK_GB" ]; then
     cat <<EOF
 ERROR: Not enough free disk space to install Coolify safely.

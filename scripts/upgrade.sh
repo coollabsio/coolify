@@ -65,6 +65,8 @@ fi
 case "$MINIMUM_REQUIRED_DISK_GB" in
     '' | *[!0-9]*) MINIMUM_REQUIRED_DISK_GB=3 ;;
 esac
+# Force base-10 so a validated leading-zero value (e.g. 08) is not read as octal.
+MINIMUM_REQUIRED_DISK_GB=$((10#$MINIMUM_REQUIRED_DISK_GB))
 REQUIRED_MB=$((MINIMUM_REQUIRED_DISK_GB * 1024))
 
 # Check the filesystems that actually fill up during an upgrade: Coolify's data
