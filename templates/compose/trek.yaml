@@ -1,0 +1,38 @@
+# documentation: https://github.com/mauriceboe/TREK
+# slogan: A self-hosted, real-time collaborative travel planner with interactive maps, budgets, and packing lists.
+# category: productivity
+# tags: travel,planner,collaborative,maps,budget,packing,self-hosted
+# logo: svgs/trek.svg
+# port: 3000
+
+services:
+  trek:
+    image: 'mauriceboe/trek:2.7.2'
+    environment:
+      - SERVICE_URL_TREK_3000
+      - 'ENCRYPTION_KEY=${SERVICE_PASSWORD_64_ENCRYPTIONKEY}'
+      - 'TZ=${TZ:-UTC}'
+      - 'LOG_LEVEL=${LOG_LEVEL:-info}'
+      - 'FORCE_HTTPS=${FORCE_HTTPS:-false}'
+      - 'TRUST_PROXY=${TRUST_PROXY:-1}'
+      - 'ALLOW_INTERNAL_NETWORK=${ALLOW_INTERNAL_NETWORK:-false}'
+      - 'OIDC_ISSUER=${OIDC_ISSUER}'
+      - 'OIDC_CLIENT_ID=${OIDC_CLIENT_ID}'
+      - 'OIDC_CLIENT_SECRET=${OIDC_CLIENT_SECRET}'
+      - 'OIDC_DISPLAY_NAME=${OIDC_DISPLAY_NAME:-SSO}'
+      - 'OIDC_ONLY=${OIDC_ONLY:-false}'
+      - 'ADMIN_EMAIL=${ADMIN_EMAIL:-admin@trek.local}'
+      - ADMIN_PASSWORD=$SERVICE_PASSWORD_ADMIN
+    volumes:
+      - trek-data:/app/data
+      - trek-uploads:/app/uploads
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '-qO-'
+        - 'http://localhost:3000/api/health'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
