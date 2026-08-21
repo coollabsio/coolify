@@ -842,6 +842,85 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
     return $labels->sort();
 }
+
+function isGeneratedProxyPortLabel(string $label): bool
+{
+    return str_contains($label, '.loadbalancer.server.port=')
+        || str_contains($label, '_reverse_proxy={{upstreams ');
+}
+
+function persistedProxyPortsNeedReconcile(Collection|string $labels, Application $application): bool
+{
+    $labelText = $labels instanceof Collection ? $labels->implode("\n") : $labels;
+    $expected = collect($application->settings->is_static ? [80] : $application->ports_exposes_array)
+        ->filter(fn ($port) => $port !== null && $port !== '')
+        ->map(fn ($port) => (string) $port)
+        ->values();
+
+    if ($application->fqdn) {
+        foreach (str($application->fqdn)->explode(',') as $domain) {
+            try {
+                $port = Url::fromString(trim($domain))->getPort();
+                if ($port) {
+                    $expected->push((string) $port);
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
+    }
+
+    preg_match_all('/loadbalancer\.server\.port=(\d+)/', $labelText, $traefikPorts);
+    preg_match_all('/\{\{upstreams (\d+)\}\}/', $labelText, $caddyPorts);
+
+    $persisted = collect($traefikPorts[1] ?? [])
+        ->merge($caddyPorts[1] ?? [])
+        ->unique()
+        ->values();
+
+    if ($persisted->isEmpty()) {
+        return false;
+    }
+
+    return $persisted->contains(fn (string $port) => ! $expected->contains($port));
+}
+
+/**
+ * Overlay generated proxy backend-port labels onto persisted labels.
+ * Router/service keys stay stable (uuid + domain index); only the port values change.
+ *
+ * @param  Collection<int, string>|string  $labels
+ * @return Collection<int, string>
+ */
+function applyGeneratedProxyPortLabels(Collection|string $labels, Application $application, ?ApplicationPreview $preview = null): Collection
+{
+    $lines = $labels instanceof Collection
+        ? $labels
+        : collect(preg_split("/\r\n|\n|\r/", (string) $labels));
+
+    $generatedPortLabels = collect(generateLabelsApplication($application, $preview))
+        ->filter(fn (string $label) => isGeneratedProxyPortLabel($label))
+        ->mapWithKeys(function (string $label) {
+            [$key, $value] = explode('=', $label, 2);
+
+            return [$key => $value];
+        });
+
+    return $lines->map(function (string $label) use ($generatedPortLabels) {
+        if ($label === '' || ! str_contains($label, '=')) {
+            return $label;
+        }
+
+        [$key] = explode('=', $label, 2);
+
+        if ($generatedPortLabels->has($key)) {
+            return $key.'='.$generatedPortLabels->get($key);
+        }
+
+        return $label;
+    });
+}
+
 function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array
 {
     $ports = $application->settings->is_static ? [80] : $application->ports_exposes_array;

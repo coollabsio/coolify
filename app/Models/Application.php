@@ -2255,6 +2255,9 @@ class Application extends BaseModel
         if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
             $customLabels = str(implode('|coolify|', generateLabelsApplication($this, $preview)))->replace('|coolify|', "\n");
         }
+        if ($this->settings?->is_container_label_readonly_enabled && persistedProxyPortsNeedReconcile($customLabels, $this)) {
+            $customLabels = applyGeneratedProxyPortLabels($customLabels, $this, $preview)->implode("\n");
+        }
         $this->custom_labels = base64_encode($customLabels);
         $this->save();
 

@@ -3232,6 +3232,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $labels = $labels->filter(function ($value, $key) {
                 return ! Str::startsWith($value, 'coolify.');
             });
+            if ($this->application->settings->is_container_label_readonly_enabled && persistedProxyPortsNeedReconcile($labels, $this->application)) {
+                $labels = applyGeneratedProxyPortLabels($labels, $this->application, $this->preview);
+            }
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
