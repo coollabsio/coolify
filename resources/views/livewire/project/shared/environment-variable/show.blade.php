@@ -87,6 +87,100 @@
             @if (! $isLocked && ! $isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endif
+            @if ($this->canDuplicate())
+                {{-- Open modal immediately (Alpine); load duplicate targets in a follow-up Livewire request. --}}
+                <x-modal-input title="Duplicate environment variable" :closeOutside="false" :wireIgnore="false"
+                    wireOpen="duplicateModalOpen">
+                    <x-slot:content>
+                        <button type="button" wire:click="prepareDuplicate" class="icon-button shrink-0"
+                            title="Duplicate environment variable" aria-label="Duplicate environment variable">
+                            <x-reicon name="layers" class="size-3.5" />
+                        </button>
+                    </x-slot:content>
+
+                    <div wire:key="env-duplicate-{{ $env->id }}" class="flex w-full flex-col gap-4">
+                        @if ($duplicateOptionsLoaded)
+                            @php
+                                $duplicateCurrentEnvironment = $this->env->resourceable?->environment;
+                                $duplicateCurrentProjectId = $duplicateCurrentEnvironment?->project?->id;
+                                $duplicateCurrentTarget =
+                                    ($this->env->resourceable?->type() ?? '') . ':' . $this->env->resourceable_id;
+                            @endphp
+                            <div class="flex w-full flex-col gap-4" x-data="{
+                                selectedProject: @js($duplicateCurrentProjectId),
+                                selectedEnvironment: @js($duplicateCurrentEnvironment?->id),
+                                selectedResource: @js($duplicateCurrentTarget),
+                                projects: @js($this->duplicateTargets),
+                                get selectedProjectData() {
+                                    return this.projects.find(project => project.id == this.selectedProject);
+                                },
+                                get projectOptions() {
+                                    return this.projects.map(project => ({
+                                        value: project.id,
+                                        label: project.name + (project.id == @js($duplicateCurrentProjectId) ? ' (current)' : ''),
+                                    }));
+                                },
+                                get environmentOptions() {
+                                    if (!this.selectedProjectData) return [];
+                                    return this.selectedProjectData.environments.map(environment => ({
+                                        value: environment.id,
+                                        label: environment.name + (environment.id == @js($duplicateCurrentEnvironment?->id) ? ' (current)' : ''),
+                                    }));
+                                },
+                                get resourceOptions() {
+                                    if (!this.selectedProjectData) return [];
+                                    const environment = this.selectedProjectData.environments.find(environment => environment.id == this.selectedEnvironment);
+                                    if (!environment) return [];
+                                    return environment.resources.map(resource => ({
+                                        value: resource.value,
+                                        label: resource.label + (resource.current ? ' (current)' : ''),
+                                    }));
+                                }
+                            }" x-init="
+                                $watch('selectedProject', () => { selectedEnvironment = null; selectedResource = null });
+                                $watch('selectedEnvironment', () => { selectedResource = null });
+                            ">
+                                <x-forms.input id="duplicateKey" label="Name" required
+                                    helper="The name of the duplicated variable. It must not exist on the destination resource yet." />
+                                @if ($is_shown_once)
+                                    <div class="text-xs text-neutral-500 dark:text-fg-faint">
+                                        The value of this locked variable is copied along, but stays hidden.
+                                    </div>
+                                @endif
+
+                                <div
+                                    class="grid gap-4 border-t border-neutral-200 pt-4 dark:border-white/[0.07] sm:grid-cols-3">
+                                    <x-forms.listbox id="duplicate-project-{{ $env->id }}" label="Project"
+                                        :wire="false" x-model="selectedProject" x-effect="options = projectOptions"
+                                        placeholder="Choose a project…" />
+                                    <x-forms.listbox id="duplicate-environment-{{ $env->id }}" label="Environment"
+                                        :wire="false" x-model="selectedEnvironment"
+                                        x-effect="options = environmentOptions" x-bind:disabled="!selectedProject"
+                                        placeholder="Choose an environment…"
+                                        emptyText="No environments are available in this project." />
+                                    <x-forms.listbox id="duplicate-resource-{{ $env->id }}" label="Resource"
+                                        :wire="false" x-model="selectedResource" x-effect="options = resourceOptions"
+                                        x-bind:disabled="!selectedEnvironment" placeholder="Choose a resource…"
+                                        emptyText="No resources are available in this environment." />
+                                </div>
+
+                                <div
+                                    class="flex flex-col gap-3 border-t border-neutral-200 pt-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]">
+                                    <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                                        The value and settings are copied to the selected resource.
+                                    </p>
+                                    <x-forms.button x-bind:disabled="!selectedResource"
+                                        @click="modalOpen = false; $wire.duplicateVariable(selectedResource)">
+                                        Duplicate variable
+                                    </x-forms.button>
+                                </div>
+                            </div>
+                        @else
+                            <x-loading text="Loading..." />
+                        @endif
+                    </div>
+                </x-modal-input>
+            @endif
             {{-- Open modal immediately (Alpine); decrypt value in a follow-up Livewire request. --}}
             <x-modal-input title="Edit environment variable" :closeOutside="false" :wireIgnore="false"
                 wireOpen="editorOpen">

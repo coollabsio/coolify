@@ -9,11 +9,21 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 
@@ -82,6 +92,35 @@ class Show extends Component
     public bool $editorOpen = false;
 
     public array $problematicVariables = [];
+
+    public bool $duplicateModalOpen = false;
+
+    /**
+     * Duplicate target options are loaded on demand when the duplicate modal
+     * opens so table rows stay cheap to render.
+     */
+    public bool $duplicateOptionsLoaded = false;
+
+    public string $duplicateKey = '';
+
+    /**
+     * Resource types that can receive a copied environment variable, keyed by
+     * their `type()` slug as used in the duplicate target picker.
+     *
+     * @var array<string, class-string<Model>>
+     */
+    private const DUPLICATE_TARGET_TYPES = [
+        'application' => Application::class,
+        'service' => Service::class,
+        'standalone-postgresql' => StandalonePostgresql::class,
+        'standalone-mysql' => StandaloneMysql::class,
+        'standalone-mariadb' => StandaloneMariadb::class,
+        'standalone-mongodb' => StandaloneMongodb::class,
+        'standalone-redis' => StandaloneRedis::class,
+        'standalone-keydb' => StandaloneKeydb::class,
+        'standalone-dragonfly' => StandaloneDragonfly::class,
+        'standalone-clickhouse' => StandaloneClickhouse::class,
+    ];
 
     protected $listeners = [
         'refreshEnvs' => 'refresh',
@@ -484,5 +523,227 @@ class Show extends Component
         } catch (\Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Whether this row offers the duplicate action. Shared, magic, and
+     * structural credential variables cannot be duplicated.
+     */
+    public function canDuplicate(): bool
+    {
+        return ! $this->isSharedVariable
+            && ! $this->isMagicVariable
+            && ! $this->is_redis_credential
+            && $this->env instanceof ModelsEnvironmentVariable
+            && $this->env->exists
+            && (auth()->user()?->can('update', $this->env) ?? false);
+    }
+
+    /**
+     * Prepare the duplicate modal: suggest a collision-free name and load the
+     * target picker options. Called when the modal opens.
+     */
+    public function prepareDuplicate(): void
+    {
+        if ($this->duplicateOptionsLoaded || ! $this->canDuplicate()) {
+            return;
+        }
+
+        $this->duplicateKey = $this->suggestedDuplicateKey();
+        $this->duplicateOptionsLoaded = true;
+    }
+
+    /**
+     * Project → environment → resource tree for the duplicate target picker,
+     * scoped to the current team.
+     *
+     * @return list<array{id: int, name: string, environments: list<array{id: int, name: string, resources: list<array{value: string, label: string, current: bool}>}>}>
+     */
+    #[Computed]
+    public function duplicateTargets(): array
+    {
+        if (! $this->duplicateOptionsLoaded || ! currentTeam()) {
+            return [];
+        }
+
+        $projects = Project::ownedByCurrentTeamCached()->sortBy('name')->values();
+
+        $resourcesByEnvironment = collect(self::DUPLICATE_TARGET_TYPES)
+            ->flatMap(function (string $class, string $type) {
+                return $class::query()
+                    ->whereIn('environment_id', $this->environmentIdsForDuplicateTargets())
+                    ->get(['id', 'name', 'environment_id'])
+                    ->map(fn (Model $resource) => [
+                        'environment_id' => $resource->environment_id,
+                        'value' => "{$type}:{$resource->id}",
+                        'label' => $resource->name.' ('.$this->duplicateTargetTypeLabel($type).')',
+                        'current' => $this->env->resourceable_type === $class
+                            && (int) $this->env->resourceable_id === (int) $resource->id,
+                    ]);
+            })
+            ->groupBy('environment_id');
+
+        return $projects->map(fn (Project $project) => [
+            'id' => $project->id,
+            'name' => $project->name,
+            'environments' => $project->environments->sortBy('name')->values()->map(fn (Environment $environment) => [
+                'id' => $environment->id,
+                'name' => $environment->name,
+                'resources' => $resourcesByEnvironment->get($environment->id, collect())
+                    ->map(fn (array $resource) => collect($resource)->except('environment_id')->all())
+                    ->sortBy('label')
+                    ->values()
+                    ->all(),
+            ])->all(),
+        ])->all();
+    }
+
+    /**
+     * Duplicate this environment variable onto the given target resource,
+     * using the name entered in the duplicate modal.
+     */
+    public function duplicateVariable(string $target)
+    {
+        try {
+            if (! $this->canDuplicate()) {
+                return;
+            }
+
+            $this->authorize('update', $this->env);
+
+            // Table rows omit the encrypted value column; fetch a full model.
+            $source = ModelsEnvironmentVariable::query()->findOrFail($this->env->id);
+
+            $validator = Validator::make(
+                ['duplicateKey' => ValidationPatterns::normalizeEnvironmentVariableKey($this->duplicateKey)],
+                ['duplicateKey' => ValidationPatterns::environmentVariableKeyRules()],
+                ValidationPatterns::environmentVariableKeyMessages('duplicateKey', 'name'),
+            );
+            if ($validator->fails()) {
+                $this->dispatch('error', $validator->errors()->first('duplicateKey'));
+
+                return;
+            }
+            $newKey = $validator->validated()['duplicateKey'];
+
+            if (str($newKey)->startsWith(['SERVICE_FQDN', 'SERVICE_URL', 'SERVICE_NAME'])) {
+                $this->dispatch('error', 'Names starting with SERVICE_FQDN, SERVICE_URL or SERVICE_NAME are reserved for magic variables.');
+
+                return;
+            }
+
+            $targetResource = $this->resolveDuplicateTarget($target);
+            if (! $targetResource || $targetResource->team()?->id !== $source->resourceable?->team()?->id) {
+                $this->dispatch('error', 'Target resource not found.');
+
+                return;
+            }
+
+            $this->authorize('manageEnvironment', $targetResource);
+
+            // Preview variables only exist on applications; kept scope otherwise drops to production.
+            $isPreview = $source->is_preview && $targetResource instanceof Application;
+
+            $keyTaken = ModelsEnvironmentVariable::query()
+                ->where('resourceable_type', $targetResource->getMorphClass())
+                ->where('resourceable_id', $targetResource->id)
+                ->where('is_preview', $isPreview)
+                ->where('key', $newKey)
+                ->exists();
+            if ($keyTaken) {
+                $this->dispatch('error', "Environment variable '{$newKey}' already exists on the target resource.");
+
+                return;
+            }
+
+            $maxOrder = ModelsEnvironmentVariable::query()
+                ->where('resourceable_type', $targetResource->getMorphClass())
+                ->where('resourceable_id', $targetResource->id)
+                ->where('is_preview', $isPreview)
+                ->max('order') ?? 0;
+
+            $duplicate = $source->replicate(['id', 'uuid', 'created_at', 'updated_at', 'version']);
+            $duplicate->key = $newKey;
+            $duplicate->resourceable_type = $targetResource->getMorphClass();
+            $duplicate->resourceable_id = $targetResource->id;
+            $duplicate->is_preview = $isPreview;
+            // Required is a property of the original template variable, not of copies.
+            $duplicate->is_required = false;
+            $duplicate->order = $maxOrder + 1;
+            $duplicate->save();
+
+            $this->duplicateModalOpen = false;
+            $this->duplicateOptionsLoaded = false;
+            $this->duplicateKey = '';
+
+            $isSameResource = $targetResource->getMorphClass() === $source->resourceable_type
+                && (int) $targetResource->id === (int) $source->resourceable_id;
+            if ($isSameResource) {
+                $this->dispatch('refreshEnvs');
+                $this->dispatch('configurationChanged');
+                $this->dispatch('success', 'Environment variable duplicated.');
+            } else {
+                $this->dispatch('success', "Environment variable copied to '{$targetResource->name}'.");
+            }
+        } catch (\Exception $e) {
+            return handleError($e);
+        }
+    }
+
+    /** @return list<int> */
+    private function environmentIdsForDuplicateTargets(): array
+    {
+        return Project::ownedByCurrentTeamCached()
+            ->flatMap(fn (Project $project) => $project->environments->pluck('id'))
+            ->map(fn (int|string $id): int => (int) $id)
+            ->all();
+    }
+
+    private function duplicateTargetTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'application' => 'Application',
+            'service' => 'Service',
+            default => 'Database',
+        };
+    }
+
+    private function resolveDuplicateTarget(string $target): ?Model
+    {
+        [$type, $id] = array_pad(explode(':', $target, 2), 2, null);
+
+        $class = self::DUPLICATE_TARGET_TYPES[$type] ?? null;
+        if ($class === null || ! ctype_digit((string) $id)) {
+            return null;
+        }
+
+        return $class::query()->find((int) $id);
+    }
+
+    /**
+     * First collision-free "KEY_COPY" style name on the source resource.
+     */
+    private function suggestedDuplicateKey(): string
+    {
+        $base = mb_substr($this->env->key, 0, 240);
+        $candidate = $base.'_COPY';
+        $suffix = 2;
+
+        while ($this->duplicateKeyExistsOnSource($candidate) && $suffix <= 100) {
+            $candidate = $base.'_COPY'.$suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function duplicateKeyExistsOnSource(string $key): bool
+    {
+        return ModelsEnvironmentVariable::query()
+            ->where('resourceable_type', $this->env->resourceable_type)
+            ->where('resourceable_id', $this->env->resourceable_id)
+            ->where('is_preview', (bool) $this->env->is_preview)
+            ->where('key', $key)
+            ->exists();
     }
 }
