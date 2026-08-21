@@ -223,6 +223,26 @@ EOF
     WARNING_SPACE=true
 fi
 
+# Hard minimum: refuse to install when free space is below a floor. The 20GB
+# recommendation above stays a warning, but a fresh install pulls several GB of
+# images and will break partway on a nearly full disk, so abort clearly instead.
+MINIMUM_REQUIRED_DISK_GB="${MINIMUM_REQUIRED_DISK_GB:-5}"
+case "$MINIMUM_REQUIRED_DISK_GB" in
+    '' | *[!0-9]*) MINIMUM_REQUIRED_DISK_GB=5 ;;
+esac
+if [ -n "$AVAILABLE_SPACE" ] && [ "$AVAILABLE_SPACE" -lt "$MINIMUM_REQUIRED_DISK_GB" ]; then
+    cat <<EOF
+ERROR: Not enough free disk space to install Coolify safely.
+
+Available disk space:  ${AVAILABLE_SPACE}GB
+Minimum required:      ${MINIMUM_REQUIRED_DISK_GB}GB
+
+Free up disk space (or lower MINIMUM_REQUIRED_DISK_GB) and run the installer again.
+==================
+EOF
+    exit 1
+fi
+
 if [ "$WARNING_SPACE" = true ]; then
     echo "Sleeping for 5 seconds."
     sleep 5
