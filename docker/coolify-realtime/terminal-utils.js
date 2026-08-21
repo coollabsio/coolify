@@ -20,7 +20,12 @@ function normalizeShellArgument(argument) {
 }
 
 export function extractSshArgs(commandString) {
-    const sshCommandMatch = commandString.match(/ssh (.+?) 'bash -se'/);
+    // The generated command ends with the remote shell wrapped in single quotes
+    // immediately before the heredoc: `ssh <args> '<remote shell>' << \DELIM`.
+    // Match on that quoted blob + heredoc rather than a literal `'bash -se'`, so
+    // this keeps working when the remote shell is the bash/sh fallback wrapper
+    // (`'if command -v bash …; then exec bash -se; else exec sh -se; fi'`).
+    const sshCommandMatch = commandString.match(/ssh (.+?) '[^']*'\s+<</);
     if (!sshCommandMatch) return [];
 
     const argsString = sshCommandMatch[1];
