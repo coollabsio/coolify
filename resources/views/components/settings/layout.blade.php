@@ -4,6 +4,7 @@
             ['label' => 'General', 'route' => 'settings.index', 'icon' => 'settings'],
             ['label' => 'Advanced', 'route' => 'settings.advanced', 'icon' => 'grid'],
             ['label' => 'Updates', 'route' => 'settings.updates', 'icon' => 'refresh3'],
+            ['label' => 'Migrations', 'route' => 'settings.migrations', 'icon' => 'servers'],
         ],
         'Instance' => [
             ['label' => 'Backup', 'route' => 'settings.backup', 'icon' => 'database'],

@@ -41,10 +41,9 @@ class StartProxy
         if ($server->isSwarmManager()) {
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Starting coolify-proxy.'",
-                'docker stack deploy --detach=true -c docker-compose.yml coolify-proxy',
+                "docker stack deploy --detach=true -c $proxy_path/docker-compose.yml coolify-proxy",
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
@@ -56,11 +55,10 @@ class StartProxy
             $caddyfile = 'import /dynamic/*.caddy';
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
-                "cd $proxy_path",
                 "echo '$caddyfile' > $proxy_path/dynamic/Caddyfile",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
-                'docker compose pull',
+                "docker compose --project-directory $proxy_path pull",
                 'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
                 "    echo 'Stopping and removing existing coolify-proxy.'",
                 '    docker stop coolify-proxy 2>/dev/null || true',
@@ -80,7 +78,7 @@ class StartProxy
             $commands = $commands->merge(ensureProxyNetworksExist($server));
             $commands = $commands->merge([
                 "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --wait --remove-orphans',
+                "docker compose --project-directory $proxy_path up -d --wait --remove-orphans",
                 "echo 'Successfully started coolify-proxy.'",
             ]);
             $commands = $commands->merge(connectProxyToNetworks($server));

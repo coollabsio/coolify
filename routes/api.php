@@ -11,6 +11,8 @@ use App\Http\Controllers\Api\GithubController;
 use App\Http\Controllers\Api\GitlabController;
 use App\Http\Controllers\Api\HetznerController;
 use App\Http\Controllers\Api\InstanceEmailSettingsController;
+use App\Http\Controllers\Api\Internal\FluxResourceStatusController;
+use App\Http\Controllers\Api\MigrationsController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
@@ -406,6 +408,13 @@ Route::group([
     Route::post('/services/{uuid}/databases/{database_uuid}/start', [ServiceDatabasesController::class, 'start'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/databases/{database_uuid}/restart', [ServiceDatabasesController::class, 'restart'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/databases/{database_uuid}/stop', [ServiceDatabasesController::class, 'stop'])->middleware(['api.ability:deploy']);
+
+    Route::get('/migrations/preflight', [MigrationsController::class, 'preflight'])->middleware(['api.ability:write']);
+    Route::get('/migrations/resources', [MigrationsController::class, 'resources'])->middleware(['api.ability:write']);
+    Route::post('/migrations/export', [MigrationsController::class, 'export'])->middleware(['api.ability:write']);
+    Route::get('/migrations/{uuid}', [MigrationsController::class, 'show'])->middleware(['api.ability:write']);
+    Route::post('/migrations/import', [MigrationsController::class, 'import'])->middleware(['api.ability:write']);
+    Route::post('/migrations/{uuid}/cleanup', [MigrationsController::class, 'cleanup'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'scheduled_tasks_by_application_uuid'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/scheduled-tasks', [ScheduledTasksController::class, 'create_scheduled_task_by_application_uuid'])->middleware(['api.ability:write']);

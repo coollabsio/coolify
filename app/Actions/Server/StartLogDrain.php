@@ -200,7 +200,7 @@ Files:
                 "echo '{$readme}' | base64 -d | tee $readme_path > /dev/null",
                 "echo '{$envEncoded}' | base64 -d | tee $config_path/.env > /dev/null",
                 "echo 'Starting Fluent Bit'",
-                "cd $config_path && docker compose up -d",
+                "docker compose --project-directory $config_path up -d",
             ];
             $command = array_merge($command, $this->logDrainNetworkConnectCommands($server));
 
