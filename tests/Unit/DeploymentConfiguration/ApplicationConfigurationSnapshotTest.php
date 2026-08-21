@@ -334,13 +334,13 @@ it('detects environment variable value changes without exposing secret values', 
     $change = collect($diff->changes())->firstWhere('label', 'API_TOKEN');
 
     expect($change)->not->toBeNull()
-        ->and($change['display_summary'])->toBeNull()
-        ->and($change['old_display_value'])->toBe('old-secret')
-        ->and($change['new_display_value'])->toBe('new-secret')
-        ->and(json_encode($diff->toArray()))->toContain('old-secret')->toContain('new-secret');
+        ->and($change['display_summary'])->toBe('Changed')
+        ->and($change['old_display_value'])->toBe('••••••••')
+        ->and($change['new_display_value'])->toBe('••••••••')
+        ->and(json_encode($diff->toArray()))->not->toContain('old-secret')->not->toContain('new-secret');
 });
 
-it('describes added unlocked environment variables with their value', function () {
+it('describes added environment variables as set without exposing secret values', function () {
     $application = snapshotTestApplication();
     markSnapshotTestApplicationDeployed($application);
 
@@ -361,6 +361,6 @@ it('describes added unlocked environment variables with their value', function (
     expect($change)->not->toBeNull()
         ->and($change['display_summary'])->toBeNull()
         ->and($change['old_display_value'])->toBe('-')
-        ->and($change['new_display_value'])->toBe('new-secret')
-        ->and(json_encode($diff->toArray()))->toContain('new-secret');
+        ->and($change['new_display_value'])->toBe('••••••••')
+        ->and(json_encode($diff->toArray()))->not->toContain('new-secret');
 });

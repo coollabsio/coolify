@@ -13,24 +13,6 @@
             'icon' => 'grid',
         ],
         [
-            'label' => 'Authentication',
-            'route' => 'settings.oauth',
-            'active' => $activeMenu === 'oauth',
-            'icon' => 'keys',
-        ],
-        [
-            'label' => 'Transactional Email',
-            'route' => 'settings.email',
-            'active' => $activeMenu === 'email',
-            'icon' => 'notifications',
-        ],
-        [
-            'label' => 'Instance Backup',
-            'route' => 'settings.backup',
-            'active' => $activeMenu === 'backup',
-            'icon' => 'database',
-        ],
-        [
             'label' => 'Updates',
             'route' => 'settings.updates',
             'active' => $activeMenu === 'updates',

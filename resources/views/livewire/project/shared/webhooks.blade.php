@@ -39,7 +39,7 @@
                         <x-external-link />
                     </a>
                 </x-slot:actions>
-                <x-forms.copy-input label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
+                <x-forms.copy-button label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
             </x-application.settings-section>
 
             @if ($githubManualWebhook && $gitlabManualWebhook)
@@ -70,7 +70,7 @@
                                         </p>
                                     </div>
                                     <div class="grid gap-4 md:grid-cols-2">
-                                        <x-forms.copy-input label="Webhook URL" :text="$provider['url'] ?? ''" />
+                                        <x-forms.copy-button label="Webhook URL" :text="$provider['url'] ?? ''" />
                                         @can('update', $resource)
                                             <x-forms.input type="password" :id="$provider['secret']"
                                                 label="Webhook secret"
@@ -106,7 +106,7 @@
                         <x-external-link />
                     </a>
                 </x-slot:actions>
-                <x-forms.copy-input label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
+                <x-forms.copy-button label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
             </x-application.settings-section>
         </div>
     @endif

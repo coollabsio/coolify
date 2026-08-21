@@ -29,7 +29,14 @@
                                     <span
                                         class="min-w-0 truncate font-mono text-[12px] text-neutral-500 dark:text-fg-dim"
                                         title="{{ $invite->link }}">{{ $invite->link }}</span>
-                                    <x-copy-button :value="$invite->link" label="Copy invitation link" />
+                                    <button type="button"
+                                        class="button h-7! shrink-0 px-2!"
+                                        title="Copy invitation link"
+                                        aria-label="Copy invitation link"
+                                        x-data
+                                        x-on:click.prevent="window.copyToClipboard(@js($invite->link))">
+                                        <x-reicon name="file-content" class="size-3.5" />
+                                    </button>
                                 </div>
                                 <div class="text-right">
                                     <button type="button"

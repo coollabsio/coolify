@@ -22,7 +22,6 @@ class InstanceSettings extends Model
         'do_not_track',
         'is_auto_update_enabled',
         'is_registration_enabled',
-        'disable_registration_when_oauth_enabled',
         'next_channel',
         'smtp_enabled',
         'smtp_from_address',
@@ -89,8 +88,6 @@ class InstanceSettings extends Model
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
-        'is_registration_enabled' => 'boolean',
-        'disable_registration_when_oauth_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
@@ -116,19 +113,6 @@ class InstanceSettings extends Model
                 \Cache::forget('instance_settings_fqdn_host');
             }
         });
-    }
-
-    public function isPasswordRegistrationAllowed(): bool
-    {
-        if (! $this->is_registration_enabled) {
-            return false;
-        }
-
-        if (! $this->disable_registration_when_oauth_enabled) {
-            return true;
-        }
-
-        return ! OauthSetting::where('enabled', true)->exists();
     }
 
     public function fqdn(): Attribute

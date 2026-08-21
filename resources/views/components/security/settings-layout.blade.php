@@ -12,12 +12,6 @@
             'active' => request()->routeIs('security.cloud-tokens*'),
             'icon' => 'cloud',
         ] : null,
-        auth()->user()?->can('viewAny', App\Models\IntegrationToken::class) ? [
-            'label' => 'Integration Tokens',
-            'route' => 'security.integration-tokens',
-            'active' => request()->routeIs('security.integration-tokens'),
-            'icon' => 'network',
-        ] : null,
         auth()->user()?->can('viewAny', App\Models\CloudInitScript::class) ? [
             'label' => 'Cloud-Init Scripts',
             'route' => 'security.cloud-init-scripts',

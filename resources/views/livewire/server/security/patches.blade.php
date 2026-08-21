@@ -35,8 +35,8 @@
                 </x-slot:actions>
 
                 <x-callout type="info" title="Supported package managers">
-                    Automated package discovery currently supports apk, apt, dnf, pacman, and zypper. Weekly status
-                    notifications can be managed from
+                    Automated package discovery currently supports apt, dnf, and zypper. Weekly status notifications
+                    can be managed from
                     <a class="font-medium underline" href="{{ route('notifications.email') }}"
                         {{ wireNavigate() }}>notification settings</a>.
                 </x-callout>

@@ -51,21 +51,27 @@ it('renders a real copy button for pending invitation links', function () {
     $view = file_get_contents(resource_path('views/livewire/team/invitations.blade.php'));
 
     expect($view)
-        ->toContain('<x-copy-button :value="$invite->link" label="Copy invitation link" />');
+        ->toContain('aria-label="Copy invitation link"')
+        ->toContain('window.copyToClipboard(@js($invite->link))')
+        ->toContain('class="button h-7! shrink-0 px-2!"');
 
     Livewire::test(Invitations::class, [
         'invitations' => TeamInvitation::ownedByCurrentTeam()->get(),
     ])
         ->assertSee($invitation->link)
         ->assertSeeHtml('aria-label="Copy invitation link"')
-        ->assertSeeHtml('x-data="copyButton"')
+        ->assertSeeHtml('window.copyToClipboard(')
         ->assertSeeHtml('type="button"');
 });
 
-it('keeps clipboard logic in the shared copy button instead of a global helper', function () {
+it('exposes a resilient global copyToClipboard helper', function () {
     $layout = file_get_contents(resource_path('views/layouts/base.blade.php'));
 
-    expect($layout)->not->toContain('copyToClipboard');
+    expect($layout)
+        ->toContain('async function copyToClipboard(text)')
+        ->toContain('window.copyToClipboard = copyToClipboard')
+        ->toContain('document.execCommand(\'copy\')')
+        ->toContain('window.isSecureContext');
 });
 
 it('preserves a provisional user when revoking their invitation fails', function () {

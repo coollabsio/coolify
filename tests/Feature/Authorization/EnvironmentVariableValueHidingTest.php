@@ -18,7 +18,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+    InstanceSettings::updateOrCreate(['id' => 0], ['is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
 
@@ -102,11 +102,6 @@ test('admin sees unlocked env value in Show component', function () {
         'env' => $this->unlockedEnv,
         'type' => 'application',
     ]);
-
-    // Values hydrate lazily; the edit modal triggers loadValues() on open.
-    expect($component->get('value'))->toBeNull();
-
-    $component->call('loadValues');
 
     expect($component->get('value'))->toBe('secret-unlocked-value');
 });
@@ -246,17 +241,6 @@ test('API hides locked env value with root token', function () {
 test('API hides env values for member even with read:sensitive token', function () {
     session(['currentTeam' => $this->team]);
     $token = $this->member->createToken('member-sensitive', ['read', 'read:sensitive']);
-
-    $response = $this->withHeaders([
-        'Authorization' => 'Bearer '.$token->plainTextToken,
-    ])->getJson("/api/v1/applications/{$this->application->uuid}/envs");
-
-    $response->assertForbidden();
-});
-
-test('API hides env values for member with read token', function () {
-    session(['currentTeam' => $this->team]);
-    $token = $this->member->createToken('member-read', ['read']);
 
     $response = $this->withHeaders([
         'Authorization' => 'Bearer '.$token->plainTextToken,
