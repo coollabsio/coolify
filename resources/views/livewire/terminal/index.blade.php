@@ -15,12 +15,6 @@
     $consoleThemeKeys = collect($consoleThemes)->pluck('key')->values();
     $consoleThemeNames = collect($consoleThemes)->pluck('name', 'key');
     $consoleThemeAccents = collect($consoleThemes)->pluck('accent', 'key');
-    $consoleRenderers = [
-        ['key' => 'xterm', 'name' => 'xterm.js', 'short' => 'xterm', 'description' => 'Default, stable renderer'],
-        ['key' => 'ghostty', 'name' => 'Ghostty', 'short' => 'Ghostty', 'description' => 'Experimental · Ghostty engine (WASM)'],
-    ];
-    $consoleRendererKeys = collect($consoleRenderers)->pluck('key')->values();
-    $consoleRendererShortNames = collect($consoleRenderers)->pluck('short', 'key');
 
     $terminalOptions = [];
     if (! $isLoadingContainers && $servers->isNotEmpty()) {
@@ -82,9 +76,7 @@
             themeAccents: @js($consoleThemeAccents),
             consoleTheme: 'system',
             themeOpen: false,
-            rendererKeys: @js($consoleRendererKeys),
-            consoleRenderer: 'xterm',
-            rendererOpen: false,
+            ...window.terminalRendererToolbar(),
             get filteredTargetGroups() {
                 const query = this.targetSearch.trim().toLowerCase();
                 const targets = query
@@ -100,21 +92,13 @@
                 const savedTheme = localStorage.getItem('coolify-console-theme');
                 this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';
                 localStorage.setItem('coolify-console-theme', this.consoleTheme);
-                const savedRenderer = localStorage.getItem('coolify-console-renderer');
-                this.consoleRenderer = this.rendererKeys.includes(savedRenderer) ? savedRenderer : 'xterm';
-                localStorage.setItem('coolify-console-renderer', this.consoleRenderer);
+                this.initRenderer();
             },
             setTheme(theme) {
                 this.consoleTheme = theme;
                 this.themeOpen = false;
                 localStorage.setItem('coolify-console-theme', theme);
                 window.dispatchEvent(new CustomEvent('terminal-theme-change', { detail: { theme } }));
-            },
-            setRenderer(renderer) {
-                this.consoleRenderer = renderer;
-                this.rendererOpen = false;
-                localStorage.setItem('coolify-console-renderer', renderer);
-                window.dispatchEvent(new CustomEvent('terminal-renderer-change', { detail: { renderer } }));
             },
             syncTheme() {
                 const savedTheme = localStorage.getItem('coolify-console-theme');
@@ -279,8 +263,7 @@
                 </div>
 
                 <div class="ml-auto flex items-center gap-2">
-                    <x-terminal.renderer-selector :renderers="$consoleRenderers"
-                        :renderer-short-names="$consoleRendererShortNames" />
+                    <x-terminal.renderer-selector />
                     <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
                         :theme-accents="$consoleThemeAccents" />
                 </div>

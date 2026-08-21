@@ -229,6 +229,11 @@ export function initializeTerminalComponent() {
             // ready immediately.
             terminalWriteReady: false,
             pendingTerminalOutput: [],
+            // Guards setTerminalRenderer against overlapping switches. Each switch
+            // tears down and rebuilds the terminal + websocket asynchronously, so a
+            // second switch while one is in flight would leave two terminals bound
+            // to one host, duplicate onData handlers, and a leaked websocket.
+            rendererSwitchInFlight: false,
 
             init() {
                 this.starting = this.$el.dataset.autoStart === 'true';
@@ -303,6 +308,10 @@ export function initializeTerminalComponent() {
                     setTimeout(() => {
                         this.initializeWebSocket();
                     }, 100);
+                }).catch((error) => {
+                    logTerminal('error', '[Terminal] Failed to initialize terminal:', error);
+                    this.starting = false;
+                    this.$wire.dispatch('error', 'The terminal failed to start. Please reload the page.');
                 });
 
                 this.$wire.on('send-back-command', (command) => {
@@ -615,6 +624,14 @@ export function initializeTerminalComponent() {
                     // Fall back to xterm if the experimental renderer fails to load.
                     if (this.selectedRenderer !== 'xterm') {
                         this.selectedRenderer = 'xterm';
+                        // Persist + announce the fallback so the next page load does not
+                        // retry the failing renderer forever, and the toolbar selector
+                        // converges on the renderer that is actually running.
+                        localStorage.setItem(TERMINAL_RENDERER_STORAGE_KEY, 'xterm');
+                        window.dispatchEvent(new CustomEvent('terminal-renderer-fallback', {
+                            detail: { renderer: 'xterm' },
+                        }));
+                        this.$wire.dispatch('error', 'The experimental renderer failed to load. Falling back to xterm.js.');
                         const { term, fitAddon } = await createTerminal('xterm', options, {
                             XtermTerminal: Terminal,
                             XtermFitAddon: FitAddon,
@@ -968,6 +985,10 @@ export function initializeTerminalComponent() {
              */
             writeToTerminal(data, cb) {
                 if (!this.term) {
+                    // Terminal is gone (teardown / renderer switch). Release the pending
+                    // write so flow-control accounting (pendingWrites) stays balanced and
+                    // the PTY is not paused forever after enough dropped writes.
+                    cb?.();
                     return;
                 }
 
@@ -1012,59 +1033,74 @@ export function initializeTerminalComponent() {
              */
             async setTerminalRenderer(renderer) {
                 const resolved = resolveTerminalRenderer(renderer);
-                if (resolved === this.selectedRenderer) {
+                // Serialize switches: selectedRenderer updates synchronously below but
+                // the rebuild awaits (ghostty WASM load makes that window long). Without
+                // this guard, rapid clicks interleave into two terminals on one host,
+                // duplicate keystrokes, and a leaked websocket.
+                if (resolved === this.selectedRenderer || this.rendererSwitchInFlight) {
                     return;
                 }
 
-                this.selectedRenderer = resolved;
-                localStorage.setItem(TERMINAL_RENDERER_STORAGE_KEY, resolved);
+                this.rendererSwitchInFlight = true;
+                try {
+                    this.selectedRenderer = resolved;
+                    localStorage.setItem(TERMINAL_RENDERER_STORAGE_KEY, resolved);
 
-                // Preserve the last command so reconnect respawns the same target session.
-                const replayCommand = this.lastSentCommand;
+                    // Preserve the last command so reconnect respawns the same target session.
+                    const replayCommand = this.lastSentCommand;
 
-                this.terminalActive = false;
-                this.terminalWriteReady = false;
-                this.pendingTerminalOutput = [];
-                this.pendingWrites = 0;
-                this.paused = false;
-                this.pendingCommand = null;
-                this.clearAllTimers();
-                this.resetTerminalSessionCountdown();
+                    this.terminalActive = false;
+                    this.terminalWriteReady = false;
+                    this.pendingTerminalOutput = [];
+                    this.pendingWrites = 0;
+                    this.paused = false;
+                    this.pendingCommand = null;
+                    this.clearAllTimers();
+                    this.resetTerminalSessionCountdown();
 
-                if (this.socket) {
-                    // Detach handlers first so the old socket's async onclose cannot
-                    // clear timers / reset state after the new connection is set up.
-                    this.socket.onopen = null;
-                    this.socket.onmessage = null;
-                    this.socket.onerror = null;
-                    this.socket.onclose = null;
-                    this.socket.close(1000, 'Renderer switch');
-                    this.socket = null;
-                }
-
-                if (this.term) {
-                    try {
-                        this.term.dispose();
-                    } catch (_) {
-                        // ignore — renderer may have already torn down its DOM
+                    if (this.socket) {
+                        // Detach handlers first so the old socket's async onclose cannot
+                        // clear timers / reset state after the new connection is set up.
+                        this.socket.onopen = null;
+                        this.socket.onmessage = null;
+                        this.socket.onerror = null;
+                        this.socket.onclose = null;
+                        this.socket.close(1000, 'Renderer switch');
+                        this.socket = null;
                     }
-                    this.term = null;
+
+                    if (this.term) {
+                        try {
+                            this.term.dispose();
+                        } catch (_) {
+                            // ignore — renderer may have already torn down its DOM
+                        }
+                        this.term = null;
+                    }
+                    this.fitAddon = null;
+
+                    const host = document.getElementById('terminal');
+                    if (host) {
+                        host.replaceChildren();
+                    }
+
+                    this.connectionState = 'disconnected';
+                    this.reconnectAttempts = 0;
+                    this.starting = Boolean(replayCommand);
+                    this.lastSentCommand = replayCommand;
+
+                    await this.setupTerminal();
+                    this.setupTerminalEventListeners();
+                    this.initializeWebSocket();
+                } catch (error) {
+                    // Handle failures internally so the Alpine renderer-change action
+                    // never produces an unhandled rejection.
+                    logTerminal('error', '[Terminal] Renderer switch failed:', error);
+                    this.starting = false;
+                    this.$wire.dispatch('error', 'Failed to switch the terminal renderer. Please reload the page.');
+                } finally {
+                    this.rendererSwitchInFlight = false;
                 }
-                this.fitAddon = null;
-
-                const host = document.getElementById('terminal');
-                if (host) {
-                    host.replaceChildren();
-                }
-
-                this.connectionState = 'disconnected';
-                this.reconnectAttempts = 0;
-                this.starting = Boolean(replayCommand);
-                this.lastSentCommand = replayCommand;
-
-                await this.setupTerminal();
-                this.setupTerminalEventListeners();
-                this.initializeWebSocket();
             },
 
             destroy() {
