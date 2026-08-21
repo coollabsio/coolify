@@ -2269,16 +2269,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         } else {
             $fqdn = $this->preview->fqdn;
         }
-        if (isset($fqdn)) {
-            $url = Url::fromString($fqdn);
-            $fqdn = $url->getHost();
-            $url = $url->withHost($fqdn)->withPort(null)->__toString();
+        // The FQDN may be a comma-separated list; parse each entry on its own
+        // (Url::fromString cannot parse a comma-joined list as a whole).
+        $fqdns = collect(ValidationPatterns::applicationDomainList($fqdn));
+        if ($fqdns->isNotEmpty()) {
+            $hosts = $fqdns->map(fn (string $domain) => Url::fromString($domain)->getHost())->implode(',');
+            $urls = $fqdns->map(fn (string $domain) => Url::fromString($domain)->withPort(null)->__toString())->implode(',');
             if ((int) $this->application->compose_parsing_version >= 3) {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($url).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($fqdn).' ';
+                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($urls).' ';
+                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($hosts).' ';
             } else {
-                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($fqdn).' ';
-                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($url).' ';
+                $this->coolify_variables .= 'COOLIFY_URL='.escapeShellValue($hosts).' ';
+                $this->coolify_variables .= 'COOLIFY_FQDN='.escapeShellValue($urls).' ';
             }
         }
         if (isset($this->application->git_branch)) {
