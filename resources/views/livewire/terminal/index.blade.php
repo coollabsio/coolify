@@ -260,8 +260,11 @@
                     @endif
                 </div>
 
-                <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
+                <div class="flex items-center gap-2">
+                    <x-forms.button wire:click="openImportModal">Import File</x-forms.button>
+                    <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
                         :theme-accents="$consoleThemeAccents" />
+                </div>
             </header>
 
             <div class="terminal-session-panel mt-8 flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -335,4 +338,31 @@
         </div>
         @endif
     </section>
+
+    @if ($showImportModal && $selected_uuid !== 'default')
+        <div class="fixed inset-0 z-99 flex h-screen w-screen items-center justify-center p-4"
+            @keydown.window.escape="$wire.closeImportModal()">
+            <div class="absolute inset-0 h-full w-full bg-black/20 backdrop-blur-xs"
+                wire:click="closeImportModal"></div>
+            <div class="relative flex max-h-[calc(100vh-2rem)] w-full min-w-full max-w-fit flex-col rounded-sm border border-neutral-200 bg-white drop-shadow-sm lg:min-w-[36rem] dark:border-coolgray-300 dark:bg-base">
+                <div class="flex shrink-0 items-center justify-between px-6 py-6">
+                    <h3 class="text-2xl font-bold">Import File to Terminal</h3>
+                    <button type="button" wire:click="closeImportModal"
+                        class="absolute top-0 right-0 mt-5 mr-5 flex h-8 w-8 items-center justify-center rounded-full hover:bg-neutral-100 dark:text-white dark:hover:bg-coolgray-300">
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                            stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="relative flex w-auto items-center justify-center overflow-y-auto px-6 pb-6">
+                    <livewire:terminal.file-import
+                        :selectedUuid="$selected_uuid"
+                        :targetName="$this->getTargetName()"
+                        :selectedServerUuid="$this->getServerUuid()"
+                        :key="'file-import-'.$selected_uuid" />
+                </div>
+            </div>
+        </div>
+    @endif
 </div>
