@@ -18,17 +18,7 @@ beforeEach(function () {
     $user = User::factory()->create();
     $this->team = $user->teams()->first();
 
-    $this->privateKey = PrivateKey::create([
-        'name' => 'Test Key',
-        'private_key' => '-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
-QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
-hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
-AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
-uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
------END OPENSSH PRIVATE KEY-----',
-        'team_id' => $this->team->id,
-    ]);
+    $this->privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
 });
 
 it('does not mount the traffic volume for caddy when traffic analytics is disabled', function () {

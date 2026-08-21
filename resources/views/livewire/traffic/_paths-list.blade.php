@@ -13,7 +13,7 @@
     $keyPrefix = $keyPrefix ?? 'analytics-path';
     $maxRequests = max(1, (int) collect($paths)->max('requests'));
 @endphp
-@if (empty($paths))
+@if (collect($paths)->isEmpty())
     <x-empty size="sm" title="No path data" description="No requests were recorded for the selected range."
         icon-name="unordered-list" />
 @else
@@ -26,7 +26,7 @@
                 $requests = (int) ($path['requests'] ?? 0);
                 $width = min(100, round(($requests / $maxRequests) * 100, 1));
             @endphp
-            <div wire:key="{{ $keyPrefix }}-{{ $loop->index }}"
+            <div wire:key="{{ $keyPrefix }}-{{ md5($pathStr) }}"
                 x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
                 class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
                 @if ($href)

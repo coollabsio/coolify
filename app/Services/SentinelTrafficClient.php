@@ -170,9 +170,15 @@ class SentinelTrafficClient
 
     private function guard(string $response): string
     {
-        if (str($response)->contains('"error"')) {
-            $error = data_get(json_decode($response, true), 'error', 'Traffic analytics request failed.');
-            throw new \Exception($error);
+        $payload = json_decode($response, true);
+
+        if (! is_array($payload)) {
+            throw new \RuntimeException('Traffic analytics returned an invalid response.');
+        }
+
+        if (array_key_exists('error', $payload)) {
+            $error = data_get($payload, 'error');
+            throw new \RuntimeException(is_string($error) ? $error : 'Traffic analytics request failed.');
         }
 
         return $response;

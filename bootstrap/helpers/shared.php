@@ -4894,8 +4894,13 @@ function refererHost(?string $referer): ?string
 }
 
 /**
- * Favicon URL for a host, served by DuckDuckGo's icon proxy (no API key, no
- * hotlink-referrer leakage). Used to decorate referrer rows in analytics.
+ * Favicon URL for a host, served by DuckDuckGo's icon proxy. Used to decorate
+ * referrer rows in analytics.
+ *
+ * Note: rendering these icons makes the operator's browser request each favicon
+ * from icons.duckduckgo.com, which discloses the referrer hostnames of the
+ * operator's own traffic to that third party. Same applies to countryFlagUrl()
+ * (flagcdn.com). No API key is required.
  */
 function refererFaviconUrl(string $host): string
 {
@@ -5187,6 +5192,7 @@ function countryName(?string $a2): string
         'VU' => 'Vanuatu',
         'WF' => 'Wallis & Futuna',
         'WS' => 'Samoa',
+        'XK' => 'Kosovo',
         'YE' => 'Yemen',
         'YT' => 'Mayotte',
         'ZA' => 'South Africa',

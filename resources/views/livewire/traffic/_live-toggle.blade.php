@@ -9,7 +9,9 @@
 @if ($range === '24h')
     <div x-data="{ live: $wire.entangle('live').live }"
         x-init="
-            if (localStorage.getItem('traffic-live') === '0') { live = false; }
+            const stored = localStorage.getItem('traffic-live');
+            if (stored === '0') { live = false; }
+            if (stored === '1') { live = true; }
             $watch('live', value => localStorage.setItem('traffic-live', value ? '1' : '0'));
         ">
         <button type="button"

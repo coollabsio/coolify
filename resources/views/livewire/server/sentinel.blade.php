@@ -115,7 +115,8 @@
                         <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
                             id="trafficRetention1dDays" label="Daily retention" required
                             helper="Days of daily rollups to keep before deletion." />
-                        <x-forms.listbox id="isGeoipEnabled" label="Geolocation"
+                        <x-forms.listbox canGate="update" :canResource="$server"
+                            id="isGeoipEnabled" label="Geolocation"
                             :options="[
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],

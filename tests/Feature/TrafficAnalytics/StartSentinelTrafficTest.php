@@ -49,6 +49,8 @@ it('passes custom traffic settings as sentinel env', function () {
     $server->settings->traffic_retention_1d_days = 180;
     $server->settings->is_geoip_enabled = false;
     $server->settings->geoip_refresh_days = 7;
+    // A key may still be stored while GeoIP is off; it must not reach Sentinel.
+    $server->settings->geoip_maxmind_license_key = 'secret-maxmind-key';
     $server->settings->save();
 
     $env = StartSentinel::sentinelTrafficEnvironment($server->fresh());
@@ -59,4 +61,15 @@ it('passes custom traffic settings as sentinel env', function () {
     expect($env['GEOIP_ENABLED'])->toBe('false');
     expect($env['GEOIP_REFRESH_DAYS'])->toBe('7');
     expect($env)->not->toHaveKey('GEOIP_MAXMIND_LICENSE_KEY');
+});
+
+it('injects the maxmind license key only when geoip is enabled', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings->is_traffic_analytics_enabled = true;
+    $server->settings->is_geoip_enabled = true;
+    $server->settings->geoip_maxmind_license_key = 'secret-maxmind-key';
+    $server->settings->save();
+
+    $env = StartSentinel::sentinelTrafficEnvironment($server->fresh());
+    expect($env['GEOIP_MAXMIND_LICENSE_KEY'])->toBe('secret-maxmind-key');
 });

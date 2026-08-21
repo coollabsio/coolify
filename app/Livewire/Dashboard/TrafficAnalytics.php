@@ -86,9 +86,12 @@ class TrafficAnalytics extends Component
                     }
                 } catch (\Throwable $e) {
                     // Leave this server out of the sparkline series.
+                    \Log::debug('Traffic series fetch failed', ['server' => $server->uuid, 'error' => $e->getMessage()]);
                 }
             } catch (\Throwable $e) {
                 // Skip unreachable/failed servers so one bad server doesn't break the whole summary.
+                \Log::debug('Traffic overview fetch failed', ['server' => $server->uuid, 'error' => $e->getMessage()]);
+
                 continue;
             }
         }

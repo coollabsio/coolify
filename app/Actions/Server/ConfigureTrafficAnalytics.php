@@ -13,6 +13,8 @@ class ConfigureTrafficAnalytics
 
     public function handle(Server $server, bool $enable): void
     {
+        $sentinelWasEnabled = (bool) $server->settings->is_sentinel_enabled;
+
         $server->settings->is_traffic_analytics_enabled = $enable;
         $server->settings->save();
         $server->refresh();
@@ -21,7 +23,11 @@ class ConfigureTrafficAnalytics
         GetProxyConfiguration::run($server, forceRegenerate: true);
         RestartProxyJob::dispatch($server);
 
-        // Recreate Sentinel with the traffic env + proxy-log mount (or without, when disabling).
-        StartSentinel::run($server, restart: true);
+        // Recreate Sentinel so it picks up (enabling) or drops (disabling) the traffic env + proxy-log mount.
+        // Enabling analytics needs Sentinel running; when disabling, only restart if Sentinel was already
+        // enabled so we never turn Sentinel on as a side effect of disabling analytics.
+        if ($enable || $sentinelWasEnabled) {
+            StartSentinel::run($server, restart: true);
+        }
     }
 }

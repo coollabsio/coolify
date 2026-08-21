@@ -30,7 +30,7 @@ class StartSentinel
             'GEOIP_REFRESH_DAYS' => (string) ($settings->geoip_refresh_days ?: 30),
         ];
         $license = data_get($settings, 'geoip_maxmind_license_key');
-        if (filled($license)) {
+        if ($settings->is_geoip_enabled && filled($license)) {
             $env['GEOIP_MAXMIND_LICENSE_KEY'] = $license;
         }
 

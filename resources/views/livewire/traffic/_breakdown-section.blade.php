@@ -16,7 +16,7 @@
     $maxRequests = max(1, (int) collect($rows)->max('requests'));
 @endphp
 <x-application.settings-section id="analytics-{{ $dimension }}-section" :title="$label" :helper="$helper" flush>
-    @if (empty($rows))
+    @if (collect($rows)->isEmpty())
         <x-empty size="sm" title="No data"
             description="No {{ strtolower($label) }} data for the selected range." icon-name="network" />
     @else
@@ -36,7 +36,7 @@
                     $requests = (int) ($row['requests'] ?? 0);
                     $width = min(100, round(($requests / $maxRequests) * 100, 1));
                 @endphp
-                <div wire:key="analytics-{{ $dimension }}-{{ $loop->index }}"
+                <div wire:key="analytics-{{ $dimension }}-{{ md5($value) }}"
                     x-show="{{ $loop->index }} >= page * per && {{ $loop->index }} < (page + 1) * per"
                     class="flex min-h-11 items-center gap-3 border-b border-neutral-200 px-4 py-2 last:border-b-0 dark:border-white/[0.07]">
                     @if ($dimension === 'referer' && $host)
