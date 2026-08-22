@@ -162,17 +162,16 @@ trait ExecuteRemoteCommand
 
         $remote_command = SshMultiplexingHelper::generateSshCommand($this->server, $command);
         $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append, $command_hidden, $skip_command_log) {
-            $output = str($output)->trim();
-            if ($output->startsWith('╔')) {
-                $output = "\n".$output;
-            }
-
             // Sanitize output to ensure valid UTF-8 encoding before JSON encoding
             $sanitized_output = sanitize_utf8_text($output);
+            $log_output = str($sanitized_output)->trim();
+            if ($log_output->startsWith('╔')) {
+                $log_output = "\n".$log_output;
+            }
 
             $new_log_entry = [
                 'command' => $skip_command_log || $command_hidden ? null : $this->redact_sensitive_info($command),
-                'output' => $this->redact_sensitive_info($sanitized_output),
+                'output' => $this->redact_sensitive_info($log_output),
                 'type' => $customType ?? ($type === 'err' ? 'stderr' : 'stdout'),
                 'timestamp' => Carbon::now('UTC'),
                 'hidden' => $hidden,
@@ -206,17 +205,7 @@ trait ExecuteRemoteCommand
 
             $this->application_deployment_queue->save();
 
-            if ($this->save) {
-                if (data_get($this->saved_outputs, $this->save, null) === null) {
-                    $this->saved_outputs->put($this->save, str());
-                }
-                if ($append) {
-                    $current_value = $this->saved_outputs->get($this->save);
-                    $this->saved_outputs->put($this->save, str($current_value.str($sanitized_output)->trim()));
-                } else {
-                    $this->saved_outputs->put($this->save, str($sanitized_output)->trim());
-                }
-            }
+            $this->saveCommandOutput($sanitized_output, $append);
         });
         $this->application_deployment_queue->update([
             'current_process_id' => $process->id(),
@@ -243,6 +232,22 @@ trait ExecuteRemoteCommand
                 throw new DeploymentException("Command execution failed (exit code {$process_result->exitCode()}): {$redactedCommand}\nError: {$error}");
             }
         }
+    }
+
+    private function saveCommandOutput(string $output, bool $append): void
+    {
+        if (! $this->save) {
+            return;
+        }
+
+        if ($append) {
+            $currentValue = $this->saved_outputs->get($this->save, '');
+            $this->saved_outputs->put($this->save, str($currentValue.$output));
+
+            return;
+        }
+
+        $this->saved_outputs->put($this->save, str($output));
     }
 
     /**
