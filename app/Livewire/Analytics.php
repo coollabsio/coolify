@@ -361,6 +361,10 @@ class Analytics extends Component
 
         if (empty($overviews)) {
             $this->resetData();
+            // The chart lives under wire:ignore, so it only updates via this event — dispatch
+            // even when cleared so a previously-populated chart flips to its no-data state
+            // instead of keeping stale data.
+            $this->dispatch("refreshChartData-{$this->chartId}-status", $this->chartPayload());
 
             return;
         }
@@ -416,15 +420,16 @@ class Analytics extends Component
     protected function chartPayload(): array
     {
         $device = $this->deviceChartData();
+        $overview = $this->overview ?? [];
 
         return [
             'hasSeries' => $this->hasSeries,
             'range' => $this->range,
             'seriesData' => [
-                $this->overview['s2xx'] ?? 0,
-                $this->overview['s3xx'] ?? 0,
-                $this->overview['s4xx'] ?? 0,
-                $this->overview['s5xx'] ?? 0,
+                $overview['s2xx'] ?? 0,
+                $overview['s3xx'] ?? 0,
+                $overview['s4xx'] ?? 0,
+                $overview['s5xx'] ?? 0,
             ],
             'timeSeries' => [
                 'categories' => array_column($this->series, 'bucket'),

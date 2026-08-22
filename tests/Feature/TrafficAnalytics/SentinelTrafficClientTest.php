@@ -241,6 +241,49 @@ it('warms every server-wide endpoint in a single batched exec and per-call metho
     $client->attribution();
 });
 
+it('probes the absent dashboard route only once per cache window, then reuses the batch fallback', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+
+    // Older Sentinel: the dashboard route 404s (unparseable body), so raw() throws and the
+    // client falls back to the batch. The absence must be remembered so a second prefetch in
+    // the same window doesn't re-probe the dashboard over SSH.
+    $client = new class($server) extends SentinelTrafficClient
+    {
+        public int $dashboardProbes = 0;
+
+        public int $batchCalls = 0;
+
+        protected function remoteFetch(string $url): string
+        {
+            if (str_contains($url, '/traffic/dashboard')) {
+                $this->dashboardProbes++;
+
+                return 'Not Found';
+            }
+            throw new RuntimeException("unexpected individual fetch: {$url}");
+        }
+
+        protected function batchRemoteFetch(array $urls): string
+        {
+            $this->batchCalls++;
+            $bodies = array_map(fn ($url) => match (true) {
+                str_contains($url, '/traffic/apps') => json_encode(['app-a']),
+                str_contains($url, '/attribution') => '{"attribution":"demo"}',
+                str_contains($url, '/overview') => '{"requests":1}',
+                default => '[]',
+            }, $urls);
+
+            return implode("\x1e", $bodies)."\x1e";
+        }
+    };
+
+    $client->prefetchServerWide(null, 'F', 'T', ['country'], '24h');
+    $client->prefetchServerWide(null, 'F', 'T', ['country'], '24h');
+
+    expect($client->dashboardProbes)->toBe(1)
+        ->and($client->batchCalls)->toBe(1);
+});
+
 it('double-quotes the url in the remote curl command so & is not a shell background operator', function () {
     $server = Server::factory()->create(['team_id' => $this->team->id]);
     $client = new class($server) extends SentinelTrafficClient

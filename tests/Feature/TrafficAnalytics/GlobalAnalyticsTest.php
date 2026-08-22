@@ -375,6 +375,32 @@ it('scopes the view to a single application and hides the leaderboard when filte
         ->assertDontSee('Top applications');
 });
 
+it('still dispatches the chart refresh when every server fails so a stale chart clears', function () {
+    $server = bootEnabledGlobalServer();
+
+    // Server unreachable: the overview fetch throws, so no overviews are collected and
+    // loadData short-circuits via resetData(). The chart lives under wire:ignore, so it
+    // must still receive a refresh event to flip to its no-data state instead of keeping
+    // whatever it last plotted.
+    $fake = new class($server) extends SentinelTrafficClient
+    {
+        protected function raw(string $url): string
+        {
+            if (str_contains($url, '/traffic/overview')) {
+                throw new RuntimeException('server unreachable');
+            }
+
+            return '{}';
+        }
+    };
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSet('overview', null)
+        ->assertDispatched('refreshChartData-global-analytics-status');
+});
+
 it('shows the not-enabled empty state when no server has traffic analytics on', function () {
     $server = Server::factory()->create([
         'team_id' => $this->team->id,

@@ -174,13 +174,26 @@ class SentinelTrafficClient
      */
     private function fetchDashboard(?string $appKey, string $from, string $to, string $range, int $pathLimit, int $breakdownLimit, int $appsLimit): ?array
     {
+        // Older Sentinel 404s this route. raw() throws on that (and doesn't cache the failure),
+        // so without a marker every refresh would re-probe over SSH before falling back to the
+        // batch. Remember the absence for the same 60s window as the data cache: at most one
+        // wasted probe per minute, and a Sentinel upgrade is picked up on the next window.
+        $absenceKey = 'traffic:dashboard-absent:'.$this->server->uuid;
+        if (Cache::get($absenceKey) === true) {
+            return null;
+        }
+
         try {
             $decoded = json_decode($this->raw($this->dashboardUrl($appKey, $from, $to, $range, $pathLimit, $breakdownLimit, $appsLimit)), true);
         } catch (\Throwable) {
+            Cache::put($absenceKey, true, 60);
+
             return null;
         }
 
         if (! is_array($decoded) || ! array_key_exists('overview', $decoded)) {
+            Cache::put($absenceKey, true, 60);
+
             return null;
         }
 
