@@ -334,12 +334,15 @@
                                         step++;
                                     } else {
                                         submitting = true;
-                                        submitForm().then((result) => {
-                                            submitting = false;
-                                            modalOpen = false;
-                                            resetModal();
-                                        }).catch(() => {
-                                            submitting = false;
+                                        modalOpen = false;
+                                        $nextTick(() => {
+                                            submitForm().then((result) => {
+                                                submitting = false;
+                                                resetModal();
+                                            }).catch(() => {
+                                                submitting = false;
+                                                modalOpen = true;
+                                            });
                                         });
                                     }
                                 ">
@@ -388,17 +391,21 @@
                                         $wire.dispatch(dispatchEventType, dispatchEventMessage);
                                     }
                                     submitting = true;
-                                    submitForm().then((result) => {
-                                        submitting = false;
-                                        if (result === true) {
-                                            modalOpen = false;
-                                            resetModal();
-                                        } else {
-                                            passwordError = result;
-                                            password = '';
-                                        }
-                                    }).catch(() => {
-                                        submitting = false;
+                                    modalOpen = false;
+                                    $nextTick(() => {
+                                        submitForm().then((result) => {
+                                            submitting = false;
+                                            if (result === true) {
+                                                resetModal();
+                                            } else {
+                                                modalOpen = true;
+                                                passwordError = result;
+                                                password = '';
+                                            }
+                                        }).catch(() => {
+                                            submitting = false;
+                                            modalOpen = true;
+                                        });
                                     });
                                     ">
                                     <x-loading-on-button x-show="submitting" x-cloak />

@@ -47,7 +47,7 @@ class Index extends Component
                     return [
                         'name' => data_get($container, 'Names'),
                         'connection_name' => data_get($container, 'Names'),
-                        'uuid' => data_get($container, 'Names'),
+                        'uuid' => $server->uuid.':'.data_get($container, 'Names'),
                         'status' => data_get_str($container, 'State')->lower(),
                         'server' => $server,
                         'server_uuid' => $server->uuid,

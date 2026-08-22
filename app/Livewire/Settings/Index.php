@@ -212,7 +212,7 @@ class Index extends Component
                 return;
             }
 
-            $imageRef = escapeshellarg("ghcr.io/coollabsio/coolify-helper:{$version}");
+            $imageRef = escapeshellarg(coolifyHelperImage().":{$version}");
             $buildCommand = "docker build -t {$imageRef} -f docker/coolify-helper/Dockerfile .";
 
             $activity = remote_process(
