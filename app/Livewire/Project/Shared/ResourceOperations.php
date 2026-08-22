@@ -81,6 +81,14 @@ class ResourceOperations extends Component
             if (! $new_destination) {
                 return $this->addError('destination_id', 'Destination not found.');
             }
+            auditLog('ui.resource.clone_started', [
+                'team_id' => $this->resource->team()?->id,
+                'resource_uuid' => $this->resource->uuid,
+                'resource_name' => $this->resource->name,
+                'resource_type' => class_basename($this->resource),
+                'destination_uuid' => $new_destination->uuid,
+                'environment_id' => $new_environment->id,
+            ]);
             $uuid = new_public_id();
             $server = $new_destination->server;
             if (! $server->canHostResources()) {

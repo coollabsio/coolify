@@ -12,6 +12,12 @@
             'active' => request()->routeIs('team.member.index'),
             'icon' => 'teams',
         ],
+        [
+            'label' => 'Audit log',
+            'route' => 'team.audit-log',
+            'active' => request()->routeIs('team.audit-log'),
+            'icon' => 'time-back',
+        ],
         isInstanceAdmin() ? [
             'label' => 'Admin View',
             'route' => 'team.admin-view',

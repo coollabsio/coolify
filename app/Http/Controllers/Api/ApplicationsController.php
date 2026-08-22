@@ -5630,14 +5630,6 @@ class ApplicationsController extends Controller
             return response()->json(['message' => $result['message']], 200);
         }
 
-        auditLog('api.application.rollback', [
-            'team_id' => $teamId,
-            'application_uuid' => $application->uuid,
-            'application_name' => $application->name,
-            'deployment_uuid' => $deployment_uuid,
-            'commit' => $commit,
-        ]);
-
         return response()->json([
             'message' => 'Rollback deployment queued.',
             'deployment_uuid' => $deployment_uuid,
