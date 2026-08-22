@@ -1666,6 +1666,39 @@ function replaceLocalSource(Stringable $source, Stringable $replacedWith)
     return $source;
 }
 
+function findLocalFileVolumeConfig(
+    Application|ServiceApplication|ServiceDatabase $resource,
+    Stringable $source,
+    Stringable $target,
+    int $pullRequestId = 0,
+): ?LocalFileVolume {
+    if ($resource instanceof Application) {
+        $mainDirectory = str(base_configuration_dir()."/applications/{$resource->uuid}");
+    } else {
+        $service = $resource->service;
+        if (! $service) {
+            return null;
+        }
+
+        $baseDirectory = (int) $service->compose_parsing_version >= 4 ? 'services' : 'applications';
+        $mainDirectory = str(base_configuration_dir()."/{$baseDirectory}/{$service->uuid}");
+    }
+
+    $resolvedSource = replaceLocalSource($source, $mainDirectory)->value();
+
+    return $resource->fileStorages()
+        ->where('mount_path', $target->value())
+        ->get()
+        ->first(function (LocalFileVolume $volume) use ($pullRequestId, $resolvedSource): bool {
+            $expectedSource = $resolvedSource;
+            if ($pullRequestId !== 0 && $volume->is_preview_suffix_enabled) {
+                $expectedSource = addPreviewDeploymentSuffix($expectedSource, $pullRequestId);
+            }
+
+            return $volume->fs_path === $expectedSource;
+        });
+}
+
 function convertToArray($collection)
 {
     if ($collection instanceof Collection) {
@@ -2687,7 +2720,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $target = data_get_str($volume, 'target');
                             $content = data_get($volume, 'content');
                             $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
-                            $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
+                            $foundConfig = findLocalFileVolumeConfig($savedService, $source, $target);
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
                                 if ($contentNotNull) {
@@ -2710,12 +2743,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                             LocalFileVolume::updateOrCreate(
                                 [
+                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService),
                                 ],
                                 [
-                                    'fs_path' => $source,
+                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,
