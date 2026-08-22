@@ -60,9 +60,12 @@ trait HasRepositoryDetection
             $this->detectedEnvFiles = array_keys($result->envFiles);
             $this->parsedEnvFiles = [];
             foreach ($result->envFiles as $filename => $content) {
-                $this->parsedEnvFiles[$filename] = $content !== null
-                    ? parseEnvFormatToArray($content)
-                    : [];
+                $parsed = $content !== null ? parseEnvFormatToArray($content) : [];
+                // parseEnvFormatToArray returns ['KEY' => ['value' => ..., 'comment' => ...]].
+                // Flatten to a plain ['KEY' => 'value'] map for the import form.
+                $this->parsedEnvFiles[$filename] = collect($parsed)
+                    ->map(fn ($item) => is_array($item) ? (string) ($item['value'] ?? '') : (string) $item)
+                    ->all();
             }
             $this->selectedEnvFile = $this->detectedEnvFiles[0];
             $this->envExampleVars = $this->parsedEnvFiles[$this->selectedEnvFile] ?? [];
