@@ -2,7 +2,7 @@
 
 it('proxies realtime websocket traffic through the bundled nginx server', function (string $environment) {
     $nginxConfiguration = file_get_contents(base_path("docker/{$environment}/etc/nginx/site-opts.d/http.conf"));
-    $locationFound = preg_match('/location \^~ \/app \{(?<body>.*?)\n\}/s', $nginxConfiguration, $location);
+    $locationFound = preg_match('/location \^~ \/app\/ \{(?<body>.*?)\n\}/s', $nginxConfiguration, $location);
 
     expect($locationFound)
         ->toBe(1)
