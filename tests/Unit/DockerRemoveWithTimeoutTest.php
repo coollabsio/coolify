@@ -75,6 +75,24 @@ it('succeeds when the container was already removed', function () {
     rmdir($directory);
 });
 
+it('reports a timeout when timeout output also says the container is missing', function () {
+    $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents($directory.'/timeout', "#!/bin/sh\necho 'Error response from daemon: No such container: container-name'\nexit 124\n");
+    chmod($directory.'/timeout', 0755);
+
+    $process = new Process(['/bin/sh', '-c', dockerRemoveCommandWithTimeout('container-name')], env: [
+        'PATH' => $directory.':'.getenv('PATH'),
+    ]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(124)
+        ->and($process->getOutput())->toContain('__COOLIFY_CONTAINER_REMOVE_TIMEOUT__');
+
+    unlink($directory.'/timeout');
+    rmdir($directory);
+});
+
 it('fails when Docker cannot remove an existing container', function () {
     $directory = sys_get_temp_dir().'/coolify-docker-remove-'.bin2hex(random_bytes(4));
     mkdir($directory);
