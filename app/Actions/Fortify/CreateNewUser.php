@@ -32,7 +32,7 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         $settings = instanceSettings();
-        if (! $settings->is_registration_enabled) {
+        if (! $settings->isPasswordRegistrationAllowed()) {
             abort(403);
         }
 
