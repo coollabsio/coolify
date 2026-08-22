@@ -296,7 +296,26 @@ it('accepts the historical environment sorting default in older snapshots', func
     expect(app(ConfigurationDiffer::class)->diff($previousSnapshot, $currentSnapshot)->isChanged())->toBeFalse();
 });
 
-it('detects environment variable value changes for unlocked variables', function () {
+it('does not report newly tracked static configuration as a pending change', function () {
+    $application = snapshotTestApplication();
+    $currentSnapshot = $application->deploymentConfigurationSnapshot();
+    $previousSnapshot = $currentSnapshot;
+
+    data_set($currentSnapshot, 'sections.runtime.items', [
+        ...data_get($currentSnapshot, 'sections.runtime.items'),
+        [
+            'key' => 'newly_tracked_setting',
+            'label' => 'Newly tracked setting',
+            'impact' => 'redeploy',
+            'compare_value' => 'already configured',
+            'display_value' => 'already configured',
+        ],
+    ]);
+
+    expect(app(ConfigurationDiffer::class)->diff($previousSnapshot, $currentSnapshot)->isChanged())->toBeFalse();
+});
+
+it('detects environment variable value changes without exposing secret values', function () {
     $application = snapshotTestApplication();
     EnvironmentVariable::create([
         'key' => 'API_TOKEN',
