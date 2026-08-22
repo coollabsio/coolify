@@ -45,6 +45,23 @@ it('surfaces a recorded migration failure as an error through the upgrade status
         ->toContain('SQLSTATE[HY000]: disk full');
 });
 
+it('clears a stale migration failure marker when a new upgrade is started', function () {
+    InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
+    $team = Team::factory()->create(['id' => 0]);
+    $user = User::factory()->create();
+    $user->teams()->attach($team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    MigrationFailure::record('a previous migration failure');
+    expect(MigrationFailure::current())->not->toBeNull();
+
+    $component = new Upgrade;
+    $component->upgrade();
+
+    expect(MigrationFailure::current())->toBeNull();
+});
+
 it('does not surface an upgrade error for the root team when no migration failure is recorded', function () {
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
     $team = Team::factory()->create(['id' => 0]);

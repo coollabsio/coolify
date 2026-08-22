@@ -42,6 +42,16 @@ it('clears a recorded failure', function () {
     expect(MigrationFailure::current($this->markerPath))->toBeNull();
 });
 
+it('surfaces a failure whose message is the falsy string "0"', function () {
+    $this->markerPath = migrationFailureTempPath();
+    file_put_contents($this->markerPath, '{"message":"0","failed_at":"2026-08-21T10:00:00+00:00"}');
+
+    expect(MigrationFailure::current($this->markerPath))->toMatchArray([
+        'message' => '0',
+        'failed_at' => '2026-08-21T10:00:00+00:00',
+    ]);
+});
+
 it('treats an empty or malformed marker as no failure', function (string $contents) {
     $this->markerPath = migrationFailureTempPath();
     file_put_contents($this->markerPath, $contents);

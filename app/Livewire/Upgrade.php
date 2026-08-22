@@ -72,6 +72,9 @@ class Upgrade extends Component
             if ($this->updateInProgress) {
                 return;
             }
+            // Drop any marker left by a previous failed upgrade so the status poll for
+            // this fresh attempt does not immediately report the old failure.
+            MigrationFailure::clear();
             $this->updateInProgress = true;
             dispatch(function () {
                 try {

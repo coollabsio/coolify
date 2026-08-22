@@ -11,8 +11,9 @@ use DateTimeInterface;
  * so a broken migration still passes the health check and the upgrade reports
  * success. This persistent marker lets the app surface the real failure instead.
  *
- * Kept free of framework dependencies so it can run at container boot and be unit
- * tested without booting Laravel; filesystem problems are reported via error_log.
+ * The record/clear/current methods take an explicit path, so they can be unit tested
+ * without booting Laravel; the default path() helper resolves storage_path() and does
+ * require the framework. Filesystem problems are reported via error_log.
  */
 class MigrationFailure
 {
@@ -75,7 +76,9 @@ class MigrationFailure
         }
 
         $data = json_decode($raw, true);
-        if (! is_array($data) || empty($data['message'])) {
+        // Use a strict empty-string check rather than empty(): a real failure message
+        // of "0" is falsy but still a genuine failure that must be surfaced.
+        if (! is_array($data) || ! isset($data['message']) || ! is_scalar($data['message']) || (string) $data['message'] === '') {
             return null;
         }
 
