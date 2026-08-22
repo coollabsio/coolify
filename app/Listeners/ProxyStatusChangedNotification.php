@@ -61,7 +61,7 @@ class ProxyStatusChangedNotification implements ShouldQueueAfterCommit
 
         if ($status === 'created') {
             instant_remote_process([
-                'docker rm -f coolify-proxy',
+                dockerRemoveCommand('coolify-proxy'),
             ], $server);
         }
     }
