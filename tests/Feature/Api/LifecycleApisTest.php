@@ -137,6 +137,16 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             'destination_id' => $this->destination->id,
             'destination_type' => $this->destination->getMorphClass(),
         ]);
+        $backup = $database->scheduledBackups()->create([
+            'team_id' => $this->team->id,
+            'enabled' => true,
+            'frequency' => '0 0 * * *',
+            'save_s3' => false,
+        ]);
+        $backup->forceFill([
+            'last_execution_at' => now()->subDay(),
+            'missing_backup_notification_sent_at' => now(),
+        ])->save();
 
         $response = $this->withHeaders($this->headers)
             ->postJson("/api/v1/databases/{$database->uuid}/clone", [
@@ -148,11 +158,14 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             ->assertJsonPath('message', 'Database cloned.');
 
         $cloned = StandalonePostgresql::where('uuid', $response->json('uuid'))->first();
+        $clonedBackup = $cloned->scheduledBackups()->sole();
         expect($cloned)->not->toBeNull()
             ->and($cloned->name)->toBe('cloned-db')
             ->and($cloned->environment_id)->toBe($database->environment_id)
             ->and($cloned->destination_id)->toBe($this->destination->id)
-            ->and(str($cloned->status)->startsWith('exited'))->toBeTrue();
+            ->and(str($cloned->status)->startsWith('exited'))->toBeTrue()
+            ->and($clonedBackup->last_execution_at)->toBeNull()
+            ->and($clonedBackup->missing_backup_notification_sent_at)->toBeNull();
     });
 
     test('creates renamed volumes when cloning a database with clone_volumes', function () {

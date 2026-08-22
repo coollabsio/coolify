@@ -91,6 +91,9 @@
                     required />
                 <x-forms.input label="Timeout" id="timeout" type="number" min="60"
                     helper="Maximum backup runtime in seconds." required />
+                <x-forms.input label="Missing backup alert after" id="missingBackupNotificationDays" type="number"
+                    min="0" max="365" suffix="days" canGate="manageBackups" :canResource="$backup->database"
+                    helper="Notify through backup failure channels after this many days without an execution. Use 0 to disable." required />
             </div>
         </div>
     </section>
