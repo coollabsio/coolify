@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RuntimeException;
 use Spatie\Url\Url;
 
 class ApplicationPreview extends BaseModel
@@ -64,7 +65,13 @@ class ApplicationPreview extends BaseModel
 
                 foreach ($persistentStorages as $storage) {
                     $volumeName = addPreviewDeploymentSuffix($storage->name, $preview->pull_request_id);
-                    instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server);
+                    try {
+                        instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server);
+                    } catch (RuntimeException $exception) {
+                        if (! preg_match('/\bvolume\b.*\bnot found\b/i', $exception->getMessage())) {
+                            throw $exception;
+                        }
+                    }
                 }
             }
 

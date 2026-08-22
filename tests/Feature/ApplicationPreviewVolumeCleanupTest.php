@@ -87,3 +87,34 @@ it('reports Docker volume removal failures and keeps the preview record', functi
 
     expect(ApplicationPreview::find($this->preview->id))->not->toBeNull();
 });
+
+it('continues removing preview volumes when an earlier volume is already absent', function () {
+    $this->application->persistentStorages()->create([
+        'name' => 'already-removed',
+        'mount_path' => '/removed',
+        'host_path' => null,
+        'is_preview_suffix_enabled' => true,
+    ]);
+    $this->application->persistentStorages()->create([
+        'name' => 'app-data',
+        'mount_path' => '/data',
+        'host_path' => null,
+        'is_preview_suffix_enabled' => true,
+    ]);
+    Process::fake(function ($process) {
+        if (str_contains($process->command, "docker volume rm -f 'already-removed-pr-42'")) {
+            return Process::result(
+                errorOutput: 'Error response from daemon: volume already-removed-pr-42 not found',
+                exitCode: 1,
+            );
+        }
+
+        return Process::result(output: 'app-data-pr-42');
+    });
+
+    $this->preview->forceDelete();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'already-removed-pr-42'"));
+    Process::assertRan(fn ($process) => str_contains($process->command, "docker volume rm -f 'app-data-pr-42'"));
+    expect(ApplicationPreview::find($this->preview->id))->toBeNull();
+});
