@@ -171,6 +171,20 @@ YAML;
     expect($volume->isReadOnlyVolume())->toBeTrue();
 });
 
+it('isReadOnlyVolume preserves colons in environment variable defaults', function () {
+    $compose = <<<'YAML'
+services:
+  database:
+    image: 'postgres:alpine'
+    volumes:
+      - '${VOLUME_DB_PATH:-db}:/var/lib/data:ro'
+YAML;
+
+    $volume = makeReadOnlyVolumeFixture($compose, 'db', '/var/lib/data');
+
+    expect($volume->isReadOnlyVolume())->toBeTrue();
+});
+
 it('isReadOnlyVolume disambiguates sibling rows with different :ro flags', function () {
     $compose = <<<'YAML'
 services:

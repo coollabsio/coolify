@@ -35,8 +35,24 @@ return new class extends Migration
 
     public function down(): void
     {
+        $hasIncompatibleSiblingMounts = DB::table('local_file_volumes')
+            ->select(['mount_path', 'resource_id', 'resource_type'])
+            ->groupBy(['mount_path', 'resource_id', 'resource_type'])
+            ->havingRaw('COUNT(*) > 1')
+            ->exists();
+
+        if ($hasIncompatibleSiblingMounts) {
+            throw new RuntimeException(
+                'Cannot roll back the local file volume unique index while sibling file mounts exist.'
+            );
+        }
+
         Schema::table('local_file_volumes', function (Blueprint $table) {
             $table->dropUnique('local_file_volumes_source_mount_resource_unique');
+            $table->unique(
+                ['mount_path', 'resource_id', 'resource_type'],
+                'local_file_volumes_mount_path_resource_id_resource_type_unique'
+            );
             $table->dropColumn('fs_path_hash');
         });
     }

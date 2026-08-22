@@ -178,7 +178,7 @@ function parseDockerVolumeString(string $volumeString): array
                     $possibleMode = substr($remaining, $lastColon + 1);
                     $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-                    if (in_array($possibleMode, $validModes)) {
+                    if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                         $mode = $possibleMode;
                         $target = substr($remaining, 0, $lastColon);
                     } else {
@@ -208,7 +208,7 @@ function parseDockerVolumeString(string $volumeString): array
             // Check if the last part is a valid Docker volume mode
             $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-            if (in_array($possibleMode, $validModes)) {
+            if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                 // It's a mode
                 // Examples: "gitea:/data:ro" or "./data:/app/data:rw"
                 $mode = $possibleMode;
@@ -275,7 +275,7 @@ function parseDockerVolumeString(string $volumeString): array
                 $possibleMode = substr($remaining, $lastColon + 1);
                 $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-                if (in_array($possibleMode, $validModes)) {
+                if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                     $mode = $possibleMode;
                     $target = substr($remaining, 0, $lastColon);
                 } else {

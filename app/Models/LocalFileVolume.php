@@ -380,13 +380,15 @@ class LocalFileVolume extends BaseModel
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     if (is_string($volume)) {
-                        $parts = explode(':', $volume);
-                        if (count($parts) < 2) {
+                        $parsedVolume = parseDockerVolumeString($volume);
+                        $source = $parsedVolume['source'];
+                        $target = $parsedVolume['target'];
+                        if ($source === null || $target === null) {
                             continue;
                         }
 
-                        if ($this->matchesComposeVolume($parts[0], $parts[1], $mainDirectory)) {
-                            $options = array_map('trim', explode(',', $parts[2] ?? ''));
+                        if ($this->matchesComposeVolume($source->value(), $target->value(), $mainDirectory)) {
+                            $options = array_map('trim', explode(',', $parsedVolume['mode']?->value() ?? ''));
 
                             return in_array('ro', $options, true);
                         }
