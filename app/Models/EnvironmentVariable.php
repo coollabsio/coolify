@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Support\ValidationPatterns;
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use OpenApi\Attributes as OA;
@@ -34,6 +35,8 @@ use OpenApi\Attributes as OA;
 )]
 class EnvironmentVariable extends BaseModel
 {
+    use Auditable;
+
     public const BUILDPACK_CONTROL_VARIABLE_PREFIXES = ['NIXPACKS_', 'RAILPACK_'];
 
     protected $attributes = [

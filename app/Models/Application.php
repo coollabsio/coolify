@@ -7,6 +7,7 @@ use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -121,10 +122,10 @@ use Symfony\Component\Yaml\Yaml;
 
 class Application extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasConfiguration, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, SoftDeletes;
-
     /** @use HasFactory<ApplicationFactory> */
-    use HasFactory;
+    use Auditable, HasFactory;
+
+    use ClearsGlobalSearchCache, HasConfiguration, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, SoftDeletes;
 
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
