@@ -562,8 +562,14 @@ Relevant classes:
 - `.data-table-row`
 - `.table-badge`
 
-Create a page-specific grid class when columns differ. Add responsive rules
-that hide secondary columns before allowing horizontal overflow.
+Create a page-specific grid class when columns differ. Prefer hiding secondary
+columns on small screens. When every column must stay visible, wrap the header
+and rows in a dedicated `*-table-scroll` container with `overflow-x: auto` and
+a shared grid `min-width` so header and rows stay aligned. Size the last
+column so typical values remain readable after scrolling. The bar appears
+only when that shared minimum exceeds the card. Do not switch to
+`overflow-x: visible` at large breakpoints: that clips overflow and paints
+over the card's right hairline ring.
 
 ---
 
