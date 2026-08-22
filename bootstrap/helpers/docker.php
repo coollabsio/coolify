@@ -160,19 +160,22 @@ function format_docker_labels_to_json(string|array $rawOutput): Collection
     }
     $outputLines = explode(PHP_EOL, $rawOutput);
 
-    return collect($outputLines)
-        ->reject(fn ($line) => empty($line))
-        ->map(function ($outputLine) {
-            $outputArray = explode(',', $outputLine);
+    $firstLine = collect($outputLines)->first(fn ($line) => ! empty(trim($line)));
+    if (! $firstLine) {
+        return collect([]);
+    }
 
-            return collect($outputArray)
-                ->map(function ($outputLine) {
-                    return explode('=', $outputLine);
-                })
-                ->mapWithKeys(function ($outputLine) {
-                    return [$outputLine[0] => $outputLine[1]];
-                });
-        })[0];
+    $outputArray = explode(',', $firstLine);
+
+    return collect($outputArray)
+        ->filter(fn ($item) => ! empty(trim($item)))
+        ->mapWithKeys(function ($item) {
+            $parts = explode('=', $item, 2);
+            $key = trim($parts[0]);
+            $value = isset($parts[1]) ? trim($parts[1]) : '';
+
+            return [$key => $value];
+        });
 }
 
 function format_docker_envs_to_json($rawOutput)
@@ -311,7 +314,7 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
         $replicas = explode('/', $replicas);
         $active = (int) $replicas[0];
         $total = (int) $replicas[1];
-        if ($active === $total) {
+        if ($total > 0 && $active === $total) {
             return 'running';
         } else {
             return 'starting';
