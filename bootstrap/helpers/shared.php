@@ -2726,7 +2726,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         } elseif ($type->value() === 'volume') {
                             if ($topLevelVolumes->has($source->value())) {
                                 $v = $topLevelVolumes->get($source->value());
-                                if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                if (data_get($v, 'driver_opts.type') === 'cifs' || data_get($v, 'driver_opts.type') === 'nfs') {
                                     return $volume;
                                 }
                             }
@@ -3315,7 +3315,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                            if (data_get($v, 'driver_opts.type') === 'cifs' || data_get($v, 'driver_opts.type') === 'nfs') {
                                                 // Do nothing
                                             } else {
                                                 if (is_null(data_get($v, 'name'))) {
@@ -3331,7 +3331,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     } else {
                                         if ($topLevelVolumes->has($name->value())) {
                                             $v = $topLevelVolumes->get($name->value());
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                            if (data_get($v, 'driver_opts.type') === 'cifs' || data_get($v, 'driver_opts.type') === 'nfs') {
                                                 // Do nothing
                                             } else {
                                                 if (is_null(data_get($v, 'name'))) {
@@ -3388,7 +3388,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     if (! str($source)->startsWith('/')) {
                                         if ($topLevelVolumes->has($source)) {
                                             $v = $topLevelVolumes->get($source);
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                            if (data_get($v, 'driver_opts.type') === 'cifs' || data_get($v, 'driver_opts.type') === 'nfs') {
                                                 // Do nothing
                                             } else {
                                                 if (is_null(data_get($v, 'name'))) {
@@ -3440,7 +3440,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                            if (data_get($v, 'driver_opts.type') === 'cifs' || data_get($v, 'driver_opts.type') === 'nfs') {
                                                 // Do nothing
                                             } else {
                                                 if (is_null(data_get($v, 'name'))) {
@@ -3459,7 +3459,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name->value())) {
                                             $v = $topLevelVolumes->get($name->value());
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                            if (data_get($v, 'driver_opts.type') === 'cifs' || data_get($v, 'driver_opts.type') === 'nfs') {
                                                 // Do nothing
                                             } else {
                                                 if (is_null(data_get($v, 'name'))) {
@@ -3516,7 +3516,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     if (! str($source)->startsWith('/')) {
                                         if ($topLevelVolumes->has($source)) {
                                             $v = $topLevelVolumes->get($source);
-                                            if (data_get($v, 'driver_opts.type') === 'cifs') {
+                                            if (data_get($v, 'driver_opts.type') === 'cifs' || data_get($v, 'driver_opts.type') === 'nfs') {
                                                 // Do nothing
                                             } else {
                                                 if (is_null(data_get($v, 'name'))) {
