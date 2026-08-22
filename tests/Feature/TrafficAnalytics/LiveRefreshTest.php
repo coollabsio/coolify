@@ -55,7 +55,7 @@ function bootLiveServer(): Server
 it('is paused by default and does not poll until Live Refresh is turned on', function () {
     $server = bootLiveServer();
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSet('live', false)
         ->assertDontSeeHtml('wire:poll.60s')
@@ -65,7 +65,7 @@ it('is paused by default and does not poll until Live Refresh is turned on', fun
 it('starts polling when live is toggled on at the 24h range', function () {
     $server = bootLiveServer();
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertDontSeeHtml('wire:poll.60s')
         ->call('toggleLive')
         ->assertSet('live', true)
@@ -76,7 +76,7 @@ it('starts polling when live is toggled on at the 24h range', function () {
 it('hides the Live Refresh control and stops polling for the 7d and 30d ranges', function () {
     $server = bootLiveServer();
 
-    $component = Livewire::test(Analytics::class)
+    $component = loadLazy(Livewire::test(Analytics::class))
         ->call('setRange', '7d')
         ->assertDontSeeHtml('wire:poll.60s')
         ->assertDontSee('Live Refresh');
@@ -91,7 +91,7 @@ it('hides the Live Refresh control and stops polling for the 7d and 30d ranges',
 it('re-arms polling when returning to the 24h range after live was turned on', function () {
     $server = bootLiveServer();
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->call('toggleLive')                 // arm live at 24h
         ->assertSeeHtml('wire:poll.60s')
         ->call('setRange', '7d')

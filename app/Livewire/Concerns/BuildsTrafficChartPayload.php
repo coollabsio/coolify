@@ -26,6 +26,16 @@ trait BuildsTrafficChartPayload
     }
 
     /**
+     * Whether there is plottable request-over-time data for the Requests chart. False when
+     * Sentinel returned no series buckets (older builds) or every bucket is empty (no traffic
+     * in the range), so the views can render a no-data state instead of a blank chart.
+     */
+    public function hasRequestSeries(): bool
+    {
+        return array_sum($this->requestsSpark()) > 0;
+    }
+
+    /**
      * Per-bucket error requests (4xx + 5xx), for the Error-rate spark.
      *
      * @return array<int, int>

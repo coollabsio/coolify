@@ -36,7 +36,7 @@ function disabledServer(): Server
 it('does not show a traffic nudge on the dashboard', function () {
     disabledServer();
 
-    Livewire::test(DashboardTrafficAnalytics::class)
+    loadLazy(Livewire::test(DashboardTrafficAnalytics::class))
         ->assertOk()
         ->assertDontSee('can start collecting traffic analytics');
 });
@@ -44,7 +44,7 @@ it('does not show a traffic nudge on the dashboard', function () {
 it('shows the analytics-page nudge when an eligible server has analytics disabled', function () {
     disabledServer();
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSee('can start collecting traffic analytics');
 });
@@ -58,7 +58,7 @@ it('does not count swarm or build servers in the analytics-page nudge', function
     $build->settings->is_build_server = true;
     $build->settings->save();
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertDontSee('can start collecting traffic analytics');
 });

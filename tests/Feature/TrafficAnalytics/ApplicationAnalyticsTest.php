@@ -78,6 +78,11 @@ function fakeAnalyticsResponses(): array
 }
 
 beforeEach(function () {
+    // RefreshDatabase resets ids each test; without flushing the model identity map a stale
+    // Server (from a prior enabled test) can leak into a later test and be treated as
+    // analytics-enabled, mounting the component against an unreachable server.
+    Server::flushIdentityMap();
+
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -116,7 +121,7 @@ it('renders KPIs from a mocked traffic client when analytics is enabled', functi
     $fake->responses = fakeAnalyticsResponses();
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class, ['application' => $application])
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSee('Requests')
         ->assertSee('1,000')
@@ -134,7 +139,7 @@ it('loads the per-app status time series when Sentinel exposes the series endpoi
     $fake->responses = fakeAnalyticsResponses();
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class, ['application' => $application])
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSet('hasSeries', true)
         ->assertSet('series', [
@@ -152,7 +157,7 @@ it('decorates per-app paths with the app domain and surfaces AI agents', functio
     $fake->responses = fakeAnalyticsResponses();
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    $component = Livewire::test(Analytics::class, ['application' => $application])
+    $component = loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSee('api.example.com')
         ->assertSee('AI agents & bots')
@@ -175,7 +180,7 @@ it('falls back to the donut for the per-app chart when the series endpoint is ab
     $fake->responses = $responses;
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class, ['application' => $application])
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSet('hasSeries', false)
         ->assertSet('series', []);
@@ -184,7 +189,7 @@ it('falls back to the donut for the per-app chart when the series endpoint is ab
 it('shows an empty state when traffic analytics is disabled for the server', function () {
     $application = makeAnalyticsApplication($this->team, $this->privateKey, $this->environment, false);
 
-    Livewire::test(Analytics::class, ['application' => $application])
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSee('Analytics')
         ->assertDontSee('Unique visitors');
@@ -199,7 +204,7 @@ it('renders the disabled empty-state without crashing when the application has n
 
     expect($application->destination)->toBeNull();
 
-    Livewire::test(Analytics::class, ['application' => $application])
+    loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
         ->assertSee('Analytics')
         ->assertDontSee('Server settings');

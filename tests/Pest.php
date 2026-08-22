@@ -2,6 +2,7 @@
 
 use App\Models\Server;
 use Illuminate\Support\Once;
+use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
 
 /*
@@ -42,6 +43,22 @@ function remoteOutputSource(string $path): string
     }
 
     return $source;
+}
+
+/**
+ * Trigger the deferred mount of a #[Lazy] Livewire component the way the browser would
+ * via its x-intersect `__lazyLoad(...)` call, so assertions can run against the real
+ * (post-mount) render instead of the placeholder.
+ */
+function loadLazy(Testable $component): Testable
+{
+    preg_match('/__lazyLoad\(&#039;([^&]+)&#039;\)/', $component->html(), $matches);
+
+    if (empty($matches)) {
+        return $component;
+    }
+
+    return $component->call('__lazyLoad', $matches[1]);
 }
 
 /*

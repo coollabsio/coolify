@@ -7,10 +7,14 @@ use App\Models\Application;
 use App\Models\Server;
 use App\Services\SentinelTrafficClient;
 use App\Services\TrafficAnalyticsAggregator;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
+#[Lazy]
 class Analytics extends Component
 {
     use BuildsTrafficChartPayload;
@@ -86,6 +90,13 @@ class Analytics extends Component
     public array $eligibleDisabledServers = [];
 
     public string $nudgeKey = '';
+
+    /**
+     * Upper bound on per-app overviews fetched for the leaderboard, so a server with a huge
+     * number of recorded apps can't reintroduce a per-app round-trip storm. Truncation is
+     * logged (see loadData) rather than silently swallowed.
+     */
+    private const MAX_LEADERBOARD_APPS = 200;
 
     /** @var array<int, string> */
     protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
@@ -178,7 +189,7 @@ class Analytics extends Component
     {
         $enabledUuids = $this->servers->pluck('uuid');
 
-        $apps = Application::ownedByCurrentTeam()->with('environment.project')->get()
+        $apps = Application::ownedByCurrentTeam()->with(['environment.project', 'destination.server'])->get()
             ->filter(function (Application $app) use ($enabledUuids): bool {
                 $serverUuid = $app->destination?->server?->uuid;
 
@@ -252,15 +263,28 @@ class Analytics extends Component
             try {
                 $client = $this->trafficClient($server);
 
-                $overviews[] = $client->overview($appKey, $from, $to);
+                // Warm every server-wide endpoint in one docker exec instead of ~15 serial
+                // SSH round-trips; the per-call methods below then read from cache.
+                $leaderboardUuids = $client->prefetchServerWide($appKey, $from, $to, $this->breakdownDimensions, $this->range, appsLimit: self::MAX_LEADERBOARD_APPS);
 
                 // Per-application leaderboard only makes sense when not already filtered to one app.
-                if ($appKey === null) {
-                    foreach ($client->apps() as $uuid) {
-                        if (! is_string($uuid) || $uuid === '') {
-                            continue;
-                        }
+                if ($appKey === null && $leaderboardUuids !== []) {
+                    if (count($leaderboardUuids) > self::MAX_LEADERBOARD_APPS) {
+                        Log::warning('Traffic analytics leaderboard truncated', [
+                            'server' => $server->uuid,
+                            'total' => count($leaderboardUuids),
+                            'shown' => self::MAX_LEADERBOARD_APPS,
+                        ]);
+                        $leaderboardUuids = array_slice($leaderboardUuids, 0, self::MAX_LEADERBOARD_APPS);
+                    }
+                    // Warm the leaderboard's per-app overviews in a second batched exec.
+                    $client->prefetchAppOverviews($leaderboardUuids, $from, $to);
+                }
 
+                $overviews[] = $client->overview($appKey, $from, $to);
+
+                if ($appKey === null) {
+                    foreach ($leaderboardUuids as $uuid) {
                         $appOverview = $client->overview($uuid, $from, $to)->toArray();
                         $meta = $this->appMeta($uuid);
 
@@ -510,6 +534,12 @@ class Analytics extends Component
         };
 
         return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+    }
+
+    public function placeholder(): View
+    {
+        // Rendered instantly; the Sentinel round-trips run in the deferred lazy-load request.
+        return view('livewire.analytics-placeholder');
     }
 
     public function render()

@@ -12,7 +12,6 @@ use App\Models\User;
 use App\Services\SentinelTrafficClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -31,15 +30,6 @@ class FakeAppOverviewTrafficClient extends SentinelTrafficClient
 
         return '{}';
     }
-}
-
-// #[Lazy] components render a placeholder first; trigger the deferred mount as the
-// browser would via the x-intersect __lazyLoad call, then continue asserting.
-function loadLazy(Testable $component): Testable
-{
-    preg_match('/__lazyLoad\(&#039;([^&]+)&#039;\)/', $component->html(), $matches);
-
-    return $component->call('__lazyLoad', $matches[1]);
 }
 
 beforeEach(function () {

@@ -149,3 +149,113 @@ it('rejects a malicious app key for the series endpoint', function () {
         ->toThrow(InvalidArgumentException::class);
     expect($client->captured)->toBeEmpty();
 });
+
+it('serves every endpoint from one aggregate dashboard fetch when Sentinel exposes it', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+
+    $bundle = json_encode([
+        'overview' => ['requests' => 7],
+        'paths' => [['path' => '/', 'requests' => 7]],
+        'breakdowns' => ['country' => [['value' => 'US', 'requests' => 7]], 'browser' => []],
+        'series' => [],
+        'attribution' => 'MaxMind',
+        'apps' => [
+            ['uuid' => 'app-a', 'overview' => ['requests' => 4]],
+            ['uuid' => 'app-b', 'overview' => ['requests' => 3]],
+        ],
+    ]);
+
+    // Only the /traffic/dashboard fetch is allowed; any individual/batch fetch means the
+    // bundle wasn't decomposed into the per-endpoint cache.
+    $client = new class($server, $bundle) extends SentinelTrafficClient
+    {
+        public function __construct($server, private string $bundle)
+        {
+            parent::__construct($server);
+        }
+
+        protected function remoteFetch(string $url): string
+        {
+            if (str_contains($url, '/traffic/dashboard')) {
+                return $this->bundle;
+            }
+            throw new RuntimeException("unexpected individual fetch: {$url}");
+        }
+
+        protected function batchRemoteFetch(array $urls): string
+        {
+            throw new RuntimeException('batch fallback should not run when the dashboard is available');
+        }
+    };
+
+    $apps = $client->prefetchServerWide(null, 'F', 'T', ['country', 'browser'], '24h');
+    expect($apps)->toBe(['app-a', 'app-b']);
+
+    // All served from the seeded cache — remoteFetch throws for anything but the dashboard.
+    expect($client->overview(null, 'F', 'T')->requests)->toBe(7)
+        ->and($client->overview('app-a', 'F', 'T')->requests)->toBe(4)
+        ->and($client->attribution())->toBe('MaxMind');
+    $client->paths(null, 'F', 'T');
+    $client->breakdown(null, 'country', 'F', 'T');
+});
+
+it('warms every server-wide endpoint in a single batched exec and per-call methods hit cache', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+
+    // Batches responses; individual remoteFetch() must never run once the batch has warmed
+    // the cache, proving the round-trips collapsed into one exec.
+    $client = new class($server) extends SentinelTrafficClient
+    {
+        public array $batchedCalls = [];
+
+        protected function batchRemoteFetch(array $urls): string
+        {
+            $this->batchedCalls[] = $urls;
+
+            // One framed body per url, matched by endpoint so ordering stays irrelevant.
+            $bodies = array_map(fn ($url) => match (true) {
+                str_contains($url, '/traffic/apps') => json_encode(['app-a', 'app-b']),
+                str_contains($url, '/attribution') => '{"attribution":"demo"}',
+                str_contains($url, '/overview') => '{"requests":1}',
+                default => '[]', // paths, series, breakdowns
+            }, $urls);
+
+            return implode("\x1e", $bodies)."\x1e";
+        }
+
+        protected function remoteFetch(string $url): string
+        {
+            throw new RuntimeException("individual fetch should not run for: {$url}");
+        }
+    };
+
+    $apps = $client->prefetchServerWide(null, 'F', 'T', ['country', 'browser'], '24h');
+
+    expect($client->batchedCalls)->toHaveCount(1)
+        ->and($apps)->toBe(['app-a', 'app-b']);
+
+    // These now read from the warmed cache; remoteFetch() would throw if they didn't.
+    expect($client->overview(null, 'F', 'T')->requests)->toBe(1);
+    $client->breakdown(null, 'country', 'F', 'T');
+    $client->series(null, '24h');
+    $client->attribution();
+});
+
+it('double-quotes the url in the remote curl command so & is not a shell background operator', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $client = new class($server) extends SentinelTrafficClient
+    {
+        public function exposeCommand(string $token, string $url): string
+        {
+            return $this->buildFetchCommand($token, $url);
+        }
+    };
+
+    // A real overview/paths/breakdown URL carries both from and to, joined by `&`.
+    $url = 'http://localhost:8888/api/traffic/overview?from=2026-08-01T00:00:00Z&to=2026-08-02T00:00:00Z';
+    $command = $client->exposeCommand('tok-123', $url);
+
+    // The URL must be wrapped in double quotes inside the inner `sh -c`, otherwise the
+    // container shell backgrounds curl at the `&` and only `from=...` reaches Sentinel.
+    expect($command)->toContain('"'.$url.'"');
+});

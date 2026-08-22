@@ -6,9 +6,12 @@ use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Server;
 use App\Services\SentinelTrafficClient;
 use App\Services\TrafficAnalyticsAggregator;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
+#[Lazy]
 class TrafficAnalytics extends Component
 {
     use BuildsTrafficChartPayload;
@@ -161,6 +164,12 @@ class TrafficAnalytics extends Component
         };
 
         return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+    }
+
+    public function placeholder(): View
+    {
+        // Rendered instantly on the dashboard; Sentinel round-trips run in the deferred request.
+        return view('livewire.dashboard.traffic-analytics-placeholder');
     }
 
     public function render()

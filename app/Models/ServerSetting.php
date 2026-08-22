@@ -204,7 +204,12 @@ class ServerSetting extends Model
                 $settings->wasChanged('geoip_refresh_days') ||
                 $settings->wasChanged('geoip_maxmind_license_key')
             ) {
-                $settings->server->restartSentinel();
+                // Only recreate Sentinel when it is already enabled. Otherwise a change to a
+                // traffic/geoip tuning knob would turn Sentinel on as a side effect, because
+                // StartSentinel unconditionally sets is_sentinel_enabled = true.
+                if ($settings->is_sentinel_enabled) {
+                    $settings->server->restartSentinel();
+                }
             }
         });
     }

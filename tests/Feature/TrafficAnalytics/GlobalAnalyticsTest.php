@@ -3,6 +3,7 @@
 use App\Livewire\Analytics;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -129,7 +130,7 @@ it('renders a team-wide analytics summary across enabled servers', function () {
     $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSee('Analytics')
         ->assertSee('1,000')
@@ -149,6 +150,54 @@ it('renders a team-wide analytics summary across enabled servers', function () {
         ->assertSee('GeoIP data by MaxMind')
         ->assertSet('serverOptions', [$server->uuid => $server->name])
         ->assertSet('appOptions', [$application->uuid => 'Global Leaderboard App']);
+});
+
+it('shows a no-data state for the requests chart when no traffic falls in the range', function () {
+    $server = bootEnabledGlobalServer();
+
+    $responses = fakeGlobalAnalyticsResponses();
+    // Zeroed overview + no series buckets: the page still renders, but there is nothing
+    // to plot over time, so the Requests chart shows its no-data overlay.
+    $responses['/traffic/overview'] = json_encode([
+        'requests' => 0, 'bytes_in' => 0, 'bytes_out' => 0,
+        'status' => ['s2xx' => 0, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0],
+        'latency' => ['p50' => 0, 'p95' => 0, 'p99' => 0], 'unique_visitors' => 0,
+    ]);
+    $responses['/traffic/series'] = json_encode([]);
+
+    $fake = new FakeGlobalAnalyticsTrafficClient($server);
+    $fake->responses = $responses;
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSee('No requests in this range')
+        // Server-rendered as visible (display:flex) before any client-side toggle.
+        ->assertSee('global-analytics-requests-empty" style="display: flex', escape: false);
+});
+
+it('hides the requests no-data overlay when there is traffic in the range', function () {
+    $server = bootEnabledGlobalServer();
+
+    $fake = new FakeGlobalAnalyticsTrafficClient($server);
+    $fake->responses = fakeGlobalAnalyticsResponses();
+    app()->bind(SentinelTrafficClient::class, fn () => $fake);
+
+    loadLazy(Livewire::test(Analytics::class))
+        ->assertOk()
+        ->assertSee('global-analytics-requests-empty" style="display: none', escape: false);
+});
+
+it('renders the full analytics page with a lazy placeholder before data loads', function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+    bootEnabledGlobalServer();
+
+    // Full-page #[Lazy]: the initial HTTP response is the skeleton placeholder plus the
+    // x-intersect __lazyLoad trigger; the Sentinel round-trips run only on the deferred call.
+    $this->get(route('analytics'))
+        ->assertOk()
+        ->assertSee('Analytics')
+        ->assertSee('__lazyLoad', escape: false);
 });
 
 it('shows path domains, links top apps to analytics, groups by project, and surfaces AI agents', function () {
@@ -177,7 +226,7 @@ it('shows path domains, links top apps to analytics, groups by project, and surf
         'application_uuid' => $application->uuid,
     ]);
 
-    $component = Livewire::test(Analytics::class)
+    $component = loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSee('Top hosts')
         ->assertSee('shop.example.com')          // served host shown in Top hosts + top-app row
@@ -208,7 +257,7 @@ it('builds a stacked status time series when Sentinel exposes the series endpoin
     $fake->responses = fakeGlobalAnalyticsResponses();
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSet('hasSeries', true)
         ->assertSet('series', [
@@ -238,7 +287,7 @@ it('derives KPI sparklines, device-donut data, and top hosts for the chart paylo
     $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    $instance = Livewire::test(Analytics::class)->assertOk()->instance();
+    $instance = loadLazy(Livewire::test(Analytics::class))->assertOk()->instance();
 
     // Per-bucket sparkline series derived from Sentinel's enriched buckets.
     expect($instance->requestsSpark())->toBe([43, 66]);
@@ -267,7 +316,7 @@ it('falls back to the donut when Sentinel lacks the series endpoint', function (
     $fake->responses = $responses;
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSet('hasSeries', false)
         ->assertSet('series', []);
@@ -293,7 +342,7 @@ it('does not disclose another team application name for a sentinel-reported uuid
     $fake->responses = fakeGlobalAnalyticsResponses([$otherTeamApplication->uuid]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertDontSee('Secret Other Team App')
         ->assertSee($otherTeamApplication->uuid);
@@ -318,7 +367,7 @@ it('scopes the view to a single application and hides the leaderboard when filte
     $fake->responses = fakeGlobalAnalyticsResponses([$application->uuid]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->set('appUuid', $application->uuid)
         ->assertOk()
         ->assertSee('1,000')
@@ -334,7 +383,7 @@ it('shows the not-enabled empty state when no server has traffic analytics on', 
     $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSee('Traffic analytics is not enabled')
         ->assertDontSee('Unique visitors');

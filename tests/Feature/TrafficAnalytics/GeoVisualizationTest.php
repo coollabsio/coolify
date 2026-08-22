@@ -75,7 +75,7 @@ it('renders resolved country names and the interactive globe when country data i
     ]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSee('Countries')
         ->assertSee('United States')
@@ -96,7 +96,7 @@ it('collapses unresolvable country codes into a single Unknown row', function ()
     ]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSee('United States')
         ->assertSee('Unknown');
@@ -109,7 +109,7 @@ it('shows a plain no-data state when no country data has been recorded', functio
     $fake->responses = fakeGeoResponses([]);
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(Analytics::class)
+    loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
         ->assertSee('Countries')
         ->assertSee('No country data for the selected range');

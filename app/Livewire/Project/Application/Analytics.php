@@ -5,8 +5,11 @@ namespace App\Livewire\Project\Application;
 use App\Livewire\Concerns\BuildsTrafficChartPayload;
 use App\Models\Application;
 use App\Services\SentinelTrafficClient;
+use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
+#[Lazy]
 class Analytics extends Component
 {
     use BuildsTrafficChartPayload;
@@ -87,6 +90,10 @@ class Analytics extends Component
             [$from, $to] = $this->window();
             $client = $this->trafficClient();
             $key = $this->application->uuid;
+
+            // Warm every endpoint for this app in one docker exec instead of ~14 serial
+            // SSH round-trips; the per-call methods below then read from cache.
+            $client->prefetchServerWide($key, $from, $to, $this->breakdownDimensions, $this->range);
 
             $this->overview = $client->overview($key, $from, $to)->toArray();
 
@@ -211,6 +218,12 @@ class Analytics extends Component
         };
 
         return [$from->toIso8601ZuluString(), $to->toIso8601ZuluString()];
+    }
+
+    public function placeholder(): View
+    {
+        // Rendered instantly; the Sentinel round-trip runs in the deferred lazy-load request.
+        return view('livewire.project.application.analytics-placeholder');
     }
 
     public function render()

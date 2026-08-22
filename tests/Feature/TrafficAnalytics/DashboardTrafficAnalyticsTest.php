@@ -94,7 +94,7 @@ it('renders the team traffic summary aggregated across servers with an approxima
         return $server && $server->is($serverOne) ? $fakeOne : $fakeTwo;
     });
 
-    Livewire::test(TrafficAnalytics::class)
+    loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
         ->assertSee('Requests')
         ->assertSee('1,500')
@@ -129,7 +129,7 @@ it('shows only sparkline KPI cards that link through to the full analytics page'
 
     app()->bind(SentinelTrafficClient::class, fn () => $fake);
 
-    Livewire::test(TrafficAnalytics::class)
+    loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
         // The slimmed dashboard shows only KPI cards + a link to /analytics — no per-app rows.
         ->assertSee('Open analytics')
@@ -158,7 +158,7 @@ it('shows a failure empty-state instead of an all-zero KPI panel when every serv
         return new FailingDashboardTrafficClient($params['server']);
     });
 
-    Livewire::test(TrafficAnalytics::class)
+    loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
         ->assertSee('No analytics data yet')
         ->assertDontSee('Unique visitors')
@@ -174,7 +174,7 @@ it('shows an empty state when no server in the team has traffic analytics enable
     $server->settings->is_traffic_analytics_enabled = false;
     $server->settings->save();
 
-    Livewire::test(TrafficAnalytics::class)
+    loadLazy(Livewire::test(TrafficAnalytics::class))
         ->assertOk()
         ->assertDontSee('Unique visitors')
         ->assertSee('not enabled');

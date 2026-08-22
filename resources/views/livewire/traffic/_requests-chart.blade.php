@@ -4,7 +4,20 @@
     token. Updated via the `refreshChartData-{chartId}-status` event (the `timeSeries.requests`
     array, aligned with `timeSeries.categories`). Expects `$chartId` in scope.
 --}}
-<div wire:ignore id="{!! $chartId !!}-requests" class="min-h-[220px] w-full"></div>
+<div wire:ignore class="relative w-full">
+    <div id="{!! $chartId !!}-requests" class="min-h-[220px] w-full"></div>
+
+    {{-- No-data overlay: covers the empty chart frame when no requests fall in the range.
+         Uses the shared x-empty component so it matches the other analytics empty states
+         (e.g. Status codes). Toggled from the refresh listener below (kept mounted so the
+         chart's listener survives live/range re-renders). --}}
+    <div id="{!! $chartId !!}-requests-empty" style="display: {{ $this->hasRequestSeries() ? 'none' : 'flex' }}"
+        class="absolute inset-0 items-center justify-center bg-white dark:bg-base">
+        <x-empty size="sm" title="No requests in this range"
+            description="No request traffic was recorded for the selected filters and range. Try a wider range or check back later."
+            icon-name="analytics" />
+    </div>
+</div>
 
 @script
 <script>
@@ -12,6 +25,7 @@
         checkTheme();
 
         const el = document.getElementById('{!! $chartId !!}-requests');
+        const emptyEl = document.getElementById('{!! $chartId !!}-requests-empty');
         const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const accent = () => cssVar('--chart-status-3xx') || '#3b82f6';
         const gridColor = () => cssVar('--chart-geo-empty') || 'rgba(128,128,128,0.15)';
@@ -69,6 +83,10 @@
 
             const ts = data.timeSeries;
             const points = (ts.categories || []).map((c, i) => ({ x: c, y: (ts.requests && ts.requests[i]) || 0 }));
+
+            // Show the no-data overlay when nothing in the range carries request volume.
+            const hasData = points.some(p => (p.y || 0) > 0);
+            if (emptyEl) { emptyEl.style.display = hasData ? 'none' : 'flex'; }
 
             chart.updateOptions({
                 colors: [accent()],
