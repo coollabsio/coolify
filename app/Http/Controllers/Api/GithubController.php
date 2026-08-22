@@ -15,9 +15,9 @@ use OpenApi\Attributes as OA;
 
 class GithubController extends Controller
 {
-    private function removeSensitiveData($githubApp)
+    private function removeSensitiveData(GithubApp $githubApp, int $teamId)
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (request()->attributes->get('can_read_sensitive', false) === true && $githubApp->team_id === $teamId) {
             $githubApp->makeVisible([
                 'client_secret',
                 'webhook_secret',
@@ -97,8 +97,8 @@ class GithubController extends Controller
                 ->orWhere('is_system_wide', true);
         })->get();
 
-        $githubApps = $githubApps->map(function ($app) {
-            return $this->removeSensitiveData($app);
+        $githubApps = $githubApps->map(function ($app) use ($teamId) {
+            return $this->removeSensitiveData($app, $teamId);
         });
 
         return response()->json($githubApps);

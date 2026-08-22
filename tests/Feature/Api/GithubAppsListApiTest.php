@@ -197,6 +197,39 @@ describe('GET /api/v1/github-apps', function () {
         ]);
     });
 
+    test('does not return system-wide github app secrets owned by another team', function () {
+        $otherTeam = Team::factory()->create();
+        $otherPrivateKey = PrivateKey::create([
+            'name' => 'System Key',
+            'private_key' => validGithubAppsApiPrivateKey(),
+            'team_id' => $otherTeam->id,
+        ]);
+        GithubApp::create([
+            'name' => 'Foreign System GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 11111,
+            'installation_id' => 22222,
+            'client_id' => 'system-client-id',
+            'client_secret' => 'foreign-client-secret',
+            'webhook_secret' => 'foreign-webhook-secret',
+            'private_key_id' => $otherPrivateKey->id,
+            'team_id' => $otherTeam->id,
+            'is_system_wide' => true,
+        ]);
+
+        $sensitiveToken = createGithubAppsApiToken($this, ['read', 'read:sensitive']);
+
+        $response = $this->withToken($sensitiveToken)
+            ->getJson('/api/v1/github-apps')
+            ->assertSuccessful()
+            ->assertJsonFragment(['name' => 'Foreign System GitHub App']);
+
+        expect($response->json('0'))
+            ->not->toHaveKey('client_secret')
+            ->not->toHaveKey('webhook_secret');
+    });
+
     test('does not return other teams github apps', function () {
         // Create a GitHub app for this team
         GithubApp::create([
