@@ -6,6 +6,7 @@ use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
 use App\Http\Controllers\UploadController;
 use App\Livewire\Admin\Index as AdminIndex;
+use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
@@ -151,6 +152,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/analytics', Analytics::class)->name('analytics');
     Route::get('/admin', AdminIndex::class)->name('admin.index');
     Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
@@ -284,6 +286,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-limits', ApplicationConfiguration::class)->name('project.application.resource-limits');
         Route::get('/resource-operations', ApplicationConfiguration::class)->name('project.application.resource-operations');
         Route::get('/metrics', ApplicationConfiguration::class)->name('project.application.metrics');
+        Route::get('/analytics', ApplicationConfiguration::class)->name('project.application.analytics');
         Route::get('/tags', ApplicationConfiguration::class)->name('project.application.tags');
         Route::get('/danger', ApplicationConfiguration::class)->name('project.application.danger');
 

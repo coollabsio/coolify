@@ -135,7 +135,7 @@ test('listbox waits for change handlers and prevents overlapping selections', fu
         ->toContain('saving: false')
         ->toContain('async choose(option)')
         ->toContain('await this.$wire.')
-        ->toContain('if (this.saving || option.disabled) return;')
+        ->toContain('if (option.header || option.disabled || this.saving) return;')
         ->toContain("'pointer-events-none opacity-70': saving");
 });
 

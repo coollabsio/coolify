@@ -10,6 +10,33 @@ class StartSentinel
 {
     use AsAction;
 
+    public static function sentinelTrafficEnvironment(Server $server): array
+    {
+        if (! $server->isTrafficAnalyticsEnabled()) {
+            return [];
+        }
+
+        $logPath = rtrim($server->proxyPath(), '/').'/access.log';
+        $settings = $server->settings;
+        $env = [
+            'TRAFFIC_ENABLED' => 'true',
+            'TRAFFIC_PROXY_TYPE' => 'auto',
+            'TRAFFIC_ACCESS_LOG_PATH' => $logPath,
+            'TRAFFIC_TOPN' => (string) ($settings->traffic_topn ?: 50),
+            'TRAFFIC_SAMPLE_THRESHOLD' => (string) ($settings->traffic_sample_threshold ?? 0),
+            'TRAFFIC_RETENTION_1H_DAYS' => (string) ($settings->traffic_retention_1h_days ?: 30),
+            'TRAFFIC_RETENTION_1D_DAYS' => (string) ($settings->traffic_retention_1d_days ?: 395),
+            'GEOIP_ENABLED' => $settings->is_geoip_enabled ? 'true' : 'false',
+            'GEOIP_REFRESH_DAYS' => (string) ($settings->geoip_refresh_days ?: 30),
+        ];
+        $license = data_get($settings, 'geoip_maxmind_license_key');
+        if ($settings->is_geoip_enabled && filled($license)) {
+            $env['GEOIP_MAXMIND_LICENSE_KEY'] = $license;
+        }
+
+        return $env;
+    }
+
     public function handle(Server $server, bool $restart = false, ?string $latestVersion = null, ?string $customImage = null)
     {
         if ($server->isSwarm() || $server->isBuildServer()) {
@@ -36,6 +63,7 @@ class StartSentinel
             'COLLECTOR_REFRESH_RATE_SECONDS' => $refreshRate,
             'COLLECTOR_RETENTION_PERIOD_DAYS' => $metricsHistory,
         ];
+        $environments = array_merge($environments, self::sentinelTrafficEnvironment($server));
         $labels = [
             'coolify.managed' => 'true',
         ];
@@ -48,7 +76,10 @@ class StartSentinel
         }
         $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
-        $dockerCommand = "docker run -d $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db --pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+        $trafficMount = $server->isTrafficAnalyticsEnabled()
+            ? '-v '.escapeshellarg($server->proxyPath().':'.$server->proxyPath().':ro').' '
+            : '';
+        $dockerCommand = "docker run -d $dockerEnvironments --name coolify-sentinel -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 
         instant_remote_process([
             'docker rm -f coolify-sentinel || true',

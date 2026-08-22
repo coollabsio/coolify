@@ -8,6 +8,29 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\Yaml\Yaml;
 
+function traefikAccessLogCommands(bool $enabled): array
+{
+    if (! $enabled) {
+        return [];
+    }
+
+    return [
+        '--accesslog=true',
+        '--accesslog.filepath=/traefik/access.log',
+        '--accesslog.format=json',
+        '--accesslog.fields.headers.names.Cf-Connecting-Ip=keep',
+        '--accesslog.fields.headers.names.Cf-Ipcountry=keep',
+        '--accesslog.fields.headers.names.Cf-Cache-Status=keep',
+        '--accesslog.fields.headers.names.Cf-Verified-Bot=keep',
+        '--accesslog.fields.headers.names.Cf-Ray=keep',
+        // Kept so Sentinel can resolve the real client IP behind a non-Cloudflare
+        // reverse proxy (leftmost X-Forwarded-For entry) and report User-Agents/referrers.
+        '--accesslog.fields.headers.names.X-Forwarded-For=keep',
+        '--accesslog.fields.headers.names.User-Agent=keep',
+        '--accesslog.fields.headers.names.Referer=keep',
+    ];
+}
+
 /**
  * Check if a network name is a Docker predefined system network.
  * These networks cannot be created, modified, or managed by docker network commands.
@@ -325,12 +348,16 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
         if (isDev()) {
             $config['services']['traefik']['command'][] = '--api.insecure=true';
             $config['services']['traefik']['command'][] = '--log.level=debug';
-            $config['services']['traefik']['command'][] = '--accesslog.filepath=/traefik/access.log';
             $config['services']['traefik']['command'][] = '--accesslog.bufferingsize=100';
             $config['services']['traefik']['volumes'][] = '/var/lib/docker/volumes/coolify_dev_coolify_data/_data/proxy/:/traefik';
         } else {
             $config['services']['traefik']['command'][] = '--api.insecure=false';
             $config['services']['traefik']['volumes'][] = "{$proxy_path}:/traefik";
+        }
+        // Access logging + analytics header capture (JSON log, real-IP/UA/referrer headers)
+        // applies to both dev and production so traffic analytics can be exercised locally.
+        foreach (traefikAccessLogCommands($server->isTrafficAnalyticsEnabled()) as $cmd) {
+            $config['services']['traefik']['command'][] = $cmd;
         }
         if ($server->isSwarm()) {
             data_forget($config, 'services.traefik.container_name');
@@ -357,6 +384,24 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
             foreach ($custom_commands as $custom_command) {
                 $config['services']['traefik']['command'][] = $custom_command;
             }
+        }
+
+        // Traefik has no native access-log rotation. Add a minimal logrotate sidecar that
+        // rotates /traefik/access.log in copytruncate mode so the file keeps the same inode
+        // and Sentinel keeps its file handle (the tailer handles len < pos by seeking to 0).
+        // Only for the non-swarm, non-dev production path (dev uses a different access-log path).
+        if ($server->isTrafficAnalyticsEnabled() && ! $server->isSwarm() && ! isDev()) {
+            $config['services']['traefik-logrotate'] = [
+                'image' => 'alpine:3.20',
+                'restart' => RESTART_MODE,
+                'volumes' => [
+                    "{$proxy_path}:/traefik",
+                ],
+                'labels' => [
+                    'coolify.managed=true',
+                ],
+                'entrypoint' => 'sh -c \'apk add --no-cache logrotate >/dev/null 2>&1; printf "/traefik/access.log {\n  copytruncate\n  size 20M\n  rotate 5\n  compress\n  missingok\n  notifempty\n}\n" > /etc/logrotate.d/traefik-access; while true; do logrotate -s /traefik/.logrotate.state /etc/logrotate.d/traefik-access; sleep 3600; done\'',
+            ];
         }
     } elseif ($proxy_type === 'CADDY') {
         $config = [
@@ -392,6 +437,9 @@ function generateDefaultProxyConfiguration(Server $server, array $custom_command
                 ],
             ],
         ];
+        if ($server->isTrafficAnalyticsEnabled()) {
+            $config['services']['caddy']['volumes'][] = "{$proxy_path}:/traffic";
+        }
     } else {
         return null;
     }

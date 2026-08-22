@@ -212,7 +212,9 @@ describe('Sentinel API', function () {
             ->getJson("/api/v1/servers/{$this->server->uuid}/sentinel")
             ->assertOk()
             ->assertJsonPath('is_sentinel_enabled', true)
-            ->assertJsonPath('is_metrics_enabled', true);
+            ->assertJsonPath('is_metrics_enabled', true)
+            ->assertJsonPath('traffic_topn', 50)
+            ->assertJsonPath('is_geoip_enabled', true);
 
         expect($response->json())->not->toHaveKey('sentinel_token')
             ->and($response->json())->not->toHaveKey('sentinel_custom_url');

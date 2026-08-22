@@ -87,6 +87,14 @@
                     <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Projects</span>
                 </a>
             </li>
+            <li>
+                <a title="Analytics" {{ wireNavigate() }}
+                    class="{{ request()->is('analytics') ? 'menu-item menu-item-active' : 'menu-item' }}"
+                    :class="collapsed && 'lg:justify-center lg:px-0'" href="{{ route('analytics') }}">
+                    <x-reicon name="analytics" class="menu-item-icon" />
+                    <span class="menu-item-label" :class="collapsed && 'lg:hidden'">Analytics</span>
+                </a>
+            </li>
             @can('canAccessTerminal')
                 <li>
                     <a title="Terminal"
