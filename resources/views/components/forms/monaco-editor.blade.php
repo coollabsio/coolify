@@ -7,6 +7,9 @@
         monacoPlaceholderText: 'Start typing here',
         monacoLoader: true,
         monacoFontSize: '15px',
+        monacoPlaceholderLeft: '56px',
+        monacoPlaceholderTop: '12px',
+        monacoPlaceholderLineHeight: 'normal',
         monacoId: $id('monaco-editor'),
         isDarkMode() {
             return document.documentElement.classList.contains('dark') || localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -25,6 +28,14 @@
         },
         updatePlaceholder(value) {
             this.monacoPlaceholder = value === '';
+        },
+        updatePlaceholderPosition(editor) {
+            const layoutInfo = editor.getLayoutInfo();
+            const lineHeight = editor.getOption(monaco.editor.EditorOption.lineHeight);
+            const padding = editor.getOption(monaco.editor.EditorOption.padding);
+            this.monacoPlaceholderLeft = layoutInfo.contentLeft + 'px';
+            this.monacoPlaceholderTop = padding.top + 'px';
+            this.monacoPlaceholderLineHeight = lineHeight + 'px';
         },
         monacoEditorFocus() {
             document.getElementById(this.monacoId).dispatchEvent(new CustomEvent('monaco-editor-focused', { detail: { monacoId: this.monacoId } }));
@@ -143,13 +154,15 @@
                     });
         
                     monacoEditor(editor);
-        
+
                     document.getElementById(monacoId).editor = editor;
                     document.getElementById(monacoId).addEventListener('monaco-editor-focused', (event) => {
                         editor.focus();
                     });
 
                     updatePlaceholder(editor.getValue());
+                    updatePlaceholderPosition(editor);
+                    editor.onDidLayoutChange(() => updatePlaceholderPosition(editor));
 
                     @if ($autofocus)
                     // Auto-focus the editor
@@ -173,8 +186,8 @@
         <div class="relative z-10 w-full h-full">
             <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 150px;"></div>
             <div x-ref="monacoPlaceholderElement" x-show="monacoPlaceholder" @click="monacoEditorFocus()"
-                :style="'font-size: ' + monacoFontSize"
-                class="w-full text-sm font-mono absolute z-50 text-gray-500 ml-14 -translate-x-0.5 mt-0.5 left-0 top-0"
+                :style="'font-size: ' + monacoFontSize + '; line-height: ' + monacoPlaceholderLineHeight + '; left: ' + monacoPlaceholderLeft + '; top: ' + monacoPlaceholderTop"
+                class="w-full text-sm font-mono absolute z-50 text-gray-500"
                 x-text="monacoPlaceholderText"></div>
         </div>
     </div>
