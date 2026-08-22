@@ -124,6 +124,7 @@ class EnvironmentVariable extends BaseModel
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            $environmentVariable->encryptPlaintextValueAttribute();
             $environmentVariable->updateIsShared();
         });
     }
@@ -155,14 +156,6 @@ class EnvironmentVariable extends BaseModel
         }
 
         return false;
-    }
-
-    protected function value(): Attribute
-    {
-        return Attribute::make(
-            get: fn (?string $value = null) => $this->get_environment_variables($value),
-            set: fn (?string $value = null) => $this->set_environment_variables($value),
-        );
     }
 
     /**
@@ -355,27 +348,14 @@ class EnvironmentVariable extends BaseModel
         return str($environment_variable)->value();
     }
 
-    private function get_environment_variables(?string $environment_variable = null): ?string
+    private function encryptPlaintextValueAttribute(): void
     {
-        if (! $environment_variable) {
-            return null;
+        $raw = $this->attributes['value'] ?? null;
+        if (! is_string($raw) || $raw === '' || str_starts_with($raw, 'eyJpdiI6')) {
+            return;
         }
 
-        return trim(decrypt($environment_variable));
-    }
-
-    private function set_environment_variables(?string $environment_variable = null): ?string
-    {
-        if (is_null($environment_variable)) {
-            return null;
-        }
-        $environment_variable = trim($environment_variable);
-        $type = str($environment_variable)->after('{{')->before('.')->value;
-        if (str($environment_variable)->startsWith('{{'.$type) && str($environment_variable)->endsWith('}}')) {
-            return encrypt($environment_variable);
-        }
-
-        return encrypt($environment_variable);
+        $this->attributes['value'] = encrypt(trim($raw));
     }
 
     protected function key(): Attribute
