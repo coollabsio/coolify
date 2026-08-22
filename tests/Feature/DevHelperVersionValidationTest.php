@@ -88,3 +88,22 @@ test('buildHelperImage refuses previously stored invalid version', function () {
         ->call('buildHelperImage')
         ->assertDispatched('error');
 });
+
+test('development helper version is read fresh for queue workers', function () {
+    config(['app.env' => 'local']);
+
+    InstanceSettings::findOrFail(0)->update(['dev_helper_version' => 'first']);
+    expect(getHelperVersion())->toBe('first');
+
+    InstanceSettings::query()->whereKey(0)->update(['dev_helper_version' => 'second']);
+
+    expect(getHelperVersion())->toBe('second');
+});
+
+test('development helper build uses the configured helper repository', function () {
+    $component = file_get_contents(app_path('Livewire/Settings/Index.php'));
+
+    expect($component)
+        ->toContain('$imageRef = escapeshellarg(coolifyHelperImage().":{$version}");')
+        ->not->toContain('"ghcr.io/coollabsio/coolify-helper:{$version}"');
+});
