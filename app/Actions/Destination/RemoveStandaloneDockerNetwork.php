@@ -11,6 +11,6 @@ class RemoveStandaloneDockerNetwork
         $safeNetwork = escapeshellarg($destination->network);
 
         instant_remote_process(["docker network disconnect {$safeNetwork} coolify-proxy"], $destination->server, throwError: false);
-        instant_remote_process(["docker network rm -f {$safeNetwork}"], $destination->server);
+        instant_remote_process([dockerNetworkRemoveCommand($destination->network)], $destination->server);
     }
 }

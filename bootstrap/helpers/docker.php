@@ -267,7 +267,28 @@ function dockerStopCommand(int $timeout, string $containers, Server|string|null 
 function dockerRemoveCommandWithTimeout(string $container, int $timeout = 60, int $killAfter = 10): string
 {
     $container = escapeShellValue($container);
-    $script = "if command -v timeout >/dev/null 2>&1; then timeout -k {$killAfter}s {$timeout}s docker rm -f {$container}; exit_code=\$?; else exit_code=124; fi; if [ \"\$exit_code\" -eq 124 ]; then echo '__COOLIFY_CONTAINER_REMOVE_TIMEOUT__'; fi; exit \$exit_code";
+    $script = "if command -v timeout >/dev/null 2>&1; then output=\$(timeout -k {$killAfter}s {$timeout}s docker rm -f {$container} 2>&1); exit_code=\$?; else output=''; exit_code=124; fi; if [ \"\$exit_code\" -eq 124 ]; then echo '__COOLIFY_CONTAINER_REMOVE_TIMEOUT__'; elif [ \"\$exit_code\" -ne 0 ] && printf '%s' \"\$output\" | grep -q 'No such container:'; then exit 0; elif [ \"\$exit_code\" -ne 0 ]; then printf '%s\\n' \"\$output\" >&2; else printf '%s\\n' \"\$output\"; fi; exit \$exit_code";
+
+    return 'bash -c '.escapeShellValue($script);
+}
+
+function dockerRemoveCommand(string $container): string
+{
+    $command = 'docker rm -f '.escapeShellValue($container);
+
+    return dockerCommandIgnoringError($command, 'No such container:');
+}
+
+function dockerNetworkRemoveCommand(string $network): string
+{
+    $command = 'docker network rm '.escapeShellValue($network);
+
+    return dockerCommandIgnoringError($command, 'network .* not found');
+}
+
+function dockerCommandIgnoringError(string $command, string $ignoredError): string
+{
+    $script = "output=\$({$command} 2>&1); exit_code=\$?; if [ \"\$exit_code\" -ne 0 ] && printf '%s' \"\$output\" | grep -Eq ".escapeShellValue($ignoredError)."; then exit 0; fi; if [ \"\$exit_code\" -ne 0 ]; then printf '%s\\n' \"\$output\" >&2; else printf '%s\\n' \"\$output\"; fi; exit \$exit_code";
 
     return 'bash -c '.escapeShellValue($script);
 }
