@@ -1,5 +1,6 @@
 # documentation: https://github.com/hoppscotch/proxyscotch
 # slogan: A simple proxy server created for https://hoppscotch.io - CORS proxy
+# category: proxy
 # tags: proxy,hoppscotch,cors
 # logo: svgs/hoppscotch.png
 # port: 9159

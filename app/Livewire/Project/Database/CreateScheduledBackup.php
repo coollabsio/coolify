@@ -3,8 +3,9 @@
 namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -16,35 +17,41 @@ class CreateScheduledBackup extends Component
     #[Validate(['required', 'string'])]
     public $frequency;
 
-    #[Validate(['required', 'boolean'])]
-    public bool $saveToS3 = false;
+    #[Locked]
+    public $database = null;
 
     #[Locked]
-    public $database;
+    public ?Service $service = null;
+
+    public ?string $selectedDatabaseUuid = null;
 
     public bool $enabled = true;
 
-    #[Validate(['nullable', 'integer'])]
-    public ?int $s3StorageId = null;
-
-    public Collection $definedS3s;
-
-    public function mount()
+    public function mount(): void
     {
-        try {
-            $this->definedS3s = currentTeam()->s3s;
-            if ($this->definedS3s->count() > 0) {
-                $this->s3StorageId = $this->definedS3s->first()->id;
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
+        if ($this->service) {
+            $this->authorize('view', $this->service);
+            $this->selectedDatabaseUuid = $this->availableDatabases()->first()?->uuid;
         }
     }
 
     public function submit()
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $database = $this->selectedDatabase();
+            if (! $database) {
+                $this->addError('selectedDatabaseUuid', 'Select a database owned by this service.');
+
+                return;
+            }
+
+            $this->authorize('manageBackups', $database);
+
+            if (! $database->isBackupSolutionAvailable()) {
+                $this->dispatch('error', 'Scheduled backups are not supported for this database type.');
+
+                return;
+            }
 
             $this->validate();
 
@@ -58,32 +65,73 @@ class CreateScheduledBackup extends Component
             $payload = [
                 'enabled' => true,
                 'frequency' => $this->frequency,
-                'save_s3' => $this->saveToS3,
-                's3_storage_id' => $this->s3StorageId,
-                'database_id' => $this->database->id,
-                'database_type' => $this->database->getMorphClass(),
+                'save_s3' => false,
+                's3_storage_id' => null,
+                'database_id' => $database->id,
+                'database_type' => $database->getMorphClass(),
                 'team_id' => currentTeam()->id,
             ];
 
-            if ($this->database->type() === 'standalone-postgresql') {
-                $payload['databases_to_backup'] = $this->database->postgres_db;
-            } elseif ($this->database->type() === 'standalone-mysql') {
-                $payload['databases_to_backup'] = $this->database->mysql_database;
-            } elseif ($this->database->type() === 'standalone-mariadb') {
-                $payload['databases_to_backup'] = $this->database->mariadb_database;
+            if ($database->type() === 'standalone-postgresql') {
+                $payload['databases_to_backup'] = $database->postgres_db;
+            } elseif ($database->type() === 'standalone-mysql') {
+                $payload['databases_to_backup'] = $database->mysql_database;
+            } elseif ($database->type() === 'standalone-mariadb') {
+                $payload['databases_to_backup'] = $database->mariadb_database;
+            } elseif ($database->type() === 'standalone-clickhouse') {
+                $payload['databases_to_backup'] = $database->clickhouse_db;
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
-            if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-                $this->dispatch('refreshScheduledBackups', $databaseBackup->id);
+            if ($database->getMorphClass() === ServiceDatabase::class) {
+                $service = $database->service;
+                $this->redirectRoute('project.service.database.backup.show', [
+                    'project_uuid' => $service->project()->uuid,
+                    'environment_uuid' => $service->environment->uuid,
+                    'service_uuid' => $service->uuid,
+                    'stack_service_uuid' => $database->uuid,
+                    'backup_uuid' => $databaseBackup->uuid,
+                ], navigate: true);
             } else {
-                $this->dispatch('refreshScheduledBackups');
+                $this->redirectRoute('project.database.backup.execution', [
+                    'project_uuid' => $database->project()->uuid,
+                    'environment_uuid' => $database->environment->uuid,
+                    'database_uuid' => $database->uuid,
+                    'backup_uuid' => $databaseBackup->uuid,
+                ], navigate: true);
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
             $this->frequency = '';
         }
+    }
+
+    public function render()
+    {
+        return view('livewire.project.database.create-scheduled-backup', [
+            'databaseOptions' => $this->availableDatabases()->map(fn (ServiceDatabase $database): array => [
+                'value' => $database->uuid,
+                'label' => $database->human_name ?: $database->name,
+            ])->values()->all(),
+        ]);
+    }
+
+    private function availableDatabases()
+    {
+        if (! $this->service) {
+            return collect();
+        }
+
+        return $this->service->databases->filter(fn (ServiceDatabase $database): bool => $database->isBackupSolutionAvailable());
+    }
+
+    private function selectedDatabase()
+    {
+        if (! $this->service) {
+            return $this->database;
+        }
+
+        return $this->availableDatabases()->firstWhere('uuid', $this->selectedDatabaseUuid);
     }
 }

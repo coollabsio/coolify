@@ -1,0 +1,126 @@
+# documentation: https://github.com/block/buzz
+# slogan: Self-hostable workspace where humans and AI agents collaborate on a Nostr relay you own.
+# category: messaging
+# tags: buzz,chat,nostr,agents,ai,collaboration,relay,block
+# logo: svgs/buzz.svg
+# port: 3000
+
+services:
+  buzz:
+    image: 'ghcr.io/block/buzz:${BUZZ_TAG:-main}'
+    environment:
+      - SERVICE_URL_BUZZ_3000
+      - BUZZ_BIND_ADDR=0.0.0.0:3000
+      - BUZZ_HEALTH_PORT=8080
+      - BUZZ_METRICS_PORT=9102
+      - RELAY_URL=wss://${SERVICE_FQDN_BUZZ}
+      - BUZZ_MEDIA_BASE_URL=${SERVICE_URL_BUZZ}/media
+      - BUZZ_MEDIA_SERVER_DOMAIN=${SERVICE_FQDN_BUZZ}
+      - BUZZ_CORS_ORIGINS=${SERVICE_URL_BUZZ}
+      - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-buzz}
+      - REDIS_URL=redis://:${SERVICE_PASSWORD_REDIS}@redis:6379
+      - BUZZ_S3_ENDPOINT=http://minio:9000
+      - BUZZ_S3_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - BUZZ_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - BUZZ_S3_BUCKET=${BUZZ_S3_BUCKET:-buzz-media}
+      - BUZZ_GIT_REPO_PATH=/data/git
+      - BUZZ_RELAY_PRIVATE_KEY=${SERVICE_HEX_64_RELAYKEY}
+      - BUZZ_GIT_HOOK_HMAC_SECRET=${SERVICE_HEX_64_GITHMAC}
+      - BUZZ_AUTO_MIGRATE=${BUZZ_AUTO_MIGRATE:-true}
+      - BUZZ_GIT_CONFORMANCE_PROBE=${BUZZ_GIT_CONFORMANCE_PROBE:-true}
+      - BUZZ_REQUIRE_AUTH_TOKEN=${BUZZ_REQUIRE_AUTH_TOKEN:-true}
+      - BUZZ_REQUIRE_RELAY_MEMBERSHIP=${BUZZ_REQUIRE_RELAY_MEMBERSHIP:-false}
+      - BUZZ_ALLOW_NIP_OA_AUTH=${BUZZ_ALLOW_NIP_OA_AUTH:-true}
+      - RELAY_OWNER_PUBKEY=${RELAY_OWNER_PUBKEY}
+      - RUST_LOG=${RUST_LOG:-buzz_relay=info,buzz_db=info,buzz_auth=info,buzz_pubsub=info,tower_http=info}
+    volumes:
+      - buzz-git-data:/data/git
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -fsS http://127.0.0.1:8080/_readiness >/dev/null || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 45s
+
+  postgres:
+    image: 'postgres:17-alpine'
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-buzz}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - buzz-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: 'redis:7-alpine'
+    command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${SERVICE_PASSWORD_REDIS}']
+    environment:
+      - REDIS_PASSWORD=${SERVICE_PASSWORD_REDIS}
+    volumes:
+      - buzz-redis-data:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli -a "$${REDIS_PASSWORD}" ping | grep -q PONG'
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  minio:
+    image: 'minio/minio:RELEASE.2025-09-07T16-13-09Z'
+    command: 'server /data --console-address ":9001"'
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    volumes:
+      - buzz-minio-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:9000/minio/health/live'
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  minio-init:
+    image: 'minio/mc:RELEASE.2025-08-13T08-35-41Z'
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      - BUZZ_S3_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - BUZZ_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - BUZZ_S3_BUCKET=${BUZZ_S3_BUCKET:-buzz-media}
+    entrypoint:
+      - /bin/sh
+      - '-euc'
+      - |
+        mc alias set local http://minio:9000 "$${BUZZ_S3_ACCESS_KEY}" "$${BUZZ_S3_SECRET_KEY}"
+        mc mb --ignore-existing "local/$${BUZZ_S3_BUCKET}"
+        mc anonymous set none "local/$${BUZZ_S3_BUCKET}"
+    restart: 'no'
+    exclude_from_hc: true

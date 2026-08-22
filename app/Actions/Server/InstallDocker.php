@@ -49,7 +49,7 @@ class InstallDocker
           }');
         $found = StandaloneDocker::where('server_id', $server->id);
         if ($found->count() == 0 && $server->id) {
-            StandaloneDocker::forceCreate([
+            StandaloneDocker::create([
                 'name' => 'coolify',
                 'network' => 'coolify',
                 'server_id' => $server->id,
@@ -79,6 +79,8 @@ class InstallDocker
                 $command = $command->merge([$this->getSuseDockerInstallCommand()]);
             } elseif ($supported_os_type->contains('arch')) {
                 $command = $command->merge([$this->getArchDockerInstallCommand()]);
+            } elseif ($supported_os_type->contains('alpine')) {
+                $command = $command->merge([$this->getAlpineDockerInstallCommand()]);
             } else {
                 $command = $command->merge([$this->getGenericDockerInstallCommand()]);
             }
@@ -93,9 +95,8 @@ class InstallDocker
                 "jq -s '.[0] * .[1]' /etc/docker/daemon.json.coolify /etc/docker/daemon.json | tee /etc/docker/daemon.json.appended > /dev/null",
                 'mv /etc/docker/daemon.json.appended /etc/docker/daemon.json',
                 "echo 'Restarting Docker Engine...'",
-                'systemctl enable docker >/dev/null 2>&1 || true',
-                'systemctl restart docker',
             ]);
+            $command = $command->merge($this->getDockerServiceCommands($supported_os_type->contains('alpine')));
             if ($server->isSwarm()) {
                 $command = $command->merge([
                     'docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true',
@@ -152,6 +153,28 @@ class InstallDocker
         return 'pacman -Syu --noconfirm --needed docker docker-compose && '.
             'systemctl enable docker.service && '.
             'systemctl start docker.service';
+    }
+
+    private function getAlpineDockerInstallCommand(): string
+    {
+        return 'apk update && '.
+            'apk add docker docker-cli-buildx docker-cli-compose && '.
+            'mkdir -p /etc/docker';
+    }
+
+    private function getDockerServiceCommands(bool $usesOpenRc): array
+    {
+        if ($usesOpenRc) {
+            return [
+                'rc-update add docker default',
+                'rc-service docker restart',
+            ];
+        }
+
+        return [
+            'systemctl enable docker >/dev/null 2>&1 || true',
+            'systemctl restart docker',
+        ];
     }
 
     private function getGenericDockerInstallCommand(): string

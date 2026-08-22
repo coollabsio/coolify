@@ -5,7 +5,7 @@ use App\Models\Server;
 use App\Models\ServerSetting;
 
 // -------------------------------------------------------------------------
-// GHSA-3xm2-hqg8-4m2p: Verify log drain env values are base64-encoded
+// Verify log drain env values are base64-encoded
 // and never appear raw in shell commands
 // -------------------------------------------------------------------------
 

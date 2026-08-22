@@ -1,22 +1,6 @@
 #!/command/execlineb -P
 
-# Use with-contenv to ensure environment variables are available
+# s6 oneshots are execline pipelines (shebang shell scripts are not run as sh).
+# Delegate to a real shell script for readable setup logic.
 with-contenv
-cd /var/www/html
-foreground {
-    composer
-    install
-}
-foreground {
-    php
-    artisan
-    migrate
-    --step
-}
-foreground {
-    php
-    artisan
-    dev
-    --init
-}
-
+/etc/s6-overlay/scripts/init-setup.sh

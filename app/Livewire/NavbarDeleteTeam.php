@@ -2,12 +2,14 @@
 
 namespace App\Livewire;
 
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use App\Actions\Team\DeleteTeam;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class NavbarDeleteTeam extends Component
 {
+    use AuthorizesRequests;
+
     public $team;
 
     public function mount()
@@ -17,27 +19,20 @@ class NavbarDeleteTeam extends Component
 
     public function delete($password, $selectedActions = [])
     {
-        if (! verifyPasswordConfirmation($password, $this)) {
-            return 'The provided password is incorrect.';
+        try {
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            $currentTeam = currentTeam();
+            $this->authorize('delete', $currentTeam);
+            $newTeam = app(DeleteTeam::class)->handle($currentTeam, auth()->user());
+            refreshSession($newTeam);
+
+            return redirect()->route('team.index');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-
-        $currentTeam = currentTeam();
-        $currentTeam->delete();
-
-        $currentTeam->members->each(function ($user) use ($currentTeam) {
-            if ($user->id === Auth::id()) {
-                return;
-            }
-            $user->teams()->detach($currentTeam);
-            $session = DB::table('sessions')->where('user_id', $user->id)->first();
-            if ($session) {
-                DB::table('sessions')->where('id', $session->id)->delete();
-            }
-        });
-
-        refreshSession();
-
-        return redirectRoute($this, 'team.index');
     }
 
     public function render()

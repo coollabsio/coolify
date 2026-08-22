@@ -3,6 +3,7 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartLogDrain
@@ -201,10 +202,29 @@ Files:
                 "echo 'Starting Fluent Bit'",
                 "cd $config_path && docker compose up -d",
             ];
+            $command = array_merge($command, $this->logDrainNetworkConnectCommands($server));
 
             return instant_remote_process($command, $server);
         } catch (\Throwable $e) {
             return handleError($e);
         }
+    }
+
+    private function logDrainNetworkConnectCommands(Server $server): array
+    {
+        if (! $server->isLogDrainEnabled()) {
+            return [];
+        }
+
+        return $server->services()
+            ->with('destination')
+            ->where('connect_to_docker_network', true)
+            ->get()
+            ->map(fn (Service $service) => data_get($service, 'destination.network'))
+            ->filter()
+            ->unique()
+            ->map(fn (string $network) => 'docker network connect '.escapeshellarg($network).' coolify-log-drain >/dev/null 2>&1 || true')
+            ->values()
+            ->all();
     }
 }

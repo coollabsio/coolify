@@ -6,6 +6,7 @@ use App\Actions\Proxy\GetProxyConfiguration;
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -41,9 +42,13 @@ class Proxy extends Component
         ];
     }
 
-    protected $rules = [
-        'generateExactLabels' => 'required|boolean',
-    ];
+    protected function rules()
+    {
+        return [
+            'generateExactLabels' => 'required|boolean',
+            'redirectUrl' => ['nullable', new SafeExternalUrl],
+        ];
+    }
 
     public function mount()
     {
@@ -97,11 +102,15 @@ class Proxy extends Component
 
     public function changeProxy()
     {
-        $this->authorize('update', $this->server);
-        $this->server->proxy = null;
-        $this->server->save();
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy = null;
+            $this->server->save();
 
-        $this->dispatch('reloadWindow');
+            $this->dispatch('reloadWindow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function selectProxy($proxy_type)
@@ -147,10 +156,12 @@ class Proxy extends Component
     {
         try {
             $this->authorize('update', $this->server);
+            $this->validate();
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->proxy->redirect_url = $this->redirectUrl;
             $this->server->save();
             $this->server->setupDefaultRedirect();
+            $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -165,6 +176,7 @@ class Proxy extends Component
             $this->proxySettings = GetProxyConfiguration::run($this->server, forceRegenerate: true);
             SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->save();
+            $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'Proxy configuration reset to default.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -266,7 +278,9 @@ class Proxy extends Component
 
             // Check if we have outdated info stored for this server (faster than computing)
             $outdatedInfo = $this->server->traefik_outdated_info;
-            if ($outdatedInfo && isset($outdatedInfo['type']) && $outdatedInfo['type'] === 'minor_upgrade') {
+            $storedCurrentVersion = ltrim((string) data_get($outdatedInfo, 'current'), 'v');
+            $detectedCurrentVersion = ltrim($currentVersion, 'v');
+            if ($storedCurrentVersion === $detectedCurrentVersion && data_get($outdatedInfo, 'type') === 'minor_upgrade') {
                 // Use the upgrade_target field if available (e.g., "v3.6")
                 if (isset($outdatedInfo['upgrade_target'])) {
                     return str_starts_with($outdatedInfo['upgrade_target'], 'v')

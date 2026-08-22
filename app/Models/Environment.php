@@ -28,6 +28,8 @@ class Environment extends BaseModel
     protected $fillable = [
         'name',
         'description',
+        'project_id',
+        'uuid',
     ];
 
     protected static function booted()
@@ -43,6 +45,11 @@ class Environment extends BaseModel
     public static function ownedByCurrentTeam()
     {
         return Environment::whereRelation('project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return Environment::whereRelation('project.team', 'id', $teamId)->orderBy('name');
     }
 
     public function isEmpty()
@@ -61,7 +68,7 @@ class Environment extends BaseModel
 
     public function environment_variables()
     {
-        return $this->hasMany(SharedEnvironmentVariable::class);
+        return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'environment');
     }
 
     public function applications()

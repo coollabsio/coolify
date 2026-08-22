@@ -25,6 +25,8 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public const MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024;
+
     /**
      * The number of times the job may be attempted.
      */
@@ -40,13 +42,13 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
      */
     public $timeout = 300;
 
-    public Team $team;
+    public ?Team $team = null;
 
     public ?Server $server = null;
 
     public ScheduledTask $task;
 
-    public Application|Service $resource;
+    public Application|Service|null $resource = null;
 
     public ?ScheduledTaskExecution $task_log = null;
 
@@ -61,25 +63,34 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
     public array $containers = [];
 
-    public string $server_timezone;
+    public string $server_timezone = 'UTC';
 
-    public function __construct($task)
+    public function __construct(ScheduledTask $task)
     {
-        $this->onQueue('high');
+        $this->onQueue(crons_queue());
 
         $this->task = $task;
-        if ($service = $task->service()->first()) {
-            $this->resource = $service;
-        } elseif ($application = $task->application()->first()) {
-            $this->resource = $application;
+        $this->timeout = $this->task->timeout ?? 300;
+    }
+
+    private function initializeExecutionContext(): void
+    {
+        $this->task->loadMissing([
+            'service.destination.server.settings',
+            'application.destination.server.settings',
+        ]);
+
+        if ($this->task->service) {
+            $this->resource = $this->task->service;
+        } elseif ($this->task->application) {
+            $this->resource = $this->task->application;
         } else {
             throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
-        $this->team = Team::findOrFail($task->team_id);
-        $this->server_timezone = $this->getServerTimezone();
 
-        // Set timeout from task configuration
-        $this->timeout = $this->task->timeout ?? 300;
+        $this->team = Team::findOrFail($this->task->team_id);
+        $this->server_timezone = $this->getServerTimezone();
+        $this->server = $this->resource->destination->server;
     }
 
     private function getServerTimezone(): string
@@ -98,6 +109,8 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
         $startTime = Carbon::now();
 
         try {
+            $this->initializeExecutionContext();
+
             $this->task_log = ScheduledTaskExecution::create([
                 'scheduled_task_id' => $this->task->id,
                 'started_at' => $startTime,
@@ -106,8 +119,6 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 
             // Store execution ID for timeout handling
             $this->executionId = $this->task_log->id;
-
-            $this->server = $this->resource->destination->server;
 
             if ($this->resource->type() === 'application') {
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
@@ -139,10 +150,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
-                    $exec = "docker exec {$containerName} {$cmd}";
+                    $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
+                    $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";
+                    $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = instant_remote_process([$exec], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+                    $this->task_output = instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->timeout, disableMultiplexing: true);
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,
@@ -179,7 +192,10 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             // Re-throw to trigger Laravel's retry mechanism with backoff
             throw $e;
         } finally {
-            ScheduledTaskDone::dispatch($this->team->id);
+            if ($this->team) {
+                ScheduledTaskDone::dispatch($this->team->id);
+            }
+
             if ($this->task_log) {
                 $finishedAt = Carbon::now();
                 $duration = round($startTime->floatDiffInSeconds($finishedAt), 2);
@@ -190,6 +206,14 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    private function boundedTaskCommand(string $command): string
+    {
+        $maxOutputBytes = self::MAX_OUTPUT_SIZE_BYTES;
+        $readLimit = $maxOutputBytes + 1;
+
+        return "output_file=\$(mktemp); trap 'rm -f \"\$output_file\"' EXIT; set +e; set -o pipefail; {$command} 2>&1 | { head -c {$readLimit} > \"\$output_file\"; cat > /dev/null; }; exit_code=\${PIPESTATUS[0]}; if [ \"\$(wc -c < \"\$output_file\")\" -gt {$maxOutputBytes} ]; then truncate -s {$maxOutputBytes} \"\$output_file\"; printf '\n\n[... Output truncated at 5MB limit ...]' >> \"\$output_file\"; fi; if [ \"\$exit_code\" -eq 0 ]; then cat \"\$output_file\"; else cat \"\$output_file\" >&2; fi; exit \$exit_code";
     }
 
     /**
@@ -205,6 +229,8 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function failed(?\Throwable $exception): void
     {
+        $this->team ??= Team::find($this->task->team_id);
+
         Log::channel('scheduled-errors')->error('ScheduledTask permanently failed', [
             'job' => 'ScheduledTaskJob',
             'task_id' => $this->task->uuid,

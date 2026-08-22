@@ -44,9 +44,9 @@ class Show extends Component
         }
     }
 
-    public function mount()
+    public function mount(?string $project_uuid = null)
     {
-        $projectUuid = request()->route('project_uuid');
+        $projectUuid = $project_uuid ?? request()->route('project_uuid');
         $teamId = currentTeam()->id;
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (! $project) {
@@ -58,9 +58,13 @@ class Show extends Component
 
     public function switch()
     {
-        $this->authorize('view', $this->project);
-        $this->view = $this->view === 'normal' ? 'dev' : 'normal';
-        $this->getDevView();
+        try {
+            $this->authorize('view', $this->project);
+            $this->view = $this->view === 'normal' ? 'dev' : 'normal';
+            $this->getDevView();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function getDevView()
@@ -70,7 +74,12 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        return $variables->map(function ($item) {
+        $isMember = auth()->user()?->isMember();
+
+        return $variables->map(function ($item) use ($isMember) {
+            if ($isMember) {
+                return "$item->key=(Hidden, only admins can view)";
+            }
             if ($item->is_shown_once) {
                 return "$item->key=(Locked Secret, delete and add again to change)";
             }

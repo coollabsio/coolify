@@ -19,6 +19,7 @@ trait HasNotificationSettings
         'test',
         'ssl_certificate_renewal',
         'hetzner_deletion_failure',
+        'api_token_expiring',
     ];
 
     /**

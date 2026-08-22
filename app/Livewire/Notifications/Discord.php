@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\DiscordNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 class Discord extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     public Team $team;
 
@@ -110,7 +111,9 @@ class Discord extends Component
             refreshSession();
         } else {
             $this->discordEnabled = $this->settings->discord_enabled;
-            $this->discordWebhookUrl = $this->settings->discord_webhook_url;
+            $this->discordWebhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->discord_webhook_url
+                : null;
 
             $this->deploymentSuccessDiscordNotifications = $this->settings->deployment_success_discord_notifications;
             $this->deploymentFailureDiscordNotifications = $this->settings->deployment_failure_discord_notifications;
@@ -160,6 +163,30 @@ class Discord extends Component
             $this->discordEnabled = $original;
 
             return handleError($e, $this);
+        }
+    }
+
+    public function toggleDiscordEnabled(): void
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->discordEnabled) {
+                $this->discordEnabled = false;
+            } else {
+                $this->validate([
+                    'discordWebhookUrl' => 'required',
+                ], [
+                    'discordWebhookUrl.required' => 'Discord Webhook URL is required.',
+                ]);
+                $this->discordEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            handleError($e, $this);
         }
     }
 

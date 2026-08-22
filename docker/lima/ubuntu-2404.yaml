@@ -1,0 +1,35 @@
+images:
+  - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+    arch: x86_64
+  - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img
+    arch: aarch64
+
+cpus: 2
+memory: 2GiB
+disk: 20GiB
+
+containerd:
+  system: false
+  user: false
+
+mounts: []
+
+ssh:
+  localPort: 2222
+  loadDotSSHPubKeys: false
+
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -euxo pipefail
+
+      install -d -m 700 /root/.ssh
+      cat >/root/.ssh/authorized_keys <<'EOF'
+      ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68 sail@76ff66d2e2dd
+      EOF
+      chmod 600 /root/.ssh/authorized_keys
+
+      sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+      sed -i 's/^#\?PubkeyAuthentication .*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+      systemctl restart ssh

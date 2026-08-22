@@ -6,13 +6,17 @@ use App\Events\TestEvent;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -39,9 +43,29 @@ class Controller extends BaseController
         return view('auth.verify-email');
     }
 
-    public function email_verify(EmailVerificationRequest $request)
+    public function email_verify(Request $request)
     {
-        $request->fulfill();
+        if (! $request->hasValidSignature()) {
+            abort(403);
+        }
+
+        $user = auth()->user();
+        if (! $user) {
+            abort(403);
+        }
+
+        if (! hash_equals((string) $request->route('id'), (string) $user->getKey())) {
+            abort(403);
+        }
+
+        if (! hash_equals((string) $request->route('hash'), hash('sha256', $user->getEmailForVerification()))) {
+            abort(403);
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new Verified($user));
+        }
 
         return redirect(RouteServiceProvider::HOME);
     }
@@ -74,38 +98,118 @@ class Controller extends BaseController
         return response()->json(['message' => 'Transactional emails are not active'], 400);
     }
 
-    public function link()
+    public function link(): View|RedirectResponse
     {
         $token = request()->get('token');
-        if ($token) {
-            $decrypted = Crypt::decryptString($token);
-            $email = str($decrypted)->before('@@@');
-            $password = str($decrypted)->after('@@@');
-            $user = User::whereEmail($email)->first();
-            if (! $user) {
-                return redirect()->route('login');
-            }
-            if (Hash::check($password, $user->password)) {
-                $invitation = TeamInvitation::whereEmail($email);
-                if ($invitation->exists()) {
-                    $team = $invitation->first()->team;
-                    $user->teams()->attach($team->id, ['role' => $invitation->first()->role]);
-                    $invitation->delete();
-                } else {
-                    $team = $user->teams()->first();
-                }
-                if (is_null(data_get($user, 'email_verified_at'))) {
-                    $user->email_verified_at = now();
-                    $user->save();
-                }
-                Auth::login($user);
-                session(['currentTeam' => $team]);
-
-                return redirect()->route('dashboard');
-            }
+        $credentials = is_string($token) ? $this->magicLinkCredentials($token) : null;
+        if (! $credentials) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
         }
 
-        return redirect()->route('login')->with('error', 'Invalid credentials.');
+        [$user, $invitation] = $credentials;
+
+        return view('invitation.accept', [
+            'invitation' => $invitation,
+            'team' => $invitation->team,
+            'alreadyMember' => $user->teams()->where('team_id', $invitation->team_id)->exists(),
+            'formAction' => route('auth.link.accept'),
+            'token' => $token,
+        ]);
+    }
+
+    public function acceptLink(Request $request): RedirectResponse
+    {
+        $token = $request->input('token');
+        if (! is_string($token)) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+        }
+
+        $acceptedInvitation = DB::transaction(function () use ($token) {
+            $credentials = $this->magicLinkCredentials($token, lockForUpdate: true);
+            if (! $credentials) {
+                return null;
+            }
+
+            [$user, $invitation] = $credentials;
+            $team = $invitation->team;
+            if (! $user->teams()->where('team_id', $team->id)->exists()) {
+                $user->teams()->attach($team->id, ['role' => $invitation->role]);
+            }
+
+            $user->forceFill([
+                'password' => Hash::make(Str::random(64)),
+            ])->save();
+            $invitation->delete();
+
+            return [$user, $team];
+        });
+
+        if (! $acceptedInvitation) {
+            return redirect()->route('login')->with('error', 'Invitation has expired or been revoked.');
+        }
+
+        [$user, $team] = $acceptedInvitation;
+
+        Auth::login($user);
+        session(['currentTeam' => $team]);
+
+        return redirect()->route('dashboard');
+    }
+
+    /**
+     * @return array{0: User, 1: TeamInvitation}|null
+     */
+    private function magicLinkCredentials(string $token, bool $lockForUpdate = false): ?array
+    {
+        if ($token === '') {
+            return null;
+        }
+
+        try {
+            $decrypted = Crypt::decryptString($token);
+        } catch (DecryptException) {
+            return null;
+        }
+
+        $payload = explode('@@@', $decrypted, 3);
+        if (count($payload) === 3) {
+            [$email, $invitationUuid, $password] = $payload;
+        } elseif (count($payload) === 2) {
+            [$email, $password] = $payload;
+            $invitationUuid = null;
+        } else {
+            return null;
+        }
+
+        $email = Str::lower($email);
+        $user = User::query()->where('email', $email)->first();
+        $invitationQuery = TeamInvitation::query()
+            ->where('email', $email)
+            ->when($lockForUpdate, fn ($query) => $query->lockForUpdate());
+        $invitation = $invitationUuid
+            ? $invitationQuery->where('uuid', $invitationUuid)->first()
+            : $invitationQuery->get()->first(
+                fn (TeamInvitation $invitation) => $this->invitationLinkMatchesToken($invitation, $token)
+            );
+
+        if (! $user || ! $invitation || $invitation->hasExpired() || ! $this->invitationLinkMatchesToken($invitation, $token)) {
+            return null;
+        }
+
+        return Hash::check($password, $user->password) ? [$user, $invitation] : null;
+    }
+
+    private function invitationLinkMatchesToken(TeamInvitation $invitation, string $token): bool
+    {
+        $query = parse_url($invitation->link, PHP_URL_QUERY);
+        if (! is_string($query)) {
+            return false;
+        }
+
+        parse_str($query, $parameters);
+        $storedToken = $parameters['token'] ?? null;
+
+        return is_string($storedToken) && hash_equals($storedToken, $token);
     }
 
     public function showInvitation()
@@ -128,6 +232,7 @@ class Controller extends BaseController
             'invitation' => $invitation,
             'team' => $invitation->team,
             'alreadyMember' => $alreadyMember,
+            'formAction' => route('team.invitation.accept', $invitation->uuid),
         ]);
     }
 

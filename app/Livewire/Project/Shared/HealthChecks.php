@@ -34,7 +34,7 @@ class HealthChecks extends Component
     #[Validate(['nullable', 'integer', 'min:1', 'max:65535'])]
     public ?string $healthCheckPort = null;
 
-    #[Validate(['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%]+$#'])]
+    #[Validate(['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'])]
     public string $healthCheckPath;
 
     #[Validate(['integer'])]
@@ -62,7 +62,7 @@ class HealthChecks extends Component
         'healthCheckEnabled' => 'boolean',
         'healthCheckType' => 'string|in:http,cmd',
         'healthCheckCommand' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
-        'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%]+$#'],
+        'healthCheckPath' => ['required', 'string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
         'healthCheckPort' => 'nullable|integer|min:1|max:65535',
         'healthCheckHost' => ['required', 'string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
         'healthCheckMethod' => 'required|string|in:GET,HEAD,POST,OPTIONS',
@@ -78,8 +78,12 @@ class HealthChecks extends Component
 
     public function mount()
     {
-        $this->authorize('view', $this->resource);
-        $this->syncData();
+        try {
+            $this->authorize('view', $this->resource);
+            $this->syncData();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function syncData(bool $toModel = false): void
@@ -147,7 +151,8 @@ class HealthChecks extends Component
         $this->resource->health_check_start_period = $this->healthCheckStartPeriod;
         $this->resource->custom_healthcheck_found = $this->customHealthcheckFound;
         $this->resource->save();
-        $this->dispatch('success', 'Health check updated.');
+        $this->dispatch('success', 'Healthcheck updated.');
+        $this->dispatch('configurationChanged');
     }
 
     public function submit()
@@ -173,7 +178,8 @@ class HealthChecks extends Component
             $this->resource->health_check_start_period = $this->healthCheckStartPeriod;
             $this->resource->custom_healthcheck_found = $this->customHealthcheckFound;
             $this->resource->save();
-            $this->dispatch('success', 'Health check updated.');
+            $this->dispatch('success', 'Healthcheck updated.');
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -205,10 +211,11 @@ class HealthChecks extends Component
             $this->resource->save();
 
             if ($this->healthCheckEnabled && ! $wasEnabled && $this->resource->isRunning()) {
-                $this->dispatch('info', 'Health check has been enabled. A restart is required to apply the new settings.');
+                $this->dispatch('info', 'Healthcheck has been enabled. A restart is required to apply the new settings.');
             } else {
-                $this->dispatch('success', 'Health check '.($this->healthCheckEnabled ? 'enabled' : 'disabled').'.');
+                $this->dispatch('success', 'Healthcheck '.($this->healthCheckEnabled ? 'enabled' : 'disabled').'.');
             }
+            $this->dispatch('configurationChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -24,7 +24,7 @@ it('creates application settings for internally created applications', function 
     ]);
     $destination = $server->standaloneDockers()->firstOrFail();
 
-    $application = Application::forceCreate([
+    $application = Application::create([
         'name' => 'internal-app',
         'git_repository' => 'https://github.com/coollabsio/coolify',
         'git_branch' => 'main',
@@ -57,7 +57,7 @@ it('creates services with protected relationship ids in trusted internal paths',
     ]);
     $destination = $server->standaloneDockers()->firstOrFail();
 
-    $service = Service::forceCreate([
+    $service = Service::create([
         'docker_compose_raw' => 'services: {}',
         'environment_id' => $environment->id,
         'server_id' => $server->id,

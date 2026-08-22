@@ -10,6 +10,7 @@ class ServiceDatabase extends BaseModel
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'service_id',
         'name',
         'human_name',
         'description',
@@ -32,6 +33,13 @@ class ServiceDatabase extends BaseModel
     ];
 
     protected $casts = [
+        'exclude_from_status' => 'boolean',
+        'is_public' => 'boolean',
+        'is_log_drain_enabled' => 'boolean',
+        'is_include_timestamps' => 'boolean',
+        'is_gzip_enabled' => 'boolean',
+        'is_stripprefix_enabled' => 'boolean',
+        'public_port' => 'integer',
         'public_port_timeout' => 'integer',
     ];
 
@@ -44,7 +52,7 @@ class ServiceDatabase extends BaseModel
         });
         static::saving(function ($service) {
             if ($service->isDirty('status')) {
-                $service->forceFill(['last_online_at' => now()]);
+                $service->last_online_at = now();
             }
         });
     }

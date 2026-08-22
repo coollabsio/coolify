@@ -18,6 +18,7 @@ use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Str;
 use Mail;
 
 use function Laravel\Prompts\confirm;
@@ -136,7 +137,7 @@ class Emails extends Command
                 $application = Application::all()->first();
                 $preview = ApplicationPreview::all()->first();
                 if (! $preview) {
-                    $preview = ApplicationPreview::forceCreate([
+                    $preview = ApplicationPreview::create([
                         'application_id' => $application->id,
                         'pull_request_id' => 1,
                         'pull_request_html_url' => 'http://example.com',

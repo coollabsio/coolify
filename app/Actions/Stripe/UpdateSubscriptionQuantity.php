@@ -17,7 +17,7 @@ class UpdateSubscriptionQuantity
 
     public function __construct(?StripeClient $stripe = null)
     {
-        $this->stripe = $stripe ?? new StripeClient(config('subscription.stripe_api_key'));
+        $this->stripe = $stripe ?? app(StripeClient::class);
     }
 
     /**

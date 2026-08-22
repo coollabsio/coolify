@@ -20,8 +20,9 @@ class DatabasePolicy
      */
     public function view(User $user, $database): bool
     {
-        // return $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($database);
+
+        return $teamId !== null && $user->teams->contains('id', $teamId);
     }
 
     /**
@@ -29,21 +30,25 @@ class DatabasePolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, $database)
+    public function update(User $user, $database): Response
     {
-        // if ($user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id)) {
-        //    return Response::allow();
-        // }
+        $teamId = $this->getTeamId($database);
 
-        // return Response::deny('As a member, you cannot update this database.<br/><br/>You need at least admin or owner permissions.');
-        return true;
+        if ($teamId === null) {
+            return Response::deny('Database team not found.');
+        }
+
+        if ($user->isAdminOfTeam($teamId)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You need at least admin or owner permissions to update this database.');
     }
 
     /**
@@ -51,8 +56,9 @@ class DatabasePolicy
      */
     public function delete(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($database);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -60,8 +66,7 @@ class DatabasePolicy
      */
     public function restore(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -69,8 +74,7 @@ class DatabasePolicy
      */
     public function forceDelete(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -78,8 +82,27 @@ class DatabasePolicy
      */
     public function manage(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($database);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    }
+
+    /**
+     * Determine whether the user can upload a backup archive for this database.
+     */
+    public function uploadBackup(User $user, $database): Response
+    {
+        $teamId = $this->getTeamId($database);
+
+        if ($teamId === null) {
+            return Response::deny('Database team not found.');
+        }
+
+        if ($user->isAdminOfTeam($teamId)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You need at least admin or owner permissions to upload backups for this database.');
     }
 
     /**
@@ -87,8 +110,9 @@ class DatabasePolicy
      */
     public function manageBackups(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($database);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
     }
 
     /**
@@ -96,7 +120,22 @@ class DatabasePolicy
      */
     public function manageEnvironment(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        $teamId = $this->getTeamId($database);
+
+        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    }
+
+    private function getTeamId($database): ?int
+    {
+        // Instance-level databases (e.g., coolify-db) belong to root team
+        if (isset($database->id) && $database->id === 0) {
+            return 0;
+        }
+
+        if (method_exists($database, 'team')) {
+            return $database->team()?->id;
+        }
+
+        return null;
     }
 }

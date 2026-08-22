@@ -177,11 +177,54 @@ class LogDrains extends Component
         }
     }
 
-    public function submit(string $type)
+    public function toggleLogDrain(string $type): void
+    {
+        $previousNewRelicEnabled = $this->server->settings->is_logdrain_newrelic_enabled;
+        $previousAxiomEnabled = $this->server->settings->is_logdrain_axiom_enabled;
+        $previousCustomEnabled = $this->server->settings->is_logdrain_custom_enabled;
+
+        try {
+            $this->authorize('update', $this->server);
+            $this->resetErrorBag();
+
+            $enabledProperty = $this->enabledProperty($type);
+
+            if ($this->{$enabledProperty}) {
+                $this->{$enabledProperty} = false;
+            } else {
+                $this->validateLogDrainSettings($type);
+                $this->isLogDrainNewRelicEnabled = $type === 'newrelic';
+                $this->isLogDrainAxiomEnabled = $type === 'axiom';
+                $this->isLogDrainCustomEnabled = $type === 'custom';
+            }
+
+            $this->syncData(true);
+
+            if ($this->server->isLogDrainEnabled()) {
+                StartLogDrain::run($this->server);
+                $this->dispatch('success', 'Log drain service started.');
+            } else {
+                StopLogDrain::run($this->server);
+                $this->dispatch('success', 'Log drain service stopped.');
+            }
+        } catch (\Throwable $e) {
+            // Restore the previously persisted enabled flags so the UI/DB never
+            // claim a runtime state that the Start/StopLogDrain action failed to apply.
+            $this->server->settings->is_logdrain_newrelic_enabled = $previousNewRelicEnabled;
+            $this->server->settings->is_logdrain_axiom_enabled = $previousAxiomEnabled;
+            $this->server->settings->is_logdrain_custom_enabled = $previousCustomEnabled;
+            $this->server->settings->save();
+            $this->syncData();
+
+            handleError($e, $this);
+        }
+    }
+
+    public function submit()
     {
         try {
             $this->authorize('update', $this->server);
-            $this->syncData(true, $type);
+            $this->syncData(true);
             $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -191,5 +234,34 @@ class LogDrains extends Component
     public function render()
     {
         return view('livewire.server.log-drains');
+    }
+
+    private function enabledProperty(string $type): string
+    {
+        return match ($type) {
+            'newrelic' => 'isLogDrainNewRelicEnabled',
+            'axiom' => 'isLogDrainAxiomEnabled',
+            'custom' => 'isLogDrainCustomEnabled',
+            default => throw new \InvalidArgumentException('Unknown log drain type.'),
+        };
+    }
+
+    private function validateLogDrainSettings(string $type): void
+    {
+        match ($type) {
+            'newrelic' => $this->validate([
+                'logDrainNewRelicLicenseKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                'logDrainNewRelicBaseUri' => ['required', 'url'],
+            ]),
+            'axiom' => $this->validate([
+                'logDrainAxiomDatasetName' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+                'logDrainAxiomApiKey' => ['required', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
+            ]),
+            'custom' => $this->validate([
+                'logDrainCustomConfig' => ['required'],
+                'logDrainCustomConfigParser' => ['string', 'nullable'],
+            ]),
+            default => throw new \InvalidArgumentException('Unknown log drain type.'),
+        };
     }
 }

@@ -1,15 +1,18 @@
 <?php
 
-use App\Livewire\Project\Shared\ResourceOperations;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
+use App\Models\ScheduledTask;
 use App\Models\Server;
-use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
-use Livewire\Livewire;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -17,7 +20,7 @@ beforeEach(function () {
     $this->user->teams()->attach($this->team, ['role' => 'owner']);
 
     $this->server = Server::factory()->create(['team_id' => $this->team->id]);
-    $this->destination = StandaloneDocker::factory()->create(['server_id' => $this->server->id]);
+    $this->destination = $this->server->standaloneDockers()->firstOrFail();
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 
@@ -25,7 +28,12 @@ beforeEach(function () {
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
+        'redirect' => 'both',
     ]);
+
+    $this->application->settings->fill([
+        'is_container_label_readonly_enabled' => false,
+    ])->save();
 
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
@@ -81,4 +89,72 @@ test('cloning application with multiple persistent volumes generates unique uuid
     // All cloned UUIDs should be unique and different from originals
     expect($clonedUuids)->each->not->toBeIn($originalUuids);
     expect(array_unique($clonedUuids))->toHaveCount(2);
+});
+
+test('cloning application reassigns settings to the cloned application', function () {
+    $this->application->settings->fill([
+        'is_static' => true,
+        'is_spa' => true,
+        'is_build_server_enabled' => true,
+    ])->save();
+
+    $newApp = clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $sourceSettingsCount = ApplicationSetting::query()
+        ->where('application_id', $this->application->id)
+        ->count();
+    $clonedSettings = ApplicationSetting::query()
+        ->where('application_id', $newApp->id)
+        ->first();
+
+    expect($sourceSettingsCount)->toBe(1)
+        ->and($clonedSettings)->not->toBeNull()
+        ->and($clonedSettings?->application_id)->toBe($newApp->id)
+        ->and($clonedSettings?->is_static)->toBeTrue()
+        ->and($clonedSettings?->is_spa)->toBeTrue()
+        ->and($clonedSettings?->is_build_server_enabled)->toBeTrue();
+});
+
+test('cloning application reassigns scheduled tasks and previews to the cloned application', function () {
+    $scheduledTask = ScheduledTask::create([
+        'uuid' => 'scheduled-task-original',
+        'application_id' => $this->application->id,
+        'team_id' => $this->team->id,
+        'name' => 'nightly-task',
+        'command' => 'php artisan schedule:run',
+        'frequency' => '* * * * *',
+        'container' => 'app',
+        'timeout' => 120,
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'uuid' => 'preview-original',
+        'application_id' => $this->application->id,
+        'pull_request_id' => 123,
+        'pull_request_html_url' => 'https://example.com/pull/123',
+        'fqdn' => 'https://preview.example.com',
+        'status' => 'running',
+    ]);
+
+    $newApp = clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    $clonedTask = ScheduledTask::query()
+        ->where('application_id', $newApp->id)
+        ->first();
+    $clonedPreview = ApplicationPreview::query()
+        ->where('application_id', $newApp->id)
+        ->first();
+
+    expect($clonedTask)->not->toBeNull()
+        ->and($clonedTask?->uuid)->not->toBe($scheduledTask->uuid)
+        ->and($clonedTask?->application_id)->toBe($newApp->id)
+        ->and($clonedTask?->team_id)->toBe($this->team->id)
+        ->and($clonedPreview)->not->toBeNull()
+        ->and($clonedPreview?->uuid)->not->toBe($preview->uuid)
+        ->and($clonedPreview?->application_id)->toBe($newApp->id)
+        ->and($clonedPreview?->status)->toBe('exited');
 });
