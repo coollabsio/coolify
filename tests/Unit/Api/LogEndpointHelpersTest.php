@@ -94,6 +94,18 @@ it('filters service sub containers in PHP instead of using user input in shell f
         ->toBe(['first', 'third']);
 });
 
+it('filters service containers when another Docker label contains commas', function () {
+    $containers = collect([
+        [
+            'ID' => 'app',
+            'Labels' => 'traefik.http.routers.app.rule=Host(`one.example.com`,`two.example.com`),coolify.name=app-service-uuid',
+        ],
+    ]);
+
+    expect(filterServiceSubContainersByName($containers, 'app-service-uuid')->pluck('ID')->all())
+        ->toBe(['app']);
+});
+
 it('does not interpolate the requested service name into the docker ps shell command', function () {
     $source = file_get_contents(__DIR__.'/../../../bootstrap/helpers/docker.php');
 
