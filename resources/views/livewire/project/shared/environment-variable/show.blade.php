@@ -160,6 +160,7 @@
                                         <x-forms.env-var-input id="value" type="password"
                                             :required="$is_redis_credential" :disabled="!$canEditValue"
                                             :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
+                                            :hasVaultSource="$this->hasSecretManagerSource()"
                                             :projectUuid="data_get($parameters, 'project_uuid')"
                                             :environmentUuid="data_get($parameters, 'environment_uuid')"
                                             :serverUuid="data_get($parameters, 'server_uuid')" />

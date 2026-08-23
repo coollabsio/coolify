@@ -250,12 +250,13 @@ class EnvironmentVariable extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                $type = str($this->value)->after('{{')->before('.')->value;
-                if (str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}')) {
-                    return true;
+                if (blank($this->value)) {
+                    return false;
                 }
 
-                return false;
+                $types = implode('|', SHARED_VARIABLE_TYPES);
+
+                return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
             }
         );
     }

@@ -5,6 +5,7 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
+use App\Support\RemoteSecretReferences;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -250,22 +251,22 @@ class StartRedis
 
         foreach ($this->database->runtime_environment_variables as $env) {
             if ($env->is_shared) {
-                $environment_variables->push("$env->key=$env->real_value");
+                $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
 
                 if ($env->key === 'REDIS_PASSWORD') {
-                    $this->database->update(['redis_password' => $env->real_value]);
+                    $this->database->update(['redis_password' => $this->database->resolveSecretManagerEnvironmentVariable($env)]);
                 }
 
                 if ($env->key === 'REDIS_USERNAME') {
-                    $this->database->update(['redis_username' => $env->real_value]);
+                    $this->database->update(['redis_username' => $this->database->resolveSecretManagerEnvironmentVariable($env)]);
                 }
             } else {
-                if ($env->key === 'REDIS_PASSWORD') {
+                if ($env->key === 'REDIS_PASSWORD' && ! RemoteSecretReferences::containsReference($env->value)) {
                     $env->update(['value' => $this->database->redis_password]);
-                } elseif ($env->key === 'REDIS_USERNAME') {
+                } elseif ($env->key === 'REDIS_USERNAME' && ! RemoteSecretReferences::containsReference($env->value)) {
                     $env->update(['value' => $this->database->redis_username]);
                 }
-                $environment_variables->push("$env->key=$env->real_value");
+                $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
             }
         }
 

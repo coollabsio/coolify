@@ -29,6 +29,13 @@ class IntegrationTokens extends Component
     {
         $token = IntegrationToken::ownedByCurrentTeam()->findOrFail($tokenId);
         $this->authorize('delete', $token);
+
+        if ($token->secretManagerLinks()->exists()) {
+            $this->dispatch('error', 'This token is used by one or more resources as a secret manager source. Remove those links first.');
+
+            return;
+        }
+
         $token->delete();
         $this->loadTokens();
         $this->dispatch('success', 'Integration token deleted successfully.');

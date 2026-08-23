@@ -30,6 +30,7 @@
                         <livewire:project.database.clickhouse.general :database="$database" />
                     @endif
                 @elseif ($currentRoute === 'project.database.environment-variables')
+                    <livewire:project.shared.secret-manager-links :resource="$database" />
                     <livewire:project.shared.environment-variable.all :resource="$database" />
                 @elseif ($currentRoute === 'project.database.servers')
                     <livewire:project.shared.destination :resource="$database" />

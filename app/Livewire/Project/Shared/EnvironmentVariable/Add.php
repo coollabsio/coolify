@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
+use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
@@ -16,7 +17,18 @@ use Livewire\Component;
 
 class Add extends Component
 {
-    use AuthorizesRequests, EnvironmentVariableAnalyzer;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, HasSecretManagerAutocomplete;
+
+    protected function secretManagerResource()
+    {
+        if ($this->shared || ! $this->resource) {
+            return null;
+        }
+
+        return $this->resource;
+    }
+
+    public $resource;
 
     public $parameters;
 

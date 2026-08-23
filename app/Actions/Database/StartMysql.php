@@ -257,7 +257,7 @@ class StartMysql
     {
         $environment_variables = collect();
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {

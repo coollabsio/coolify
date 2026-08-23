@@ -6,13 +6,14 @@ use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandalonePostgresql extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
     protected $fillable = [
         'uuid',
