@@ -3,12 +3,14 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneClickhouse;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartClickhouse
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneClickhouse $database;
 
@@ -20,7 +22,7 @@ class StartClickhouse
 
     private string $resolvedClickhousePassword;
 
-    public function handle(StandaloneClickhouse $database)
+    public function handle(StandaloneClickhouse $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -113,7 +115,7 @@ class StartClickhouse
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()

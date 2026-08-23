@@ -5,12 +5,14 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandalonePostgresql;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartPostgresql
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandalonePostgresql $database;
 
@@ -26,7 +28,7 @@ class StartPostgresql
 
     private string $resolvedPostgresDatabase;
 
-    public function handle(StandalonePostgresql $database)
+    public function handle(StandalonePostgresql $database, ?Activity $activity = null)
     {
         $this->database = $database;
         $container_name = $this->database->uuid;
@@ -231,7 +233,7 @@ class StartPostgresql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()

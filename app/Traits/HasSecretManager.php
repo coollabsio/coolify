@@ -93,4 +93,10 @@ trait HasSecretManager
 
         return $this->resolvedSecretManagerValues = $link->fetchSecrets();
     }
+
+    /** @return array<string, string> */
+    public function resolvedSecretManagerValuesForRedaction(): array
+    {
+        return $this->resolvedSecretManagerValues ?? [];
+    }
 }

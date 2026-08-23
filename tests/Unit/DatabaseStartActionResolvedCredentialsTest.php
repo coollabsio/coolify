@@ -37,3 +37,30 @@ it('reuses resolved environment credentials in database startup integrations', f
         ['$this->database->postgres_user, \'-d\'', '$this->database->postgres_db, \'-c\''],
     ],
 ]);
+
+it('runs database start commands without persisting them through remote process', function (string $action) {
+    $source = file_get_contents(__DIR__."/../../app/Actions/Database/{$action}.php");
+
+    expect($source)
+        ->toContain('ExecutesDatabaseStartCommands')
+        ->toContain('executeDatabaseStartCommands(')
+        ->not->toContain('return remote_process(');
+})->with([
+    'StartClickhouse',
+    'StartDragonfly',
+    'StartKeydb',
+    'StartMariadb',
+    'StartMongodb',
+    'StartMysql',
+    'StartPostgresql',
+    'StartRedis',
+]);
+
+it('queues database starts with identifiers instead of generated commands', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Actions/Database/StartDatabase.php');
+
+    expect($source)
+        ->toContain('DatabaseStartJob::dispatch(')
+        ->not->toContain('StartPostgresql::run(')
+        ->not->toContain('StartRedis::run(');
+});
