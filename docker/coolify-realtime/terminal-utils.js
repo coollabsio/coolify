@@ -20,7 +20,7 @@ function normalizeShellArgument(argument) {
 }
 
 export function extractSshArgs(commandString) {
-    const sshCommandMatch = commandString.match(/ssh (.+?) 'bash -se'/);
+    const sshCommandMatch = commandString.match(/ssh (.+?) '[^']+' << /);
     if (!sshCommandMatch) return [];
 
     const argsString = sshCommandMatch[1];

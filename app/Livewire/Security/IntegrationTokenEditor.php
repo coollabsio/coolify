@@ -3,7 +3,7 @@
 namespace App\Livewire\Security;
 
 use App\Models\IntegrationToken;
-use App\Services\CloudflareTokenValidator;
+use App\Services\IntegrationTokenValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -19,6 +19,8 @@ class IntegrationTokenEditor extends Component
 
     public array $capabilities = [];
 
+    public array $metadata = [];
+
     public function mount(string $integration_token_uuid): void
     {
         $this->integrationToken = IntegrationToken::ownedByCurrentTeam()
@@ -29,16 +31,31 @@ class IntegrationTokenEditor extends Component
 
         $this->name = $this->integrationToken->name;
         $this->capabilities = $this->integrationToken->capabilities;
+        $this->metadata = $this->integrationToken->metadata ?? [];
     }
 
     protected function rules(): array
     {
-        return [
+        $allowedCapability = $this->integrationToken->provider === 'cloudflare' ? 'dns' : 'secrets';
+
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'newToken' => ['nullable', 'string'],
             'capabilities' => ['required', 'array', 'min:1'],
-            'capabilities.*' => ['required', 'in:dns'],
+            'capabilities.*' => ['required', 'in:'.$allowedCapability],
         ];
+
+        if ($this->integrationToken->provider === 'infisical') {
+            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.client_id'] = ['required', 'string'];
+        }
+
+        if ($this->integrationToken->provider === 'vault') {
+            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.namespace'] = ['nullable', 'string'];
+        }
+
+        return $rules;
     }
 
     protected function messages(): array
@@ -49,18 +66,21 @@ class IntegrationTokenEditor extends Component
         ];
     }
 
-    public function save(CloudflareTokenValidator $validator): void
+    public function save(IntegrationTokenValidator $validator): void
     {
         $this->authorize('update', $this->integrationToken);
         $validated = $this->validate();
+        $provider = $this->integrationToken->provider;
         $token = filled($validated['newToken']) ? $validated['newToken'] : $this->integrationToken->token;
+        $metadata = array_filter(data_get($validated, 'metadata', []), fn ($value) => filled($value));
         $capabilitiesChanged = collect($validated['capabilities'])->sort()->values()->all()
             !== collect($this->integrationToken->capabilities)->sort()->values()->all();
+        $metadataChanged = $metadata != ($this->integrationToken->metadata ?? []);
 
         try {
-            if ((filled($validated['newToken']) || $capabilitiesChanged)
-                && ! $validator->validate($token, $validated['capabilities'])) {
-                $this->dispatch('error', 'The token could not access the selected Cloudflare capabilities. Check its permissions and zone resources.');
+            if ((filled($validated['newToken']) || $capabilitiesChanged || $metadataChanged)
+                && ! $validator->validate($provider, $token, $validated['capabilities'], $metadata)) {
+                $this->dispatch('error', $validator->errorMessage($provider));
 
                 return;
             }
@@ -68,6 +88,7 @@ class IntegrationTokenEditor extends Component
             $updates = [
                 'name' => $validated['name'],
                 'capabilities' => $validated['capabilities'],
+                'metadata' => $metadata ?: null,
             ];
 
             if (filled($validated['newToken'])) {
@@ -100,6 +121,13 @@ class IntegrationTokenEditor extends Component
     public function delete(string $password = ''): void
     {
         $this->authorize('delete', $this->integrationToken);
+
+        if ($this->integrationToken->secretManagerLinks()->exists()) {
+            $this->dispatch('error', 'This token is used by one or more resources as a secret manager source. Remove those links first.');
+
+            return;
+        }
+
         $this->integrationToken->delete();
 
         $this->dispatch('integration-token-deleted', uuid: $this->integrationToken->uuid);

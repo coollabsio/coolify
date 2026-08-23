@@ -12,7 +12,9 @@ use App\Models\SharedEnvironmentVariable;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
+use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -21,7 +23,12 @@ class Show extends Component
 {
     public bool $showEnvironmentType = true;
 
-    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
+
+    protected function secretManagerResource(): ?Model
+    {
+        return $this->isSharedVariable ? null : $this->env->resourceable;
+    }
 
     public $parameters;
 

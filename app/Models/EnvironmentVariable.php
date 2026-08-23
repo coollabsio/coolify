@@ -252,15 +252,19 @@ class EnvironmentVariable extends BaseModel
     protected function isShared(): Attribute
     {
         return Attribute::make(
-            get: function () {
-                $type = str($this->value)->after('{{')->before('.')->value;
-                if (str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}')) {
-                    return true;
-                }
-
-                return false;
-            }
+            get: fn () => $this->isSharedReference(),
         );
+    }
+
+    private function isSharedReference(): bool
+    {
+        if (blank($this->value)) {
+            return false;
+        }
+
+        $types = implode('|', SHARED_VARIABLE_TYPES);
+
+        return preg_match('/^{{\s*(?:'.$types.')\..*}}$/s', trim($this->value)) === 1;
     }
 
     public function get_real_environment_variables_with_server(?string $environment_variable = null, $resource = null, $server = null)
@@ -409,8 +413,6 @@ class EnvironmentVariable extends BaseModel
 
     protected function updateIsShared(): void
     {
-        $type = str($this->value)->after('{{')->before('.')->value;
-        $isShared = str($this->value)->startsWith('{{'.$type) && str($this->value)->endsWith('}}');
-        $this->is_shared = $isShared;
+        $this->is_shared = $this->isSharedReference();
     }
 }
