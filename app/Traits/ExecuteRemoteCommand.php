@@ -46,6 +46,10 @@ trait ExecuteRemoteCommand
             );
         }
 
+        if (isset($this->remote_secrets_cache)) {
+            $lockedVars = $lockedVars->merge(array_values($this->remote_secrets_cache));
+        }
+
         foreach ($lockedVars as $key => $value) {
             $escapedValue = preg_quote($value, '/');
             $text = preg_replace(

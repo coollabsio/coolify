@@ -14,6 +14,30 @@ use Illuminate\Support\Collection;
 
 uses(RefreshDatabase::class);
 
+it('does not persist environment write commands or generated Dockerfiles in deployment logs', function () {
+    $source = file_get_contents(app_path('Jobs/ApplicationDeploymentJob.php'));
+    $finalDockerfileWrite = str($source)
+        ->after("addLogEntry('Final Dockerfile:'")
+        ->before('private function modify_dockerfile_for_secrets')
+        ->toString();
+
+    expect($source)
+        ->and(substr_count($source, "'skip_command_log' => true"))->toBeGreaterThanOrEqual(4);
+
+    expect($finalDockerfileWrite)
+        ->not->toContain('executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}")');
+});
+
+it('redacts resolved remote secrets from command output', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'remote_secrets_cache' => ['API_TOKEN' => 'remote-secret-value'],
+    ]);
+
+    expect(invokeDeploymentJobMethod($job, $reflection, 'redact_sensitive_info', 'token=remote-secret-value'))
+        ->toBe('token='.REDACTED);
+});
+
 class TestableControlVarFilteringDeploymentJob extends ApplicationDeploymentJob
 {
     public array $recordedCommands = [];
@@ -130,12 +154,12 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
     return [$job, $reflection];
 }
 
-function invokeDeploymentJobMethod(object $job, ReflectionClass $reflection, string $method): mixed
+function invokeDeploymentJobMethod(object $job, ReflectionClass $reflection, string $method, mixed ...$arguments): mixed
 {
     $reflectionMethod = $reflection->getMethod($method);
     $reflectionMethod->setAccessible(true);
 
-    return $reflectionMethod->invoke($job);
+    return $reflectionMethod->invoke($job, ...$arguments);
 }
 
 function readDeploymentJobProperty(object $job, ReflectionClass $reflection, string $property): mixed

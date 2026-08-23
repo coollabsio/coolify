@@ -1701,6 +1701,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
+                'skip_command_log' => true,
             ]
         );
 
@@ -1986,6 +1987,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee ".self::BUILD_TIME_ENV_PATH.' > /dev/null'),
+                    'skip_command_log' => true,
                 ]
             );
 
@@ -4550,11 +4552,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             [
                 executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$this->workdir}{$this->dockerfile_location} > /dev/null"),
                 'hidden' => true,
-            ],
-            [
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"),
-                'hidden' => true,
-                'ignore_errors' => true,
+                'skip_command_log' => true,
             ]);
     }
 
