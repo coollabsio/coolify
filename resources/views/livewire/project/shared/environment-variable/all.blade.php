@@ -168,7 +168,7 @@
                                 Add
                             </button>
                         </x-slot:content>
-                        <livewire:project.shared.environment-variable.add />
+                        <livewire:project.shared.environment-variable.add :resource="$resource" />
                     </x-modal-input>
                 @endcan
         </x-table.toolbar>

@@ -2,29 +2,52 @@
     <form class="application-settings-form flex w-full flex-col gap-4" wire:submit="save">
         <div class="grid gap-4 lg:grid-cols-2">
             <x-forms.input required id="name" label="Token name" />
-            <x-forms.input readonly label="Provider" value="Cloudflare" />
+            <x-forms.input readonly label="Provider" value="{{ $integrationToken->providerName() }}" />
             <div class="lg:col-span-2">
-                <x-forms.input type="password" id="newToken" label="New API token"
+                <x-forms.input type="password" id="newToken"
+                    label="{{ $integrationToken->provider === 'infisical' ? 'New client secret' : 'New API token' }}"
                     placeholder="Leave blank to keep the current token"
                     helper="Paste a replacement token to rotate this credential." />
             </div>
         </div>
 
-        <fieldset>
-            <legend class="text-sm font-medium text-black dark:text-fg">Capabilities</legend>
-            <div class="mt-3 rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
-                <x-forms.checkbox id="edit-dns-capability" label="DNS" domValue="dns" fullWidth
-                    wire:model.live="capabilities" />
-                <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
-                    Manage Cloudflare DNS records.
-                </p>
+        @if ($integrationToken->provider === 'infisical')
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input required id="metadata.base_url" label="Base URL"
+                    placeholder="https://app.infisical.com" />
+                <x-forms.input required id="metadata.client_id" label="Client ID" />
             </div>
-            @error('capabilities')
-                <span class="text-xs text-red-500">{{ $message }}</span>
-            @enderror
-        </fieldset>
+        @elseif ($integrationToken->provider === 'vault')
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input required id="metadata.base_url" label="Base URL"
+                    placeholder="https://vault.example.com:8200" />
+                <x-forms.input id="metadata.namespace" label="Namespace (optional)" />
+            </div>
+        @endif
 
-        @if (in_array('dns', $capabilities, true))
+        @if ($integrationToken->provider === 'cloudflare')
+            <fieldset>
+                <legend class="text-sm font-medium text-black dark:text-fg">Capabilities</legend>
+                <div class="mt-3 rounded-lg border border-neutral-200 p-1 dark:border-white/[0.08]">
+                    <x-forms.checkbox id="edit-dns-capability" label="DNS" domValue="dns" fullWidth
+                        wire:model.live="capabilities" />
+                    <p class="px-2.5 pb-2 text-[11px] text-neutral-500 dark:text-fg-dim">
+                        Manage Cloudflare DNS records.
+                    </p>
+                </div>
+                @error('capabilities')
+                    <span class="text-xs text-red-500">{{ $message }}</span>
+                @enderror
+            </fieldset>
+        @else
+            <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+                <div class="font-medium text-black dark:text-fg">Capability: Secrets (read-only)</div>
+                <p>Coolify reads secrets from this provider at deployment time. Secret values are never stored in
+                    the Coolify database.</p>
+            </div>
+        @endif
+
+        @if ($integrationToken->provider === 'cloudflare' && in_array('dns', $capabilities, true))
             <div class="rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-[11px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
                 <div class="font-medium text-black dark:text-fg">Required Cloudflare permissions</div>
                 <ul class="list-inside list-disc">
