@@ -1,6 +1,7 @@
 services:
   coolify:
     image: "${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    restart: always
     volumes:
       - type: bind
         source: /data/coolify/source/.env
@@ -12,6 +13,7 @@ services:
       - /data/coolify/services:/var/www/html/storage/app/services
       - /data/coolify/backups:/var/www/html/storage/app/backups
       - /data/coolify/images:/var/www/html/storage/app/images
+      - ./http.conf:/etc/nginx/site-opts.d/http.conf
     environment:
       - APP_ENV=${APP_ENV:-production}
       - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-256M}
@@ -39,6 +41,7 @@ services:
       soketi:
         condition: service_healthy
   postgres:
+    restart: always
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
@@ -51,6 +54,7 @@ services:
       retries: 10
       timeout: 2s
   redis:
+    restart: always
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     environment:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
@@ -63,6 +67,7 @@ services:
       timeout: 2s
   soketi:
     image: '${REGISTRY_URL:-docker.io}/coollabsio/coolify-realtime:1.0.17'
+    restart: always
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"
