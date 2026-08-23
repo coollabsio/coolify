@@ -26,6 +26,14 @@ test('extracts unique referenced keys in order', function () {
     expect(RemoteSecretReferences::referencedKeys($value))->toBe(['A']);
 });
 
+test('handles padded reference syntax consistently', function () {
+    expect(RemoteSecretReferences::referencedKeys('{{ vault.A }}'))->toBe(['A'])
+        ->and(RemoteSecretReferences::substitute('{{ vault.A }} {{ vault.MISSING }}', ['A' => 'value-a']))
+        ->toBe('value-a {{ vault.MISSING }}')
+        ->and(RemoteSecretReferences::missingKeys('{{ vault.A }} {{ vault.MISSING }}', ['A' => 'value-a']))
+        ->toBe(['MISSING']);
+});
+
 test('substitutes references and leaves unknown keys untouched', function () {
     $secrets = ['A' => 'value-a'];
 

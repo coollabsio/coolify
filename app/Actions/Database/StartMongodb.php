@@ -20,6 +20,12 @@ class StartMongodb
 
     private ?SslCertificate $ssl_certificate = null;
 
+    private string $resolvedMongoUsername;
+
+    private string $resolvedMongoPassword;
+
+    private string $resolvedMongoDatabase;
+
     public function handle(StandaloneMongodb $database)
     {
         $this->database = $database;
@@ -303,8 +309,19 @@ class StartMongodb
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedMongoUsername = (string) $this->database->mongo_initdb_root_username;
+        $this->resolvedMongoPassword = (string) $this->database->mongo_initdb_root_password;
+        $this->resolvedMongoDatabase = (string) $this->database->mongo_initdb_database;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
+            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'MONGO_INITDB_ROOT_USERNAME') {
+                $this->resolvedMongoUsername = $resolvedValue;
+            } elseif ($env->key === 'MONGO_INITDB_ROOT_PASSWORD') {
+                $this->resolvedMongoPassword = $resolvedValue;
+            } elseif ($env->key === 'MONGO_INITDB_DATABASE') {
+                $this->resolvedMongoDatabase = $resolvedValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
@@ -337,9 +354,9 @@ class StartMongodb
 
     private function add_default_database()
     {
-        $dbJson = json_encode($this->database->mongo_initdb_database, JSON_UNESCAPED_SLASHES);
-        $userJson = json_encode($this->database->mongo_initdb_root_username, JSON_UNESCAPED_SLASHES);
-        $pwdJson = json_encode($this->database->mongo_initdb_root_password, JSON_UNESCAPED_SLASHES);
+        $dbJson = json_encode($this->resolvedMongoDatabase, JSON_UNESCAPED_SLASHES);
+        $userJson = json_encode($this->resolvedMongoUsername, JSON_UNESCAPED_SLASHES);
+        $pwdJson = json_encode($this->resolvedMongoPassword, JSON_UNESCAPED_SLASHES);
         $content = "db = db.getSiblingDB({$dbJson});db.createCollection('init_collection');db.createUser({user: {$userJson}, pwd: {$pwdJson}, roles: [{role:\"readWrite\",db:{$dbJson}}]});";
         $content_base64 = base64_encode($content);
         $this->commands[] = "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d";

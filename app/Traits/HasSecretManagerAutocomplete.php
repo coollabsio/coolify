@@ -37,7 +37,7 @@ trait HasSecretManagerAutocomplete
 
             return $keys;
         } catch (\Throwable) {
-            return [];
+            throw new \RuntimeException('Unable to fetch secret manager keys.');
         }
     }
 

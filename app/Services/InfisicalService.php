@@ -2,16 +2,23 @@
 
 namespace App\Services;
 
+use App\Rules\SafeExternalUrl;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Validator;
 
 class InfisicalService
 {
     private string $baseUrl;
 
+    /** @var array<string, mixed> */
+    private array $httpClientOptions;
+
     public function __construct(string $baseUrl, private string $clientId, private string $clientSecret)
     {
         $this->baseUrl = rtrim($baseUrl, '/');
+        Validator::make(['base_url' => $this->baseUrl], ['base_url' => new SafeExternalUrl])->validate();
+        $this->httpClientOptions = SafeExternalUrl::httpClientOptions($this->baseUrl);
     }
 
     public function validate(): bool
@@ -75,6 +82,7 @@ class InfisicalService
     private function client(): PendingRequest
     {
         return Http::acceptJson()
+            ->withOptions($this->httpClientOptions)
             ->connectTimeout(5)
             ->timeout(10);
     }

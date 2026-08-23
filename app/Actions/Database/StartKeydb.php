@@ -20,6 +20,8 @@ class StartKeydb
 
     private ?SslCertificate $ssl_certificate = null;
 
+    private string $resolvedRedisPassword;
+
     public function handle(StandaloneKeydb $database)
     {
         $this->database = $database;
@@ -109,7 +111,7 @@ class StartKeydb
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'keydb-cli', '--pass', (string) $this->database->keydb_password, 'ping',
+                        'CMD', 'keydb-cli', '--pass', $this->resolvedRedisPassword, 'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -252,8 +254,13 @@ class StartKeydb
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedRedisPassword = (string) $this->database->keydb_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
+            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'REDIS_PASSWORD') {
+                $this->resolvedRedisPassword = $resolvedValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {
@@ -288,10 +295,10 @@ class StartKeydb
             if ($hasRequirePass) {
                 $command = "keydb-server $keydbConfPath";
             } else {
-                $command = "keydb-server $keydbConfPath --requirepass {$this->database->keydb_password}";
+                $command = "keydb-server $keydbConfPath --requirepass {$this->resolvedRedisPassword}";
             }
         } else {
-            $command = "keydb-server --requirepass {$this->database->keydb_password} --appendonly yes";
+            $command = "keydb-server --requirepass {$this->resolvedRedisPassword} --appendonly yes";
         }
 
         if ($this->database->enable_ssl) {

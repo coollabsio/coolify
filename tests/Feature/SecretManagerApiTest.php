@@ -58,6 +58,25 @@ test('a secret manager integration token can be created through the api', functi
         ->and($token->capabilities)->toBe(['secrets']);
 });
 
+test('secret manager provider base urls only accept http and https', function (string $provider, array $metadata) {
+    Http::fake();
+
+    $this->withHeaders(secretManagerApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/security/integration-tokens', [
+            'provider' => $provider,
+            'name' => 'Invalid base URL',
+            'token' => 'token',
+            'metadata' => $metadata,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('metadata.base_url');
+
+    Http::assertNothingSent();
+})->with([
+    'infisical' => ['infisical', ['base_url' => 'ftp://infisical.example.com', 'client_id' => 'client-1']],
+    'vault' => ['vault', ['base_url' => 'ftp://vault.example.com']],
+]);
+
 test('an application can be configured to use a secret manager through the api', function () {
     $token = IntegrationToken::query()->create([
         'team_id' => $this->team->id,

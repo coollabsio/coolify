@@ -44,7 +44,6 @@
                     this.vaultKeysLoading = false;
                     this.handleInput();
                 }).catch(() => {
-                    this.availableVars['vault'] = [];
                     this.vaultKeysLoading = false;
                 });
             },

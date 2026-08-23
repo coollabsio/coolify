@@ -158,6 +158,7 @@
                                         </div>
                                     @else
                                         <x-forms.env-var-input id="value" type="password"
+                                            canGate="manageEnvironment" :canResource="$this->resource"
                                             :required="$is_redis_credential" :disabled="!$canEditValue"
                                             :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
                                             :hasVaultSource="$this->hasSecretManagerSource()"

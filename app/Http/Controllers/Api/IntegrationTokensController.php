@@ -62,10 +62,10 @@ class IntegrationTokensController extends Controller
         if (($body['provider'] ?? null) === 'doppler') {
             $rules['token'][] = 'regex:/^dp\.(st|sa)\./';
         } elseif (($body['provider'] ?? null) === 'infisical') {
-            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.client_id'] = ['required', 'string'];
         } elseif (($body['provider'] ?? null) === 'vault') {
-            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.namespace'] = ['nullable', 'string'];
         }
 

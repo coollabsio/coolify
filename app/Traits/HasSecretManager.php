@@ -25,11 +25,28 @@ trait HasSecretManager
 
     public function resolveSecretManagerEnvironmentVariable(EnvironmentVariable $environmentVariable): ?string
     {
-        $value = $environmentVariable->get_real_environment_variables_with_server(
-            $environmentVariable->value,
-            $this,
-            data_get($this, 'server'),
-        );
+        $value = $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+            return $value;
+        }
+
+        return $environmentVariable->is_literal || $environmentVariable->is_multiline
+            ? "'{$value}'"
+            : escapeEnvVariables($value);
+    }
+
+    public function resolveSecretManagerEnvironmentVariableValue(EnvironmentVariable $environmentVariable): ?string
+    {
+        $value = $this->resolvedEnvironmentVariableValue($environmentVariable);
+
+        if ($value === null) {
+            return null;
+        }
 
         if (RemoteSecretReferences::containsReference($value)) {
             $secrets = $this->secretManagerValues();
@@ -42,13 +59,23 @@ trait HasSecretManager
             $value = RemoteSecretReferences::substitute($value, $secrets);
         }
 
-        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
-            return $value;
-        }
+        return $value;
+    }
 
-        return $environmentVariable->is_literal || $environmentVariable->is_multiline
-            ? "'{$value}'"
-            : escapeEnvVariables($value);
+    public function environmentVariableUsesSecretManager(EnvironmentVariable $environmentVariable): bool
+    {
+        return RemoteSecretReferences::containsReference(
+            $this->resolvedEnvironmentVariableValue($environmentVariable),
+        );
+    }
+
+    private function resolvedEnvironmentVariableValue(EnvironmentVariable $environmentVariable): ?string
+    {
+        return $environmentVariable->get_real_environment_variables_with_server(
+            $environmentVariable->value,
+            $this,
+            data_get($this, 'server'),
+        );
     }
 
     /** @return array<string, string> */

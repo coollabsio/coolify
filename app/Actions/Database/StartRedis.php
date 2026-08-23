@@ -5,7 +5,6 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
-use App\Support\RemoteSecretReferences;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
 
@@ -20,6 +19,10 @@ class StartRedis
     public string $configuration_dir;
 
     private ?SslCertificate $ssl_certificate = null;
+
+    private ?string $resolvedRedisPassword = null;
+
+    private ?string $resolvedRedisUsername = null;
 
     public function handle(StandaloneRedis $database)
     {
@@ -250,22 +253,39 @@ class StartRedis
         $environment_variables = collect();
 
         foreach ($this->database->runtime_environment_variables as $env) {
+            $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
+
             if ($env->is_shared) {
                 $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
 
                 if ($env->key === 'REDIS_PASSWORD') {
-                    $this->database->update(['redis_password' => $this->database->resolveSecretManagerEnvironmentVariable($env)]);
+                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+                    if (! $usesSecretManager) {
+                        $this->database->update(['redis_password' => $this->resolvedRedisPassword]);
+                    }
                 }
 
                 if ($env->key === 'REDIS_USERNAME') {
-                    $this->database->update(['redis_username' => $this->database->resolveSecretManagerEnvironmentVariable($env)]);
+                    $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+                    if (! $usesSecretManager) {
+                        $this->database->update(['redis_username' => $this->resolvedRedisUsername]);
+                    }
                 }
             } else {
-                if ($env->key === 'REDIS_PASSWORD' && ! RemoteSecretReferences::containsReference($env->value)) {
+                if ($env->key === 'REDIS_PASSWORD' && ! $usesSecretManager) {
                     $env->update(['value' => $this->database->redis_password]);
-                } elseif ($env->key === 'REDIS_USERNAME' && ! RemoteSecretReferences::containsReference($env->value)) {
+                } elseif ($env->key === 'REDIS_USERNAME' && ! $usesSecretManager) {
                     $env->update(['value' => $this->database->redis_username]);
                 }
+
+                if ($env->key === 'REDIS_PASSWORD') {
+                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                } elseif ($env->key === 'REDIS_USERNAME') {
+                    $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                }
+
                 $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
             }
         }
@@ -277,6 +297,7 @@ class StartRedis
 
     private function buildStartCommand(): string
     {
+        $redisPassword = $this->resolvedRedisPassword ?? $this->database->redis_password;
         $hasRedisConf = ! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf);
         $redisConfPath = '/usr/local/etc/redis/redis.conf';
 
@@ -287,10 +308,10 @@ class StartRedis
             if ($hasRequirePass) {
                 $command = "redis-server $redisConfPath";
             } else {
-                $command = "redis-server $redisConfPath --requirepass {$this->database->redis_password}";
+                $command = "redis-server $redisConfPath --requirepass {$redisPassword}";
             }
         } else {
-            $command = "redis-server --requirepass {$this->database->redis_password} --appendonly yes";
+            $command = "redis-server --requirepass {$redisPassword} --appendonly yes";
         }
 
         if ($this->database->enable_ssl) {

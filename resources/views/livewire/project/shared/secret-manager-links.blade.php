@@ -89,8 +89,8 @@
                                                     <span class="font-mono text-[12px] text-black dark:text-fg">{{ $key }}</span>
                                                     <span class="font-mono text-[11px] text-neutral-400 dark:text-fg-dim">{{ '{{vault.'.$key.'}'.'}' }}</span>
                                                 </div>
-                                                <x-forms.button wire:click="addReference('{{ $key }}')"
-                                                    wire:target="addReference('{{ $key }}')">
+                                                <x-forms.button wire:click="addReference({{ \Illuminate\Support\Js::from($key) }})"
+                                                    wire:target="addReference({{ \Illuminate\Support\Js::from($key) }})">
                                                     Add as variable
                                                 </x-forms.button>
                                             </div>

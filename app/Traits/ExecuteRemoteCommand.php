@@ -47,7 +47,10 @@ trait ExecuteRemoteCommand
         }
 
         if (isset($this->remote_secrets_cache)) {
-            $lockedVars = $lockedVars->merge(array_values($this->remote_secrets_cache));
+            $lockedVars = $lockedVars->merge(array_values(array_filter(
+                $this->remote_secrets_cache,
+                static fn (mixed $value): bool => is_string($value) && $value !== ''
+            )));
         }
 
         foreach ($lockedVars as $key => $value) {

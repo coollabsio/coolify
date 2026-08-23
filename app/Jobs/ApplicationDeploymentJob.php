@@ -144,7 +144,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private $env_args;
 
-    /** @var array{runtime: array<string, string>, buildtime: array<string, string>}|null */
+    /** @var array<string, string>|null */
     private ?array $remote_secrets_cache = null;
 
     private $env_nixpacks_args;
@@ -1431,11 +1431,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function format_remote_secret_value(string $value): string
     {
-        // Keep valid JSON objects/arrays unquoted, matching EnvironmentVariable::realValue().
-        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
-            return $value;
-        }
-
         if (! str_contains($value, "'")) {
             return "'".$value."'";
         }
@@ -1720,6 +1715,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+                    'skip_command_log' => true,
                 ]
             );
             $this->server = $this->build_server;
@@ -1727,6 +1723,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->execute_remote_command(
                 [
                     "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+                    'skip_command_log' => true,
                 ]
             );
         }
@@ -4479,7 +4476,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (data_get($env, 'is_multiline') === true) {
                     $argsToInsert->push("ARG {$env->key}");
                 } else {
-                    $argsToInsert->push("ARG {$env->key}={$this->resolve_environment_variable($env)}");
+                    $argsToInsert->push("ARG {$env->key}=".escapeBashEnvValue($this->resolve_environment_variable_raw($env)));
                 }
             }
             // Add Coolify variables as ARGs
@@ -4501,7 +4498,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 if (data_get($env, 'is_multiline') === true) {
                     $argsToInsert->push("ARG {$env->key}");
                 } else {
-                    $argsToInsert->push("ARG {$env->key}={$this->resolve_environment_variable($env)}");
+                    $argsToInsert->push("ARG {$env->key}=".escapeBashEnvValue($this->resolve_environment_variable_raw($env)));
                 }
             }
             // Add Coolify variables as ARGs
@@ -4517,7 +4514,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($argsToInsert->isNotEmpty()) {
             $environmentVariables = $envs->mapWithKeys(function ($environmentVariable) {
-                return [$environmentVariable->key => $this->resolve_environment_variable($environmentVariable)];
+                return [$environmentVariable->key => escapeBashEnvValue($this->resolve_environment_variable_raw($environmentVariable))];
             });
             $secretsHash = $this->generate_secrets_hash($environmentVariables);
             $argsToInsert->push("ARG COOLIFY_BUILD_SECRETS_HASH={$secretsHash}");

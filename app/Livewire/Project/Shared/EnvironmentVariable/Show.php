@@ -14,6 +14,7 @@ use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
 use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -24,7 +25,7 @@ class Show extends Component
 
     use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
 
-    protected function secretManagerResource()
+    protected function secretManagerResource(): ?Model
     {
         return $this->isSharedVariable ? null : $this->env->resourceable;
     }

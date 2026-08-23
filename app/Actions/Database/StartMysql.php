@@ -20,6 +20,8 @@ class StartMysql
 
     private ?SslCertificate $ssl_certificate = null;
 
+    private string $resolvedMysqlRootPassword;
+
     public function handle(StandaloneMysql $database)
     {
         $this->database = $database;
@@ -104,7 +106,7 @@ class StartMysql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}",
+                        'CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->resolvedMysqlRootPassword}",
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -256,8 +258,13 @@ class StartMysql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedMysqlRootPassword = (string) $this->database->mysql_root_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
+            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'MYSQL_ROOT_PASSWORD') {
+                $this->resolvedMysqlRootPassword = $resolvedValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {

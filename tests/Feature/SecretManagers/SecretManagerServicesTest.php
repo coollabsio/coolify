@@ -4,6 +4,7 @@ use App\Services\DopplerService;
 use App\Services\InfisicalService;
 use App\Services\VaultService;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 describe('DopplerService', function () {
     test('downloads secrets as a flat key value map', function () {
@@ -66,12 +67,21 @@ describe('DopplerService', function () {
 });
 
 describe('InfisicalService', function () {
+    test('rejects an unapproved endpoint before sending credentials', function () {
+        Http::fake();
+
+        expect(fn () => new InfisicalService('http://127.0.0.1:8080', 'client-id', 'client-secret'))
+            ->toThrow(ValidationException::class);
+
+        Http::assertNothingSent();
+    });
+
     test('logs in with universal auth and fetches secrets from the v4 endpoint', function () {
         Http::fake([
-            'https://infisical.example.com/api/v1/auth/universal-auth/login' => Http::response([
+            'https://example.com/infisical/api/v1/auth/universal-auth/login' => Http::response([
                 'accessToken' => 'short-lived-token',
             ]),
-            'https://infisical.example.com/api/v4/secrets*' => Http::response([
+            'https://example.com/infisical/api/v4/secrets*' => Http::response([
                 'secrets' => [
                     ['secretKey' => 'DB_PASSWORD', 'secretValue' => 's3cret'],
                     ['secretKey' => 'API_KEY', 'secretValue' => 'abc'],
@@ -79,7 +89,7 @@ describe('InfisicalService', function () {
             ]),
         ]);
 
-        $service = new InfisicalService('https://infisical.example.com/', 'client-id', 'client-secret');
+        $service = new InfisicalService('https://example.com/infisical/', 'client-id', 'client-secret');
         $secrets = $service->fetchSecrets('project-1', 'prod', '/');
 
         expect($secrets)->toBe([
@@ -94,18 +104,18 @@ describe('InfisicalService', function () {
 
     test('falls back to the v3 raw endpoint on older self-hosted instances', function () {
         Http::fake([
-            'https://infisical.example.com/api/v1/auth/universal-auth/login' => Http::response([
+            'https://example.com/infisical/api/v1/auth/universal-auth/login' => Http::response([
                 'accessToken' => 'short-lived-token',
             ]),
-            'https://infisical.example.com/api/v4/secrets*' => Http::response([], 404),
-            'https://infisical.example.com/api/v3/secrets/raw*' => Http::response([
+            'https://example.com/infisical/api/v4/secrets*' => Http::response([], 404),
+            'https://example.com/infisical/api/v3/secrets/raw*' => Http::response([
                 'secrets' => [
                     ['secretKey' => 'LEGACY_KEY', 'secretValue' => 'legacy-value'],
                 ],
             ]),
         ]);
 
-        $service = new InfisicalService('https://infisical.example.com', 'client-id', 'client-secret');
+        $service = new InfisicalService('https://example.com/infisical', 'client-id', 'client-secret');
 
         expect($service->fetchSecrets('project-1', 'prod'))->toBe(['LEGACY_KEY' => 'legacy-value']);
 
@@ -114,12 +124,12 @@ describe('InfisicalService', function () {
 
     test('throws when the login fails', function () {
         Http::fake([
-            'https://infisical.example.com/api/v1/auth/universal-auth/login' => Http::response([
+            'https://example.com/infisical/api/v1/auth/universal-auth/login' => Http::response([
                 'message' => 'Invalid credentials',
             ], 401),
         ]);
 
-        $service = new InfisicalService('https://infisical.example.com', 'client-id', 'wrong');
+        $service = new InfisicalService('https://example.com/infisical', 'client-id', 'wrong');
 
         expect($service->validate())->toBeFalse()
             ->and(fn () => $service->fetchSecrets('project-1', 'prod'))
@@ -128,9 +138,18 @@ describe('InfisicalService', function () {
 });
 
 describe('VaultService', function () {
+    test('rejects an unapproved endpoint before sending the token', function () {
+        Http::fake();
+
+        expect(fn () => new VaultService('http://127.0.0.1:8200', 'hvs.token'))
+            ->toThrow(ValidationException::class);
+
+        Http::assertNothingSent();
+    });
+
     test('reads a kv v2 secret and stringifies non-string values', function () {
         Http::fake([
-            'https://vault.example.com:8200/v1/secret/data/my-app/production' => Http::response([
+            'https://example.com:8200/vault/v1/secret/data/my-app/production' => Http::response([
                 'data' => [
                     'data' => [
                         'DB_PASSWORD' => 's3cret',
@@ -140,7 +159,7 @@ describe('VaultService', function () {
             ]),
         ]);
 
-        $secrets = (new VaultService('https://vault.example.com:8200/', 'hvs.token'))
+        $secrets = (new VaultService('https://example.com:8200/vault/', 'hvs.token'))
             ->fetchSecrets('secret', '/my-app/production/');
 
         expect($secrets)->toBe([
@@ -154,12 +173,12 @@ describe('VaultService', function () {
 
     test('sends the namespace header when configured', function () {
         Http::fake([
-            'https://vault.example.com:8200/v1/secret/data/my-app' => Http::response([
+            'https://example.com:8200/vault/v1/secret/data/my-app' => Http::response([
                 'data' => ['data' => ['KEY' => 'value']],
             ]),
         ]);
 
-        (new VaultService('https://vault.example.com:8200', 'hvs.token', 'admin/team-a'))
+        (new VaultService('https://example.com:8200/vault', 'hvs.token', 'admin/team-a'))
             ->fetchSecrets('secret', 'my-app');
 
         Http::assertSent(fn ($request) => $request->hasHeader('X-Vault-Namespace', 'admin/team-a'));
@@ -167,20 +186,20 @@ describe('VaultService', function () {
 
     test('throws a readable error when the read fails', function () {
         Http::fake([
-            'https://vault.example.com:8200/v1/secret/data/missing' => Http::response([
+            'https://example.com:8200/vault/v1/secret/data/missing' => Http::response([
                 'errors' => ['permission denied'],
             ], 403),
         ]);
 
-        expect(fn () => (new VaultService('https://vault.example.com:8200', 'hvs.token'))->fetchSecrets('secret', 'missing'))
+        expect(fn () => (new VaultService('https://example.com:8200/vault', 'hvs.token'))->fetchSecrets('secret', 'missing'))
             ->toThrow(RuntimeException::class, 'Vault API error: permission denied');
     });
 
     test('validates the token with lookup-self', function () {
         Http::fake([
-            'https://vault.example.com:8200/v1/auth/token/lookup-self' => Http::response(['data' => []]),
+            'https://example.com:8200/vault/v1/auth/token/lookup-self' => Http::response(['data' => []]),
         ]);
 
-        expect((new VaultService('https://vault.example.com:8200', 'hvs.token'))->validate())->toBeTrue();
+        expect((new VaultService('https://example.com:8200/vault', 'hvs.token'))->validate())->toBeTrue();
     });
 });

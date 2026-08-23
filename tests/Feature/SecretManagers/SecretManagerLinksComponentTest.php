@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Js;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -167,6 +168,27 @@ test('browse keys shows key names only and search filters them', function () {
         ->assertDontSee('API_KEY');
 });
 
+test('browse key actions encode apostrophes and backslashes', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            "TEAM'S_KEY" => 'apostrophe-secret',
+            'TEAM\\KEY' => 'backslash-secret',
+        ]),
+    ]);
+
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+
+    $apostropheExpression = 'addReference('.Js::from("TEAM'S_KEY").')';
+    $backslashExpression = 'addReference('.Js::from('TEAM\\KEY').')';
+
+    Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->call('loadKeys')
+        ->assertSeeHtml('wire:click="'.$apostropheExpression.'"')
+        ->assertSeeHtml('wire:target="'.$apostropheExpression.'"')
+        ->assertSeeHtml('wire:click="'.$backslashExpression.'"')
+        ->assertSeeHtml('wire:target="'.$backslashExpression.'"');
+});
+
 test('add reference creates a variable with a secret reference value', function () {
     Http::fake([
         'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
@@ -225,7 +247,8 @@ test('members without update permission cannot save a source', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
-        ->set('integration_token_uuid', $this->token->uuid);
+        ->set('integration_token_uuid', $this->token->uuid)
+        ->assertDispatched('error', 'You need at least admin or owner permissions to update this application.');
 
     $this->assertDatabaseCount('secret_manager_links', 0);
 });
@@ -245,10 +268,19 @@ test('the edit modal value autocomplete offers the vault scope with lazy key fet
         ->assertSeeHtml('hasVaultSource: true');
 
     expect($component->instance()->fetchSecretManagerKeys())->toBe(['DB_PASSWORD']);
+});
 
-    $trait = file_get_contents(app_path('Traits/HasSecretManagerAutocomplete.php'));
+test('the edit modal value autocomplete reports secret provider failures', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([], 503),
+    ]);
 
-    expect($trait)->toContain('$this->skipRender();');
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+    $env = $this->application->environment_variables()->create(['key' => 'MY_VAR', 'value' => 'plain']);
+    $component = Livewire::test(Show::class, ['env' => $env, 'type' => 'application']);
+
+    expect(fn () => $component->instance()->fetchSecretManagerKeys())
+        ->toThrow(RuntimeException::class, 'Unable to fetch secret manager keys.');
 });
 
 test('the edit modal value autocomplete has no vault scope without a source', function () {

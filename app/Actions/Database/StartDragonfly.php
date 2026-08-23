@@ -20,6 +20,8 @@ class StartDragonfly
 
     private ?SslCertificate $ssl_certificate = null;
 
+    private string $resolvedRedisPassword;
+
     public function handle(StandaloneDragonfly $database)
     {
         $this->database = $database;
@@ -107,7 +109,7 @@ class StartDragonfly
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'redis-cli', '-a', (string) $this->database->dragonfly_password, 'ping',
+                        'CMD', 'redis-cli', '-a', $this->resolvedRedisPassword, 'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -201,7 +203,7 @@ class StartDragonfly
 
     private function buildStartCommand(): string
     {
-        $command = "dragonfly --requirepass {$this->database->dragonfly_password}";
+        $command = "dragonfly --requirepass {$this->resolvedRedisPassword}";
 
         if ($this->database->enable_ssl) {
             $sslArgs = [
@@ -251,8 +253,13 @@ class StartDragonfly
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedRedisPassword = (string) $this->database->dragonfly_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
+            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'REDIS_PASSWORD') {
+                $this->resolvedRedisPassword = $resolvedValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('REDIS_PASSWORD'))->isEmpty()) {

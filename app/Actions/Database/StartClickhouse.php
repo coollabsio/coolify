@@ -16,6 +16,10 @@ class StartClickhouse
 
     public string $configuration_dir;
 
+    private string $resolvedClickhouseUser;
+
+    private string $resolvedClickhousePassword;
+
     public function handle(StandaloneClickhouse $database)
     {
         $this->database = $database;
@@ -51,7 +55,7 @@ class StartClickhouse
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'clickhouse-client', '--user', (string) $this->database->clickhouse_admin_user, '--password', (string) $this->database->clickhouse_admin_password, '--query', 'SELECT 1',
+                        'CMD', 'clickhouse-client', '--user', $this->resolvedClickhouseUser, '--password', $this->resolvedClickhousePassword, '--query', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -147,8 +151,16 @@ class StartClickhouse
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedClickhouseUser = (string) $this->database->clickhouse_admin_user;
+        $this->resolvedClickhousePassword = (string) $this->database->clickhouse_admin_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
+            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'CLICKHOUSE_USER') {
+                $this->resolvedClickhouseUser = $resolvedValue;
+            } elseif ($env->key === 'CLICKHOUSE_PASSWORD') {
+                $this->resolvedClickhousePassword = $resolvedValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('CLICKHOUSE_USER'))->isEmpty()) {

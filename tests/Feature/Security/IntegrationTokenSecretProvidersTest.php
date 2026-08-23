@@ -62,9 +62,10 @@ test('an invalid doppler token is not saved', function () {
     Livewire::test(IntegrationTokenForm::class)
         ->set('provider', 'doppler')
         ->set('name', 'Bad token')
-        ->set('token', 'wrong')
+        ->set('token', 'dp.st.rejected')
         ->call('addToken')
-        ->assertHasErrors(['token']);
+        ->assertHasNoErrors()
+        ->assertDispatched('error');
 
     $this->assertDatabaseCount('integration_tokens', 0);
 });
@@ -113,6 +114,24 @@ test('an infisical token requires a base url and a client id', function () {
     $this->assertDatabaseCount('integration_tokens', 0);
 });
 
+test('secret manager provider base urls only accept http and https', function (string $provider, array $metadata) {
+    Http::fake();
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('provider', $provider)
+        ->set('name', 'Invalid base URL')
+        ->set('token', 'token')
+        ->set('metadata', $metadata)
+        ->call('addToken')
+        ->assertHasErrors(['metadata.base_url']);
+
+    Http::assertNothingSent();
+    $this->assertDatabaseCount('integration_tokens', 0);
+})->with([
+    'infisical' => ['infisical', ['base_url' => 'ftp://infisical.example.com', 'client_id' => 'client-1']],
+    'vault' => ['vault', ['base_url' => 'ftp://vault.example.com']],
+]);
+
 test('the infisical fields put the client id before the client secret', function () {
     Livewire::test(IntegrationTokenForm::class)
         ->set('provider', 'infisical')
@@ -121,7 +140,7 @@ test('the infisical fields put the client id before the client secret', function
 
 test('an infisical token stores its metadata after a successful login', function () {
     Http::fake([
-        'https://infisical.example.com/api/v1/auth/universal-auth/login' => Http::response([
+        'https://example.com/api/v1/auth/universal-auth/login' => Http::response([
             'accessToken' => 'token',
         ]),
     ]);
@@ -130,26 +149,26 @@ test('an infisical token stores its metadata after a successful login', function
         ->set('provider', 'infisical')
         ->set('name', 'Infisical')
         ->set('token', 'client-secret')
-        ->set('metadata', ['base_url' => 'https://infisical.example.com', 'client_id' => 'client-1'])
+        ->set('metadata', ['base_url' => 'https://example.com', 'client_id' => 'client-1'])
         ->call('addToken')
         ->assertHasNoErrors();
 
     $token = IntegrationToken::query()->where('provider', 'infisical')->firstOrFail();
 
-    expect($token->metadata)->toBe(['base_url' => 'https://infisical.example.com', 'client_id' => 'client-1'])
+    expect($token->metadata)->toBe(['base_url' => 'https://example.com', 'client_id' => 'client-1'])
         ->and($token->capabilities)->toBe(['secrets']);
 });
 
 test('a vault token is validated with lookup-self before it is saved', function () {
     Http::fake([
-        'https://vault.example.com:8200/v1/auth/token/lookup-self' => Http::response(['data' => []]),
+        'https://example.com:8200/v1/auth/token/lookup-self' => Http::response(['data' => []]),
     ]);
 
     Livewire::test(IntegrationTokenForm::class)
         ->set('provider', 'vault')
         ->set('name', 'Vault')
         ->set('token', 'hvs.token')
-        ->set('metadata', ['base_url' => 'https://vault.example.com:8200'])
+        ->set('metadata', ['base_url' => 'https://example.com:8200'])
         ->call('addToken')
         ->assertHasNoErrors();
 

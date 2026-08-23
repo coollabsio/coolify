@@ -14,6 +14,7 @@
         <template x-if="!isMultiline">
             <div wire:key="env-value-input">
                 <x-forms.env-var-input placeholder="production" id="value" label="Value" required
+                    canGate="manageEnvironment" :canResource="$resource"
                     :availableVars="$shared ? [] : $this->availableSharedVariables"
                     :hasVaultSource="$this->hasSecretManagerSource()"
                     :projectUuid="data_get($parameters, 'project_uuid')"

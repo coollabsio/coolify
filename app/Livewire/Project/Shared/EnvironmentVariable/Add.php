@@ -11,6 +11,7 @@ use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -19,7 +20,7 @@ class Add extends Component
 {
     use AuthorizesRequests, EnvironmentVariableAnalyzer, HasSecretManagerAutocomplete;
 
-    protected function secretManagerResource()
+    protected function secretManagerResource(): ?Model
     {
         if ($this->shared || ! $this->resource) {
             return null;

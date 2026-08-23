@@ -22,6 +22,10 @@ class StartPostgresql
 
     private ?SslCertificate $ssl_certificate = null;
 
+    private string $resolvedPostgresUser;
+
+    private string $resolvedPostgresDatabase;
+
     public function handle(StandalonePostgresql $database)
     {
         $this->database = $database;
@@ -111,7 +115,7 @@ class StartPostgresql
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'psql', '-U', (string) $this->database->postgres_user, '-d', (string) $this->database->postgres_db, '-c', 'SELECT 1',
+                        'CMD', 'psql', '-U', $this->resolvedPostgresUser, '-d', $this->resolvedPostgresDatabase, '-c', 'SELECT 1',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -265,8 +269,16 @@ class StartPostgresql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedPostgresUser = (string) $this->database->postgres_user;
+        $this->resolvedPostgresDatabase = (string) $this->database->postgres_db;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
+            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'POSTGRES_USER') {
+                $this->resolvedPostgresUser = $resolvedValue;
+            } elseif ($env->key === 'POSTGRES_DB') {
+                $this->resolvedPostgresDatabase = $resolvedValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('POSTGRES_USER'))->isEmpty()) {

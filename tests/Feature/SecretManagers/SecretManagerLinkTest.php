@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Database\StartRedis;
 use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Security\IntegrationTokens;
@@ -12,6 +13,7 @@ use App\Models\Project;
 use App\Models\SecretManagerLink;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -149,14 +151,14 @@ test('a doppler link fetches secrets with the stored token', function () {
 
 test('a vault link uses the base url and namespace from the token metadata', function () {
     Http::fake([
-        'https://vault.internal:8200/v1/kv/data/apps/web' => Http::response([
+        'https://example.com:8200/v1/kv/data/apps/web' => Http::response([
             'data' => ['data' => ['KEY' => 'value']],
         ]),
     ]);
 
     $link = createSecretManagerLink('vault',
         ['mount' => 'kv', 'path' => 'apps/web'],
-        ['base_url' => 'https://vault.internal:8200', 'namespace' => 'team-a'],
+        ['base_url' => 'https://example.com:8200', 'namespace' => 'team-a'],
     );
 
     expect($link->fetchSecrets())->toBe(['KEY' => 'value']);
@@ -190,6 +192,58 @@ test('services resolve environment variables from their configured secret manage
     ]);
 
     expect($service->resolveSecretManagerEnvironmentVariable($environmentVariable))->toBe('remote-service-value');
+});
+
+test('redis remote credentials stay deployment-local and use raw values in the start command', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'REDIS_PASSWORD' => 'p4$$word',
+            'REDIS_USERNAME' => 'remote-user',
+        ]),
+    ]);
+
+    $redis = StandaloneRedis::forceCreate([
+        'uuid' => 'redis-secret-test',
+        'name' => 'Redis secret test',
+        'image' => 'redis:7-alpine',
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'doppler',
+        'name' => 'Redis secrets',
+        'token' => 'the-secret-token',
+        'capabilities' => ['secrets'],
+    ]);
+    $redis->secretManagerLink()->create(['integration_token_id' => $token->id]);
+    $sharedPassword = SharedEnvironmentVariable::query()->create([
+        'key' => 'REDIS_PASSWORD',
+        'value' => '{{vault.REDIS_PASSWORD}}',
+        'type' => 'team',
+        'team_id' => $this->team->id,
+    ]);
+    $password = $redis->runtime_environment_variables()->create([
+        'key' => 'REDIS_PASSWORD',
+        'value' => '{{team.REDIS_PASSWORD}}',
+    ]);
+    $username = $redis->runtime_environment_variables()->create([
+        'key' => 'REDIS_USERNAME',
+        'value' => '{{vault.REDIS_USERNAME}}',
+    ]);
+
+    $action = new StartRedis;
+    $action->database = $redis;
+    $environmentVariables = (new ReflectionMethod($action, 'generate_environment_variables'))->invoke($action);
+    $startCommand = (new ReflectionMethod($action, 'buildStartCommand'))->invoke($action);
+
+    expect($password->fresh()->value)->toBe('{{team.REDIS_PASSWORD}}')
+        ->and($sharedPassword->fresh()->value)->toBe('{{vault.REDIS_PASSWORD}}')
+        ->and($username->fresh()->value)->toBe('{{vault.REDIS_USERNAME}}')
+        ->and($environmentVariables)->toContain('REDIS_PASSWORD=p4$$word')
+        ->and($environmentVariables)->toContain('REDIS_USERNAME=remote-user')
+        ->and($startCommand)->toContain('--requirepass p4$$word');
 });
 
 test('all deployable environment-variable resources support secret managers', function (string $resourceClass) {
@@ -295,6 +349,15 @@ test('variables without references never contact the secret manager', function (
     Http::assertNothingSent();
 });
 
+test('a null environment variable value remains null', function () {
+    $env = $this->application->environment_variables()->create([
+        'key' => 'EMPTY',
+        'value' => null,
+    ]);
+
+    expect($this->application->resolveSecretManagerEnvironmentVariable($env))->toBeNull();
+});
+
 test('a missing secret key fails the deployment and names the variable', function () {
     Http::fake([
         'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
@@ -386,7 +449,7 @@ test('remote secret values are formatted as dotenv literals', function () {
     expect($format('simple'))->toBe("'simple'")
         ->and($format('with $dollar and spaces'))->toBe("'with \$dollar and spaces'")
         ->and($format("it's quoted"))->toBe('"it\'s quoted"')
-        ->and($format('{"json": true}'))->toBe('{"json": true}');
+        ->and($format('{"json": true}'))->toBe('\'{"json": true}\'');
 });
 
 test('deleting an integration token is blocked while links exist', function () {

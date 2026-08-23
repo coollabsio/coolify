@@ -15,7 +15,8 @@ return new class extends Migration
         Schema::create('secret_manager_links', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
-            $table->morphs('resourceable');
+            $table->string('resourceable_type');
+            $table->unsignedBigInteger('resourceable_id');
             $table->foreignId('integration_token_id')->constrained()->cascadeOnDelete();
             $table->json('settings')->nullable();
             $table->timestamps();

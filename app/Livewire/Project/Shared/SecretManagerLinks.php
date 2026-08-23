@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\IntegrationToken;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -251,7 +252,7 @@ class SecretManagerLinks extends Component
         ));
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.project.shared.secret-manager-links', [
             'selectedToken' => $this->selectedToken,

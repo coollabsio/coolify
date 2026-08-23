@@ -46,7 +46,7 @@ class IntegrationTokenForm extends Component
         $allowedCapability = $this->provider === 'cloudflare' ? 'dns' : 'secrets';
 
         $rules = [
-            'provider' => ['required', 'in:cloudflare,doppler,infisical,vault'],
+            'provider' => ['required', 'in:'.implode(',', array_keys(IntegrationToken::PROVIDER_NAMES))],
             'name' => ['required', 'string', 'max:255'],
             'token' => ['required', 'string'],
             'capabilities' => ['required', 'array', 'min:1'],
@@ -54,7 +54,7 @@ class IntegrationTokenForm extends Component
         ];
 
         if ($this->provider === 'infisical') {
-            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.client_id'] = ['required', 'string'];
         }
 
@@ -63,7 +63,7 @@ class IntegrationTokenForm extends Component
         }
 
         if ($this->provider === 'vault') {
-            $rules['metadata.base_url'] = ['required', 'url'];
+            $rules['metadata.base_url'] = ['required', 'url:http,https'];
             $rules['metadata.namespace'] = ['nullable', 'string'];
         }
 
