@@ -4456,8 +4456,8 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
-            $customLabels = base64_decode($request->custom_labels);
-            if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
+            $customLabels = decodeBase64EncodedLabels($request->custom_labels);
+            if ($customLabels === null) {
                 return response()->json([
                     'message' => 'Validation failed.',
                     'errors' => [
@@ -4465,6 +4465,7 @@ class ApplicationsController extends Controller
                     ],
                 ], 422);
             }
+            $request->offsetSet('custom_labels', base64_encode($customLabels));
         }
         if ($request->has('domains') && $server->isProxyShouldRun()) {
             $uuid = $request->uuid;

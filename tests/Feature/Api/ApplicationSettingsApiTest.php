@@ -185,6 +185,26 @@ test('http basic auth updates preserve user-managed labels', function () {
     expect(base64_decode($this->application->fresh()->custom_labels))->toBe('sentinel-label=true');
 });
 
+test('nested base64 custom labels are stored in canonical form', function () {
+    $labels = "traefik.enable=true\ntraefik.http.routers.web.rule=Host(`example.com`)";
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'custom_labels' => base64_encode(base64_encode($labels)),
+        ])
+        ->assertOk();
+
+    expect($this->application->fresh()->custom_labels)->toBe(base64_encode($labels));
+});
+
+test('deployment parsing repairs historically nested custom labels', function () {
+    $labels = "traefik.enable=true\ntraefik.http.routers.web.rule=Host(`example.com`)";
+    $this->application->update(['custom_labels' => base64_encode(base64_encode($labels))]);
+
+    expect($this->application->parseContainerLabels())->toBe($labels)
+        ->and($this->application->fresh()->custom_labels)->toBe(base64_encode($labels));
+});
+
 test('rejects invalid boolean application settings', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [

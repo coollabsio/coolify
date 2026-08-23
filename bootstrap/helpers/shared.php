@@ -2414,6 +2414,32 @@ function isBase64Encoded($strValue)
 {
     return base64_encode(base64_decode($strValue, true)) === $strValue;
 }
+
+function decodeBase64EncodedLabels(string $value): ?string
+{
+    if (! isBase64Encoded($value)) {
+        return null;
+    }
+
+    $decoded = base64_decode($value, true);
+    $labels = $decoded;
+
+    while ($decoded !== '' && isBase64Encoded($decoded)) {
+        $decoded = base64_decode($decoded, true);
+        if (mb_detect_encoding($decoded, 'UTF-8', true) !== false) {
+            $lines = preg_split('/\r\n|\n|\r/', $decoded);
+            $containsOnlyLabels = collect($lines)
+                ->filter(fn (string $line) => $line !== '')
+                ->every(fn (string $line) => str_contains($line, '=') && ! str_starts_with($line, '='));
+
+            if ($containsOnlyLabels) {
+                $labels = $decoded;
+            }
+        }
+    }
+
+    return mb_detect_encoding($labels, 'UTF-8', true) === false ? null : $labels;
+}
 function customApiValidator(Collection|array $item, array $rules, array $messages = [])
 {
     if (is_array($item)) {
