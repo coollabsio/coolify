@@ -46,11 +46,16 @@ class StartDatabase
             ->event(ActivityTypes::INLINE->value)
             ->log('[]');
 
+        if ($activity === null) {
+            return 'Database start could not be queued because activity logging is disabled.';
+        }
+
         DatabaseStartJob::dispatch(
             $database->getMorphClass(),
             (int) $database->getKey(),
             (int) $database->team()->id,
             (int) $activity->getKey(),
+            auth()->id(),
         );
 
         if ($database->is_public && $database->public_port) {

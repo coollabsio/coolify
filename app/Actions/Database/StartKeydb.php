@@ -258,10 +258,11 @@ class StartKeydb
         $environment_variables = collect();
         $this->resolvedRedisPassword = (string) $this->database->keydb_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
-                $this->resolvedRedisPassword = $resolvedValue;
+                $this->resolvedRedisPassword = $rawValue;
             }
         }
 
@@ -289,6 +290,7 @@ class StartKeydb
     {
         $hasKeydbConf = ! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf);
         $keydbConfPath = '/etc/keydb/keydb.conf';
+        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
 
         if ($hasKeydbConf) {
             $confContent = $this->database->keydb_conf;
@@ -297,10 +299,10 @@ class StartKeydb
             if ($hasRequirePass) {
                 $command = "keydb-server $keydbConfPath";
             } else {
-                $command = "keydb-server $keydbConfPath --requirepass {$this->resolvedRedisPassword}";
+                $command = "keydb-server $keydbConfPath --requirepass {$escapedRedisPassword}";
             }
         } else {
-            $command = "keydb-server --requirepass {$this->resolvedRedisPassword} --appendonly yes";
+            $command = "keydb-server --requirepass {$escapedRedisPassword} --appendonly yes";
         }
 
         if ($this->database->enable_ssl) {

@@ -274,12 +274,13 @@ class StartPostgresql
         $this->resolvedPostgresUser = (string) $this->database->postgres_user;
         $this->resolvedPostgresDatabase = (string) $this->database->postgres_db;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'POSTGRES_USER') {
-                $this->resolvedPostgresUser = $resolvedValue;
+                $this->resolvedPostgresUser = $rawValue;
             } elseif ($env->key === 'POSTGRES_DB') {
-                $this->resolvedPostgresDatabase = $resolvedValue;
+                $this->resolvedPostgresDatabase = $rawValue;
             }
         }
 

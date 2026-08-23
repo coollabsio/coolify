@@ -315,14 +315,15 @@ class StartMongodb
         $this->resolvedMongoPassword = (string) $this->database->mongo_initdb_root_password;
         $this->resolvedMongoDatabase = (string) $this->database->mongo_initdb_database;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'MONGO_INITDB_ROOT_USERNAME') {
-                $this->resolvedMongoUsername = $resolvedValue;
+                $this->resolvedMongoUsername = $rawValue;
             } elseif ($env->key === 'MONGO_INITDB_ROOT_PASSWORD') {
-                $this->resolvedMongoPassword = $resolvedValue;
+                $this->resolvedMongoPassword = $rawValue;
             } elseif ($env->key === 'MONGO_INITDB_DATABASE') {
-                $this->resolvedMongoDatabase = $resolvedValue;
+                $this->resolvedMongoDatabase = $rawValue;
             }
         }
 

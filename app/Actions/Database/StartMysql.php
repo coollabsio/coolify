@@ -262,10 +262,11 @@ class StartMysql
         $environment_variables = collect();
         $this->resolvedMysqlRootPassword = (string) $this->database->mysql_root_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'MYSQL_ROOT_PASSWORD') {
-                $this->resolvedMysqlRootPassword = $resolvedValue;
+                $this->resolvedMysqlRootPassword = $rawValue;
             }
         }
 

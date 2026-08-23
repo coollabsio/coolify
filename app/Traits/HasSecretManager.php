@@ -27,6 +27,11 @@ trait HasSecretManager
     {
         $value = $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
 
+        return $this->formatEnvironmentVariableValue($environmentVariable, $value);
+    }
+
+    public function formatEnvironmentVariableValue(EnvironmentVariable $environmentVariable, ?string $value): ?string
+    {
         if ($value === null) {
             return null;
         }

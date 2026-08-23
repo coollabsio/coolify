@@ -42,6 +42,7 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
         public int $databaseId,
         public int $teamId,
         public int $activityId,
+        public ?int $userId,
     ) {
         $this->onQueue(deployment_queue());
     }
@@ -52,34 +53,36 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
         abort_unless((int) $database->team()->id === $this->teamId, 403);
         $activity = Activity::query()->findOrFail($this->activityId);
 
-        try {
-            match ($database->getMorphClass()) {
-                StandalonePostgresql::class => StartPostgresql::run($database, $activity),
-                StandaloneRedis::class => StartRedis::run($database, $activity),
-                StandaloneMongodb::class => StartMongodb::run($database, $activity),
-                StandaloneMysql::class => StartMysql::run($database, $activity),
-                StandaloneMariadb::class => StartMariadb::run($database, $activity),
-                StandaloneKeydb::class => StartKeydb::run($database, $activity),
-                StandaloneDragonfly::class => StartDragonfly::run($database, $activity),
-                StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
-            };
-        } finally {
-            event(new DatabaseStatusChanged($database));
-        }
+        match ($database->getMorphClass()) {
+            StandalonePostgresql::class => StartPostgresql::run($database, $activity),
+            StandaloneRedis::class => StartRedis::run($database, $activity),
+            StandaloneMongodb::class => StartMongodb::run($database, $activity),
+            StandaloneMysql::class => StartMysql::run($database, $activity),
+            StandaloneMariadb::class => StartMariadb::run($database, $activity),
+            StandaloneKeydb::class => StartKeydb::run($database, $activity),
+            StandaloneDragonfly::class => StartDragonfly::run($database, $activity),
+            StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
+        };
+
+        event(new DatabaseStatusChanged($this->userId));
     }
 
     public function failed(?Throwable $exception): void
     {
-        $activity = Activity::query()->find($this->activityId);
-        if (! $activity) {
-            return;
-        }
+        try {
+            $activity = Activity::query()->find($this->activityId);
+            if (! $activity) {
+                return;
+            }
 
-        $activity->properties = $activity->properties->merge([
-            'status' => ProcessStatus::ERROR->value,
-            'error' => 'Database start failed.',
-            'failed_at' => now()->toIso8601String(),
-        ]);
-        $activity->save();
+            $activity->properties = $activity->properties->merge([
+                'status' => ProcessStatus::ERROR->value,
+                'error' => 'Database start failed.',
+                'failed_at' => now()->toIso8601String(),
+            ]);
+            $activity->save();
+        } finally {
+            event(new DatabaseStatusChanged($this->userId));
+        }
     }
 }

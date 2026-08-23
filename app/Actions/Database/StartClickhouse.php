@@ -156,12 +156,13 @@ class StartClickhouse
         $this->resolvedClickhouseUser = (string) $this->database->clickhouse_admin_user;
         $this->resolvedClickhousePassword = (string) $this->database->clickhouse_admin_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'CLICKHOUSE_USER') {
-                $this->resolvedClickhouseUser = $resolvedValue;
+                $this->resolvedClickhouseUser = $rawValue;
             } elseif ($env->key === 'CLICKHOUSE_PASSWORD') {
-                $this->resolvedClickhousePassword = $resolvedValue;
+                $this->resolvedClickhousePassword = $rawValue;
             }
         }
 

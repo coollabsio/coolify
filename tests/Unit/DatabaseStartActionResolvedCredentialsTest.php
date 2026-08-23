@@ -64,3 +64,20 @@ it('queues database starts with identifiers instead of generated commands', func
         ->not->toContain('StartPostgresql::run(')
         ->not->toContain('StartRedis::run(');
 });
+
+it('keeps raw secret values separate from compose environment formatting', function (string $action, array $rawAssignments) {
+    $source = file_get_contents(__DIR__."/../../app/Actions/Database/{$action}.php");
+
+    expect($source)
+        ->toContain('$rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);')
+        ->toContain('$resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);')
+        ->toContain('$environment_variables->push($env->key.\'=\'.$resolvedValue);')
+        ->toContain(...$rawAssignments);
+})->with([
+    'clickhouse' => ['StartClickhouse', ['$this->resolvedClickhouseUser = $rawValue;', '$this->resolvedClickhousePassword = $rawValue;']],
+    'dragonfly' => ['StartDragonfly', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->resolvedRedisPassword)']],
+    'keydb' => ['StartKeydb', ['$this->resolvedRedisPassword = $rawValue;', 'escapeshellarg($this->resolvedRedisPassword)']],
+    'mongodb' => ['StartMongodb', ['$this->resolvedMongoUsername = $rawValue;', '$this->resolvedMongoPassword = $rawValue;', '$this->resolvedMongoDatabase = $rawValue;', 'json_encode($this->resolvedMongoPassword']],
+    'mysql' => ['StartMysql', ['$this->resolvedMysqlRootPassword = $rawValue;']],
+    'postgresql' => ['StartPostgresql', ['$this->resolvedPostgresUser = $rawValue;', '$this->resolvedPostgresDatabase = $rawValue;']],
+]);

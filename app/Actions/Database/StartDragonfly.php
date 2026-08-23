@@ -205,7 +205,8 @@ class StartDragonfly
 
     private function buildStartCommand(): string
     {
-        $command = "dragonfly --requirepass {$this->resolvedRedisPassword}";
+        $escapedRedisPassword = escapeshellarg($this->resolvedRedisPassword);
+        $command = "dragonfly --requirepass {$escapedRedisPassword}";
 
         if ($this->database->enable_ssl) {
             $sslArgs = [
@@ -257,10 +258,11 @@ class StartDragonfly
         $environment_variables = collect();
         $this->resolvedRedisPassword = (string) $this->database->dragonfly_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $resolvedValue = (string) $this->database->resolveSecretManagerEnvironmentVariable($env);
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
             $environment_variables->push($env->key.'='.$resolvedValue);
             if ($env->key === 'REDIS_PASSWORD') {
-                $this->resolvedRedisPassword = $resolvedValue;
+                $this->resolvedRedisPassword = $rawValue;
             }
         }
 
