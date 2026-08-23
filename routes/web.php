@@ -11,6 +11,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
+use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -120,6 +121,9 @@ Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->n
 
 // Local/testing previews for HTTP error pages and the Laravel debug renderer (never in production).
 if (app()->environment(['local', 'testing'])) {
+    Route::get('/__livewire-request-failure', LivewireRequestFailurePreview::class)
+        ->name('dev.livewire-request-failure-preview');
+
     Route::get('/__exception', function () {
         throw new RuntimeException('Testing Laravel exception page');
     })->name('dev.exception-preview');
