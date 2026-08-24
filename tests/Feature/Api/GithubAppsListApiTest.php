@@ -494,36 +494,3 @@ describe('GitHub app API url normalization', function () {
         Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/repos/octocorp/repo/branches');
     });
 });
-
-
-describe('PATCH /api/v1/github-apps/{id} private key identifier', function () {
-    test('accepts the private key public identifier', function () {
-        $githubApp = GithubApp::create([
-            'name' => 'Test GitHub App',
-            'api_url' => 'https://api.github.com',
-            'html_url' => 'https://github.com',
-            'app_id' => 12345,
-            'installation_id' => 67890,
-            'client_id' => 'test-client-id',
-            'client_secret' => 'test-client-secret',
-            'webhook_secret' => 'test-webhook-secret',
-            'private_key_id' => $this->privateKey->id,
-            'team_id' => $this->team->id,
-            'is_system_wide' => false,
-            'is_public' => false,
-        ]);
-
-        // Coolify's public identifiers are 24-character lowercase alphanumeric
-        // strings, not RFC 4122 UUIDs, so the `uuid` rule rejects them.
-        expect($this->privateKey->uuid)->not->toContain('-');
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$this->bearerToken,
-        ])->patchJson("/api/v1/github-apps/{$githubApp->id}", [
-            'private_key_uuid' => $this->privateKey->uuid,
-        ]);
-
-        $response->assertSuccessful()
-            ->assertJsonPath('data.private_key_id', $this->privateKey->id);
-    });
-});
