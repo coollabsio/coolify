@@ -6,6 +6,7 @@ use App\Jobs\VolumeBackupJob;
 use App\Jobs\VolumeBackupRecoveryJob;
 use App\Livewire\Project\Application\Backup\Create as CreateScheduledVolumeBackup;
 use App\Livewire\Project\Service\FileStorage;
+use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\Show;
 use App\Livewire\Project\Shared\Storages\VolumeBackups;
 use App\Models\Application;
@@ -20,6 +21,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
@@ -185,6 +187,45 @@ it('creates a scheduled backup with a preselected volume from the shared modal',
         ->and($backup->enabled)->toBeTrue()
         ->and($backup->save_s3)->toBeFalse()
         ->and($backup->s3_storage_id)->toBeNull();
+});
+
+it('shows readable service storage backup target labels', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application] = createVolumeBackupApplication($team);
+    $service = Service::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ]);
+    $resource = ServiceApplication::create([
+        'uuid' => new_public_id(),
+        'name' => 'directus',
+        'service_id' => $service->id,
+    ]);
+    LocalPersistentVolume::create([
+        'name' => $service->uuid.'_directus-templates',
+        'mount_path' => '/directus/templates',
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ]);
+    LocalFileVolume::unguarded(fn () => LocalFileVolume::withoutEvents(fn () => LocalFileVolume::create([
+        'uuid' => new_public_id(),
+        'fs_path' => './uploads',
+        'mount_path' => '/directus/uploads',
+        'is_directory' => true,
+        'is_based_on_git' => false,
+        'is_preview_suffix_enabled' => true,
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ])));
+
+    Livewire::test(CreateServiceVolumeBackup::class, ['service' => $service])
+        ->assertSet('targets.0.name', 'directus-templates')
+        ->assertSet('targets.0.type', 'Directus')
+        ->assertSet('targets.1.name', './uploads (directory)')
+        ->assertSet('targets.1.type', 'Directus')
+        ->assertSee('Directus: directus-templates');
 });
 
 it('handles scheduled backup persistence failures', function () {

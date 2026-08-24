@@ -4152,11 +4152,12 @@ function coolifyHelperImage(): string
 
 function getHelperVersion(): string
 {
-    $settings = instanceSettings();
+    if (isDev()) {
+        $devHelperVersion = InstanceSettings::query()->whereKey(0)->value('dev_helper_version');
 
-    // In development mode, use the dev_helper_version if set, otherwise fallback to config
-    if (isDev() && ! empty($settings->dev_helper_version)) {
-        return $settings->dev_helper_version;
+        if (! empty($devHelperVersion)) {
+            return $devHelperVersion;
+        }
     }
 
     return config('constants.coolify.helper_version');
