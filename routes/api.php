@@ -308,6 +308,9 @@ Route::group([
     Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
 
     Route::get('/databases/{uuid}', [DatabasesController::class, 'database_by_uuid'])->middleware(['api.ability:read']);
+    Route::post('/databases/{uuid}/imports/uploads', [DatabasesController::class, 'upload_import'])->middleware(['api.ability:deploy'])->name('api.databases.imports.upload');
+    Route::post('/databases/{uuid}/imports', [DatabasesController::class, 'create_import'])->middleware(['api.ability:deploy'])->name('api.databases.imports.store');
+    Route::get('/databases/{uuid}/imports/{activity_id}', [DatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->name('api.databases.imports.show');
     Route::get('/databases/{uuid}/backups', [DatabasesController::class, 'database_backup_details_uuid'])->middleware(['api.ability:read']);
     Route::get('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions', [DatabasesController::class, 'list_backup_executions'])->middleware(['api.ability:read']);
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
@@ -407,6 +410,9 @@ Route::group([
 
     Route::get('/services/{uuid}/databases', [ServiceDatabasesController::class, 'index'])->middleware(['api.ability:read']);
     Route::get('/services/{uuid}/databases/{database_uuid}', [ServiceDatabasesController::class, 'show'])->middleware(['api.ability:read']);
+    Route::post('/services/{uuid}/databases/{database_uuid}/imports/uploads', [ServiceDatabasesController::class, 'upload_import'])->middleware(['api.ability:deploy'])->name('api.service-databases.imports.upload');
+    Route::post('/services/{uuid}/databases/{database_uuid}/imports', [ServiceDatabasesController::class, 'create_import'])->middleware(['api.ability:deploy'])->name('api.service-databases.imports.store');
+    Route::get('/services/{uuid}/databases/{database_uuid}/imports/{activity_id}', [ServiceDatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->name('api.service-databases.imports.show');
     Route::patch('/services/{uuid}/databases/{database_uuid}', [ServiceDatabasesController::class, 'update'])->middleware(['api.ability:write']);
     Route::get('/services/{uuid}/databases/{database_uuid}/logs', [ServiceDatabasesController::class, 'logs'])->middleware(['api.ability:read']);
     Route::post('/services/{uuid}/databases/{database_uuid}/start', [ServiceDatabasesController::class, 'start'])->middleware(['api.ability:deploy']);

@@ -11,6 +11,66 @@
         }
     ],
     "paths": {
+        "\/applications\/{uuid}\/secret-manager": {
+            "patch": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "Configure Application Secret Manager",
+                "description": "Configure the secret manager source used by an application.",
+                "operationId": "configure-application-secret-manager",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "integration_token_uuid"
+                                ],
+                                "properties": {
+                                    "integration_token_uuid": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Secret manager configured."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications": {
             "get": {
                 "tags": [
@@ -5766,6 +5826,85 @@
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/imports\/uploads": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Upload database import",
+                "operationId": "upload-database-import",
+                "responses": {
+                    "201": {
+                        "description": "Upload completed"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/imports": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Import database backup",
+                "operationId": "create-database-import",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/DatabaseImportRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Import queued"
+                    },
+                    "409": {
+                        "description": "Import already active"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/imports\/{activity_id}": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Get database import status",
+                "operationId": "get-database-import",
+                "responses": {
+                    "200": {
+                        "description": "Import status"
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -11689,13 +11828,129 @@
                 ]
             }
         },
+        "\/settings\/email": {
+            "get": {
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Get instance email settings",
+                "description": "Get instance-wide SMTP and Resend settings. Requires a root-team token belonging to a root-team admin or owner. Sensitive fields require the `read:sensitive` or `root` token ability.",
+                "operationId": "get-instance-email-settings",
+                "responses": {
+                    "200": {
+                        "description": "Instance email settings."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Update instance email settings",
+                "description": "Update instance-wide SMTP and Resend settings. Requires `write:sensitive` and a root-team token belonging to a root-team admin or owner.",
+                "operationId": "update-instance-email-settings",
+                "responses": {
+                    "200": {
+                        "description": "Updated instance email settings."
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/security\/integration-tokens": {
+            "post": {
+                "tags": [
+                    "Secret Managers"
+                ],
+                "summary": "Create Secret Manager Token",
+                "description": "Create and validate a Doppler, Infisical, or Vault integration token.",
+                "operationId": "create-secret-manager-integration-token",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "provider",
+                                    "name",
+                                    "token"
+                                ],
+                                "properties": {
+                                    "provider": {
+                                        "type": "string",
+                                        "enum": [
+                                            "doppler",
+                                            "infisical",
+                                            "vault"
+                                        ]
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "metadata": {
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Integration token created."
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/notifications\/email": {
             "get": {
                 "tags": [
                     "Notifications"
                 ],
                 "summary": "Get email notification settings",
-                "description": "Get the current team email notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin\/owner.",
+                "description": "Get the current team email notification settings, including `smtp_ehlo_domain`, the hostname sent with SMTP EHLO. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin\/owner.",
                 "operationId": "get-current-team-email-notifications",
                 "responses": {
                     "200": {
@@ -11719,7 +11974,7 @@
                     "Notifications"
                 ],
                 "summary": "Update email notification settings",
-                "description": "Update the current team email notification settings.",
+                "description": "Update the current team email notification settings. Set `smtp_ehlo_domain` to a valid hostname to control the SMTP EHLO domain, or `null` to use the system default.",
                 "operationId": "update-current-team-email-notifications",
                 "responses": {
                     "200": {
@@ -16816,6 +17071,12 @@
                                             "boolean",
                                             "null"
                                         ]
+                                    },
+                                    "is_force_https_enabled": {
+                                        "type": [
+                                            "boolean",
+                                            "null"
+                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -17194,6 +17455,85 @@
                     },
                     "501": {
                         "description": "Swarm not supported."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/databases\/{database_uuid}\/imports\/uploads": {
+            "post": {
+                "tags": [
+                    "Service databases"
+                ],
+                "summary": "Upload service database import",
+                "operationId": "upload-service-database-import",
+                "responses": {
+                    "201": {
+                        "description": "Upload completed"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/databases\/{database_uuid}\/imports": {
+            "post": {
+                "tags": [
+                    "Service databases"
+                ],
+                "summary": "Import service database backup",
+                "operationId": "create-service-database-import",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "$ref": "#\/components\/schemas\/DatabaseImportRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "202": {
+                        "description": "Import queued"
+                    },
+                    "409": {
+                        "description": "Import already active"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/databases\/{database_uuid}\/imports\/{activity_id}": {
+            "get": {
+                "tags": [
+                    "Service databases"
+                ],
+                "summary": "Get service database import status",
+                "operationId": "get-service-database-import",
+                "responses": {
+                    "200": {
+                        "description": "Import status"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
                     }
                 },
                 "security": [
@@ -21402,6 +21742,128 @@
     },
     "components": {
         "schemas": {
+            "DatabaseImportRequest": {
+                "type": "object",
+                "oneOf": [
+                    {
+                        "required": [
+                            "source",
+                            "upload_id"
+                        ],
+                        "properties": {
+                            "source": {
+                                "type": "string",
+                                "enum": [
+                                    "upload"
+                                ]
+                            },
+                            "upload_id": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "dump_all": {
+                                "type": "boolean",
+                                "default": false
+                            }
+                        },
+                        "type": "object"
+                    },
+                    {
+                        "required": [
+                            "source",
+                            "s3_storage_uuid",
+                            "path"
+                        ],
+                        "properties": {
+                            "source": {
+                                "type": "string",
+                                "enum": [
+                                    "s3"
+                                ]
+                            },
+                            "s3_storage_uuid": {
+                                "type": "string"
+                            },
+                            "path": {
+                                "type": "string"
+                            },
+                            "dump_all": {
+                                "type": "boolean",
+                                "default": false
+                            }
+                        },
+                        "type": "object"
+                    },
+                    {
+                        "required": [
+                            "source",
+                            "path"
+                        ],
+                        "properties": {
+                            "source": {
+                                "type": "string",
+                                "enum": [
+                                    "server"
+                                ]
+                            },
+                            "path": {
+                                "type": "string",
+                                "example": "\/var\/backups\/database.sql.gz"
+                            },
+                            "dump_all": {
+                                "type": "boolean",
+                                "default": false
+                            }
+                        },
+                        "type": "object"
+                    }
+                ],
+                "additionalProperties": false
+            },
+            "DatabaseImportStatus": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "queued",
+                            "in_progress",
+                            "finished",
+                            "error",
+                            "killed",
+                            "cancelled",
+                            "closed"
+                        ]
+                    },
+                    "exit_code": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "output": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "finished_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
             "VolumeBackupScheduleRequest": {
                 "required": [
                     "frequency"
@@ -21474,7 +21936,7 @@
                     },
                     "timeout": {
                         "type": "integer",
-                        "default": 3600,
+                        "default": 36000,
                         "maximum": 36000,
                         "minimum": 60
                     }
@@ -22520,6 +22982,9 @@
                     "deployment_queue_limit": {
                         "type": "integer"
                     },
+                    "backup_compression_cpu_percentage": {
+                        "type": "integer"
+                    },
                     "dynamic_timeout": {
                         "type": "integer"
                     },
@@ -22630,6 +23095,26 @@
                     "connection_timeout": {
                         "type": "integer",
                         "description": "SSH connection timeout in seconds."
+                    },
+                    "docker_version": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Detected Docker Engine version on the server."
+                    },
+                    "docker_version_checked_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When Docker Engine version was last detected."
+                    },
+                    "compose_version": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Detected Docker Compose plugin version on the server."
+                    },
+                    "compose_version_checked_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When Docker Compose version was last detected."
                     }
                 },
                 "type": "object"
@@ -22970,6 +23455,10 @@
     },
     "tags": [
         {
+            "name": "Secret Managers",
+            "description": "Secret Managers"
+        },
+        {
             "name": "Applications",
             "description": "Applications"
         },
@@ -23008,6 +23497,10 @@
         {
             "name": "Hetzner",
             "description": "Hetzner"
+        },
+        {
+            "name": "Settings",
+            "description": "Settings"
         },
         {
             "name": "Notifications",

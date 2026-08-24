@@ -12,6 +12,31 @@ use OpenApi\Attributes as OA;
     securityScheme: 'bearerAuth',
     description: 'Go to `Keys & Tokens` / `API tokens` and create a new token. Use the token as the bearer token.')]
 #[OA\Components(
+    schemas: [
+        new OA\Schema(
+            schema: 'DatabaseImportRequest',
+            oneOf: [
+                new OA\Schema(required: ['source', 'upload_id'], properties: [new OA\Property(property: 'source', type: 'string', enum: ['upload']), new OA\Property(property: 'upload_id', type: 'string', format: 'uuid'), new OA\Property(property: 'dump_all', type: 'boolean', default: false)]),
+                new OA\Schema(required: ['source', 's3_storage_uuid', 'path'], properties: [new OA\Property(property: 'source', type: 'string', enum: ['s3']), new OA\Property(property: 's3_storage_uuid', type: 'string'), new OA\Property(property: 'path', type: 'string'), new OA\Property(property: 'dump_all', type: 'boolean', default: false)]),
+                new OA\Schema(required: ['source', 'path'], properties: [new OA\Property(property: 'source', type: 'string', enum: ['server']), new OA\Property(property: 'path', type: 'string', example: '/var/backups/database.sql.gz'), new OA\Property(property: 'dump_all', type: 'boolean', default: false)]),
+            ],
+            type: 'object',
+            additionalProperties: false,
+        ),
+        new OA\Schema(
+            schema: 'DatabaseImportStatus',
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'id', type: 'integer'),
+                new OA\Property(property: 'status', type: 'string', enum: ['queued', 'in_progress', 'finished', 'error', 'killed', 'cancelled', 'closed']),
+                new OA\Property(property: 'exit_code', type: 'integer', nullable: true),
+                new OA\Property(property: 'output', type: 'string'),
+                new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+                new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+                new OA\Property(property: 'finished_at', type: 'string', format: 'date-time', nullable: true),
+            ],
+        ),
+    ],
     responses: [
         new OA\Response(
             response: 400,
