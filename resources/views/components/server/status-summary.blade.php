@@ -6,10 +6,16 @@
 
 @php
     $serverReady = $server->isFunctional();
-    $proxyUpdateAvailable = $server->proxySet()
-        && ($server->hasCurrentTraefikOutdatedInfo() || $server->hasPendingProxyConfiguration());
+    $proxyConfigurationPending = $server->proxySet() && $server->hasPendingProxyConfiguration();
+    $traefikUpdateAvailable = $server->proxySet() && $server->hasCurrentTraefikOutdatedInfo();
+    $proxyUpdateAvailable = $proxyConfigurationPending || $traefikUpdateAvailable;
     $proxyNeedsAttention = $server->proxySet()
         && (! in_array($proxyStatus, ['running'], true) || $proxyUpdateAvailable);
+    $proxyStatusLabel = match (true) {
+        $proxyConfigurationPending => 'Restart required',
+        $traefikUpdateAvailable => 'Update available',
+        default => str($proxyStatus ?: 'unknown')->headline(),
+    };
     $sentinelNeedsAttention = $showSentinelStatus && ! $server->isSentinelLive();
 
     [$summaryLabel, $summaryType] = match (true) {
@@ -66,7 +72,7 @@
                     'bg-error' => $proxyNeedsAttention && ! $proxyUpdateAvailable && ! in_array($proxyStatus, ['starting', 'restarting', 'stopping'], true),
                 ])></span>
                 <span class="flex-1">Proxy</span>
-                <span>{{ str($proxyStatus ?: 'unknown')->headline() }}</span>
+                <span>{{ $proxyStatusLabel }}</span>
             </a>
         @endif
         @if ($showSentinelStatus)
