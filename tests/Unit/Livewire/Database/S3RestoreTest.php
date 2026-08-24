@@ -116,7 +116,7 @@ test('buildRestoreCommand dump-all PostgreSQL restore is pg_restore for PGDMP ot
     $escapedTmpPath = escapeshellarg('/tmp/test.dump');
 
     expect($component->buildRestoreCommand('/tmp/test.dump'))->toBe(
-        'psql -U ${POSTGRES_USER} -c "cleanup" && if [ "$(head -c 5 '.$escapedTmpPath.')" = \'PGDMP\' ]; then pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}} '.$escapedTmpPath.'; else (gunzip -cf '.$escapedTmpPath.' 2>/dev/null || cat '.$escapedTmpPath.') | psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}; fi'
+        'psql -U ${POSTGRES_USER} -c "cleanup" && if [ "$({ gunzip -cf '.$escapedTmpPath.' 2>/dev/null || cat '.$escapedTmpPath.'; } | head -c 5)" = \'PGDMP\' ]; then pg_restore -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}} '.$escapedTmpPath.'; else (gunzip -cf '.$escapedTmpPath.' 2>/dev/null || cat '.$escapedTmpPath.') | psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}; fi'
     );
 });
 
@@ -124,6 +124,7 @@ test('dump-all PostgreSQL restore selects the client for the dump format', funct
     expect(invokedPostgresRestoreClients($contents, $gzip))->toBe([$client]);
 })->with([
     'custom archive' => ['PGDMP'.str_repeat("\0", 16), false, 'pg_restore'],
+    'gzip custom archive' => ['PGDMP'.str_repeat("\0", 16), true, 'pg_restore'],
     'plain SQL' => ["-- PostgreSQL database dump\nSELECT 1;\n", false, 'psql'],
     'gzip SQL' => ["-- PostgreSQL database dump\nSELECT 1;\n", true, 'psql'],
 ]);
