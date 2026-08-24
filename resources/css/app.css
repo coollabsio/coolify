@@ -1872,11 +1872,11 @@ html[data-theme="custom"] textarea:disabled {
 
 .split-action {
     display: inline-flex;
-    align-items: stretch;
 }
 
 .split-action-main,
 .split-action-caret {
+    @apply button-highlighted;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1886,10 +1886,6 @@ html[data-theme="custom"] textarea:disabled {
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
-    border: none;
-    background: linear-gradient(to bottom, var(--color-coollabs-100), var(--color-coollabs-200));
-    color: #ffffff;
-    transition: background-color 0.15s, color 0.15s, filter 0.15s;
 }
 
 .split-action-main {
@@ -1910,12 +1906,6 @@ html[data-theme="custom"] textarea:disabled {
     border-radius: 6px;
 }
 
-.split-action-main:hover:not(:disabled),
-.split-action-caret:hover:not(:disabled) {
-    background: linear-gradient(to bottom, var(--color-coollabs-100), var(--color-coollabs));
-    color: #ffffff;
-}
-
 .split-action-main:disabled,
 .split-action-caret:disabled {
     cursor: not-allowed;
@@ -1930,7 +1920,6 @@ html[data-theme="custom"] textarea:disabled {
     box-shadow: 0 0 0 1px var(--color-accent);
 }
 
-/* Compact height inside the fixed heading action bar */
 .application-heading-actions .split-action-main,
 .application-heading-actions .split-action-caret {
     height: 1.75rem;

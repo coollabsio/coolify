@@ -176,8 +176,7 @@
                 @can('manageProxy', $server)
                     <x-split-action id="server-mobile-actions" class="mb-3 flex w-full">
                         @if ($proxyCanBeStopped)
-                            <x-slot:main wire:loading.attr="disabled" wire:loading.class="is-loading"
-                                wire:target="checkProxy,startProxy"
+                            <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
                                 @click="document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
                                 <x-reicon name="restart" class="size-3.5" />
                                 Restart Proxy
@@ -189,8 +188,7 @@
                                 Stop Proxy
                             </button>
                         @else
-                            <x-slot:main wire:loading.attr="disabled" wire:loading.class="is-loading"
-                                wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
+                            <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
                                 <x-reicon name="play-circle" class="size-3.5" />
                                 Start Proxy
                             </x-slot:main>
@@ -286,8 +284,7 @@
                         @endif
                         <x-split-action id="server-desktop-actions" class="resource-heading-actions shrink-0">
                             @if ($proxyCanBeStopped)
-                                <x-slot:main wire:loading.attr="disabled" wire:loading.class="is-loading"
-                                    wire:target="checkProxy,startProxy"
+                                <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy"
                                     @click="document.getElementById('server-mobile-restart-proxy-trigger')?.click()">
                                     <x-reicon name="restart" class="size-3.5" />
                                     Restart Proxy
@@ -299,8 +296,7 @@
                                     Stop Proxy
                                 </button>
                             @else
-                                <x-slot:main wire:loading.attr="disabled" wire:loading.class="is-loading"
-                                    wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
+                                <x-slot:main wire:loading.attr="disabled" wire:target="checkProxy,startProxy" @click="$wire.dispatch('checkProxyEvent')">
                                     <x-reicon name="play-circle" class="size-3.5" />
                                     Start Proxy
                                 </x-slot:main>
