@@ -1,0 +1,60 @@
+# documentation: https://github.com/vrtmrz/obsidian-livesync/blob/main/docs/setup_own_server.md
+# slogan: Self-hosted sync backend for Obsidian LiveSync plugin using CouchDB
+# category: storage
+# tags: obsidian,couchdb,sync,notes,markdown
+# logo: svgs/obsidian-livesync.svg
+# port: 5984
+
+services:
+  couchdb:
+    image: couchdb:3.4.2
+    environment:
+      # Tells Coolify to proxy this service on port 5984 at the assigned domain
+      - SERVICE_FQDN_COUCHDB_5984
+      # Coolify auto-generates and persists these — find them under Environment Variables
+      - COUCHDB_USER=${SERVICE_USER_COUCHDB}
+      - COUCHDB_PASSWORD=${SERVICE_PASSWORD_64_COUCHDB}
+      # Max size of a single document (bytes). Default: 50MB.
+      - MAX_DOCUMENT_SIZE=${MAX_DOCUMENT_SIZE:-52428800}
+      # Max HTTP request size (bytes). Should be slightly above MAX_DOCUMENT_SIZE to allow multipart overhead.
+      # Raise only if you attach very large files to your notes. Default: 64MB.
+      - MAX_HTTP_REQUEST_SIZE=${MAX_HTTP_REQUEST_SIZE:-67108864}
+    volumes:
+      - type: bind
+        source: ./local.ini
+        target: /opt/couchdb/etc/local.ini
+        content: |
+          [couchdb]
+          single_node=true
+          max_document_size = ${MAX_DOCUMENT_SIZE}
+
+          [chttpd]
+          require_valid_user = true
+          max_http_request_size = ${MAX_HTTP_REQUEST_SIZE}
+
+          [chttpd_auth]
+          require_valid_user = true
+          authentication_redirect = /_utils/session.html
+
+          [httpd]
+          WWW-Authenticate = Basic realm="couchdb"
+          enable_cors = true
+
+          [cors]
+          origins = app://obsidian.md,capacitor://localhost,http://localhost
+          credentials = true
+          headers = accept, authorization, content-type, origin, referer
+          methods = GET, PUT, POST, HEAD, DELETE
+          max_age = 3600
+      - couchdb-data:/opt/couchdb/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -f -u "$${COUCHDB_USER}:$${COUCHDB_PASSWORD}" http://localhost:5984/_up
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+volumes:
+  couchdb-data:
