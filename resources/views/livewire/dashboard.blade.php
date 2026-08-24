@@ -16,6 +16,8 @@
     <div class="flex min-w-0 flex-col gap-8">
         <livewire:dashboard.active-deployments />
 
+        <livewire:dashboard.traffic-analytics />
+
         <section class="mb-0! min-w-0">
             <div class="mb-3 flex items-end justify-between gap-4">
                 <div>

@@ -507,7 +507,7 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -571,6 +571,18 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         }
         if ($is_http_basic_auth_enabled) {
             $labels->push("caddy_{$loop}.basicauth.{$http_basic_auth_username}=\"{$hashedPassword}\"");
+        }
+        if ($is_traffic_analytics_enabled) {
+            $labels->push("caddy_{$loop}.log.output=file /traffic/access.log");
+            // Explicit lumberjack roll options so the access log doesn't grow unbounded
+            // (Caddy's defaults are undocumented). caddy-docker-proxy renders these dotted
+            // keys as a nested block: output file /traffic/access.log { roll_size 20MiB; roll_keep 5; roll_keep_for 168h }.
+            // Rotation is rename-based, which is safe for Sentinel's tailer (it reopens on inode change).
+            $labels->push("caddy_{$loop}.log.output.roll_size=20MiB");
+            $labels->push("caddy_{$loop}.log.output.roll_keep=5");
+            $labels->push("caddy_{$loop}.log.output.roll_keep_for=168h");
+            $labels->push("caddy_{$loop}.log.format=json");
+            $labels->push("caddy_{$loop}.log_append=coolify_app_id {$uuid}");
         }
     }
 
@@ -891,6 +903,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
+                            is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                         ));
                         break;
                 }
@@ -922,6 +935,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
                     noindex_domains: $noindexDomains,
+                    is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                 ));
             }
         }
@@ -964,6 +978,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
                         noindex_domains: $noindexDomains,
+                        is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                     ));
                     break;
             }
@@ -993,6 +1008,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
                 noindex_domains: $noindexDomains,
+                is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
             ));
         }
     }

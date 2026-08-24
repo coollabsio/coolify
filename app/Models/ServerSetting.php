@@ -27,6 +27,13 @@ use OpenApi\Attributes as OA;
         'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
         'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
+        'is_traffic_analytics_enabled' => ['type' => 'boolean'],
+        'traffic_topn' => ['type' => 'integer'],
+        'traffic_sample_threshold' => ['type' => 'integer'],
+        'traffic_retention_1h_days' => ['type' => 'integer'],
+        'traffic_retention_1d_days' => ['type' => 'integer'],
+        'is_geoip_enabled' => ['type' => 'boolean'],
+        'geoip_refresh_days' => ['type' => 'integer'],
         'is_reachable' => ['type' => 'boolean'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
         'is_swarm_manager' => ['type' => 'boolean'],
@@ -106,6 +113,14 @@ class ServerSetting extends Model
         'backup_compression_cpu_percentage',
         'disable_application_image_retention',
         'connection_timeout',
+        'is_traffic_analytics_enabled',
+        'traffic_topn',
+        'traffic_sample_threshold',
+        'traffic_retention_1h_days',
+        'traffic_retention_1d_days',
+        'is_geoip_enabled',
+        'geoip_refresh_days',
+        'geoip_maxmind_license_key',
         'docker_version',
         'docker_version_checked_at',
         'compose_version',
@@ -123,6 +138,14 @@ class ServerSetting extends Model
         'is_terminal_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
+        'is_traffic_analytics_enabled' => 'boolean',
+        'traffic_topn' => 'integer',
+        'traffic_sample_threshold' => 'integer',
+        'traffic_retention_1h_days' => 'integer',
+        'traffic_retention_1d_days' => 'integer',
+        'is_geoip_enabled' => 'boolean',
+        'geoip_refresh_days' => 'integer',
+        'geoip_maxmind_license_key' => 'encrypted',
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
@@ -140,12 +163,22 @@ class ServerSetting extends Model
         'logdrain_axiom_api_key',
         'logdrain_custom_config',
         'logdrain_custom_config_parser',
+        'geoip_maxmind_license_key',
     ];
 
     protected static function booted()
     {
         static::creating(function ($setting) {
             try {
+                // Enable traffic analytics by default for eligible servers, unless the
+                // caller explicitly set a value. Swarm and build servers are ineligible,
+                // mirroring the toggle guard so the flag never contradicts capability.
+                // Runs before sentinel generation, which may throw and be swallowed below.
+                if (! $setting->isDirty('is_traffic_analytics_enabled')) {
+                    $isSwarm = $setting->is_swarm_manager || $setting->is_swarm_worker;
+                    $isBuild = (bool) $setting->is_build_server;
+                    $setting->is_traffic_analytics_enabled = ! $isSwarm && ! $isBuild;
+                }
                 if (str($setting->sentinel_token)->isEmpty()) {
                     $setting->generateSentinelToken(save: false, ignoreEvent: true);
                 }
@@ -162,9 +195,21 @@ class ServerSetting extends Model
                 $settings->wasChanged('sentinel_custom_url') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
-                $settings->wasChanged('sentinel_push_interval_seconds')
+                $settings->wasChanged('sentinel_push_interval_seconds') ||
+                $settings->wasChanged('traffic_topn') ||
+                $settings->wasChanged('traffic_sample_threshold') ||
+                $settings->wasChanged('traffic_retention_1h_days') ||
+                $settings->wasChanged('traffic_retention_1d_days') ||
+                $settings->wasChanged('is_geoip_enabled') ||
+                $settings->wasChanged('geoip_refresh_days') ||
+                $settings->wasChanged('geoip_maxmind_license_key')
             ) {
-                $settings->server->restartSentinel();
+                // Only recreate Sentinel when it is already enabled. Otherwise a change to a
+                // traffic/geoip tuning knob would turn Sentinel on as a side effect, because
+                // StartSentinel unconditionally sets is_sentinel_enabled = true.
+                if ($settings->is_sentinel_enabled) {
+                    $settings->server->restartSentinel();
+                }
             }
         });
     }
