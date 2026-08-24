@@ -2354,6 +2354,15 @@ function serviceParser(Service $resource): Collection
             foreach ($baseNetwork as $key => $network) {
                 $networks_temp->put($network, null);
             }
+
+            if (data_get($resource, 'connect_to_docker_network')) {
+                $network = $resource->destination->network;
+                $networks_temp->put($network, null);
+                $topLevel->get('networks')->put($network, [
+                    'name' => $network,
+                    'external' => true,
+                ]);
+            }
         }
 
         $normalEnvironments = $environment->diffKeys($allMagicEnvironments);
