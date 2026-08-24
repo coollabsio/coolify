@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -45,6 +46,40 @@ class AuditEvent extends Model
         ];
     }
 
+    public function scopeVisibleToTeam(Builder $query, int $teamId, bool $includeInstanceEvents = false): Builder
+    {
+        return $query->where(function (Builder $query) use ($includeInstanceEvents, $teamId): void {
+            $query->where('team_id', $teamId)
+                ->when($includeInstanceEvents, fn (Builder $query) => $query->orWhereNull('team_id'));
+        });
+    }
+
+    public function scopeFiltered(
+        Builder $query,
+        string $search = '',
+        string $action = 'all',
+        string $source = 'all',
+        bool $searchSensitiveFields = true,
+    ): Builder {
+        return $query
+            ->when($action !== 'all', fn (Builder $query) => $query->where('action', $action))
+            ->when($source !== 'all', fn (Builder $query) => $query->where('source', $source))
+            ->when($search !== '', function (Builder $query) use ($search, $searchSensitiveFields): void {
+                $query->where(function (Builder $query) use ($search, $searchSensitiveFields): void {
+                    $query->where('event', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhere('resource_name', 'like', "%{$search}%")
+                        ->orWhere('actor_name', 'like', "%{$search}%")
+                        ->when($searchSensitiveFields, fn (Builder $query) => $query->orWhere('actor_email', 'like', "%{$search}%"));
+                });
+            });
+    }
+
+    public function scopeLatestFirst(Builder $query): Builder
+    {
+        return $query->latest('created_at')->latest('id');
+    }
+
     /**
      * @param  array<string, mixed>  $context
      */
@@ -52,10 +87,6 @@ class AuditEvent extends Model
     {
         try {
             $attributes = self::attributesFor($event, $context);
-
-            if ($attributes === null) {
-                return;
-            }
 
             DB::afterCommit(function () use ($attributes): void {
                 defer(function () use ($attributes): void {
@@ -90,8 +121,8 @@ class AuditEvent extends Model
 
         $parts = explode('.', $event);
         $source = $parts[0] ?? 'system';
-        $resourceType = $parts[1] ?? null;
-        $action = end($parts) ?: 'event';
+        $resourceType = data_get($context, 'resource') ?? ($parts[1] ?? null);
+        $action = data_get($context, 'action') ?? (end($parts) ?: 'event');
         $resourceUuid = self::firstContextValue($context, $resourceType ? "{$resourceType}_uuid" : null, '_uuid');
         $resourceName = self::firstContextValue($context, $resourceType ? "{$resourceType}_name" : null, '_name');
         $user = auth()->user();
@@ -163,7 +194,7 @@ class AuditEvent extends Model
 
     private static function redact(mixed $value, ?string $key = null): mixed
     {
-        if ($key !== null && preg_match('/password|secret|token|private_key|signature|credential|invitation_email/i', $key)) {
+        if ($key !== null && preg_match('/password|secret|token|private_key|signature|credential|invitation_email|api_key|access_key|authorization|cookie/i', $key)) {
             return '[REDACTED]';
         }
 

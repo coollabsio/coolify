@@ -29,8 +29,10 @@ return new class extends Migration
             $table->string('user_agent', 200)->nullable();
             $table->timestamp('created_at')->useCurrent();
 
-            $table->index(['team_id', 'created_at']);
-            $table->index(['team_id', 'action', 'created_at']);
+            $table->index('created_at');
+            $table->index(['team_id', 'created_at', 'id']);
+            $table->index(['team_id', 'action', 'created_at', 'id']);
+            $table->index(['team_id', 'source', 'created_at', 'id']);
             $table->index(['team_id', 'resource_type', 'resource_uuid', 'created_at']);
             $table->index(['team_id', 'actor_id', 'created_at']);
         });

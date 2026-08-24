@@ -503,6 +503,36 @@ test('audit log redacts sensitive metadata', function () {
         ->and($metadata['nested']['safe'])->toBe('visible');
 });
 
+test('audit log redacts common credential metadata keys', function (string $key) {
+    auditLog('api.application.updated', [
+        'team_id' => $this->team->id,
+        $key => 'sensitive-value',
+    ]);
+
+    expect(AuditEvent::query()->sole()->metadata[$key])->toBe('[REDACTED]');
+})->with([
+    'api_key',
+    'access_key',
+    'authorization',
+    'cookie',
+    'client_secret',
+]);
+
+test('audit event classification can use explicit resource and action context', function () {
+    auditLog('mcp.control', [
+        'team_id' => $this->team->id,
+        'resource' => 'application',
+        'action' => 'restart',
+        'resource_uuid' => 'app-123',
+    ]);
+
+    $event = AuditEvent::query()->sole();
+
+    expect($event->resource_type)->toBe('application')
+        ->and($event->action)->toBe('restart')
+        ->and($event->resource_uuid)->toBe('app-123');
+});
+
 test('team invitation audit logs redact the invitation email', function () {
     auditLog('ui.team_invitation.created', [
         'team_id' => $this->team->id,
@@ -567,6 +597,11 @@ test('team admins can query only their team audit events through the api', funct
         'source' => 'api',
         'action' => 'updated',
         'description' => 'Visible event',
+        'actor_email' => 'owner@example.com',
+        'actor_token_name' => 'production token',
+        'metadata' => ['changed_fields' => ['name']],
+        'ip_address' => '192.0.2.1',
+        'user_agent' => 'Sensitive user agent',
     ]);
     AuditEvent::factory()->create([
         'team_id' => Team::factory()->create()->id,
@@ -585,7 +620,56 @@ test('team admins can query only their team audit events through the api', funct
         ->getJson('/api/v1/audit-events?source=api&action=updated')
         ->assertOk()
         ->assertJsonCount(1, 'data')
-        ->assertJsonPath('data.0.description', 'Visible event');
+        ->assertJsonPath('data.0.description', 'Visible event')
+        ->assertJsonMissingPath('data.0.actor_email')
+        ->assertJsonMissingPath('data.0.actor_token_id')
+        ->assertJsonMissingPath('data.0.actor_token_name')
+        ->assertJsonMissingPath('data.0.metadata')
+        ->assertJsonMissingPath('data.0.ip_address')
+        ->assertJsonMissingPath('data.0.user_agent');
+});
+
+test('team admins with sensitive read access can query full audit event details', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_email' => 'owner@example.com',
+        'actor_token_name' => 'production token',
+        'metadata' => ['changed_fields' => ['name']],
+        'ip_address' => '192.0.2.1',
+        'user_agent' => 'Sensitive user agent',
+    ]);
+
+    $token = $this->user->createToken('audit-sensitive-read', ['read', 'read:sensitive']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+
+    $this->withToken($token->plainTextToken)
+        ->getJson('/api/v1/audit-events')
+        ->assertOk()
+        ->assertJsonPath('data.0.actor_email', 'owner@example.com')
+        ->assertJsonPath('data.0.actor_token_name', 'production token')
+        ->assertJsonPath('data.0.metadata.changed_fields.0', 'name')
+        ->assertJsonPath('data.0.ip_address', '192.0.2.1')
+        ->assertJsonPath('data.0.user_agent', 'Sensitive user agent');
+});
+
+test('tokens without sensitive read access cannot search private audit fields', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_email' => 'private-audit@example.com',
+        'description' => 'Public description',
+    ]);
+
+    $token = $this->user->createToken('audit-read', ['read']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+
+    $this->withToken($token->plainTextToken)
+        ->getJson('/api/v1/audit-events?search=private-audit@example.com')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
 });
 
 test('team members cannot query audit events through the api', function () {
@@ -611,6 +695,19 @@ test('audit source filter omits the unused system source', function () {
         ->assertSee('MCP')
         ->assertSee('Webhook')
         ->assertDontSee('System');
+});
+
+test('audit action filter includes actions recorded for the current team', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'action' => 'backup_schedule_deleted',
+    ]);
+
+    Livewire::test(AuditLog::class)
+        ->assertViewHas('actionOptions', fn (array $options): bool => in_array([
+            'value' => 'backup_schedule_deleted',
+            'label' => 'Backup Schedule Deleted',
+        ], $options, true));
 });
 
 test('resource clone audit starts only after the destination server capability check', function () {

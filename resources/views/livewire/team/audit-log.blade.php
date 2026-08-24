@@ -18,21 +18,8 @@
                     </div>
                     <div class="grid grid-cols-2 gap-2 sm:flex">
                         <div class="sm:w-36">
-                            <x-forms.listbox id="action" live canGate="viewAdmin" :canResource="currentTeam()" :options="[
-                                ['value' => 'all', 'label' => 'All actions'],
-                                ['value' => 'created', 'label' => 'Created'],
-                                ['value' => 'updated', 'label' => 'Updated'],
-                                ['value' => 'deleted', 'label' => 'Deleted'],
-                                ['value' => 'deployed', 'label' => 'Deployed'],
-                                ['value' => 'started', 'label' => 'Started'],
-                                ['value' => 'stopped', 'label' => 'Stopped'],
-                                ['value' => 'restarted', 'label' => 'Restarted'],
-                                ['value' => 'cancelled', 'label' => 'Cancelled'],
-                                ['value' => 'rollback', 'label' => 'Rollback'],
-                                ['value' => 'executed', 'label' => 'Executed'],
-                                ['value' => 'revoked', 'label' => 'Revoked'],
-                                ['value' => 'imported', 'label' => 'Imported'],
-                            ]" />
+                            <x-forms.listbox id="action" live canGate="viewAdmin" :canResource="currentTeam()"
+                                :options="$actionOptions" />
                         </div>
                         <div class="sm:w-36">
                             <x-forms.listbox id="source" live canGate="viewAdmin" :canResource="currentTeam()" :options="[

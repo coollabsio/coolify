@@ -4,6 +4,7 @@ namespace App\Livewire\Team;
 
 use App\Models\AuditEvent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -50,26 +51,23 @@ class AuditLog extends Component
         $search = trim($this->search);
         $teamId = currentTeam()->id;
         $canViewInstanceEvents = $teamId === 0 && isInstanceAdmin();
+        $visibleEvents = AuditEvent::query()->visibleToTeam($teamId, $canViewInstanceEvents);
+        $actionOptions = [
+            ['value' => 'all', 'label' => 'All actions'],
+            ...$visibleEvents->clone()
+                ->select('action')
+                ->distinct()
+                ->orderBy('action')
+                ->pluck('action')
+                ->map(fn (string $action): array => ['value' => $action, 'label' => Str::headline($action)])
+                ->all(),
+        ];
         $events = AuditEvent::query()
-            ->where(function ($query) use ($canViewInstanceEvents, $teamId): void {
-                $query->where('team_id', $teamId)
-                    ->when($canViewInstanceEvents, fn ($query) => $query->orWhereNull('team_id'));
-            })
-            ->when($this->action !== 'all', fn ($query) => $query->where('action', $this->action))
-            ->when($this->source !== 'all', fn ($query) => $query->where('source', $this->source))
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($query) use ($search): void {
-                    $query->where('description', 'like', "%{$search}%")
-                        ->orWhere('resource_name', 'like', "%{$search}%")
-                        ->orWhere('actor_name', 'like', "%{$search}%")
-                        ->orWhere('actor_email', 'like', "%{$search}%")
-                        ->orWhere('event', 'like', "%{$search}%");
-                });
-            })
-            ->latest('created_at')
-            ->latest('id')
+            ->visibleToTeam($teamId, $canViewInstanceEvents)
+            ->filtered($search, $this->action, $this->source)
+            ->latestFirst()
             ->paginate($this->perPage);
 
-        return view('livewire.team.audit-log', ['events' => $events]);
+        return view('livewire.team.audit-log', ['actionOptions' => $actionOptions, 'events' => $events]);
     }
 }

@@ -22,21 +22,39 @@ class AuditEventsController extends Controller
 
         $perPage = max(1, min(100, $request->integer('per_page', 25)));
         $search = trim((string) $request->query('search', ''));
+        $canReadSensitive = $request->attributes->get('can_read_sensitive', false) === true;
         $events = AuditEvent::query()
-            ->where('team_id', $teamId)
-            ->when($request->filled('source'), fn ($query) => $query->where('source', $request->string('source')->toString()))
-            ->when($request->filled('action'), fn ($query) => $query->where('action', $request->string('action')->toString()))
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($query) use ($search): void {
-                    $query->where('event', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%")
-                        ->orWhere('resource_name', 'like', "%{$search}%")
-                        ->orWhere('actor_name', 'like', "%{$search}%")
-                        ->orWhere('actor_email', 'like', "%{$search}%");
-                });
-            })
-            ->latest('created_at')
-            ->latest('id')
+            ->select([
+                'id',
+                'team_id',
+                'event',
+                'source',
+                'action',
+                'actor_type',
+                'actor_id',
+                'actor_name',
+                'resource_type',
+                'resource_uuid',
+                'resource_name',
+                'description',
+                'created_at',
+            ])
+            ->when($canReadSensitive, fn ($query) => $query->addSelect([
+                'actor_email',
+                'actor_token_id',
+                'actor_token_name',
+                'metadata',
+                'ip_address',
+                'user_agent',
+            ]))
+            ->visibleToTeam($teamId)
+            ->filtered(
+                search: $search,
+                action: $request->string('action', 'all')->toString(),
+                source: $request->string('source', 'all')->toString(),
+                searchSensitiveFields: $canReadSensitive,
+            )
+            ->latestFirst()
             ->paginate($perPage);
 
         return response()->json($events);
