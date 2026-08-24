@@ -38,6 +38,20 @@ test('buildRestoreCommand handles PostgreSQL with dumpAll', function () {
     expect($result)->toContain('psql -U ${POSTGRES_USER} -d ${POSTGRES_DB:-${POSTGRES_USER:-postgres}}');
 });
 
+test('buildRestoreCommand uses pg_restore for a custom PostgreSQL archive when replacing all databases', function () {
+    $component = importFormWithResource('App\Models\StandalonePostgresql');
+    $component->dumpAll = true;
+    $component->postgresqlRestoreCommand = 'psql -U ${POSTGRES_USER} -c "cleanup"';
+
+    $result = $component->buildRestoreCommand('/tmp/test.dump');
+
+    expect($result)
+        ->toContain("head -c 5 '/tmp/test.dump'")
+        ->toContain("= 'PGDMP'")
+        ->toContain("pg_restore -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}} '/tmp/test.dump'")
+        ->toContain("psql -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}");
+});
+
 test('buildRestoreCommand handles MySQL without dumpAll', function () {
     $component = importFormWithResource('App\Models\StandaloneMysql');
     $component->dumpAll = false;

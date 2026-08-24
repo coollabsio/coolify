@@ -883,7 +883,7 @@ EOD;
             case 'postgresql':
                 $restoreCommand = $this->postgresqlRestoreCommand;
                 if ($this->dumpAll) {
-                    $restoreCommand .= " && (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | psql -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}";
+                    $restoreCommand .= " && if [ \"\$(head -c 5 {$escapedTmpPath})\" = 'PGDMP' ]; then pg_restore -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}} {$escapedTmpPath}; else (gunzip -cf {$escapedTmpPath} 2>/dev/null || cat {$escapedTmpPath}) | psql -U \${POSTGRES_USER} -d \${POSTGRES_DB:-\${POSTGRES_USER:-postgres}}; fi";
                 } else {
                     $restoreCommand .= " {$escapedTmpPath}";
                 }
