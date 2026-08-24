@@ -409,6 +409,59 @@ test('audit log is available under team settings', function () {
         ->assertSeeLivewire(AuditLog::class);
 });
 
+test('team members cannot view the audit log page', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    $this->get('/team/audit-log')->assertForbidden();
+});
+
+test('team admins can query only their team audit events through the api', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'event' => 'api.project.updated',
+        'source' => 'api',
+        'action' => 'updated',
+        'description' => 'Visible event',
+    ]);
+    AuditEvent::factory()->create([
+        'team_id' => Team::factory()->create()->id,
+        'event' => 'api.project.updated',
+        'source' => 'api',
+        'action' => 'updated',
+        'description' => 'Other team event',
+    ]);
+
+    $token = $this->user->createToken('audit-read', ['read']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+
+    $this->withToken($token->plainTextToken)
+        ->getJson('/api/v1/audit-events?source=api&action=updated')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.description', 'Visible event');
+});
+
+test('team members cannot query audit events through the api', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+    $token = $member->createToken('audit-read', ['read']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+
+    $this->withToken($token->plainTextToken)
+        ->getJson('/api/v1/audit-events')
+        ->assertForbidden();
+});
+
 test('audit source filter omits the unused system source', function () {
     $view = file_get_contents(resource_path('views/livewire/team/audit-log.blade.php'));
 

@@ -3,6 +3,7 @@
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Livewire\Project\Shared\SecretManagerLinks;
 use App\Models\Application;
+use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
@@ -18,6 +19,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->withoutDefer();
     if (! InstanceSettings::query()->whereKey(0)->exists()) {
         $settings = new InstanceSettings;
         $settings->id = 0;
@@ -59,6 +61,11 @@ test('selecting a token in the dropdown saves the source automatically', functio
         'resourceable_type' => $this->application->getMorphClass(),
         'resourceable_id' => $this->application->id,
         'integration_token_id' => $this->token->id,
+    ]);
+    $this->assertDatabaseHas('audit_events', [
+        'team_id' => $this->team->id,
+        'event' => 'ui.application.secret_manager.source_updated',
+        'resource_uuid' => $this->application->uuid,
     ]);
 });
 
@@ -163,6 +170,10 @@ test('browse keys shows key names only and search filters them', function () {
 
     expect($component->get('keys'))->toBe(['API_KEY', 'DB_PASSWORD']);
 
+    $auditEvent = AuditEvent::query()->where('event', 'ui.application.secret_manager.keys_viewed')->sole();
+    expect($auditEvent->metadata['key_count'])->toBe(2)
+        ->and($auditEvent->metadata)->not->toHaveKey('keys');
+
     $component->set('search', 'db_pass')
         ->assertSee('DB_PASSWORD')
         ->assertDontSee('API_KEY');
@@ -206,6 +217,9 @@ test('add reference creates a variable with a secret reference value', function 
 
     $created = $this->application->environment_variables()->where('key', 'DB_PASSWORD')->firstOrFail();
     expect($created->value)->toBe('{{vault.DB_PASSWORD}}');
+
+    $auditEvent = AuditEvent::query()->where('event', 'ui.application.secret_manager.reference_created')->sole();
+    expect($auditEvent->metadata['secret_key'])->toBe('[REDACTED]');
 });
 
 test('import all creates references for missing keys and skips existing ones', function () {
@@ -228,6 +242,10 @@ test('import all creates references for missing keys and skips existing ones', f
         ->toBe('{{vault.NEW_KEY}}')
         ->and($this->application->environment_variables()->where('key', 'EXISTING')->firstOrFail()->value)
         ->toBe('local');
+
+    $auditEvent = AuditEvent::query()->where('event', 'ui.application.secret_manager.references_imported')->sole();
+    expect($auditEvent->metadata['key_count'])->toBe(1)
+        ->and($auditEvent->metadata['secret_keys'])->toBe('[REDACTED]');
 });
 
 test('the source can be removed', function () {
@@ -238,6 +256,11 @@ test('the source can be removed', function () {
         ->assertDispatched('success');
 
     $this->assertDatabaseCount('secret_manager_links', 0);
+    $this->assertDatabaseHas('audit_events', [
+        'team_id' => $this->team->id,
+        'event' => 'ui.application.secret_manager.source_removed',
+        'resource_uuid' => $this->application->uuid,
+    ]);
 });
 
 test('members without update permission cannot save a source', function () {

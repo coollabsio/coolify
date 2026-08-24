@@ -19,6 +19,11 @@ class AuditLog extends Component
 
     public int $perPage = 25;
 
+    public function mount(): void
+    {
+        abort_unless(auth()->user()->isAdminOfTeam(currentTeam()->id), 403);
+    }
+
     public function updatedSearch(): void
     {
         $this->resetPage();

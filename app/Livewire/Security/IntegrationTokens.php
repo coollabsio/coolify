@@ -36,7 +36,16 @@ class IntegrationTokens extends Component
             return;
         }
 
+        $tokenUuid = $token->uuid;
+        $tokenName = $token->name;
+        $provider = $token->provider;
         $token->delete();
+        auditLog('ui.integration_token.deleted', [
+            'team_id' => currentTeam()->id,
+            'integration_token_uuid' => $tokenUuid,
+            'integration_token_name' => $tokenName,
+            'provider' => $provider,
+        ]);
         $this->loadTokens();
         $this->dispatch('success', 'Integration token deleted successfully.');
     }

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    $this->withoutDefer();
     config(['app.maintenance.driver' => 'file']);
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0, 'is_api_enabled' => true]));
 
@@ -56,6 +57,12 @@ test('a secret manager integration token can be created through the api', functi
 
     expect($token->team_id)->toBe($this->team->id)
         ->and($token->capabilities)->toBe(['secrets']);
+
+    $this->assertDatabaseHas('audit_events', [
+        'team_id' => $this->team->id,
+        'event' => 'api.integration_token.created',
+        'resource_uuid' => $token->uuid,
+    ]);
 });
 
 test('secret manager provider base urls only accept http and https', function (string $provider, array $metadata) {
@@ -103,4 +110,10 @@ test('an application can be configured to use a secret manager through the api',
 
     expect($link->integration_token_id)->toBe($token->id)
         ->and($link->settings)->toBe(['project' => 'website', 'config' => 'production']);
+
+    $this->assertDatabaseHas('audit_events', [
+        'team_id' => $this->team->id,
+        'event' => 'api.application.secret_manager.updated',
+        'resource_uuid' => $this->application->uuid,
+    ]);
 });
