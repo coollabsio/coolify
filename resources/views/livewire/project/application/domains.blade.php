@@ -2,6 +2,7 @@
     $configuredCount = collect($domainRows)->where('is_suggested', false)->count();
     $suggestedCount = collect($domainRows)->where('is_suggested', true)->count();
     $hasRows = count($domainRows) > 0;
+    $hasDnsChecksInProgress = collect($domainRows)->contains(fn ($row) => $row['dns_status'] === 'checking');
     $composeDomainGroups = collect($domainRows)
         ->groupBy(fn ($row) => $row['service'] ?? '__unknown')
         ->filter(fn ($rows) => $rows->contains(fn ($row) => ! ($row['is_suggested'] ?? false)));
@@ -36,6 +37,9 @@
     }"
     @open-edit-domain.window="openEditDomain()"
     @edit-domain-saved.window="closeEditDomain()">
+    @if ($hasDnsChecksInProgress)
+        <div class="hidden" wire:poll.2000ms="pollDnsChecks" aria-hidden="true"></div>
+    @endif
     <x-application.settings-section id="domains-section" title="Domains">
         @can('update', $application)
             <x-slot:actions>

@@ -167,13 +167,11 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
 
             if ($isFile === 'OK') {
-                // If its a file & exists
-                $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
-                if ($fileVolume->is_based_on_git) {
-                    $fileVolume->content = $filesystemContent;
-                }
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
+                if ($fileVolume->is_based_on_git) {
+                    $fileVolume->loadStorageOnServer();
+                }
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
@@ -235,7 +233,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // IMPORTANT: Only extract variables that are DIRECTLY DECLARED for this service,
         // not variables that are merely referenced from other services
         $serviceConfig = data_get($dockerCompose, "services.{$name}");
-        $environment = data_get($serviceConfig, 'environment', []);
+        $environment = data_get($serviceConfig, 'environment') ?? [];
         $templateVariableNames = [];
 
         foreach ($environment as $key => $value) {

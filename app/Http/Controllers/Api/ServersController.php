@@ -550,11 +550,7 @@ class ServersController extends Controller
         }
         $foundServer = ModelsServer::whereIp($request->ip)->first();
         if ($foundServer) {
-            if ($foundServer->team_id === $teamId) {
-                return response()->json(['message' => 'A server with this IP/Domain already exists in your team.'], 400);
-            }
-
-            return response()->json(['message' => 'A server with this IP/Domain is already in use by another team.'], 400);
+            return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
         }
 
         $proxyType = $request->proxy_type ? str($request->proxy_type)->upper() : ProxyTypes::TRAEFIK->value;

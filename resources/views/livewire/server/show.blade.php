@@ -184,7 +184,7 @@
                                 </div>
                             @endif
 
-                            <x-process-dialog closeWithX size="xl" :open="$isValidating">
+                            <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
                                 <x-slot:title>Validate and configure</x-slot:title>
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$server"

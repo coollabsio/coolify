@@ -20,7 +20,7 @@ class ApiTokenPolicy
      */
     public function view(User $user, PersonalAccessToken $token): bool
     {
-        return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
+        return $this->belongsToUserAndCurrentTeam($user, $token);
     }
 
     /**
@@ -36,7 +36,7 @@ class ApiTokenPolicy
      */
     public function update(User $user, PersonalAccessToken $token): bool
     {
-        return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
+        return $this->belongsToUserAndCurrentTeam($user, $token);
     }
 
     /**
@@ -44,7 +44,7 @@ class ApiTokenPolicy
      */
     public function delete(User $user, PersonalAccessToken $token): bool
     {
-        return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
+        return $this->belongsToUserAndCurrentTeam($user, $token);
     }
 
     /**
@@ -85,5 +85,20 @@ class ApiTokenPolicy
     public function useSensitivePermissions(User $user): bool
     {
         return $user->isAdmin() || $user->isOwner();
+    }
+
+    private function belongsToUserAndCurrentTeam(User $user, PersonalAccessToken $token): bool
+    {
+        if ($user->id !== $token->tokenable_id || $token->tokenable_type !== User::class) {
+            return false;
+        }
+
+        $currentTeamId = $user->currentTeam()?->id;
+
+        if ($currentTeamId === null || $token->team_id === null) {
+            return false;
+        }
+
+        return (string) $currentTeamId === (string) $token->team_id;
     }
 }

@@ -6,14 +6,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('discovers running container networks instead of relying on cached resource statuses', function () {
+it('discovers managed container networks regardless of container status', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
 
     $commands = connectProxyToNetworks($server)->implode("\n");
 
     expect($commands)
-        ->toContain('docker ps --filter label=coolify.managed=true')
+        ->toContain('docker ps -a --filter label=coolify.managed=true')
         ->toContain('.NetworkSettings.Networks')
         ->toContain('docker network inspect "$network"')
         ->toContain('docker network connect "$network" coolify-proxy')

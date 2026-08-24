@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Project\Application\Domains;
 use App\Models\Application;
 use App\Models\Environment;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -248,7 +250,7 @@ it('adds a domain to the application', function () {
         ->call('addDomain')
         ->assertHasNoErrors()
         ->assertSet('addDomainDnsFailed', false)
-        ->assertDispatched('success')
+        ->assertDispatched('success', 'Domain added. DNS check started.')
         ->assertDispatched('close-modal');
 
     $this->application->refresh();
@@ -290,7 +292,9 @@ it('adds multiple domains without replacing existing ones', function () {
         ->toContain('https://api.example.com');
 });
 
-it('blocks adding a domain with bad dns until the user continues', function () {
+it('saves a domain before checking dns in a separate request', function () {
+    Queue::fake();
+
     $settings = InstanceSettings::get();
     $settings->is_dns_validation_enabled = true;
     $settings->save();
@@ -298,15 +302,8 @@ it('blocks adding a domain with bad dns until the user continues', function () {
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->set('newDomain', 'https://this-domain-should-not-resolve-for-coolify-tests.invalid')
         ->call('addDomain')
-        ->assertSet('addDomainDnsFailed', true)
-        ->assertSee('DNS is not pointing to the right IP')
-        ->assertSee('Are you sure you want to add it anyway');
-
-    $this->application->refresh();
-    expect($this->application->fqdn)->toBeNull();
-
-    $component->call('confirmAddDomainDespiteDns')
         ->assertSet('addDomainDnsFailed', false)
+        ->assertSet('domainRows.0.dns_status', 'checking')
         ->assertDispatched('success')
         ->assertDispatched('close-modal');
 
@@ -315,17 +312,24 @@ it('blocks adding a domain with bad dns until the user continues', function () {
         'https://this-domain-should-not-resolve-for-coolify-tests.invalid',
         'https://www.this-domain-should-not-resolve-for-coolify-tests.invalid',
     ]);
+
+    expect($this->application->domain_dns_statuses['https://this-domain-should-not-resolve-for-coolify-tests.invalid']['status'] ?? null)
+        ->toBe('checking');
+
+    Queue::assertPushed(CheckDomainDnsJob::class, 2);
+
+    $jobs = Queue::pushed(CheckDomainDnsJob::class);
+
+    expect($jobs->pluck('statusKey')->all())->toEqualCanonicalizing([
+        'https://this-domain-should-not-resolve-for-coolify-tests.invalid',
+        'https://www.this-domain-should-not-resolve-for-coolify-tests.invalid',
+    ])->and($jobs->pluck('checkId')->unique())->toHaveCount(2);
 });
 
 it('resets the dns gate when the domain input changes', function () {
-    $settings = InstanceSettings::get();
-    $settings->is_dns_validation_enabled = true;
-    $settings->save();
-
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->set('newDomain', 'https://this-domain-should-not-resolve-for-coolify-tests.invalid')
-        ->call('addDomain')
-        ->assertSet('addDomainDnsFailed', true)
+        ->set('addDomainDnsFailed', true)
+        ->set('forceSaveDns', true)
         ->set('newDomain', 'https://another.example.com')
         ->assertSet('addDomainDnsFailed', false)
         ->assertSet('forceSaveDns', false);
@@ -725,6 +729,98 @@ it('persists dns status after checking a domain', function () {
     expect($entry)->toBeArray()
         ->and($entry['status'] ?? null)->toBe('failed')
         ->and($entry['checked_at'] ?? null)->not->toBeNull();
+});
+
+it('polls a queued dns check and notifies about a mismatch', function () {
+    $domain = 'https://app.example.com';
+    $this->application->update([
+        'fqdn' => $domain,
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => null,
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Checking DNS...')
+        ->assertSee('wire:poll.2000ms="pollDnsChecks"', false);
+
+    $this->application->update([
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $component->call('pollDnsChecks')
+        ->assertSet('domainRows.0.dns_status', 'failed')
+        ->assertDispatched('error', 'DNS is not configured for app.example.com. Review the required DNS record.');
+});
+
+it('does not overwrite a completed queued dns result with stale checking state', function () {
+    $domain = 'https://app.example.com';
+    $this->application->update([
+        'fqdn' => $domain,
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => null,
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    $this->application->update([
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $method = new ReflectionMethod($component->instance(), 'persistDomainDnsStatuses');
+    $method->invoke($component->instance());
+
+    expect($this->application->fresh()->domain_dns_statuses[$domain]['status'])->toBe('ok');
+});
+
+it('does not overwrite a newer queued dns check with stale completed component state', function () {
+    $domain = 'https://app.example.com';
+    $status = [
+        'status' => 'ok',
+        'message' => 'DNS looks correct.',
+        'expected_ip' => '203.0.113.10',
+        'checked_at' => null,
+        'check_id' => null,
+    ];
+    $this->application->update([
+        'fqdn' => $domain,
+        'domain_dns_statuses' => [$domain => $status],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    $status['check_id'] = 'newer-check';
+    $this->application->update(['domain_dns_statuses' => [$domain => $status]]);
+
+    $method = new ReflectionMethod($component->instance(), 'persistDomainDnsStatuses');
+    $method->invoke($component->instance());
+
+    expect($this->application->fresh()->domain_dns_statuses[$domain]['check_id'])->toBe('newer-check');
 });
 
 it('resolves hostname server addresses to a real ip for dns messages', function () {

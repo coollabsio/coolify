@@ -166,11 +166,13 @@ function format_docker_labels_to_json(string|array $rawOutput): Collection
             $outputArray = explode(',', $outputLine);
 
             return collect($outputArray)
-                ->map(function ($outputLine) {
-                    return explode('=', $outputLine);
-                })
                 ->mapWithKeys(function ($outputLine) {
-                    return [$outputLine[0] => $outputLine[1]];
+                    $label = explode('=', $outputLine, 2);
+                    if (count($label) !== 2) {
+                        return [];
+                    }
+
+                    return [$label[0] => $label[1]];
                 });
         })[0];
 }
@@ -263,6 +265,36 @@ function dockerStopCommand(int $timeout, string $containers, Server|string|null 
 
     return $command;
 }
+
+function dockerRemoveCommandWithTimeout(string $container, int $timeout = 60, int $killAfter = 10): string
+{
+    $container = escapeShellValue($container);
+    $script = "if command -v timeout >/dev/null 2>&1; then output=\$(timeout -k {$killAfter}s {$timeout}s docker rm -f {$container} 2>&1); exit_code=\$?; else output=''; exit_code=124; fi; if [ \"\$exit_code\" -eq 124 ]; then echo '__COOLIFY_CONTAINER_REMOVE_TIMEOUT__'; elif [ \"\$exit_code\" -ne 0 ] && printf '%s' \"\$output\" | grep -q 'No such container:'; then exit 0; elif [ \"\$exit_code\" -ne 0 ]; then printf '%s\\n' \"\$output\" >&2; else printf '%s\\n' \"\$output\"; fi; exit \$exit_code";
+
+    return 'bash -c '.escapeShellValue($script);
+}
+
+function dockerRemoveCommand(string $container): string
+{
+    $command = 'docker rm -f '.escapeShellValue($container);
+
+    return dockerCommandIgnoringError($command, 'No such container:');
+}
+
+function dockerNetworkRemoveCommand(string $network): string
+{
+    $command = 'docker network rm '.escapeShellValue($network);
+
+    return dockerCommandIgnoringError($command, 'network .* not found');
+}
+
+function dockerCommandIgnoringError(string $command, string $ignoredError): string
+{
+    $script = "output=\$({$command} 2>&1); exit_code=\$?; if [ \"\$exit_code\" -ne 0 ] && printf '%s' \"\$output\" | grep -Eq ".escapeShellValue($ignoredError)."; then exit 0; fi; if [ \"\$exit_code\" -ne 0 ]; then printf '%s\\n' \"\$output\" >&2; else printf '%s\\n' \"\$output\"; fi; exit \$exit_code";
+
+    return 'bash -c '.escapeShellValue($script);
+}
+
 function escapeShellValue(string $value): string
 {
     return "'".str_replace("'", "'\\''", $value)."'";
@@ -882,7 +914,6 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
-                            escape_redirect_replacement_for_compose: false,
                         ));
                         break;
                 }

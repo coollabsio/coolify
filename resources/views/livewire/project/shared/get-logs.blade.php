@@ -7,7 +7,9 @@
         alwaysScroll: false,
         followManuallyDisabled: false,
         rafId: null,
+        scrollTimeout: null,
         scrollDebounce: null,
+        destroyed: false,
         colorLogs: localStorage.getItem('coolify-color-logs') === 'true',
         logFilters: JSON.parse(localStorage.getItem('coolify-log-filters')) || {error: true, warning: true, debug: true, info: true},
         searchQuery: '',
@@ -17,10 +19,7 @@
             this.fullscreen = !this.fullscreen;
             if (this.fullscreen === false) {
                 this.alwaysScroll = false;
-                if (this.rafId) {
-                    cancelAnimationFrame(this.rafId);
-                    this.rafId = null;
-                }
+                this.cancelScrollLoop();
             }
         },
         handleKeyDown(event) {
@@ -33,9 +32,20 @@
         disableFollow() {
             if (!this.alwaysScroll) return;
             this.alwaysScroll = false;
+            this.cancelScrollLoop();
+        },
+        cancelScrollLoop() {
             if (this.rafId) {
                 cancelAnimationFrame(this.rafId);
                 this.rafId = null;
+            }
+            if (this.scrollTimeout) {
+                clearTimeout(this.scrollTimeout);
+                this.scrollTimeout = null;
+            }
+            if (this.scrollDebounce) {
+                clearTimeout(this.scrollDebounce);
+                this.scrollDebounce = null;
             }
         },
         handleWheel(event) {
@@ -62,7 +72,8 @@
             }
         },
         scrollToBottom() {
-            const logsContainer = document.getElementById('logsContainer');
+            if (this.destroyed) return;
+            const logsContainer = this.$root.querySelector('#logsContainer');
             if (logsContainer) {
                 this.isScrolling = true;
                 logsContainer.scrollTop = logsContainer.scrollHeight;
@@ -70,11 +81,12 @@
             }
         },
         scheduleScroll() {
-            if (!this.alwaysScroll) return;
+            if (!this.alwaysScroll || this.destroyed) return;
             this.rafId = requestAnimationFrame(() => {
+                if (!this.alwaysScroll || this.destroyed) return;
                 this.scrollToBottom();
-                if (this.alwaysScroll) {
-                    setTimeout(() => this.scheduleScroll(), 250);
+                if (this.alwaysScroll && !this.destroyed) {
+                    this.scrollTimeout = setTimeout(() => this.scheduleScroll(), 250);
                 }
             });
         },
@@ -85,16 +97,14 @@
                 this.scheduleScroll();
             } else {
                 this.followManuallyDisabled = true;
-                if (this.rafId) {
-                    cancelAnimationFrame(this.rafId);
-                    this.rafId = null;
-                }
+                this.cancelScrollLoop();
             }
         },
         handleScroll(event) {
-            if (this.isScrolling) return;
+            if (this.isScrolling || this.destroyed) return;
             clearTimeout(this.scrollDebounce);
             this.scrollDebounce = setTimeout(() => {
+                if (this.destroyed) return;
                 const el = event.target;
                 const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
                 if (!this.alwaysScroll && !this.followManuallyDisabled && distanceFromBottom <= 10) {
@@ -253,6 +263,11 @@
                     applyAfterUpdate();
                 }
             });
+        },
+        destroy() {
+            this.destroyed = true;
+            this.alwaysScroll = false;
+            this.cancelScrollLoop();
         }
     }" @keydown.window="handleKeyDown($event)">
         @if ($collapsible)

@@ -11,6 +11,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class ScheduledVolumeBackup extends BaseModel
 {
+    public const int DEFAULT_TIMEOUT = 36000;
+
     protected $fillable = [
         'uuid',
         'backupable_type',

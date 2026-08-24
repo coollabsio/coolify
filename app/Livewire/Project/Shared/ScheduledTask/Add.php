@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
+use App\Models\Application;
 use App\Models\ScheduledTask;
+use App\Models\Service;
+use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -59,13 +62,13 @@ class Add extends Component
         // Get the resource based on type and id
         switch ($this->type) {
             case 'application':
-                $this->resource = \App\Models\Application::findOrFail($this->id);
+                $this->resource = Application::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             case 'service':
-                $this->resource = \App\Models\Service::findOrFail($this->id);
+                $this->resource = Service::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             case 'standalone-postgresql':
-                $this->resource = \App\Models\StandalonePostgresql::findOrFail($this->id);
+                $this->resource = StandalonePostgresql::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             default:
                 throw new \Exception('Invalid resource type');

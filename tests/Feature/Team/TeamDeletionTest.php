@@ -1,11 +1,19 @@
 <?php
 
+use App\Actions\Team\DeleteTeam;
 use App\Livewire\Team\DangerZone;
+use App\Models\Application;
+use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -40,6 +48,89 @@ test('deleting a team switches session to another team without error', function 
     $sessionTeam = session('currentTeam');
     expect($sessionTeam)->not->toBeNull()
         ->and($sessionTeam->id)->toBe($this->personalTeam->id);
+});
+
+test('the danger zone resource list can be refreshed', function () {
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->teamToDelete]);
+
+    Livewire::test(DangerZone::class)
+        ->call('refreshResources')
+        ->assertSuccessful();
+});
+
+test('a team with a running application cannot be deleted', function () {
+    $server = Server::factory()->create(['team_id' => $this->teamToDelete->id]);
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->teamToDelete->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'status' => 'running:healthy',
+    ]);
+
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->teamToDelete]);
+
+    Livewire::test(DangerZone::class)
+        ->call('delete')
+        ->assertDispatched('error');
+
+    expect(Team::find($this->teamToDelete->id))->not->toBeNull();
+});
+
+test('a team with a server cannot be deleted', function () {
+    Server::factory()->create(['team_id' => $this->teamToDelete->id]);
+
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->teamToDelete]);
+
+    Livewire::test(DangerZone::class)
+        ->call('delete')
+        ->assertDispatched('error', fn (string $event, array $params): bool => $params[0] === 'Delete all team servers before deleting this team.');
+
+    expect(Team::find($this->teamToDelete->id))->not->toBeNull();
+});
+
+test('a team with a project but no servers cannot be deleted', function () {
+    Project::factory()->create(['team_id' => $this->teamToDelete->id]);
+
+    $member = User::factory()->create();
+    $this->teamToDelete->members()->attach($member->id, ['role' => 'member']);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $this->teamToDelete->id]);
+
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->teamToDelete]);
+
+    Livewire::test(DangerZone::class)
+        ->call('delete')
+        ->assertDispatched('error', fn (string $event, array $params): bool => $params[0] === 'Delete all team resources before deleting this team.');
+
+    expect(Team::find($this->teamToDelete->id))->not->toBeNull()
+        ->and(PrivateKey::find($privateKey->id))->not->toBeNull()
+        ->and($this->teamToDelete->members()->whereKey($member->id)->exists())->toBeTrue();
+});
+
+test('an admin cannot delete a team through the deletion action', function () {
+    $admin = User::factory()->create();
+    $this->teamToDelete->members()->attach($admin->id, ['role' => 'admin']);
+
+    expect(fn () => app(DeleteTeam::class)->handle($this->teamToDelete, $admin))
+        ->toThrow(AuthorizationException::class);
+
+    expect(Team::find($this->teamToDelete->id))->not->toBeNull();
+});
+
+test('a stale owner relationship cannot authorize team deletion', function () {
+    $this->owner->teams;
+    $this->owner->teams()->updateExistingPivot($this->teamToDelete->id, ['role' => 'admin']);
+
+    expect(fn () => app(DeleteTeam::class)->handle($this->teamToDelete, $this->owner))
+        ->toThrow(AuthorizationException::class);
+
+    expect(Team::find($this->teamToDelete->id))->not->toBeNull();
 });
 
 test('refreshSession clears session when no team exists', function () {
@@ -77,4 +168,21 @@ test('deleting a team deletes github and gitlab sources with the same primary ke
 
     expect(GithubApp::find($githubApp->id))->toBeNull()
         ->and(GitlabApp::find($gitlabApp->id))->toBeNull();
+});
+
+test('team deletion rolls back all database changes when an operation fails', function () {
+    $member = User::factory()->create();
+    $this->teamToDelete->members()->attach($member->id, ['role' => 'member']);
+
+    Team::deleting(function (Team $deletingTeam): void {
+        if ($deletingTeam->id === $this->teamToDelete->id) {
+            throw new RuntimeException('Simulated deletion failure.');
+        }
+    });
+
+    expect(fn () => app(DeleteTeam::class)->handle($this->teamToDelete, $this->owner))
+        ->toThrow(RuntimeException::class, 'Simulated deletion failure.');
+
+    expect(Team::find($this->teamToDelete->id))->not->toBeNull()
+        ->and($this->teamToDelete->members()->whereKey($member->id)->exists())->toBeTrue();
 });

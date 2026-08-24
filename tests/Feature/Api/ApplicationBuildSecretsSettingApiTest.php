@@ -254,4 +254,58 @@ describe('other application creation endpoints use_build_secrets', function () {
 
         expect($application->settings->use_build_secrets)->toBeTrue();
     });
+
+    test('creates an application from a system-wide GitHub App owned by another team', function () {
+        $ownerTeam = Team::factory()->create();
+        $privateKey = PrivateKey::create([
+            'name' => 'System-wide GitHub App Key',
+            'private_key' => buildSecretsGithubPrivateKey(),
+            'team_id' => $ownerTeam->id,
+        ]);
+        $githubApp = GithubApp::create([
+            'name' => 'System-wide GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 54321,
+            'installation_id' => 9876,
+            'client_id' => 'system-wide-client-id',
+            'client_secret' => 'system-wide-client-secret',
+            'webhook_secret' => 'system-wide-webhook-secret',
+            'private_key_id' => $privateKey->id,
+            'team_id' => $ownerTeam->id,
+            'is_system_wide' => true,
+            'is_public' => false,
+        ]);
+
+        Http::fake([
+            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
+                'Date' => now()->toRfc7231String(),
+            ]),
+            'https://api.github.com/app/installations/9876/access_tokens' => Http::response([
+                'token' => 'github-installation-token',
+            ], 201),
+            'https://api.github.com/repos/coolify/system-wide-test' => Http::response([
+                'id' => 654321,
+            ]),
+        ]);
+
+        $response = $this->withHeaders(buildSecretsApiHeaders($this->bearerToken))
+            ->postJson('/api/v1/applications/private-github-app', [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'server_uuid' => $this->server->uuid,
+                'github_app_uuid' => $githubApp->uuid,
+                'git_repository' => 'coolify/system-wide-test',
+                'git_branch' => 'main',
+                'build_pack' => 'nixpacks',
+                'ports_exposes' => '3000',
+                'autogenerate_domain' => false,
+            ])
+            ->assertCreated();
+
+        $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($application->source_id)->toBe($githubApp->id)
+            ->and($application->environment_id)->toBe($this->environment->id);
+    });
 });

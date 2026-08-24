@@ -25,6 +25,8 @@ class GetLogs extends Component
 {
     public const MAX_LOG_LINES = 50000;
 
+    public const MAX_DISPLAY_SIZE_BYTES = 5 * 1024 * 1024;
+
     public const MAX_DOWNLOAD_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 
     public string $outputs = '';
@@ -154,14 +156,12 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} -t {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             } else {
                 if ($this->server->isSwarm()) {
@@ -170,22 +170,39 @@ class GetLogs extends Component
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 } else {
                     $command = "docker logs -n {$this->numberOfLines} {$this->container}";
                     if ($this->server->isNonRoot()) {
                         $command = parseCommandsByLineForSudo(collect($command), $this->server);
                         $command = $command[0];
                     }
-                    $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
                 }
             }
+            $command = $this->boundedLogCommand($command, self::MAX_DISPLAY_SIZE_BYTES);
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
+
             // Collect new logs into temporary variable first to prevent flickering
             // (avoids clearing output before new data is ready)
             // Use array accumulation + implode for O(n) instead of O(n²) string concatenation
             $logChunks = [];
-            Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks) {
+            $accumulatedBytes = 0;
+            $truncated = false;
+            Process::timeout(config('constants.ssh.command_timeout'))->run($sshCommand, function (string $type, string $output) use (&$logChunks, &$accumulatedBytes, &$truncated) {
+                if ($truncated) {
+                    return;
+                }
+
+                $remainingBytes = self::MAX_DISPLAY_SIZE_BYTES - $accumulatedBytes;
+                $outputBytes = strlen($output);
+                if ($outputBytes > $remainingBytes) {
+                    $logChunks[] = removeAnsiColors(substr($output, 0, max(0, $remainingBytes)));
+                    $truncated = true;
+
+                    return;
+                }
+
                 $logChunks[] = removeAnsiColors($output);
+                $accumulatedBytes += $outputBytes;
             });
             $newOutputs = implode('', $logChunks);
 
@@ -196,6 +213,10 @@ class GetLogs extends Component
 
                     return $a[0] <=> $b[0];
                 })->join("\n");
+            }
+
+            if ($truncated) {
+                $newOutputs .= "\n\n[... Output truncated at 5MB limit ...]";
             }
 
             // Only update outputs after new data is ready (atomic update prevents flicker)
@@ -239,6 +260,7 @@ class GetLogs extends Component
             $command = $command[0];
         }
 
+        $command = $this->boundedLogCommand($command, self::MAX_DOWNLOAD_SIZE_BYTES);
         $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $command);
 
         // Use array accumulation + implode for O(n) instead of O(n²) string concatenation
@@ -252,20 +274,19 @@ class GetLogs extends Component
                 return;
             }
 
-            $output = removeAnsiColors($output);
             $outputBytes = strlen($output);
 
             if ($accumulatedBytes + $outputBytes > self::MAX_DOWNLOAD_SIZE_BYTES) {
                 $remaining = self::MAX_DOWNLOAD_SIZE_BYTES - $accumulatedBytes;
                 if ($remaining > 0) {
-                    $logChunks[] = substr($output, 0, $remaining);
+                    $logChunks[] = removeAnsiColors(substr($output, 0, $remaining));
                 }
                 $truncated = true;
 
                 return;
             }
 
-            $logChunks[] = $output;
+            $logChunks[] = removeAnsiColors($output);
             $accumulatedBytes += $outputBytes;
         });
 
@@ -285,6 +306,11 @@ class GetLogs extends Component
         }
 
         return sanitizeLogsForExport($allLogs);
+    }
+
+    private function boundedLogCommand(string $command, int $maxBytes): string
+    {
+        return "({$command}) 2>&1 | head -c ".($maxBytes + 1);
     }
 
     public function render()
