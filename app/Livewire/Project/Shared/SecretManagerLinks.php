@@ -116,6 +116,10 @@ class SecretManagerLinks extends Component
                 'integration_token_id' => $token->id,
                 'settings' => $settings ?: null,
             ]);
+            $this->auditSecretManagerAction('source_updated', [
+                'integration_token_uuid' => $token->uuid,
+                'provider' => $token->provider,
+            ]);
 
             $this->resetKeys();
             $this->loadData();
@@ -143,6 +147,7 @@ class SecretManagerLinks extends Component
             $settings = array_filter(data_get($validated, 'settings', []), fn ($value) => filled($value));
 
             $this->link->update(['settings' => $settings ?: null]);
+            $this->auditSecretManagerAction('settings_updated');
             $this->resetKeys();
             $this->loadData();
             $this->dispatch('success', 'Secret manager settings saved.');
@@ -155,7 +160,12 @@ class SecretManagerLinks extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $token = $this->link?->integrationToken;
             $this->resource->secretManagerLink()->delete();
+            $this->auditSecretManagerAction('source_removed', [
+                'integration_token_uuid' => $token?->uuid,
+                'provider' => $token?->provider,
+            ]);
             $this->link = null;
             $this->integration_token_uuid = '';
             $this->settings = [];
@@ -181,6 +191,7 @@ class SecretManagerLinks extends Component
             sort($keys);
             $this->keys = $keys;
             $this->keysLoaded = true;
+            $this->auditSecretManagerAction('keys_viewed', ['key_count' => count($keys)]);
         } catch (\Throwable $e) {
             $this->dispatch('error', 'Could not fetch keys: '.$e->getMessage());
         }
@@ -205,6 +216,7 @@ class SecretManagerLinks extends Component
                 'key' => $key,
                 'value' => '{{vault.'.$key.'}}',
             ]);
+            $this->auditSecretManagerAction('reference_created', ['secret_key' => $key]);
 
             $this->dispatch('refreshEnvs');
             $this->dispatch('success', "Added {$key} as {{vault.{$key}}}.");
@@ -223,6 +235,10 @@ class SecretManagerLinks extends Component
             }
 
             $imported = $this->link->importMissingReferences();
+            $this->auditSecretManagerAction('references_imported', [
+                'key_count' => count($imported),
+                'secret_keys' => $imported,
+            ]);
 
             $this->dispatch('refreshEnvs');
             $this->dispatch('success', $imported === []
@@ -238,6 +254,18 @@ class SecretManagerLinks extends Component
         $this->keys = [];
         $this->keysLoaded = false;
         $this->search = '';
+    }
+
+    /** @param array<string, mixed> $context */
+    private function auditSecretManagerAction(string $action, array $context = []): void
+    {
+        $resourceType = str(class_basename($this->resource))->snake()->value();
+
+        auditLog("ui.{$resourceType}.secret_manager.{$action}", array_merge([
+            'team_id' => $this->resource->team()?->id,
+            "{$resourceType}_uuid" => $this->resource->uuid,
+            "{$resourceType}_name" => $this->resource->name,
+        ], $context));
     }
 
     public function getFilteredKeysProperty(): array

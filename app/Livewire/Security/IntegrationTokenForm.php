@@ -91,13 +91,20 @@ class IntegrationTokenForm extends Component
                 return;
             }
 
-            IntegrationToken::query()->create([
+            $integrationToken = IntegrationToken::query()->create([
                 'provider' => $validated['provider'],
                 'name' => $validated['name'],
                 'token' => $validated['token'],
                 'capabilities' => $validated['capabilities'],
                 'metadata' => $metadata ?: null,
                 'team_id' => currentTeam()->id,
+            ]);
+
+            auditLog('ui.integration_token.created', [
+                'team_id' => currentTeam()->id,
+                'integration_token_uuid' => $integrationToken->uuid,
+                'integration_token_name' => $integrationToken->name,
+                'provider' => $integrationToken->provider,
             ]);
 
             $this->reset(['name', 'token']);

@@ -377,6 +377,12 @@ class Previews extends Component
             ApplicationPreview::where('application_id', $this->application->id)
                 ->where('pull_request_id', $pull_request_id)
                 ->update(['status' => 'exited']);
+            auditLog('ui.application.preview_stopped', [
+                'team_id' => $this->application->team()?->id,
+                'application_uuid' => $this->application->uuid,
+                'application_name' => $this->application->name,
+                'pull_request_id' => $pull_request_id,
+            ]);
             ServiceStatusChanged::dispatch($this->application->environment->project->team->id);
 
             GetContainersStatus::run($server);
