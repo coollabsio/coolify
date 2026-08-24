@@ -16,6 +16,8 @@ class StandaloneClickhouse extends BaseModel
 {
     use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
 
+    protected array $auditExclude = ['last_online_at'];
+
     protected $fillable = [
         'uuid',
         'name',

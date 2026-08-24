@@ -84,9 +84,8 @@ function queue_application_deployment(Application $application, string $deployme
         'only_this_server' => $only_this_server,
     ]);
 
-    if (auth()->check() && ! $is_webhook && ! $is_api) {
+    if (auth()->check() && ! $is_webhook && ! $is_api && ! $rollback) {
         auditLog($restart_only ? 'ui.application.restarted' : 'ui.application.deployed', [
-            'team_id' => $application->team()?->id,
             'application_uuid' => $application->uuid,
             'application_name' => $application->name,
             'deployment_uuid' => $deployment_uuid,

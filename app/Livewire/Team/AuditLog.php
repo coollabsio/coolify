@@ -19,7 +19,7 @@ class AuditLog extends Component
 
     public int $perPage = 25;
 
-    public function mount(): void
+    public function boot(): void
     {
         abort_unless(auth()->user()->isAdminOfTeam(currentTeam()->id), 403);
     }

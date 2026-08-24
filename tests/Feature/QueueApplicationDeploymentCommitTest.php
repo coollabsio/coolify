@@ -3,6 +3,7 @@
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
@@ -61,18 +62,39 @@ describe('queue_application_deployment commit resolution', function () {
     });
 
     test('uses the deployed application team for the audit event', function () {
+        $actorTeam = Team::factory()->create();
         $user = User::factory()->create();
-        $this->team->members()->attach($user, ['role' => 'owner']);
+        $actorTeam->members()->attach($user, ['role' => 'owner']);
         $this->actingAs($user);
         session()->forget('currentTeam');
         $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
 
         queue_application_deployment($application, 'resource-team-audit-deploy');
 
-        $this->assertDatabaseHas('audit_events', [
-            'team_id' => $this->team->id,
-            'event' => 'ui.application.deployed',
-            'resource_uuid' => $application->uuid,
+        $event = AuditEvent::query()->where('event', 'ui.application.deployed')->sole();
+
+        expect($event->team_id)->toBe($this->team->id)
+            ->and($event->team_id)->not->toBe($actorTeam->id)
+            ->and($event->resource_uuid)->toBe($application->uuid)
+            ->and($event->metadata)->not->toHaveKey('team_id');
+    });
+
+    test('records only the rollback audit event when a user queues a rollback', function () {
+        $user = User::factory()->create();
+        $this->team->members()->attach($user, ['role' => 'owner']);
+        $this->actingAs($user);
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+        AuditEvent::query()->delete();
+
+        queue_application_deployment(
+            application: $application,
+            deployment_uuid: 'audit-rollback-uuid',
+            commit: 'previous-commit',
+            rollback: true,
+        );
+
+        expect(AuditEvent::query()->pluck('event')->all())->toBe([
+            'ui.application.rollback',
         ]);
     });
 

@@ -87,8 +87,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             }
 
             // Transfer instance-wide sources to root team so they remain available
-            GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
-            GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
+            $systemWideSources = GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->get()
+                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
+            foreach ($systemWideSources as $source) {
+                $source->update(['team_id' => 0]);
+            }
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()

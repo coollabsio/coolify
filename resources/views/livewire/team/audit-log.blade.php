@@ -18,7 +18,7 @@
                     </div>
                     <div class="grid grid-cols-2 gap-2 sm:flex">
                         <div class="sm:w-36">
-                            <x-forms.listbox id="action" live :options="[
+                            <x-forms.listbox id="action" live canGate="viewAdmin" :canResource="currentTeam()" :options="[
                                 ['value' => 'all', 'label' => 'All actions'],
                                 ['value' => 'created', 'label' => 'Created'],
                                 ['value' => 'updated', 'label' => 'Updated'],
@@ -35,7 +35,7 @@
                             ]" />
                         </div>
                         <div class="sm:w-36">
-                            <x-forms.listbox id="source" live :options="[
+                            <x-forms.listbox id="source" live canGate="viewAdmin" :canResource="currentTeam()" :options="[
                                 ['value' => 'all', 'label' => 'All sources'],
                                 ['value' => 'ui', 'label' => 'Web UI'],
                                 ['value' => 'api', 'label' => 'API'],
@@ -103,7 +103,8 @@
                         :last-page="$events->lastPage()" wire-target="setPage,previousPage,nextPage"
                         previous-action="previousPage" next-action="nextPage">
                         <x-slot:pageSize>
-                            <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.audit-log" />
+                            <x-page-size-select model="perPage" livewire storage-key="coolify.page-size.audit-log"
+                                canGate="viewAdmin" :canResource="currentTeam()" />
                         </x-slot:pageSize>
                     </x-table-pagination>
                 @else

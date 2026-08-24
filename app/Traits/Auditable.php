@@ -29,7 +29,12 @@ trait Auditable
 
         $changedFields = $action === 'updated'
             ? collect(array_keys($this->getChanges()))
-                ->reject(fn (string $field): bool => in_array($field, ['updated_at', 'order', 'status'], true))
+                ->reject(fn (string $field): bool => in_array($field, [
+                    'updated_at',
+                    'order',
+                    'status',
+                    ...($this->auditExclude ?? []),
+                ], true))
                 ->values()
                 ->all()
             : [];

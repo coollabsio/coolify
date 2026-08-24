@@ -64,7 +64,9 @@ class Project extends BaseModel
             ]);
         });
         static::deleting(function ($project) {
-            $project->environments()->delete();
+            foreach ($project->environments()->get() as $environment) {
+                $environment->delete();
+            }
             $project->settings()->delete();
             $shared_variables = $project->environment_variables();
             foreach ($shared_variables as $shared_variable) {

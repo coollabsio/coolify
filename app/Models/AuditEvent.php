@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -60,11 +61,19 @@ class AuditEvent extends Model
                 defer(function () use ($attributes): void {
                     try {
                         self::query()->create($attributes);
-                    } catch (Throwable) {
+                    } catch (Throwable $exception) {
+                        Log::warning('Audit event persistence failed', [
+                            'event' => $attributes['event'],
+                            'exception' => $exception::class,
+                        ]);
                     }
                 })->always();
             });
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::warning('Audit event preparation failed', [
+                'event' => $event,
+                'exception' => $exception::class,
+            ]);
         }
     }
 
@@ -154,7 +163,7 @@ class AuditEvent extends Model
 
     private static function redact(mixed $value, ?string $key = null): mixed
     {
-        if ($key !== null && preg_match('/password|secret|token|private_key|signature|credential/i', $key)) {
+        if ($key !== null && preg_match('/password|secret|token|private_key|signature|credential|invitation_email/i', $key)) {
             return '[REDACTED]';
         }
 

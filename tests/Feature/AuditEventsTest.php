@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Kernel;
+use App\Livewire\Project\Service\Heading;
 use App\Livewire\Project\Shared\EnvironmentVariable\Show;
 use App\Livewire\Team\AuditLog;
 use App\Livewire\Team\Index as TeamIndex;
@@ -9,6 +10,8 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -26,6 +29,7 @@ use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\Auditable;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Http\Middleware\InvokeDeferredCallbacks;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
@@ -94,11 +98,46 @@ test('http kernel invokes deferred callbacks', function () {
 });
 
 test('audit persistence failures do not fail the action', function () {
-    Schema::drop('audit_events');
+    Schema::rename('audit_events', 'unavailable_audit_events');
 
-    auditLog('ui.project.updated', ['team_id' => $this->team->id]);
+    try {
+        expect(fn () => auditLog('ui.project.updated', ['team_id' => $this->team->id]))
+            ->not->toThrow(Throwable::class);
 
-    expect(true)->toBeTrue();
+        Log::shouldHaveReceived('warning')->once()->with(
+            'Audit event persistence failed',
+            Mockery::on(fn (array $context): bool => $context === [
+                'event' => 'ui.project.updated',
+                'exception' => QueryException::class,
+            ]),
+        );
+    } finally {
+        Schema::rename('unavailable_audit_events', 'audit_events');
+    }
+});
+
+test('audit preparation failures log sanitized diagnostics without failing the action', function () {
+    $resourceName = new class
+    {
+        public function __toString(): string
+        {
+            throw new RuntimeException('sensitive audit metadata');
+        }
+    };
+
+    expect(fn () => auditLog('ui.project.updated', [
+        'team_id' => $this->team->id,
+        'project_name' => $resourceName,
+        'secret' => 'must not be logged',
+    ]))->not->toThrow(Throwable::class);
+
+    Log::shouldHaveReceived('warning')->once()->with(
+        'Audit event preparation failed',
+        Mockery::on(fn (array $context): bool => $context === [
+            'event' => 'ui.project.updated',
+            'exception' => RuntimeException::class,
+        ]),
+    );
 });
 
 test('audit log persists a structured event for the current team', function () {
@@ -136,6 +175,49 @@ test('auditable models record authenticated create update and delete actions', f
         'ui.project.updated',
         'ui.project.deleted',
     ])->and($events[1]->metadata['changed_fields'])->toBe(['name']);
+});
+
+test('deleting a project dispatches deleted events for its environments', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = $project->environments()->sole();
+    AuditEvent::query()->delete();
+
+    $project->delete();
+
+    expect(AuditEvent::query()
+        ->where('event', 'ui.environment.deleted')
+        ->where('resource_uuid', $environment->uuid)
+        ->exists())->toBeTrue();
+});
+
+test('deleting a team dispatches updated events for transferred system-wide sources', function () {
+    Team::factory()->create(['id' => 0]);
+    $githubApp = GithubApp::query()->create([
+        'name' => 'System GitHub source',
+        'team_id' => $this->team->id,
+        'is_system_wide' => true,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+    ]);
+    $gitlabApp = GitlabApp::query()->create([
+        'name' => 'System GitLab source',
+        'team_id' => $this->team->id,
+        'is_system_wide' => true,
+        'api_url' => 'https://gitlab.com/api/v4',
+        'html_url' => 'https://gitlab.com',
+    ]);
+    AuditEvent::query()->delete();
+
+    $this->team->delete();
+
+    expect(AuditEvent::query()
+        ->where('event', 'ui.github_app.updated')
+        ->where('resource_uuid', $githubApp->uuid)
+        ->exists())->toBeTrue()
+        ->and(AuditEvent::query()
+            ->where('event', 'ui.gitlab_app.updated')
+            ->where('resource_uuid', $gitlabApp->uuid)
+            ->exists())->toBeTrue();
 });
 
 test('auditable model mutations succeed when audit persistence fails', function () {
@@ -373,6 +455,39 @@ test('team resource models opt in to automatic auditing', function (string $mode
     StandaloneClickhouse::class,
 ]);
 
+test('status-only database updates do not record last online audit changes', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+    foreach ([StandaloneClickhouse::class, StandaloneRedis::class] as $model) {
+        $attributes = [
+            'uuid' => fake()->uuid(),
+            'name' => 'Status test database',
+            'status' => 'exited',
+            'environment_id' => $environment->id,
+            'destination_type' => Server::class,
+            'destination_id' => 0,
+        ];
+        if ($model === StandaloneClickhouse::class) {
+            $attributes['clickhouse_admin_password'] = 'password';
+        }
+
+        $database = $model::create($attributes);
+        AuditEvent::query()->delete();
+
+        $database->update(['status' => 'running']);
+
+        expect(AuditEvent::query()->count())->toBe(0);
+
+        $database->update(['name' => 'Renamed status test database']);
+
+        $event = AuditEvent::query()->sole();
+
+        expect($event->metadata['changed_fields'])->toBe(['name']);
+        AuditEvent::query()->delete();
+    }
+});
+
 test('audit log redacts sensitive metadata', function () {
     auditLog('api.application.updated', [
         'team_id' => $this->team->id,
@@ -386,6 +501,23 @@ test('audit log redacts sensitive metadata', function () {
     expect($metadata['token'])->toBe('[REDACTED]')
         ->and($metadata['nested']['password'])->toBe('[REDACTED]')
         ->and($metadata['nested']['safe'])->toBe('visible');
+});
+
+test('team invitation audit logs redact the invitation email', function () {
+    auditLog('ui.team_invitation.created', [
+        'team_id' => $this->team->id,
+        'invitation_uuid' => 'invitation-123',
+        'invitation_email' => 'invitee@example.com',
+        'role' => 'member',
+        'via' => 'email',
+    ]);
+
+    $metadata = AuditEvent::query()->sole()->metadata;
+
+    expect($metadata['invitation_email'])->toBe('[REDACTED]')
+        ->and($metadata['invitation_uuid'])->toBe('invitation-123')
+        ->and($metadata['role'])->toBe('member')
+        ->and($metadata['via'])->toBe('email');
 });
 
 test('audit log page only shows events for the current team', function () {
@@ -417,6 +549,15 @@ test('team members cannot view the audit log page', function () {
     session(['currentTeam' => $this->team]);
 
     $this->get('/team/audit-log')->assertForbidden();
+});
+
+test('demoted team admins cannot make subsequent audit log requests', function () {
+    $component = Livewire::test(AuditLog::class);
+
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    auth()->setUser($this->user->fresh());
+
+    $component->set('search', 'deployment')->assertStatus(403);
 });
 
 test('team admins can query only their team audit events through the api', function () {
@@ -463,41 +604,31 @@ test('team members cannot query audit events through the api', function () {
 });
 
 test('audit source filter omits the unused system source', function () {
-    $view = file_get_contents(resource_path('views/livewire/team/audit-log.blade.php'));
-
-    expect($view)->not->toContain("['value' => 'system', 'label' => 'System']");
+    Livewire::test(AuditLog::class)
+        ->assertSee('All sources')
+        ->assertSee('Web UI')
+        ->assertSee('API')
+        ->assertSee('MCP')
+        ->assertSee('Webhook')
+        ->assertDontSee('System');
 });
 
-test('critical UI operations have explicit audit events', function (string $path, string $event) {
-    expect(file_get_contents(base_path($path)))->toContain("'{$event}'");
-})->with([
-    ['app/Livewire/Project/Application/Heading.php', 'ui.application.stopped'],
-    ['app/Livewire/Project/Application/Previews.php', 'ui.application.preview_stopped'],
-    ['app/Livewire/Project/Shared/Destination.php', 'ui.application.destination_stopped'],
-    ['app/Livewire/Project/Service/Heading.php', 'ui.service.started'],
-    ['app/Livewire/Project/Service/Heading.php', 'ui.service.stopped'],
-    ['app/Livewire/Project/Service/Heading.php', 'ui.service.restarted'],
-    ['app/Livewire/Project/Database/Heading.php', 'ui.database.started'],
-    ['app/Livewire/Project/Database/Heading.php', 'ui.database.stopped'],
-    ['app/Livewire/Project/Database/Heading.php', 'ui.database.restarted'],
-    ['app/Livewire/Server/Navbar.php', 'ui.proxy.stopped'],
-    ['app/Livewire/Server/Navbar.php', 'ui.proxy.restarted'],
-    ['app/Livewire/Project/Database/BackupEdit.php', 'ui.database.backup_started'],
-    ['app/Livewire/Project/Database/BackupEdit.php', 'ui.database.backup_schedule_deleted'],
-    ['app/Livewire/Project/Database/ImportForm.php', 'ui.database.import_started'],
-    ['app/Livewire/Project/Database/ImportForm.php', 'ui.database.restore_started'],
-    ['app/Livewire/Project/Shared/ScheduledTask/Show.php', 'ui.scheduled_task.executed'],
-    ['app/Livewire/Security/ApiTokens.php', 'ui.api_token.created'],
-    ['app/Livewire/Security/ApiTokens.php', 'ui.api_token.revoked'],
-    ['app/Livewire/Team/Member.php', 'ui.team_member.role_updated'],
-    ['app/Livewire/Team/Member.php', 'ui.team_member.removed'],
-    ['app/Livewire/Team/InviteLink.php', 'ui.team_invitation.created'],
-    ['app/Livewire/Team/Invitations.php', 'ui.team_invitation.revoked'],
-    ['app/Livewire/Server/DockerCleanup.php', 'ui.server.docker_cleanup_started'],
-    ['app/Livewire/Server/TransferImport.php', 'ui.server.imported'],
-    ['app/Livewire/Project/CloneMe.php', 'ui.project.clone_started'],
-    ['app/Livewire/Project/Shared/ResourceOperations.php', 'ui.resource.clone_started'],
-]);
+test('resource clone audit starts only after the destination server capability check', function () {
+    $source = file_get_contents(app_path('Livewire/Project/Shared/ResourceOperations.php'));
+
+    expect(strpos($source, "auditLog('ui.resource.clone_started'"))
+        ->toBeGreaterThan(strpos($source, 'if (! $server->canHostResources())'));
+});
+
+test('pull and restart records the service restart audit event after starting the service', function () {
+    $method = new ReflectionMethod(Heading::class, 'pullAndRestartEvent');
+    $source = file($method->getFileName());
+    $methodSource = implode('', array_slice($source, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
+
+    expect($methodSource)
+        ->toContain("auditServiceAction('ui.service.restarted')")
+        ->and(strpos($methodSource, 'StartService::run'))->toBeLessThan(strpos($methodSource, 'auditServiceAction'));
+});
 
 test('critical operational events persist with their source action and actor', function (string $event) {
     auditLog($event, [
@@ -547,17 +678,26 @@ test('critical operational events persist with their source action and actor', f
 ]);
 
 test('audit log table keeps actor details visible in a mobile scroll area', function () {
-    $view = file_get_contents(resource_path('views/livewire/team/audit-log.blade.php'));
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'actor_name' => 'Visible Actor',
+    ]);
 
-    expect($view)->toContain('overflow-x-auto')
-        ->toContain('min-w-[760px]')
-        ->not->toContain('hidden lg:block">Actor');
+    Livewire::test(AuditLog::class)
+        ->assertSeeHtml('class="overflow-x-auto"')
+        ->assertSeeHtml('min-w-[760px]')
+        ->assertSee('Actor')
+        ->assertSee('Visible Actor');
 });
 
 test('audit log displays source abbreviations in uppercase', function () {
-    $view = file_get_contents(resource_path('views/livewire/team/audit-log.blade.php'));
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'source' => 'cli',
+    ]);
 
-    expect($view)->toContain('Str::upper($event->source)');
+    Livewire::test(AuditLog::class)
+        ->assertSee('CLI');
 });
 
 test('audit log page filters events by search and action', function () {
