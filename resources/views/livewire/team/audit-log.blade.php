@@ -37,7 +37,7 @@
                     <div class="overflow-x-auto">
                     <div class="data-table min-w-[760px] transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
                         wire:target="search,action,source,setPage,previousPage,nextPage">
-                        <div class="grid grid-cols-[10rem_minmax(0,1fr)_12rem_9rem] gap-4 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:border-white/[0.07] dark:text-fg-faint">
+                        <div class="grid grid-cols-[14rem_minmax(0,1fr)_12rem_9rem] gap-4 border-b border-neutral-200 px-4 py-2 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:border-white/[0.07] dark:text-fg-faint">
                             <span>Actor</span>
                             <span>Activity</span>
                             <span>Source</span>
@@ -45,7 +45,7 @@
                         </div>
                         @foreach ($events as $event)
                             <div wire:key="audit-event-{{ $event->id }}"
-                                class="grid grid-cols-[10rem_minmax(0,1fr)_12rem_9rem] gap-4 border-b border-neutral-200 px-4 py-3 last:border-b-0 dark:border-white/[0.07]">
+                                class="grid grid-cols-[14rem_minmax(0,1fr)_12rem_9rem] gap-4 border-b border-neutral-200 px-4 py-3 last:border-b-0 dark:border-white/[0.07]">
                                 <div class="min-w-0">
                                     <div class="truncate text-[12px] font-medium text-black dark:text-fg">
                                         {{ $event->actor_name ?: Str::headline($event->actor_type) }}
@@ -56,7 +56,8 @@
                                         </div>
                                     @endif
                                     @if ($event->actor_token_name)
-                                        <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        <div class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
+                                            title="Token: {{ $event->actor_token_name }}">
                                             Token: {{ $event->actor_token_name }}
                                         </div>
                                     @endif
@@ -77,7 +78,7 @@
                                 </div>
                                 <time datetime="{{ $event->created_at->toIso8601String() }}"
                                     title="{{ $event->created_at->toDayDateTimeString() }}"
-                                    class="text-right text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    class="self-center text-right text-[11px] text-neutral-500 dark:text-fg-faint">
                                     {{ $event->created_at->diffForHumans() }}
                                 </time>
                             </div>

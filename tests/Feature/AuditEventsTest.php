@@ -19,6 +19,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -412,6 +413,33 @@ test('API model mutations produce one audit event', function () {
         ->count())->toBe(1);
 });
 
+test('API application updates produce one audit event', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    AuditEvent::query()->delete();
+
+    $token = $this->user->createToken('audit-api', ['root']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+
+    $this->withToken($token->plainTextToken)
+        ->patchJson("/api/v1/applications/{$application->uuid}", ['description' => 'Updated through API'])
+        ->assertOk();
+
+    expect(AuditEvent::query()
+        ->where('event', 'api.application.updated')
+        ->where('resource_uuid', $application->uuid)
+        ->count())->toBe(1);
+});
+
 test('deployment queue records rollback and cancellation operations', function () {
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
@@ -778,11 +806,15 @@ test('audit log table keeps actor details visible in a mobile scroll area', func
     AuditEvent::factory()->create([
         'team_id' => $this->team->id,
         'actor_name' => 'Visible Actor',
+        'actor_token_name' => 'visible-audit-token',
     ]);
 
     Livewire::test(AuditLog::class)
         ->assertSeeHtml('class="overflow-x-auto"')
         ->assertSeeHtml('min-w-[760px]')
+        ->assertSeeHtml('grid-cols-[14rem_minmax(0,1fr)_12rem_9rem]')
+        ->assertSeeHtml('class="self-center text-right text-[11px]')
+        ->assertSeeHtml('title="Token: visible-audit-token"')
         ->assertSee('Actor')
         ->assertSee('Visible Actor');
 });

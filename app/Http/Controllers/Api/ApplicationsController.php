@@ -3122,7 +3122,7 @@ class ApplicationsController extends Controller
         if ($application->settings->is_container_label_readonly_enabled && ($requestHasDomains || $requestHasNoindexDomains || $requestHasHttpBasicAuth) && $server->isProxyShouldRun()) {
             $application->custom_labels = str(implode('|coolify|', generateLabelsApplication($application)))->replace('|coolify|', "\n");
         }
-        $application->save();
+        $application->withoutAuditLogging(fn () => $application->save());
 
         auditLog('api.application.updated', [
             'team_id' => $teamId,

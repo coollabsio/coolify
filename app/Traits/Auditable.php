@@ -4,11 +4,14 @@ namespace App\Traits;
 
 use App\Models\PersonalAccessToken;
 use App\Models\Team;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 trait Auditable
 {
+    private bool $auditLoggingEnabled = true;
+
     public static function bootAuditable(): void
     {
         static::created(fn (Model $model) => $model->recordAuditMutation('created'));
@@ -18,7 +21,7 @@ trait Auditable
 
     private function recordAuditMutation(string $action): void
     {
-        if (! auth()->check()) {
+        if (! $this->auditLoggingEnabled || ! auth()->check()) {
             return;
         }
 
@@ -52,6 +55,17 @@ trait Auditable
             "{$resourceType}_name" => $this->getAttribute('name') ?? $this->getAttribute('key'),
             'changed_fields' => $changedFields,
         ]);
+    }
+
+    public function withoutAuditLogging(Closure $callback): mixed
+    {
+        $this->auditLoggingEnabled = false;
+
+        try {
+            return $callback();
+        } finally {
+            $this->auditLoggingEnabled = true;
+        }
     }
 
     private function auditTeamId(): ?int
