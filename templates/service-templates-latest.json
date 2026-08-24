@@ -5457,6 +5457,23 @@
         "template_last_updated_at": "2026-04-06T11:35:16-05:00",
         "port": "3000"
     },
+    "vault": {
+        "documentation": "https://developer.hashicorp.com/vault/docs/deploy/run-container?utm_source=coolify.io",
+        "slogan": "HashiCorp Vault securely stores and controls access to secrets.",
+        "compose": "c2VydmljZXM6CiAgdmF1bHQ6CiAgICBpbWFnZTogJ2hhc2hpY29ycC92YXVsdDoke1ZBVUxUX1ZFUlNJT046LWxhdGVzdH0nCiAgICBjb21tYW5kOiBzZXJ2ZXIKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX1ZBVUxUXzgyMDAKICAgICAgLSAnVkFVTFRfQUREUj1odHRwOi8vMTI3LjAuMC4xOjgyMDAnCiAgICAgIC0gJ1ZBVUxUX0FQSV9BRERSPSR7U0VSVklDRV9VUkxfVkFVTFRfODIwMH0nCiAgICAgIC0gJ1ZBVUxUX0xPQ0FMX0NPTkZJRz17InVpIjp0cnVlLCJkaXNhYmxlX21sb2NrIjp0cnVlLCJzdG9yYWdlIjp7ImZpbGUiOnsicGF0aCI6Ii92YXVsdC9maWxlIn19LCJsaXN0ZW5lciI6eyJ0Y3AiOnsiYWRkcmVzcyI6IjAuMC4wLjA6ODIwMCIsInRsc19kaXNhYmxlIjp0cnVlfX19JwogICAgdm9sdW1lczoKICAgICAgLSAndmF1bHQtZGF0YTovdmF1bHQvZmlsZScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAnd2dldCAtcU8tICJodHRwOi8vMTI3LjAuMC4xOjgyMDAvdjEvc3lzL2hlYWx0aD9zdGFuZGJ5b2s9dHJ1ZSZzZWFsZWRjb2RlPTIwMCZ1bmluaXRjb2RlPTIwMCIgPi9kZXYvbnVsbCB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAxMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTIKICAgICAgc3RhcnRfcGVyaW9kOiAxNXMK",
+        "tags": [
+            "vault",
+            "hashicorp",
+            "secrets",
+            "security",
+            "encryption"
+        ],
+        "category": "security",
+        "logo": "svgs/default.webp",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "8200"
+    },
     "vaultwarden": {
         "documentation": "https://github.com/dani-garcia/vaultwarden?utm_source=coolify.io",
         "slogan": "Vaultwarden is a password manager that allows you to securely store and manage your passwords.",

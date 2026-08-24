@@ -166,11 +166,13 @@ function format_docker_labels_to_json(string|array $rawOutput): Collection
             $outputArray = explode(',', $outputLine);
 
             return collect($outputArray)
-                ->map(function ($outputLine) {
-                    return explode('=', $outputLine);
-                })
                 ->mapWithKeys(function ($outputLine) {
-                    return [$outputLine[0] => $outputLine[1]];
+                    $label = explode('=', $outputLine, 2);
+                    if (count($label) !== 2) {
+                        return [];
+                    }
+
+                    return [$label[0] => $label[1]];
                 });
         })[0];
 }

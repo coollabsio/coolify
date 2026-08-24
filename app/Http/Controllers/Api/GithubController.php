@@ -642,7 +642,7 @@ class GithubController extends Controller
                 $rules['webhook_secret'] = 'string';
             }
             if (isset($payload['private_key_uuid'])) {
-                $rules['private_key_uuid'] = 'string|uuid';
+                $rules['private_key_uuid'] = 'string';
             }
             if (! isCloud() && isset($payload['is_system_wide'])) {
                 $rules['is_system_wide'] = 'boolean';
