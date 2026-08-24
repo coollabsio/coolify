@@ -128,7 +128,17 @@ class IntegrationTokenEditor extends Component
             return;
         }
 
+        $uuid = $this->integrationToken->uuid;
+        $name = $this->integrationToken->name;
+        $provider = $this->integrationToken->provider;
         $this->integrationToken->delete();
+
+        auditLog('ui.integration_token.deleted', [
+            'team_id' => currentTeam()->id,
+            'integration_token_uuid' => $uuid,
+            'integration_token_name' => $name,
+            'provider' => $provider,
+        ]);
 
         $this->dispatch('integration-token-deleted', uuid: $this->integrationToken->uuid);
         $this->dispatch('close-modal');
