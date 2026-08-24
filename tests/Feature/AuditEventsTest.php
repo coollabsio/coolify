@@ -483,6 +483,31 @@ test('team resource models opt in to automatic auditing', function (string $mode
     StandaloneClickhouse::class,
 ]);
 
+test('withoutAuditLogging suppresses mutations until the outer callback ends', function () {
+    $project = Project::factory()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Original project',
+        'description' => 'Original description',
+    ]);
+    AuditEvent::query()->delete();
+
+    $project->withoutAuditLogging(function () use ($project) {
+        $project->update(['name' => 'Outer suppressed']);
+
+        $project->withoutAuditLogging(function () use ($project) {
+            $project->update(['description' => 'Inner suppressed']);
+        });
+
+        $project->update(['name' => 'Still suppressed']);
+    });
+
+    expect(AuditEvent::query()->count())->toBe(0);
+
+    $project->update(['description' => 'Logged after suppression']);
+
+    expect(AuditEvent::query()->pluck('event')->all())->toBe(['ui.project.updated']);
+});
+
 test('status-only database updates do not record last online audit changes', function () {
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
@@ -713,6 +738,53 @@ test('team members cannot query audit events through the api', function () {
     $this->withToken($token->plainTextToken)
         ->getJson('/api/v1/audit-events')
         ->assertForbidden();
+});
+
+test('audit events api rejects pagination and filter values outside the allowed bounds', function (string $query, string $field) {
+    $token = $this->user->createToken('audit-read', ['read']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+
+    $this->withToken($token->plainTextToken)
+        ->getJson('/api/v1/audit-events?'.$query)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([$field]);
+})->with([
+    'per_page below minimum' => ['per_page=0', 'per_page'],
+    'per_page above maximum' => ['per_page=101', 'per_page'],
+    'page below minimum' => ['page=0', 'page'],
+    'unsupported source' => ['source=unknown', 'source'],
+    'action longer than 255 characters' => ['action='.str_repeat('a', 256), 'action'],
+]);
+
+test('audit events api accepts valid pagination and filter values', function () {
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'event' => 'api.project.updated',
+        'source' => 'api',
+        'action' => 'updated',
+        'description' => 'Visible event',
+    ]);
+    AuditEvent::factory()->create([
+        'team_id' => $this->team->id,
+        'event' => 'ui.project.created',
+        'source' => 'ui',
+        'action' => 'created',
+        'description' => 'Other event',
+    ]);
+
+    $token = $this->user->createToken('audit-read', ['read']);
+    $token->accessToken->forceFill(['team_id' => $this->team->id])->save();
+    auth()->logout();
+    auth()->forgetGuards();
+
+    $this->withToken($token->plainTextToken)
+        ->getJson('/api/v1/audit-events?per_page=1&source=api&action=updated&search=Visible')
+        ->assertOk()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.description', 'Visible event')
+        ->assertJsonPath('per_page', 1);
 });
 
 test('audit source filter omits the unused system source', function () {

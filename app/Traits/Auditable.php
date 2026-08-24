@@ -59,12 +59,13 @@ trait Auditable
 
     public function withoutAuditLogging(Closure $callback): mixed
     {
+        $wasAuditLoggingEnabled = $this->auditLoggingEnabled;
         $this->auditLoggingEnabled = false;
 
         try {
             return $callback();
         } finally {
-            $this->auditLoggingEnabled = true;
+            $this->auditLoggingEnabled = $wasAuditLoggingEnabled;
         }
     }
 

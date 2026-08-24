@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class AuditEventsController extends Controller
 {
@@ -20,8 +22,24 @@ class AuditEventsController extends Controller
             return response()->json(['message' => 'Only team admins and owners can view audit logs.'], 403);
         }
 
-        $perPage = max(1, min(100, $request->integer('per_page', 25)));
-        $search = trim((string) $request->query('search', ''));
+        $validator = Validator::make($request->all(), [
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'action' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'source' => ['sometimes', 'nullable', 'string', Rule::in(['all', 'ui', 'api', 'mcp', 'webhook', 'system', 'scheduler'])],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
+        $perPage = (int) ($validated['per_page'] ?? 25);
+        $search = trim((string) ($validated['search'] ?? ''));
         $canReadSensitive = $request->attributes->get('can_read_sensitive', false) === true;
         $events = AuditEvent::query()
             ->select([
@@ -50,13 +68,13 @@ class AuditEventsController extends Controller
             ->visibleToTeam($teamId)
             ->filtered(
                 search: $search,
-                action: $request->string('action', 'all')->toString(),
-                source: $request->string('source', 'all')->toString(),
+                action: (string) ($validated['action'] ?? 'all'),
+                source: (string) ($validated['source'] ?? 'all'),
                 searchSensitiveFields: $canReadSensitive,
             )
             ->latestFirst()
             ->paginate($perPage);
 
-        return response()->json($events);
+        return response()->json(serializeApiResponse($events));
     }
 }
