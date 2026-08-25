@@ -3323,6 +3323,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (! is_null($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.'.$this->container_name.'.cpuset', $this->application->limits_cpuset);
         }
+        $stop_grace_period = $this->application->settings->composeStopGracePeriod();
+        if (! is_null($stop_grace_period)) {
+            $docker_compose['services'][$this->container_name]['stop_grace_period'] = $stop_grace_period;
+        }
         if ($this->mainServer->isSwarm()) {
             data_forget($docker_compose, 'services.'.$this->container_name.'.container_name');
             data_forget($docker_compose, 'services.'.$this->container_name.'.expose');

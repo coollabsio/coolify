@@ -142,6 +142,15 @@ class ApplicationSetting extends Model
         return $this->stopGracePeriodSeconds();
     }
 
+    public function composeStopGracePeriod(): ?string
+    {
+        if (is_null($this->stop_grace_period)) {
+            return null;
+        }
+
+        return $this->stopGracePeriodSeconds().'s';
+    }
+
     public function isStatic(): Attribute
     {
         return Attribute::make(
