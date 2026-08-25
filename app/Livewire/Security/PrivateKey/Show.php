@@ -92,18 +92,11 @@ class Show extends Component
 
             $this->syncData(false);
             $this->isInUse = $this->private_key->isInUse();
+            $this->public_key = $this->private_key->getPublicKey();
         } catch (AuthorizationException $e) {
             abort(403, 'You do not have permission to view this private key.');
         } catch (\Throwable) {
             abort(404);
-        }
-    }
-
-    public function loadPublicKey()
-    {
-        $this->public_key = $this->private_key->getPublicKey();
-        if ($this->public_key === 'Error loading private key') {
-            $this->dispatch('error', 'Failed to load public key. The private key may be invalid.');
         }
     }
 
@@ -123,8 +116,7 @@ class Show extends Component
             currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
 
             if ($this->modalMode) {
-                $this->dispatch('securityResourceChanged');
-                $this->dispatch('close-modal');
+                $this->dispatch('privateKeyDeleted');
 
                 return null;
             }
@@ -150,10 +142,12 @@ class Show extends Component
             ]);
             refresh_server_connection($this->private_key);
             $this->dispatch('success', 'Private key updated.');
-            $this->dispatch('securityResourceChanged');
             if ($this->modalMode) {
-                $this->dispatch('close-modal');
+                $this->dispatch('privateKeyUpdated');
+
+                return null;
             }
+            $this->dispatch('securityResourceChanged');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
