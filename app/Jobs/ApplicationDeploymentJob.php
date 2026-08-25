@@ -3301,6 +3301,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // Always use .env file
         $docker_compose['services'][$this->container_name]['env_file'] = ['.env'];
 
+        if ($this->application->settings->stop_grace_period !== null) {
+            $docker_compose['services'][$this->container_name]['stop_grace_period'] = $this->application->settings->stopGracePeriodSeconds().'s';
+        }
+
         // Only add Coolify healthcheck if no custom HEALTHCHECK found in Dockerfile
         // If custom_healthcheck_found is true, the Dockerfile's HEALTHCHECK will be used
         // If healthcheck is disabled, no healthcheck will be added
@@ -3423,24 +3427,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->pull_request_id === 0) {
             $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
-                if (! $this->application->settings->custom_internal_name) {
-                    $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-                    if (count($custom_compose) > 0) {
-                        $ipv4 = data_get($custom_compose, 'ip.0');
-                        $ipv6 = data_get($custom_compose, 'ip6.0');
-                        data_forget($custom_compose, 'ip');
-                        data_forget($custom_compose, 'ip6');
-                        if ($ipv4 || $ipv6) {
-                            data_forget($docker_compose['services'][$this->application->uuid], 'networks');
-                        }
-                        if ($ipv4) {
-                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
-                        }
-                        if ($ipv6) {
-                            $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
-                        }
-                        $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
+                $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+                if (count($custom_compose) > 0) {
+                    $ipv4 = data_get($custom_compose, 'ip.0');
+                    $ipv6 = data_get($custom_compose, 'ip6.0');
+                    data_forget($custom_compose, 'ip');
+                    data_forget($custom_compose, 'ip6');
+                    if ($ipv4) {
+                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
                     }
+                    if ($ipv6) {
+                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                    }
+                    $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                 }
             } else {
                 if (count($custom_compose) > 0) {
