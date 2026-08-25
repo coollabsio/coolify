@@ -579,8 +579,13 @@ function refreshSession(?Team $team = null): void
     if (! $team) {
         // The user has no team left (e.g. just deleted their current team and
         // belongs to no other): clear the stale session reference instead of
-        // dereferencing null.
+        // dereferencing null, and drop the persisted choice so it is not
+        // restored on next login.
         session()->forget('currentTeam');
+        $user = Auth::user();
+        if ($user && ! is_null($user->current_team_id)) {
+            $user->forceFill(['current_team_id' => null])->saveQuietly();
+        }
 
         return;
     }

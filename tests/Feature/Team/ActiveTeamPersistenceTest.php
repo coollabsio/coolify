@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Team\DeleteTeam;
 use App\Livewire\SelectTeam;
 use App\Models\InstanceSettings;
 use App\Models\Team;
@@ -126,6 +127,38 @@ it('lets the livewire update endpoint through for an ambiguous user', function (
         ->post('/livewire/update', []);
 
     expect($response->headers->get('Location'))->not->toBe(route('team.select'));
+});
+
+it('clears the stored team when the member is removed from it', function () {
+    [$user, , $second] = userWithTwoTeams();
+    $user->update(['current_team_id' => $second->id]);
+
+    // Simulate the removal event (Team\Member::remove detaches then clears).
+    $user->teams()->detach($second->id);
+    $user->clearStoredTeamIfMatches($second->id);
+
+    expect($user->fresh()->current_team_id)->toBeNull();
+});
+
+it('keeps the stored team when the member is removed from a different team', function () {
+    [$user, $personal, $second] = userWithTwoTeams();
+    $user->update(['current_team_id' => $second->id]);
+
+    $user->teams()->detach($personal->id);
+    $user->clearStoredTeamIfMatches($personal->id);
+
+    expect($user->fresh()->current_team_id)->toBe($second->id);
+});
+
+it('clears the stored team for members when their team is deleted', function () {
+    [$owner, , $shared] = userWithTwoTeams();
+    $member = User::factory()->create();
+    $member->teams()->attach($shared, ['role' => 'member']);
+    $member->update(['current_team_id' => $shared->id]);
+
+    app(DeleteTeam::class)->handle($shared->fresh(), $owner);
+
+    expect($member->fresh()->current_team_id)->toBeNull();
 });
 
 it('bounces users who already have an active team away from the select screen', function () {

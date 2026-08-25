@@ -402,6 +402,21 @@ class User extends Authenticatable implements SendsEmail
         return null;
     }
 
+    /**
+     * Reset the persisted active team when it points to the given team.
+     *
+     * Called when the user is removed from a team (or the team is deleted) so a
+     * stale current_team_id can never be trusted after the fact. Read paths
+     * already re-validate membership; this is defense-in-depth that clears the
+     * dangling value at the source event instead of relying on self-healing.
+     */
+    public function clearStoredTeamIfMatches(int $teamId): void
+    {
+        if ($this->current_team_id === $teamId) {
+            $this->forceFill(['current_team_id' => null])->saveQuietly();
+        }
+    }
+
     public function role(): ?string
     {
         if (data_get($this, 'pivot')) {
