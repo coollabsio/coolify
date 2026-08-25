@@ -45,13 +45,24 @@ it('opens security resources in modal editors and keeps create actions in card h
             ->toContain('<x-modal-input title="Edit')
             ->toContain('<x-reicon name="settings"')
             ->toContain(':contentClicks="false"')
-            ->toContain('@click="modalOpen=true"')
-            ->not->toContain('wire:click="openEditor(')
             ->not->toContain('href="{{ route(\'security.');
     }
 
-    expect(file_get_contents($views[0]))->toContain('>Private key</div>', '>Status</div>');
-    expect(file_get_contents($views[0]))->toContain('wire:key="private-key-{{ $key->id }}"');
+    expect(file_get_contents($views[0]))
+        ->toContain('>Private key</div>', '>Status</div>')
+        ->toContain('wire:click="openEditor(\'{{ $key->uuid }}\')"')
+        ->toContain("\$dispatch('open-private-key-editor', { name:")
+        ->toContain('$refs.loadingPrivateKeyName.value = $event.detail.name')
+        ->toContain('wire:loading.flex wire:target="openEditor"')
+        ->toContain('aria-label="Loading private key editor"')
+        ->toContain('class="w-full flex-col gap-4"')
+        ->toContain('<x-forms.input label="Public key" loading')
+        ->toContain('<x-forms.input loading :allowToPeak="false" />')
+        ->toContain('<x-forms.input label="Name" required x-ref="loadingPrivateKeyName" />')
+        ->toContain('<x-forms.input label="Description" x-ref="loadingPrivateKeyDescription" />')
+        ->not->toContain('class="flex flex-col gap-1.5 lg:col-span-2"')
+        ->not->toContain('animate-pulse')
+        ->and(substr_count(file_get_contents($views[0]), '<livewire:security.private-key.show'))->toBe(1);
     expect(file_get_contents($views[1]))->toContain('>Token</div>', '>Provider</div>');
     expect(file_get_contents($views[2]))->toContain('>Script</div>', '>Last updated</div>');
 
@@ -90,9 +101,11 @@ it('deletes a cloud-init script from its modal editor without redirecting to a d
 });
 
 it('keeps the remaining private key editor populated after deleting multiple keys', function () {
-    $privateKeys = PrivateKey::factory()->count(3)->create([
+    $privateKeys = collect(range(1, 3))->map(fn (int $index) => PrivateKey::factory()->create([
+        'name' => "private-key-regression-marker-{$index}",
         'team_id' => $this->team->id,
-    ]);
+        'private_key' => PrivateKey::generateNewKeyPair('ed25519')['private_key'],
+    ]));
     $index = Livewire::test(PrivateKeyIndex::class);
 
     foreach ($privateKeys->take(2) as $privateKey) {
@@ -100,8 +113,8 @@ it('keeps the remaining private key editor populated after deleting multiple key
             'private_key_uuid' => $privateKey->uuid,
             'modalMode' => true,
         ])->call('delete')
-            ->assertDispatched('securityResourceChanged')
-            ->assertDispatched('close-modal');
+            ->assertDispatched('privateKeyDeleted')
+            ->assertNoRedirect();
     }
 
     $remainingPrivateKey = $privateKeys->last();
@@ -116,4 +129,32 @@ it('keeps the remaining private key editor populated after deleting multiple key
         'modalMode' => true,
     ])->assertSet('name', $remainingPrivateKey->name)
         ->assertSee($remainingPrivateKey->name);
+});
+
+it('loads only the selected private key editor and refreshes mutations without navigation', function () {
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id,
+    ]);
+
+    Livewire::test(PrivateKeyIndex::class)
+        ->call('openEditor', $privateKey->uuid)
+        ->assertSet('selectedPrivateKeyUuid', $privateKey->uuid)
+        ->dispatch('modalClosed')
+        ->assertSet('selectedPrivateKeyUuid', null)
+        ->dispatch('privateKeyCreated', keyId: $privateKey->id)
+        ->assertNoRedirect();
+});
+
+it('loads the public key with the editor instead of making a follow-up request', function () {
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $this->team->id,
+    ]);
+
+    Livewire::test(PrivateKeyShow::class, [
+        'private_key_uuid' => $privateKey->uuid,
+        'modalMode' => true,
+    ])->assertSet('public_key', $privateKey->getPublicKey());
+
+    expect(file_get_contents(resource_path('views/livewire/security/private-key/show.blade.php')))
+        ->not->toContain('x-init="$wire.loadPublicKey()"');
 });

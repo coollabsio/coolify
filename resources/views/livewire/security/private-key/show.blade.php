@@ -1,4 +1,4 @@
-<div x-init="$wire.loadPublicKey()">
+<div>
     @if ($modalMode)
         <form wire:submit="changePrivateKey" class="flex flex-col gap-4" x-data="{ showPrivateKey: false }">
             <div class="grid gap-4 lg:grid-cols-2">
