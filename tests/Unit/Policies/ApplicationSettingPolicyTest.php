@@ -76,6 +76,7 @@ it('allows admin user to create application setting', function () {
 it('denies non-admin user from creating application setting', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ApplicationSettingPolicy;
     expect($policy->create($user))->toBeFalse();
@@ -99,6 +100,7 @@ it('allows team admin to update application setting', function () {
 it('denies team member from updating application setting', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $team = (object) ['id' => 1];
     $application = Mockery::mock(Application::class)->makePartial();
@@ -139,6 +141,7 @@ it('allows team admin to delete application setting', function () {
 it('denies team member from deleting application setting', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $team = (object) ['id' => 1];
     $application = Mockery::mock(Application::class)->makePartial();

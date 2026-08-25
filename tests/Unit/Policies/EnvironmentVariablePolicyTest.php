@@ -63,6 +63,7 @@ it('allows admin to create environment variable', function () {
 it('denies member from creating environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new EnvironmentVariablePolicy;
     expect($policy->create($user))->toBeFalse();
@@ -85,6 +86,7 @@ it('allows team admin to update environment variable', function () {
 it('denies non-admin from updating environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $resource = Mockery::mock(Application::class)->makePartial();
     $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -123,6 +125,7 @@ it('allows team admin to delete environment variable', function () {
 it('denies non-admin from deleting environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $resource = Mockery::mock(Application::class)->makePartial();
     $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -177,6 +180,7 @@ it('allows team admin to manage environment', function () {
 it('denies non-admin from managing environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $resource = Mockery::mock(Application::class)->makePartial();
     $resource->shouldReceive('team')->andReturn((object) ['id' => 1]);

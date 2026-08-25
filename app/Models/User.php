@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\User\RevokeUserTeamTokens;
+use App\Enums\Role;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\EmailChangeVerification;
@@ -159,7 +160,9 @@ class User extends Authenticatable implements SendsEmail
                             continue;
                         } else {
                             $found_other_member_who_is_not_owner = $team->members->filter(function ($member) {
-                                return $member->pivot->role === 'member';
+                                return $member->pivot->role === 'operator' || $member->pivot->role === 'member';
+                            })->sortByDesc(function ($member) {
+                                return Role::from($member->pivot->role)->rank();
                             })->first();
 
                             if ($found_other_member_who_is_not_owner) {
@@ -311,6 +314,11 @@ class User extends Authenticatable implements SendsEmail
         return $this->role() === 'member';
     }
 
+    public function isOperator()
+    {
+        return $this->role() === 'operator';
+    }
+
     public function isAdminFromSession()
     {
         if (Auth::id() === 0) {
@@ -415,6 +423,22 @@ class User extends Authenticatable implements SendsEmail
         $role = $team->pivot->role ?? null;
 
         return $role === 'admin' || $role === 'owner';
+    }
+
+    /**
+     * Check if the user can manage resources (operator or above) in the current team
+     */
+    public function canManageResources(): bool
+    {
+        return $this->isAdmin() || $this->isOperator();
+    }
+
+    /**
+     * Check if the user can manage resources (operator or above) in a specific team
+     */
+    public function canManageResourcesOfTeam(int $teamId): bool
+    {
+        return $this->isAdminOfTeam($teamId) || $this->roleInTeam($teamId) === 'operator';
     }
 
     /**

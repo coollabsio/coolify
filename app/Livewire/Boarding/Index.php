@@ -89,7 +89,7 @@ class Index extends Component
 
     public function mount()
     {
-        if (auth()->user()?->isMember() && auth()->user()->currentTeam()->show_boarding === true) {
+        if ((auth()->user()?->isMember() || auth()->user()?->isOperator()) && auth()->user()->currentTeam()->show_boarding === true) {
             return redirect()->route('dashboard');
         }
 
@@ -176,7 +176,7 @@ class Index extends Component
 
     public function skipBoarding()
     {
-        if (auth()->user()?->isMember()) {
+        if (auth()->user()?->isMember() || auth()->user()?->isOperator()) {
             return redirect()->route('dashboard');
         }
         Team::find(currentTeam()->id)->update([

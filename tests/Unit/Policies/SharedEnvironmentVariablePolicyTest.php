@@ -50,6 +50,7 @@ it('allows admin to create shared environment variable', function () {
 it('denies non-admin to create shared environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new SharedEnvironmentVariablePolicy;
     expect($policy->create($user))->toBeFalse();
@@ -68,6 +69,7 @@ it('allows team admin to update shared environment variable', function () {
 it('denies team member to update shared environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $model = mockSharedEnvironmentVariable(teamId: 1);
 
@@ -88,6 +90,7 @@ it('allows team admin to delete shared environment variable', function () {
 it('denies team member to delete shared environment variable', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $model = mockSharedEnvironmentVariable(teamId: 1);
 
@@ -126,6 +129,7 @@ it('allows team admin to manage environment', function () {
 it('denies team member to manage environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $model = mockSharedEnvironmentVariable(teamId: 1);
 

@@ -112,7 +112,7 @@ function loginAsRoot(): mixed
 - **Services/** — Business logic services (ConfigurationGenerator, DockerImageParser, ContainerStatusAggregator, HetznerService, etc.). Use Services for complex orchestration; use Actions for single-purpose domain operations.
 - **Helpers/** — Global helpers loaded via `bootstrap/includeHelpers.php` from `bootstrap/helpers/` — organized into `shared.php`, `constants.php`, `versions.php`, `subscriptions.php`, `domains.php`, `docker.php`, `services.php`, `github.php`, `proxy.php`, `notifications.php`.
 - **Data/** — Spatie Laravel Data DTOs (e.g., `ServerMetadata`).
-- **Enums/** — PHP enums (TitleCase keys). Key enums: `ProcessStatus`, `Role` (MEMBER/ADMIN/OWNER with rank comparison), `BuildPackTypes`, `ProxyTypes`, `ContainerStatusTypes`.
+- **Enums/** — PHP enums (TitleCase keys). Key enums: `ProcessStatus`, `Role` (MEMBER/OPERATOR/ADMIN/OWNER with rank comparison), `BuildPackTypes`, `ProxyTypes`, `ContainerStatusTypes`.
 - **Rules/** — Custom validation rules (`ValidGitRepositoryUrl`, `ValidServerIp`, `ValidHostname`, `DockerImageFormat`, etc.).
 
 ### API Layer
@@ -125,7 +125,7 @@ function loginAsRoot(): mixed
 ### Authorization
 - Policy-based authorization with ~15 model-to-policy mappings in `AuthServiceProvider`
 - Custom gates: `createAnyResource`, `canAccessTerminal`
-- Role hierarchy: `Role::MEMBER` (1) < `Role::ADMIN` (2) < `Role::OWNER` (3) with `lt()`/`gt()` comparison methods
+- Role hierarchy: `Role::MEMBER` (1) < `Role::OPERATOR` (2) < `Role::ADMIN` (3) < `Role::OWNER` (4) with `lt()`/`gt()` comparison methods. Operator manages the resource lifecycle (`User::canManageResources()`/`canManageResourcesOfTeam()`) but has no access to terminals, team management, credentials (keys, git apps, cloud/API tokens), servers, or instance settings — those still require `isAdmin()`/`isAdminOfTeam()`
 - Multi-tenancy via Teams — team auto-initializes notification settings on creation
 
 ### Event Broadcasting

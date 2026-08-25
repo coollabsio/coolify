@@ -51,6 +51,17 @@ it('denies non-admin team members on POST /terminal/auth', function () {
         ->assertStatus(403);
 });
 
+it('denies team operators on POST /terminal/auth', function () {
+    $operator = User::factory()->create();
+    $operator->teams()->attach($this->team, ['role' => 'operator']);
+
+    $this->actingAs($operator);
+    session(['currentTeam' => $this->team]);
+
+    $this->postJson('/terminal/auth')
+        ->assertStatus(403);
+});
+
 it('allows team owners on POST /terminal/auth', function () {
     $owner = User::factory()->create();
     $owner->teams()->attach($this->team, ['role' => 'owner']);

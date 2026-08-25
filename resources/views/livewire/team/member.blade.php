@@ -56,6 +56,12 @@
                                     Make admin
                                 </button>
                             @endif
+                            @if (data_get($member, 'pivot.role') !== 'operator')
+                                <button type="button" class="listbox-option justify-start!"
+                                    wire:click="makeOperator" @click="open = false">
+                                    Make operator
+                                </button>
+                            @endif
                             @if (data_get($member, 'pivot.role') !== 'member')
                                 <button type="button" class="listbox-option justify-start!"
                                     wire:click="makeReadonly" @click="open = false">
@@ -63,16 +69,25 @@
                                 </button>
                             @endif
                         @elseif (Auth::user()->isAdmin())
-                            @if (data_get($member, 'pivot.role') === 'admin')
-                                <button type="button" class="listbox-option justify-start!"
-                                    wire:click="makeReadonly" @click="open = false">
-                                    Make member
-                                </button>
-                            @elseif (data_get($member, 'pivot.role') === 'member')
-                                <button type="button" class="listbox-option justify-start!" wire:click="makeAdmin"
-                                    @click="open = false">
-                                    Make admin
-                                </button>
+                            @if (data_get($member, 'pivot.role') !== 'owner')
+                                @if (data_get($member, 'pivot.role') !== 'admin')
+                                    <button type="button" class="listbox-option justify-start!"
+                                        wire:click="makeAdmin" @click="open = false">
+                                        Make admin
+                                    </button>
+                                @endif
+                                @if (data_get($member, 'pivot.role') !== 'operator')
+                                    <button type="button" class="listbox-option justify-start!"
+                                        wire:click="makeOperator" @click="open = false">
+                                        Make operator
+                                    </button>
+                                @endif
+                                @if (data_get($member, 'pivot.role') !== 'member')
+                                    <button type="button" class="listbox-option justify-start!"
+                                        wire:click="makeReadonly" @click="open = false">
+                                        Make member
+                                    </button>
+                                @endif
                             @endif
                         @endif
                         <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>

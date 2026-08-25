@@ -1,4 +1,4 @@
-@can('createAnyResource')
+@can('create', App\Models\GitlabApp::class)
     <form wire:submit="createGitLabApp" class="flex w-full flex-col gap-4">
         <p class="text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
             Connect a GitLab OAuth application for private repositories, webhooks, and deployments.
