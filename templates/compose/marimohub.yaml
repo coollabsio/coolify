@@ -1,0 +1,443 @@
+# documentation: https://github.com/marimo-team/marimohub
+# slogan: Store, share, and run marimo notebooks with isolated compute and durable object storage.
+# category: devtools
+# tags: notebook, python, data, analysis, collaboration, s3, seaweedfs
+# logo: svgs/marimo.svg
+# port: 80
+# amd_only: true
+
+services:
+  marimohub:
+    image: caddy:2.10.2-alpine
+    environment:
+      - SERVICE_URL_MARIMOHUB_80
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        content: |
+          :80 {
+            encode zstd gzip
+            header -Server
+
+            @dex path /dex /dex/*
+            handle @dex {
+              reverse_proxy dex:5556 {
+                header_up X-Forwarded-Host {http.request.host}
+                header_up X-Forwarded-Proto https
+              }
+            }
+
+            handle {
+              reverse_proxy marimohub-server:3000 {
+                header_up X-Forwarded-Host {http.request.host}
+                header_up X-Forwarded-Proto https
+              }
+            }
+          }
+    read_only: true
+    tmpfs:
+      - /config
+      - /data
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      dex:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  marimohub-server:
+    image: ghcr.io/marimo-team/marimohub:0.3.7@sha256:c044d03898d85fd5e29d0e207cc90154bffb1c1bd8a9eb02dbbb6c08682bbec4
+    environment:
+      # Storage
+      - MARIMOHUB_STORAGE_BACKEND=s3
+      - MARIMOHUB_STORAGE_S3_BUCKET=${MARIMOHUB_STORAGE_S3_BUCKET:?marimohub} # Bucket created during deployment.
+      - MARIMOHUB_STORAGE_S3_ENDPOINT=http://seaweedfs:8333
+      - MARIMOHUB_STORAGE_S3_REGION=${MARIMOHUB_STORAGE_S3_REGION:?us-east-1} # S3 region reported to Marimo Hub.
+      - MARIMOHUB_STORAGE_S3_ACCESS_KEY_ID=${SERVICE_USER_STORAGE}
+      - MARIMOHUB_STORAGE_S3_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_STORAGE}
+      - MARIMOHUB_STORAGE_S3_FORCE_PATH_STYLE=true
+
+      # Isolated notebook compute
+      - MARIMOHUB_COMPUTE_BACKEND=docker
+      - MARIMOHUB_COMPUTE_IMAGE=ghcr.io/marimo-team/marimo-sandbox:py3.13-marimo0.24.0@sha256:0e0b10fb6194bd347f45373b6dfd96b3a224c6930693e0111c3d8526519c0e33
+      - MARIMOHUB_COMPUTE_DOCKER_HOST=docker-engine
+      - MARIMOHUB_COMPUTE_DOCKER_BIND_HOST=0.0.0.0
+      - 'MARIMOHUB_COMPUTE_PROFILES=${MARIMOHUB_COMPUTE_PROFILES:?standard:cpu=1;mem=2Gi,large:cpu=2;mem=4Gi}' # Ordered profiles offered when creating a notebook.
+      - MARIMOHUB_COMPUTE_PROFILE_OVERRIDE=${MARIMOHUB_COMPUTE_PROFILE_OVERRIDE:?editors} # none or editors.
+      - MARIMOHUB_SANDBOX_STARTUP_TIMEOUT_SECONDS=${MARIMOHUB_SANDBOX_STARTUP_TIMEOUT_SECONDS:?120} # Cold-start timeout in seconds.
+      # Proxy mode serves notebook-authored JavaScript on the Hub origin. Use this template with trusted editors.
+      - MARIMOHUB_SANDBOX_EXPOSURE=proxy
+      - MARIMOHUB_SANDBOX_PROXY_ACK_UNTRUSTED=true
+      - MARIMOHUB_APP_BASE_URL=${SERVICE_URL_MARIMOHUB}
+      - DOCKER_HOST=tcp://docker-engine:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_CERT_PATH=/certs/client
+      - PATH=/opt/docker-cli:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+      # Authentication and access policy
+      - MARIMOHUB_AUTH_BACKEND=oidc
+      - MARIMOHUB_AUTH_OIDC_ISSUER=${SERVICE_URL_MARIMOHUB}/dex # Replace with an external OIDC issuer when required.
+      - MARIMOHUB_AUTH_OIDC_CLIENT_ID=${MARIMOHUB_OIDC_CLIENT_ID:?marimohub} # OIDC client ID.
+      - MARIMOHUB_AUTH_OIDC_CLIENT_SECRET=${SERVICE_PASSWORD_64_OIDC}
+      - MARIMOHUB_AUTH_OIDC_REDIRECT_URI=${SERVICE_URL_MARIMOHUB}/api/auth/callback
+      - MARIMOHUB_AUTH_OIDC_EMAIL_VERIFICATION=trusted-issuer
+      - 'MARIMOHUB_AUTH_ALLOWED_EMAIL_DOMAINS=${MARIMOHUB_AUTH_ALLOWED_EMAIL_DOMAINS:?*}' # Comma-separated domains or * for every verified domain.
+      - MARIMOHUB_AUTH_SESSION_SECRET=${SERVICE_PASSWORD_64_SESSION}
+      - MARIMOHUB_SUPER_ADMINS=${ADMIN_EMAIL:?admin@marimohub.local}
+      - MARIMOHUB_DEFAULT_ROLE=${MARIMOHUB_DEFAULT_ROLE:?none} # none, viewer, editor, or manager.
+      - MARIMOHUB_VIEWER_MODE=${MARIMOHUB_VIEWER_MODE:?static} # static, applications, or ephemeral-sandbox.
+      - MARIMOHUB_EDITOR_SANDBOX_SHARING=${MARIMOHUB_EDITOR_SANDBOX_SHARING:?shared} # shared or exclusive.
+      - MARIMOHUB_ALLOWED_ORIGINS=${MARIMOHUB_ALLOWED_ORIGINS:-} # Comma-separated additional browser origins.
+
+      # Session lifecycle
+      - MARIMOHUB_RUN_MAINTENANCE=true
+      - MARIMOHUB_MAX_SESSIONS_PER_USER=${MARIMOHUB_MAX_SESSIONS_PER_USER:?5} # Concurrent sessions per user. Set 0 for unlimited.
+      - MARIMOHUB_MAX_APPS_PER_PROJECT=${MARIMOHUB_MAX_APPS_PER_PROJECT:?5} # Concurrent app sessions per project. Set 0 for unlimited.
+      - MARIMOHUB_SESSION_MAX_LIFETIME_SECONDS=${MARIMOHUB_SESSION_MAX_LIFETIME_SECONDS:?14400} # Graceful maximum session lifetime.
+      - MARIMOHUB_SESSION_IDLE_TIMEOUT_SECONDS=${MARIMOHUB_SESSION_IDLE_TIMEOUT_SECONDS:?1800} # Save and stop after this idle period.
+      - MARIMOHUB_SESSION_SNAPSHOT_INTERVAL_SECONDS=${MARIMOHUB_SESSION_SNAPSHOT_INTERVAL_SECONDS:?120} # Periodic save interval. Set 0 to disable.
+      - MARIMOHUB_SESSION_CONNECTION_AWARE=${MARIMOHUB_SESSION_CONNECTION_AWARE:?true} # Extend active editor sessions before teardown.
+      - MARIMOHUB_PERSIST_WORKSPACE=${MARIMOHUB_PERSIST_WORKSPACE:?source} # source or workspace.
+
+      # Integrations and project features
+      - MARIMOHUB_INTEGRATIONS=${MARIMOHUB_INTEGRATIONS:?on} # on or off.
+      - MARIMOHUB_INTEGRATIONS_PROBE=${MARIMOHUB_INTEGRATIONS_PROBE:?guarded} # guarded, private, or off.
+      - MARIMOHUB_DATA_BROWSER=${MARIMOHUB_DATA_BROWSER:?full} # off, metadata, or full.
+      - MARIMOHUB_DATA_PREVIEW_IMAGE=ghcr.io/marimo-team/marimo-sandbox:py3.13-marimo0.24.0@sha256:0e0b10fb6194bd347f45373b6dfd96b3a224c6930693e0111c3d8526519c0e33
+      - MARIMOHUB_DATA_PREVIEW_MAX_CONCURRENT=${MARIMOHUB_DATA_PREVIEW_MAX_CONCURRENT:?2}
+      - MARIMOHUB_DATA_QUERY_MAX_CONCURRENT=${MARIMOHUB_DATA_QUERY_MAX_CONCURRENT:?2}
+      - MARIMOHUB_SECRETS_KEK=${SERVICE_REALBASE64_32_SECRETS}
+      - MARIMOHUB_SECRETS_KEK_ID=${MARIMOHUB_SECRETS_KEK_ID:?coolify-v1}
+      - MARIMOHUB_PROJECT_ALERTS=${MARIMOHUB_PROJECT_ALERTS:?on} # on or off.
+
+      # Source control
+      - MARIMOHUB_SOURCE_CONTROL_GITHUB_APP_ID=${MARIMOHUB_SOURCE_CONTROL_GITHUB_APP_ID:-} # GitHub App ID for repository sync and publishing.
+      - MARIMOHUB_SOURCE_CONTROL_GITHUB_APP_PRIVATE_KEY=${MARIMOHUB_SOURCE_CONTROL_GITHUB_APP_PRIVATE_KEY:-} # PEM or single-line base64 private key.
+
+      # Managed AI
+      - MARIMOHUB_AI_BACKEND=${MARIMOHUB_AI_BACKEND:-none} # none or openai-compatible.
+      - MARIMOHUB_AI_UPSTREAM_BASE_URL=${MARIMOHUB_AI_UPSTREAM_BASE_URL:-} # OpenAI-compatible base URL.
+      - MARIMOHUB_AI_UPSTREAM_API_KEY=${MARIMOHUB_AI_UPSTREAM_API_KEY:-} # Provider API key held by the Hub.
+      - MARIMOHUB_AI_UPSTREAM_PROJECT=${MARIMOHUB_AI_UPSTREAM_PROJECT:-} # Optional OpenAI-Project header.
+      - MARIMOHUB_AI_MODEL=${MARIMOHUB_AI_MODEL:-} # Default model ID.
+      - MARIMOHUB_AI_ALLOWED_MODELS=${MARIMOHUB_AI_ALLOWED_MODELS:-} # Optional comma-separated model allowlist.
+      - MARIMOHUB_AI_MAX_TOKENS=${MARIMOHUB_AI_MAX_TOKENS:-} # Optional notebook assistant token limit.
+      - MARIMOHUB_AI_RULES=${MARIMOHUB_AI_RULES:-} # Optional notebook assistant instructions.
+      - MARIMOHUB_AI_TOKEN_TTL_SECONDS=${MARIMOHUB_AI_TOKEN_TTL_SECONDS:-3600} # Session-scoped AI token lifetime.
+
+      # Notifications
+      - MARIMOHUB_NOTIFY_BACKENDS=${MARIMOHUB_NOTIFY_BACKENDS:-} # Comma-separated smtp, slack, and webhook backends.
+      - MARIMOHUB_NOTIFY_KINDS=${MARIMOHUB_NOTIFY_KINDS:-} # Default notification kind allowlist.
+      - MARIMOHUB_NOTIFY_ALLOW_PRIVATE=${MARIMOHUB_NOTIFY_ALLOW_PRIVATE:-false} # Allow operator-controlled private webhook destinations.
+      - MARIMOHUB_NOTIFY_SMTP_URL=${MARIMOHUB_NOTIFY_SMTP_URL:-} # smtp:// or smtps:// connection URL.
+      - MARIMOHUB_NOTIFY_SMTP_FROM=${MARIMOHUB_NOTIFY_SMTP_FROM:-} # Sender address for email notifications.
+      - MARIMOHUB_NOTIFY_SMTP_ADMIN_TO=${MARIMOHUB_NOTIFY_SMTP_ADMIN_TO:-} # Comma-separated broadcast recipients.
+      - MARIMOHUB_NOTIFY_SMTP_KINDS=${MARIMOHUB_NOTIFY_SMTP_KINDS:-} # Optional SMTP-specific kind allowlist.
+      - MARIMOHUB_NOTIFY_SLACK_WEBHOOK_URL=${MARIMOHUB_NOTIFY_SLACK_WEBHOOK_URL:-} # Slack incoming webhook URL.
+      - MARIMOHUB_NOTIFY_SLACK_KINDS=${MARIMOHUB_NOTIFY_SLACK_KINDS:-} # Optional Slack-specific kind allowlist.
+      - MARIMOHUB_NOTIFY_WEBHOOK_URL=${MARIMOHUB_NOTIFY_WEBHOOK_URL:-} # HTTPS notification webhook.
+      - MARIMOHUB_NOTIFY_WEBHOOK_SECRET=${MARIMOHUB_NOTIFY_WEBHOOK_SECRET:-} # HMAC signing key.
+      - MARIMOHUB_NOTIFY_WEBHOOK_KINDS=${MARIMOHUB_NOTIFY_WEBHOOK_KINDS:-} # Optional webhook-specific kind allowlist.
+    volumes:
+      - marimohub-docker-cli:/opt/docker-cli:ro
+      - marimohub-docker-certs:/certs:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      seaweedfs-bucket:
+        condition: service_completed_successfully
+      docker-cli-init:
+        condition: service_completed_successfully
+      docker-engine:
+        condition: service_healthy
+      sandbox-image-init:
+        condition: service_completed_successfully
+      dex:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  dex-config:
+    image: caddy:2.10.2-alpine
+    restart: "no"
+    exclude_from_hc: true
+    environment:
+      - DEX_ISSUER=${SERVICE_URL_MARIMOHUB}/dex
+      - DEX_REDIRECT_URI=${SERVICE_URL_MARIMOHUB}/api/auth/callback
+      - DEX_CLIENT_ID=${MARIMOHUB_OIDC_CLIENT_ID:?marimohub}
+      - DEX_CLIENT_SECRET=${SERVICE_PASSWORD_64_OIDC}
+      - DEX_ADMIN_EMAIL=${ADMIN_EMAIL:?admin@marimohub.local}
+      - DEX_ADMIN_NAME=${MARIMOHUB_ADMIN_NAME:?Marimo Hub Admin} # Display name for the built-in administrator.
+      - DEX_ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        umask 077
+        password_hash="$$(caddy hash-password --algorithm bcrypt --plaintext "$${DEX_ADMIN_PASSWORD}")"
+        mkdir -p /config /data
+        cat > /config/config.yaml <<EOF
+        issuer: "$${DEX_ISSUER}"
+        storage:
+          type: sqlite3
+          config:
+            file: /data/dex.db
+        web:
+          http: 0.0.0.0:5556
+        oauth2:
+          skipApprovalScreen: true
+        enablePasswordDB: true
+        staticClients:
+          - id: "$${DEX_CLIENT_ID}"
+            name: "Marimo Hub"
+            secret: "$${DEX_CLIENT_SECRET}"
+            redirectURIs:
+              - "$${DEX_REDIRECT_URI}"
+        staticPasswords:
+          - email: "$${DEX_ADMIN_EMAIL}"
+            hash: "$${password_hash}"
+            username: "$${DEX_ADMIN_NAME}"
+            userID: "marimohub-admin"
+        EOF
+        chown -R 1001:1001 /config /data
+        chmod 0600 /config/config.yaml
+    volumes:
+      - marimohub-dex-config:/config
+      - marimohub-dex-data:/data
+
+  dex:
+    image: ghcr.io/dexidp/dex:v2.44.0
+    command: ["dex", "serve", "/config/config.yaml"]
+    volumes:
+      - marimohub-dex-config:/config:ro
+      - marimohub-dex-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      dex-config:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5556/dex/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  docker-cli-init:
+    image: docker:28.3.2-cli
+    restart: "no"
+    exclude_from_hc: true
+    user: 0:0
+    entrypoint: ["/bin/sh", "-ec"]
+    command: ["cp /usr/local/bin/docker /target/docker && chmod 0555 /target/docker"]
+    volumes:
+      - marimohub-docker-cli:/target
+
+  docker-engine:
+    image: docker:28.3.2-dind
+    hostname: docker-engine
+    privileged: true
+    environment:
+      - DOCKER_TLS_CERTDIR=/certs
+    volumes:
+      - marimohub-docker-certs:/certs
+      - marimohub-docker-data:/var/lib/docker
+    healthcheck:
+      test: ["CMD-SHELL", "DOCKER_HOST=unix:///var/run/docker.sock docker info >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
+
+  sandbox-image-init:
+    image: docker:28.3.2-cli
+    restart: "no"
+    exclude_from_hc: true
+    environment:
+      - DOCKER_HOST=tcp://docker-engine:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_CERT_PATH=/certs/client
+      - SANDBOX_IMAGE=ghcr.io/marimo-team/marimo-sandbox:py3.13-marimo0.24.0@sha256:0e0b10fb6194bd347f45373b6dfd96b3a224c6930693e0111c3d8526519c0e33
+      - SANDBOX_IMAGE_PULL_ATTEMPTS=${SANDBOX_IMAGE_PULL_ATTEMPTS:?5}
+      - SANDBOX_IMAGE_PULL_DELAY_SECONDS=${SANDBOX_IMAGE_PULL_DELAY_SECONDS:?5}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        attempt=1
+        until docker pull "$${SANDBOX_IMAGE}"; do
+          if [ "$${attempt}" -ge "$${SANDBOX_IMAGE_PULL_ATTEMPTS}" ]; then
+            echo "Could not pull the Marimo sandbox image after $${attempt} attempts." >&2
+            exit 1
+          fi
+          attempt=$$((attempt + 1))
+          sleep "$${SANDBOX_IMAGE_PULL_DELAY_SECONDS}"
+        done
+        docker image inspect "$${SANDBOX_IMAGE}" >/dev/null
+    volumes:
+      - marimohub-docker-certs:/certs:ro
+    depends_on:
+      docker-engine:
+        condition: service_healthy
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.44
+    user: 1000:1000
+    environment:
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_STORAGE}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_STORAGE}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        sed "s|env:AWS_ACCESS_KEY_ID|$${AWS_ACCESS_KEY_ID}|g" /s3-config.template.json > /tmp/s3-config.json
+        sed -i "s|env:AWS_SECRET_ACCESS_KEY|$${AWS_SECRET_ACCESS_KEY}|g" /tmp/s3-config.json
+        exec weed server -dir=/data -master.port=9333 -s3 -s3.port=8333 -s3.config=/tmp/s3-config.json
+    volumes:
+      - marimohub-seaweedfs-data:/data
+      - type: bind
+        source: ./seaweedfs-s3-config.json
+        target: /s3-config.template.json
+        read_only: true
+        content: |
+          {
+            "identities": [
+              {
+                "name": "marimohub",
+                "credentials": [
+                  {
+                    "accessKey": "env:AWS_ACCESS_KEY_ID",
+                    "secretKey": "env:AWS_SECRET_ACCESS_KEY"
+                  }
+                ],
+                "actions": [
+                  "Admin",
+                  "Read",
+                  "ReadAcp",
+                  "List",
+                  "Tagging",
+                  "Write",
+                  "WriteAcp"
+                ]
+              }
+            ]
+          }
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9333/cluster/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+
+  seaweedfs-bucket:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    exclude_from_hc: true
+    environment:
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_STORAGE}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_STORAGE}
+      - BUCKET_NAME=${MARIMOHUB_STORAGE_S3_BUCKET:?marimohub}
+      - SEAWEEDFS_BUCKET_INIT_ATTEMPTS=${SEAWEEDFS_BUCKET_INIT_ATTEMPTS:?60}
+      - SEAWEEDFS_BUCKET_INIT_DELAY_SECONDS=${SEAWEEDFS_BUCKET_INIT_DELAY_SECONDS:?2}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        attempt=1
+        until mc alias set local http://seaweedfs:8333 "$${AWS_ACCESS_KEY_ID}" "$${AWS_SECRET_ACCESS_KEY}"; do
+          if [ "$${attempt}" -ge "$${SEAWEEDFS_BUCKET_INIT_ATTEMPTS}" ]; then
+            echo "Could not connect to the SeaweedFS S3 endpoint after $${attempt} attempts." >&2
+            exit 1
+          fi
+          attempt=$$((attempt + 1))
+          sleep "$${SEAWEEDFS_BUCKET_INIT_DELAY_SECONDS}"
+        done
+        mc mb --ignore-existing "local/$${BUCKET_NAME}"
+        mc stat "local/$${BUCKET_NAME}"
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+
+  seaweedfs-admin:
+    image: chrislusf/seaweedfs:4.44
+    user: 1000:1000
+    environment:
+      - SEAWEED_USER_ADMIN=${SERVICE_USER_STORAGEADMIN}
+      - SEAWEED_PASSWORD_ADMIN=${SERVICE_PASSWORD_STORAGEADMIN}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        exec weed admin -master=seaweedfs:9333 -adminUser="$${SEAWEED_USER_ADMIN}" -adminPassword="$${SEAWEED_PASSWORD_ADMIN}" -port=23646 -dataDir=/data
+    volumes:
+      - marimohub-seaweedfs-admin-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -S --spider http://127.0.0.1:23646/ 2>&1 | grep -Eq "HTTP/[0-9.]+ (200|301|302|401)"'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  storage-admin:
+    image: caddy:2.10.2-alpine
+    environment:
+      - SERVICE_URL_STORAGEADMIN_80
+    volumes:
+      - type: bind
+        source: ./StorageCaddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        content: |
+          :80 {
+            encode zstd gzip
+            header -Server
+            reverse_proxy seaweedfs-admin:23646
+          }
+    read_only: true
+    tmpfs:
+      - /config
+      - /data
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      seaweedfs-admin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
