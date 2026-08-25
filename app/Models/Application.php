@@ -739,24 +739,20 @@ class Application extends BaseModel
 
             return "{$this->source->html_url}/{$this->git_repository}/commit/{$link}";
         }
-        if (str($this->git_repository)->contains('bitbucket')) {
-            $git_repository = str_replace('.git', '', $this->git_repository);
-            $url = Url::fromString($git_repository);
-            $url = $url->withUserInfo('');
-            $url = $url->withPath($url->getPath().'/commits/'.$link);
 
-            return $url->__toString();
-        }
+        $git_repository = $this->git_repository;
         if (strpos($this->git_repository, 'git@') === 0) {
-            $git_repository = str_replace(['git@', ':', '.git'], ['', '/', ''], $this->git_repository);
-            if (data_get($this, 'source.html_url')) {
-                return "{$this->source->html_url}/{$git_repository}/commit/{$link}";
-            }
-
-            return "{$git_repository}/commit/{$link}";
+            $git_repository = preg_replace('/^git@([^:]+):/', 'https://$1/', $git_repository);
+        } elseif (str($this->git_repository)->startsWith('ssh://')) {
+            $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
         }
 
-        return $this->git_repository;
+        $url = Url::fromString(Str::replaceEnd('.git', '', $git_repository));
+        $url = $url->withUserInfo('');
+        $commitPath = str($git_repository)->contains('bitbucket') ? 'commits' : 'commit';
+        $url = $url->withPath(Str::finish($url->getPath(), '/').$commitPath.'/'.$link);
+
+        return $url->__toString();
     }
 
     public function dockerfileLocation(): Attribute

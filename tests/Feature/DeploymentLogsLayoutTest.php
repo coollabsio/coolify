@@ -244,11 +244,9 @@ it('links deployment commit hashes to the source commit page', function () {
 
     $response->assertSuccessful();
     $response->assertSee(
-        'href="https://github.com/coollabsio/coolify/commit/1234567890abcdef1234567890abcdef12345678"',
+        'href="https://github.com/coollabsio/coolify/commit/1234567890abcdef1234567890abcdef12345678" target="_blank" rel="noopener noreferrer"',
         false,
     );
-    $response->assertSee('target="_blank"', false);
-    $response->assertSee('rel="noopener noreferrer"', false);
 });
 
 it('places cancel deployment controls inside the deployment logs toolbar', function () {
