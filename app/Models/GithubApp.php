@@ -2,10 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\DB;
 
 class GithubApp extends BaseModel
 {
+    use Auditable;
+
+    public function delete(): ?bool
+    {
+        return DB::transaction(fn () => parent::delete());
+    }
+
     protected $fillable = [
         'team_id',
         'private_key_id',

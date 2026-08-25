@@ -81,7 +81,7 @@ class Show extends Component
                 }
                 $safeNetwork = escapeshellarg($this->destination->network);
                 instant_remote_process(["docker network disconnect {$safeNetwork} coolify-proxy"], $this->destination->server, throwError: false);
-                instant_remote_process(["docker network rm -f {$safeNetwork}"], $this->destination->server);
+                instant_remote_process([dockerNetworkRemoveCommand($this->destination->network)], $this->destination->server);
             }
             $this->destination->delete();
 

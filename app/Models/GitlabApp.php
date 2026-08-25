@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\Crypt;
 
 class GitlabApp extends BaseModel
 {
+    use Auditable;
+
     protected $fillable = [
         'name',
         'organization',
@@ -100,6 +103,7 @@ class GitlabApp extends BaseModel
             if ($gitlabApp->applications()->count() > 0) {
                 throw new \RuntimeException('This source is being used by an application. Please delete all applications first.');
             }
+
         });
     }
 

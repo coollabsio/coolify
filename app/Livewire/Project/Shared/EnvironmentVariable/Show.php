@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Events\ApplicationConfigurationChanged;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
@@ -12,7 +13,9 @@ use App\Models\SharedEnvironmentVariable;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
+use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -21,7 +24,12 @@ class Show extends Component
 {
     public bool $showEnvironmentType = true;
 
-    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
+
+    protected function secretManagerResource(): ?Model
+    {
+        return $this->isSharedVariable ? null : $this->env->resourceable;
+    }
 
     public $parameters;
 
@@ -161,6 +169,22 @@ class Show extends Component
         $this->valuesLoaded = true;
     }
 
+    public function copyValue(): ?string
+    {
+        if ($this->env->is_shown_once || (auth()->user()?->isMember() ?? true)) {
+            return null;
+        }
+
+        if (! $this->env instanceof ModelsEnvironmentVariable) {
+            return $this->env->value;
+        }
+
+        return $this->env->get_real_environment_variables_with_server(
+            $this->env->resolveReferencedValue(),
+            $this->env->resourceable,
+        );
+    }
+
     public function syncData(bool $toModel = false)
     {
         if ($toModel) {
@@ -204,7 +228,7 @@ class Show extends Component
             $this->is_required = (bool) ($this->env->is_required ?? false);
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
-            $this->isValueHidden = auth()->user()?->isMember() ?? false;
+            $this->isValueHidden = auth()->user()?->isMember() ?? true;
 
             if ($this->valuesLoaded) {
                 $this->hydrateValueFields();
@@ -231,12 +255,12 @@ class Show extends Component
             $this->is_really_required = $this->is_required && blank($this->value);
         }
 
-        if ($this->env->is_shown_once || auth()->user()?->isMember()) {
+        if ($this->env->is_shown_once || (auth()->user()?->isMember() ?? true)) {
             $this->value = null;
             $this->real_value = null;
         }
 
-        $this->isValueHidden = auth()->user()?->isMember() ?? false;
+        $this->isValueHidden = auth()->user()?->isMember() ?? true;
     }
 
     public function checkEnvs()
@@ -298,6 +322,10 @@ class Show extends Component
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
+
+            if ($this->is_required && $this->resource instanceof Service) {
+                event(new ApplicationConfigurationChanged($this->resource->team()->id));
+            }
         } catch (\Exception $e) {
             return handleError($e);
         }

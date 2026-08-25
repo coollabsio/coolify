@@ -11,6 +11,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
+use App\Livewire\Dev\LivewireRequestFailurePreview;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -97,6 +98,7 @@ use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Subscription\Show as SubscriptionShow;
 use App\Livewire\Tags\Show as TagsShow;
 use App\Livewire\Team\AdminView as TeamAdminView;
+use App\Livewire\Team\AuditLog as TeamAuditLog;
 use App\Livewire\Team\DangerZone as TeamDangerZone;
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Member\Index as TeamMemberIndex;
@@ -113,15 +115,17 @@ Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('p
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
-Route::middleware(['throttle:login'])->group(function () {
-    Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
-});
+Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
+Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 
 // Local/testing previews for HTTP error pages and the Laravel debug renderer (never in production).
 if (app()->environment(['local', 'testing'])) {
+    Route::get('/__livewire-request-failure', LivewireRequestFailurePreview::class)
+        ->name('dev.livewire-request-failure-preview');
+
     Route::get('/__exception', function () {
         throw new RuntimeException('Testing Laravel exception page');
     })->name('dev.exception-preview');
@@ -207,6 +211,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
+        Route::get('/audit-log', TeamAuditLog::class)->name('team.audit-log');
         Route::get('/admin', TeamAdminView::class)->name('team.admin-view');
         Route::get('/danger', TeamDangerZone::class)->name('team.danger-zone');
     });

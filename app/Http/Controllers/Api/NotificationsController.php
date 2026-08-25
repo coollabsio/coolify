@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\WebhookNotificationSettings;
 use App\Rules\SafeWebhookUrl;
+use App\Rules\ValidHostname;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,7 @@ class NotificationsController extends Controller
                     'smtp_username' => 'sometimes|nullable|string|max:255',
                     'smtp_password' => 'sometimes|nullable|string|max:255',
                     'smtp_timeout' => 'sometimes|nullable|integer|min:0',
+                    'smtp_ehlo_domain' => ['sometimes', 'nullable', 'string', 'max:255', new ValidHostname],
                     'resend_enabled' => 'sometimes|boolean',
                     'resend_api_key' => 'sometimes|nullable|string|max:255',
                     'use_instance_email_settings' => 'sometimes|boolean',
@@ -283,7 +285,7 @@ class NotificationsController extends Controller
 
     #[OA\Get(
         summary: 'Get email notification settings',
-        description: 'Get the current team email notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.',
+        description: 'Get the current team email notification settings, including `smtp_ehlo_domain`, the hostname sent with SMTP EHLO. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.',
         path: '/notifications/email',
         operationId: 'get-current-team-email-notifications',
         security: [['bearerAuth' => []]],
@@ -301,7 +303,7 @@ class NotificationsController extends Controller
 
     #[OA\Patch(
         summary: 'Update email notification settings',
-        description: 'Update the current team email notification settings.',
+        description: 'Update the current team email notification settings. Set `smtp_ehlo_domain` to a valid hostname to control the SMTP EHLO domain, or `null` to use the system default.',
         path: '/notifications/email',
         operationId: 'update-current-team-email-notifications',
         security: [['bearerAuth' => []]],

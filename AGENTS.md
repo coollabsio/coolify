@@ -99,8 +99,29 @@ function loginAsRoot(): mixed
 ```
 
 - See `tests/v4/Browser/LoginTest.php`, `tests/v4/Browser/DashboardTest.php`, and `tests/v4/Browser/RegistrationTest.php` for conventions.
-- Chrome driver runs on `localhost:4444`, app on `localhost:8000` (configured in `tests/DuskTestCase.php`).
 - Legacy Dusk macros in `app/Providers/DuskServiceProvider.php` use the old `type()`/`press()` API — do not mix with Pest Browser Plugin's `fill()`/`click()` API.
+
+### How Browser Tests Actually Run (no Docker, no display needed)
+
+`visit()` does NOT hit the dev app on `localhost:8000` and does NOT use the Dusk ChromeDriver on `:4444` (that config in `tests/DuskTestCase.php` is legacy). Instead the Pest Browser Plugin:
+
+1. Starts a local Playwright server (`node node_modules/.bin/playwright run-server`) and launches a **headless Chromium** from `~/.cache/ms-playwright` (install once with `npm install && npx playwright install chromium`).
+2. Boots an **in-process amphp HTTP server** on a random port that serves the Laravel app from the test process itself.
+
+Because the "server" and the test share one PHP process, they share the phpunit env (sqlite `:memory:`, array cache) — so `config()->set(...)`, model writes, and `Cache` calls in the test are visible to browser-issued requests, and `RefreshDatabase` never touches the dev Postgres.
+
+`->screenshot(filename: '...')` writes real PNGs to `tests/Browser/Screenshots/` — read them to visually verify UI state (toasts, modals, stray elements).
+
+### Browser Test Gotchas
+
+- **`Class "Redis" not found` thrown by the HTTP server**: host PHP has no phpredis, and the maintenance-mode store is hard-wired to redis (`config/app.php` → `'maintenance' => ['store' => 'redis']`). Add `config()->set('app.maintenance.store', 'array');` in `beforeEach`.
+- **Every path redirects to onboarding** for a fresh user (`DecideWhatToDoWithUser` + `showBoarding()`). Finish boarding before navigating: `Team::query()->update(['show_boarding' => false]); Cache::flush();` — the `Cache::flush()` is required because `User::currentTeam()` caches the Team for an hour and the in-process server shares that cache.
+- **`->navigate('/path')` races form-submit redirects.** After `->click('Login')`, assert something on the destination page (e.g. `->assertSee('Welcome to Coolify')`) before calling `navigate()`.
+- **Failure messages print the *initial* `visit()` URL**, not the current URL. Read the auto-saved screenshot in `tests/Browser/Screenshots/` to see where the browser actually ended up.
+- **Runs hang forever**: stale Playwright servers from a previously killed run. Fix: `pkill -f "playwright run-server"` and rerun. Healthy runs take seconds.
+- **Guest pages miss `DOMPurify`** (`public/js/purify.min.js` loads only `@auth` in `layouts/base.blade.php`), so toast descriptions fail on unauthenticated pages — log in first for toast-related assertions.
+- Layouts that call `@livewireScripts` manually must also call `@livewireStyles`, otherwise Livewire's asset auto-injection is disabled and `[wire\:loading]`/`[x-cloak]` elements render visible.
+- Run browser test files in their own `php artisan test` invocation — combining them with non-browser test paths in one command can hang the runner.
 
 ## Architecture
 

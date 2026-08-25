@@ -101,6 +101,11 @@ class Navbar extends Component
 
             // Always use background job for all servers
             RestartProxyJob::dispatch($this->server);
+            auditLog('ui.proxy.restarted', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
 
         } catch (\Throwable $e) {
             $this->restartInitiated = false;
@@ -125,6 +130,11 @@ class Navbar extends Component
         try {
             $this->authorize('manageProxy', $this->server);
             $activity = StartProxy::run($this->server, force: true);
+            auditLog('ui.proxy.started', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -136,6 +146,12 @@ class Navbar extends Component
         try {
             $this->authorize('manageProxy', $this->server);
             StopProxy::dispatch($this->server, $forceStop);
+            auditLog('ui.proxy.stopped', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'force' => $forceStop,
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
