@@ -3433,9 +3433,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $ipv6 = data_get($custom_compose, 'ip6.0');
                     data_forget($custom_compose, 'ip');
                     data_forget($custom_compose, 'ip6');
-                    if ($ipv4 || $ipv6) {
-                        data_forget($docker_compose['services'][$this->application->uuid], 'networks');
-                    }
                     if ($ipv4) {
                         $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
                     }
