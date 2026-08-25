@@ -92,14 +92,19 @@ class FortifyServiceProvider extends ServiceProvider
                     }
                     $user->currentTeam = $invitation->team;
                     $invitation->delete();
+                    session(['currentTeam' => $user->currentTeam]);
                 } else {
-                    // Normal login - use personal team
-                    $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                    if (! $user->currentTeam) {
-                        $user->currentTeam = $user->recreate_personal_team();
+                    // Restore the last active team; only fall back when unambiguous.
+                    $team = $user->resolveStoredTeam();
+                    if (! $team && $user->teams->isEmpty()) {
+                        $team = $user->recreate_personal_team();
                     }
+                    if ($team) {
+                        session(['currentTeam' => $user->currentTeam = $team]);
+                    }
+                    // Otherwise (multiple teams, no stored choice) leave the session
+                    // team unset so the user is sent to the team-selection screen.
                 }
-                session(['currentTeam' => $user->currentTeam]);
 
                 return $user;
             }
