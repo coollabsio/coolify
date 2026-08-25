@@ -353,17 +353,24 @@ class Proxy extends Component
 
     private function clearAppliedTraefikBranchWarning(): void
     {
-        if (data_get($this->server->traefik_outdated_info, 'type') !== 'minor_upgrade') {
+        $outdatedInfo = $this->server->traefik_outdated_info;
+
+        if (data_get($outdatedInfo, 'type') !== 'minor_upgrade') {
             return;
         }
 
         $configuredBranch = $this->getConfiguredTraefikBranch();
-        $upgradeTarget = ltrim((string) data_get($this->server->traefik_outdated_info, 'upgrade_target'), 'v');
+        $upgradeTarget = ltrim((string) data_get($outdatedInfo, 'upgrade_target'), 'v');
 
         if (! $configuredBranch || ! $upgradeTarget || version_compare($configuredBranch, $upgradeTarget, '<')) {
             return;
         }
 
-        $this->server->update(['traefik_outdated_info' => null]);
+        Server::query()
+            ->whereKey($this->server->id)
+            ->where('traefik_outdated_info->type', data_get($outdatedInfo, 'type'))
+            ->where('traefik_outdated_info->current', data_get($outdatedInfo, 'current'))
+            ->where('traefik_outdated_info->upgrade_target', data_get($outdatedInfo, 'upgrade_target'))
+            ->update(['traefik_outdated_info' => null]);
     }
 }
