@@ -59,6 +59,65 @@ test('the danger zone resource list can be refreshed', function () {
         ->assertSuccessful();
 });
 
+test('unused private keys do not block team deletion', function () {
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $this->teamToDelete->id,
+        'description' => 'Created by Coolify',
+    ]);
+
+    expect($this->teamToDelete->isEmpty())->toBeTrue();
+
+    app(DeleteTeam::class)->handle($this->teamToDelete, $this->owner);
+
+    expect(Team::find($this->teamToDelete->id))->toBeNull()
+        ->and(PrivateKey::find($privateKey->id))->toBeNull();
+});
+
+test('system-wide git sources do not block team deletion', function () {
+    Team::forceCreate([
+        'id' => 0,
+        'name' => 'Root Team',
+        'personal_team' => false,
+    ]);
+
+    $githubApp = GithubApp::forceCreate([
+        'name' => 'System-wide GitHub source',
+        'team_id' => $this->teamToDelete->id,
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+        'is_public' => false,
+        'is_system_wide' => true,
+    ]);
+    $gitlabApp = GitlabApp::forceCreate([
+        'name' => 'System-wide GitLab source',
+        'team_id' => $this->teamToDelete->id,
+        'api_url' => 'https://gitlab.com/api/v4',
+        'html_url' => 'https://gitlab.com',
+        'is_public' => false,
+        'is_system_wide' => true,
+    ]);
+
+    expect($this->teamToDelete->isEmpty())->toBeTrue();
+
+    app(DeleteTeam::class)->handle($this->teamToDelete, $this->owner);
+
+    expect(Team::find($this->teamToDelete->id))->toBeNull()
+        ->and($githubApp->refresh()->team_id)->toBe(0)
+        ->and($gitlabApp->refresh()->team_id)->toBe(0);
+});
+
+test('the danger zone names and links blocking resource types', function () {
+    Project::factory()->count(2)->create(['team_id' => $this->teamToDelete->id]);
+
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->teamToDelete]);
+
+    Livewire::test(DangerZone::class)
+        ->assertSee('This team still owns:')
+        ->assertSee('2 projects')
+        ->assertSeeHtml('href="'.route('project.index').'"');
+});
+
 test('a team with a running application cannot be deleted', function () {
     $server = Server::factory()->create(['team_id' => $this->teamToDelete->id]);
     $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
