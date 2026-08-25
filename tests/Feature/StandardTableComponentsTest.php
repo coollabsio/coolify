@@ -3,6 +3,12 @@
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 
+it('contains wide data tables without overflowing their layout', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)->toContain(".data-table {\n    min-width: 0;\n    max-width: 100%;\n    overflow-x: auto;");
+});
+
 it('renders the standard table toolbar controls', function () {
     $html = Blade::render(<<<'BLADE'
         <x-table.toolbar>
