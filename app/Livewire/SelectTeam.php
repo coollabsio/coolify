@@ -3,10 +3,14 @@
 namespace App\Livewire;
 
 use App\Models\Team;
+use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class SelectTeam extends Component
 {
+    // mount()/selectTeam() intentionally have no return type: Livewire's
+    // redirect() returns a Redirector (not an Illuminate RedirectResponse),
+    // matching the convention in sibling components such as SwitchTeam.
     public function mount()
     {
         $user = auth()->user();
@@ -37,7 +41,7 @@ class SelectTeam extends Component
         return redirect()->route('dashboard');
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.select-team', [
             'teams' => auth()->user()->teams,

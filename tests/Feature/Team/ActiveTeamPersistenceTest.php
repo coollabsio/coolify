@@ -161,6 +161,28 @@ it('clears the stored team for members when their team is deleted', function () 
     expect($member->fresh()->current_team_id)->toBeNull();
 });
 
+it('clears the deleting owner stored team when they delete that team', function () {
+    [$owner, $personal, $shared] = userWithTwoTeams();
+    $owner->update(['current_team_id' => $shared->id]);
+
+    app(DeleteTeam::class)->handle($shared->fresh(), $owner);
+
+    expect($owner->fresh()->current_team_id)->toBeNull();
+});
+
+it('preserves a newer team selection when clearing a stale team', function () {
+    [$user, $personal, $second] = userWithTwoTeams();
+    // In-memory model still points at the team being removed ($second)...
+    $user->update(['current_team_id' => $second->id]);
+    // ...but a concurrent request already switched the stored choice to $personal.
+    User::query()->whereKey($user->id)->update(['current_team_id' => $personal->id]);
+
+    $user->clearStoredTeamIfMatches($second->id);
+
+    // The atomic WHERE guard must not clobber the newer selection.
+    expect($user->fresh()->current_team_id)->toBe($personal->id);
+});
+
 it('bounces users who already have an active team away from the select screen', function () {
     [$user, , $second] = userWithTwoTeams();
     $user->update(['current_team_id' => $second->id]);
