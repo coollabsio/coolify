@@ -2152,6 +2152,14 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 /* Data table (layer-card body, full-bleed) */
+.data-table {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
 .data-table-header {
     display: grid;
     align-items: center;
