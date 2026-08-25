@@ -77,6 +77,7 @@ it('prevents the stable helper workflow from publishing an existing version', fu
     $workflow = file_get_contents(dirname(__DIR__, 2).'/.github/workflows/coolify-helper.yml');
 
     expect($workflow)
+        ->toContain('workflow_dispatch:')
         ->toContain('check-version:')
         ->toContain('needs: check-version')
         ->toContain('VERSION="${BASE_VERSION}"')
