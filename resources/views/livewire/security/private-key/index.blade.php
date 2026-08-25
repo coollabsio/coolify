@@ -77,6 +77,7 @@
             @foreach ($privateKeys as $key)
                 @can('view', $key)
                     <x-modal-input title="Edit Private Key" isFullWidth :wireIgnore="false" :contentClicks="false"
+                        wire:key="private-key-{{ $key->id }}"
                         class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
                         <x-slot:content>
                     <div

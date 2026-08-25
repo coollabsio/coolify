@@ -46,6 +46,7 @@ it('opens security resources in modal editors and keeps create actions in card h
     }
 
     expect(file_get_contents($views[0]))->toContain('>Private key</div>', '>Status</div>');
+    expect(file_get_contents($views[0]))->toContain('wire:key="private-key-{{ $key->id }}"');
     expect(file_get_contents($views[1]))->toContain('>Token</div>', '>Provider</div>');
     expect(file_get_contents($views[2]))->toContain('>Script</div>', '>Last updated</div>');
 
