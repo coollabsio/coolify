@@ -89,6 +89,7 @@ class Member extends Component
             DB::transaction(function () use ($teamId): void {
                 $this->member->teams()->detach($teamId);
                 RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
+                $this->member->clearStoredTeamIfMatches($teamId);
             });
             // Clear cache for the removed user - both old and new key formats
             Cache::forget("team:{$this->member->id}");
