@@ -9,13 +9,13 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
-class SharedBuildTeams extends Component
+class SharedDeploymentTeams extends Component
 {
     #[Locked]
     public Server $server;
 
     /**
-     * Team ID => build access enabled.
+     * Team ID => deployment access enabled.
      *
      * @var array<int|string, bool>
      */
@@ -28,7 +28,10 @@ class SharedBuildTeams extends Component
         $server->refresh();
         $server->load('settings');
 
-        abort_unless($server->isBuildServer(), 404);
+        abort_unless(
+            $server->canHostResources() && ! $server->isLocalhost(),
+            404
+        );
 
         $this->server = $server;
         $this->loadTeamAccess();
@@ -50,11 +53,14 @@ class SharedBuildTeams extends Component
         $this->server->refresh();
         $this->server->load('settings');
 
-        if (! $this->server->isBuildServer()) {
+        if (
+            ! $this->server->canHostResources()
+            || $this->server->isLocalhost()
+        ) {
             $this->dispatch(
                 'error',
-                'Build server sharing is unavailable.',
-                'Only dedicated build servers can be shared.'
+                'Deployment server sharing is unavailable.',
+                'Only non-local deployment servers can be shared.'
             );
 
             return;
@@ -81,10 +87,10 @@ class SharedBuildTeams extends Component
 
         foreach ($allowedTeamIds as $teamId) {
             $teamId = (int) $teamId;
-            $canBuild = $selectedTeamIds->contains($teamId);
-            $canDeploy = (bool) data_get(
+            $canDeploy = $selectedTeamIds->contains($teamId);
+            $canBuild = (bool) data_get(
                 $existingAccess->get($teamId),
-                'pivot.can_deploy',
+                'pivot.can_build',
                 false
             );
 
@@ -106,7 +112,7 @@ class SharedBuildTeams extends Component
             $this->server->sharedTeams()->detach($detachTeamIds);
         }
 
-        auditLog('ui.server.shared_build_teams_updated', [
+        auditLog('ui.server.shared_deployment_teams_updated', [
             'server_id' => $this->server->id,
             'server_uuid' => $this->server->uuid,
             'owner_team_id' => $this->server->team_id,
@@ -114,14 +120,14 @@ class SharedBuildTeams extends Component
         ]);
 
         $this->loadTeamAccess();
-        $this->dispatch('success', 'Shared build-server access updated.');
+        $this->dispatch('success', 'Shared deployment access updated.');
     }
 
     private function loadTeamAccess(): void
     {
         $sharedTeamIds = $this->server
             ->sharedTeams()
-            ->wherePivot('can_build', true)
+            ->wherePivot('can_deploy', true)
             ->pluck('teams.id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -135,6 +141,6 @@ class SharedBuildTeams extends Component
 
     public function render()
     {
-        return view('livewire.server.shared-build-teams');
+        return view('livewire.server.shared-deployment-teams');
     }
 }

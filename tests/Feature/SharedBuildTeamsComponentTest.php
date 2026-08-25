@@ -100,6 +100,48 @@ test('saving synchronizes removed team access', function () {
     ]);
 });
 
+test('saving build access preserves an existing deployment grant', function () {
+    $this->buildServer->sharedTeams()->attach($this->teamA->id, [
+        'can_build' => false,
+        'can_deploy' => true,
+    ]);
+
+    Livewire::test(SharedBuildTeams::class, [
+        'server' => $this->buildServer,
+    ])
+        ->set("teamAccess.{$this->teamA->id}", true)
+        ->call('save')
+        ->assertDispatched('success');
+
+    $this->assertDatabaseHas('server_team', [
+        'server_id' => $this->buildServer->id,
+        'team_id' => $this->teamA->id,
+        'can_build' => true,
+        'can_deploy' => true,
+    ]);
+});
+
+test('removing build access does not remove an existing deployment grant', function () {
+    $this->buildServer->sharedTeams()->attach($this->teamA->id, [
+        'can_build' => true,
+        'can_deploy' => true,
+    ]);
+
+    Livewire::test(SharedBuildTeams::class, [
+        'server' => $this->buildServer,
+    ])
+        ->set("teamAccess.{$this->teamA->id}", false)
+        ->call('save')
+        ->assertDispatched('success');
+
+    $this->assertDatabaseHas('server_team', [
+        'server_id' => $this->buildServer->id,
+        'team_id' => $this->teamA->id,
+        'can_build' => false,
+        'can_deploy' => true,
+    ]);
+});
+
 test('owner team and unknown team ids cannot be injected into sharing', function () {
     Livewire::test(SharedBuildTeams::class, [
         'server' => $this->buildServer,

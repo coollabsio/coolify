@@ -284,10 +284,16 @@
                     @endif
                 </form>
 
-                @if ($server->isBuildServer() && isInstanceAdmin())
-                    <livewire:server.shared-build-teams
-                        :server="$server"
-                        :key="'shared-build-teams-'.$server->id" />
+                @if (isInstanceAdmin())
+                    @if ($server->isBuildServer())
+                        <livewire:server.shared-build-teams
+                            :server="$server"
+                            :key="'shared-build-teams-'.$server->id" />
+                    @elseif (!$server->isLocalhost())
+                        <livewire:server.shared-deployment-teams
+                            :server="$server"
+                            :key="'shared-deployment-teams-'.$server->id" />
+                    @endif
                 @endif
             @endif
         </div>

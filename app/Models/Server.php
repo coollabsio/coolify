@@ -901,6 +901,36 @@ $siteAddress {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
     }
 
+    public function scopeDeployableByTeam(Builder $query, int $teamId): Builder
+    {
+        return $query
+            ->where(function (Builder $accessQuery) use ($teamId) {
+                $accessQuery
+                    ->where('team_id', $teamId)
+                    ->orWhere(function (Builder $sharedQuery) use ($teamId) {
+                        $sharedQuery
+                            ->whereKeyNot(0)
+                            ->whereRelation('settings', 'is_build_server', false)
+                            ->whereHas('sharedTeams', function (Builder $teamQuery) use ($teamId) {
+                                $teamQuery
+                                    ->where('teams.id', $teamId)
+                                    ->where('server_team.can_deploy', true);
+                            });
+                    });
+            });
+    }
+
+    public static function usableDeploymentServersForTeam(int $teamId): Builder
+    {
+        return self::query()
+            ->deployableByTeam($teamId)
+            ->whereRelation('settings', 'is_build_server', false)
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_usable', true)
+            ->whereRelation('settings', 'is_swarm_worker', false)
+            ->whereRelation('settings', 'force_disabled', false);
+    }
+
     public static function buildServers(int $teamId): Builder
     {
         return self::accessibleDeploymentExecutionServersForTeam($teamId)
@@ -1329,7 +1359,7 @@ $siteAddress {
     public function sharedTeams()
     {
         return $this->belongsToMany(Team::class)
-            ->withPivot('can_build')
+            ->withPivot(['can_build', 'can_deploy'])
             ->withTimestamps();
     }
 
