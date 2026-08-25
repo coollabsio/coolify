@@ -568,8 +568,11 @@ function refreshSession(?Team $team = null): void
             $team = Team::find($currentTeam->id);
         }
         if (! $team) {
-            // Fall back to any team the user still belongs to.
-            $team = User::query()->find(Auth::id())?->teams()->first();
+            // Fall back to the user's resolvable team (stored choice, or their
+            // sole team). Returns null for a multi-team user with no valid stored
+            // choice, so an arbitrary first team is never silently persisted —
+            // the user is sent to the selection screen instead.
+            $team = User::query()->find(Auth::id())?->resolveStoredTeam();
         }
     }
 

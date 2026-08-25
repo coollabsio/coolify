@@ -54,6 +54,10 @@ class DeleteTeam
                     DB::table('sessions')->where('user_id', $member->id)->delete();
                 });
 
+            // The deleting owner is excluded from the loop above; clear their
+            // stored team too so the deleted id is not restored on next login.
+            $user->clearStoredTeamIfMatches($team->id);
+
             $team->delete();
 
             return $user->teams()->first();

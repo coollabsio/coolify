@@ -412,8 +412,16 @@ class User extends Authenticatable implements SendsEmail
      */
     public function clearStoredTeamIfMatches(int $teamId): void
     {
+        // Atomic conditional update: only null the column when the database value
+        // still points at this team, so a newer team selection made concurrently
+        // (in another request) is preserved rather than clobbered.
+        static::query()
+            ->whereKey($this->getKey())
+            ->where('current_team_id', $teamId)
+            ->update(['current_team_id' => null]);
+
         if ($this->current_team_id === $teamId) {
-            $this->forceFill(['current_team_id' => null])->saveQuietly();
+            $this->current_team_id = null;
         }
     }
 
