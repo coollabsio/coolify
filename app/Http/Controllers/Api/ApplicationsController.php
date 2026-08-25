@@ -2560,6 +2560,8 @@ class ApplicationsController extends Controller
 
         $this->authorize('delete', $application);
 
+        $application->delete();
+
         DeleteResourceJob::dispatch(
             resource: $application,
             deleteVolumes: $request->boolean('delete_volumes', true),

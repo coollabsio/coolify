@@ -10,6 +10,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -48,6 +49,7 @@ it('deletes the Coolify resource when remote cleanup fails', function () {
     (new DeleteResourceJob($this->application))->handle();
 
     expect(Application::withTrashed()->find($this->application->id))->toBeNull();
+    Queue::assertNotPushed(QueuedCommand::class);
 });
 
 it('rolls back local metadata deletion when deleting the resource fails', function () {

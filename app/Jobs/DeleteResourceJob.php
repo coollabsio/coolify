@@ -26,7 +26,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -128,7 +127,6 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             $this->resource->forceDelete();
         });
 
-        Artisan::queue('cleanup:stucked-resources');
     }
 
     private function isDatabase(): bool
