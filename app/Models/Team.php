@@ -283,8 +283,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         return array_filter([
             'projects' => $this->projects()->count(),
             'servers' => $this->servers()->count(),
-            'sources' => GithubApp::query()->where('team_id', $this->id)->count()
-                + GitlabApp::query()->where('team_id', $this->id)->count(),
+            'sources' => GithubApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count()
+                + GitlabApp::query()->where('team_id', $this->id)->where('is_system_wide', false)->count(),
         ]);
     }
 
