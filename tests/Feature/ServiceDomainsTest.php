@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Project\Service\Domains;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -11,6 +12,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -283,39 +285,38 @@ it('auto-adds missing non-www pair for a service application redirect', function
 it('adds only the entered domain when redirects allow both directions', function () {
     $this->webApp->update(['redirect' => 'both']);
 
-    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('newServiceApplicationId', $this->webApp->id)
         ->set('newDomain', 'https://web.example.com')
         ->call('addDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('success')
+        ->assertDispatched('success');
+
+    $component->call('pollDnsChecks')
         ->assertSee('DNS skipped');
 
     expect($this->webApp->fresh()->fqdn)->toBe('https://web.example.com');
 });
 
 it('adds a domain to a selected service application', function () {
+    Queue::fake();
+
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->set('newServiceApplicationId', $this->webApp->id)
         ->set('newDomain', 'https://web.example.com')
         ->call('addDomain')
         ->assertHasNoErrors()
-        ->assertDispatched('success')
+        ->assertDispatched('success', 'Domain added. DNS check started.')
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->firstWhere('url', 'https://web.example.com')['dns_status'] === 'checking')
         ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->pluck('url')->contains('https://web.example.com'))
         ->assertSee('https://web.example.com');
 
     $this->webApp->refresh();
     expect($this->webApp->fqdn)->toBe('https://web.example.com');
 
-    $dnsStatuses = $this->webApp->domain_dns_statuses;
+    expect($this->webApp->domain_dns_statuses['https://web.example.com']['status'] ?? null)->toBe('checking');
 
-    expect($dnsStatuses)
-        ->toHaveKey('https://web.example.com')
-        ->not->toHaveKey('https://www.web.example.com')
-        ->and($dnsStatuses['https://web.example.com']['status'])
-        ->toBe('skipped')
-        ->and($dnsStatuses['https://web.example.com']['checked_at'])
-        ->not->toBeNull();
+    Queue::assertPushed(CheckDomainDnsJob::class, 1);
 });
 
 it('adds a domain when the compose service has an empty environment section', function () {
@@ -457,13 +458,15 @@ it('does not restore stale dns status when a removed service domain is re-added'
         ],
     ]);
 
-    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->call('removeDomain', 0)
         ->set('newServiceApplicationId', $this->apiApp->id)
         ->set('newDomain', 'https://api.example.com')
         ->call('addDomain')
         ->assertHasNoErrors()
         ->assertDispatched('success');
+
+    $component->call('pollDnsChecks');
 
     $this->apiApp->refresh();
 
@@ -562,6 +565,39 @@ it('hides dns message text when service domain dns status is ok', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSee('DNS OK')
         ->assertDontSee('DNS points to 203.0.113.10');
+});
+
+it('polls a queued service dns check and notifies about success', function () {
+    $domain = 'https://api.example.com';
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => null,
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSee('Checking DNS...')
+        ->assertSee('wire:poll.2000ms="pollDnsChecks"', false);
+
+    $this->apiApp->update([
+        'domain_dns_statuses' => [
+            $domain => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $component->call('pollDnsChecks')
+        ->assertSet('domainRows', fn (array $rows): bool => collect($rows)->firstWhere('url', $domain)['dns_status'] === 'ok')
+        ->assertDispatched('success', 'DNS is configured correctly for api.example.com.');
 });
 
 it('forbids read-only users from checking service domain dns', function (string $action, array $parameters) {

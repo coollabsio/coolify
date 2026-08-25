@@ -614,6 +614,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $this->dockerImagePreviewTag;
         }
 
+        if ($this->rollback && str($this->commit)->isNotEmpty()) {
+            return $this->commit;
+        }
+
         if (str($this->application->docker_registry_image_tag)->isNotEmpty()) {
             return $this->application->docker_registry_image_tag;
         }
