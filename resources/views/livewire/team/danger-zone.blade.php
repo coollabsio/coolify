@@ -85,7 +85,8 @@
                                     confirmationText="{{ currentTeam()->name }}"
                                     confirmationLabel="Enter the team name to confirm permanent deletion"
                                     shortConfirmationLabel="Team name" :confirmWithPassword="false"
-                                    step2ButtonText="Permanently Delete" />
+                                    step2ButtonText="Permanently Delete" canGate="delete"
+                                    :canResource="$team" />
                             @else
                                 <x-forms.button disabled tooltip="Resolve the requirements shown before deleting this team.">
                                     Delete team
