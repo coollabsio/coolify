@@ -59,6 +59,32 @@ test('the danger zone resource list can be refreshed', function () {
         ->assertSuccessful();
 });
 
+test('unused private keys do not block team deletion', function () {
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $this->teamToDelete->id,
+        'description' => 'Created by Coolify',
+    ]);
+
+    expect($this->teamToDelete->isEmpty())->toBeTrue();
+
+    app(DeleteTeam::class)->handle($this->teamToDelete, $this->owner);
+
+    expect(Team::find($this->teamToDelete->id))->toBeNull()
+        ->and(PrivateKey::find($privateKey->id))->toBeNull();
+});
+
+test('the danger zone names and links blocking resource types', function () {
+    Project::factory()->count(2)->create(['team_id' => $this->teamToDelete->id]);
+
+    $this->actingAs($this->owner);
+    session(['currentTeam' => $this->teamToDelete]);
+
+    Livewire::test(DangerZone::class)
+        ->assertSee('This team still owns:')
+        ->assertSee('2 projects')
+        ->assertSeeHtml('href="'.route('project.index').'"');
+});
+
 test('a team with a running application cannot be deleted', function () {
     $server = Server::factory()->create(['team_id' => $this->teamToDelete->id]);
     $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
