@@ -1,11 +1,15 @@
 <?php
 
 use App\Livewire\Security\CloudInitScript\Show as CloudInitScriptShow;
+use App\Livewire\Security\PrivateKey\Index as PrivateKeyIndex;
+use App\Livewire\Security\PrivateKey\Show as PrivateKeyShow;
 use App\Models\CloudInitScript;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 
@@ -22,6 +26,7 @@ beforeEach(function () {
     $this->actingAs($user);
     session(['currentTeam' => $team]);
     $this->team = $team;
+    Storage::fake('ssh-keys');
 });
 
 it('opens security resources in modal editors and keeps create actions in card headers', function () {
@@ -82,4 +87,33 @@ it('deletes a cloud-init script from its modal editor without redirecting to a d
         ->assertDispatched('close-modal');
 
     $this->assertModelMissing($script);
+});
+
+it('keeps the remaining private key editor populated after deleting multiple keys', function () {
+    $privateKeys = PrivateKey::factory()->count(3)->create([
+        'team_id' => $this->team->id,
+    ]);
+    $index = Livewire::test(PrivateKeyIndex::class);
+
+    foreach ($privateKeys->take(2) as $privateKey) {
+        Livewire::test(PrivateKeyShow::class, [
+            'private_key_uuid' => $privateKey->uuid,
+            'modalMode' => true,
+        ])->call('delete')
+            ->assertDispatched('securityResourceChanged')
+            ->assertDispatched('close-modal');
+    }
+
+    $remainingPrivateKey = $privateKeys->last();
+
+    $index->dispatch('securityResourceChanged')
+        ->assertDontSee($privateKeys->get(0)->name)
+        ->assertDontSee($privateKeys->get(1)->name)
+        ->assertSee($remainingPrivateKey->name);
+
+    Livewire::test(PrivateKeyShow::class, [
+        'private_key_uuid' => $remainingPrivateKey->uuid,
+        'modalMode' => true,
+    ])->assertSet('name', $remainingPrivateKey->name)
+        ->assertSee($remainingPrivateKey->name);
 });
