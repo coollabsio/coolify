@@ -158,3 +158,12 @@ it('loads the public key with the editor instead of making a follow-up request',
     expect(file_get_contents(resource_path('views/livewire/security/private-key/show.blade.php')))
         ->not->toContain('x-init="$wire.loadPublicKey()"');
 });
+
+it('shows deletion progress in the underlying private key editor', function () {
+    $view = file_get_contents(resource_path('views/livewire/security/private-key/show.blade.php'));
+
+    expect($view)
+        ->toContain('wire:loading.class="pointer-events-none opacity-50" wire:target="delete"')
+        ->toContain('wire:loading.flex wire:target="delete"')
+        ->toContain('<x-loading text="Deleting private key..." />');
+});
