@@ -2,6 +2,7 @@
 
 namespace App\Actions\Fortify;
 
+use App\Jobs\SendVerificationEmailJob;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -74,7 +75,7 @@ class CreateNewUser implements CreatesNewUsers
             ]);
             $team = $user->teams()->first();
             if (isCloud()) {
-                $user->sendVerificationEmail();
+                SendVerificationEmailJob::dispatch($user);
             } else {
                 $user->markEmailAsVerified();
             }

@@ -1,8 +1,10 @@
 <?php
 
+use App\Jobs\SendVerificationEmailJob;
 use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
@@ -133,4 +135,25 @@ it('keeps distinct dotted and plus-addressed mailboxes in separate rate limit bu
         $this->flushSession();
         RateLimiter::clear($registrationIpKey);
     }
+});
+
+it('queues the verification email for cloud registrations', function () {
+    config()->set('constants.coolify.self_hosted', false);
+    Queue::fake();
+
+    $this->withHeader('CF-Connecting-IP', '2001:db8::30')
+        ->post('/register', [
+            'name' => 'Cloud User',
+            'email' => 'cloud-user@example.com',
+            'password' => 'Password1!@',
+            'password_confirmation' => 'Password1!@',
+        ])
+        ->assertRedirect();
+
+    $user = User::query()->where('email', 'cloud-user@example.com')->firstOrFail();
+
+    Queue::assertPushed(
+        SendVerificationEmailJob::class,
+        fn (SendVerificationEmailJob $job) => $job->user->is($user)
+    );
 });
