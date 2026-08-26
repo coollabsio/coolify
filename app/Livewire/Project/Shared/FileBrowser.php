@@ -9,10 +9,12 @@ use App\Services\ContainerFilesystemService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class FileBrowser extends Component
 {
     use AuthorizesRequests;
+    use WithFileUploads;
 
     public $resource;
 
@@ -29,6 +31,12 @@ class FileBrowser extends Component
 
     /** @var array<int, array{name:string,type:string,size:int,mtime:int}> */
     public array $entries = [];
+
+    public ?string $editingPath = null;
+
+    public string $editorContent = '';
+
+    public $upload;
 
     public function mount($resource): void
     {
@@ -85,6 +93,122 @@ class FileBrowser extends Component
     public function refresh(): void
     {
         $this->loadEntries();
+    }
+
+    public function createDirectory(string $name): void
+    {
+        $this->guard();
+        try {
+            $this->service()->makeDirectory($this->childPath($name));
+            $this->loadEntries();
+            $this->dispatch('success', 'Folder created.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function renameEntry(string $from, string $newName): void
+    {
+        $this->guard();
+        try {
+            $this->service()->rename($this->childPath($from), $this->childPath($newName));
+            $this->loadEntries();
+            $this->dispatch('success', 'Renamed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function deleteEntry(string $name): void
+    {
+        $this->guard();
+        try {
+            $this->service()->delete($this->childPath($name));
+            $this->loadEntries();
+            $this->dispatch('success', 'Deleted.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function openEditor(string $name): void
+    {
+        $this->guard();
+        $path = $this->childPath($name);
+        try {
+            if (! $this->service()->isEditable($path)) {
+                $this->dispatch('error', "Can't edit this file - it's binary or larger than 5 MB. Download it instead.");
+
+                return;
+            }
+            $this->editorContent = $this->service()->read($path);
+            $this->editingPath = $path;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function saveEditor(): void
+    {
+        $this->guard();
+        if (is_null($this->editingPath)) {
+            return;
+        }
+        try {
+            $this->service()->write($this->editingPath, $this->editorContent);
+            $this->editingPath = null;
+            $this->editorContent = '';
+            $this->loadEntries();
+            $this->dispatch('success', 'Saved.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function closeEditor(): void
+    {
+        $this->editingPath = null;
+        $this->editorContent = '';
+    }
+
+    public function uploadFile(): void
+    {
+        $this->guard();
+        $this->validate(['upload' => 'required|file|max:1048576']); // 1 GB (KB units)
+        try {
+            $localTmp = $this->upload->getRealPath();
+            $this->service()->upload($localTmp, $this->childPath($this->upload->getClientOriginalName()));
+            $this->upload = null;
+            $this->loadEntries();
+            $this->dispatch('success', 'Uploaded.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function download(string $name)
+    {
+        $this->guard();
+        $localTmp = $this->service()->download($this->childPath($name));
+        $downloadName = str_ends_with($localTmp, '.tar.gz') ? $name.'.tar.gz' : $name;
+
+        return response()->streamDownload(function () use ($localTmp) {
+            readfile($localTmp);
+            @unlink($localTmp);
+        }, $downloadName);
+    }
+
+    protected function childPath(string $name): string
+    {
+        return rtrim($this->currentPath, '/').'/'.$name;
+    }
+
+    protected function guard(): void
+    {
+        $this->authorize('canAccessTerminal');
+        if (! $this->containerRunning || is_null($this->container)) {
+            throw new \RuntimeException('Container is not running.');
+        }
     }
 
     /**
