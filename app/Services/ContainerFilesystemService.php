@@ -35,6 +35,30 @@ class ContainerFilesystemService
     /**
      * @return array<int, FileEntry>
      */
+    public function list(string $path): array
+    {
+        $raw = instant_remote_process([$this->buildListCommand($path)], $this->server, throwError: false);
+
+        return $this->parseListing($raw);
+    }
+
+    public function defaultRoot(): string
+    {
+        $escapedContainer = escapeshellarg($this->container);
+        $workingDir = instant_remote_process(
+            ["docker inspect --format '{{.Config.WorkingDir}}' {$escapedContainer}"],
+            $this->server,
+            throwError: false,
+        );
+
+        $workingDir = trim((string) $workingDir);
+
+        return $workingDir !== '' ? $workingDir : '/';
+    }
+
+    /**
+     * @return array<int, FileEntry>
+     */
     public function parseListing(?string $raw): array
     {
         if (blank($raw)) {
