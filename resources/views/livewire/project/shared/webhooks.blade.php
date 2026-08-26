@@ -86,6 +86,39 @@
                         </div>
                     </x-application.settings-section>
                 </form>
+            @elseif ($this->gitlabSource())
+                <x-application.settings-section id="gitlab-app-webhook-section" title="Repository webhook"
+                    helper="Coolify registers this webhook in GitLab so pushes and merge requests deploy automatically. Sync it again if it was removed in GitLab or if this instance URL changed."
+                    wire:init="checkGitlabAppWebhook">
+                    <x-slot:actions>
+                        @can('update', $resource)
+                            <x-forms.button wire:click="syncGitlabAppWebhook" wire:target="syncGitlabAppWebhook">
+                                Sync webhook
+                            </x-forms.button>
+                        @endcan
+                    </x-slot:actions>
+
+                    <div class="flex flex-col gap-4">
+                        <div class="text-[13px] leading-5">
+                            @if ($gitlabAppWebhookState === 'active')
+                                <span class="font-medium text-success">Active</span>
+                                <span class="text-neutral-500 dark:text-fg-dim">— GitLab notifies Coolify on every
+                                    push.</span>
+                            @elseif ($gitlabAppWebhookState === 'missing')
+                                <span class="font-medium text-warning">Not configured</span>
+                                <span class="text-neutral-500 dark:text-fg-dim">— automatic deployments are off until
+                                    the webhook is synced.</span>
+                            @elseif ($gitlabAppWebhookState === 'error')
+                                <span class="font-medium text-error">Could not read the webhook</span>
+                                <span class="text-neutral-500 dark:text-fg-dim">— {{ $gitlabAppWebhookMessage }}</span>
+                            @else
+                                <span class="text-neutral-500 dark:text-fg-dim">Checking the webhook in GitLab…</span>
+                            @endif
+                        </div>
+
+                        <x-forms.copy-input label="Webhook URL" :text="$gitlabAppWebhookUrl ?? ''" />
+                    </div>
+                </x-application.settings-section>
             @else
                 <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
                     helper="Manual repository webhooks are only required when a repository is not connected through an official Git App.">

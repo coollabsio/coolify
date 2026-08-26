@@ -211,6 +211,10 @@
                             <code class="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-white/[0.06]">read_repository</code>
                         </li>
                         <li>Uncheck <strong class="text-black dark:text-fg">Confidential</strong> if you run into issues</li>
+                        <li>
+                            The authorizing user needs the <strong class="text-black dark:text-fg">Maintainer</strong>
+                            role on the projects you deploy, so Coolify can register their webhooks for you
+                        </li>
                     </ul>
                 </div>
             </x-application.settings-section>

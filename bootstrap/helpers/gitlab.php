@@ -160,3 +160,109 @@ function loadGitlabBranches(GitlabApp $source, int $projectId, int $page = 1): a
 
     return $response->json();
 }
+
+/**
+ * Public URL GitLab must call for the push / merge request events of this source.
+ *
+ * The base is taken from the OAuth redirect URI the user already validated against GitLab,
+ * so the webhook lands on the same public endpoint (tunnel, reverse proxy, custom domain).
+ */
+function gitlabWebhookUrl(GitlabApp $source): string
+{
+    $base = filled($source->redirect_uri)
+        ? rtrim(str($source->redirect_uri)->before('/webhooks/source/gitlab/redirect')->toString(), '/')
+        : '';
+
+    if (blank($base)) {
+        $base = rtrim((string) config('app.url'), '/');
+    }
+
+    if (blank($base)) {
+        throw new RuntimeException('Coolify has no public URL configured. Set the instance FQDN before configuring GitLab webhooks.');
+    }
+
+    return $base.'/webhooks/source/gitlab/events';
+}
+
+/**
+ * Find the Coolify webhook already registered on a GitLab project.
+ *
+ * @return array{id: int, url: string}|null
+ */
+function findGitlabProjectWebhook(GitlabApp $source, int $projectId, ?string $url = null): ?array
+{
+    $url ??= gitlabWebhookUrl($source);
+
+    $hooks = gitlabApi($source, "/projects/{$projectId}/hooks?per_page=100")['data'];
+
+    $hook = $hooks->first(
+        fn ($hook): bool => rtrim((string) data_get($hook, 'url'), '/') === rtrim($url, '/')
+    );
+
+    if (! $hook) {
+        return null;
+    }
+
+    return [
+        'id' => (int) data_get($hook, 'id'),
+        'url' => (string) data_get($hook, 'url'),
+    ];
+}
+
+/**
+ * Create (or refresh) the Coolify webhook on a GitLab project so pushes deploy automatically.
+ *
+ * GitLab OAuth applications have no app-level webhook like GitHub Apps do, so Coolify has to
+ * register a project hook itself. Requires the Maintainer role on the project.
+ *
+ * @return array{status: string, id: int, url: string}
+ */
+function syncGitlabProjectWebhook(GitlabApp $source, int $projectId): array
+{
+    if (! $source->isConnected()) {
+        throw new RuntimeException('This GitLab source is not connected. Authorize it before configuring webhooks.');
+    }
+
+    $token = (string) $source->webhook_token;
+    if (blank($token)) {
+        throw new RuntimeException('This GitLab source has no webhook token. Save the source again to generate one.');
+    }
+
+    $url = gitlabWebhookUrl($source);
+
+    $payload = [
+        'url' => $url,
+        'token' => $token,
+        'push_events' => true,
+        'merge_requests_events' => true,
+        'enable_ssl_verification' => str_starts_with($url, 'https://'),
+    ];
+
+    $existing = findGitlabProjectWebhook($source, $projectId, $url);
+
+    if ($existing) {
+        gitlabApi($source, "/projects/{$projectId}/hooks/{$existing['id']}", 'put', $payload);
+
+        return ['status' => 'updated', 'id' => $existing['id'], 'url' => $url];
+    }
+
+    $created = gitlabApi($source, "/projects/{$projectId}/hooks", 'post', $payload)['data'];
+
+    return ['status' => 'created', 'id' => (int) data_get($created, 'id'), 'url' => $url];
+}
+
+/**
+ * Remove the Coolify webhook from a GitLab project. Returns false when there was nothing to remove.
+ */
+function removeGitlabProjectWebhook(GitlabApp $source, int $projectId): bool
+{
+    $existing = findGitlabProjectWebhook($source, $projectId);
+
+    if (! $existing) {
+        return false;
+    }
+
+    gitlabApi($source, "/projects/{$projectId}/hooks/{$existing['id']}", 'delete');
+
+    return true;
+}

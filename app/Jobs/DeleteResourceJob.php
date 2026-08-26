@@ -11,6 +11,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\GitlabApp;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -99,6 +100,16 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
+        try {
+            $this->removeGitlabProjectWebhookIfUnused();
+        } catch (\Throwable $e) {
+            Log::warning('Could not remove the GitLab webhook while deleting a resource; continuing with local deletion.', [
+                'resource_id' => $this->resource->id,
+                'resource_type' => $this->resource->type(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         DB::transaction(function (): void {
             try {
                 $this->deleteScheduledVolumeBackups();
@@ -131,6 +142,35 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         });
 
         Artisan::queue('cleanup:stucked-resources');
+    }
+
+    /**
+     * Drop the project hook Coolify registered in GitLab, unless another application still
+     * deploys the same GitLab project through the same source.
+     */
+    private function removeGitlabProjectWebhookIfUnused(): void
+    {
+        if (! $this->resource instanceof Application) {
+            return;
+        }
+
+        $source = $this->resource->source;
+
+        if (! $source instanceof GitlabApp || blank($this->resource->repository_project_id)) {
+            return;
+        }
+
+        $stillUsed = Application::where('source_id', $source->id)
+            ->where('source_type', $source->getMorphClass())
+            ->where('repository_project_id', $this->resource->repository_project_id)
+            ->whereKeyNot($this->resource->getKey())
+            ->exists();
+
+        if ($stillUsed) {
+            return;
+        }
+
+        removeGitlabProjectWebhook($source, (int) $this->resource->repository_project_id);
     }
 
     private function isDatabase(): bool

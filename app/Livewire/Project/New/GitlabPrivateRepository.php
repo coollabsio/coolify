@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
@@ -218,6 +219,8 @@ class GitlabPrivateRepository extends Component
             $application->name = generate_application_name($this->selected_repository_path, $this->selected_branch_name, $application->uuid);
             $application->save();
 
+            $this->registerWebhook($gitlab_app, $application);
+
             return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
                 'environment_uuid' => $environment->uuid,
@@ -225,6 +228,25 @@ class GitlabPrivateRepository extends Component
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    /**
+     * GitLab OAuth applications have no app-level webhook like GitHub Apps, so the project hook
+     * has to be registered explicitly. A failure here must not discard the created application:
+     * the webhook can be retried from the application's Webhooks tab.
+     */
+    private function registerWebhook(GitlabApp $gitlab_app, Application $application): void
+    {
+        try {
+            syncGitlabProjectWebhook($gitlab_app, $this->selected_project_id);
+        } catch (\Throwable $e) {
+            Log::warning('Could not register the GitLab webhook for a new application.', [
+                'application_id' => $application->id,
+                'gitlab_app_id' => $gitlab_app->id,
+                'project_id' => $this->selected_project_id,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 
