@@ -47,19 +47,13 @@
             </x-forms.button>
 
             @if ($containerRunning)
-                {{-- Upload --}}
-                <form wire:submit="uploadFile" x-data class="contents">
-                    <label
-                        class="button flex cursor-pointer items-center gap-1"
-                        title="Upload a file to this folder">
-                        <x-reicon name="upload" class="size-3.5" />
-                        Upload
-                        <input type="file" class="hidden" wire:model="upload"
-                            @change="$nextTick(() => $wire.uploadFile())" />
-                    </label>
-                </form>
+                <input type="file" class="hidden" x-ref="uploadInput" wire:model="upload"
+                    @change="$nextTick(() => $wire.uploadFile())" />
+                <x-forms.button type="button" title="Upload a file to this folder"
+                    wire:target="uploadFile" @click="$refs.uploadInput.click()">
+                    Upload
+                </x-forms.button>
 
-                {{-- New file --}}
                 <x-modal-input buttonTitle="New file" title="New file">
                     <form x-data="{ name: '' }"
                         @submit.prevent="$wire.createFile(name); name=''; $dispatch('close-modal')"
@@ -72,7 +66,6 @@
                     </form>
                 </x-modal-input>
 
-                {{-- New folder --}}
                 <x-modal-input buttonTitle="New folder" title="New folder">
                     <form x-data="{ name: '' }"
                         @submit.prevent="$wire.createDirectory(name); name=''; $dispatch('close-modal')"
@@ -86,7 +79,6 @@
                 </x-modal-input>
 
                 <x-forms.button type="button" wire:click="refresh" title="Refresh this folder">
-                    <x-reicon name="refresh" class="size-3.5" />
                     Refresh
                 </x-forms.button>
             @endif
