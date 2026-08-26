@@ -1,6 +1,7 @@
 <?php
 
 use App\Data\FileEntry;
+use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -13,6 +14,9 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Storage::fake('ssh-keys');
+    // Disable SSH multiplexing so each instant_remote_process is exactly one
+    // faked Process call (mux setup would run extra calls and desync sequences).
+    config(['constants.ssh.mux_enabled' => false]);
 });
 
 function fsService(): ContainerFilesystemService
@@ -96,4 +100,26 @@ it('falls back to / when the container has no WorkingDir', function () {
 
     $server = fsServer();
     expect((new ContainerFilesystemService($server, 'app-123'))->defaultRoot())->toBe('/');
+});
+
+it('refuses to read a file larger than the edit cap', function () {
+    $tooBig = (string) (LocalFileVolume::MAX_CONTENT_SIZE + 1);
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: $tooBig))        // stat size
+        ->push(Process::result(output: 'text'))]);      // grep -qI (unused here)
+
+    $server = fsServer();
+    (new ContainerFilesystemService($server, 'app-123'))->read('/app/big.bin');
+})->throws(RuntimeException::class);
+
+it('reads an editable text file', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '12'))              // stat size
+        ->push(Process::result(output: 'text'))                              // binary check => text
+        ->push(Process::result(output: base64_encode("hello world\n")))]);  // base64 read
+
+    $server = fsServer();
+    $content = (new ContainerFilesystemService($server, 'app-123'))->read('/app/a.txt');
+
+    expect($content)->toBe("hello world\n");
 });

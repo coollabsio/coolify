@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Data\FileEntry;
+use App\Models\LocalFileVolume;
 use App\Models\Server;
 
 class ContainerFilesystemService
@@ -40,6 +41,48 @@ class ContainerFilesystemService
         $raw = instant_remote_process([$this->buildListCommand($path)], $this->server, throwError: false);
 
         return $this->parseListing($raw);
+    }
+
+    public function isEditable(string $path): bool
+    {
+        $escaped = $this->escapePath($path, 'read path');
+
+        $size = (int) trim((string) instant_remote_process(
+            [$this->dockerExecShell("stat -c %s {$escaped} 2>/dev/null || echo 0")],
+            $this->server,
+            throwError: false,
+        ));
+        if ($size > LocalFileVolume::MAX_CONTENT_SIZE) {
+            return false;
+        }
+
+        // grep -qI exits non-zero for binary; echo text on success, binary otherwise.
+        $kind = trim((string) instant_remote_process(
+            [$this->dockerExecShell("grep -qI . {$escaped} && echo text || echo binary")],
+            $this->server,
+            throwError: false,
+        ));
+
+        return $kind === 'text';
+    }
+
+    public function read(string $path): string
+    {
+        if (! $this->isEditable($path)) {
+            throw new \RuntimeException('File is not editable (binary or too large).');
+        }
+
+        $escaped = $this->escapePath($path, 'read path');
+
+        // base64 the content so instant_remote_process's trim() cannot corrupt
+        // exact bytes (e.g. trailing newlines).
+        $encoded = (string) instant_remote_process(
+            [$this->dockerExecShell("base64 {$escaped}")],
+            $this->server,
+            throwError: false,
+        );
+
+        return (string) base64_decode(trim($encoded), true);
     }
 
     public function defaultRoot(): string
