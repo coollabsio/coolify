@@ -151,3 +151,16 @@ it('builds mkdir, rename and delete commands with escaped paths', function () {
 it('rejects unsafe paths in mutating builders', function () {
     fsService()->buildDeleteCommand('/app/$(reboot)');
 })->throws(Exception::class);
+
+it('uploads by scp-ing to the server then docker cp into the container', function () {
+    Process::fake(['*' => Process::result(output: '')]);
+    $server = fsServer();
+    $local = tempnam(sys_get_temp_dir(), 'up');
+    file_put_contents($local, 'data');
+
+    (new ContainerFilesystemService($server, 'app-123'))->upload($local, '/app/plugins/x.jar');
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp')
+        && str_contains($process->command, 'app-123'));
+    @unlink($local);
+});
