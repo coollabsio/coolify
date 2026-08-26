@@ -137,7 +137,10 @@
                                                     wire:click="openEditor('{{ $entry['name'] }}')">Edit</x-forms.button>
                                             @endif
                                             <x-forms.button type="button"
-                                                wire:click="download('{{ $entry['name'] }}')">Download</x-forms.button>
+                                                wire:click="download('{{ $entry['name'] }}')">
+                                                <x-reicon name="download" class="size-3.5" />
+                                                Download
+                                            </x-forms.button>
 
                                             {{-- Rename --}}
                                             <x-modal-input buttonTitle="Rename" title="Rename">
