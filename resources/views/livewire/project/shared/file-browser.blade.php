@@ -11,23 +11,29 @@
         <livewire:project.database.heading :database="$resource" />
     @endif
 
-    <div x-data="{ navOpen: false }" class="flex gap-6">
-        {{-- Full resource navigation, hidden by default and revealed with the
-             header toggle so the file browser keeps full width until needed. --}}
-        <aside x-show="navOpen" x-cloak class="w-[220px] shrink-0 max-xl:hidden">
-            @if ($type === 'application')
-                <x-application.configuration-sidebar :application="$resource"
-                    current-route="project.application.files" />
-            @elseif ($type === 'service')
-                <x-service.configuration-sidebar :service="$resource"
-                    current-route="project.service.files" />
-            @else
-                <x-database.configuration-sidebar :database="$resource"
-                    current-route="project.database.files" />
-            @endif
-        </aside>
+    {{-- Standard resource settings workspace (matches Logs/Configuration) so the
+         heading spacing and sidebar behave identically to every other page. --}}
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0" x-data="{ navOpen: true }"
+        x-init="navOpen = (localStorage.getItem('coolify.filesNav') ?? 'open') !== 'closed';
+                $watch('navOpen', v => localStorage.setItem('coolify.filesNav', v ? 'open' : 'closed'))">
+        <div class="files-grid grid min-w-0 gap-8" :data-nav="navOpen ? 'open' : 'closed'">
+            {{-- Resource navigation, shown by default. The header toggle collapses
+                 this column smoothly on desktop; below xl it stacks like other
+                 resource pages. --}}
+            <div class="files-nav min-w-0">
+                @if ($type === 'application')
+                    <x-application.configuration-sidebar :application="$resource"
+                        current-route="project.application.files" />
+                @elseif ($type === 'service')
+                    <x-service.configuration-sidebar :service="$resource"
+                        current-route="project.service.files" />
+                @else
+                    <x-database.configuration-sidebar :database="$resource"
+                        current-route="project.database.files" />
+                @endif
+            </div>
 
-        <div class="min-w-0 flex-1">
+            <div class="min-w-0">
     <x-application.settings-section title="Files"
         helper="Browse and manage files inside the running container." :flush="true">
 
@@ -36,7 +42,7 @@
             <x-forms.button type="button" @click="navOpen = !navOpen"
                 x-bind:title="navOpen ? 'Hide navigation' : 'Show navigation'"
                 x-bind:class="navOpen && 'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'"
-                class="max-xl:hidden">
+                class="hidden xl:inline-flex">
                 <x-reicon name="unordered-list" class="size-3.5" />
             </x-forms.button>
 
@@ -279,6 +285,7 @@
             </x-modal-input>
         @endif
     </x-application.settings-section>
+            </div>
         </div>
-    </div>
+    </section>
 </div>
