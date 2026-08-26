@@ -68,6 +68,30 @@ class SshRetryMechanismTest extends TestCase
         );
     }
 
+    public function test_docker_exec_tcp_upgrade_race_is_retryable()
+    {
+        $handler = new class
+        {
+            use SshRetryable;
+
+            // Make methods public for testing
+            public function test_is_retryable_ssh_error($error)
+            {
+                return $this->isRetryableSshError($error);
+            }
+        };
+
+        // `docker exec` attached immediately after `docker run -d` for the
+        // same container can transiently fail the HTTP hijack upgrade
+        // before the container is fully ready to accept exec sessions.
+        // Retrying (same backoff as any other transient error here) is
+        // safe - the container itself isn't in a bad state, just not
+        // ready yet.
+        $this->assertTrue(
+            $handler->test_is_retryable_ssh_error('Error: unable to upgrade to tcp, received 409')
+        );
+    }
+
     public function test_non_ssh_errors_are_not_retryable()
     {
         $handler = new class
