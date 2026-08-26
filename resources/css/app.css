@@ -2254,6 +2254,28 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
 
+/* File browser: icon, name, size, modified, actions */
+.file-table-grid {
+    grid-template-columns: 1.75rem minmax(10rem, 1fr) 6rem 11rem auto;
+}
+
+@media (max-width: 768px) {
+    .data-table-header.file-table-grid {
+        display: none;
+    }
+
+    .data-table-row.file-table-grid {
+        grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+        gap: 0.75rem;
+    }
+
+    /* Hide size and modified columns on small screens */
+    .data-table-row.file-table-grid > :nth-child(3),
+    .data-table-row.file-table-grid > :nth-child(4) {
+        display: none;
+    }
+}
+
 .environment-table-scroll {
     overflow-x: auto;
     overscroll-behavior-x: contain;
