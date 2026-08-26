@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\RateLimiter;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    config()->set('app.maintenance.store', 'array');
+
     InstanceSettings::query()->forceCreate([
         'id' => 0,
         'is_registration_enabled' => true,

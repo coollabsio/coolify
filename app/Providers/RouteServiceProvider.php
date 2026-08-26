@@ -60,7 +60,7 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('login', function (Request $request) {
-            return Limit::perMinute(5)->by((string) $request->email.'|'.$request->ip());
+            return Limit::perMinute(5)->by((string) $request->email.'|'.auth_rate_limit_ip($request));
         });
 
         RateLimiter::for('two-factor', function (Request $request) {
@@ -69,7 +69,7 @@ class RouteServiceProvider extends ServiceProvider
 
         RateLimiter::for('forgot-password', function (Request $request) {
             $limits = [
-                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1((string) $request->ip())),
+                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1(auth_rate_limit_ip($request))),
             ];
 
             $emailIdentity = normalize_email_identity($request->input('email'));
@@ -81,7 +81,7 @@ class RouteServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('magic-link', function (Request $request) {
-            return Limit::perMinute(5)->by(hash('sha256', (string) $request->input('token').'|'.$request->ip()));
+            return Limit::perMinute(5)->by(hash('sha256', (string) $request->input('token').'|'.auth_rate_limit_ip($request)));
         });
 
         RateLimiter::for('force-password-reset', function (Request $request) {
