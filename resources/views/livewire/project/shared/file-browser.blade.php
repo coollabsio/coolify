@@ -274,7 +274,16 @@
                          wire:ignore protects the ProseMirror DOM from Livewire morphs. --}}
                     <div wire:ignore x-data="fileEditor" x-on:load-file-editor.window="load($event.detail)"
                         class="min-w-0">
-                        <div x-ref="editor" class="file-editor"></div>
+                        <div class="file-ide">
+                            <div class="file-ide-gutter" x-ref="gutter" aria-hidden="true"></div>
+                            <div class="file-ide-code">
+                                <div x-ref="editor"></div>
+                            </div>
+                        </div>
+                        <div class="file-ide-status">
+                            <span x-ref="status">Ln 1, Col 1</span>
+                            <span x-ref="statusRight" class="ml-auto"></span>
+                        </div>
                     </div>
                     <div class="flex justify-end gap-2">
                         <x-forms.button type="button" wire:click="closeEditor"
