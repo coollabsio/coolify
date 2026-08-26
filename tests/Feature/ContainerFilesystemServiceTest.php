@@ -123,3 +123,31 @@ it('reads an editable text file', function () {
 
     expect($content)->toBe("hello world\n");
 });
+
+it('base64-encodes content in the write command', function () {
+    $cmd = fsService()->buildWriteCommand('/app/a.txt', "hi\n");
+
+    expect($cmd)
+        ->toContain('base64 -d')
+        ->toContain(base64_encode("hi\n"))
+        ->toContain(escapeshellarg('/app/a.txt'));
+});
+
+it('builds mkdir, rename and delete commands with escaped paths', function () {
+    $svc = fsService();
+
+    expect($svc->buildMkdirCommand('/app/new dir'))
+        ->toContain('mkdir -p')
+        ->toContain(escapeshellarg('/app/new dir'));
+    expect($svc->buildRenameCommand('/app/a', '/app/b'))
+        ->toContain('mv')
+        ->toContain(escapeshellarg('/app/a'))
+        ->toContain(escapeshellarg('/app/b'));
+    expect($svc->buildDeleteCommand('/app/x'))
+        ->toContain('rm -rf')
+        ->toContain(escapeshellarg('/app/x'));
+});
+
+it('rejects unsafe paths in mutating builders', function () {
+    fsService()->buildDeleteCommand('/app/$(reboot)');
+})->throws(Exception::class);
