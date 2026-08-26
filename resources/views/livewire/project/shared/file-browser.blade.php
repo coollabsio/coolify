@@ -11,11 +11,36 @@
         <livewire:project.database.heading :database="$resource" />
     @endif
 
+    <div x-data="{ navOpen: false }" class="flex gap-6">
+        {{-- Full resource navigation, hidden by default and revealed with the
+             header toggle so the file browser keeps full width until needed. --}}
+        <aside x-show="navOpen" x-cloak class="w-[220px] shrink-0 max-xl:hidden">
+            @if ($type === 'application')
+                <x-application.configuration-sidebar :application="$resource"
+                    current-route="project.application.files" />
+            @elseif ($type === 'service')
+                <x-service.configuration-sidebar :service="$resource"
+                    current-route="project.service.files" />
+            @else
+                <x-database.configuration-sidebar :database="$resource"
+                    current-route="project.database.files" />
+            @endif
+        </aside>
+
+        <div class="min-w-0 flex-1">
     <x-application.settings-section title="Files"
         helper="Browse and manage files inside the running container." :flush="true">
 
-        @if ($containerRunning)
-            <x-slot:actions>
+        <x-slot:actions>
+            {{-- Toggle resource navigation (desktop) --}}
+            <x-forms.button type="button" @click="navOpen = !navOpen"
+                x-bind:title="navOpen ? 'Hide navigation' : 'Show navigation'"
+                x-bind:class="navOpen && 'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'"
+                class="max-xl:hidden">
+                <x-reicon name="unordered-list" class="size-3.5" />
+            </x-forms.button>
+
+            @if ($containerRunning)
                 {{-- Upload --}}
                 <form wire:submit="uploadFile" x-data class="contents">
                     <label
@@ -58,8 +83,8 @@
                     <x-reicon name="refresh" class="size-3.5" />
                     Refresh
                 </x-forms.button>
-            </x-slot:actions>
-        @endif
+            @endif
+        </x-slot:actions>
 
         @if (! $containerRunning)
             <x-empty title="Container is not running"
@@ -254,4 +279,6 @@
             </x-modal-input>
         @endif
     </x-application.settings-section>
+        </div>
+    </div>
 </div>
