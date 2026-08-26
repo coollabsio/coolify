@@ -38,6 +38,8 @@ class FileBrowser extends Component
 
     public string $editorContent = '';
 
+    public string $editorLanguage = '';
+
     public $upload;
 
     /** @var array<string, mixed> */
@@ -115,6 +117,30 @@ class FileBrowser extends Component
         }
     }
 
+    public function createFile(string $name): void
+    {
+        $this->guard();
+        try {
+            $this->service()->createFile($this->childPath($name));
+            $this->loadEntries();
+            $this->dispatch('success', 'File created.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function chmodEntry(string $name, string $mode): void
+    {
+        $this->guard();
+        try {
+            $this->service()->chmod($this->childPath($name), $mode);
+            $this->loadEntries();
+            $this->dispatch('success', 'Permissions updated.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function renameEntry(string $from, string $newName): void
     {
         $this->guard();
@@ -144,14 +170,13 @@ class FileBrowser extends Component
         $this->guard();
         $path = $this->childPath($name);
         try {
-            if (! $this->service()->isEditable($path)) {
-                $this->dispatch('error', "Can't edit this file - it's binary or larger than 5 MB. Download it instead.");
-
-                return;
-            }
+            // read() guards binary/oversized files internally and throws.
             $this->editorContent = $this->service()->read($path);
+            $this->editorLanguage = $this->guessLanguage($name);
             $this->editingPath = $path;
             $this->editorOpen = true;
+        } catch (\RuntimeException $e) {
+            $this->dispatch('error', "Can't edit this file - it's binary or larger than 5 MB. Download it instead.");
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -209,6 +234,28 @@ class FileBrowser extends Component
         }, $downloadName);
     }
 
+    /**
+     * Map a filename to a highlight.js language id for the editor.
+     */
+    protected function guessLanguage(string $name): string
+    {
+        $map = [
+            'js' => 'javascript', 'mjs' => 'javascript', 'cjs' => 'javascript', 'ts' => 'typescript',
+            'json' => 'json', 'php' => 'php', 'py' => 'python', 'rb' => 'ruby', 'go' => 'go',
+            'rs' => 'rust', 'java' => 'java', 'sh' => 'bash', 'bash' => 'bash', 'zsh' => 'bash',
+            'yml' => 'yaml', 'yaml' => 'yaml', 'toml' => 'ini', 'ini' => 'ini', 'env' => 'ini',
+            'conf' => 'ini', 'md' => 'markdown', 'markdown' => 'markdown', 'html' => 'xml',
+            'htm' => 'xml', 'xml' => 'xml', 'svg' => 'xml', 'css' => 'css', 'scss' => 'scss',
+            'sql' => 'sql', 'dockerfile' => 'dockerfile', 'properties' => 'properties',
+        ];
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+        if ($ext === '' && strtolower($name) === 'dockerfile') {
+            return 'dockerfile';
+        }
+
+        return $map[$ext] ?? '';
+    }
+
     protected function childPath(string $name): string
     {
         return rtrim($this->currentPath, '/').'/'.$name;
@@ -245,6 +292,7 @@ class FileBrowser extends Component
             'type' => $e->type,
             'size' => $e->size,
             'mtime' => $e->mtime,
+            'perms' => $e->perms,
         ], $entries);
     }
 

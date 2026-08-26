@@ -2254,9 +2254,12 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
 
-/* File browser: icon, name, size, modified, actions */
+/* File browser: icon, name, perms, size, modified, actions.
+   Every column is a fixed width except the flexible name column, so the
+   header grid and each row grid resolve identical tracks and stay aligned
+   (an `auto` column would size to its own content per row and drift). */
 .file-table-grid {
-    grid-template-columns: 1.75rem minmax(10rem, 1fr) 6rem 11rem auto;
+    grid-template-columns: 1.75rem minmax(10rem, 1fr) 5rem 5.5rem 11rem 10rem;
 }
 
 @media (max-width: 768px) {
@@ -2265,15 +2268,125 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .data-table-row.file-table-grid {
-        grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+        grid-template-columns: 1.75rem minmax(0, 1fr) 10rem;
         gap: 0.75rem;
     }
 
-    /* Hide size and modified columns on small screens */
+    /* Hide perms, size and modified columns on small screens */
     .data-table-row.file-table-grid > :nth-child(3),
-    .data-table-row.file-table-grid > :nth-child(4) {
+    .data-table-row.file-table-grid > :nth-child(4),
+    .data-table-row.file-table-grid > :nth-child(5) {
         display: none;
     }
+}
+
+/* --- File browser TipTap code editor --- */
+.file-editor {
+    max-height: 60vh;
+    overflow: auto;
+    border-radius: 8px;
+    background: var(--coollabs-recessed);
+    box-shadow: inset 0 0 0 1px var(--coollabs-line);
+}
+
+.file-editor .file-editor-prosemirror,
+.file-editor .ProseMirror {
+    outline: none;
+    min-height: 12rem;
+}
+
+.file-editor pre {
+    margin: 0;
+    padding: 0.875rem 1rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    white-space: pre;
+    tab-size: 2;
+    color: var(--coollabs-fg, #1f2328);
+}
+
+.dark .file-editor pre {
+    color: #e6edf3;
+}
+
+/* highlight.js tokens (light) */
+.file-editor .hljs-comment,
+.file-editor .hljs-quote {
+    color: #6a737d;
+    font-style: italic;
+}
+.file-editor .hljs-keyword,
+.file-editor .hljs-selector-tag,
+.file-editor .hljs-literal {
+    color: #cf222e;
+}
+.file-editor .hljs-string,
+.file-editor .hljs-meta .hljs-string {
+    color: #0a3069;
+}
+.file-editor .hljs-number,
+.file-editor .hljs-attr,
+.file-editor .hljs-property {
+    color: #0550ae;
+}
+.file-editor .hljs-title,
+.file-editor .hljs-title.function_,
+.file-editor .hljs-section {
+    color: #8250df;
+}
+.file-editor .hljs-built_in,
+.file-editor .hljs-type,
+.file-editor .hljs-attribute {
+    color: #953800;
+}
+.file-editor .hljs-tag,
+.file-editor .hljs-name,
+.file-editor .hljs-selector-id,
+.file-editor .hljs-selector-class {
+    color: #116329;
+}
+.file-editor .hljs-meta {
+    color: #57606a;
+}
+
+/* highlight.js tokens (dark) */
+.dark .file-editor .hljs-comment,
+.dark .file-editor .hljs-quote {
+    color: #8b949e;
+}
+.dark .file-editor .hljs-keyword,
+.dark .file-editor .hljs-selector-tag,
+.dark .file-editor .hljs-literal {
+    color: #ff7b72;
+}
+.dark .file-editor .hljs-string,
+.dark .file-editor .hljs-meta .hljs-string {
+    color: #a5d6ff;
+}
+.dark .file-editor .hljs-number,
+.dark .file-editor .hljs-attr,
+.dark .file-editor .hljs-property {
+    color: #79c0ff;
+}
+.dark .file-editor .hljs-title,
+.dark .file-editor .hljs-title.function_,
+.dark .file-editor .hljs-section {
+    color: #d2a8ff;
+}
+.dark .file-editor .hljs-built_in,
+.dark .file-editor .hljs-type,
+.dark .file-editor .hljs-attribute {
+    color: #ffa657;
+}
+.dark .file-editor .hljs-tag,
+.dark .file-editor .hljs-name,
+.dark .file-editor .hljs-selector-id,
+.dark .file-editor .hljs-selector-class {
+    color: #7ee787;
+}
+.dark .file-editor .hljs-meta {
+    color: #8b949e;
 }
 
 .environment-table-scroll {

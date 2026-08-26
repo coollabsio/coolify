@@ -28,6 +28,19 @@
                     </label>
                 </form>
 
+                {{-- New file --}}
+                <x-modal-input buttonTitle="New file" title="New file">
+                    <form x-data="{ name: '' }"
+                        @submit.prevent="$wire.createFile(name); name=''; $dispatch('close-modal')"
+                        class="flex flex-col gap-4">
+                        <x-forms.input id="newFileName" label="File name" x-model="name"
+                            placeholder="config.yml" required />
+                        <div class="flex justify-end">
+                            <x-forms.button type="submit" isHighlighted>Create file</x-forms.button>
+                        </div>
+                    </form>
+                </x-modal-input>
+
                 {{-- New folder --}}
                 <x-modal-input buttonTitle="New folder" title="New folder">
                     <form x-data="{ name: '' }"
@@ -70,14 +83,20 @@
                 </div>
             @endif
 
-            {{-- Breadcrumb --}}
+            {{-- Breadcrumb. The root crumb renders as "/" and doubles as the
+                 first separator, so we only draw a slash between named segments
+                 (index >= 2) - avoids the "/ /" duplicate. --}}
             <div class="flex flex-wrap items-center gap-1 px-4 py-2 text-sm">
                 @foreach ($this->breadcrumbs() as $crumb)
-                    @if (! $loop->first)
+                    @if ($loop->index > 1)
                         <span class="text-coollabs-subtle">/</span>
                     @endif
                     <button type="button" wire:click="goTo('{{ $crumb['path'] }}')"
-                        class="rounded-md px-1.5 py-0.5 text-coollabs-subtle hover:bg-black/5 hover:text-current dark:hover:bg-white/[0.06]">
+                        @class([
+                            'rounded-md px-1.5 py-0.5 hover:bg-black/5 hover:text-current dark:hover:bg-white/[0.06]',
+                            'text-current font-medium' => $loop->last,
+                            'text-coollabs-subtle' => ! $loop->last,
+                        ])>
                         {{ $crumb['label'] }}
                     </button>
                 @endforeach
@@ -102,6 +121,7 @@
                         <div class="data-table-header file-table-grid">
                             <span></span>
                             <span>Name</span>
+                            <span>Perms</span>
                             <span class="text-right">Size</span>
                             <span>Modified</span>
                             <span class="text-right">Actions</span>
@@ -119,6 +139,30 @@
                                     @else
                                         <span class="block truncate">{{ $entry['name'] }}</span>
                                     @endif
+                                </div>
+                                {{-- Permissions (click to chmod) --}}
+                                <div class="min-w-0">
+                                    <x-modal-input title="Change permissions">
+                                        <x-slot:content>
+                                            <button type="button" title="Edit permissions"
+                                                class="cursor-pointer rounded-md px-1.5 py-0.5 font-mono text-xs text-coollabs-subtle hover:bg-black/5 hover:text-current dark:hover:bg-white/[0.06]">
+                                                {{ $entry['perms'] ?: '-' }}
+                                            </button>
+                                        </x-slot:content>
+                                        <form x-data="{ mode: @js($entry['perms']) }"
+                                            @submit.prevent="$wire.chmodEntry(@js($entry['name']), mode); $dispatch('close-modal')"
+                                            class="flex flex-col gap-4">
+                                            <p class="text-sm text-coollabs-subtle">
+                                                Set the octal permission mode for
+                                                <span class="font-medium">{{ $entry['name'] }}</span>.
+                                            </p>
+                                            <x-forms.input id="chmodMode-{{ $loop->index }}" label="Octal mode"
+                                                x-model="mode" placeholder="644" required />
+                                            <div class="flex justify-end">
+                                                <x-forms.button type="submit" isHighlighted>Apply</x-forms.button>
+                                            </div>
+                                        </form>
+                                    </x-modal-input>
                                 </div>
                                 <div class="text-right text-coollabs-subtle tabular-nums">
                                     {{ $entry['type'] === 'dir' ? '-' : formatBytes($entry['size']) }}
@@ -189,9 +233,17 @@
                     <span class="hidden"></span>
                 </x-slot:content>
                 <form wire:submit="saveEditor" class="flex flex-col gap-4">
-                    <p class="truncate text-xs text-coollabs-subtle">{{ $editingPath }}</p>
-                    <x-forms.textarea id="editorContent" wire:model="editorContent" rows="20"
-                        class="font-mono"></x-forms.textarea>
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="truncate font-mono text-xs text-coollabs-subtle">{{ $editingPath }}</p>
+                        @if ($editorLanguage)
+                            <span class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 font-mono text-[11px] text-coollabs dark:bg-warning/15 dark:text-warning">{{ $editorLanguage }}</span>
+                        @endif
+                    </div>
+                    {{-- TipTap code editor (single code block, lowlight highlighting).
+                         wire:ignore protects the ProseMirror DOM from Livewire morphs. --}}
+                    <div wire:ignore x-data="fileEditor" class="min-w-0">
+                        <div x-ref="editor" class="file-editor"></div>
+                    </div>
                     <div class="flex justify-end gap-2">
                         <x-forms.button type="button" wire:click="closeEditor"
                             @click="$dispatch('close-modal')">Cancel</x-forms.button>
