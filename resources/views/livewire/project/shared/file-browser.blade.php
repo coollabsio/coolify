@@ -1,4 +1,16 @@
 <div>
+    <x-slot:title>
+        {{ data_get_str($resource, 'name')->limit(10) }} > Files | Coolify
+    </x-slot>
+
+    @if ($type === 'application')
+        <livewire:project.application.heading :application="$resource" wire:key="application-heading-files" />
+    @elseif ($type === 'service')
+        <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Files" />
+    @else
+        <livewire:project.database.heading :database="$resource" />
+    @endif
+
     <x-application.settings-section title="Files"
         helper="Browse and manage files inside the running container." :flush="true">
 

@@ -15,6 +15,7 @@
         ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
         ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+        ['label' => 'Files', 'route' => 'project.service.files', 'icon' => 'folder', 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
         ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
         ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
@@ -32,7 +33,7 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files'],
         'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
         'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
     ];

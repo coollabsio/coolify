@@ -40,8 +40,14 @@ class FileBrowser extends Component
 
     public $upload;
 
-    public function mount($resource): void
+    /** @var array<string, mixed> */
+    public array $parameters = [];
+
+    public function mount($resource = null): void
     {
+        $this->parameters = get_route_parameters();
+        $resource = $resource ?? $this->resolveResourceFromRoute();
+
         // Security gate first, before any server or container resolution.
         $this->authorize('canAccessTerminal');
         $this->authorize('view', $resource);
@@ -253,6 +259,29 @@ class FileBrowser extends Component
             'service' => $this->resource->server,
             default => $this->resource->destination->server,
         };
+    }
+
+    protected function resolveResourceFromRoute()
+    {
+        $parameters = get_route_parameters();
+        $teamId = data_get(auth()->user()->currentTeam(), 'id');
+
+        if ($uuid = data_get($parameters, 'application_uuid')) {
+            return Application::ownedByCurrentTeam()->where('uuid', $uuid)->firstOrFail();
+        }
+        if ($uuid = data_get($parameters, 'service_uuid')) {
+            return Service::ownedByCurrentTeam()->where('uuid', $uuid)->firstOrFail();
+        }
+        if ($uuid = data_get($parameters, 'database_uuid')) {
+            $resource = getResourceByUuid($uuid, $teamId);
+            if (is_null($resource)) {
+                abort(404);
+            }
+
+            return $resource;
+        }
+
+        abort(404);
     }
 
     protected function resolveType($resource): string
