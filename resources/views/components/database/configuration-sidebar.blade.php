@@ -16,6 +16,7 @@
         ['label' => 'Servers', 'route' => 'project.database.servers', 'icon' => 'servers'],
         ['label' => 'Runtime Logs', 'route' => 'project.database.logs', 'icon' => 'unordered-list', 'navigate' => false],
         ['label' => 'Terminal', 'route' => 'project.database.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
+        ['label' => 'Files', 'route' => 'project.database.files', 'icon' => 'folder', 'visible' => auth()->user()?->can('canAccessTerminal')],
         ['label' => 'Webhooks', 'route' => 'project.database.webhooks', 'icon' => 'notifications'],
         ['label' => 'Healthcheck', 'route' => 'project.database.healthcheck', 'icon' => 'feedback'],
         ['label' => 'Resource Limits', 'route' => 'project.database.resource-limits', 'icon' => 'cpu'],
@@ -33,7 +34,7 @@
 
     $menuGroups = [
         'Settings' => ['General', 'Environment Variables', 'Persistent Storage', 'Healthcheck'],
-        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Metrics'],
+        'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Metrics'],
         'Deploy' => ['Servers'],
         'Automation' => ['Webhooks', 'Backups', 'Import Backup'],
         'Operations' => ['Resource Operations', 'Resource Limits', 'Tags', 'Danger Zone'],
