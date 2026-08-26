@@ -195,7 +195,9 @@ it('sets the editor language from the file extension when opening', function () 
     Livewire::test(FileBrowser::class, ['resource' => $database])
         ->call('openEditor', 'config.yml')
         ->assertSet('editorOpen', true)
-        ->assertSet('editorLanguage', 'yaml');
+        ->assertSet('editorLanguage', 'yaml')
+        ->assertSet('editorContent', "a: 1\n")
+        ->assertDispatched('load-file-editor', content: "a: 1\n", language: 'yaml');
 });
 
 it('refuses to open a binary or oversized file in the editor', function () {

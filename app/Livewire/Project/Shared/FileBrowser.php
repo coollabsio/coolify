@@ -175,6 +175,9 @@ class FileBrowser extends Component
             $this->editorLanguage = $this->guessLanguage($name);
             $this->editingPath = $path;
             $this->editorOpen = true;
+            // Push the content into the TipTap editor (reliable across the
+            // teleported, wire:ignore'd modal).
+            $this->dispatch('load-file-editor', content: $this->editorContent, language: $this->editorLanguage);
         } catch (\RuntimeException $e) {
             $this->dispatch('error', "Can't edit this file - it's binary or larger than 5 MB. Download it instead.");
         } catch (\Throwable $e) {
