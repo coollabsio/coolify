@@ -34,6 +34,12 @@ class FlushCacheDatabase
      * The command connects over the container's local plaintext port (available even when
      * SSL is enabled, because Coolify never disables it), so no TLS flags are needed. The
      * password is shell-escaped so it cannot break out of the argument and inject commands.
+     *
+     * Note: on non-root servers the command passes through parseCommandsByLineForSudo(),
+     * which rewrites `$(`, ` | `, `&&` and `||` line-wide, so a password containing those
+     * sequences is mutated even inside the escaped quotes and the flush fails to authenticate.
+     * This is a limitation shared with every other password-carrying remote command in the
+     * codebase (e.g. DatabaseBackupJob); the escaping still holds, so no command is injected.
      */
     public function buildFlushCommand(string $containerName, ?string $password): string
     {
