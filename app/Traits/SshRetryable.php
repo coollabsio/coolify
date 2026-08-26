@@ -41,6 +41,7 @@ trait SshRetryable
             'Authentication failed',
             'Too many authentication failures',
             'SSH command failed with exit code: 255',
+            'unable to upgrade to tcp',
         ];
 
         $lowerErrorOutput = strtolower($errorOutput);
