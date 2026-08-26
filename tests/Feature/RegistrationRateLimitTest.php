@@ -72,6 +72,43 @@ it('rate limits dotted plus-address variants of the same email identity across i
         ->assertTooManyRequests();
 });
 
+it('keeps clients behind the same reverse proxy in separate ip rate limit buckets', function () {
+    foreach (range(1, 3) as $attempt) {
+        $this->withServerVariables(['REMOTE_ADDR' => '172.18.0.2'])
+            ->withHeaders(['X-Forwarded-For' => '203.0.113.50'])
+            ->post('/register', [
+                'name' => "Proxied User {$attempt}",
+                'email' => "proxied{$attempt}@example.com",
+                'password' => 'Password1!@',
+                'password_confirmation' => 'Password1!@',
+            ])
+            ->assertRedirect();
+
+        auth()->logout();
+        $this->flushSession();
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => '172.18.0.2'])
+        ->withHeaders(['X-Forwarded-For' => '203.0.113.50'])
+        ->post('/register', [
+            'name' => 'Blocked User',
+            'email' => 'blocked-proxied@example.com',
+            'password' => 'Password1!@',
+            'password_confirmation' => 'Password1!@',
+        ])
+        ->assertTooManyRequests();
+
+    $this->withServerVariables(['REMOTE_ADDR' => '172.18.0.2'])
+        ->withHeaders(['X-Forwarded-For' => '203.0.113.51'])
+        ->post('/register', [
+            'name' => 'Other Client',
+            'email' => 'other-proxied@example.com',
+            'password' => 'Password1!@',
+            'password_confirmation' => 'Password1!@',
+        ])
+        ->assertRedirect();
+});
+
 it('keeps distinct dotted and plus-addressed mailboxes in separate rate limit buckets on ordinary domains', function () {
     $registrationIpKey = 'registration:ip:'.sha1('127.0.0.1');
     $emails = [

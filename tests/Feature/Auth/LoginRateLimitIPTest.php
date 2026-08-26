@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\RateLimiter;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::forceCreate(['id' => 0]);
     RateLimiter::clear('login');
 
     $this->user = User::factory()->create([
