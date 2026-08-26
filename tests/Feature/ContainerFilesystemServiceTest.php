@@ -1,14 +1,37 @@
 <?php
 
 use App\Data\FileEntry;
+use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\Team;
 use App\Services\ContainerFilesystemService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    Storage::fake('ssh-keys');
+});
 
 function fsService(): ContainerFilesystemService
 {
     $server = Server::factory()->make(['id' => 999]);
 
     return new ContainerFilesystemService($server, 'app-123');
+}
+
+function fsServer(): Server
+{
+    $team = Team::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
+
+    return Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $privateKey->id,
+        'ip' => '203.0.113.10',
+    ]);
 }
 
 it('sorts directories before files, then by name case-insensitively', function () {
@@ -56,4 +79,21 @@ it('parses a tab-delimited listing into sorted FileEntry rows', function () {
 it('parses an empty listing to an empty array', function () {
     expect(fsService()->parseListing(null))->toBe([]);
     expect(fsService()->parseListing(''))->toBe([]);
+});
+
+it('lists a directory by running the built command over SSH', function () {
+    Process::fake(['*' => Process::result(output: "dir\t0\t1\tsrc\nfile\t10\t2\tREADME.md")]);
+
+    $server = fsServer();
+    $entries = (new ContainerFilesystemService($server, 'app-123'))->list('/app');
+
+    expect($entries)->toHaveCount(2);
+    expect($entries[0]->name)->toBe('src');
+});
+
+it('falls back to / when the container has no WorkingDir', function () {
+    Process::fake(['*' => Process::result(output: '')]);
+
+    $server = fsServer();
+    expect((new ContainerFilesystemService($server, 'app-123'))->defaultRoot())->toBe('/');
 });
