@@ -125,7 +125,7 @@
                                         @endif
                                     </td>
                                     <td class="text-right text-coollabs-subtle">
-                                        {{ $entry['type'] === 'dir' ? '-' : \Illuminate\Support\Number::fileSize($entry['size']) }}
+                                        {{ $entry['type'] === 'dir' ? '-' : formatBytes($entry['size']) }}
                                     </td>
                                     <td class="text-coollabs-subtle">
                                         {{ $entry['mtime'] ? \Illuminate\Support\Carbon::createFromTimestamp($entry['mtime'])->toDateTimeString() : '-' }}
