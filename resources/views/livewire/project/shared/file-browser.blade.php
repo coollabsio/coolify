@@ -98,85 +98,88 @@
                         </x-slot:icon>
                     </x-empty>
                 @else
-                    <table class="data-table">
-                        <thead>
-                            <tr class="data-table-header">
-                                <th class="w-8"></th>
-                                <th>Name</th>
-                                <th class="w-28 text-right">Size</th>
-                                <th class="w-40">Modified</th>
-                                <th class="w-32 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach ($entries as $entry)
-                                <tr wire:key="entry-{{ $entry['name'] }}" class="data-table-row">
-                                    <td>
-                                        <x-reicon
-                                            :name="$entry['type'] === 'dir' ? 'folder' : 'file'"
-                                            class="size-4 text-coollabs-subtle" />
-                                    </td>
-                                    <td>
-                                        @if ($entry['type'] === 'dir')
-                                            <button type="button" wire:click="open('{{ $entry['name'] }}')"
-                                                class="text-left hover:underline">{{ $entry['name'] }}</button>
-                                        @else
-                                            <span>{{ $entry['name'] }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-right text-coollabs-subtle">
-                                        {{ $entry['type'] === 'dir' ? '-' : formatBytes($entry['size']) }}
-                                    </td>
-                                    <td class="text-coollabs-subtle">
-                                        {{ $entry['mtime'] ? \Illuminate\Support\Carbon::createFromTimestamp($entry['mtime'])->toDateTimeString() : '-' }}
-                                    </td>
-                                    <td>
-                                        <div class="flex items-center justify-end gap-1">
-                                            @if ($entry['type'] !== 'dir')
-                                                <x-forms.button type="button"
-                                                    wire:click="openEditor('{{ $entry['name'] }}')">Edit</x-forms.button>
-                                            @endif
-                                            <x-forms.button type="button"
-                                                wire:click="download('{{ $entry['name'] }}')">
-                                                <x-reicon name="download" class="size-3.5" />
-                                                Download
+                    <div class="data-table w-full">
+                        <div class="data-table-header file-table-grid">
+                            <span></span>
+                            <span>Name</span>
+                            <span class="text-right">Size</span>
+                            <span>Modified</span>
+                            <span class="text-right">Actions</span>
+                        </div>
+                        @foreach ($entries as $entry)
+                            <div wire:key="entry-{{ $entry['name'] }}" class="data-table-row file-table-grid">
+                                <div class="flex items-center">
+                                    <x-reicon :name="$entry['type'] === 'dir' ? 'folder' : 'file'"
+                                        class="size-4 {{ $entry['type'] === 'dir' ? 'text-coollabs dark:text-warning' : 'text-coollabs-subtle' }}" />
+                                </div>
+                                <div class="min-w-0">
+                                    @if ($entry['type'] === 'dir')
+                                        <button type="button" wire:click="open('{{ $entry['name'] }}')"
+                                            class="block w-full cursor-pointer truncate text-left font-medium hover:text-coollabs hover:underline dark:hover:text-warning">{{ $entry['name'] }}</button>
+                                    @else
+                                        <span class="block truncate">{{ $entry['name'] }}</span>
+                                    @endif
+                                </div>
+                                <div class="text-right text-coollabs-subtle tabular-nums">
+                                    {{ $entry['type'] === 'dir' ? '-' : formatBytes($entry['size']) }}
+                                </div>
+                                <div class="text-coollabs-subtle tabular-nums">
+                                    {{ $entry['mtime'] ? \Illuminate\Support\Carbon::createFromTimestamp($entry['mtime'])->toDateTimeString() : '-' }}
+                                </div>
+                                <div class="flex items-center justify-end gap-0.5">
+                                    @if ($entry['type'] !== 'dir')
+                                        <x-forms.button type="button" title="Edit"
+                                            wire:click="openEditor('{{ $entry['name'] }}')">
+                                            <x-reicon name="file-content" class="size-3.5" />
+                                        </x-forms.button>
+                                    @endif
+                                    <x-forms.button type="button" title="Download"
+                                        wire:click="download('{{ $entry['name'] }}')">
+                                        <x-reicon name="download" class="size-3.5" />
+                                    </x-forms.button>
+
+                                    {{-- Rename --}}
+                                    <x-modal-input title="Rename">
+                                        <x-slot:content>
+                                            <x-forms.button type="button" title="Rename">
+                                                <x-reicon name="edit" class="size-3.5" />
                                             </x-forms.button>
+                                        </x-slot:content>
+                                        <form x-data="{ name: @js($entry['name']) }"
+                                            @submit.prevent="$wire.renameEntry(@js($entry['name']), name); $dispatch('close-modal')"
+                                            class="flex flex-col gap-4">
+                                            <x-forms.input id="renameName-{{ $loop->index }}"
+                                                label="New name" x-model="name" required />
+                                            <div class="flex justify-end">
+                                                <x-forms.button type="submit" isHighlighted>Rename</x-forms.button>
+                                            </div>
+                                        </form>
+                                    </x-modal-input>
 
-                                            {{-- Rename --}}
-                                            <x-modal-input buttonTitle="Rename" title="Rename">
-                                                <form x-data="{ name: @js($entry['name']) }"
-                                                    @submit.prevent="$wire.renameEntry(@js($entry['name']), name); $dispatch('close-modal')"
-                                                    class="flex flex-col gap-4">
-                                                    <x-forms.input id="renameName-{{ $loop->index }}"
-                                                        label="New name" x-model="name" required />
-                                                    <div class="flex justify-end">
-                                                        <x-forms.button type="submit" isHighlighted>Rename</x-forms.button>
-                                                    </div>
-                                                </form>
-                                            </x-modal-input>
-
-                                            {{-- Delete --}}
-                                            <x-modal-input buttonTitle="Delete" title="Delete this item?"
-                                                isErrorButton>
-                                                <div class="flex flex-col gap-4">
-                                                    <p class="text-sm text-coollabs-subtle">
-                                                        This permanently deletes
-                                                        <span class="font-medium">{{ $entry['name'] }}</span>
-                                                        inside the container. This cannot be undone.
-                                                    </p>
-                                                    <div class="flex justify-end">
-                                                        <x-forms.button isError type="button"
-                                                            wire:click="deleteEntry('{{ $entry['name'] }}')"
-                                                            @click="$dispatch('close-modal')">Delete</x-forms.button>
-                                                    </div>
-                                                </div>
-                                            </x-modal-input>
+                                    {{-- Delete --}}
+                                    <x-modal-input title="Delete this item?">
+                                        <x-slot:content>
+                                            <x-forms.button isError type="button" title="Delete">
+                                                <x-reicon name="trash" class="size-3.5" />
+                                            </x-forms.button>
+                                        </x-slot:content>
+                                        <div class="flex flex-col gap-4">
+                                            <p class="text-sm text-coollabs-subtle">
+                                                This permanently deletes
+                                                <span class="font-medium">{{ $entry['name'] }}</span>
+                                                inside the container. This cannot be undone.
+                                            </p>
+                                            <div class="flex justify-end">
+                                                <x-forms.button isError type="button"
+                                                    wire:click="deleteEntry('{{ $entry['name'] }}')"
+                                                    @click="$dispatch('close-modal')">Delete</x-forms.button>
+                                            </div>
                                         </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                                    </x-modal-input>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
                 @endif
             </div>
 
