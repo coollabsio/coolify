@@ -61,6 +61,9 @@
                         <x-top-breadcrumb />
                         <div id="server-topbar-context" class="min-w-0"></div>
                     </div>
+                    @if (isInstanceAdmin() && ! isCloud())
+                        <livewire:host-vitals />
+                    @endif
                     {{-- Dev Server-Timing HUD docks here (local only; empty in production) --}}
                     <div id="server-timing-hud-slot" data-server-timing-hud-slot class="hidden shrink-0 items-center"></div>
                     <div id="configuration-warning-hud-slot" class="relative shrink-0"></div>
