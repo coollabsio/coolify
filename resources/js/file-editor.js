@@ -25,9 +25,9 @@ function docFor(text, language) {
 
 /**
  * Register the `fileEditor` Alpine component used by the file browser's edit
- * modal. It mirrors the Livewire `editorContent` string both ways: content is
- * loaded when a file is opened (`editorOpen` flips true) and pushed back to
- * Livewire on every edit (deferred, so it rides along with the save request).
+ * modal. Content is pushed in via the server-dispatched `load-file-editor`
+ * event (reliable across the teleported, wire:ignore'd modal) and synced back
+ * to the Livewire `editorContent` property on every edit.
  */
 export function initializeFileEditorComponent() {
     window.Alpine.data('fileEditor', function fileEditor() {
@@ -40,22 +40,21 @@ export function initializeFileEditorComponent() {
                     editorProps: {
                         attributes: { class: 'file-editor-prosemirror', spellcheck: 'false' },
                     },
-                    content: docFor(this.$wire.get('editorContent'), this.$wire.get('editorLanguage')),
+                    content: docFor('', null),
                     onUpdate: ({ editor }) => {
-                        this.$wire.set('editorContent', editor.getText(), false);
+                        this.$wire.set('editorContent', editor.getText({ blockSeparator: '\n' }), false);
                     },
                 });
-
-                // Reload content and language whenever a new file is opened.
-                this.$wire.$watch('editorOpen', (open) => {
-                    if (open && this.editor) {
-                        this.editor.commands.setContent(
-                            docFor(this.$wire.get('editorContent'), this.$wire.get('editorLanguage')),
-                            false,
-                        );
-                        this.$nextTick(() => this.editor.commands.focus('end'));
-                    }
+            },
+            load(detail) {
+                if (!this.editor || !detail) {
+                    return;
+                }
+                // v3 setContent(content, options) — options is an object, not a bool.
+                this.editor.commands.setContent(docFor(detail.content ?? '', detail.language || null), {
+                    emitUpdate: false,
                 });
+                this.$nextTick(() => this.editor.commands.focus('end'));
             },
             destroy() {
                 if (this.editor) {

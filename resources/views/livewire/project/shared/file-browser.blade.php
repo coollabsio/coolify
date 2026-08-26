@@ -272,7 +272,8 @@
                     </div>
                     {{-- TipTap code editor (single code block, lowlight highlighting).
                          wire:ignore protects the ProseMirror DOM from Livewire morphs. --}}
-                    <div wire:ignore x-data="fileEditor" class="min-w-0">
+                    <div wire:ignore x-data="fileEditor" x-on:load-file-editor.window="load($event.detail)"
+                        class="min-w-0">
                         <div x-ref="editor" class="file-editor"></div>
                     </div>
                     <div class="flex justify-end gap-2">
