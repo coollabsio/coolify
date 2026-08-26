@@ -3,6 +3,7 @@ import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
 import './traffic-globe.js';
+import { initializeFileEditorComponent } from './file-editor.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
@@ -50,6 +51,7 @@ document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
 document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
 document.addEventListener('alpine:init', initializeSettingsSidebarAccordionComponent);
+document.addEventListener('alpine:init', initializeFileEditorComponent);
 
 /**
  * Smooth-scroll a settings section into view, then flash its border for 500ms

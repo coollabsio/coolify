@@ -19,7 +19,8 @@ class ContainerFilesystemService
         $escapedPath = $this->escapePath($path, 'list path');
 
         // Iterate `* .*`, skip . and .., guard literal globs, emit
-        // type<TAB>size<TAB>mtime<TAB>name. Portable across busybox/coreutils.
+        // type<TAB>size<TAB>mtime<TAB>perms<TAB>name. Portable across
+        // busybox/coreutils (%a = octal permission bits).
         // Names containing a tab/newline are skipped by parseListing (v1 scope).
         $inner = 'cd '.$escapedPath.' 2>/dev/null || exit 0; '
             .'for e in * .*; do '
@@ -28,7 +29,8 @@ class ContainerFilesystemService
             .'if [ -L "$e" ]; then t=symlink; elif [ -d "$e" ]; then t=dir; else t=file; fi; '
             .'s=$(stat -c %s "$e" 2>/dev/null || echo 0); '
             .'m=$(stat -c %Y "$e" 2>/dev/null || echo 0); '
-            .'printf "%s\t%s\t%s\t%s\n" "$t" "$s" "$m" "$e"; '
+            .'p=$(stat -c %a "$e" 2>/dev/null || echo ""); '
+            .'printf "%s\t%s\t%s\t%s\t%s\n" "$t" "$s" "$m" "$p" "$e"; '
             .'done';
 
         return $this->dockerExecShell($inner);
@@ -101,6 +103,22 @@ class ContainerFilesystemService
         return $this->dockerExecShell("mkdir -p -- {$escaped}");
     }
 
+    public function buildCreateFileCommand(string $path): string
+    {
+        $escaped = $this->escapePath($path, 'create file path');
+
+        // Create only if absent so an existing file is never truncated.
+        return $this->dockerExecShell("[ -e {$escaped} ] || : > {$escaped}");
+    }
+
+    public function buildChmodCommand(string $path, string $mode): string
+    {
+        $mode = $this->normalizeMode($mode);
+        $escaped = $this->escapePath($path, 'chmod path');
+
+        return $this->dockerExecShell("chmod {$mode} -- {$escaped}");
+    }
+
     public function buildRenameCommand(string $from, string $to): string
     {
         $escapedFrom = $this->escapePath($from, 'rename source');
@@ -124,6 +142,26 @@ class ContainerFilesystemService
     public function makeDirectory(string $path): void
     {
         instant_remote_process([$this->buildMkdirCommand($path)], $this->server);
+    }
+
+    public function createFile(string $path): void
+    {
+        instant_remote_process([$this->buildCreateFileCommand($path)], $this->server);
+    }
+
+    public function chmod(string $path, string $mode): void
+    {
+        instant_remote_process([$this->buildChmodCommand($path, $mode)], $this->server);
+    }
+
+    protected function normalizeMode(string $mode): string
+    {
+        $mode = trim($mode);
+        if (! preg_match('/^[0-7]{3,4}$/', $mode)) {
+            throw new \InvalidArgumentException('Invalid permission mode. Use octal like 644 or 0755.');
+        }
+
+        return $mode;
     }
 
     public function rename(string $from, string $to): void
@@ -164,12 +202,17 @@ class ContainerFilesystemService
             if ($line === '') {
                 continue;
             }
-            $parts = explode("\t", $line, 4);
-            if (count($parts) !== 4) {
+            $parts = explode("\t", $line, 5);
+            // Accept both the 5-field (with perms) and legacy 4-field formats.
+            if (count($parts) === 5) {
+                [$type, $size, $mtime, $perms, $name] = $parts;
+            } elseif (count($parts) === 4) {
+                [$type, $size, $mtime, $name] = $parts;
+                $perms = '';
+            } else {
                 continue;
             }
-            [$type, $size, $mtime, $name] = $parts;
-            $entries[] = new FileEntry($name, $type, (int) $size, (int) $mtime);
+            $entries[] = new FileEntry($name, $type, (int) $size, (int) $mtime, trim($perms));
         }
 
         return FileEntry::sort($entries);

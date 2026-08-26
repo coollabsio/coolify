@@ -147,6 +147,57 @@ it('creates a directory and re-lists', function () {
         ->assertSee('plugins');
 });
 
+it('creates a file and re-lists', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))                     // defaultRoot
+        ->push(Process::result(output: ''))                           // initial list (empty)
+        ->push(Process::result(output: ''))                           // createFile
+        ->push(Process::result(output: "file\t0\t1\t644\tconfig.yml"))]); // re-list
+
+    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('createFile', 'config.yml')
+        ->assertSee('config.yml');
+});
+
+it('changes permissions and re-lists', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))                        // defaultRoot
+        ->push(Process::result(output: "file\t10\t1\t644\tapp.sh"))     // initial list
+        ->push(Process::result(output: ''))                             // chmod
+        ->push(Process::result(output: "file\t10\t1\t755\tapp.sh"))]);  // re-list
+
+    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->assertSee('644')
+        ->call('chmodEntry', 'app.sh', '755')
+        ->assertSee('755');
+});
+
+it('sets the editor language from the file extension when opening', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))                       // defaultRoot
+        ->push(Process::result(output: "file\t12\t1\t644\tconfig.yml")) // initial list
+        ->push(Process::result(output: '12'))                          // isEditable stat size
+        ->push(Process::result(output: 'text'))                        // binary check
+        ->push(Process::result(output: base64_encode("a: 1\n")))]);    // base64 read
+
+    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('openEditor', 'config.yml')
+        ->assertSet('editorOpen', true)
+        ->assertSet('editorLanguage', 'yaml');
+});
+
 it('refuses to open a binary or oversized file in the editor', function () {
     $tooBig = (string) (LocalFileVolume::MAX_CONTENT_SIZE + 1);
     Process::fake(['*' => Process::sequence()

@@ -152,6 +152,42 @@ it('rejects unsafe paths in mutating builders', function () {
     fsService()->buildDeleteCommand('/app/$(reboot)');
 })->throws(Exception::class);
 
+it('parses permissions from the 5-field listing format', function () {
+    $raw = "file\t497\t1700000000\t644\t50x.html\ndir\t0\t1700000001\t755\tassets";
+
+    $entries = fsService()->parseListing($raw);
+
+    expect($entries[0]->name)->toBe('assets');
+    expect($entries[0]->perms)->toBe('755');
+    expect($entries[1]->name)->toBe('50x.html');
+    expect($entries[1]->perms)->toBe('644');
+});
+
+it('builds a create-file command that does not truncate an existing file', function () {
+    $cmd = fsService()->buildCreateFileCommand('/app/new file.txt');
+
+    expect($cmd)
+        ->toContain('[ -e')
+        ->toContain(': >')
+        ->toContain(escapeshellarg('/app/new file.txt'));
+});
+
+it('builds a chmod command with a validated octal mode', function () {
+    $cmd = fsService()->buildChmodCommand('/app/x.sh', '0755');
+
+    expect($cmd)
+        ->toContain('chmod 0755 --')
+        ->toContain(escapeshellarg('/app/x.sh'));
+});
+
+it('rejects a non-octal chmod mode', function () {
+    fsService()->buildChmodCommand('/app/x.sh', 'rwx');
+})->throws(InvalidArgumentException::class);
+
+it('rejects an unsafe path in the chmod builder', function () {
+    fsService()->buildChmodCommand('/app/$(reboot)', '644');
+})->throws(Exception::class);
+
 it('uploads by scp-ing to the server then docker cp into the container', function () {
     Process::fake(['*' => Process::result(output: '')]);
     $server = fsServer();
