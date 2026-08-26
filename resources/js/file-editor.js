@@ -25,36 +25,41 @@ function docFor(text, language) {
 
 /**
  * Register the `fileEditor` Alpine component used by the file browser's edit
- * modal. Content is pushed in via the server-dispatched `load-file-editor`
- * event (reliable across the teleported, wire:ignore'd modal) and synced back
- * to the Livewire `editorContent` property on every edit.
+ * modal. The editor is recreated fresh each time a file is loaded (content
+ * baked into the initial doc) rather than mutated via setContent — that avoids
+ * ProseMirror "mismatched transaction" errors caused by the teleported,
+ * wire:ignore'd modal churning editor instances. Edits sync back to the
+ * Livewire `editorContent` property.
  */
 export function initializeFileEditorComponent() {
     window.Alpine.data('fileEditor', function fileEditor() {
         return {
             editor: null,
-            init() {
+            create(text, language) {
+                if (this.editor) {
+                    this.editor.destroy();
+                    this.editor = null;
+                }
+                // Clear any orphaned ProseMirror DOM left by a previous instance.
+                this.$refs.editor.innerHTML = '';
                 this.editor = new Editor({
                     element: this.$refs.editor,
                     extensions: [CodeDocument, Text, CodeBlockLowlight.configure({ lowlight })],
                     editorProps: {
                         attributes: { class: 'file-editor-prosemirror', spellcheck: 'false' },
                     },
-                    content: docFor('', null),
+                    content: docFor(text, language),
                     onUpdate: ({ editor }) => {
                         this.$wire.set('editorContent', editor.getText({ blockSeparator: '\n' }), false);
                     },
                 });
             },
             load(detail) {
-                if (!this.editor || !detail) {
+                if (!detail) {
                     return;
                 }
-                // v3 setContent(content, options) — options is an object, not a bool.
-                this.editor.commands.setContent(docFor(detail.content ?? '', detail.language || null), {
-                    emitUpdate: false,
-                });
-                this.$nextTick(() => this.editor.commands.focus('end'));
+                this.create(detail.content ?? '', detail.language || null);
+                this.$nextTick(() => this.editor && this.editor.commands.focus('end'));
             },
             destroy() {
                 if (this.editor) {
