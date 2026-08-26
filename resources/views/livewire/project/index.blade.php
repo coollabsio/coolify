@@ -64,7 +64,7 @@
                             <template x-for="option in sortOptions" :key="option.value">
                                 <button type="button"
                                     class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="sortBy = option.value; close(); page = 1">
+                                    x-on:click="sortBy = option.value; localStorage.setItem('projects-sort', sortBy); close(); page = 1">
                                     <span class="flex-1" x-text="option.label"></span>
                                     <svg x-show="sortBy === option.value" class="size-3.5 text-warning"
                                         viewBox="0 0 12 12" fill="none" aria-hidden="true">
@@ -122,6 +122,29 @@
                                         x-text="project.name"></h2>
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="project.description || 'No description'"></p>
+                                    <span class="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] font-medium"
+                                        :style="project.statusType === 'success' ? 'color:#047857;background:rgba(16,185,129,.07);border-color:rgba(16,185,129,.22)' : project.statusType === 'warning' ? 'color:#b45309;background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.22)' : project.statusType === 'error' ? 'color:#b91c1c;background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.22)' : 'color:#525252;background:rgba(115,115,115,.05);border-color:rgba(115,115,115,.18)'"
+                                        :title="`Project status: ${project.statusLabel}`">
+                                        <span class="size-1.5 rounded-full"
+                                            :style="project.statusType === 'success' ? 'background:#10b981' : project.statusType === 'warning' ? 'background:#f59e0b' : project.statusType === 'error' ? 'background:#ef4444' : 'background:#a3a3a3'"></span>
+                                        <span x-text="project.statusLabel"></span>
+                                    </span>
+                                    <div x-show="project.domains && project.domains.length"
+                                        class="relative z-10 mt-2 flex min-w-0 flex-wrap gap-1">
+                                        <template x-for="domain in project.domains.slice(0, 3)" :key="domain.href">
+                                            <a :href="domain.href" target="_blank" rel="noopener noreferrer" x-on:click.stop
+                                                class="inline-flex max-w-full items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10.5px] font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-100 hover:text-black dark:border-white/[0.09] dark:bg-white/[0.035] dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                                                :title="domain.href">
+                                                <svg class="size-2.5 shrink-0 opacity-60" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                                    <path d="M6.5 9.5 9.5 6.5M5.25 11.75H4a2.75 2.75 0 0 1 0-5.5h2M10.75 4.25H12a2.75 2.75 0 1 1 0 5.5h-2" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/>
+                                                </svg>
+                                                <span class="max-w-36 truncate" x-text="domain.label"></span>
+                                            </a>
+                                        </template>
+                                        <span x-show="project.domains.length > 3"
+                                            class="inline-flex items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10.5px] font-medium text-neutral-500 dark:border-white/[0.09] dark:bg-white/[0.035] dark:text-fg-faint"
+                                            x-text="`+${project.domains.length - 3}`"></span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -157,19 +180,24 @@
             </div>
 
             <div x-show="viewMode === 'table'"
-                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]">
+                class="rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]"
+                style="overflow-x:auto;">
                 <div
-                    class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                    class="projects-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint"
+                    style="min-width:1180px;grid-template-columns:minmax(230px,1.45fr) 115px 95px 85px minmax(260px,1.5fr) minmax(180px,1fr) 70px;">
                     <div>Project</div>
+                    <div>Status</div>
                     <div>Environments</div>
                     <div>Resources</div>
+                    <div>Domains</div>
                     <div class="project-description">Description</div>
                     <div></div>
                 </div>
 
                 <template x-for="project in paginatedProjects" :key="project.uuid">
                     <div
-                        class="projects-table-grid group min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        class="projects-table-grid group min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]"
+                        style="min-width:1180px;grid-template-columns:minmax(230px,1.45fr) 115px 95px 85px minmax(260px,1.5fr) minmax(180px,1fr) 70px;">
                         <div class="flex min-w-0 items-center gap-3">
                             <div
                                 class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
@@ -185,10 +213,35 @@
                                 x-text="project.name"></a>
                         </div>
 
+                        <div>
+                            <span class="inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] font-medium"
+                                :style="project.statusType === 'success' ? 'color:#047857;background:rgba(16,185,129,.07);border-color:rgba(16,185,129,.22)' : project.statusType === 'warning' ? 'color:#b45309;background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.22)' : project.statusType === 'error' ? 'color:#b91c1c;background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.22)' : 'color:#525252;background:rgba(115,115,115,.05);border-color:rgba(115,115,115,.18)'"
+                                :title="`Project status: ${project.statusLabel}`">
+                                <span class="size-1.5 rounded-full"
+                                    :style="project.statusType === 'success' ? 'background:#10b981' : project.statusType === 'warning' ? 'background:#f59e0b' : project.statusType === 'error' ? 'background:#ef4444' : 'background:#a3a3a3'"></span>
+                                <span x-text="project.statusLabel"></span>
+                            </span>
+                        </div>
+
                         <div class="text-[12px] text-neutral-600 dark:text-fg-dim"
                             x-text="project.environmentCount"></div>
                         <div class="text-[12px] text-neutral-600 dark:text-fg-dim"
                             x-text="project.resourceCount"></div>
+                        <div class="flex min-w-0 flex-wrap gap-1">
+                            <template x-if="!project.domains || project.domains.length === 0">
+                                <span class="text-[11px] text-neutral-400 dark:text-fg-faint">—</span>
+                            </template>
+                            <template x-for="domain in (project.domains || []).slice(0, 3)" :key="domain.href">
+                                <a :href="domain.href" target="_blank" rel="noopener noreferrer" x-on:click.stop
+                                    class="inline-flex max-w-36 items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10.5px] font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-100 hover:text-black dark:border-white/[0.09] dark:bg-white/[0.035] dark:text-fg-dim dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                                    :title="domain.href">
+                                    <span class="truncate" x-text="domain.label"></span>
+                                </a>
+                            </template>
+                            <span x-show="project.domains && project.domains.length > 3"
+                                class="inline-flex items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10.5px] font-medium text-neutral-500 dark:border-white/[0.09] dark:bg-white/[0.035] dark:text-fg-faint"
+                                x-text="`+${project.domains.length - 3}`"></span>
+                        </div>
                         <p class="project-description truncate text-[12px] text-neutral-500 dark:text-fg-dim"
                             x-text="project.description || '-'"></p>
 
@@ -227,13 +280,17 @@
     function projectsIndex() {
         return {
             search: '',
-            sortBy: 'name-asc',
+            sortBy: localStorage.getItem('projects-sort') || 'running',
             sortOpen: false,
             viewMode: localStorage.getItem('projects-view') || 'grid',
             page: 1,
             pageSize: 12,
             projects: @js($projectsJs),
             sortOptions: [{
+                    value: 'running',
+                    label: 'Running first'
+                },
+                {
                     value: 'name-asc',
                     label: 'Name A–Z'
                 },
@@ -250,10 +307,16 @@
                     label: 'Most environments'
                 },
             ],
+            init() {
+                if (!this.sortOptions.some((option) => option.value === this.sortBy)) {
+                    this.sortBy = 'running';
+                    localStorage.setItem('projects-sort', this.sortBy);
+                }
+            },
             get filteredProjects() {
                 const query = this.search.trim().toLowerCase();
                 const projects = this.projects.filter((project) => {
-                    const searchable = [project.name, project.description]
+                    const searchable = [project.name, project.description, ...(project.domains || []).map((domain) => domain.label)]
                         .filter(Boolean)
                         .join(' ')
                         .toLowerCase();
@@ -262,6 +325,11 @@
                 });
 
                 return projects.sort((first, second) => {
+                    if (this.sortBy === 'running') {
+                        const priority = { success: 0, warning: 1, error: 2, neutral: 3 };
+                        return (priority[first.statusType] ?? 4) - (priority[second.statusType] ?? 4) ||
+                            first.name.localeCompare(second.name);
+                    }
                     if (this.sortBy === 'name-desc') {
                         return second.name.localeCompare(first.name);
                     }

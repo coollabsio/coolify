@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Support\ProjectStatusAggregator;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -15,6 +16,8 @@ class Dashboard extends Component
     public Collection $servers;
 
     public Collection $privateKeys;
+
+    public array $projectStatuses = [];
 
     public function mount()
     {
@@ -35,6 +38,8 @@ class Dashboard extends Component
                 'mariadbs',
             ])
             ->get();
+
+        $this->projectStatuses = ProjectStatusAggregator::forProjects($this->projects);
     }
 
     public function render()

@@ -3,12 +3,18 @@
 namespace App\Livewire\Project;
 
 use App\Models\Project;
+use App\Support\ProjectDomainAggregator;
+use App\Support\ProjectStatusAggregator;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class Index extends Component
 {
     public $projects;
+
+    public array $projectStatuses = [];
+
+    public array $projectDomains = [];
 
     public function mount(): void
     {
@@ -29,6 +35,9 @@ class Index extends Component
                 'mariadbs',
             ])
             ->get();
+
+        $this->projectStatuses = ProjectStatusAggregator::forProjects($this->projects);
+        $this->projectDomains = ProjectDomainAggregator::forProjects($this->projects);
     }
 
     public function render(): View
@@ -60,6 +69,9 @@ class Index extends Component
                     'href' => $project->navigateTo(),
                     'environmentCount' => $project->environments->count(),
                     'resourceCount' => $resourceCount,
+                    'statusLabel' => data_get($this->projectStatuses, $project->uuid.'.label', 'Unknown'),
+                    'statusType' => data_get($this->projectStatuses, $project->uuid.'.type', 'neutral'),
+                    'domains' => data_get($this->projectDomains, $project->uuid, []),
                     'settingsHref' => auth()->user()->can('update', $project)
                         ? route('project.edit', ['project_uuid' => $project->uuid])
                         : null,

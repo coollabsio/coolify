@@ -81,6 +81,21 @@
                                     <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
                                         {{ $project->description ?: 'No description' }}
                                     </p>
+                                    @php
+                                        $projectStatus = $projectStatuses[$project->uuid] ?? ['label' => 'Unknown', 'type' => 'neutral'];
+                                        [$statusColor, $statusDot, $statusBg, $statusBorder] = match ($projectStatus['type']) {
+                                            'success' => ['#047857', '#10b981', 'rgba(16,185,129,.07)', 'rgba(16,185,129,.22)'],
+                                            'warning' => ['#b45309', '#f59e0b', 'rgba(245,158,11,.07)', 'rgba(245,158,11,.22)'],
+                                            'error' => ['#b91c1c', '#ef4444', 'rgba(239,68,68,.07)', 'rgba(239,68,68,.22)'],
+                                            default => ['#525252', '#a3a3a3', 'rgba(115,115,115,.05)', 'rgba(115,115,115,.18)'],
+                                        };
+                                    @endphp
+                                    <span class="mt-2 inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10.5px] font-medium"
+                                        style="color:{{ $statusColor }};background:{{ $statusBg }};border-color:{{ $statusBorder }}"
+                                        title="Project status: {{ $projectStatus['label'] }}">
+                                        <span class="size-1.5 rounded-full" style="background:{{ $statusDot }}"></span>
+                                        {{ $projectStatus['label'] }}
+                                    </span>
                                 </div>
                             </div>
 
