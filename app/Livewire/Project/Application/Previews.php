@@ -129,12 +129,16 @@ class Previews extends Component
                     $fqdn = ValidationPatterns::normalizeApplicationDomains($fqdn);
                     $this->previewFqdns[$previewKey] = $fqdn;
 
-                    if (! validateDNSEntry($fqdn, $this->application->destination->server)) {
-                        $server = $this->application->destination->server;
-                        $target = serverDnsTargetIp($server) ?? $server->ip;
-                        $guidance = dnsMismatchGuidanceMessage($target, $target);
-                        $this->dispatch('error', 'Validating DNS failed.', "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
-                        $success = false;
+                    foreach (ValidationPatterns::applicationDomainList($fqdn) as $domain) {
+                        if (! validateDNSEntry($domain, $this->application->destination->server)) {
+                            $server = $this->application->destination->server;
+                            $target = serverDnsTargetIp($server) ?? $server->ip;
+                            $guidance = dnsMismatchGuidanceMessage($target, $target);
+                            $this->dispatch('error', 'Validating DNS failed.', "{$guidance}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
+                            $success = false;
+
+                            break;
+                        }
                     }
 
                     // Check for domain conflicts if not forcing save
@@ -184,7 +188,7 @@ class Previews extends Component
                 return;
             }
 
-            $preview->generate_preview_fqdn();
+            $preview->generate_preview_fqdn(force: true);
             $this->application->refresh();
             $this->syncData(false);
             $this->dispatch('update_links');

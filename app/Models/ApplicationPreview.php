@@ -105,29 +105,42 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn()
+    public function generate_preview_fqdn(bool $force = false)
     {
-        if ($this->application->fqdn) {
-            if (str($this->application->fqdn)->contains(',')) {
-                $url = Url::fromString(str($this->application->fqdn)->explode(',')[0]);
-            } else {
-                $url = Url::fromString($this->application->fqdn);
-            }
-            $template = $this->application->preview_url_template;
+        // A preview that already has a domain keeps it (it may have been
+        // customized by the user); only explicit regeneration overwrites it.
+        // generate_preview_fqdn_compose() has no equivalent guard yet, so
+        // compose previews are still regenerated on every deployment.
+        if (filled($this->fqdn) && ! $force) {
+            return $this;
+        }
+
+        $domains = ValidationPatterns::applicationDomainList($this->application->fqdn);
+        if (count($domains) === 0) {
+            return $this;
+        }
+
+        $template = $this->application->preview_url_template;
+        $random = new_public_id();
+
+        $preview_fqdns = collect($domains)->map(function (string $domain) use ($template, $random) {
+            $url = Url::fromString($domain);
             $host = $url->getHost();
             $schema = $url->getScheme();
             $portInt = $url->getPort();
             $port = $portInt !== null ? ':'.$portInt : '';
             $urlPath = $url->getPath();
             $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
-            $random = new_public_id();
+
             $preview_fqdn = str_replace('{{random}}', $random, $template);
             $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
             $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
-            $preview_fqdn = "$schema://$preview_fqdn{$port}{$path}";
-            $this->fqdn = $preview_fqdn;
-            $this->save();
-        }
+
+            return "$schema://$preview_fqdn{$port}{$path}";
+        });
+
+        $this->fqdn = $preview_fqdns->unique()->implode(',');
+        $this->save();
 
         return $this;
     }

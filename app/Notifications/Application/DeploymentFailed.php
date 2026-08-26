@@ -30,6 +30,8 @@ class DeploymentFailed extends CustomEmailNotification
 
     public ?string $fqdn = null;
 
+    public ?string $preview_fqdn = null;
+
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
     {
         $this->onQueue('high');
@@ -43,6 +45,10 @@ class DeploymentFailed extends CustomEmailNotification
         $this->fqdn = data_get($application, 'fqdn');
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
+        }
+        $this->preview_fqdn = data_get($preview, 'fqdn');
+        if (str($this->preview_fqdn)->explode(',')->count() > 1) {
+            $this->preview_fqdn = str($this->preview_fqdn)->explode(',')->first();
         }
         $this->deployment_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
     }
@@ -60,7 +66,7 @@ class DeploymentFailed extends CustomEmailNotification
         if ($pull_request_id === 0) {
             $mail->subject('Coolify: Deployment failed of '.$this->application_name.'.');
         } else {
-            $fqdn = $this->preview->fqdn;
+            $fqdn = $this->preview_fqdn;
             $mail->subject('Coolify: Deployment failed of pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.'.');
         }
         $mail->view('emails.application-deployment-failed', [
@@ -117,7 +123,7 @@ class DeploymentFailed extends CustomEmailNotification
     public function toTelegram(): array
     {
         if ($this->preview) {
-            $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview->fqdn.') deployment failed: ';
+            $message = 'Coolify: Pull request #'.$this->preview->pull_request_id.' of '.$this->application_name.' ('.$this->preview_fqdn.') deployment failed: ';
         } else {
             $message = 'Coolify: Deployment failed of '.$this->application_name.' ('.$this->fqdn.'): ';
         }
@@ -164,8 +170,8 @@ class DeploymentFailed extends CustomEmailNotification
         if ($this->preview) {
             $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
             $description = "Pull request deployment failed for {$this->application_name}";
-            if ($this->preview->fqdn) {
-                $description .= "\nPreview URL: {$this->preview->fqdn}";
+            if ($this->preview_fqdn) {
+                $description .= "\nPreview URL: {$this->preview_fqdn}";
             }
         } else {
             $title = 'Deployment failed';

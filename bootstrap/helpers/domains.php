@@ -3,6 +3,7 @@
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 
 /**
@@ -78,15 +79,18 @@ function checkDomainUsage(ServiceApplication|Application|null $resource = null, 
         $currentTeam = $resource->team();
     }
 
-    if ($resource) {
+    // An explicit domain list wins over the resource's stored domains, so
+    // callers can validate not-yet-persisted input (e.g. a preview domain)
+    // while keeping the resource's team scoping and self-exclusion.
+    if ($domain) {
+        $domains = collect(ValidationPatterns::applicationDomainList($domain));
+    } elseif ($resource) {
         if ($resource->getMorphClass() === Application::class && $resource->build_pack === 'dockercompose') {
             $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
             $domains = collect($domains);
         } else {
             $domains = collect($resource->fqdns);
         }
-    } elseif ($domain) {
-        $domains = collect([$domain]);
     } else {
         return ['conflicts' => [], 'hasConflicts' => false];
     }
