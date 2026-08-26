@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Data\FileEntry;
 use App\Models\LocalFileVolume;
 use App\Models\Server;
+use Illuminate\Support\Str;
 
 class ContainerFilesystemService
 {
@@ -172,6 +173,67 @@ class ContainerFilesystemService
         }
 
         return FileEntry::sort($entries);
+    }
+
+    public function isDirectory(string $path): bool
+    {
+        $escaped = $this->escapePath($path, 'stat path');
+        $result = trim((string) instant_remote_process(
+            [$this->dockerExecShell("[ -d {$escaped} ] && echo dir || echo file")],
+            $this->server,
+            throwError: false,
+        ));
+
+        return $result === 'dir';
+    }
+
+    public function upload(string $localTmpPath, string $destPath): void
+    {
+        validateShellSafePath($destPath, 'upload path');
+        $serverTmp = '/tmp/coolify-upload-'.Str::random(16);
+        $escapedServerTmp = escapeshellarg($serverTmp);
+        $escapedContainer = escapeshellarg($this->container);
+        $escapedDest = escapeshellarg($destPath);
+
+        try {
+            instant_scp($localTmpPath, $serverTmp, $this->server);
+            instant_remote_process(
+                ["docker cp {$escapedServerTmp} {$escapedContainer}:{$escapedDest}"],
+                $this->server,
+            );
+        } finally {
+            instant_remote_process(["rm -f {$escapedServerTmp}"], $this->server, throwError: false);
+        }
+    }
+
+    public function download(string $path): string
+    {
+        $escaped = $this->escapePath($path, 'download path');
+        $escapedContainer = escapeshellarg($this->container);
+        $isDir = $this->isDirectory($path);
+        $serverTmp = '/tmp/coolify-download-'.Str::random(16).($isDir ? '.tar.gz' : '');
+        $escapedServerTmp = escapeshellarg($serverTmp);
+        $localTmp = storage_path('app/tmp/'.Str::random(16).($isDir ? '.tar.gz' : ''));
+        @mkdir(dirname($localTmp), 0755, true);
+
+        try {
+            if ($isDir) {
+                instant_remote_process(
+                    ["docker exec {$escapedContainer} sh -c ".escapeshellarg("cd {$escaped} && tar czf - .")." > {$escapedServerTmp}"],
+                    $this->server,
+                );
+            } else {
+                instant_remote_process(
+                    ["docker cp {$escapedContainer}:{$escaped} {$escapedServerTmp}"],
+                    $this->server,
+                );
+            }
+            instant_scp_from_server($serverTmp, $localTmp, $this->server);
+        } finally {
+            instant_remote_process(["rm -f {$escapedServerTmp}"], $this->server, throwError: false);
+        }
+
+        return $localTmp;
     }
 
     protected function escapePath(string $path, string $label): string
