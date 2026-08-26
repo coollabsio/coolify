@@ -3,6 +3,7 @@
 use App\Livewire\Project\Shared\FileBrowser;
 use App\Models\Application;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -112,4 +113,52 @@ it('lists the default directory on mount for a running database', function () {
         ->assertSet('container', $database->uuid)
         ->assertSee('data')
         ->assertSee('postgresql.conf');
+});
+
+function fbRunningDatabase(Team $team, $environment, $destination): StandalonePostgresql
+{
+    return StandalonePostgresql::create([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'DB',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'testdb',
+        'image' => 'postgres:15',
+        'status' => 'running',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+
+it('creates a directory and re-lists', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))                    // defaultRoot
+        ->push(Process::result(output: ''))                          // initial list (empty)
+        ->push(Process::result(output: ''))                          // mkdir
+        ->push(Process::result(output: "dir\t0\t1\tplugins"))]);     // re-list
+
+    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('createDirectory', 'plugins')
+        ->assertSee('plugins');
+});
+
+it('refuses to open a binary or oversized file in the editor', function () {
+    $tooBig = (string) (LocalFileVolume::MAX_CONTENT_SIZE + 1);
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))                     // defaultRoot
+        ->push(Process::result(output: "file\t99999999\t1\tbig.bin")) // initial list
+        ->push(Process::result(output: $tooBig))]);                  // isEditable stat
+
+    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('openEditor', 'big.bin')
+        ->assertSet('editingPath', null);
 });
