@@ -387,8 +387,8 @@ services:
     image: chrislusf/seaweedfs:4.44
     user: 1000:1000
     environment:
-      - SEAWEED_USER_ADMIN=${SERVICE_USER_STORAGEADMIN}
-      - SEAWEED_PASSWORD_ADMIN=${SERVICE_PASSWORD_STORAGEADMIN}
+      - SEAWEED_USER_ADMIN=${ADMIN_EMAIL:?admin@marimohub.local}
+      - SEAWEED_PASSWORD_ADMIN=${SERVICE_PASSWORD_ADMIN}
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
