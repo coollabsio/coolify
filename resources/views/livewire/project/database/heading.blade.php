@@ -88,6 +88,13 @@
                                 <x-reicon name="restart" class="size-3.5" x-show="!busy" />
                                 <span x-text="busy ? 'Restarting…' : 'Restart'">Restart</span>
                             </x-slot:main>
+                            @if ($isCacheDatabase)
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    @click="open = false; document.getElementById('database-flush-trigger')?.click()" role="menuitem">
+                                    <x-reicon name="trash" class="size-3.5 text-error" />
+                                    Flush cache
+                                </button>
+                            @endif
                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                 @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
                                 <x-reicon name="stop-circle" class="size-3.5 text-error" />
@@ -124,6 +131,13 @@
                                         <x-reicon name="restart" class="size-3.5" x-show="!busy" />
                                         <span x-text="busy ? 'Restarting…' : 'Restart'">Restart</span>
                                     </x-slot:main>
+                                    @if ($isCacheDatabase)
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @click="open = false; document.getElementById('database-flush-trigger')?.click()" role="menuitem">
+                                            <x-reicon name="trash" class="size-3.5 text-error" />
+                                            Flush cache
+                                        </button>
+                                    @endif
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('database-stop-trigger')?.click()" role="menuitem">
                                         <x-reicon name="stop-circle" class="size-3.5 text-error" />
@@ -171,6 +185,19 @@
                     <button id="database-stop-trigger" type="button">Stop</button>
                 </x-slot:trigger>
             </x-modal-confirmation>
+            @if ($isCacheDatabase)
+                <x-modal-confirmation title="Confirm Cache Flush?" buttonTitle="Flush cache" submitAction="flush"
+                    :confirmWithText="true" :confirmationText="$database->name" :confirmWithPassword="false"
+                    :actions="[
+                        'Every key stored in this cache will be permanently erased.',
+                        'This action cannot be undone and data cannot be recovered.',
+                        'The database container keeps running; only its data is removed.',
+                    ]" step1ButtonText="Continue" step2ButtonText="Flush cache">
+                    <x-slot:trigger>
+                        <button id="database-flush-trigger" type="button">Flush cache</button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
+            @endif
         </div>
     @endif
 
