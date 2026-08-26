@@ -85,6 +85,56 @@ class ContainerFilesystemService
         return (string) base64_decode(trim($encoded), true);
     }
 
+    public function buildWriteCommand(string $path, string $content): string
+    {
+        $escaped = $this->escapePath($path, 'write path');
+        $b64 = base64_encode($content);
+
+        return $this->dockerExecShell("echo {$b64} | base64 -d > {$escaped}");
+    }
+
+    public function buildMkdirCommand(string $path): string
+    {
+        $escaped = $this->escapePath($path, 'mkdir path');
+
+        return $this->dockerExecShell("mkdir -p -- {$escaped}");
+    }
+
+    public function buildRenameCommand(string $from, string $to): string
+    {
+        $escapedFrom = $this->escapePath($from, 'rename source');
+        $escapedTo = $this->escapePath($to, 'rename target');
+
+        return $this->dockerExecShell("mv -- {$escapedFrom} {$escapedTo}");
+    }
+
+    public function buildDeleteCommand(string $path): string
+    {
+        $escaped = $this->escapePath($path, 'delete path');
+
+        return $this->dockerExecShell("rm -rf -- {$escaped}");
+    }
+
+    public function write(string $path, string $content): void
+    {
+        instant_remote_process([$this->buildWriteCommand($path, $content)], $this->server);
+    }
+
+    public function makeDirectory(string $path): void
+    {
+        instant_remote_process([$this->buildMkdirCommand($path)], $this->server);
+    }
+
+    public function rename(string $from, string $to): void
+    {
+        instant_remote_process([$this->buildRenameCommand($from, $to)], $this->server);
+    }
+
+    public function delete(string $path): void
+    {
+        instant_remote_process([$this->buildDeleteCommand($path)], $this->server);
+    }
+
     public function defaultRoot(): string
     {
         $escapedContainer = escapeshellarg($this->container);
