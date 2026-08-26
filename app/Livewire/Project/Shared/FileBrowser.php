@@ -34,6 +34,8 @@ class FileBrowser extends Component
 
     public ?string $editingPath = null;
 
+    public bool $editorOpen = false;
+
     public string $editorContent = '';
 
     public $upload;
@@ -143,6 +145,7 @@ class FileBrowser extends Component
             }
             $this->editorContent = $this->service()->read($path);
             $this->editingPath = $path;
+            $this->editorOpen = true;
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -157,6 +160,7 @@ class FileBrowser extends Component
         try {
             $this->service()->write($this->editingPath, $this->editorContent);
             $this->editingPath = null;
+            $this->editorOpen = false;
             $this->editorContent = '';
             $this->loadEntries();
             $this->dispatch('success', 'Saved.');
@@ -168,6 +172,7 @@ class FileBrowser extends Component
     public function closeEditor(): void
     {
         $this->editingPath = null;
+        $this->editorOpen = false;
         $this->editorContent = '';
     }
 
