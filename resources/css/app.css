@@ -2311,112 +2311,166 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 }
 
-/* --- File browser TipTap code editor --- */
-.file-editor {
+/* --- File browser TipTap code editor (IDE look) --- */
+.file-ide {
+    --file-line-height: 20px;
+    --file-pad-y: 12px;
+    position: relative;
+    display: flex;
     max-height: 60vh;
     overflow: auto;
-    border-radius: 8px;
+    border-radius: 8px 8px 0 0;
     background: var(--coollabs-recessed);
     box-shadow: inset 0 0 0 1px var(--coollabs-line);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    line-height: var(--file-line-height);
+    tab-size: 2;
 }
 
-.file-editor .file-editor-prosemirror,
-.file-editor .ProseMirror {
+/* Line-number gutter: pinned left, scrolls vertically with the code. */
+.file-ide-gutter {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    flex-shrink: 0;
+    min-width: 2.75rem;
+    padding: var(--file-pad-y) 8px var(--file-pad-y) 10px;
+    text-align: right;
+    color: var(--coollabs-subtle);
+    background: var(--coollabs-recessed);
+    box-shadow: inset -1px 0 0 var(--coollabs-fill);
+    user-select: none;
+}
+
+.file-ide-gutter > div {
+    height: var(--file-line-height);
+    opacity: 0.55;
+}
+
+.file-ide-gutter > div.is-active {
+    opacity: 1;
+    color: var(--coollabs);
+    font-weight: 600;
+}
+
+.dark .file-ide-gutter > div.is-active {
+    color: var(--warning, #f5c211);
+}
+
+.file-ide-code {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.file-ide-code .file-editor-prosemirror,
+.file-ide-code .ProseMirror {
     outline: none;
     min-height: 12rem;
 }
 
-.file-editor pre {
+.file-ide pre {
     margin: 0;
-    padding: 0.875rem 1rem;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 12.5px;
-    line-height: 1.6;
+    padding: var(--file-pad-y) 16px;
     white-space: pre;
     tab-size: 2;
     color: var(--coollabs-fg, #1f2328);
 }
 
-.dark .file-editor pre {
+.dark .file-ide pre {
     color: #e6edf3;
 }
 
+/* Status bar */
+.file-ide-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 0 0 8px 8px;
+    background: var(--coollabs-elevated);
+    box-shadow: inset 0 0 0 1px var(--coollabs-line);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--coollabs-subtle);
+}
+
 /* highlight.js tokens (light) */
-.file-editor .hljs-comment,
-.file-editor .hljs-quote {
+.file-ide .hljs-comment,
+.file-ide .hljs-quote {
     color: #6a737d;
     font-style: italic;
 }
-.file-editor .hljs-keyword,
-.file-editor .hljs-selector-tag,
-.file-editor .hljs-literal {
+.file-ide .hljs-keyword,
+.file-ide .hljs-selector-tag,
+.file-ide .hljs-literal {
     color: #cf222e;
 }
-.file-editor .hljs-string,
-.file-editor .hljs-meta .hljs-string {
+.file-ide .hljs-string,
+.file-ide .hljs-meta .hljs-string {
     color: #0a3069;
 }
-.file-editor .hljs-number,
-.file-editor .hljs-attr,
-.file-editor .hljs-property {
+.file-ide .hljs-number,
+.file-ide .hljs-attr,
+.file-ide .hljs-property {
     color: #0550ae;
 }
-.file-editor .hljs-title,
-.file-editor .hljs-title.function_,
-.file-editor .hljs-section {
+.file-ide .hljs-title,
+.file-ide .hljs-title.function_,
+.file-ide .hljs-section {
     color: #8250df;
 }
-.file-editor .hljs-built_in,
-.file-editor .hljs-type,
-.file-editor .hljs-attribute {
+.file-ide .hljs-built_in,
+.file-ide .hljs-type,
+.file-ide .hljs-attribute {
     color: #953800;
 }
-.file-editor .hljs-tag,
-.file-editor .hljs-name,
-.file-editor .hljs-selector-id,
-.file-editor .hljs-selector-class {
+.file-ide .hljs-tag,
+.file-ide .hljs-name,
+.file-ide .hljs-selector-id,
+.file-ide .hljs-selector-class {
     color: #116329;
 }
-.file-editor .hljs-meta {
+.file-ide .hljs-meta {
     color: #57606a;
 }
 
 /* highlight.js tokens (dark) */
-.dark .file-editor .hljs-comment,
-.dark .file-editor .hljs-quote {
+.dark .file-ide .hljs-comment,
+.dark .file-ide .hljs-quote {
     color: #8b949e;
 }
-.dark .file-editor .hljs-keyword,
-.dark .file-editor .hljs-selector-tag,
-.dark .file-editor .hljs-literal {
+.dark .file-ide .hljs-keyword,
+.dark .file-ide .hljs-selector-tag,
+.dark .file-ide .hljs-literal {
     color: #ff7b72;
 }
-.dark .file-editor .hljs-string,
-.dark .file-editor .hljs-meta .hljs-string {
+.dark .file-ide .hljs-string,
+.dark .file-ide .hljs-meta .hljs-string {
     color: #a5d6ff;
 }
-.dark .file-editor .hljs-number,
-.dark .file-editor .hljs-attr,
-.dark .file-editor .hljs-property {
+.dark .file-ide .hljs-number,
+.dark .file-ide .hljs-attr,
+.dark .file-ide .hljs-property {
     color: #79c0ff;
 }
-.dark .file-editor .hljs-title,
-.dark .file-editor .hljs-title.function_,
-.dark .file-editor .hljs-section {
+.dark .file-ide .hljs-title,
+.dark .file-ide .hljs-title.function_,
+.dark .file-ide .hljs-section {
     color: #d2a8ff;
 }
-.dark .file-editor .hljs-built_in,
-.dark .file-editor .hljs-type,
-.dark .file-editor .hljs-attribute {
+.dark .file-ide .hljs-built_in,
+.dark .file-ide .hljs-type,
+.dark .file-ide .hljs-attribute {
     color: #ffa657;
 }
-.dark .file-editor .hljs-tag,
-.dark .file-editor .hljs-name,
-.dark .file-editor .hljs-selector-id,
-.dark .file-editor .hljs-selector-class {
+.dark .file-ide .hljs-tag,
+.dark .file-ide .hljs-name,
+.dark .file-ide .hljs-selector-id,
+.dark .file-ide .hljs-selector-class {
     color: #7ee787;
 }
-.dark .file-editor .hljs-meta {
+.dark .file-ide .hljs-meta {
     color: #8b949e;
 }
 
