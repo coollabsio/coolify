@@ -1,7 +1,6 @@
 <?php
 
 use App\Data\FileEntry;
-use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -51,13 +50,18 @@ it('sorts directories before files, then by name case-insensitively', function (
     expect($names)->toBe(['assets', 'src', '.env', 'README.md']);
 });
 
-it('builds a listing command with an escaped path and the container name', function () {
+it('builds a listing command with a single stat call, escaped path and container name', function () {
     $cmd = fsService()->buildListCommand('/var/www/html');
 
     expect($cmd)
         ->toContain('docker exec')
         ->toContain('app-123')
-        ->toContain(escapeshellarg('/var/www/html'));
+        ->toContain('stat -c')
+        ->toContain(escapeshellarg('/var/www/html'))
+        // Must embed a REAL tab, not a literal backslash-t: stat -c does not
+        // expand \t, so a literal escape would break the tab-delimited parse.
+        ->toContain("%F\t%s")
+        ->not->toContain('%F\\t%s');
 });
 
 it('rejects an unsafe listing path', function () {
@@ -103,20 +107,23 @@ it('falls back to / when the container has no WorkingDir', function () {
 });
 
 it('refuses to read a file larger than the edit cap', function () {
-    $tooBig = (string) (LocalFileVolume::MAX_CONTENT_SIZE + 1);
-    Process::fake(['*' => Process::sequence()
-        ->push(Process::result(output: $tooBig))        // stat size
-        ->push(Process::result(output: 'text'))]);      // grep -qI (unused here)
+    // The combined read command emits TOOBIG in a single round trip.
+    Process::fake(['*' => Process::result(output: 'TOOBIG')]);
 
     $server = fsServer();
     (new ContainerFilesystemService($server, 'app-123'))->read('/app/big.bin');
 })->throws(RuntimeException::class);
 
-it('reads an editable text file', function () {
-    Process::fake(['*' => Process::sequence()
-        ->push(Process::result(output: '12'))              // stat size
-        ->push(Process::result(output: 'text'))                              // binary check => text
-        ->push(Process::result(output: base64_encode("hello world\n")))]);  // base64 read
+it('refuses to read a binary file', function () {
+    Process::fake(['*' => Process::result(output: 'BINARY')]);
+
+    $server = fsServer();
+    (new ContainerFilesystemService($server, 'app-123'))->read('/app/a.bin');
+})->throws(RuntimeException::class);
+
+it('reads an editable text file in a single round trip', function () {
+    // "OK" header line then the base64 payload, from one docker exec.
+    Process::fake(['*' => Process::result(output: "OK\n".base64_encode("hello world\n"))]);
 
     $server = fsServer();
     $content = (new ContainerFilesystemService($server, 'app-123'))->read('/app/a.txt');
@@ -125,9 +132,8 @@ it('reads an editable text file', function () {
 });
 
 it('treats an empty file as editable text', function () {
-    Process::fake(['*' => Process::sequence()
-        ->push(Process::result(output: '0'))   // stat size => 0
-        ->push(Process::result(output: ''))]);  // base64 read (empty)
+    // Empty file => "OK" header with no payload.
+    Process::fake(['*' => Process::result(output: 'OK')]);
 
     $server = fsServer();
 
@@ -170,6 +176,30 @@ it('builds mkdir, rename and delete commands with escaped paths', function () {
 it('rejects unsafe paths in mutating builders', function () {
     fsService()->buildDeleteCommand('/app/$(reboot)');
 })->throws(Exception::class);
+
+it('parses the 7-field stat listing with owner and group, mapping the file type', function () {
+    $raw = implode("\n", [
+        "directory\t4096\t1700000000\t755\troot\troot\t.",
+        "directory\t4096\t1700000000\t755\troot\troot\t..",
+        "regular file\t497\t1700000001\t644\twww-data\twww-data\t50x.html",
+        "directory\t4096\t1700000002\t755\tapp\tapp\tassets",
+        "symbolic link\t11\t1700000003\t777\troot\troot\tlink",
+    ]);
+
+    $entries = fsService()->parseListing($raw);
+
+    // The stat . and .. rows are dropped.
+    expect($entries)->toHaveCount(3);
+    expect($entries[0]->name)->toBe('assets');
+    expect($entries[0]->type)->toBe('dir');
+    expect($entries[0]->owner)->toBe('app');
+    expect($entries[0]->group)->toBe('app');
+    expect($entries[1]->name)->toBe('50x.html');
+    expect($entries[1]->type)->toBe('file');
+    expect($entries[1]->owner)->toBe('www-data');
+    expect($entries[2]->name)->toBe('link');
+    expect($entries[2]->type)->toBe('symlink');
+});
 
 it('parses permissions from the 5-field listing format', function () {
     $raw = "file\t497\t1700000000\t644\t50x.html\ndir\t0\t1700000001\t755\tassets";

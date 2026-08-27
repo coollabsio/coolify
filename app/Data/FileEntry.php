@@ -10,6 +10,8 @@ class FileEntry
         public int $size,
         public int $mtime,
         public string $perms = '',
+        public string $owner = '',
+        public string $group = '',
     ) {}
 
     public function isDir(): bool

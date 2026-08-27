@@ -187,8 +187,8 @@ class FileBrowser extends Component
             $this->editorLanguage = $this->guessLanguage($name);
             $this->editingPath = $path;
             $this->editorOpen = true;
-            // Push the content into the TipTap editor (reliable across the
-            // teleported, wire:ignore'd modal).
+            // Push content + language into the mounted Monaco editor. It lives
+            // behind wire:ignore, so a dispatched event is how it receives them.
             $this->dispatch('load-file-editor', content: $this->editorContent, language: $this->editorLanguage);
         } catch (\RuntimeException $e) {
             $this->dispatch('error', "Can't edit this file - it's binary or larger than 5 MB. Download it instead.");
@@ -274,25 +274,41 @@ class FileBrowser extends Component
     }
 
     /**
-     * Map a filename to a highlight.js language id for the editor.
+     * Map a filename to a Monaco language id for the editor. Falls back to
+     * well-known whole-file names so extension-less files still highlight.
      */
     protected function guessLanguage(string $name): string
     {
-        $map = [
+        $extMap = [
             'js' => 'javascript', 'mjs' => 'javascript', 'cjs' => 'javascript', 'ts' => 'typescript',
             'json' => 'json', 'php' => 'php', 'py' => 'python', 'rb' => 'ruby', 'go' => 'go',
-            'rs' => 'rust', 'java' => 'java', 'sh' => 'bash', 'bash' => 'bash', 'zsh' => 'bash',
+            'rs' => 'rust', 'java' => 'java', 'sh' => 'shell', 'bash' => 'shell', 'zsh' => 'shell',
             'yml' => 'yaml', 'yaml' => 'yaml', 'toml' => 'ini', 'ini' => 'ini', 'env' => 'ini',
-            'conf' => 'ini', 'md' => 'markdown', 'markdown' => 'markdown', 'html' => 'xml',
-            'htm' => 'xml', 'xml' => 'xml', 'svg' => 'xml', 'css' => 'css', 'scss' => 'scss',
-            'sql' => 'sql', 'dockerfile' => 'dockerfile', 'properties' => 'properties',
+            'conf' => 'ini', 'cnf' => 'ini', 'md' => 'markdown', 'markdown' => 'markdown', 'html' => 'html',
+            'htm' => 'html', 'xml' => 'xml', 'svg' => 'xml', 'css' => 'css', 'scss' => 'scss',
+            'sql' => 'sql', 'dockerfile' => 'dockerfile',
         ];
-        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-        if ($ext === '' && strtolower($name) === 'dockerfile') {
-            return 'dockerfile';
+
+        $base = strtolower(basename($name));
+
+        // Whole-name matches for common extension-less/dotfiles.
+        $nameMap = [
+            'dockerfile' => 'dockerfile', 'containerfile' => 'dockerfile',
+            '.gitignore' => 'ini', '.dockerignore' => 'ini', '.editorconfig' => 'ini',
+            '.npmrc' => 'ini', '.gitconfig' => 'ini',
+            '.bashrc' => 'shell', '.bash_profile' => 'shell', '.bash_aliases' => 'shell',
+            '.profile' => 'shell', '.zshrc' => 'shell', '.zprofile' => 'shell',
+        ];
+        if (isset($nameMap[$base])) {
+            return $nameMap[$base];
+        }
+        if ($base === '.env' || str_starts_with($base, '.env.')) {
+            return 'ini';
         }
 
-        return $map[$ext] ?? '';
+        $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+
+        return $extMap[$ext] ?? '';
     }
 
     protected function childPath(string $name): string
@@ -332,6 +348,8 @@ class FileBrowser extends Component
             'size' => $e->size,
             'mtime' => $e->mtime,
             'perms' => $e->perms,
+            'owner' => $e->owner,
+            'group' => $e->group,
         ], $entries);
     }
 

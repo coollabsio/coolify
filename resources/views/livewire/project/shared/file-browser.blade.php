@@ -145,6 +145,8 @@
                             <span></span>
                             <span>Name</span>
                             <span>Perms</span>
+                            <span>Owner</span>
+                            <span>Group</span>
                             <span class="text-right">Size</span>
                             <span>Modified</span>
                             <span class="text-right">Actions</span>
@@ -187,61 +189,88 @@
                                         </form>
                                     </x-modal-input>
                                 </div>
+                                <div class="min-w-0 truncate text-coollabs-subtle">
+                                    {{ $entry['owner'] ?: '-' }}
+                                </div>
+                                <div class="min-w-0 truncate text-coollabs-subtle">
+                                    {{ $entry['group'] ?: '-' }}
+                                </div>
                                 <div class="text-right text-coollabs-subtle tabular-nums">
                                     {{ $entry['type'] === 'dir' ? '-' : formatBytes($entry['size']) }}
                                 </div>
                                 <div class="text-coollabs-subtle tabular-nums">
                                     {{ $entry['mtime'] ? \Illuminate\Support\Carbon::createFromTimestamp($entry['mtime'])->toDateTimeString() : '-' }}
                                 </div>
-                                <div class="flex items-center justify-end gap-0.5">
-                                    @if ($entry['type'] !== 'dir')
-                                        <x-forms.button type="button" title="Edit"
-                                            x-on:click="$wire.openEditor(@js($entry['name']))">
-                                            <x-reicon name="file-content" class="size-3.5" />
+                                {{-- Actions kebab. The entry name lives in this
+                                     row's x-data as a JS string so the menu can
+                                     call $wire.* with it directly - passing @js()
+                                     through a component attribute double-encodes
+                                     the quotes and breaks the handler. --}}
+                                <div class="flex items-center justify-end"
+                                    x-data="{ open: false, name: @js($entry['name']) }"
+                                    @keydown.escape.window="open = false">
+                                    <div class="relative">
+                                        <x-forms.button type="button" title="Actions"
+                                            x-on:click="open = !open" @click.outside="open = false"
+                                            x-bind:class="open && 'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25'">
+                                            <x-reicon name="dots-vertical" class="size-3.5" />
                                         </x-forms.button>
-                                    @endif
-                                    <x-forms.button type="button" title="Download"
-                                        x-on:click="$wire.download(@js($entry['name']))">
-                                        <x-reicon name="download" class="size-3.5" />
-                                    </x-forms.button>
+                                        <div x-show="open" x-cloak x-transition.opacity.duration.120ms
+                                            class="listbox-panel right-0! left-auto! z-30!">
+                                            @if ($entry['type'] !== 'dir')
+                                                <button type="button" class="listbox-option"
+                                                    x-on:click="open = false; $wire.openEditor(name)">
+                                                    <x-reicon name="file-content" class="size-3.5 shrink-0" />
+                                                    <span class="min-w-0 flex-1 text-left">Edit</span>
+                                                </button>
+                                            @endif
+                                            <button type="button" class="listbox-option"
+                                                x-on:click="open = false; $wire.download(name)">
+                                                <x-reicon name="download" class="size-3.5 shrink-0" />
+                                                <span class="min-w-0 flex-1 text-left">Download</span>
+                                            </button>
 
-                                    {{-- Rename --}}
-                                    <x-modal-input title="Rename">
-                                        <x-slot:content>
-                                            <x-forms.button type="button" title="Rename">
-                                                <x-reicon name="edit" class="size-3.5" />
-                                            </x-forms.button>
-                                        </x-slot:content>
-                                        <form x-data="{ name: @js($entry['name']) }"
-                                            @submit.prevent="$wire.renameEntry(@js($entry['name']), name); $dispatch('close-modal')"
-                                            class="flex flex-col gap-4">
-                                            <x-forms.input id="renameName-{{ $loop->index }}"
-                                                label="New name" x-model="name" required />
-                                            <div class="flex justify-end">
-                                                <x-forms.button type="submit" isHighlighted>Rename</x-forms.button>
-                                            </div>
-                                        </form>
-                                    </x-modal-input>
+                                            {{-- Rename --}}
+                                            <x-modal-input title="Rename">
+                                                <x-slot:content>
+                                                    <button type="button" class="listbox-option" x-on:click="open = false">
+                                                        <x-reicon name="edit" class="size-3.5 shrink-0" />
+                                                        <span class="min-w-0 flex-1 text-left">Rename</span>
+                                                    </button>
+                                                </x-slot:content>
+                                                <form x-data="{ newName: @js($entry['name']) }"
+                                                    @submit.prevent="$wire.renameEntry(name, newName); $dispatch('close-modal')"
+                                                    class="flex flex-col gap-4">
+                                                    <x-forms.input id="renameName-{{ $loop->index }}"
+                                                        label="New name" x-model="newName" required />
+                                                    <div class="flex justify-end">
+                                                        <x-forms.button type="submit" isHighlighted>Rename</x-forms.button>
+                                                    </div>
+                                                </form>
+                                            </x-modal-input>
 
-                                    {{-- Delete --}}
-                                    <x-modal-input title="Delete this item?">
-                                        <x-slot:content>
-                                            <x-forms.button isError type="button" title="Delete">
-                                                <x-reicon name="trash" class="size-3.5" />
-                                            </x-forms.button>
-                                        </x-slot:content>
-                                        <div class="flex flex-col gap-4">
-                                            <p class="text-sm text-coollabs-subtle">
-                                                This permanently deletes
-                                                <span class="font-medium">{{ $entry['name'] }}</span>
-                                                inside the container. This cannot be undone.
-                                            </p>
-                                            <div class="flex justify-end">
-                                                <x-forms.button isError type="button"
-                                                    x-on:click="$wire.deleteEntry(@js($entry['name'])); $dispatch('close-modal')">Delete</x-forms.button>
-                                            </div>
+                                            {{-- Delete --}}
+                                            <x-modal-input title="Delete this item?">
+                                                <x-slot:content>
+                                                    <button type="button" class="listbox-option" x-on:click="open = false">
+                                                        <x-reicon name="trash" class="size-3.5 shrink-0 text-red-600 dark:text-red-500" />
+                                                        <span class="min-w-0 flex-1 text-left text-red-600 dark:text-red-500">Delete</span>
+                                                    </button>
+                                                </x-slot:content>
+                                                <div class="flex flex-col gap-4">
+                                                    <p class="text-sm text-coollabs-subtle">
+                                                        This permanently deletes
+                                                        <span class="font-medium">{{ $entry['name'] }}</span>
+                                                        inside the container. This cannot be undone.
+                                                    </p>
+                                                    <div class="flex justify-end">
+                                                        <x-forms.button isError type="button"
+                                                            x-on:click="$wire.deleteEntry(name); $dispatch('close-modal')">Delete</x-forms.button>
+                                                    </div>
+                                                </div>
+                                            </x-modal-input>
                                         </div>
-                                    </x-modal-input>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -261,20 +290,68 @@
                             <span class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 font-mono text-[11px] text-coollabs dark:bg-warning/15 dark:text-warning">{{ $editorLanguage }}</span>
                         @endif
                     </div>
-                    {{-- TipTap code editor (single code block, lowlight highlighting).
-                         wire:ignore protects the ProseMirror DOM from Livewire morphs. --}}
-                    <div wire:ignore x-data="fileEditor" x-on:load-file-editor.window="load($event.detail)"
-                        class="min-w-0">
-                        <div class="file-ide">
-                            <div class="file-ide-gutter" x-ref="gutter" aria-hidden="true"></div>
-                            <div class="file-ide-code">
-                                <div x-ref="editor"></div>
-                            </div>
-                        </div>
-                        <div class="file-ide-status">
-                            <span x-ref="status">Ln 1, Col 1</span>
-                            <span x-ref="statusRight" class="ml-auto"></span>
-                        </div>
+                    {{-- Monaco editor, kept mounted across opens (wire:ignore) and
+                         preloaded on page init so the first Edit click is instant.
+                         openEditor dispatches load-file-editor with the content and
+                         Monaco language id; we setValue + setModelLanguage without
+                         recreating, so highlighting applies and there is no flash.
+                         Inline Alpine (like x-forms.monaco-editor) means this works
+                         without a JS rebuild. --}}
+                    <div wire:ignore class="min-w-0" x-init="loadMonaco()"
+                        x-on:load-file-editor.window="load($event.detail)"
+                        x-data="{
+                            vs: '/js/monaco-editor-0.52.2/min/vs',
+                            base: '/js/monaco-editor-0.52.2/min',
+                            isDark() {
+                                return document.documentElement.classList.contains('dark') || localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                            },
+                            loadMonaco() {
+                                if (window.__fileEditorMonaco) return window.__fileEditorMonaco;
+                                const vs = this.vs, base = this.base;
+                                window.__fileEditorMonaco = new Promise((resolve, reject) => {
+                                    const boot = () => {
+                                        window.require.config({ paths: { vs } });
+                                        const proxy = URL.createObjectURL(new Blob([`self.MonacoEnvironment={baseUrl:'${window.location.origin}${base}'};importScripts('${window.location.origin}${vs}/base/worker/workerMain.js');`], { type: 'text/javascript' }));
+                                        window.MonacoEnvironment = { getWorkerUrl: () => proxy };
+                                        window.require(['vs/editor/editor.main'], () => resolve(window.monaco));
+                                    };
+                                    if (typeof window.require !== 'undefined' && window.require.config) { boot(); return; }
+                                    const s = document.createElement('script');
+                                    s.src = `${vs}/loader.js`; s.onload = boot; s.onerror = reject;
+                                    document.head.appendChild(s);
+                                });
+                                return window.__fileEditorMonaco;
+                            },
+                            ensureTheme(monaco) {
+                                if (window.__fileEditorThemeDefined) return;
+                                monaco.editor.defineTheme('coolify-dark', { base: 'vs-dark', inherit: true, rules: [], colors: { 'editor.background': '#0b0b0c', 'editorGutter.background': '#0b0b0c', 'minimap.background': '#0b0b0c' } });
+                                window.__fileEditorThemeDefined = true;
+                            },
+                            async load(detail) {
+                                const monaco = await this.loadMonaco();
+                                this.ensureTheme(monaco);
+                                const el = this.$refs.editor;
+                                const wire = this.$wire;
+                                const content = (detail && detail.content) || '';
+                                const language = (detail && detail.language) || 'plaintext';
+                                // Keep the Monaco instance on the DOM node, NOT in
+                                // Alpine reactive state - proxying its huge object
+                                // graph would hang and crash the tab.
+                                if (!el._monacoEditor) {
+                                    const editor = monaco.editor.create(el, { value: content, language, theme: this.isDark() ? 'coolify-dark' : 'vs', automaticLayout: true, minimap: { enabled: false }, fontSize: 14, lineNumbersMinChars: 3, scrollBeyondLastLine: false, renderLineHighlight: 'all', padding: { top: 12, bottom: 12 }, scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8, useShadows: false } });
+                                    el._monacoEditor = editor;
+                                    editor.onDidChangeModelContent(() => { wire.set('editorContent', editor.getValue(), false); });
+                                    new MutationObserver(() => monaco.editor.setTheme(this.isDark() ? 'coolify-dark' : 'vs')).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+                                } else {
+                                    const model = el._monacoEditor.getModel();
+                                    model.setValue(content);
+                                    monaco.editor.setModelLanguage(model, language);
+                                }
+                                const editor = el._monacoEditor;
+                                this.$nextTick(() => { editor.layout(); setTimeout(() => editor.focus(), 40); });
+                            }
+                        }">
+                        <div x-ref="editor" class="file-editor-monaco"></div>
                     </div>
                     <div class="flex justify-end gap-2">
                         <x-forms.button type="button" wire:click="closeEditor"

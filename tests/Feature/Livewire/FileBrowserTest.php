@@ -3,7 +3,6 @@
 use App\Livewire\Project\Shared\FileBrowser;
 use App\Models\Application;
 use App\Models\InstanceSettings;
-use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -181,13 +180,11 @@ it('changes permissions and re-lists', function () {
         ->assertSee('755');
 });
 
-it('sets the editor language from the file extension when opening', function () {
+it('sets the editor language and content from the file when opening', function () {
     Process::fake(['*' => Process::sequence()
         ->push(Process::result(output: '/data'))                       // defaultRoot
         ->push(Process::result(output: "file\t12\t1\t644\tconfig.yml")) // initial list
-        ->push(Process::result(output: '12'))                          // isEditable stat size
-        ->push(Process::result(output: 'text'))                        // binary check
-        ->push(Process::result(output: base64_encode("a: 1\n")))]);    // base64 read
+        ->push(Process::result(output: "OK\n".base64_encode("a: 1\n")))]); // single-round-trip read
 
     $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
@@ -201,12 +198,26 @@ it('sets the editor language from the file extension when opening', function () 
         ->assertDispatched('load-file-editor', content: "a: 1\n", language: 'yaml');
 });
 
+it('resolves a Monaco language for common extension-less files', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))                      // defaultRoot
+        ->push(Process::result(output: "file\t12\t1\t644\tDockerfile")) // initial list
+        ->push(Process::result(output: "OK\n".base64_encode("FROM alpine\n")))]); // read
+
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->call('openEditor', 'Dockerfile')
+        ->assertSet('editorLanguage', 'dockerfile');
+});
+
 it('refuses to open a binary or oversized file in the editor', function () {
-    $tooBig = (string) (LocalFileVolume::MAX_CONTENT_SIZE + 1);
     Process::fake(['*' => Process::sequence()
         ->push(Process::result(output: '/data'))                     // defaultRoot
         ->push(Process::result(output: "file\t99999999\t1\tbig.bin")) // initial list
-        ->push(Process::result(output: $tooBig))]);                  // isEditable stat
+        ->push(Process::result(output: 'TOOBIG'))]);                 // single-round-trip read
 
     $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
