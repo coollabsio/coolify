@@ -41,7 +41,7 @@ class RestartLimitReached extends CustomEmailNotification
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $this->resource_url = $this->resource->link() ?? base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->resource->uuid}";
+        $this->resource_url = base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/application/{$this->resource->uuid}";
     }
 
     public function via(object $notifiable): array

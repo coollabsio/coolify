@@ -2,7 +2,11 @@
 
 use App\Actions\Application\StopApplication;
 use App\Models\Application;
+use App\Models\InstanceSettings;
 use App\Notifications\Application\RestartLimitReached;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 function applicationWithRestartState(array $attributes = []): Application
 {
@@ -56,14 +60,10 @@ it('keeps restart tracking configurable when stopping an application', function 
         ->and($resetRestartCount->getDefaultValue())->toBeTrue();
 });
 
-it('uses the application link for restart limit notifications', function () {
-    $application = new class extends Application
-    {
-        public function link()
-        {
-            return 'https://coolify.test/project/link-from-model';
-        }
-    };
+it('builds restart limit notification urls from the instance base url', function () {
+    InstanceSettings::forceCreate(['id' => 0, 'fqdn' => 'https://coolify.test']);
+
+    $application = new Application;
     $application->forceFill([
         'name' => 'crashy-app',
         'uuid' => 'application-uuid',
@@ -78,5 +78,5 @@ it('uses the application link for restart limit notifications', function () {
 
     $notification = new RestartLimitReached($application);
 
-    expect($notification->resource_url)->toBe('https://coolify.test/project/link-from-model');
+    expect($notification->resource_url)->toBe('https://coolify.test/project/project-uuid/environment/environment-uuid/application/application-uuid');
 });
