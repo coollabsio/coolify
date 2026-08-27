@@ -42,14 +42,26 @@ class ApplicationPreview extends BaseModel
                 $networks = data_get($composeFile, 'networks');
                 $networkKeys = collect($networks)->keys();
                 $volumeKeys = collect($volumes)->keys();
-                $volumeKeys->each(function ($key) use ($server) {
+                // The parsed compose also lists volumes and networks that Coolify does not own
+                // (the names written by the user, external ones, the shared Coolify network),
+                // so only the resources generated for this preview may be removed. Every
+                // generated volume name ends with the preview suffix, in both parser generations.
+                $volumeSuffix = '-pr-'.$preview->pull_request_id;
+                $previewNetwork = data_get($application, 'uuid').'-'.$preview->pull_request_id;
+                $volumeKeys->each(function ($key) use ($server, $volumeSuffix) {
                     if (! preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key)) {
+                        return;
+                    }
+                    if (! str($key)->endsWith($volumeSuffix)) {
                         return;
                     }
                     instant_remote_process(['docker volume rm -f '.escapeshellarg($key)], $server, false);
                 });
-                $networkKeys->each(function ($key) use ($server) {
+                $networkKeys->each(function ($key) use ($server, $previewNetwork) {
                     if (! preg_match(ValidationPatterns::DOCKER_NETWORK_PATTERN, $key)) {
+                        return;
+                    }
+                    if ($key !== $previewNetwork) {
                         return;
                     }
                     $k = escapeshellarg($key);
