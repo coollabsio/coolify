@@ -4817,7 +4817,7 @@ function convertContainerMemoryBytesToMegabytes(array $metrics): array
 }
 
 /**
- * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}.
+ * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}, {{server.VAR}}.
  *
  * This is the canonical implementation used by both EnvironmentVariable::realValue and the compose parsers
  * to ensure shared variable references are replaced with their actual values.
@@ -4845,6 +4845,12 @@ function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
             $id = $resource->environment->project->id;
         } elseif ($type->value() === 'team') {
             $id = $resource->team()->id;
+        } elseif ($type->value() === 'server') {
+            if (isset($resource->server) && $resource->server) {
+                $id = $resource->server->id;
+            } elseif (isset($resource->destination) && $resource->destination && isset($resource->destination->server)) {
+                $id = $resource->destination->server->id;
+            }
         }
         if (is_null($id)) {
             continue;
