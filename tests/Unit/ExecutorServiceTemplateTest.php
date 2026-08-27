@@ -12,11 +12,18 @@ it('includes an Executor one-click service template', function () {
         ->toContain('SERVICE_URL_EXECUTOR_4788')
         ->toContain('EXECUTOR_WEB_BASE_URL=${SERVICE_URL_EXECUTOR_4788}')
         ->toContain('executor-data:/data')
-        ->toContain('http://127.0.0.1:4788/api/health');
+        ->toContain('http://127.0.0.1:${process.env.PORT||4788}/api/health');
 
     foreach (['service-templates.json', 'service-templates-latest.json'] as $templateFile) {
+        $templateCatalogPath = __DIR__."/../../templates/{$templateFile}";
+        $templateCatalog = file_get_contents($templateCatalogPath);
+
+        if ($templateCatalog === false) {
+            throw new RuntimeException("Unable to read service template catalog at {$templateCatalogPath}.");
+        }
+
         $templates = json_decode(
-            file_get_contents(__DIR__."/../../templates/{$templateFile}"),
+            $templateCatalog,
             associative: true,
             flags: JSON_THROW_ON_ERROR,
         );
@@ -30,6 +37,7 @@ it('includes an Executor one-click service template', function () {
 
         expect($generatedCompose)
             ->toContain('ghcr.io/rhyssullivan/executor-selfhost:${EXECUTOR_VERSION:-latest}')
+            ->toContain('http://127.0.0.1:${process.env.PORT||4788}/api/health')
             ->toContain($templateFile === 'service-templates.json'
                 ? 'EXECUTOR_WEB_BASE_URL=${SERVICE_FQDN_EXECUTOR_4788}'
                 : 'EXECUTOR_WEB_BASE_URL=${SERVICE_URL_EXECUTOR_4788}');
