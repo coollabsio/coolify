@@ -12,7 +12,8 @@
         <div class="hidden" aria-hidden="true" wire:poll.keep-alive.30s="keepTerminalPageAlive"></div>
     @endif
 
-    @if (!$hasShell)
+    {{-- Attach (console) mode does not need a shell, so only warn while Shell mode is active. --}}
+    @if (!$hasShell && $terminalMode === 'shell')
         @if ($isApplicationConsole)
             <div class="flex h-full min-h-[32rem] items-center justify-center">
                 <x-empty size="lg" title="Shell unavailable"

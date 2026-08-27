@@ -41,10 +41,12 @@ class Terminal extends Component
     private function checkShellAvailability(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);
+        // Non-root SSH users need sudo to reach the Docker socket.
+        $sudo = $server->isNonRoot() ? 'sudo ' : '';
         try {
             instant_remote_process([
-                "docker exec {$escapedContainer} bash -c 'exit 0' 2>/dev/null || ".
-                "docker exec {$escapedContainer} sh -c 'exit 0' 2>/dev/null",
+                "{$sudo}docker exec {$escapedContainer} bash -c 'exit 0' 2>/dev/null || ".
+                "{$sudo}docker exec {$escapedContainer} sh -c 'exit 0' 2>/dev/null",
             ], $server);
 
             return true;
@@ -56,9 +58,11 @@ class Terminal extends Component
     private function containerKeepsStdinOpen(Server $server, string $container): bool
     {
         $escapedContainer = escapeshellarg($container);
+        // Non-root SSH users need sudo to reach the Docker socket.
+        $sudo = $server->isNonRoot() ? 'sudo ' : '';
         try {
             $output = instant_remote_process([
-                "docker inspect --format '{{.Config.OpenStdin}}' {$escapedContainer} 2>/dev/null",
+                "{$sudo}docker inspect --format '{{.Config.OpenStdin}}' {$escapedContainer} 2>/dev/null",
             ], $server, false);
 
             return is_string($output) && str_starts_with(trim($output), 'true');
@@ -114,7 +118,7 @@ class Terminal extends Component
     }
 
     #[On('send-terminal-command')]
-    public function sendTerminalCommand($isContainer, $identifier, $serverUuid, $requestedMode = null)
+    public function sendTerminalCommand($isContainer, $identifier, $serverUuid, ?string $requestedMode = null): void
     {
         $this->authorize('canAccessTerminal');
 

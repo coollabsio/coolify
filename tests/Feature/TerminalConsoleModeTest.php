@@ -111,3 +111,44 @@ it('lets the header selector switch modes through a livewire listener', function
 
     expect($component)->toContain("#[On('set-terminal-mode')]");
 });
+
+it('prefixes sudo for non-root servers when probing container capabilities', function () {
+    $component = file_get_contents(app_path('Livewire/Project/Shared/Terminal.php'));
+
+    expect($component)
+        // Both the shell probe and the OpenStdin inspection must reach the Docker socket.
+        ->toContain('{$sudo}docker exec {$escapedContainer} bash')
+        ->toContain("{\$sudo}docker inspect --format '{{.Config.OpenStdin}}'");
+});
+
+it('hides the shell option and shell-unavailable notice when no shell exists', function () {
+    $selector = file_get_contents(resource_path('views/components/terminal/mode-selector.blade.php'));
+    $terminal = file_get_contents(resource_path('views/livewire/project/shared/terminal.blade.php'));
+
+    expect($selector)
+        // Shell (docker exec) needs a shell in the image, so hide it when there is none.
+        ->toContain('x-show="hasShell"');
+
+    expect($terminal)
+        // Attach mode does not need a shell, so only warn while shell mode is active.
+        ->toContain("!\$hasShell && \$terminalMode === 'shell'");
+
+    foreach (['project/shared/execute-container-command', 'terminal/index'] as $view) {
+        $blade = file_get_contents(resource_path("views/livewire/{$view}.blade.php"));
+
+        expect($blade)
+            // The parent Alpine state tracks shell availability for the selector.
+            ->toContain('hasShell = $event.detail.hasShell')
+            ->toContain("mode === 'shell' && !this.hasShell");
+    }
+});
+
+it('scopes persisted console history to the server and container identity', function () {
+    $client = file_get_contents(resource_path('js/terminal.js'));
+
+    expect($client)
+        // A matching container name on another server must not recall its commands.
+        ->toContain('coolify-console-history:${serverUuid}:${identifier}')
+        // The mode-updated event carries shell availability to the header selector.
+        ->toContain('hasShell: this.$wire?.hasShell ?? true');
+});

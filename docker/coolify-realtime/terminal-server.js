@@ -425,6 +425,14 @@ async function handleCommand(ws, command, userId) {
             exitCode,
             signal,
         });
+
+        // A previous PTY can exit late (e.g. an attach session detaching during a mode
+        // switch) after its replacement is already spawned. Only mutate the shared session
+        // state when this exit belongs to the session's current PTY.
+        if (userSession.ptyProcess !== ptyProcess) {
+            return;
+        }
+
         ws.send('pty-exited');
         userSession.isActive = false;
 

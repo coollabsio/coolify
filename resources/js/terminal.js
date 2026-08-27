@@ -774,6 +774,15 @@ export function initializeTerminalComponent() {
                 return this.$wire?.terminalMode === 'attach';
             },
 
+            // Focus the console command box in attach mode, otherwise the xterm.
+            focusActiveInput() {
+                if (this.isConsoleMode()) {
+                    this.$refs.consoleInput?.focus();
+                } else {
+                    this.term?.focus();
+                }
+            },
+
             // Keep the xterm read-only while in console mode and load its command history.
             applyConsoleMode() {
                 const consoleMode = this.isConsoleMode();
@@ -789,6 +798,7 @@ export function initializeTerminalComponent() {
                 window.dispatchEvent(new CustomEvent('terminal-mode-updated', {
                     detail: {
                         attachAvailable: Boolean(this.$wire?.attachAvailable),
+                        hasShell: this.$wire?.hasShell ?? true,
                         mode: this.$wire?.terminalMode ?? 'shell',
                     },
                 }));
@@ -796,7 +806,13 @@ export function initializeTerminalComponent() {
 
             consoleHistoryKey() {
                 const identifier = this.$wire?.currentIdentifier;
-                return identifier ? `coolify-console-history:${identifier}` : null;
+                if (!identifier) {
+                    return null;
+                }
+                // Scope history to the server too so a matching container name on a
+                // different server (or tenant) cannot recall another target's commands.
+                const serverUuid = this.$wire?.currentServerUuid ?? 'unknown';
+                return `coolify-console-history:${serverUuid}:${identifier}`;
             },
 
             loadConsoleHistory() {
@@ -882,7 +898,9 @@ export function initializeTerminalComponent() {
                     }
                     this.terminalActive = true;
                     this.startTerminalSessionCountdown();
-                    this.term.focus();
+                    // In console (attach) mode the user types into the command box, not the
+                    // read-only xterm, so keep focus on that input instead of the terminal.
+                    this.focusActiveInput();
                     document.querySelector('.xterm-viewport').classList.add('scrollbar', 'rounded-sm');
 
                     // Initial resize after terminal is ready
@@ -893,13 +911,13 @@ export function initializeTerminalComponent() {
                         this.resizeTerminal();
                     }, 200);
 
-                    // Ensure terminal gets focus after connection with multiple attempts
+                    // Ensure focus after connection with multiple attempts
                     setTimeout(() => {
-                        this.term.focus();
+                        this.focusActiveInput();
                     }, 100);
-                    
+
                     setTimeout(() => {
-                        this.term.focus();
+                        this.focusActiveInput();
                     }, 500);
 
                     // Notify parent component that terminal is connected

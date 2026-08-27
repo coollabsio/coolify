@@ -65,7 +65,7 @@
     <section class="{{ $selected_uuid === 'default' ? 'w-full' : 'terminal-page-console min-h-0 w-full flex-1 overflow-hidden' }}"
         x-on:terminal-theme-selected="setTheme($event.detail.theme)"
         x-on:terminal-starting.window="syncTheme()"
-        x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode"
+        x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode; hasShell = $event.detail.hasShell"
         x-data="{
             targets: @js($terminalOptions),
             multipleServers: @js($servers->count() > 1),
@@ -78,6 +78,7 @@
             consoleTheme: 'system',
             themeOpen: false,
             attachAvailable: false,
+            hasShell: true,
             terminalMode: 'shell',
             modeOpen: false,
             get filteredTargetGroups() {
@@ -104,7 +105,7 @@
             },
             setTerminalMode(mode) {
                 this.modeOpen = false;
-                if (this.terminalMode === mode) {
+                if (this.terminalMode === mode || (mode === 'shell' && !this.hasShell)) {
                     return;
                 }
                 this.terminalMode = mode;

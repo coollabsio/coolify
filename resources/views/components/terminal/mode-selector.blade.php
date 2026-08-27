@@ -28,7 +28,9 @@
     <div x-cloak x-show="modeOpen" x-transition.origin.top.right role="menu"
         class="console-theme-selector absolute top-11 right-0 z-50 w-64 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-1 shadow-[0_18px_50px_rgba(0,0,0,0.18)] dark:border-white/[0.1] dark:bg-[#111113] dark:shadow-[0_18px_50px_rgba(0,0,0,0.55)]">
         @foreach ($modes as $mode)
+            {{-- Shell (docker exec) needs a shell in the image; hide it when none is available. --}}
             <button type="button" role="menuitemradio" :aria-checked="terminalMode === '{{ $mode['key'] }}'"
+                @if ($mode['key'] === 'shell') x-show="hasShell" @endif
                 class="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-950 dark:text-white/65 dark:hover:bg-white/[0.07] dark:hover:text-white"
                 @click="setTerminalMode('{{ $mode['key'] }}')">
                 <span class="min-w-0 flex-1">

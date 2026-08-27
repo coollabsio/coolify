@@ -70,13 +70,14 @@
         <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full max-w-none xl:mt-0"
             x-on:terminal-theme-selected="setTheme($event.detail.theme)"
             x-on:terminal-starting.window="syncTheme()"
-            x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode"
+            x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode; hasShell = $event.detail.hasShell"
             x-data="{
                 themeKeys: @js($consoleThemeKeys),
                 themeAccents: @js($consoleThemeAccents),
                 consoleTheme: 'system',
                 themeOpen: false,
                 attachAvailable: false,
+                hasShell: true,
                 terminalMode: 'shell',
                 modeOpen: false,
                 containerOpen: false,
@@ -96,7 +97,7 @@
                 },
                 setTerminalMode(mode) {
                     this.modeOpen = false;
-                    if (this.terminalMode === mode) {
+                    if (this.terminalMode === mode || (mode === 'shell' && !this.hasShell)) {
                         return;
                     }
                     this.terminalMode = mode;
