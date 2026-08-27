@@ -197,6 +197,10 @@ export function initializeTerminalComponent() {
             wasConnectedBeforeHidden: false,
             mobileToolbarCollapsed: false,
             terminalModifier: null,
+            // Console (attach) mode — line-oriented command input, like a game-server panel.
+            consoleCommand: '',
+            consoleHistory: [],
+            consoleHistoryIndex: -1,
             keyboardInset: 0,
             keyboardAnchorTop: 0,
             keyboardViewportHeight: 0,
@@ -291,6 +295,7 @@ export function initializeTerminalComponent() {
                 this.setupTerminalEventListeners();
 
                 this.$wire.on('send-back-command', (command) => {
+                    this.applyConsoleMode();
                     this.sendCommandWhenReady({ command: command });
                 });
 
@@ -765,9 +770,85 @@ export function initializeTerminalComponent() {
                 }
             },
 
-            detachTerminal() {
-                // Ctrl-P, Ctrl-Q — docker's detach escape. Leaves the container's main process running.
-                this.sendMessage({ message: '\x10\x11' });
+            isConsoleMode() {
+                return this.$wire?.terminalMode === 'attach';
+            },
+
+            // Keep the xterm read-only while in console mode and load its command history.
+            applyConsoleMode() {
+                const consoleMode = this.isConsoleMode();
+                if (this.term) {
+                    this.term.options.disableStdin = consoleMode;
+                    this.term.options.cursorBlink = !consoleMode;
+                }
+                if (consoleMode) {
+                    this.loadConsoleHistory();
+                    this.$nextTick(() => this.$refs.consoleInput?.focus());
+                }
+                // Let the header mode selector reflect the container's current state.
+                window.dispatchEvent(new CustomEvent('terminal-mode-updated', {
+                    detail: {
+                        attachAvailable: Boolean(this.$wire?.attachAvailable),
+                        mode: this.$wire?.terminalMode ?? 'shell',
+                    },
+                }));
+            },
+
+            consoleHistoryKey() {
+                const identifier = this.$wire?.currentIdentifier;
+                return identifier ? `coolify-console-history:${identifier}` : null;
+            },
+
+            loadConsoleHistory() {
+                const key = this.consoleHistoryKey();
+                if (!key) {
+                    return;
+                }
+                try {
+                    const stored = JSON.parse(localStorage.getItem(key) ?? '[]');
+                    this.consoleHistory = Array.isArray(stored) ? stored : [];
+                } catch (_) {
+                    this.consoleHistory = [];
+                }
+                this.consoleHistoryIndex = -1;
+            },
+
+            submitConsoleCommand() {
+                const command = this.consoleCommand;
+                if (command.trim() === '') {
+                    return;
+                }
+                // Send the whole line plus a newline to the process stdin.
+                this.sendMessage({ message: `${command}\n` });
+
+                if (this.consoleHistory[this.consoleHistory.length - 1] !== command) {
+                    this.consoleHistory.push(command);
+                    this.consoleHistory = this.consoleHistory.slice(-50);
+                    const key = this.consoleHistoryKey();
+                    if (key) {
+                        try {
+                            localStorage.setItem(key, JSON.stringify(this.consoleHistory));
+                        } catch (_) {
+                            // ignore storage failures — history is best-effort
+                        }
+                    }
+                }
+
+                this.consoleCommand = '';
+                this.consoleHistoryIndex = -1;
+            },
+
+            recallConsoleCommand(direction) {
+                if (this.consoleHistory.length === 0) {
+                    return;
+                }
+                if (this.consoleHistoryIndex === -1) {
+                    this.consoleHistoryIndex = this.consoleHistory.length;
+                }
+                let index = this.consoleHistoryIndex + direction;
+                index = Math.max(0, Math.min(this.consoleHistory.length, index));
+                this.consoleHistoryIndex = index;
+                this.consoleCommand = index >= this.consoleHistory.length ? '' : this.consoleHistory[index];
             },
 
             handleSocketMessage(event) {
@@ -888,6 +969,11 @@ export function initializeTerminalComponent() {
                 if (!this.term) return;
 
                 this.term.onData((data) => {
+                    // Console (attach) mode is read-only: commands go through the input box,
+                    // so raw keystrokes (including Ctrl-C) are never sent to the process.
+                    if (this.isConsoleMode()) {
+                        return;
+                    }
                     this.sendMessage({ message: data });
                     if (data === '\r') {
                         this.commandBuffer = '';
@@ -924,6 +1010,11 @@ export function initializeTerminalComponent() {
 
             sendTerminalInput(data) {
                 if (!this.term || !this.terminalActive) {
+                    return;
+                }
+
+                // Console (attach) mode only accepts commands from the input box.
+                if (this.isConsoleMode()) {
                     return;
                 }
 

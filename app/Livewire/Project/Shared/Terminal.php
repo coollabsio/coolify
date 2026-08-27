@@ -89,25 +89,28 @@ class Terminal extends Component
     public function buildDockerCommand(Server $server, string $identifier, string $mode): string
     {
         $escapedIdentifier = escapeshellarg($identifier);
+        // Add sudo for non-root users to access the Docker socket.
+        $sudo = $server->isNonRoot() ? 'sudo ' : '';
 
         if ($mode === 'attach') {
             $detachKeys = config('constants.terminal.detach_keys');
+            $historyLines = (int) config('constants.terminal.console_history_lines');
+
+            // Print recent output first so the console is not blank, then attach for live output.
+            $primeHistory = $historyLines > 0
+                ? "{$sudo}docker logs --tail {$historyLines} {$escapedIdentifier} 2>&1; "
+                : '';
+
             // Attach to the container's main process. --detach-keys lets the user leave with
             // Ctrl-P, Ctrl-Q and --sig-proxy=false stops the client forwarding signals to the app.
-            $dockerCommand = "docker attach --detach-keys=\"{$detachKeys}\" --sig-proxy=false {$escapedIdentifier}";
-        } else {
-            $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
-                            'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
-                            'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
-            $dockerCommand = "docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'";
+            return "{$primeHistory}exec {$sudo}docker attach --detach-keys=\"{$detachKeys}\" --sig-proxy=false {$escapedIdentifier}";
         }
 
-        // Add sudo for non-root users to access the Docker socket.
-        if ($server->isNonRoot()) {
-            $dockerCommand = "sudo {$dockerCommand}";
-        }
+        $shellCommand = 'PATH=$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin && '.
+                        'if [ -f ~/.profile ]; then . ~/.profile; fi && '.
+                        'if [ -n "$SHELL" ] && [ -x "$SHELL" ]; then exec $SHELL; else sh; fi';
 
-        return $dockerCommand;
+        return "{$sudo}docker exec -it {$escapedIdentifier} sh -c '{$shellCommand}'";
     }
 
     #[On('send-terminal-command')]
@@ -185,6 +188,7 @@ class Terminal extends Component
     /**
      * Switch between shell and console (attach) mode and reconnect to the current container.
      */
+    #[On('set-terminal-mode')]
     public function setMode(string $mode): void
     {
         if (! in_array($mode, ['shell', 'attach'], true)) {

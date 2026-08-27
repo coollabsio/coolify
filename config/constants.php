@@ -39,6 +39,9 @@ return [
         // Docker's default detach escape for `docker attach`. Pressing this
         // sequence (Ctrl-P, Ctrl-Q) leaves the container's main process running.
         'detach_keys' => 'ctrl-p,ctrl-q',
+        // Recent log lines shown when a console (attach) session opens, so the
+        // screen is not blank until the next line of live output arrives.
+        'console_history_lines' => 200,
     ],
 
     'pusher' => [
