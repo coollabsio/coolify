@@ -1,0 +1,28 @@
+# documentation: https://rustrak.github.io/rustrak/
+# slogan: Self-hosted error tracking that accepts events from any Sentry SDK.
+# category: monitoring
+# tags: error-tracking, sentry, rust, observability, sqlite
+# logo: svgs/rustrak.svg
+# port: 3000
+
+services:
+  rustrak-api:
+    image: rustrak/rustrak-server:latest
+    environment:
+      - SERVICE_URL_RUSTRAKAPI_8080
+      - HOST=0.0.0.0
+      - PORT=8080
+      - RUST_LOG=info
+      - SSL_PROXY=true
+      - SESSION_SECRET_KEY=${SERVICE_HEX_128_RUSTRAK}
+      - CREATE_SUPERUSER=${RUSTRAK_ADMIN_EMAIL:-admin@example.com}:${SERVICE_PASSWORD_ADMIN}
+    volumes:
+      - rustrak-data:/data
+
+  rustrak:
+    image: rustrak/rustrak-ui:latest
+    environment:
+      - SERVICE_URL_RUSTRAK_3000
+      - RUSTRAK_API_URL=http://rustrak-api:8080
+    depends_on:
+      - rustrak-api
