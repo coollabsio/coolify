@@ -35,6 +35,7 @@ class TelegramChannel
             \App\Notifications\Server\Unreachable::class => $settings->telegram_notifications_server_unreachable_thread_id,
             \App\Notifications\Server\Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
             \App\Notifications\Server\ServerPatchCheck::class => $settings->telegram_notifications_server_patch_thread_id,
+            \App\Notifications\Server\TraefikVersionOutdated::class => $settings->telegram_notifications_traefik_outdated_thread_id,
 
             default => null,
         };
