@@ -124,6 +124,25 @@ it('reads an editable text file', function () {
     expect($content)->toBe("hello world\n");
 });
 
+it('treats an empty file as editable text', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '0'))   // stat size => 0
+        ->push(Process::result(output: ''))]);  // base64 read (empty)
+
+    $server = fsServer();
+
+    expect((new ContainerFilesystemService($server, 'app-123'))->read('/app/empty.txt'))->toBe('');
+});
+
+it('writes content larger than the shell argument limit via docker cp', function () {
+    Process::fake(['*' => Process::result(output: '')]);
+    $server = fsServer();
+
+    (new ContainerFilesystemService($server, 'app-123'))->write('/app/big.txt', str_repeat('a', 200_000));
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'docker cp'));
+});
+
 it('base64-encodes content in the write command', function () {
     $cmd = fsService()->buildWriteCommand('/app/a.txt', "hi\n");
 

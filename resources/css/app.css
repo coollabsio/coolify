@@ -2315,6 +2315,7 @@ input[type="search"]::-webkit-search-results-decoration {
 .file-ide {
     --file-line-height: 20px;
     --file-pad-y: 12px;
+
     position: relative;
     display: flex;
     max-height: 60vh;

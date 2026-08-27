@@ -9,6 +9,13 @@ use Illuminate\Support\Str;
 
 class ContainerFilesystemService
 {
+    /**
+     * Inline `echo <base64> | base64 -d` writes travel as a single execve
+     * argument, capped at ~128 KiB by MAX_ARG_STRLEN. base64 inflates by 4/3,
+     * so anything above ~96 KiB of content must go through the docker cp path.
+     */
+    private const MAX_INLINE_WRITE_SIZE = 96 * 1024;
+
     public function __construct(
         private Server $server,
         private string $container,
@@ -57,6 +64,12 @@ class ContainerFilesystemService
         ));
         if ($size > LocalFileVolume::MAX_CONTENT_SIZE) {
             return false;
+        }
+
+        // An empty file has no matching line, so grep -qI would report it as
+        // binary. Treat size 0 as editable text.
+        if ($size === 0) {
+            return true;
         }
 
         // grep -qI exits non-zero for binary; echo text on success, binary otherwise.
@@ -136,7 +149,29 @@ class ContainerFilesystemService
 
     public function write(string $path, string $content): void
     {
+        if (strlen($content) > self::MAX_INLINE_WRITE_SIZE) {
+            $this->writeViaUpload($path, $content);
+
+            return;
+        }
         instant_remote_process([$this->buildWriteCommand($path, $content)], $this->server);
+    }
+
+    /**
+     * Write content too large for a single shell argument by staging it to a
+     * local temp file and reusing the docker cp upload path.
+     */
+    protected function writeViaUpload(string $path, string $content): void
+    {
+        validateShellSafePath($path, 'write path');
+        $localTmp = storage_path('app/tmp/'.Str::random(16));
+        @mkdir(dirname($localTmp), 0755, true);
+        file_put_contents($localTmp, $content);
+        try {
+            $this->upload($localTmp, $path);
+        } finally {
+            @unlink($localTmp);
+        }
     }
 
     public function makeDirectory(string $path): void

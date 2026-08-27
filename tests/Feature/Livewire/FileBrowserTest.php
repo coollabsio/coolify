@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -115,7 +116,7 @@ it('lists the default directory on mount for a running database', function () {
         ->assertSee('postgresql.conf');
 });
 
-function fbRunningDatabase(Team $team, $environment, $destination): StandalonePostgresql
+function fbRunningDatabase($environment, $destination): StandalonePostgresql
 {
     return StandalonePostgresql::create([
         'uuid' => (string) Str::uuid(),
@@ -138,7 +139,7 @@ it('creates a directory and re-lists', function () {
         ->push(Process::result(output: ''))                          // mkdir
         ->push(Process::result(output: "dir\t0\t1\tplugins"))]);     // re-list
 
-    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
@@ -154,7 +155,7 @@ it('creates a file and re-lists', function () {
         ->push(Process::result(output: ''))                           // createFile
         ->push(Process::result(output: "file\t0\t1\t644\tconfig.yml"))]); // re-list
 
-    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
@@ -170,7 +171,7 @@ it('changes permissions and re-lists', function () {
         ->push(Process::result(output: ''))                             // chmod
         ->push(Process::result(output: "file\t10\t1\t755\tapp.sh"))]);  // re-list
 
-    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
@@ -188,7 +189,7 @@ it('sets the editor language from the file extension when opening', function () 
         ->push(Process::result(output: 'text'))                        // binary check
         ->push(Process::result(output: base64_encode("a: 1\n")))]);    // base64 read
 
-    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
@@ -207,7 +208,7 @@ it('refuses to open a binary or oversized file in the editor', function () {
         ->push(Process::result(output: "file\t99999999\t1\tbig.bin")) // initial list
         ->push(Process::result(output: $tooBig))]);                  // isEditable stat
 
-    $database = fbRunningDatabase($this->team, $this->environment, $this->destination);
+    $database = fbRunningDatabase($this->environment, $this->destination);
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
@@ -215,3 +216,16 @@ it('refuses to open a binary or oversized file in the editor', function () {
         ->call('openEditor', 'big.bin')
         ->assertSet('editingPath', null);
 });
+
+it('rejects a client attempt to change the locked container property', function () {
+    Process::fake(['*' => Process::sequence()
+        ->push(Process::result(output: '/data'))   // defaultRoot
+        ->push(Process::result(output: ''))]);      // initial list
+
+    $database = fbRunningDatabase($this->environment, $this->destination);
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(FileBrowser::class, ['resource' => $database])
+        ->set('container', 'someone-elses-container');
+})->throws(CannotUpdateLockedPropertyException::class);

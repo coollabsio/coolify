@@ -7,24 +7,33 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Services\ContainerFilesystemService;
 use App\Support\ValidationPatterns;
+use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileBrowser extends Component
 {
     use AuthorizesRequests;
     use WithFileUploads;
 
+    #[Locked]
     public $resource;
 
+    #[Locked]
     public string $type = '';
 
+    #[Locked]
     public bool $containerRunning = false;
 
+    #[Locked]
     public ?string $container = null;
 
     /** @var array<int, string> */
+    #[Locked]
     public array $availableContainers = [];
 
     public string $currentPath = '';
@@ -87,12 +96,14 @@ class FileBrowser extends Component
 
     public function open(string $name): void
     {
+        $this->guard();
         $this->currentPath = rtrim($this->currentPath, '/').'/'.$name;
         $this->loadEntries();
     }
 
     public function goTo(string $path): void
     {
+        $this->guard();
         if (! str_starts_with($path, '/')) {
             return;
         }
@@ -102,6 +113,7 @@ class FileBrowser extends Component
 
     public function refresh(): void
     {
+        $this->guard();
         $this->loadEntries();
     }
 
@@ -216,7 +228,8 @@ class FileBrowser extends Component
         $this->validate(['upload' => 'required|file|max:1048576']); // 1 GB (KB units)
         try {
             $localTmp = $this->upload->getRealPath();
-            $this->service()->upload($localTmp, $this->childPath($this->upload->getClientOriginalName()));
+            $filename = $this->sanitizeUploadName($this->upload->getClientOriginalName());
+            $this->service()->upload($localTmp, $this->childPath($filename));
             $this->upload = null;
             $this->loadEntries();
             $this->dispatch('success', 'Uploaded.');
@@ -225,16 +238,39 @@ class FileBrowser extends Component
         }
     }
 
-    public function download(string $name)
+    public function download(string $name): ?StreamedResponse
     {
         $this->guard();
-        $localTmp = $this->service()->download($this->childPath($name));
+        try {
+            $localTmp = $this->service()->download($this->childPath($name));
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return null;
+        }
         $downloadName = str_ends_with($localTmp, '.tar.gz') ? $name.'.tar.gz' : $name;
 
         return response()->streamDownload(function () use ($localTmp) {
-            readfile($localTmp);
-            @unlink($localTmp);
-        }, $downloadName);
+            try {
+                readfile($localTmp);
+            } finally {
+                @unlink($localTmp);
+            }
+        }, $downloadName)->deleteFileAfterSend();
+    }
+
+    /**
+     * Reduce a client-supplied upload name to a single safe basename,
+     * stripping any directory traversal before it reaches the container.
+     */
+    protected function sanitizeUploadName(string $name): string
+    {
+        $name = basename(str_replace('\\', '/', $name));
+        if ($name === '' || preg_match('/^\.+$/', $name) === 1) {
+            throw new \RuntimeException('Invalid file name.');
+        }
+
+        return $name;
     }
 
     /**
@@ -312,7 +348,7 @@ class FileBrowser extends Component
         };
     }
 
-    protected function resolveResourceFromRoute()
+    protected function resolveResourceFromRoute(): Model
     {
         $parameters = get_route_parameters();
         $teamId = data_get(auth()->user()->currentTeam(), 'id');
@@ -383,7 +419,7 @@ class FileBrowser extends Component
         return ValidationPatterns::isValidContainerName($name) ? [$name] : [];
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.project.shared.file-browser');
     }
