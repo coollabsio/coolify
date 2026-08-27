@@ -97,7 +97,7 @@
                 <div class="flex flex-wrap items-center gap-2 border-b border-coollabs-hairline px-4 py-2">
                     <span class="text-xs text-coollabs-subtle">Container</span>
                     @foreach ($availableContainers as $name)
-                        <button type="button" wire:click="selectContainer('{{ $name }}')"
+                        <button type="button" x-on:click="$wire.selectContainer(@js($name))"
                             @class([
                                 'button',
                                 'bg-coollabs/10 text-coollabs ring-coollabs/25 dark:bg-warning/15 dark:text-warning dark:ring-warning/25' => $name === $container,
@@ -114,7 +114,7 @@
                     @if ($loop->index > 1)
                         <span class="text-coollabs-subtle">/</span>
                     @endif
-                    <button type="button" wire:click="goTo('{{ $crumb['path'] }}')"
+                    <button type="button" x-on:click="$wire.goTo(@js($crumb['path']))"
                         @class([
                             'rounded-md px-1.5 py-0.5 hover:bg-black/5 hover:text-current dark:hover:bg-white/[0.06]',
                             'text-current font-medium' => $loop->last,
@@ -157,7 +157,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     @if ($entry['type'] === 'dir')
-                                        <button type="button" wire:click="open('{{ $entry['name'] }}')"
+                                        <button type="button" x-on:click="$wire.open(@js($entry['name']))"
                                             class="block w-full cursor-pointer truncate text-left font-medium hover:text-coollabs hover:underline dark:hover:text-warning">{{ $entry['name'] }}</button>
                                     @else
                                         <span class="block truncate">{{ $entry['name'] }}</span>
@@ -196,12 +196,12 @@
                                 <div class="flex items-center justify-end gap-0.5">
                                     @if ($entry['type'] !== 'dir')
                                         <x-forms.button type="button" title="Edit"
-                                            wire:click="openEditor('{{ $entry['name'] }}')">
+                                            x-on:click="$wire.openEditor(@js($entry['name']))">
                                             <x-reicon name="file-content" class="size-3.5" />
                                         </x-forms.button>
                                     @endif
                                     <x-forms.button type="button" title="Download"
-                                        wire:click="download('{{ $entry['name'] }}')">
+                                        x-on:click="$wire.download(@js($entry['name']))">
                                         <x-reicon name="download" class="size-3.5" />
                                     </x-forms.button>
 
@@ -238,8 +238,7 @@
                                             </p>
                                             <div class="flex justify-end">
                                                 <x-forms.button isError type="button"
-                                                    wire:click="deleteEntry('{{ $entry['name'] }}')"
-                                                    @click="$dispatch('close-modal')">Delete</x-forms.button>
+                                                    x-on:click="$wire.deleteEntry(@js($entry['name'])); $dispatch('close-modal')">Delete</x-forms.button>
                                             </div>
                                         </div>
                                     </x-modal-input>
