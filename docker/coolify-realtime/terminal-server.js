@@ -9,8 +9,12 @@ import {
     extractTargetHost,
     extractTimeout,
     getTerminalSessionTimeout,
+    isAttachCommand,
     isAuthorizedTargetHost,
 } from './terminal-utils.js';
+
+// Ctrl-P, Ctrl-Q — docker's default detach escape. Leaves the container's main process running.
+const DOCKER_DETACH_SEQUENCE = '\x10\x11';
 
 async function postToCoolify(path, headers) {
     return new Promise((resolve, reject) => {
@@ -405,6 +409,8 @@ async function handleCommand(ws, command, userId) {
 
     userSession.ptyProcess = ptyProcess;
     userSession.isActive = true;
+    // Attach sessions share the container's main process, so they must be detached, not killed.
+    userSession.isAttach = isAttachCommand(hereDocContent);
 
     ws.send('pty-ready');
 
@@ -453,6 +459,10 @@ async function killPtyProcess(userId) {
     const session = userSessions.get(userId);
     if (!session?.ptyProcess) return false;
 
+    if (session.isAttach) {
+        return detachPtyProcess(session, userId);
+    }
+
     return new Promise((resolve) => {
         // Loop to ensure terminal is killed before continuing
         let killAttempts = 0;
@@ -498,6 +508,59 @@ async function killPtyProcess(userId) {
         };
 
         attemptKill();
+    });
+}
+
+// Leave a `docker attach` session without stopping the container's main process.
+// Sends the detach escape (Ctrl-P, Ctrl-Q); docker exits the attach client but the app keeps running.
+async function detachPtyProcess(session, userId) {
+    return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        const attemptDetach = () => {
+            attempts++;
+            logTerminal('log', 'Detaching from attached container session.', {
+                userId,
+                attempts,
+                maxAttempts,
+            });
+
+            try {
+                session.ptyProcess.write(DOCKER_DETACH_SEQUENCE);
+            } catch (_) {
+                // ignore — the exit check below still runs
+            }
+
+            setTimeout(() => {
+                if (!session.isActive || !session.ptyProcess) {
+                    if (session.terminalSessionTimer) {
+                        clearTimeout(session.terminalSessionTimer);
+                        session.terminalSessionTimer = null;
+                    }
+                    resolve(true);
+                    return;
+                }
+
+                if (attempts < maxAttempts) {
+                    attemptDetach();
+                } else {
+                    // Last resort: drop the local ssh client. --sig-proxy=false keeps the container safe.
+                    try {
+                        session.ptyProcess.kill();
+                    } catch (_) {
+                        // ignore
+                    }
+                    logTerminal('warn', 'Attached session did not detach cleanly; closed the ssh client instead.', {
+                        userId,
+                        attempts,
+                    });
+                    resolve(true);
+                }
+            }, 500);
+        };
+
+        attemptDetach();
     });
 }
 

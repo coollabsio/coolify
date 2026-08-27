@@ -36,6 +36,9 @@ return [
         'host' => env('TERMINAL_HOST'),
         'port' => env('TERMINAL_PORT'),
         'command_timeout' => 0,
+        // Docker's default detach escape for `docker attach`. Pressing this
+        // sequence (Ctrl-P, Ctrl-Q) leaves the container's main process running.
+        'detach_keys' => 'ctrl-p,ctrl-q',
     ],
 
     'pusher' => [

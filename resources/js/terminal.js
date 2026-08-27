@@ -765,6 +765,11 @@ export function initializeTerminalComponent() {
                 }
             },
 
+            detachTerminal() {
+                // Ctrl-P, Ctrl-Q — docker's detach escape. Leaves the container's main process running.
+                this.sendMessage({ message: '\x10\x11' });
+            },
+
             handleSocketMessage(event) {
                 // Handle pong responses
                 if (event.data === 'pong') {

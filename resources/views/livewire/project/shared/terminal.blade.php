@@ -68,6 +68,39 @@
             </div>
         @endif
 
+        {{-- Shell / Console switch — shown only when the container keeps stdin open (e.g. Minecraft). --}}
+        <div x-cloak x-show="$wire.attachAvailable && terminalActive"
+            class="terminal-mode-bar relative z-20 mb-2 flex shrink-0 flex-wrap items-center gap-2">
+            <div
+                class="inline-flex items-center rounded-md border border-white/10 bg-white/[0.05] p-0.5 text-xs font-medium">
+                <button type="button" class="flex h-7 items-center rounded-[5px] px-2.5 transition-colors"
+                    :class="$wire.terminalMode === 'shell' ? 'bg-white/15 text-white' : 'text-white/55 hover:text-white'"
+                    @click="if ($wire.terminalMode !== 'shell') { window.dispatchEvent(new CustomEvent('terminal-starting')); $wire.setMode('shell'); }">
+                    Shell
+                </button>
+                <button type="button" class="flex h-7 items-center rounded-[5px] px-2.5 transition-colors"
+                    :class="$wire.terminalMode === 'attach' ? 'bg-white/15 text-white' : 'text-white/55 hover:text-white'"
+                    @click="if ($wire.terminalMode !== 'attach') { window.dispatchEvent(new CustomEvent('terminal-starting')); $wire.setMode('attach'); }">
+                    Console
+                </button>
+            </div>
+
+            {{-- Safety notice and safe exit, shown only while attached to the live process. --}}
+            <div x-cloak x-show="$wire.terminalMode === 'attach'"
+                class="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-200/90">
+                <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+                        stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span class="min-w-0 flex-1 truncate">Live process — Ctrl-C can stop the app.</span>
+                <button type="button"
+                    class="shrink-0 rounded-[5px] border border-amber-300/40 px-2 py-0.5 font-medium text-amber-100 transition-colors hover:bg-amber-400/20"
+                    title="Leave without stopping the app (Ctrl-P, Ctrl-Q)" @click="detachTerminal()">
+                    Detach
+                </button>
+            </div>
+        </div>
+
         <div id="terminal" wire:ignore data-terminal-style="{{ $isApplicationConsole ? 'application' : 'default' }}"
             :class="fullscreen
                 ? 'terminal-host relative z-[1] min-h-0 flex-1 overflow-hidden px-1 py-[5px] bg-transparent'
