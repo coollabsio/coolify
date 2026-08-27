@@ -6,6 +6,7 @@ use App\Livewire\Project\Index;
 use App\Livewire\SharedVariables\Project\Index as SharedVariablesProjectIndex;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -100,6 +101,76 @@ it('exposes the icon URL on the projects index', function () {
             'project_uuid' => $this->project->uuid,
             'v' => $this->project->updated_at->timestamp,
         ]));
+});
+
+it('loads an S3 project icon from the configured CDN', function () {
+    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com/media/');
+    Team::factory()->create(['id' => 0]);
+    $storage = S3Storage::query()->create([
+        'team_id' => 0,
+        'name' => 'Avatar storage',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'avatars',
+        'endpoint' => 'https://s3.example.com',
+        'is_usable' => true,
+    ]);
+    $this->project->forceFill([
+        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
+        'icon_storage_type' => 's3',
+        'icon_s3_storage_id' => $storage->id,
+    ])->save();
+
+    Livewire::test(Index::class)
+        ->assertViewHas('projectsJs', fn (array $projects): bool => $projects[0]['iconUrl'] === "https://avatars.example.com/media/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
+});
+
+it('loads an S3 project icon directly from S3 when the CDN is not configured', function () {
+    config()->set('constants.coolify.avatar_cdn_url');
+    Team::factory()->create(['id' => 0]);
+    $storage = S3Storage::query()->create([
+        'team_id' => 0,
+        'name' => 'Avatar storage',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'avatars',
+        'endpoint' => 'https://s3.example.com',
+        'is_usable' => true,
+    ]);
+    $this->project->forceFill([
+        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
+        'icon_storage_type' => 's3',
+        'icon_s3_storage_id' => $storage->id,
+    ])->save();
+
+    expect(project_icon_url($this->project))->toBe("https://s3.example.com/avatars/project-icons/{$this->project->uuid}/icon.jpg?v={$this->project->updated_at->timestamp}");
+});
+
+it('does not use an unusable S3 storage URL for a project icon', function () {
+    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com');
+    Team::factory()->create(['id' => 0]);
+    $storage = S3Storage::query()->create([
+        'team_id' => 0,
+        'name' => 'Unusable storage',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'avatars',
+        'endpoint' => 'https://unusable.example.com',
+        'is_usable' => false,
+    ]);
+    $this->project->forceFill([
+        'icon_path' => "project-icons/{$this->project->uuid}/icon.jpg",
+        'icon_storage_type' => 's3',
+        'icon_s3_storage_id' => $storage->id,
+    ])->save();
+
+    expect(project_icon_url($this->project))->toBe(route('project.icon', [
+        'project_uuid' => $this->project->uuid,
+        'v' => $this->project->updated_at->timestamp,
+    ]));
 });
 
 it('displays the project icon on the dashboard', function () {
