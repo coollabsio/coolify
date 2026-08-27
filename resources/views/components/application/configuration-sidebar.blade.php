@@ -52,6 +52,12 @@
                 'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
+                'label' => 'Files',
+                'route' => 'project.application.files',
+                'active' => $currentRoute === 'project.application.files',
+                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+            ],
+            [
                 'label' => 'Deployment Logs',
                 'route' => 'project.application.deployment.index',
                 'active' => str($currentRoute)->startsWith('project.application.deployment'),
@@ -142,6 +148,7 @@
             'Persistent Storage' => 'storages',
             'Backups' => 'database',
             'Terminal' => 'browser-terminal',
+            'Files' => 'folder',
             'Deployment Logs' => 'time-back',
             'Runtime Logs' => 'unordered-list',
             'Git Source' => 'sources',
@@ -161,7 +168,7 @@
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Metrics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
             'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags', 'Danger Zone'],
