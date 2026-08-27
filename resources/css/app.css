@@ -2259,7 +2259,7 @@ input[type="search"]::-webkit-search-results-decoration {
    header grid and each row grid resolve identical tracks and stay aligned
    (an `auto` column would size to its own content per row and drift). */
 .file-table-grid {
-    grid-template-columns: 1.75rem minmax(10rem, 1fr) 5rem 5.5rem 11rem 10rem;
+    grid-template-columns: 1.75rem minmax(10rem, 1fr) 5rem 6rem 6rem 5rem 11rem 10rem;
 }
 
 @media (max-width: 768px) {
@@ -2272,12 +2272,24 @@ input[type="search"]::-webkit-search-results-decoration {
         gap: 0.75rem;
     }
 
-    /* Hide perms, size and modified columns on small screens */
+    /* Hide perms, owner, group, size and modified columns on small screens */
     .data-table-row.file-table-grid > :nth-child(3),
     .data-table-row.file-table-grid > :nth-child(4),
-    .data-table-row.file-table-grid > :nth-child(5) {
+    .data-table-row.file-table-grid > :nth-child(5),
+    .data-table-row.file-table-grid > :nth-child(6),
+    .data-table-row.file-table-grid > :nth-child(7) {
         display: none;
     }
+}
+
+/* File browser Monaco editor container: fixed viewport-relative height with a
+   rounded, hairline-framed surface that matches the rest of the settings UI. */
+.file-editor-monaco {
+    height: 60vh;
+    min-height: 320px;
+    overflow: hidden;
+    border-radius: 8px;
+    box-shadow: inset 0 0 0 1px var(--coollabs-line);
 }
 
 /* File browser layout: standard settings workspace grid whose sidebar column
@@ -2309,170 +2321,6 @@ input[type="search"]::-webkit-search-results-decoration {
     .files-grid > .files-nav {
         transition: none;
     }
-}
-
-/* --- File browser TipTap code editor (IDE look) --- */
-.file-ide {
-    --file-line-height: 20px;
-    --file-pad-y: 12px;
-
-    position: relative;
-    display: flex;
-    max-height: 60vh;
-    overflow: auto;
-    border-radius: 8px 8px 0 0;
-    background: var(--coollabs-recessed);
-    box-shadow: inset 0 0 0 1px var(--coollabs-line);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 13px;
-    line-height: var(--file-line-height);
-    tab-size: 2;
-}
-
-/* Line-number gutter: pinned left, scrolls vertically with the code. */
-.file-ide-gutter {
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    flex-shrink: 0;
-    min-width: 2.75rem;
-    padding: var(--file-pad-y) 8px var(--file-pad-y) 10px;
-    text-align: right;
-    color: var(--coollabs-subtle);
-    background: var(--coollabs-recessed);
-    box-shadow: inset -1px 0 0 var(--coollabs-fill);
-    user-select: none;
-}
-
-.file-ide-gutter > div {
-    height: var(--file-line-height);
-    opacity: 0.55;
-}
-
-.file-ide-gutter > div.is-active {
-    opacity: 1;
-    color: var(--coollabs);
-    font-weight: 600;
-}
-
-.dark .file-ide-gutter > div.is-active {
-    color: var(--warning, #f5c211);
-}
-
-.file-ide-code {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.file-ide-code .file-editor-prosemirror,
-.file-ide-code .ProseMirror {
-    outline: none;
-    min-height: 12rem;
-}
-
-.file-ide pre {
-    margin: 0;
-    padding: var(--file-pad-y) 16px;
-    white-space: pre;
-    tab-size: 2;
-    color: var(--coollabs-fg, #1f2328);
-}
-
-.dark .file-ide pre {
-    color: #e6edf3;
-}
-
-/* Status bar */
-.file-ide-status {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 4px 12px;
-    border-radius: 0 0 8px 8px;
-    background: var(--coollabs-elevated);
-    box-shadow: inset 0 0 0 1px var(--coollabs-line);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-size: 11px;
-    color: var(--coollabs-subtle);
-}
-
-/* highlight.js tokens (light) */
-.file-ide .hljs-comment,
-.file-ide .hljs-quote {
-    color: #6a737d;
-    font-style: italic;
-}
-.file-ide .hljs-keyword,
-.file-ide .hljs-selector-tag,
-.file-ide .hljs-literal {
-    color: #cf222e;
-}
-.file-ide .hljs-string,
-.file-ide .hljs-meta .hljs-string {
-    color: #0a3069;
-}
-.file-ide .hljs-number,
-.file-ide .hljs-attr,
-.file-ide .hljs-property {
-    color: #0550ae;
-}
-.file-ide .hljs-title,
-.file-ide .hljs-title.function_,
-.file-ide .hljs-section {
-    color: #8250df;
-}
-.file-ide .hljs-built_in,
-.file-ide .hljs-type,
-.file-ide .hljs-attribute {
-    color: #953800;
-}
-.file-ide .hljs-tag,
-.file-ide .hljs-name,
-.file-ide .hljs-selector-id,
-.file-ide .hljs-selector-class {
-    color: #116329;
-}
-.file-ide .hljs-meta {
-    color: #57606a;
-}
-
-/* highlight.js tokens (dark) */
-.dark .file-ide .hljs-comment,
-.dark .file-ide .hljs-quote {
-    color: #8b949e;
-}
-.dark .file-ide .hljs-keyword,
-.dark .file-ide .hljs-selector-tag,
-.dark .file-ide .hljs-literal {
-    color: #ff7b72;
-}
-.dark .file-ide .hljs-string,
-.dark .file-ide .hljs-meta .hljs-string {
-    color: #a5d6ff;
-}
-.dark .file-ide .hljs-number,
-.dark .file-ide .hljs-attr,
-.dark .file-ide .hljs-property {
-    color: #79c0ff;
-}
-.dark .file-ide .hljs-title,
-.dark .file-ide .hljs-title.function_,
-.dark .file-ide .hljs-section {
-    color: #d2a8ff;
-}
-.dark .file-ide .hljs-built_in,
-.dark .file-ide .hljs-type,
-.dark .file-ide .hljs-attribute {
-    color: #ffa657;
-}
-.dark .file-ide .hljs-tag,
-.dark .file-ide .hljs-name,
-.dark .file-ide .hljs-selector-id,
-.dark .file-ide .hljs-selector-class {
-    color: #7ee787;
-}
-.dark .file-ide .hljs-meta {
-    color: #8b949e;
 }
 
 .environment-table-scroll {

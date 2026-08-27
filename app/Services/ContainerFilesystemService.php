@@ -25,20 +25,18 @@ class ContainerFilesystemService
     {
         $escapedPath = $this->escapePath($path, 'list path');
 
-        // Iterate `* .*`, skip . and .., guard literal globs, emit
-        // type<TAB>size<TAB>mtime<TAB>perms<TAB>name. Portable across
-        // busybox/coreutils (%a = octal permission bits).
+        // Emit the whole directory in ONE stat call instead of a per-entry loop
+        // (three stat forks each). %F is the human file type ("directory",
+        // "symbolic link", "regular file"), mapped to a token by parseListing.
+        // Fields: type<TAB>size<TAB>mtime<TAB>perms<TAB>owner<TAB>group<TAB>name.
+        // A real tab is embedded in the format because stat's -c does NOT expand
+        // a backslash \t escape (unlike printf) - it would emit the literal text.
+        // `* .*` covers hidden files; parseListing drops the . and .. rows.
         // Names containing a tab/newline are skipped by parseListing (v1 scope).
+        $tab = "\t";
+        $format = '%F'.$tab.'%s'.$tab.'%Y'.$tab.'%a'.$tab.'%U'.$tab.'%G'.$tab.'%n';
         $inner = 'cd '.$escapedPath.' 2>/dev/null || exit 0; '
-            .'for e in * .*; do '
-            .'case "$e" in .|..) continue;; esac; '
-            .'[ -e "$e" ] || [ -L "$e" ] || continue; '
-            .'if [ -L "$e" ]; then t=symlink; elif [ -d "$e" ]; then t=dir; else t=file; fi; '
-            .'s=$(stat -c %s "$e" 2>/dev/null || echo 0); '
-            .'m=$(stat -c %Y "$e" 2>/dev/null || echo 0); '
-            .'p=$(stat -c %a "$e" 2>/dev/null || echo ""); '
-            .'printf "%s\t%s\t%s\t%s\t%s\n" "$t" "$s" "$m" "$p" "$e"; '
-            .'done';
+            .'stat -c "'.$format.'" -- * .* 2>/dev/null';
 
         return $this->dockerExecShell($inner);
     }
@@ -53,52 +51,42 @@ class ContainerFilesystemService
         return $this->parseListing($raw);
     }
 
-    public function isEditable(string $path): bool
-    {
-        $escaped = $this->escapePath($path, 'read path');
-
-        $size = (int) trim((string) instant_remote_process(
-            [$this->dockerExecShell("stat -c %s {$escaped} 2>/dev/null || echo 0")],
-            $this->server,
-            throwError: false,
-        ));
-        if ($size > LocalFileVolume::MAX_CONTENT_SIZE) {
-            return false;
-        }
-
-        // An empty file has no matching line, so grep -qI would report it as
-        // binary. Treat size 0 as editable text.
-        if ($size === 0) {
-            return true;
-        }
-
-        // grep -qI exits non-zero for binary; echo text on success, binary otherwise.
-        $kind = trim((string) instant_remote_process(
-            [$this->dockerExecShell("grep -qI . {$escaped} && echo text || echo binary")],
-            $this->server,
-            throwError: false,
-        ));
-
-        return $kind === 'text';
-    }
-
+    /**
+     * Read an editable text file in a single SSH round trip.
+     *
+     * The remote command folds the size cap, binary probe and base64 read into
+     * one docker exec: it prints TOOBIG or BINARY for a rejected file, otherwise
+     * an "OK\n" header followed by the base64 payload (empty for a 0-byte file,
+     * which is valid editable text). base64 keeps exact bytes safe from the
+     * trailing-whitespace trim in instant_remote_process.
+     *
+     * @throws \RuntimeException when the file is binary or larger than the cap
+     */
     public function read(string $path): string
     {
-        if (! $this->isEditable($path)) {
-            throw new \RuntimeException('File is not editable (binary or too large).');
-        }
-
         $escaped = $this->escapePath($path, 'read path');
+        $max = LocalFileVolume::MAX_CONTENT_SIZE;
 
-        // base64 the content so instant_remote_process's trim() cannot corrupt
-        // exact bytes (e.g. trailing newlines).
-        $encoded = (string) instant_remote_process(
-            [$this->dockerExecShell("base64 {$escaped}")],
+        $cmd = 'sz=$(stat -c %s '.$escaped.' 2>/dev/null || echo 0); '
+            .'if [ "$sz" -gt '.$max.' ]; then echo TOOBIG; exit 0; fi; '
+            .'if [ -s '.$escaped.' ] && ! grep -qI . '.$escaped.'; then echo BINARY; exit 0; fi; '
+            .'echo OK; base64 '.$escaped.' 2>/dev/null';
+
+        $raw = (string) instant_remote_process(
+            [$this->dockerExecShell($cmd)],
             $this->server,
             throwError: false,
         );
 
-        return (string) base64_decode(trim($encoded), true);
+        $newline = strpos($raw, "\n");
+        $status = $newline === false ? trim($raw) : substr($raw, 0, $newline);
+        if ($status === 'TOOBIG' || $status === 'BINARY') {
+            throw new \RuntimeException('File is not editable (binary or too large).');
+        }
+
+        $payload = $newline === false ? '' : substr($raw, $newline + 1);
+
+        return (string) base64_decode(trim($payload), true);
     }
 
     public function buildWriteCommand(string $path, string $content): string
@@ -237,9 +225,14 @@ class ContainerFilesystemService
             if ($line === '') {
                 continue;
             }
-            $parts = explode("\t", $line, 5);
-            // Accept both the 5-field (with perms) and legacy 4-field formats.
-            if (count($parts) === 5) {
+            $parts = explode("\t", $line, 7);
+            $owner = '';
+            $group = '';
+            // Accept the current 7-field format (with owner/group) and the
+            // legacy 5-field (perms) and 4-field formats.
+            if (count($parts) === 7) {
+                [$type, $size, $mtime, $perms, $owner, $group, $name] = $parts;
+            } elseif (count($parts) === 5) {
                 [$type, $size, $mtime, $perms, $name] = $parts;
             } elseif (count($parts) === 4) {
                 [$type, $size, $mtime, $name] = $parts;
@@ -247,10 +240,39 @@ class ContainerFilesystemService
             } else {
                 continue;
             }
-            $entries[] = new FileEntry($name, $type, (int) $size, (int) $mtime, trim($perms));
+            // stat lists the directory itself and its parent; skip them.
+            if ($name === '.' || $name === '..') {
+                continue;
+            }
+            $entries[] = new FileEntry(
+                $name,
+                $this->normalizeType($type),
+                (int) $size,
+                (int) $mtime,
+                trim($perms),
+                trim($owner),
+                trim($group),
+            );
         }
 
         return FileEntry::sort($entries);
+    }
+
+    /**
+     * Map a raw type field to a file/dir/symlink token. Accepts both the
+     * already-tokenized legacy value and stat's human %F string.
+     */
+    protected function normalizeType(string $raw): string
+    {
+        $t = strtolower(trim($raw));
+        if ($t === 'dir' || str_contains($t, 'directory')) {
+            return 'dir';
+        }
+        if ($t === 'symlink' || str_contains($t, 'symbolic link')) {
+            return 'symlink';
+        }
+
+        return 'file';
     }
 
     public function isDirectory(string $path): bool
