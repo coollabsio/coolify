@@ -402,6 +402,21 @@ it('removes a domain', function () {
     expect($this->application->fqdn)->toBe('https://www.example.com');
 });
 
+it('removes consecutive domains by stable row identity after indexes change', function () {
+    $this->application->update([
+        'fqdn' => 'https://first.example.com,https://second.example.com,https://third.example.com',
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    $component
+        ->call('removeDomainByKey', hash('sha256', 'https://first.example.com|'))
+        ->call('removeDomainByKey', hash('sha256', 'https://second.example.com|'))
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)->toBe('https://third.example.com');
+});
+
 it('does not revalidate dns on remaining domains when removing one', function () {
     $settings = InstanceSettings::get();
     $settings->is_dns_validation_enabled = true;

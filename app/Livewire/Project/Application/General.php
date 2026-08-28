@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\GenerateConfig;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Project\Service\Storage;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
@@ -530,7 +531,7 @@ class General extends Component
 
             $showToast && $this->dispatch('success', 'Docker compose file loaded.');
             $this->dispatch('compose_loaded');
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
             $this->dispatch('refreshEnvs');
         } catch (\Throwable $e) {
             // Refresh model to get restored values from Application::loadComposeFile
