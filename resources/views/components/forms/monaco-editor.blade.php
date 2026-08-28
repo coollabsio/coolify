@@ -171,6 +171,11 @@
         }, 5);" :id="monacoId">
         </div>
         <div class="relative z-10 w-full h-full">
+            <div x-cloak x-show="monacoLoader"
+                class="absolute inset-0 z-50 flex items-center justify-center gap-2 bg-white/70 text-[13px] text-neutral-500 backdrop-blur-[1px] dark:bg-[#0b0b0c]/70 dark:text-fg-dim">
+                <span class="size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-transparent dark:border-white/25 dark:border-t-transparent"></span>
+                Loading editor
+            </div>
             <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 150px;"></div>
             <div x-ref="monacoPlaceholderElement" x-show="monacoPlaceholder" @click="monacoEditorFocus()"
                 :style="'font-size: ' + monacoFontSize"

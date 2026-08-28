@@ -49,21 +49,21 @@
             <x-application.settings-section title="Compose"
                 helper="Review the template's changes hunk by hunk, or edit the compose directly. Environment variables live in the compose, so their changes appear here too.">
                 <x-slot:actions>
-                    <div class="inline-flex rounded-lg border border-neutral-200 p-0.5 dark:border-white/[0.08]"
+                    <div class="flex h-9 items-center rounded-lg border border-neutral-200 bg-white p-0.5 dark:border-white/[0.08] dark:bg-white/[0.06]"
                         role="tablist" aria-label="Compose mode">
                         <button type="button" wire:click="setMode('review')" role="tab"
-                            :aria-selected="'{{ $mode === 'review' ? 'true' : 'false' }}'" @class([
+                            aria-selected="{{ $mode === 'review' ? 'true' : 'false' }}" @class([
                                 'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' => $mode === 'review',
-                                'text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg' => $mode !== 'review',
+                                'control-selected' => $mode === 'review',
+                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg' => $mode !== 'review',
                             ])>
                             Review changes
                         </button>
                         <button type="button" wire:click="setMode('edit')" role="tab"
-                            :aria-selected="'{{ $mode === 'edit' ? 'true' : 'false' }}'" @class([
+                            aria-selected="{{ $mode === 'edit' ? 'true' : 'false' }}" @class([
                                 'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
-                                'bg-coollabs/10 text-coollabs dark:bg-warning/15 dark:text-warning' => $mode === 'edit',
-                                'text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg' => $mode !== 'edit',
+                                'control-selected' => $mode === 'edit',
+                                'text-neutral-400 hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg' => $mode !== 'edit',
                             ])>
                             Edit compose
                         </button>
