@@ -484,7 +484,7 @@ class Change extends Component
             // @can and canGate checks against a deleted model (null team_id TypeError).
             $this->github_app = null;
 
-            return redirect()->route('source.all');
+            return redirectRoute($this, 'source.all');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -212,14 +212,14 @@ class BackupEdit extends Component
             if ($this->backup->database->getMorphClass() === ServiceDatabase::class) {
                 $serviceDatabase = $this->backup->database;
 
-                return redirect()->route('project.service.database.backups', [
+                return redirectRoute($this, 'project.service.database.backups', [
                     'project_uuid' => $this->parameters['project_uuid'],
                     'environment_uuid' => $this->parameters['environment_uuid'],
                     'service_uuid' => $serviceDatabase->service->uuid,
                     'stack_service_uuid' => $serviceDatabase->uuid,
                 ]);
             } else {
-                return redirect()->route('project.database.backup.index', [
+                return redirectRoute($this, 'project.database.backup.index', [
                     'project_uuid' => $this->parameters['project_uuid'],
                     'environment_uuid' => $this->parameters['environment_uuid'],
                     'database_uuid' => $this->parameters['database_uuid'],

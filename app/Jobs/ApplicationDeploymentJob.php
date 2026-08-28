@@ -261,14 +261,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
-        if ($this->application->settings->custom_internal_name && ! $this->application->settings->is_consistent_container_name_enabled) {
-            if ($this->pull_request_id === 0) {
-                $this->container_name = $this->application->settings->custom_internal_name;
-            } else {
-                $this->container_name = addPreviewDeploymentSuffix($this->application->settings->custom_internal_name, $this->pull_request_id);
-            }
-        }
+        $this->container_name = $this->resolveContainerName();
 
         $this->saved_outputs = collect();
 
@@ -1986,6 +1979,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    private function resolveContainerName(): string
+    {
+        if (str($this->application->settings->custom_internal_name)->isEmpty()) {
+            return generateApplicationContainerName($this->application, $this->pull_request_id);
+        }
+
+        if ($this->pull_request_id === 0) {
+            return $this->application->settings->custom_internal_name;
+        }
+
+        return addPreviewDeploymentSuffix($this->application->settings->custom_internal_name, $this->pull_request_id);
+    }
+
     private function health_check()
     {
         try {
@@ -3428,6 +3434,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $custom_compose = convertDockerRunToCompose($this->application->custom_docker_run_options);
             if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                 $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+                if ($this->container_name !== $this->application->uuid) {
+                    unset($docker_compose['services'][$this->container_name]);
+                }
                 if (count($custom_compose) > 0) {
                     $ipv4 = data_get($custom_compose, 'ip.0');
                     $ipv6 = data_get($custom_compose, 'ip6.0');
@@ -4027,7 +4036,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy || $force) {
                 if ($this->application->settings->is_consistent_container_name_enabled || str($this->application->settings->custom_internal_name)->isNotEmpty()) {
-                    $this->graceful_shutdown_container($this->container_name);
+                    $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+                    $this->containerNamesToRemove($containers)->each(function (string $containerName) {
+                        $this->graceful_shutdown_container($containerName);
+                    });
                 } else {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
                     if ($this->pull_request_id === 0) {
@@ -4064,6 +4076,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             // Only re-throw if deployment hasn't succeeded yet
             throw new DeploymentException("Failed to stop running container: {$e->getMessage()}", $e->getCode(), $e);
         }
+    }
+
+    private function containerNamesToRemove(Collection $containers): Collection
+    {
+        return $containers
+            ->pluck('Names')
+            ->push($this->container_name)
+            ->filter()
+            ->unique()
+            ->values();
     }
 
     private function start_by_compose_file()
