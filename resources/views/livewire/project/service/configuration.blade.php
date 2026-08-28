@@ -23,7 +23,7 @@
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
-            ['label' => 'Template', 'route' => 'project.service.template', 'icon' => 'server-update', 'hasWarning' => \App\Services\TemplateUpdateChecker::showBadge($service)],
+            ['label' => 'Template', 'route' => 'project.service.template', 'icon' => 'server-update', 'hasWarning' => \App\Services\TemplateUpdateChecker::showBadge($service), 'warningClass' => 'bg-coollabs dark:bg-warning', 'warningTitle' => 'Template update available'],
             ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
             ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'shield-alert'],
         ])->filter(fn (array $item): bool => $item['visible'] ?? true)->map(fn (array $item): array => [
@@ -58,9 +58,12 @@
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         @if (\App\Services\TemplateUpdateChecker::showBadge($service))
             <a href="{{ route('project.service.template', $serviceRouteParameters) }}" {{ wireNavigate() }}
-                class="mb-4 flex items-center justify-between rounded border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
-                <span>A newer version of the {{ str($service->service_type)->headline() }} template is available.</span>
-                <span class="font-medium underline">Review changes</span>
+                class="mb-4 flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-[13px] ring-1 ring-inset bg-coollabs/[0.06] text-coollabs ring-coollabs/20 hover:bg-coollabs/10 dark:bg-warning/[0.06] dark:text-warning dark:ring-warning/20 dark:hover:bg-warning/10">
+                <span class="inline-flex items-center gap-2">
+                    <x-reicon name="server-update" class="size-4 shrink-0" />
+                    A newer version of the {{ str($service->service_type)->headline() }} template is available.
+                </span>
+                <span class="shrink-0 font-medium underline underline-offset-4">Review changes</span>
             </a>
         @endif
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
@@ -83,7 +86,8 @@
                                 <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                 @if ($menuItem['hasWarning'] ?? false)
-                                    <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
+                                    <span class="ml-auto size-2 shrink-0 rounded-full {{ $menuItem['warningClass'] ?? 'bg-error' }}"
+                                        title="{{ $menuItem['warningTitle'] ?? 'Required environment variables missing' }}"></span>
                                 @endif
                             </a>
                             @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())

@@ -58,7 +58,7 @@ it('renders update-available state and applies the compose update', function () 
 
     Livewire::test(TemplateUpdate::class, ['service' => $service])
         ->assertSee('Update available')
-        ->set('acceptedHunks', [0])
+        ->set('acceptedHunks', [0 => true])
         ->call('apply');
 
     $service->refresh();

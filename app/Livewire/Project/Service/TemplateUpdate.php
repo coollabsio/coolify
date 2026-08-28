@@ -7,6 +7,7 @@ use App\Models\Service;
 use App\Services\ComposeDiff;
 use App\Services\TemplateEnvDiff;
 use App\Services\TemplateUpdateChecker;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -17,11 +18,11 @@ class TemplateUpdate extends Component
 
     public Service $service;
 
-    /** @var array<int, int> accepted compose hunk indexes */
+    /** @var array<int|string, bool> accepted compose hunks, keyed by hunk index */
     public array $acceptedHunks = [];
 
-    /** @var array<int, string> env keys the user chose to add/overwrite */
-    public array $acceptedEnvKeys = [];
+    /** @var array<string, bool> accepted env changes, keyed by env key */
+    public array $acceptedEnv = [];
 
     public function mount(Service $service): void
     {
@@ -41,6 +42,20 @@ class TemplateUpdate extends Component
         $compose = data_get($this->template, 'compose');
 
         return is_string($compose) ? base64_decode($compose) : null;
+    }
+
+    public function getLatestUpdatedAtProperty(): ?string
+    {
+        $raw = data_get($this->template, 'template_last_updated_at');
+        if (! is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($raw)->format('M j, Y');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function getHunksProperty(): array
@@ -72,10 +87,11 @@ class TemplateUpdate extends Component
                 return;
             }
 
+            $acceptedHunks = array_map('intval', array_keys(array_filter($this->acceptedHunks)));
             $merged = ComposeDiff::apply(
                 (string) $this->service->docker_compose_raw,
                 $this->latestCompose,
-                $this->acceptedHunks,
+                $acceptedHunks,
             );
 
             if (! ComposeDiff::isValidYaml($merged)) {
@@ -98,8 +114,10 @@ class TemplateUpdate extends Component
             });
 
             $this->service->refresh();
+            $this->acceptedHunks = [];
+            $this->acceptedEnv = [];
 
-            $this->dispatch('success', 'Template changes applied. Redeploy the service to make them take effect.');
+            $this->dispatch('success', 'Template changes applied. Redeploy the service for them to take effect.');
             $this->dispatch('refreshEnvs');
             $this->dispatch('refreshServices');
         } catch (\Throwable $e) {
@@ -110,7 +128,10 @@ class TemplateUpdate extends Component
 
     public function replaceAll(): void
     {
-        $this->acceptedHunks = collect($this->hunks)->pluck('index')->all();
+        $this->acceptedHunks = collect($this->hunks)
+            ->pluck('index')
+            ->mapWithKeys(fn ($index): array => [$index => true])
+            ->all();
         $this->apply();
     }
 
@@ -129,7 +150,7 @@ class TemplateUpdate extends Component
     private function applyEnvSelections(array $envDiff): void
     {
         $byKey = collect($envDiff['new'])->concat($envDiff['changed'])->keyBy('key');
-        foreach ($this->acceptedEnvKeys as $key) {
+        foreach (array_keys(array_filter($this->acceptedEnv)) as $key) {
             $item = $byKey->get($key);
             if ($item === null) {
                 continue;
