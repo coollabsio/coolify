@@ -108,6 +108,17 @@ it('seeds the inline editor from the current selection when switching to edit mo
         ->assertSet('editorContent', "services:\n  app:\n    image: nginx:2\n");
 });
 
+it('seeds the inline editor from the latest template when no hunks are selected', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->assertSet('mode', 'edit')
+        ->assertSet('editorContent', "services:\n  app:\n    image: nginx:2\n")
+        ->assertSee('Apply compose')
+        ->assertSee('Reset to latest template');
+});
+
 it('applies hand-edited compose from the inline editor', function () {
     $service = makeDemoService();
 

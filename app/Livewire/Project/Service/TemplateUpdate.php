@@ -77,7 +77,12 @@ class TemplateUpdate extends Component
     {
         if ($mode === 'edit') {
             if ($this->editorContent === null) {
-                $this->editorContent = $this->mergedFromSelection();
+                // Seed the editable (right) side: carry any hunk selection, otherwise
+                // show the full latest template so the diff is immediately meaningful.
+                $anySelected = count(array_filter($this->acceptedHunks)) > 0;
+                $this->editorContent = $anySelected
+                    ? $this->mergedFromSelection()
+                    : ((string) $this->latestCompose !== '' ? (string) $this->latestCompose : (string) $this->service->docker_compose_raw);
             }
             $this->mode = 'edit';
 

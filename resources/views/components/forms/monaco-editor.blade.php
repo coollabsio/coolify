@@ -1,3 +1,7 @@
+@php
+    $isDiff = filter_var($attributes->get('diff', false), FILTER_VALIDATE_BOOLEAN);
+    $originalContent = (string) $attributes->get('original', '');
+@endphp
 <div wire:key="{{ random_int(0, PHP_INT_MAX) }}" class="coolify-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{
         monacoVersion: '0.52.2',
@@ -101,18 +105,13 @@
                         });
                     }
                     @endif
-                    const editor = monaco.editor.create($refs.monacoEditorElement, {
-                        value: monacoContent,
+                    const sharedEditorOptions = {
                         theme: document.documentElement.classList.contains('dark') ? 'coolify-dark' : 'vs',
                         wordWrap: 'on',
-                        readOnly: '{{ $readonly ?? false }}',
                         minimap: { enabled: false },
                         fontSize: monacoFontSize,
                         lineNumbersMinChars: 3,
                         automaticLayout: true,
-                        language: '{{ $language }}',
-                        domReadOnly: '{{ $readonly ?? false }}',
-                        contextmenu: '!{{ $readonly ?? false }}',
                         renderLineHighlight: 'none',
                         stickyScroll: { enabled: false },
                         padding: { top: 12, bottom: 12 },
@@ -126,7 +125,35 @@
                             horizontalScrollbarSize: 8,
                             useShadows: false
                         }
+                    };
+
+                    let editor;
+                    @if ($isDiff)
+                    const diffEditor = monaco.editor.createDiffEditor($refs.monacoEditorElement, {
+                        ...sharedEditorOptions,
+                        readOnly: false,
+                        originalEditable: false,
+                        renderSideBySide: true,
+                        renderOverviewRuler: false,
+                        ignoreTrimWhitespace: false,
                     });
+                    const originalText = $refs.monacoOriginalData ? $refs.monacoOriginalData.dataset.content : '';
+                    diffEditor.setModel({
+                        original: monaco.editor.createModel(originalText, '{{ $language }}'),
+                        modified: monaco.editor.createModel(monacoContent, '{{ $language }}'),
+                    });
+                    editor = diffEditor.getModifiedEditor();
+                    document.getElementById(monacoId).diffEditor = diffEditor;
+                    @else
+                    editor = monaco.editor.create($refs.monacoEditorElement, {
+                        ...sharedEditorOptions,
+                        value: monacoContent,
+                        readOnly: '{{ $readonly ?? false }}',
+                        language: '{{ $language }}',
+                        domReadOnly: '{{ $readonly ?? false }}',
+                        contextmenu: '!{{ $readonly ?? false }}',
+                    });
+                    @endif
         
                     const observer = new MutationObserver((mutations) => {
                         mutations.forEach((mutation) => {
@@ -171,13 +198,16 @@
         }, 5);" :id="monacoId">
         </div>
         <div class="relative z-10 w-full h-full">
+            @if ($isDiff)
+                <div x-ref="monacoOriginalData" class="hidden" data-content="{{ $originalContent }}"></div>
+            @endif
             <div x-cloak x-show="monacoLoader"
                 class="absolute inset-0 z-50 flex items-center justify-center gap-2 bg-white/70 text-[13px] text-neutral-500 backdrop-blur-[1px] dark:bg-[#0b0b0c]/70 dark:text-fg-dim">
                 <span class="size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-transparent dark:border-white/25 dark:border-t-transparent"></span>
                 Loading editor
             </div>
             <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 150px;"></div>
-            <div x-ref="monacoPlaceholderElement" x-show="monacoPlaceholder" @click="monacoEditorFocus()"
+            <div x-ref="monacoPlaceholderElement" x-show="monacoPlaceholder && {{ $isDiff ? 'false' : 'true' }}" @click="monacoEditorFocus()"
                 :style="'font-size: ' + monacoFontSize"
                 class="w-full text-sm font-mono absolute z-50 text-gray-500 ml-14 -translate-x-0.5 mt-0.5 left-0 top-0"
                 x-text="monacoPlaceholderText"></div>

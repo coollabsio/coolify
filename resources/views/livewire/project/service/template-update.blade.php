@@ -103,19 +103,32 @@
                     </div>
                 @else
                     <div class="flex flex-col gap-3">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <x-forms.button wire:click="seedFromLatest" canGate="update" :canResource="$service">
-                                Load latest template
-                            </x-forms.button>
-                            <x-forms.button wire:click="seedFromCurrent" canGate="update" :canResource="$service">
-                                Load my current compose
-                            </x-forms.button>
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center gap-3 text-[12px] text-neutral-500 dark:text-fg-dim">
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="size-2 rounded-full bg-neutral-300 dark:bg-white/25"></span>
+                                    Left: your current compose (read-only)
+                                </span>
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span class="size-2 rounded-full bg-emerald-500"></span>
+                                    Right: editable, saved on apply
+                                </span>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <x-forms.button wire:click="seedFromLatest" canGate="update" :canResource="$service">
+                                    Reset to latest template
+                                </x-forms.button>
+                                <x-forms.button wire:click="seedFromCurrent" canGate="update" :canResource="$service">
+                                    Discard template changes
+                                </x-forms.button>
+                            </div>
                         </div>
 
                         <div class="compose-editor-container min-h-[24rem] overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-white/[0.10] dark:bg-[#0b0b0c]"
                             style="--editor-height: clamp(24rem, calc(100dvh - 25rem), 48rem)">
-                            <x-forms.textarea allowTab useMonacoEditor monacoEditorLanguage="yaml"
-                                id="editorContent" />
+                            <x-forms.monaco-editor id="editorContent" name="editorContent" language="yaml"
+                                readonly="" autofocus="" diff
+                                :original="(string) $service->docker_compose_raw" />
                         </div>
 
                         <div class="flex flex-wrap items-center gap-2">
