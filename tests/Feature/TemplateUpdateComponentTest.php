@@ -68,6 +68,11 @@ it('renders update-available state and applies the compose update', function () 
     expect($service->template_dismissed_hash)->toBeNull();
 });
 
+it('flags the demo service so the page banner and tab dot show', function () {
+    $service = makeDemoService();
+    expect(TemplateUpdateChecker::showBadge($service->refresh()))->toBeTrue();
+});
+
 it('dismisses the current version so the badge is suppressed', function () {
     $service = makeDemoService();
 

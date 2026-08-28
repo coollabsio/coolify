@@ -56,6 +56,13 @@
     @endphp
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        @if (\App\Services\TemplateUpdateChecker::showBadge($service))
+            <a href="{{ route('project.service.template', $serviceRouteParameters) }}" {{ wireNavigate() }}
+                class="mb-4 flex items-center justify-between rounded border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+                <span>A newer version of the {{ str($service->service_type)->headline() }} template is available.</span>
+                <span class="font-medium underline">Review changes</span>
+            </a>
+        @endif
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <aside class="application-settings-navigation min-w-0 xl:self-start">
                 <nav aria-label="Service settings"
