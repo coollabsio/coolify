@@ -41,8 +41,9 @@
 
                     @if ($this->updateAvailable)
                         <x-callout type="info" title="A newer template version is available">
-                            Pick the compose changes and environment variables to adopt, then apply. Redeploy the
-                            service afterwards for the changes to take effect.
+                            Pick the compose changes to adopt, then apply. Environment variables live in the compose,
+                            so their changes appear here too. Redeploy the service afterwards for the changes to take
+                            effect.
                         </x-callout>
                     @endif
                 </div>
@@ -79,33 +80,6 @@
                     </p>
                 @endforelse
             </x-application.settings-section>
-
-            {{-- Environment variable changes --}}
-            @php($envDiff = $this->envDiff)
-            @if (count($envDiff['new']) || count($envDiff['changed']) || count($envDiff['removed']))
-                <x-application.settings-section title="Environment variables"
-                    helper="Selected new keys are added. A changed default never overwrites a value you set unless you select it. Removed keys are kept.">
-                    <div class="flex flex-col gap-1">
-                        @foreach ($envDiff['new'] as $item)
-                            <x-forms.checkbox :id="'acceptedEnv.' . $item['key']" fullWidth
-                                :label="'<span class=\'font-mono\'>' . e($item['key']) . '</span> <span class=\'text-neutral-400 dark:text-fg-faint\'>New</span>'" />
-                        @endforeach
-
-                        @foreach ($envDiff['changed'] as $item)
-                            <x-forms.checkbox :id="'acceptedEnv.' . $item['key']" fullWidth
-                                helper="Selecting this overwrites the value you currently have set."
-                                :label="'<span class=\'font-mono\'>' . e($item['key']) . '</span> <span class=\'text-neutral-400 dark:text-fg-faint\'>Default changed</span>'" />
-                        @endforeach
-
-                        @foreach ($envDiff['removed'] as $item)
-                            <div class="flex min-h-9 items-center gap-2 px-2.5 py-1.5 text-[12px] text-neutral-500 dark:text-fg-dim">
-                                <span class="font-mono">{{ $item['key'] }}</span>
-                                <span class="text-neutral-400 dark:text-fg-faint">Removed from the template. Kept as is.</span>
-                            </div>
-                        @endforeach
-                    </div>
-                </x-application.settings-section>
-            @endif
         @endif
     </div>
 </div>
