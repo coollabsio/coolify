@@ -88,13 +88,13 @@
                     <div class="flex flex-col gap-1">
                         @foreach ($envDiff['new'] as $item)
                             <x-forms.checkbox :id="'acceptedEnv.' . $item['key']" fullWidth
-                                :label="'<span class=&quot;font-mono&quot;>' . e($item['key']) . '</span> <span class=&quot;text-neutral-400 dark:text-fg-faint&quot;>New</span>'" />
+                                :label="'<span class=\'font-mono\'>' . e($item['key']) . '</span> <span class=\'text-neutral-400 dark:text-fg-faint\'>New</span>'" />
                         @endforeach
 
                         @foreach ($envDiff['changed'] as $item)
                             <x-forms.checkbox :id="'acceptedEnv.' . $item['key']" fullWidth
                                 helper="Selecting this overwrites the value you currently have set."
-                                :label="'<span class=&quot;font-mono&quot;>' . e($item['key']) . '</span> <span class=&quot;text-neutral-400 dark:text-fg-faint&quot;>Default changed</span>'" />
+                                :label="'<span class=\'font-mono\'>' . e($item['key']) . '</span> <span class=\'text-neutral-400 dark:text-fg-faint\'>Default changed</span>'" />
                         @endforeach
 
                         @foreach ($envDiff['removed'] as $item)

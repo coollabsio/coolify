@@ -73,6 +73,17 @@ it('flags the demo service so the page banner and tab dot show', function () {
     expect(TemplateUpdateChecker::showBadge($service->refresh()))->toBeTrue();
 });
 
+it('renders the diff chrome and env changes without stray entities', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->assertSee('Compose changes')
+        ->assertSee('Environment variables')
+        ->assertSee('NEWKEY')
+        ->assertSee('image: nginx:2')
+        ->assertDontSee('&quot;');
+});
+
 it('dismisses the current version so the badge is suppressed', function () {
     $service = makeDemoService();
 
