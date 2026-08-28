@@ -23,6 +23,7 @@
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
+            ['label' => 'Template', 'route' => 'project.service.template', 'icon' => 'server-update', 'hasWarning' => \App\Services\TemplateUpdateChecker::showBadge($service)],
             ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
             ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'shield-alert'],
         ])->filter(fn (array $item): bool => $item['visible'] ?? true)->map(fn (array $item): array => [
@@ -36,7 +37,7 @@
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
             'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-            'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
+            'Operations' => ['Resource Operations', 'Template', 'Tags', 'Danger Zone'],
         ];
 
         $groupedItems = collect($menuGroups)
@@ -207,6 +208,8 @@
                     <livewire:project.shared.tags :resource="$service" />
                 @elseif ($currentRoute === 'project.service.danger')
                     <livewire:project.shared.danger :resource="$service" />
+                @elseif ($currentRoute === 'project.service.template')
+                    <livewire:project.service.template-update :service="$service" />
                 @endif
             </div>
         </div>
