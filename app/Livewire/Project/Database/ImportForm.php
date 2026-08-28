@@ -8,6 +8,7 @@ use App\Models\Service;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -16,6 +17,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Rules\SafeWebhookUrl;
 use App\Support\DatabaseBackupFileValidator;
+use App\Support\InfluxdbRestoreCommand;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Storage;
@@ -361,6 +363,10 @@ EOD;
             $this->container = $resource->uuid;
             $this->resourceUuid = $resource->uuid;
             $this->resourceDbType = $resource->type();
+        }
+
+        if ($this->resourceDbType === 'standalone-influxdb') {
+            $this->restoreCommandText = InfluxdbRestoreCommand::preview();
         }
 
         if (str($resource->status)->startsWith('running')) {
@@ -928,6 +934,9 @@ SH;
             case StandaloneMongodb::class:
             case 'mongodb':
                 $restoreCommand = $this->mongodbRestoreCommand.$escapedTmpPath;
+                break;
+            case StandaloneInfluxdb::class:
+                $restoreCommand = InfluxdbRestoreCommand::script($tmpPath);
                 break;
             default:
                 $restoreCommand = '';

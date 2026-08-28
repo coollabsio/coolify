@@ -16,6 +16,7 @@
             $resource->getMorphClass() == 'App\Models\StandaloneKeydb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
             $resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneInfluxdb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMongodb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMysql')
         <x-application.settings-section id="storage-mounts-section" title="Persistent storage" :flush="true"

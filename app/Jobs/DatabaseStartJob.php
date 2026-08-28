@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Database\StartClickhouse;
 use App\Actions\Database\StartDragonfly;
+use App\Actions\Database\StartInfluxdb;
 use App\Actions\Database\StartKeydb;
 use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMongodb;
@@ -14,6 +15,7 @@ use App\Enums\ProcessStatus;
 use App\Events\DatabaseStatusChanged;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -62,6 +64,7 @@ class DatabaseStartJob implements ShouldBeEncrypted, ShouldQueue
             StandaloneKeydb::class => StartKeydb::run($database, $activity),
             StandaloneDragonfly::class => StartDragonfly::run($database, $activity),
             StandaloneClickhouse::class => StartClickhouse::run($database, $activity),
+            StandaloneInfluxdb::class => StartInfluxdb::run($database, $activity),
         };
 
         event(new DatabaseStatusChanged($this->userId));

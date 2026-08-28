@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -202,6 +203,8 @@ class GlobalSearch extends Component
             'new mongodb' => 'mongodb',
             'new mongo' => 'mongodb',
             'new clickhouse' => 'clickhouse',
+            'new influxdb' => 'influxdb',
+            'new influx' => 'influxdb',
         ];
 
         foreach ($resourceMap as $command => $type) {
@@ -237,7 +240,7 @@ class GlobalSearch extends Component
             'dockerfile', 'docker-compose-empty', 'docker-image',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
-            'dragonfly', 'mongodb', 'clickhouse',
+            'dragonfly', 'mongodb', 'clickhouse', 'influxdb',
         ]) || str_starts_with($type, 'one-click-service-')) {
             return $user->can('createAnyResource');
         }
@@ -509,6 +512,27 @@ class GlobalSearch extends Component
                             'project' => $db->environment->project->name ?? null,
                             'environment' => $db->environment->name ?? null,
                             'search_text' => strtolower($db->name.' '.$db->uuid.' clickhouse '.$db->description.' database databases db'),
+                        ];
+                    })
+            );
+
+            // InfluxDB
+            $databases = $databases->merge(
+                StandaloneInfluxdb::ownedByCurrentTeam()
+                    ->with(['environment.project'])
+                    ->get()
+                    ->map(function ($db) {
+                        return [
+                            'id' => $db->id,
+                            'name' => $db->name,
+                            'type' => 'database',
+                            'subtype' => 'influxdb',
+                            'uuid' => $db->uuid,
+                            'description' => $db->description,
+                            'link' => $db->link(),
+                            'project' => $db->environment->project->name ?? null,
+                            'environment' => $db->environment->name ?? null,
+                            'search_text' => strtolower($db->name.' '.$db->uuid.' influxdb '.$db->description.' database databases db'),
                         ];
                     })
             );
@@ -1122,6 +1146,16 @@ class GlobalSearch extends Component
                 'type' => 'clickhouse',
                 'category' => 'Databases',
                 'logo' => 'svgs/clickhouse-icon.svg',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'InfluxDB',
+                'description' => 'Time series database for metrics and events',
+                'quickcommand' => '(type: new influxdb)',
+                'type' => 'influxdb',
+                'category' => 'Databases',
+                'logo' => 'svgs/influxdb.svg',
                 'resourceType' => 'database',
             ]);
         }

@@ -84,13 +84,19 @@
                             <x-forms.input label="Import command" wire:model="mariadbRestoreCommand"
                                 canGate="update" :canResource="$this->resource" />
                 @endif
+            @elseif ($resourceDbType === 'standalone-influxdb')
+                        <x-forms.textarea rows="10" readonly label="Import command"
+                            wire:model="restoreCommandText" canGate="update"
+                            :canResource="$this->resource" />
             @endif
-                    <div class="max-w-sm">
-                        <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
-                            ['value' => true, 'label' => 'Backup contains all databases'],
-                            ['value' => false, 'label' => 'Backup contains one database'],
-                        ]" />
-                    </div>
+                    @if ($resourceDbType !== 'standalone-influxdb')
+                        <div class="max-w-sm">
+                            <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
+                                ['value' => true, 'label' => 'Backup contains all databases'],
+                                ['value' => false, 'label' => 'Backup contains one database'],
+                            ]" />
+                        </div>
+                    @endif
                 </div>
             </x-application.settings-section>
 

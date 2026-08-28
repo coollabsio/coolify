@@ -30,6 +30,7 @@ use App\Models\SlackNotificationSettings;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -104,6 +105,7 @@ class AuthServiceProvider extends ServiceProvider
         StandaloneKeydb::class => DatabasePolicy::class,
         StandaloneDragonfly::class => DatabasePolicy::class,
         StandaloneClickhouse::class => DatabasePolicy::class,
+        StandaloneInfluxdb::class => DatabasePolicy::class,
 
         // Notification policies - all use the shared NotificationPolicy
         EmailNotificationSettings::class => NotificationPolicy::class,

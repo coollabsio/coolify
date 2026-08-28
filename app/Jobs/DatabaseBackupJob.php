@@ -9,6 +9,7 @@ use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -20,6 +21,7 @@ use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Rules\SafeWebhookUrl;
 use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
+use App\Support\InfluxdbBackupCommand;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -42,7 +44,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneInfluxdb|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -276,6 +278,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mariadb_database];
                 } elseif ($this->database instanceof StandaloneClickhouse) {
                     $databasesToBackup = [$this->database->clickhouse_db];
+                } elseif ($this->database instanceof StandaloneInfluxdb) {
+                    $databasesToBackup = [$this->database->influxdb_bucket];
                 } else {
                     return;
                 }
@@ -383,6 +387,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             'local_storage_deleted' => false,
                         ]);
                         $this->backup_standalone_clickhouse($database);
+                    } elseif ($this->database instanceof StandaloneInfluxdb) {
+                        $this->backup_file = '/influxdb-backup-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.tar.gz";
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        $this->backup_standalone_influxdb($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
@@ -397,7 +412,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 } catch (Throwable $e) {
                     // Local backup failed
-                    if ($this->database instanceof StandaloneClickhouse) {
+                    if ($this->database instanceof StandaloneClickhouse || $this->database instanceof StandaloneInfluxdb) {
                         deleteBackupsLocally($this->backup_location, $this->server);
                     }
                     if ($this->backup_log) {
@@ -594,7 +609,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             return array_map('trim', explode('|', $databases));
         }
 
-        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse'])) {
+        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse', 'influxdb'])) {
             return array_map('trim', explode(',', $databases));
         }
 
@@ -704,6 +719,33 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         } finally {
             $cleanupCommand = ClickhouseBackupCommand::cleanup($this->container_name, $archiveName);
+            instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
+        }
+    }
+
+    private function backup_standalone_influxdb(string $bucket): void
+    {
+        $archiveName = ltrim($this->backup_file, '/');
+
+        try {
+            $commands = InfluxdbBackupCommand::make(
+                containerName: $this->container_name,
+                bucket: $bucket,
+                archiveName: $archiveName,
+                backupDirectory: $this->backup_dir,
+                adminToken: (string) $this->database->influxdb_admin_token,
+            );
+
+            $this->backup_output = instant_remote_process($commands, $this->server, true, false, $this->timeout, disableMultiplexing: true);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+        } catch (Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        } finally {
+            $cleanupCommand = InfluxdbBackupCommand::cleanup($this->container_name, $archiveName);
             instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
         }
     }
