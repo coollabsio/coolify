@@ -132,6 +132,19 @@ it('applies hand-edited compose from the inline editor', function () {
     expect($service->template_reference_hash)->toBe(TemplateUpdateChecker::currentHash('demo'));
 });
 
+it('generates magic env values for new SERVICE_ keys introduced by an applied template', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->set('editorContent', "services:\n  app:\n    image: nginx:2\n    environment:\n      - 'SECRET=\${SERVICE_PASSWORD_APPLYGEN}'\n")
+        ->call('applyEditor');
+
+    $generated = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_APPLYGEN')->first();
+    expect($generated)->not->toBeNull();
+    expect($generated->value)->not->toBe('');
+});
+
 it('rejects invalid yaml from the inline editor without saving', function () {
     $service = makeDemoService();
     $original = $service->docker_compose_raw;
