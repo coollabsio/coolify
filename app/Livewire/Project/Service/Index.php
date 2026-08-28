@@ -305,11 +305,13 @@ class Index extends Component
                 return;
             }
             $this->syncDatabaseData(true);
+            $this->serviceDatabase->save();
             if ($this->serviceDatabase->is_public) {
                 if (! str($this->serviceDatabase->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->isPublic = false;
                     $this->serviceDatabase->is_public = false;
+                    $this->serviceDatabase->save();
 
                     return;
                 }
