@@ -78,7 +78,8 @@ it('renders the diff chrome without stray entities', function () {
     $service = makeDemoService();
 
     Livewire::test(TemplateUpdate::class, ['service' => $service])
-        ->assertSee('Compose changes')
+        ->assertSee('Review changes')
+        ->assertSee('Edit compose')
         ->assertSee('image: nginx:2')
         ->assertDontSee('&quot;');
 });
@@ -95,6 +96,43 @@ it('shows the banner with a dismiss control and dismissing hides it', function (
     $service->refresh();
     expect($service->template_dismissed_hash)->toBe(TemplateUpdateChecker::currentHash('demo'));
     expect(TemplateUpdateChecker::showBadge($service))->toBeFalse();
+});
+
+it('seeds the inline editor from the current selection when switching to edit mode', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->set('acceptedHunks', [0 => true])
+        ->call('setMode', 'edit')
+        ->assertSet('mode', 'edit')
+        ->assertSet('editorContent', "services:\n  app:\n    image: nginx:2\n");
+});
+
+it('applies hand-edited compose from the inline editor', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->set('editorContent', "services:\n  app:\n    image: nginx:3-custom\n")
+        ->call('applyEditor');
+
+    $service->refresh();
+    expect($service->docker_compose_raw)->toContain('nginx:3-custom');
+    expect($service->template_reference_hash)->toBe(TemplateUpdateChecker::currentHash('demo'));
+});
+
+it('rejects invalid yaml from the inline editor without saving', function () {
+    $service = makeDemoService();
+    $original = $service->docker_compose_raw;
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->set('editorContent', "services:\n  app:\n   image: [unclosed\n")
+        ->call('applyEditor')
+        ->assertDispatched('error');
+
+    $service->refresh();
+    expect($service->docker_compose_raw)->toBe($original);
 });
 
 it('dismisses the current version so the badge is suppressed', function () {

@@ -16,8 +16,14 @@ class TemplateUpdate extends Component
 
     public Service $service;
 
+    /** review | edit */
+    public string $mode = 'review';
+
     /** @var array<int|string, bool> accepted compose hunks, keyed by hunk index */
     public array $acceptedHunks = [];
+
+    /** Editable compose in edit mode; seeded lazily. */
+    public ?string $editorContent = null;
 
     public function mount(Service $service): void
     {
@@ -67,49 +73,40 @@ class TemplateUpdate extends Component
         return TemplateUpdateChecker::updateAvailable($this->service);
     }
 
+    public function setMode(string $mode): void
+    {
+        if ($mode === 'edit') {
+            if ($this->editorContent === null) {
+                $this->editorContent = $this->mergedFromSelection();
+            }
+            $this->mode = 'edit';
+
+            return;
+        }
+
+        $this->mode = 'review';
+    }
+
+    public function seedFromLatest(): void
+    {
+        $this->editorContent = (string) $this->latestCompose;
+    }
+
+    public function seedFromCurrent(): void
+    {
+        $this->editorContent = (string) $this->service->docker_compose_raw;
+    }
+
     public function apply(): void
     {
-        try {
-            $this->authorize('update', $this->service);
-            if ($this->latestCompose === null) {
-                return;
-            }
-
-            $acceptedHunks = array_map('intval', array_keys(array_filter($this->acceptedHunks)));
-            $merged = ComposeDiff::apply(
-                (string) $this->service->docker_compose_raw,
-                $this->latestCompose,
-                $acceptedHunks,
-            );
-
-            if (! ComposeDiff::isValidYaml($merged)) {
-                $this->dispatch('error', 'The selected changes produce invalid YAML. Adjust your selection and try again.');
-
-                return;
-            }
-
-            $newHash = TemplateUpdateChecker::currentHash($this->service->service_type);
-
-            // parse() materializes any new env vars from the accepted compose via
-            // firstOrCreate, so existing values the user set are never overwritten.
-            DB::transaction(function () use ($merged, $newHash): void {
-                $this->service->docker_compose_raw = $merged;
-                $this->service->template_reference_hash = $newHash;
-                $this->service->template_dismissed_hash = null;
-                $this->service->save();
-                $this->service->parse();
-            });
-
-            $this->service->refresh();
-            $this->acceptedHunks = [];
-
-            $this->dispatch('success', 'Template changes applied. Redeploy the service for them to take effect.');
-            $this->dispatch('refreshEnvs');
-            $this->dispatch('refreshServices');
-        } catch (\Throwable $e) {
-            $this->service->refresh();
-            handleError($e, $this);
+        if ($this->latestCompose === null) {
+            return;
         }
+
+        $accepted = array_map('intval', array_keys(array_filter($this->acceptedHunks)));
+        $merged = ComposeDiff::apply((string) $this->service->docker_compose_raw, $this->latestCompose, $accepted);
+
+        $this->persistCompose($merged);
     }
 
     public function replaceAll(): void
@@ -121,6 +118,11 @@ class TemplateUpdate extends Component
         $this->apply();
     }
 
+    public function applyEditor(): void
+    {
+        $this->persistCompose((string) $this->editorContent);
+    }
+
     public function dismiss(): void
     {
         $this->authorize('update', $this->service);
@@ -128,6 +130,54 @@ class TemplateUpdate extends Component
         $this->service->save();
         $this->dispatch('success', 'Update dismissed. You will be notified when a newer version ships.');
         $this->dispatch('refreshServices');
+    }
+
+    private function mergedFromSelection(): string
+    {
+        if ($this->latestCompose === null) {
+            return (string) $this->service->docker_compose_raw;
+        }
+
+        $accepted = array_map('intval', array_keys(array_filter($this->acceptedHunks)));
+
+        return ComposeDiff::apply((string) $this->service->docker_compose_raw, $this->latestCompose, $accepted);
+    }
+
+    private function persistCompose(string $compose): void
+    {
+        try {
+            $this->authorize('update', $this->service);
+
+            if (trim($compose) === '' || ! ComposeDiff::isValidYaml($compose)) {
+                $this->dispatch('error', 'The compose is not valid YAML. Fix it and try again.');
+
+                return;
+            }
+
+            $newHash = TemplateUpdateChecker::currentHash($this->service->service_type);
+
+            // parse() materializes any new env vars via firstOrCreate, so values
+            // the user has already set are never overwritten.
+            DB::transaction(function () use ($compose, $newHash): void {
+                $this->service->docker_compose_raw = $compose;
+                $this->service->template_reference_hash = $newHash;
+                $this->service->template_dismissed_hash = null;
+                $this->service->save();
+                $this->service->parse();
+            });
+
+            $this->service->refresh();
+            $this->acceptedHunks = [];
+            $this->editorContent = null;
+            $this->mode = 'review';
+
+            $this->dispatch('success', 'Template changes applied. Redeploy the service for them to take effect.');
+            $this->dispatch('refreshEnvs');
+            $this->dispatch('refreshServices');
+        } catch (\Throwable $e) {
+            $this->service->refresh();
+            handleError($e, $this);
+        }
     }
 
     public function render()
