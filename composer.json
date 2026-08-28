@@ -11,7 +11,6 @@
         "server"
     ],
     "require": {
-        "php": "^8.4",
         "danharrin/livewire-rate-limiting": "^2.2.1",
         "doctrine/dbal": "^4.4.4",
         "firebase/php-jwt": "7.1.0",
@@ -23,6 +22,7 @@
         "laravel/nightwatch": "^1.28.6",
         "laravel/pail": "^1.2.7",
         "laravel/prompts": "^0.3.22|^0.3.22|^0.3.22",
+        "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.3.3",
         "laravel/socialite": "^5.29.0",
         "laravel/tinker": "^2.11.1",
@@ -34,6 +34,7 @@
         "log1x/laravel-webfonts": "^2.0.1",
         "lorisleiva/laravel-actions": "^2.10.2",
         "nubs/random-name-generator": "^2.2",
+        "php": "^8.4",
         "phpseclib/phpseclib": "^3.0.56",
         "pion/laravel-chunk-upload": "^1.6.1",
         "poliander/cron": "^3.3.1",

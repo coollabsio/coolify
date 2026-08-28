@@ -10,7 +10,7 @@
 # Optional profiles: vite, mailpit, minio, testing-host
 #   ./scripts/dev-instances up a --with vite mailpit
 #
-# Ports (a / b): app 8000/8001, db 5432/5433, redis 6379/6380, soketi 6001/6011
+# Ports (a / b): app 8000/8001, db 5432/5433, redis 6379/6380, Reverb 6001/6011
 
 services:
   coolify:
@@ -24,6 +24,8 @@ services:
         - GROUP_ID=${GROUPID:-1000}
     ports:
       - "${APP_PORT:-8000}:8080"
+      - "${FORWARD_PUSHER_PORT:-6001}:6001"
+      - "${FORWARD_TERMINAL_PORT:-6002}:6002"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -43,13 +45,14 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: "${REDIS_PASSWORD:-null}"
       COOLIFY_CONTAINER_ROLE: all
-      PUSHER_HOST: ""
-      PUSHER_PORT: ""
+      PUSHER_HOST: coolify
+      PUSHER_PORT: 6001
+      PUSHER_BACKEND_PORT: 6001
       PUSHER_SCHEME: http
       PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
       PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
-      BROADCAST_CONNECTION: pusher
+      BROADCAST_CONNECTION: reverb
       QUEUE_CONNECTION: redis
       CACHE_STORE: redis
       SESSION_DRIVER: redis
@@ -61,6 +64,8 @@ services:
     volumes:
       - .:/var/www/html/:cached
       - backups_data:/var/www/html/storage/app/backups
+      - ./docker/coolify-terminal/terminal-server.js:/terminal/terminal-server.js
+      - ./docker/coolify-terminal/terminal-utils.js:/terminal/terminal-utils.js
     depends_on:
       postgres:
         condition: service_healthy
@@ -101,36 +106,6 @@ services:
       timeout: 2s
     volumes:
       - redis_data:/data
-    networks:
-      - coolify
-
-  soketi:
-    image: coolify-realtime:dev
-    pull_policy: never
-    build:
-      context: .
-      dockerfile: ./docker/coolify-realtime/Dockerfile
-    ports:
-      - "${FORWARD_SOKETI_PORT:-6001}:6001"
-      - "${FORWARD_SOKETI_PORT_ALT:-6002}:6002"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ./storage:/var/www/html/storage
-      - ./docker/coolify-realtime/terminal-server.js:/terminal/terminal-server.js
-      - ./docker/coolify-realtime/terminal-utils.js:/terminal/terminal-utils.js
-    environment:
-      SOKETI_DEBUG: "false"
-      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
-      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
-      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
-      SOKETI_HOST: "0.0.0.0"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:6001/ready && curl -fsS http://127.0.0.1:6002/ready || exit 1"]
-      interval: 5s
-      retries: 10
-      timeout: 2s
-    entrypoint: ["/bin/sh", "/soketi-entrypoint.sh"]
     networks:
       - coolify
 

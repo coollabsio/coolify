@@ -15,7 +15,7 @@ import {
 async function postToCoolify(path, headers) {
     return new Promise((resolve, reject) => {
         const request = http.request({
-            hostname: 'coolify',
+            hostname: process.env.TERMINAL_AUTH_HOST || '127.0.0.1',
             port: 8080,
             path,
             method: 'POST',
