@@ -56,15 +56,10 @@
     @endphp
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
-        @if (\App\Services\TemplateUpdateChecker::showBadge($service))
-            <a href="{{ route('project.service.template', $serviceRouteParameters) }}" {{ wireNavigate() }}
-                class="mb-4 flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-[13px] ring-1 ring-inset bg-coollabs/[0.06] text-coollabs ring-coollabs/20 hover:bg-coollabs/10 dark:bg-warning/[0.06] dark:text-warning dark:ring-warning/20 dark:hover:bg-warning/10">
-                <span class="inline-flex items-center gap-2">
-                    <x-reicon name="server-update" class="size-4 shrink-0" />
-                    A newer version of the {{ str($service->service_type)->headline() }} template is available.
-                </span>
-                <span class="shrink-0 font-medium underline underline-offset-4">Review changes</span>
-            </a>
+        @if ($currentRoute !== 'project.service.template')
+            <livewire:project.service.template-update-banner :service="$service"
+                :href="route('project.service.template', $serviceRouteParameters)"
+                :wire:key="'tpl-banner-' . $service->uuid" />
         @endif
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <aside class="application-settings-navigation min-w-0 xl:self-start">

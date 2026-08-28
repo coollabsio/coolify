@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Project\Service\TemplateUpdate;
+use App\Livewire\Project\Service\TemplateUpdateBanner;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -80,6 +81,20 @@ it('renders the diff chrome without stray entities', function () {
         ->assertSee('Compose changes')
         ->assertSee('image: nginx:2')
         ->assertDontSee('&quot;');
+});
+
+it('shows the banner with a dismiss control and dismissing hides it', function () {
+    $service = makeDemoService();
+
+    $component = Livewire::test(TemplateUpdateBanner::class, ['service' => $service, 'href' => '/template'])
+        ->assertSee('Review changes')
+        ->assertSee('is available')
+        ->call('dismiss')
+        ->assertDontSee('Review changes');
+
+    $service->refresh();
+    expect($service->template_dismissed_hash)->toBe(TemplateUpdateChecker::currentHash('demo'));
+    expect(TemplateUpdateChecker::showBadge($service))->toBeFalse();
 });
 
 it('dismisses the current version so the badge is suppressed', function () {
