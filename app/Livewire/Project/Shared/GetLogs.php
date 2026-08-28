@@ -10,6 +10,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -34,7 +35,7 @@ class GetLogs extends Component
     public string $errors = '';
 
     #[Locked]
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|null $resource = null;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|null $resource = null;
 
     #[Locked]
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;

@@ -37,11 +37,13 @@ class Index extends Component
 
     protected Collection $clickhouses;
 
+    protected Collection $influxdbs;
+
     protected Collection $services;
 
     public function mount(): void
     {
-        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->services = collect();
+        $this->applications = $this->postgresqls = $this->redis = $this->mongodbs = $this->mysqls = $this->mariadbs = $this->keydbs = $this->dragonflies = $this->clickhouses = $this->influxdbs = $this->services = collect();
         $this->parameters = get_route_parameters();
         $project = currentTeam()
             ->projects()
@@ -68,6 +70,7 @@ class Index extends Component
             'keydbs:id,uuid,name,environment_id',
             'dragonflies:id,uuid,name,environment_id',
             'clickhouses:id,uuid,name,environment_id',
+            'influxdbs:id,uuid,name,environment_id',
         ];
 
         $this->allEnvironments = $project->environments()
@@ -83,6 +86,7 @@ class Index extends Component
             'keydbs',
             'dragonflies',
             'clickhouses',
+            'influxdbs',
             'mariadbs',
             'mongodbs',
             'services',
@@ -117,6 +121,7 @@ class Index extends Component
             'keydbs' => 'keydbs',
             'dragonflies' => 'dragonflies',
             'clickhouses' => 'clickhouses',
+            'influxdbs' => 'influxdbs',
         ];
 
         foreach ($databaseTypes as $property => $relation) {
@@ -163,6 +168,7 @@ class Index extends Component
             'keydbs' => $this->keydbs,
             'dragonflies' => $this->dragonflies,
             'clickhouses' => $this->clickhouses,
+            'influxdbs' => $this->influxdbs,
             'services' => $this->services,
             'applicationsJs' => $this->toSearchableArray($this->applications, 'application', 'Application'),
             'postgresqlsJs' => $this->toSearchableArray($this->postgresqls, 'database', 'Database'),
@@ -173,6 +179,7 @@ class Index extends Component
             'keydbsJs' => $this->toSearchableArray($this->keydbs, 'database', 'Database'),
             'dragonfliesJs' => $this->toSearchableArray($this->dragonflies, 'database', 'Database'),
             'clickhousesJs' => $this->toSearchableArray($this->clickhouses, 'database', 'Database'),
+            'influxdbsJs' => $this->toSearchableArray($this->influxdbs, 'database', 'Database'),
             'servicesJs' => $this->toSearchableArray($this->services, 'service', 'Service'),
         ]);
     }

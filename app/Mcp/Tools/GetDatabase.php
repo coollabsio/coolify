@@ -13,7 +13,7 @@ class GetDatabase extends Tool
 {
     protected string $name = 'get_database';
 
-    protected string $description = 'Get full details for a standalone database by UUID. Detects type across postgresql, mysql, mariadb, mongodb, redis, keydb, dragonfly, clickhouse.';
+    protected string $description = 'Get full details for a standalone database by UUID. Detects type across postgresql, mysql, mariadb, mongodb, redis, keydb, dragonfly, clickhouse, influxdb.';
 
     use BuildsResponse;
     use ResolvesTeam;

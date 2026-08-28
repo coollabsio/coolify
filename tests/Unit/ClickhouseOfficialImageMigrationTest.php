@@ -1,6 +1,11 @@
 <?php
 
 use App\Models\StandaloneClickhouse;
+use Tests\TestCase;
+
+// Encrypted casts need the container's encrypter, so this file must boot the app
+// rather than rely on an earlier test in the same process having done so.
+uses(TestCase::class);
 
 test('clickhouse uses clickhouse_db field in internal connection string', function () {
     $clickhouse = new StandaloneClickhouse;

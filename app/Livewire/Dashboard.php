@@ -30,6 +30,7 @@ class Dashboard extends Component
                 'keydbs',
                 'dragonflies',
                 'clickhouses',
+                'influxdbs',
                 'mongodbs',
                 'mysqls',
                 'mariadbs',

@@ -5,6 +5,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -31,6 +32,7 @@ describe('mass assignment protection', function () {
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneInfluxdb::class,
         ];
 
         foreach ($models as $modelClass) {
@@ -137,6 +139,7 @@ describe('mass assignment protection', function () {
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneInfluxdb::class,
         ];
 
         foreach ($models as $modelClass) {
@@ -178,6 +181,7 @@ describe('mass assignment protection', function () {
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneInfluxdb::class,
         ];
 
         foreach ($models as $modelClass) {
@@ -204,8 +208,9 @@ describe('mass assignment protection', function () {
                 ->toBeTrue("{$modelClass} should allow mass assignment of 'enable_ssl'");
         }
 
-        // Clickhouse has no SSL columns
+        // Clickhouse and InfluxDB have no SSL columns
         expect((new StandaloneClickhouse)->isFillable('enable_ssl'))->toBeFalse();
+        expect((new StandaloneInfluxdb)->isFillable('enable_ssl'))->toBeFalse();
 
         $sslModeModels = [
             StandalonePostgresql::class,

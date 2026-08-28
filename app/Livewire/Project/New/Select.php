@@ -279,6 +279,12 @@ class Select extends Component
                 'description' => 'A column-oriented database for real-time analytics over large datasets.',
                 'logo' => asset('svgs/resources/clickhouse.svg'),
             ],
+            [
+                'id' => 'influxdb',
+                'name' => 'InfluxDB',
+                'description' => 'A time series database for metrics, events, and real-time analytics.',
+                'logo' => asset('svgs/resources/influxdb.svg'),
+            ],
 
         ];
 
@@ -392,6 +398,7 @@ class Select extends Component
             case 'keydb':
             case 'dragonfly':
             case 'clickhouse':
+            case 'influxdb':
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;

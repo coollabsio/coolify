@@ -362,6 +362,7 @@
                 ...@js($keydbsJs),
                 ...@js($dragonfliesJs),
                 ...@js($clickhousesJs),
+                ...@js($influxdbsJs),
                 ...@js($servicesJs),
             ],
             get filterGroups() {

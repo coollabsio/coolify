@@ -21,6 +21,7 @@ use App\Models\SlackNotificationSettings;
 use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -266,6 +267,17 @@ describe('Sensitive model fields are hidden by default', function () {
 
         expect($hidden)->toContain(
             'clickhouse_admin_password',
+            'internal_db_url',
+            'external_db_url',
+        );
+    });
+
+    test('StandaloneInfluxdb hides password, token and db urls', function () {
+        $hidden = (new StandaloneInfluxdb)->getHidden();
+
+        expect($hidden)->toContain(
+            'influxdb_admin_password',
+            'influxdb_admin_token',
             'internal_db_url',
             'external_db_url',
         );

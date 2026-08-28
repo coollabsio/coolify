@@ -7,6 +7,45 @@ servers:
     url: 'https://app.coolify.io/api/v1'
     description: 'Coolify Cloud API. Change the host to your own instance if you are self-hosting.'
 paths:
+  '/applications/{uuid}/secret-manager':
+    patch:
+      tags:
+        - 'Secret Managers'
+      summary: 'Configure Application Secret Manager'
+      description: 'Configure the secret manager source used by an application.'
+      operationId: configure-application-secret-manager
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - integration_token_uuid
+              properties:
+                integration_token_uuid:
+                  type: string
+                settings:
+                  type: object
+              type: object
+      responses:
+        '200':
+          description: 'Secret manager configured.'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /applications:
     get:
       tags:
@@ -4487,6 +4526,114 @@ paths:
       security:
         -
           bearerAuth: []
+  /databases/influxdb:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (InfluxDB)'
+      description: 'Create a new InfluxDB database.'
+      operationId: create-database-influxdb
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+                - environment_name
+                - environment_uuid
+              properties:
+                server_uuid:
+                  type: string
+                  description: 'UUID of the server'
+                project_uuid:
+                  type: string
+                  description: 'UUID of the project'
+                environment_name:
+                  type: string
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                destination_uuid:
+                  type: string
+                  description: 'UUID of the destination if the server has multiple destinations'
+                influxdb_admin_user:
+                  type: string
+                  description: 'InfluxDB admin user'
+                influxdb_admin_password:
+                  type: string
+                  description: 'InfluxDB admin password'
+                influxdb_admin_token:
+                  type: string
+                  description: 'InfluxDB admin API token'
+                influxdb_org:
+                  type: string
+                  description: 'InfluxDB initial organization'
+                influxdb_bucket:
+                  type: string
+                  description: 'InfluxDB initial bucket'
+                name:
+                  type: string
+                  description: 'Name of the database'
+                description:
+                  type: string
+                  description: 'Description of the database'
+                image:
+                  type: string
+                  description: 'Docker Image of the database'
+                is_public:
+                  type: boolean
+                  description: 'Is the database public?'
+                public_port:
+                  type: integer
+                  description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
+                limits_memory:
+                  type: string
+                  description: 'Memory limit of the database'
+                limits_memory_swap:
+                  type: string
+                  description: 'Memory swap limit of the database'
+                limits_memory_swappiness:
+                  type: integer
+                  description: 'Memory swappiness of the database'
+                limits_memory_reservation:
+                  type: string
+                  description: 'Memory reservation of the database'
+                limits_cpus:
+                  type: string
+                  description: 'CPU limit of the database'
+                limits_cpuset:
+                  type: string
+                  description: 'CPU set of the database'
+                limits_cpu_shares:
+                  type: integer
+                  description: 'CPU shares of the database'
+                instant_deploy:
+                  type: boolean
+                  description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /databases/dragonfly:
     post:
       tags:
@@ -7490,12 +7637,86 @@ paths:
       security:
         -
           bearerAuth: []
+  /settings/email:
+    get:
+      tags:
+        - Settings
+      summary: 'Get instance email settings'
+      description: 'Get instance-wide SMTP and Resend settings. Requires a root-team token belonging to a root-team admin or owner. Sensitive fields require the `read:sensitive` or `root` token ability.'
+      operationId: get-instance-email-settings
+      responses:
+        '200':
+          description: 'Instance email settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Settings
+      summary: 'Update instance email settings'
+      description: 'Update instance-wide SMTP and Resend settings. Requires `write:sensitive` and a root-team token belonging to a root-team admin or owner.'
+      operationId: update-instance-email-settings
+      responses:
+        '200':
+          description: 'Updated instance email settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /security/integration-tokens:
+    post:
+      tags:
+        - 'Secret Managers'
+      summary: 'Create Secret Manager Token'
+      description: 'Create and validate a Doppler, Infisical, or Vault integration token.'
+      operationId: create-secret-manager-integration-token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - provider
+                - name
+                - token
+              properties:
+                provider:
+                  type: string
+                  enum: [doppler, infisical, vault]
+                name:
+                  type: string
+                token:
+                  type: string
+                metadata:
+                  type: object
+              type: object
+      responses:
+        '201':
+          description: 'Integration token created.'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /notifications/email:
     get:
       tags:
         - Notifications
       summary: 'Get email notification settings'
-      description: 'Get the current team email notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.'
+      description: 'Get the current team email notification settings, including `smtp_ehlo_domain`, the hostname sent with SMTP EHLO. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.'
       operationId: get-current-team-email-notifications
       responses:
         '200':
@@ -7511,7 +7732,7 @@ paths:
       tags:
         - Notifications
       summary: 'Update email notification settings'
-      description: 'Update the current team email notification settings.'
+      description: 'Update the current team email notification settings. Set `smtp_ehlo_domain` to a valid hostname to control the SMTP EHLO domain, or `null` to use the system default.'
       operationId: update-current-team-email-notifications
       responses:
         '200':
@@ -10658,6 +10879,8 @@ paths:
                   type: [boolean, 'null']
                 is_stripprefix_enabled:
                   type: [boolean, 'null']
+                is_force_https_enabled:
+                  type: [boolean, 'null']
               type: object
       responses:
         '200':
@@ -13659,7 +13882,7 @@ components:
           minimum: 0
         timeout:
           type: integer
-          default: 3600
+          default: 36000
           maximum: 36000
           minimum: 60
       type: object
@@ -14429,6 +14652,8 @@ components:
           type: integer
         deployment_queue_limit:
           type: integer
+        backup_compression_cpu_percentage:
+          type: integer
         dynamic_timeout:
           type: integer
         force_disabled:
@@ -14504,6 +14729,22 @@ components:
         connection_timeout:
           type: integer
           description: 'SSH connection timeout in seconds.'
+        docker_version:
+          type: string
+          nullable: true
+          description: 'Detected Docker Engine version on the server.'
+        docker_version_checked_at:
+          type: string
+          nullable: true
+          description: 'When Docker Engine version was last detected.'
+        compose_version:
+          type: string
+          nullable: true
+          description: 'Detected Docker Compose plugin version on the server.'
+        compose_version_checked_at:
+          type: string
+          nullable: true
+          description: 'When Docker Compose version was last detected.'
       type: object
     Service:
       description: 'Service model'
@@ -14734,6 +14975,9 @@ components:
       scheme: bearer
 tags:
   -
+    name: 'Secret Managers'
+    description: 'Secret Managers'
+  -
     name: Applications
     description: Applications
   -
@@ -14763,6 +15007,9 @@ tags:
   -
     name: Hetzner
     description: Hetzner
+  -
+    name: Settings
+    description: Settings
   -
     name: Notifications
     description: Notifications

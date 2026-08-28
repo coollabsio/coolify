@@ -8,6 +8,7 @@ use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -61,11 +62,12 @@ class Resources extends Component
             $this->destination->keydbs,
             $this->destination->dragonflies,
             $this->destination->clickhouses,
+            $this->destination->influxdbs,
         ]);
     }
 
     /**
-     * @param  array<int, iterable<Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse>>  $groups
+     * @param  array<int, iterable<Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb>>  $groups
      * @return array<int, array{uuid:string,type:string,name:string,project:string|null,environment:string|null,url:string|null,search:string}>
      */
     protected function collectResources(array $groups): array
@@ -81,7 +83,7 @@ class Resources extends Component
     }
 
     /**
-     * @param  Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse  $resource
+     * @param  Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb  $resource
      * @return array{uuid:string,type:string,name:string,project:string|null,environment:string|null,url:string|null,search:string}
      */
     protected function resourceRow(BaseModel $resource): array

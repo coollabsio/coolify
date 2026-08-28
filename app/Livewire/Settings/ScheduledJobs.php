@@ -11,6 +11,7 @@ use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -154,6 +155,7 @@ class ScheduledJobs extends Component
                 ->loadMorph('database', [
                     ServiceDatabase::class => ['service.environment.project'],
                     StandaloneClickhouse::class => ['environment.project'],
+                    StandaloneInfluxdb::class => ['environment.project'],
                     StandaloneDragonfly::class => ['environment.project'],
                     StandaloneKeydb::class => ['environment.project'],
                     StandaloneMariadb::class => ['environment.project'],

@@ -50,6 +50,7 @@
                                 $project->keydbs_count,
                                 $project->dragonflies_count,
                                 $project->clickhouses_count,
+                                $project->influxdbs_count,
                                 $project->mongodbs_count,
                                 $project->mysqls_count,
                                 $project->mariadbs_count,

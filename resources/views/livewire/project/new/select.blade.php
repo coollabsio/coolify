@@ -422,6 +422,10 @@
                             clickhouse: {
                                 docs: 'https://clickhouse.com/docs',
                                 website: 'https://clickhouse.com/'
+                            },
+                            influxdb: {
+                                docs: 'https://docs.influxdata.com/influxdb/',
+                                website: 'https://www.influxdata.com/'
                             }
                         },
                         docLinkCache: {}, // Cache resolved doc URLs: { serviceName: url | null }

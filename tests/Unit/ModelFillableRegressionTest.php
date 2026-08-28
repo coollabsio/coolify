@@ -21,6 +21,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -73,4 +74,5 @@ it('keeps required mass-assignment attributes fillable for internal create flows
     [StandaloneKeydb::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
     [StandaloneDragonfly::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
     [StandaloneClickhouse::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
+    [StandaloneInfluxdb::class, ['uuid', 'destination_type', 'destination_id', 'environment_id']],
 ]);

@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -49,6 +50,7 @@ class CleanupNames extends Command
         'StandaloneKeydb' => StandaloneKeydb::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
+        'StandaloneInfluxdb' => StandaloneInfluxdb::class,
         'S3Storage' => S3Storage::class,
         'Tag' => Tag::class,
         'PrivateKey' => PrivateKey::class,

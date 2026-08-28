@@ -6,6 +6,7 @@ use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -56,7 +57,14 @@ test('StandaloneDocker::databases() includes attached clickhouse', function () {
     expect($this->destination->attachedTo())->toBeTrue();
 });
 
-test('StandaloneDocker::databases() includes all 8 standalone database types', function () {
+test('StandaloneDocker::databases() includes attached influxdb', function () {
+    attachDb(StandaloneInfluxdb::class, ['influxdb_admin_password' => 'pw', 'influxdb_admin_token' => 'token'], $this->destination, $this->environment);
+
+    expect($this->destination->databases()->count())->toBe(1);
+    expect($this->destination->attachedTo())->toBeTrue();
+});
+
+test('StandaloneDocker::databases() includes all 9 standalone database types', function () {
     attachDb(StandalonePostgresql::class, ['postgres_password' => 'pw'], $this->destination, $this->environment);
     attachDb(StandaloneRedis::class, ['redis_password' => 'pw'], $this->destination, $this->environment);
     attachDb(StandaloneMongodb::class, ['mongo_initdb_root_password' => 'pw'], $this->destination, $this->environment);
@@ -65,7 +73,8 @@ test('StandaloneDocker::databases() includes all 8 standalone database types', f
     attachDb(StandaloneKeydb::class, ['keydb_password' => 'pw'], $this->destination, $this->environment);
     attachDb(StandaloneDragonfly::class, ['dragonfly_password' => 'pw'], $this->destination, $this->environment);
     attachDb(StandaloneClickhouse::class, ['clickhouse_admin_password' => 'pw'], $this->destination, $this->environment);
+    attachDb(StandaloneInfluxdb::class, ['influxdb_admin_password' => 'pw', 'influxdb_admin_token' => 'token'], $this->destination, $this->environment);
 
-    expect($this->destination->databases()->count())->toBe(8);
+    expect($this->destination->databases()->count())->toBe(9);
     expect($this->destination->attachedTo())->toBeTrue();
 });
