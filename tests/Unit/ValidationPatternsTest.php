@@ -191,3 +191,9 @@ it('normalizes application domain scheme and host without lowercasing path query
 it('validates application domains with underscores in the hostname', function () {
     expect(ValidationPatterns::validateApplicationDomains('https://myapp_service.example.com'))->toBeEmpty();
 });
+
+it('rejects single-label application hostnames but allows IP addresses', function () {
+    expect(ValidationPatterns::validateApplicationDomains('https://aaa'))->not->toBeEmpty()
+        ->and(ValidationPatterns::validateApplicationDomains('https://localhost'))->not->toBeEmpty()
+        ->and(ValidationPatterns::validateApplicationDomains('http://192.0.2.10:8000'))->toBeEmpty();
+});

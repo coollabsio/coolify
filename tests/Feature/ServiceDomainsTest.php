@@ -193,6 +193,18 @@ it('resets the add domain dns gate when segmented domain fields change', functio
         ->assertSet('forceSaveDns', false);
 });
 
+it('does not add a single-label hostname as a service domain', function () {
+    $this->apiApp->update(['fqdn' => null]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->apiApp->id)
+        ->set('newDomainParts.host', 'aaa')
+        ->call('addDomain')
+        ->assertDispatched('error');
+
+    expect($this->apiApp->fresh()->fqdn)->toBeNull();
+});
+
 it('shows dns entries control next to Add', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSuccessful()

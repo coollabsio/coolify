@@ -98,6 +98,15 @@ it('uses safe domain validation rules on the domains form', function () {
         ->and($validator->errors()->has('newDomain'))->toBeTrue();
 });
 
+it('does not add a single-label hostname as an application domain', function () {
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'aaa')
+        ->call('addDomain')
+        ->assertDispatched('error');
+
+    expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
 it('lists existing domains as individual rows', function () {
     $this->application->update([
         'fqdn' => 'https://example.com,https://www.example.com,https://another.example.com,https://www.another.example.com',
