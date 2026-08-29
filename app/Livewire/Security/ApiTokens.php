@@ -59,7 +59,10 @@ class ApiTokens extends Component
 
     private function getTokens()
     {
-        $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
+        $this->tokens = auth()->user()->tokens()
+            ->where('team_id', currentTeam()->id)
+            ->latest()
+            ->get();
     }
 
     public function updatedPermissions($permissionToUpdate)
@@ -148,7 +151,10 @@ class ApiTokens extends Component
     public function revoke(int $id)
     {
         try {
-            $token = auth()->user()->tokens()->where('id', $id)->firstOrFail();
+            $token = auth()->user()->tokens()
+                ->where('team_id', currentTeam()->id)
+                ->where('id', $id)
+                ->firstOrFail();
             $this->authorize('delete', $token);
             $token->delete();
             $this->getTokens();

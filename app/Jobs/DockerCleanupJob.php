@@ -155,4 +155,38 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
     }
+
+    public function failed(?\Throwable $exception): void
+    {
+        $execution = DockerCleanupExecution::query()
+            ->where('server_id', $this->server->id)
+            ->where('status', 'running')
+            ->whereNull('finished_at')
+            ->latest('id')
+            ->first();
+
+        if (! $execution) {
+            return;
+        }
+
+        $message = $exception?->getMessage() ?? 'Docker cleanup job failed without an exception.';
+
+        $updated = DockerCleanupExecution::query()
+            ->whereKey($execution->id)
+            ->where('status', 'running')
+            ->whereNull('finished_at')
+            ->update([
+                'status' => 'failed',
+                'message' => $message,
+                'finished_at' => Carbon::now()->toImmutable(),
+            ]);
+
+        if ($updated === 0) {
+            return;
+        }
+
+        $execution->refresh();
+        event(new DockerCleanupDone($execution));
+        $this->server->team?->notify(new DockerCleanupFailed($this->server, 'Docker cleanup job failed with the following error: '.$message));
+    }
 }

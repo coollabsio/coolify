@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ScheduledVolumeBackup;
 use Illuminate\Support\Str;
 
 return [
@@ -29,6 +30,18 @@ return [
     */
 
     'path' => env('HORIZON_PATH', 'horizon'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Horizon Allowed Emails
+    |--------------------------------------------------------------------------
+    |
+    | A comma-separated list of email addresses that may access the Horizon
+    | dashboard in addition to the root user.
+    |
+    */
+
+    'allowed_emails' => env('HORIZON_ALLOWED_EMAILS', ''),
 
     /*
     |--------------------------------------------------------------------------
@@ -190,7 +203,10 @@ return [
             'tries' => 1,
             'nice' => 0,
             'sleep' => 3,
-            'timeout' => env('HORIZON_TIMEOUT', 36000),
+            'timeout' => min(
+                max((int) env('HORIZON_TIMEOUT', 39600), ScheduledVolumeBackup::DEFAULT_TIMEOUT + 600),
+                85800,
+            ),
         ],
 
     ],

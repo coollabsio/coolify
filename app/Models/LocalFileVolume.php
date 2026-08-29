@@ -138,9 +138,9 @@ class LocalFileVolume extends BaseModel
 
                 return;
             }
-            $content = instant_remote_process(["cat {$escapedPath}"], $server, false);
+            $content = $this->readRemoteFileContent($escapedPath, $server);
             // Check if content contains binary data by looking for null bytes or non-printable characters
-            if (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content)) {
+            if ($content !== self::TOO_LARGE_PLACEHOLDER && (str_contains($content, "\0") || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', $content))) {
                 $content = self::BINARY_PLACEHOLDER;
             }
             $this->content = $content;
@@ -159,6 +159,27 @@ class LocalFileVolume extends BaseModel
         $size = (int) trim((string) $sizeOutput);
 
         return $size > self::MAX_CONTENT_SIZE;
+    }
+
+    /**
+     * Cap the remote read itself so a file that grows after the size check
+     * cannot be fully slurped into PHP memory.
+     */
+    protected function readRemoteFileContent(string $escapedPath, $server): string
+    {
+        $readLimit = self::MAX_CONTENT_SIZE + 1;
+        $content = instant_remote_process(["head -c {$readLimit} {$escapedPath}"], $server, false);
+
+        return self::contentFromBoundedRead($content);
+    }
+
+    public static function contentFromBoundedRead(?string $content): string
+    {
+        if (strlen((string) $content) > self::MAX_CONTENT_SIZE) {
+            return self::TOO_LARGE_PLACEHOLDER;
+        }
+
+        return (string) $content;
     }
 
     public function deleteStorageOnServer()
@@ -253,7 +274,7 @@ class LocalFileVolume extends BaseModel
             if ($this->remoteFileExceedsLimit($escapedPath, $server)) {
                 $this->content = self::TOO_LARGE_PLACEHOLDER;
             } else {
-                $this->content = instant_remote_process(["cat {$escapedPath}"], $server, false);
+                $this->content = $this->readRemoteFileContent($escapedPath, $server);
             }
             $this->is_directory = false;
             $this->save();

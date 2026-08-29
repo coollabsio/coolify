@@ -45,3 +45,14 @@ test('turning off follow logs stays off at the bottom of the log viewer', functi
             ->toContain('this.followManuallyDisabled = false');
     }
 });
+
+test('runtime log follow loop is cleaned up when navigating away', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/get-logs.blade.php'));
+
+    expect($view)
+        ->toContain('scrollTimeout: null')
+        ->toContain("this.\$root.querySelector('#logsContainer')")
+        ->toContain('destroy() {')
+        ->toContain('this.destroyed = true')
+        ->toContain('this.cancelScrollLoop()');
+});

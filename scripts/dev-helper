@@ -1,0 +1,280 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+REPOSITORY=${HELPER_IMAGE_REPOSITORY:-docker.io/coollabsio/coolify-helper}
+DEFAULT_TAG="dev-$(git -C "$ROOT_DIR" rev-parse --short HEAD)"
+COOLIFY_CONTAINER=${COOLIFY_CONTAINER:-coolify}
+
+usage() {
+    cat <<EOF
+Usage: $0 <command> [tag]
+
+Commands:
+  build [tag]   Build the local helper image
+  use [tag]     Configure local Coolify to use an existing helper image
+  verify [tag]  Verify tools and run a Docker Compose socket smoke test
+  deploy [tag]  Deploy seeded Dockerfile, Compose, and Nixpacks applications
+  reset         Clear the local helper version override
+  test [tag]    Build, select, verify, and run real seeded deployments
+
+Default tag: $DEFAULT_TAG
+EOF
+}
+
+require_local_coolify() {
+    local is_dev
+
+    if ! docker inspect "$COOLIFY_CONTAINER" >/dev/null 2>&1; then
+        echo "Coolify container '$COOLIFY_CONTAINER' is not running." >&2
+        exit 1
+    fi
+
+    is_dev=$(docker exec "$COOLIFY_CONTAINER" php artisan tinker --execute 'echo isDev() ? "yes" : "no";' 2>/dev/null | tail -1)
+    if [[ $is_dev != yes ]]; then
+        echo "The running Coolify instance is not in development mode." >&2
+        exit 1
+    fi
+}
+
+validate_tag() {
+    local tag=$1
+
+    if [[ ! $tag =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+        echo "Invalid Docker tag: $tag" >&2
+        exit 1
+    fi
+}
+
+image_for() {
+    echo "${REPOSITORY}:$1"
+}
+
+build_helper() {
+    local tag=$1
+    local image
+    image=$(image_for "$tag")
+
+    echo "Building $image"
+    docker build --progress=plain -f "$ROOT_DIR/docker/coolify-helper/Dockerfile" -t "$image" "$ROOT_DIR"
+}
+
+use_helper() {
+    local tag=$1
+    local image
+    image=$(image_for "$tag")
+
+    require_local_coolify
+    docker image inspect "$image" >/dev/null
+    docker exec -e DEV_HELPER_VERSION="$tag" "$COOLIFY_CONTAINER" php artisan tinker --execute '
+        App\Models\InstanceSettings::findOrFail(0)->update([
+            "dev_helper_version" => getenv("DEV_HELPER_VERSION"),
+        ]);
+    ' >/dev/null
+
+    local selected
+    selected=$(docker exec "$COOLIFY_CONTAINER" php artisan tinker --execute 'echo getHelperVersion();' 2>/dev/null | tail -1)
+    if [[ $selected != "$tag" ]]; then
+        echo "Coolify selected helper '$selected' instead of '$tag'." >&2
+        exit 1
+    fi
+
+    echo "Coolify now uses $image"
+}
+
+verify_helper() {
+    local tag=$1
+    local image project compose
+    image=$(image_for "$tag")
+    project="coolify-helper-${tag//[^A-Za-z0-9_-]/-}-smoke"
+    compose=$'services:\n  app:\n    image: alpine:3.21\n    command: ["sh", "-c", "sleep 30"]\n'
+
+    docker image inspect "$image" >/dev/null
+
+    docker run --rm "$image" docker --version
+    docker run --rm "$image" docker compose version
+    docker run --rm "$image" docker buildx version
+    docker run --rm "$image" pack version
+    docker run --rm "$image" nixpacks --version
+    docker run --rm "$image" railpack --version
+
+    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$image" \
+        docker version --format 'client={{.Client.Version}} server={{.Server.Version}} api={{.Client.APIVersion}}/{{.Server.APIVersion}}'
+
+    cleanup_compose() {
+        printf '%s' "$compose" | docker run --rm -i \
+            -v /var/run/docker.sock:/var/run/docker.sock "$image" \
+            docker compose -p "$project" -f - down --remove-orphans >/dev/null 2>&1 || true
+    }
+    trap cleanup_compose RETURN
+
+    printf '%s' "$compose" | docker run --rm -i \
+        -v /var/run/docker.sock:/var/run/docker.sock "$image" \
+        docker compose -p "$project" -f - up -d --wait
+    printf '%s' "$compose" | docker run --rm -i \
+        -v /var/run/docker.sock:/var/run/docker.sock "$image" \
+        docker compose -p "$project" -f - ps --format json
+    cleanup_compose
+    trap - RETURN
+
+    if [[ -n $(docker ps -aq --filter "label=com.docker.compose.project=$project") ]]; then
+        echo "Compose smoke-test resources were not removed." >&2
+        exit 1
+    fi
+
+    echo "Helper verification passed for $image"
+}
+
+queue_deployment() {
+    local application_uuid=$1
+
+    docker exec -e APPLICATION_UUID="$application_uuid" "$COOLIFY_CONTAINER" php artisan tinker --execute '
+        $application = App\Models\Application::query()
+            ->where("uuid", getenv("APPLICATION_UUID"))
+            ->firstOrFail();
+        $deploymentUuid = (string) Illuminate\Support\Str::uuid();
+        queue_application_deployment(
+            application: $application,
+            deployment_uuid: $deploymentUuid,
+            force_rebuild: true,
+            no_questions_asked: true,
+        );
+        echo "DEPLOYMENT_UUID={$deploymentUuid}";
+    ' 2>/dev/null | sed -n 's/^DEPLOYMENT_UUID=//p' | tail -1
+}
+
+wait_for_deployment() {
+    local deployment_uuid=$1
+    local expected_image=$2
+    local status
+
+    for _ in $(seq 1 150); do
+        status=$(docker exec -e DEPLOYMENT_UUID="$deployment_uuid" "$COOLIFY_CONTAINER" php artisan tinker --execute '
+            $deployment = App\Models\ApplicationDeploymentQueue::query()
+                ->where("deployment_uuid", getenv("DEPLOYMENT_UUID"))
+                ->first();
+            echo $deployment?->status ?? "missing";
+        ' 2>/dev/null | tail -1)
+
+        case "$status" in
+            finished)
+                break
+                ;;
+            failed|cancelled|missing)
+                echo "Deployment $deployment_uuid ended with status: $status" >&2
+                return 1
+                ;;
+        esac
+
+        sleep 4
+    done
+
+    if [[ $status != finished ]]; then
+        echo "Deployment $deployment_uuid timed out with status: $status" >&2
+        return 1
+    fi
+
+    local used_expected_helper
+    used_expected_helper=$(docker exec \
+        -e DEPLOYMENT_UUID="$deployment_uuid" \
+        -e EXPECTED_HELPER_IMAGE="$expected_image" \
+        "$COOLIFY_CONTAINER" php artisan tinker --execute '
+            $deployment = App\Models\ApplicationDeploymentQueue::query()
+                ->where("deployment_uuid", getenv("DEPLOYMENT_UUID"))
+                ->firstOrFail();
+            $logs = collect(json_decode($deployment->logs, true))
+                ->pluck("output")
+                ->implode("\n");
+            echo str_contains(
+                $logs,
+                "Preparing container with helper image: ".getenv("EXPECTED_HELPER_IMAGE"),
+            ) ? "yes" : "no";
+        ' 2>/dev/null | tail -1)
+
+    if [[ $used_expected_helper != yes ]]; then
+        echo "Deployment $deployment_uuid did not use $expected_image." >&2
+        return 1
+    fi
+}
+
+deploy_examples() {
+    local tag=$1
+    local image application_uuid deployment_uuid fqdn
+    image=$(image_for "$tag")
+
+    require_local_coolify
+    use_helper "$tag"
+
+    for application_uuid in dockerfile docker-compose nodejs; do
+        echo "Deploying seeded application: $application_uuid"
+        deployment_uuid=$(queue_deployment "$application_uuid")
+        if [[ -z $deployment_uuid ]]; then
+            echo "Could not queue $application_uuid." >&2
+            exit 1
+        fi
+
+        wait_for_deployment "$deployment_uuid" "$image"
+
+        fqdn=$(docker exec -e APPLICATION_UUID="$application_uuid" "$COOLIFY_CONTAINER" php artisan tinker --execute '
+            echo App\Models\Application::query()
+                ->where("uuid", getenv("APPLICATION_UUID"))
+                ->value("fqdn") ?? "";
+        ' 2>/dev/null | tail -1)
+
+        if [[ -n $fqdn ]]; then
+            curl --fail --silent --show-error --output /dev/null "$fqdn"
+        fi
+
+        echo "Deployment passed: $application_uuid ($deployment_uuid)"
+    done
+}
+
+reset_helper() {
+    require_local_coolify
+    docker exec "$COOLIFY_CONTAINER" php artisan tinker --execute '
+        App\Models\InstanceSettings::findOrFail(0)->update([
+            "dev_helper_version" => null,
+        ]);
+    ' >/dev/null
+    echo "Development helper override cleared."
+}
+
+command=${1:-help}
+tag=${2:-$DEFAULT_TAG}
+
+case "$command" in
+    build)
+        validate_tag "$tag"
+        build_helper "$tag"
+        ;;
+    use)
+        validate_tag "$tag"
+        use_helper "$tag"
+        ;;
+    verify)
+        validate_tag "$tag"
+        verify_helper "$tag"
+        ;;
+    deploy)
+        validate_tag "$tag"
+        deploy_examples "$tag"
+        ;;
+    reset)
+        reset_helper
+        ;;
+    test)
+        validate_tag "$tag"
+        build_helper "$tag"
+        use_helper "$tag"
+        verify_helper "$tag"
+        deploy_examples "$tag"
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 1
+        ;;
+esac

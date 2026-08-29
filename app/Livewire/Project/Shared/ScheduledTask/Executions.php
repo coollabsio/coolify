@@ -10,6 +10,7 @@ use Livewire\Component;
 
 class Executions extends Component
 {
+    #[Locked]
     public ScheduledTask $task;
 
     #[Locked]
@@ -28,6 +29,7 @@ class Executions extends Component
 
     public $logsPerPage = 100;
 
+    #[Locked]
     public $selectedExecution = null;
 
     public $isPollingActive = false;
@@ -45,7 +47,7 @@ class Executions extends Component
     {
         try {
             $this->taskId = $taskId;
-            $this->task = ScheduledTask::findOrFail($taskId);
+            $this->task = ScheduledTask::where('team_id', Auth::user()->currentTeam()->id)->findOrFail($taskId);
             $this->executions = $this->task->executions()->take(20)->get();
             $this->serverTimezone = data_get($this->task, 'application.destination.server.settings.server_timezone');
             if (! $this->serverTimezone) {

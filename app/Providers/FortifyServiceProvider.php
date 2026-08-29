@@ -152,6 +152,13 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($email.'|'.$realIp);
         });
 
+        RateLimiter::for('magic-link', function (Request $request) {
+            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
+            $token = (string) $request->input('token');
+
+            return Limit::perMinute(5)->by(hash('sha256', $token.'|'.$realIp));
+        });
+
         RateLimiter::for('two-factor', function (Request $request) {
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });

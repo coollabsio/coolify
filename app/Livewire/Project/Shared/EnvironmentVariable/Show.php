@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
+use App\Events\ApplicationConfigurationChanged;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
@@ -298,6 +299,10 @@ class Show extends Component
             $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('envsUpdated');
             $this->dispatch('configurationChanged');
+
+            if ($this->is_required && $this->resource instanceof Service) {
+                event(new ApplicationConfigurationChanged($this->resource->team()->id));
+            }
         } catch (\Exception $e) {
             return handleError($e);
         }

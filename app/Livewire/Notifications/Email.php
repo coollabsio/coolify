@@ -6,6 +6,7 @@ use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\EmailNotificationSettings;
 use App\Models\Team;
 use App\Notifications\Test;
+use App\Rules\ValidHostname;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
@@ -56,6 +57,9 @@ class Email extends Component
 
     #[Validate(['nullable', 'numeric'])]
     public ?string $smtpTimeout = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $smtpEhloDomain = null;
 
     #[Validate(['boolean'])]
     public bool $resendEnabled = false;
@@ -129,6 +133,7 @@ class Email extends Component
     {
         if ($toModel) {
             $this->validate();
+            $this->validate(['smtpEhloDomain' => ['nullable', 'string', new ValidHostname]]);
             $this->authorize('update', $this->settings);
             $this->settings->smtp_enabled = $this->smtpEnabled;
             $this->settings->smtp_from_address = $this->smtpFromAddress;
@@ -140,6 +145,7 @@ class Email extends Component
             $this->settings->smtp_username = $this->smtpUsername;
             $this->settings->smtp_password = $this->smtpPassword;
             $this->settings->smtp_timeout = $this->smtpTimeout;
+            $this->settings->smtp_ehlo_domain = $this->smtpEhloDomain;
 
             $this->settings->resend_enabled = $this->resendEnabled;
             $this->settings->resend_api_key = $this->resendApiKey;
@@ -175,6 +181,7 @@ class Email extends Component
                 ? $this->settings->smtp_password
                 : null;
             $this->smtpTimeout = $this->settings->smtp_timeout;
+            $this->smtpEhloDomain = $this->settings->smtp_ehlo_domain;
 
             $this->resendEnabled = $this->settings->resend_enabled;
             $this->resendApiKey = auth()->user()->can('update', $this->settings)
@@ -261,6 +268,7 @@ class Email extends Component
                 'smtpUsername' => 'nullable|string',
                 'smtpPassword' => 'nullable|string',
                 'smtpTimeout' => 'nullable|numeric',
+                'smtpEhloDomain' => ['nullable', 'string', new ValidHostname],
             ], [
                 'smtpFromAddress.required' => 'From Address is required.',
                 'smtpFromAddress.email' => 'Please enter a valid email address.',
@@ -284,6 +292,7 @@ class Email extends Component
             $this->settings->smtp_username = $this->smtpUsername;
             $this->settings->smtp_password = $this->smtpPassword;
             $this->settings->smtp_timeout = $this->smtpTimeout;
+            $this->settings->smtp_ehlo_domain = $this->smtpEhloDomain;
 
             $this->settings->save();
             $this->dispatch('success', 'SMTP settings updated.');
@@ -375,6 +384,7 @@ class Email extends Component
         $this->smtpUsername = $settings->smtp_username;
         $this->smtpPassword = $settings->smtp_password;
         $this->smtpTimeout = $settings->smtp_timeout;
+        $this->smtpEhloDomain = $settings->smtp_ehlo_domain;
 
         if ($settings->resend_enabled) {
             $this->resendEnabled = true;

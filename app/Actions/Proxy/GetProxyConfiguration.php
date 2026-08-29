@@ -13,6 +13,8 @@ class GetProxyConfiguration
 {
     use AsAction;
 
+    public const MAX_CONFIGURATION_SIZE_BYTES = 5 * 1024 * 1024;
+
     public function handle(Server $server, bool $forceRegenerate = false): string
     {
         $proxyType = $server->proxyType();
@@ -98,10 +100,16 @@ class GetProxyConfiguration
     private function backfillFromDisk(Server $server): ?string
     {
         $proxy_path = $server->proxyPath();
+        $configurationPath = escapeshellarg("$proxy_path/docker-compose.yml");
+        $readLimit = self::MAX_CONFIGURATION_SIZE_BYTES + 1;
         $result = instant_remote_process([
             "mkdir -p $proxy_path",
-            "cat $proxy_path/docker-compose.yml 2>/dev/null",
+            "if [ ! -f {$configurationPath} ]; then exit 0; elif [ \"$(wc -c < {$configurationPath})\" -gt ".self::MAX_CONFIGURATION_SIZE_BYTES." ]; then echo '__COOLIFY_PROXY_CONFIG_TOO_LARGE__'; else head -c {$readLimit} {$configurationPath}; fi",
         ], $server, false);
+
+        if ($result === '__COOLIFY_PROXY_CONFIG_TOO_LARGE__' || strlen($result ?? '') > self::MAX_CONFIGURATION_SIZE_BYTES) {
+            throw new \RuntimeException('Proxy configuration exceeds the 5 MiB size limit.');
+        }
 
         if (! empty(trim($result ?? ''))) {
             $server->proxy->last_saved_proxy_configuration = $result;

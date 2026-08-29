@@ -4,11 +4,11 @@ namespace App\Support;
 
 class DomainUrlParts
 {
-    public static function compose(string $scheme, string $host, string $port = '', string $path = ''): string
+    public static function compose(string $scheme, string $host, ?string $port = '', string $path = ''): string
     {
         $scheme = strtolower(trim($scheme)) === 'http' ? 'http' : 'https';
         $host = trim($host);
-        $port = trim($port);
+        $port = trim((string) $port);
         $path = trim($path);
 
         if ($path !== '' && ! str_starts_with($path, '/') && ! str_starts_with($path, '?') && ! str_starts_with($path, '#')) {
