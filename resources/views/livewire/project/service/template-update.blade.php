@@ -70,7 +70,12 @@
                     </div>
                 </x-slot:actions>
 
+                @php($canUpdate = auth()->user()?->can('update', $service) ?? false)
                 @if ($mode === 'review')
+                    <div x-data="{
+                        hasSelection: false,
+                        recompute() { this.hasSelection = this.$root.querySelectorAll('input[type=checkbox]:checked').length > 0; },
+                    }" x-init="$nextTick(() => recompute())" @change="recompute()">
                     @forelse ($this->hunks as $hunk)
                         <div @class([
                             'overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.08]',
@@ -78,7 +83,8 @@
                         ])>
                             <div class="border-b border-neutral-200 dark:border-white/[0.08]">
                                 <x-forms.checkbox :id="'acceptedHunks.' . $hunk['index']"
-                                    label="Change {{ $hunk['index'] + 1 }}" fullWidth />
+                                    label="Change {{ $hunk['index'] + 1 }}" canGate="update"
+                                    :canResource="$service" fullWidth />
                             </div>
                             <pre class="overflow-x-auto p-3 font-mono text-xs leading-5">@foreach ($hunk['lines'] as $line)<div @class([
     'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' => $line['type'] === 'add',
@@ -93,16 +99,30 @@
                     @endforelse
 
                     <div class="mt-4 flex flex-wrap items-center gap-2">
-                        <x-forms.button wire:click="apply" canGate="update" :canResource="$service" isHighlighted>
+                        <x-forms.button wire:click="apply" canGate="update" :canResource="$service"
+                            :disabled="!$this->hasSelectedHunks"
+                            x-bind:disabled="{{ $canUpdate ? '!hasSelection' : 'true' }}"
+                            :tooltip="$canUpdate ? 'Select at least one change to apply.' : null"
+                            isHighlighted>
                             Apply selected changes
                         </x-forms.button>
                         <x-forms.button wire:click="replaceAll" canGate="update" :canResource="$service"
+                            :disabled="!$this->hasHunks"
+                            :tooltip="$canUpdate && !$this->hasHunks ? 'Your compose already matches the latest template.' : null"
                             wire:confirm="Replace your entire compose with the latest template? Your compose customizations will be lost.">
                             Replace with latest
                         </x-forms.button>
                     </div>
+                    </div>
                 @else
-                    <div class="flex flex-col gap-3">
+                    <div class="flex flex-col gap-3" x-data="{
+                        original: @js((string) $service->docker_compose_raw),
+                        latest: @js((string) $this->latestCompose),
+                        get value() { return $wire.editorContent ?? ''; },
+                        get isBlank() { return this.value.trim() === ''; },
+                        get isCurrent() { return this.value === this.original; },
+                        get isLatest() { return this.value === this.latest; },
+                    }">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div class="flex items-center gap-3 text-[12px] text-neutral-500 dark:text-fg-dim">
                                 <span class="inline-flex items-center gap-1.5">
@@ -115,10 +135,14 @@
                                 </span>
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <x-forms.button wire:click="seedFromLatest" canGate="update" :canResource="$service">
+                                <x-forms.button wire:click="seedFromLatest" canGate="update" :canResource="$service"
+                                    x-bind:disabled="{{ $canUpdate ? 'isLatest' : 'true' }}"
+                                    :tooltip="$canUpdate ? 'The editor already matches the latest template.' : null">
                                     Reset to latest template
                                 </x-forms.button>
-                                <x-forms.button wire:click="seedFromCurrent" canGate="update" :canResource="$service">
+                                <x-forms.button wire:click="seedFromCurrent" canGate="update" :canResource="$service"
+                                    x-bind:disabled="{{ $canUpdate ? 'isCurrent' : 'true' }}"
+                                    :tooltip="$canUpdate ? 'The editor already matches your current compose.' : null">
                                     Discard template changes
                                 </x-forms.button>
                             </div>
@@ -133,7 +157,8 @@
 
                         <div class="flex flex-wrap items-center gap-2">
                             <x-forms.button wire:click="applyEditor" canGate="update" :canResource="$service"
-                                isHighlighted>
+                                x-bind:disabled="{{ $canUpdate ? 'isBlank || isCurrent' : 'true' }}"
+                                :tooltip="$canUpdate ? 'Edit the compose to apply a change.' : null" isHighlighted>
                                 Apply compose
                             </x-forms.button>
                             <span class="text-[12px] text-neutral-500 dark:text-fg-dim">

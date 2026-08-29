@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
 use App\Services\TemplateUpdateChecker;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -40,7 +41,7 @@ class TemplateUpdateBanner extends Component
         }
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.project.service.template-update-banner');
     }

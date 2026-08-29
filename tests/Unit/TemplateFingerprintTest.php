@@ -32,3 +32,7 @@ it('hashes a template entry from its base64 compose', function () {
 it('returns null for a template entry without a compose key', function () {
     expect(TemplateFingerprint::forTemplate(['envs' => 'x']))->toBeNull();
 });
+
+it('returns null for a template whose compose is not valid base64', function () {
+    expect(TemplateFingerprint::forTemplate(['compose' => 'not*valid*base64!!']))->toBeNull();
+});

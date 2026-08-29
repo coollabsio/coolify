@@ -1,6 +1,9 @@
 @php
     $isDiff = filter_var($attributes->get('diff', false), FILTER_VALIDATE_BOOLEAN);
-    $originalContent = (string) $attributes->get('original', '');
+    // Undeclared component attributes come back already HTML-escaped from the bag,
+    // so decode once here and let the single {{ }} below re-escape it — otherwise
+    // quotes reach the editor double-escaped (e.g. ' shows as &#039;).
+    $originalContent = html_entity_decode((string) $attributes->get('original', ''), ENT_QUOTES);
 @endphp
 <div wire:key="{{ random_int(0, PHP_INT_MAX) }}" class="coolify-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{

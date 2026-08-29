@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Service;
+use App\Services\TemplateFingerprint;
 use App\Services\TemplateUpdateChecker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -40,6 +41,16 @@ it('suppresses the badge when the current version was dismissed', function () {
 
     expect(TemplateUpdateChecker::updateAvailable($service))->toBeTrue();
     expect(TemplateUpdateChecker::showBadge($service))->toBeFalse();
+});
+
+it('produces a reference hash that matches the checker for the same template', function () {
+    // Locks the producer (Create sets template_reference_hash via TemplateFingerprint::forTemplate)
+    // to the consumer (TemplateUpdateChecker::currentHash), so a new service is never born stale.
+    fakeTemplateBundle('demo', "services:\n  app:\n    image: nginx:7\n");
+
+    $template = data_get(get_service_templates(), 'demo');
+
+    expect(TemplateFingerprint::forTemplate($template))->toBe(TemplateUpdateChecker::currentHash('demo'));
 });
 
 it('never flags a service whose service_type maps to no template', function () {

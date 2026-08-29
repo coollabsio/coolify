@@ -6,6 +6,7 @@ use App\Models\Service;
 use App\Services\ComposeDiff;
 use App\Services\TemplateUpdateChecker;
 use Carbon\CarbonImmutable;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
@@ -25,6 +26,9 @@ class TemplateUpdate extends Component
     /** Editable compose in edit mode; seeded lazily. */
     public ?string $editorContent = null;
 
+    /** Hunk-selection signature the editor was last seeded from; null until first seed. */
+    public ?string $editorSeededSignature = null;
+
     public function mount(Service $service): void
     {
         $this->service = $service;
@@ -41,8 +45,13 @@ class TemplateUpdate extends Component
     public function getLatestComposeProperty(): ?string
     {
         $compose = data_get($this->template, 'compose');
+        if (! is_string($compose)) {
+            return null;
+        }
 
-        return is_string($compose) ? base64_decode($compose) : null;
+        $decoded = base64_decode($compose, true);
+
+        return $decoded === false ? null : $decoded;
     }
 
     public function getLatestUpdatedAtProperty(): ?string
@@ -73,16 +82,30 @@ class TemplateUpdate extends Component
         return TemplateUpdateChecker::updateAvailable($this->service);
     }
 
+    public function getHasHunksProperty(): bool
+    {
+        return $this->hunks !== [];
+    }
+
+    public function getHasSelectedHunksProperty(): bool
+    {
+        return count(array_filter($this->acceptedHunks)) > 0;
+    }
+
     public function setMode(string $mode): void
     {
         if ($mode === 'edit') {
-            if ($this->editorContent === null) {
-                // Seed the editable (right) side: carry any hunk selection, otherwise
-                // show the full latest template so the diff is immediately meaningful.
+            $signature = $this->selectionSignature();
+            // Re-seed the editable (right) side when first entering edit mode, or
+            // when the hunk selection changed since the last seed — otherwise a
+            // stale single-hunk merge would hide newly selected changes. Manual
+            // edits survive as long as the selection is unchanged.
+            if ($this->editorContent === null || $signature !== $this->editorSeededSignature) {
                 $anySelected = count(array_filter($this->acceptedHunks)) > 0;
                 $this->editorContent = $anySelected
                     ? $this->mergedFromSelection()
                     : ((string) $this->latestCompose !== '' ? (string) $this->latestCompose : (string) $this->service->docker_compose_raw);
+                $this->editorSeededSignature = $signature;
             }
             $this->mode = 'edit';
 
@@ -90,6 +113,14 @@ class TemplateUpdate extends Component
         }
 
         $this->mode = 'review';
+    }
+
+    private function selectionSignature(): string
+    {
+        $accepted = array_keys(array_filter($this->acceptedHunks));
+        sort($accepted);
+
+        return implode(',', $accepted);
     }
 
     public function seedFromLatest(): void
@@ -104,7 +135,7 @@ class TemplateUpdate extends Component
 
     public function apply(): void
     {
-        if ($this->latestCompose === null) {
+        if ($this->latestCompose === null || ! $this->hasSelectedHunks) {
             return;
         }
 
@@ -116,6 +147,10 @@ class TemplateUpdate extends Component
 
     public function replaceAll(): void
     {
+        if (! $this->hasHunks) {
+            return;
+        }
+
         $this->acceptedHunks = collect($this->hunks)
             ->pluck('index')
             ->mapWithKeys(fn ($index): array => [$index => true])
@@ -130,11 +165,16 @@ class TemplateUpdate extends Component
 
     public function dismiss(): void
     {
-        $this->authorize('update', $this->service);
-        $this->service->template_dismissed_hash = TemplateUpdateChecker::currentHash($this->service->service_type);
-        $this->service->save();
-        $this->dispatch('success', 'Update dismissed. You will be notified when a newer version ships.');
-        $this->dispatch('refreshServices');
+        try {
+            $this->authorize('update', $this->service);
+            $this->service->template_dismissed_hash = TemplateUpdateChecker::currentHash($this->service->service_type);
+            $this->service->save();
+            $this->service->refresh();
+            $this->dispatch('success', 'Update dismissed. You will be notified when a newer version ships.');
+            $this->dispatch('refreshServices');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     private function mergedFromSelection(): string
@@ -174,6 +214,7 @@ class TemplateUpdate extends Component
             $this->service->refresh();
             $this->acceptedHunks = [];
             $this->editorContent = null;
+            $this->editorSeededSignature = null;
             $this->mode = 'review';
 
             $this->dispatch('success', 'Template changes applied. Redeploy the service for them to take effect.');
@@ -185,7 +226,7 @@ class TemplateUpdate extends Component
         }
     }
 
-    public function render()
+    public function render(): View
     {
         return view('livewire.project.service.template-update');
     }

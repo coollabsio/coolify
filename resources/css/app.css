@@ -1504,6 +1504,16 @@ html[data-theme="custom"] textarea:disabled {
 }
 
 /*
+ * Checkbox/toggle rows wrap their text in a <label> that shares its baseline with
+ * the control, so it must not inherit the stacked field-label bottom margin —
+ * otherwise the control sits above the row's vertical center.
+ */
+.application-settings-workspace .form-control label,
+.application-settings-form .form-control label {
+    margin-bottom: 0;
+}
+
+/*
  * Labels that sit in a fixed-height control row (with optional helper icon) must not
  * add their own bottom margin — the row wrapper owns spacing so side-by-side inputs align.
  */

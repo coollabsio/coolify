@@ -119,6 +119,70 @@ it('seeds the inline editor from the latest template when no hunks are selected'
         ->assertSee('Reset to latest template');
 });
 
+it('gates the apply buttons on a valid hunk selection', function () {
+    $service = makeDemoService();
+
+    $component = Livewire::test(TemplateUpdate::class, ['service' => $service]);
+    // A diff exists, so "Replace with latest" is enabled but "Apply selected" is not yet.
+    expect($component->instance()->hasHunks)->toBeTrue();
+    expect($component->instance()->hasSelectedHunks)->toBeFalse();
+    // The disabled button carries a reason tooltip instead of a stray text line.
+    // (Visibility is gated client-side on the live disabled state.)
+    $component->assertSee('Select at least one change to apply.');
+
+    $component->set('acceptedHunks', [0 => true]);
+    expect($component->instance()->hasSelectedHunks)->toBeTrue();
+});
+
+it('does not touch the compose when apply runs with no selected hunks', function () {
+    $service = makeDemoService();
+    $original = $service->docker_compose_raw;
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->set('acceptedHunks', [])
+        ->call('apply');
+
+    $service->refresh();
+    expect($service->docker_compose_raw)->toBe($original);
+    expect($service->template_reference_hash)->toBe('stale');
+});
+
+it('re-seeds the editor when the hunk selection changed since the last edit', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->set('editorContent', 'MANUAL EDIT')
+        ->call('setMode', 'review')
+        ->set('acceptedHunks', [0 => true])
+        ->call('setMode', 'edit')
+        ->assertSet('editorContent', "services:\n  app:\n    image: nginx:2\n");
+});
+
+it('preserves manual editor edits when the selection is unchanged', function () {
+    $service = makeDemoService();
+
+    Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->set('editorContent', 'MANUAL EDIT')
+        ->call('setMode', 'review')
+        ->call('setMode', 'edit')
+        ->assertSet('editorContent', 'MANUAL EDIT');
+});
+
+it('renders the original compose in the diff editor without double-escaping quotes', function () {
+    $service = makeDemoService();
+    $service->forceFill(['docker_compose_raw' => "services:\n  app:\n    image: 'nginx:1'\n"])->save();
+
+    $html = Livewire::test(TemplateUpdate::class, ['service' => $service])
+        ->call('setMode', 'edit')
+        ->html();
+
+    // The single quote must reach the editor single-escaped, never as &amp;#039;.
+    expect($html)->toContain('&#039;');
+    expect($html)->not->toContain('&amp;#039;');
+});
+
 it('applies hand-edited compose from the inline editor', function () {
     $service = makeDemoService();
 

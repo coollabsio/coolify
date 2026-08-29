@@ -9,6 +9,9 @@ class ComposeDiff
 {
     private const CONTEXT = 3;
 
+    /** Above this line count on either side, skip the quadratic LCS and treat the change as a whole-file replace. */
+    private const MAX_LCS_LINES = 4000;
+
     /**
      * @return array<int, array{index: int, lines: array<int, array{type: string, text: string}>}>
      */
@@ -105,6 +108,20 @@ class ComposeDiff
     {
         $n = count($old);
         $m = count($new);
+
+        // Guard against the O(n·m) LCS matrix exhausting memory on very large
+        // composes: present the change as a single whole-file replacement.
+        if ($n > self::MAX_LCS_LINES || $m > self::MAX_LCS_LINES) {
+            if ($n === 0) {
+                return [['insert', 0, 0, 0, $m]];
+            }
+            if ($m === 0) {
+                return [['delete', 0, $n, 0, 0]];
+            }
+
+            return [['replace', 0, $n, 0, $m]];
+        }
+
         $lcs = array_fill(0, $n + 1, array_fill(0, $m + 1, 0));
         for ($i = $n - 1; $i >= 0; $i--) {
             for ($j = $m - 1; $j >= 0; $j--) {
@@ -167,7 +184,7 @@ class ComposeDiff
     }
 
     /**
-     * Group non-equal opcodes (with trailing context) into display hunks.
+     * Group non-equal opcodes (with surrounding context) into display hunks.
      *
      * @param  array<int, array{0:string,1:int,2:int,3:int,4:int}>  $opcodes
      * @return array<int, array<int, array{0:string,1:int,2:int,3:int,4:int}>>
@@ -176,6 +193,7 @@ class ComposeDiff
     {
         $groups = [];
         $current = [];
+        $previousEqual = null;
         foreach ($opcodes as $op) {
             if ($op[0] === 'equal') {
                 if ($current !== []) {
@@ -184,8 +202,19 @@ class ComposeDiff
                     $groups[] = $current;
                     $current = [];
                 }
+                $previousEqual = $op;
 
                 continue;
+            }
+            if ($current === [] && $previousEqual !== null) {
+                $ctx = min(self::CONTEXT, $previousEqual[2] - $previousEqual[1]);
+                if ($ctx > 0) {
+                    $current[] = [
+                        'equal',
+                        $previousEqual[2] - $ctx, $previousEqual[2],
+                        $previousEqual[4] - $ctx, $previousEqual[4],
+                    ];
+                }
             }
             $current[] = $op;
         }

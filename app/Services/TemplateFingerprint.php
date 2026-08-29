@@ -29,7 +29,12 @@ class TemplateFingerprint
             return null;
         }
 
-        return self::hash(base64_decode($compose));
+        $decoded = base64_decode($compose, true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        return self::hash($decoded);
     }
 
     private static function ksortRecursive(array &$array): void
