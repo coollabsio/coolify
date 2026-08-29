@@ -170,6 +170,7 @@ class Index extends Component
             $this->serviceDatabase->public_port_timeout = $this->publicPortTimeout ?: null;
             $this->serviceDatabase->is_public = $this->isPublic;
             $this->serviceDatabase->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->serviceDatabase->save();
         } else {
             $this->humanName = $this->serviceDatabase->human_name;
             $this->description = $this->serviceDatabase->description;
@@ -305,13 +306,12 @@ class Index extends Component
                 return;
             }
             $this->syncDatabaseData(true);
-            $this->serviceDatabase->save();
             if ($this->serviceDatabase->is_public) {
                 if (! str($this->serviceDatabase->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->isPublic = false;
                     $this->serviceDatabase->is_public = false;
-                    $this->serviceDatabase->save();
+                    $this->syncDatabaseData(true);
 
                     return;
                 }
@@ -334,7 +334,6 @@ class Index extends Component
             $this->authorize('update', $this->serviceDatabase);
             $this->validate();
             $this->syncDatabaseData(true);
-            $this->serviceDatabase->save();
             $this->serviceDatabase->refresh();
             $this->syncDatabaseData(false);
             updateCompose($this->serviceDatabase);
