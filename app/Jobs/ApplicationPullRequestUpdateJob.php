@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Spatie\Url\Url;
 
 class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -104,7 +105,7 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
                     $firstDomain = str($domain)->explode(',')->first();
                     $firstDomain = trim($firstDomain);
                     if (! empty($firstDomain)) {
-                        $links[] = "[Open {$serviceName}]({$firstDomain})";
+                        $links[] = "[Open {$serviceName}](".$this->publicUrl($firstDomain).')';
                     }
                 }
             }
@@ -112,6 +113,19 @@ class ApplicationPullRequestUpdateJob implements ShouldBeEncrypted, ShouldQueue
             return ! empty($links) ? implode(' | ', $links).' | ' : '';
         }
 
-        return $this->preview->fqdn ? "[Open Preview]({$this->preview->fqdn}) | " : '';
+        return $this->preview->fqdn ? '[Open Preview]('.$this->publicUrl($this->preview->fqdn).') | ' : '';
+    }
+
+    /**
+     * The port stored on a preview domain is the container port the proxy forwards to,
+     * not a port the visitor connects to, so it must not appear in a shared link.
+     */
+    private function publicUrl(string $url): string
+    {
+        try {
+            return (string) Url::fromString($url)->withPort(null);
+        } catch (\Throwable) {
+            return $url;
+        }
     }
 }
