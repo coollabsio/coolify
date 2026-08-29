@@ -1323,7 +1323,7 @@ class Application extends BaseModel
 
         if (! $previousSnapshot) {
             $oldConfigHash = data_get($this, 'config_hash');
-            $hasLegacyChange = $oldConfigHash === null || $oldConfigHash !== $this->legacyConfigurationHash();
+            $hasLegacyChange = $oldConfigHash === null || ! in_array($oldConfigHash, $this->legacyConfigurationHashes(), true);
 
             if (! $hasLegacyChange) {
                 return ConfigurationDiff::unchanged();
@@ -1385,12 +1385,41 @@ class Application extends BaseModel
 
     private function legacyConfigurationHash(): string
     {
-        $newConfigHash = base64_encode($this->fqdn.json_encode($this->noindexDomains()->all()).$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
+        return $this->buildLegacyConfigurationHash(withNoindexDomains: true, withEnvironmentValues: true);
+    }
+
+    /**
+     * Every hash the current configuration would have produced under a past recipe.
+     *
+     * The recipe changed twice without a data migration: environment variable values
+     * were added on 2026-07-07 and noindex domains on 2026-08-10. A resource deployed
+     * before either change still carries a hash in the older format, and comparing it
+     * against the current recipe alone reports the whole configuration as pending.
+     *
+     * @return array<int, string>
+     */
+    private function legacyConfigurationHashes(): array
+    {
+        return [
+            $this->buildLegacyConfigurationHash(withNoindexDomains: true, withEnvironmentValues: true),
+            $this->buildLegacyConfigurationHash(withNoindexDomains: false, withEnvironmentValues: true),
+            $this->buildLegacyConfigurationHash(withNoindexDomains: false, withEnvironmentValues: false),
+        ];
+    }
+
+    private function buildLegacyConfigurationHash(bool $withNoindexDomains, bool $withEnvironmentValues): string
+    {
+        $noindexDomains = $withNoindexDomains ? json_encode($this->noindexDomains()->all()) : '';
+        $newConfigHash = base64_encode($this->fqdn.$noindexDomains.$this->git_repository.$this->git_branch.$this->git_commit_sha.$this->build_pack.$this->static_image.$this->install_command.$this->build_command.$this->start_command.$this->ports_exposes.$this->ports_mappings.$this->custom_network_aliases.$this->base_directory.$this->publish_directory.$this->dockerfile.$this->dockerfile_location.$this->custom_labels.$this->custom_docker_run_options.$this->dockerfile_target_build.$this->redirect.$this->custom_nginx_configuration.$this->settings?->use_build_secrets.$this->settings?->inject_build_args_to_dockerfile.$this->settings?->include_source_commit_in_build);
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->makeVisible('value')->sort());
+            $variables = $this->environment_variables()->get(['value',  'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime']);
         } else {
-            $newConfigHash .= json_encode($this->environment_variables_preview()->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime'])->makeVisible('value')->sort());
+            $variables = $this->environment_variables_preview()->get(['value', 'is_multiline', 'is_literal', 'is_buildtime', 'is_runtime']);
         }
+        if ($withEnvironmentValues) {
+            $variables = $variables->makeVisible('value');
+        }
+        $newConfigHash .= json_encode($variables->sort());
 
         return md5($newConfigHash);
     }
