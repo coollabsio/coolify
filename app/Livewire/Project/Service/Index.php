@@ -303,14 +303,12 @@ class Index extends Component
                 if (! $this->publicPort) {
                     $this->dispatch('error', 'Public port is required.');
                     $this->isPublic = false;
-                    $this->syncDatabaseData(true);
 
                     return;
                 }
                 if (! str($this->serviceDatabase->status)->startsWith('running')) {
                     $this->dispatch('error', 'Database must be started to be publicly accessible.');
                     $this->isPublic = false;
-                    $this->syncDatabaseData(true);
 
                     return;
                 }
