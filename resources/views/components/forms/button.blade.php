@@ -30,6 +30,12 @@
         visible: false,
         _t: null,
         showTooltip(delay = 0) {
+            // Only explain WHY a button is unavailable: skip while it is enabled
+            // so a disabled-reason tooltip never shows on an active control.
+            const btn = this.$el.querySelector('button');
+            if (btn && !btn.disabled) {
+                return;
+            }
             clearTimeout(this._t);
             this._t = setTimeout(() => {
                 this.visible = true;

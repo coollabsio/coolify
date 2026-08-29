@@ -23,6 +23,7 @@
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
             ['label' => 'Webhooks', 'route' => 'project.service.webhooks', 'icon' => 'notifications'],
             ['label' => 'Resource Operations', 'route' => 'project.service.resource-operations', 'icon' => 'server-update'],
+            ['label' => 'Template', 'route' => 'project.service.template', 'icon' => 'server-update', 'hasWarning' => \App\Services\TemplateUpdateChecker::showBadge($service), 'warningClass' => 'bg-coollabs dark:bg-warning', 'warningTitle' => 'Template update available'],
             ['label' => 'Tags', 'route' => 'project.service.tags', 'icon' => 'tags'],
             ['label' => 'Danger Zone', 'route' => 'project.service.danger', 'icon' => 'shield-alert'],
         ])->filter(fn (array $item): bool => $item['visible'] ?? true)->map(fn (array $item): array => [
@@ -36,7 +37,7 @@
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
             'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-            'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
+            'Operations' => ['Resource Operations', 'Template', 'Tags', 'Danger Zone'],
         ];
 
         $groupedItems = collect($menuGroups)
@@ -55,6 +56,11 @@
     @endphp
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        @if ($currentRoute !== 'project.service.template')
+            <livewire:project.service.template-update-banner :service="$service"
+                :href="route('project.service.template', $serviceRouteParameters)"
+                :wire:key="'tpl-banner-' . $service->uuid" />
+        @endif
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <aside class="application-settings-navigation min-w-0 xl:self-start">
                 <nav aria-label="Service settings"
@@ -75,7 +81,8 @@
                                 <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                                 <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                 @if ($menuItem['hasWarning'] ?? false)
-                                    <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
+                                    <span class="ml-auto size-2 shrink-0 rounded-full {{ $menuItem['warningClass'] ?? 'bg-error' }}"
+                                        title="{{ $menuItem['warningTitle'] ?? 'Required environment variables missing' }}"></span>
                                 @endif
                             </a>
                             @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
@@ -207,6 +214,8 @@
                     <livewire:project.shared.tags :resource="$service" />
                 @elseif ($currentRoute === 'project.service.danger')
                     <livewire:project.shared.danger :resource="$service" />
+                @elseif ($currentRoute === 'project.service.template')
+                    <livewire:project.service.template-update :service="$service" />
                 @endif
             </div>
         </div>
