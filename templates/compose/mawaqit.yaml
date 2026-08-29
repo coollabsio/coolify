@@ -1,0 +1,22 @@
+# documentation: https://mrsofiane.me/mawaqit-api/
+# slogan: Mawaqit API is a FastAPI-based REST API that fetches prayer times and mosque information from mawaqit.net and returns the data in JSON format.
+# category: utilities
+# tags: prayer, islam, mosques, api, fastapi, self-hosted
+# logo: svgs/mawaqit.svg
+# port: 80
+version: "3"
+services:
+  mawaqit-api:
+    image: "mrsofiane/mawaqit-api:latest"
+    ports:
+      - "80"
+    environment:
+      - SERVICE_URL_MAWAQIT_API_80
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://127.0.0.1:80/api/v1/ || exit 1"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
