@@ -1,7 +1,7 @@
 <form class="application-settings-form flex w-full flex-col gap-4" wire:submit="submit">
     @if ($service)
         <x-forms.listbox id="selectedDatabaseUuid" label="Database" :options="$databaseOptions"
-            empty-text="No databases in this service support scheduled backups." required />
+            empty-text="No databases in this service support scheduled backups." required portal />
         @error('selectedDatabaseUuid')
             <p class="text-xs text-error">{{ $message }}</p>
         @enderror

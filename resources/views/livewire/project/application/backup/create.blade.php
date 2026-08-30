@@ -5,7 +5,7 @@
             icon-name="storages" />
     @else
         <div class="grid gap-4 sm:grid-cols-2">
-            <x-forms.listbox id="targetKey" label="Backup target" required :options="$targets->map(fn ($target) => [
+            <x-forms.listbox id="targetKey" label="Backup target" required portal :options="$targets->map(fn ($target) => [
                 'value' => $target['key'],
                 'label' => $target['type'] . ': ' . $target['name'],
             ])->all()" x-bind:disabled="{{ $targetLocked ? 'true' : 'false' }}" />
