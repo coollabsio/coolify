@@ -2,7 +2,10 @@
 
 use App\Jobs\CheckDomainDnsJob;
 use App\Livewire\Project\Application\Domains;
+use App\Livewire\Project\Application\PreviewDomains;
+use App\Livewire\Project\Application\Previews;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -105,6 +108,469 @@ it('does not add a single-label hostname as an application domain', function () 
         ->assertDispatched('error');
 
     expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
+it('generates a preview domain when the application has no domain', function () {
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 41,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/41',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('generateDomain')
+        ->assertDispatched('success');
+
+    expect($preview->fresh()->fqdn)
+        ->not->toBeNull()
+        ->toContain('41.');
+});
+
+it('generates compose preview domains when the application has no domains', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => null,
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 42,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/42',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('generateDomain')
+        ->assertDispatched('success');
+
+    expect($preview->fresh()->fqdn)
+        ->not->toBeNull()
+        ->toContain('42.');
+});
+
+it('derives preview domain services from compose and defaults the selected service', function () {
+    Queue::fake();
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  worker-pr-49:\n    image: nginx:alpine\n  database:\n    image: postgres:17\n",
+        'docker_compose_domains' => null,
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 49,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/49',
+        'docker_compose_domains' => json_encode([
+            'removed-service' => ['domain' => ''],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertViewHas('composeServices', ['web', 'worker-pr-49'])
+        ->assertSet('newDomainService', 'web')
+        ->set('newDomainService', 'worker-pr-49')
+        ->set('newDomainParts.host', 'worker-preview.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertSet('newDomainService', 'web');
+
+    $preview->generate_preview_fqdn_compose();
+
+    expect(json_decode($preview->fresh()->docker_compose_domains, true))
+        ->toHaveKey('worker-pr-49')
+        ->not->toHaveKey('worker');
+});
+
+it('handles compose parsing failures without exposing stale preview services', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services: [\n",
+        'docker_compose_domains' => null,
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 52,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/52',
+        'docker_compose_domains' => json_encode([
+            'stale-service' => ['domain' => ''],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertViewHas('composeServices', [])
+        ->assertSet('newDomainService', null);
+});
+
+it('does not erase preview domains when compose parsing fails during persistence', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  worker:\n    image: nginx:alpine\n",
+    ]);
+
+    $storedDomains = [
+        'web' => ['domain' => 'https://web-preview.example.com'],
+        'worker' => ['domain' => 'https://worker-preview.example.com'],
+    ];
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 53,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/53',
+        'docker_compose_domains' => json_encode($storedDomains),
+        'fqdn' => 'https://web-preview.example.com,https://worker-preview.example.com',
+    ]);
+
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+
+    $application = Mockery::mock($component->instance()->preview->application)->makePartial();
+    $application->shouldReceive('parse')->once()->andThrow(new RuntimeException('Temporary parse failure'));
+    $component->instance()->preview->setRelation('application', $application);
+
+    $component->instance()->removeDomain(0);
+
+    expect(json_decode($preview->fresh()->docker_compose_domains, true))->toBe($storedDomains)
+        ->and($preview->fresh()->fqdn)->toBe('https://web-preview.example.com,https://worker-preview.example.com')
+        ->and($component->get('domainRows'))->toHaveCount(2);
+});
+
+it('preserves empty compose service slots after removing the last preview domain', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  worker:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => null,
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 50,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/50',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web-preview.example.com'],
+        ]),
+        'fqdn' => 'https://web-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('removeDomain', 0)
+        ->assertViewHas('composeServices', ['web', 'worker']);
+
+    expect(json_decode($preview->fresh()->docker_compose_domains, true))->toBe([
+        'web' => ['domain' => ''],
+        'worker' => ['domain' => ''],
+    ]);
+});
+
+it('rejects missing and unknown services when adding compose preview domains', function (?string $service) {
+    Queue::fake();
+
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => null,
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 51,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/51',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->set('newDomainParts.host', 'preview.example.com')
+        ->set('newDomainService', $service)
+        ->call('addDomain')
+        ->assertHasErrors('newDomainService')
+        ->assertCount('domainRows', 0);
+
+    expect($preview->fresh()->docker_compose_domains)->toBeNull()
+        ->and($preview->fresh()->fqdn)->toBeNull();
+    Queue::assertNothingPushed();
+})->with([null, 'unknown']);
+
+it('generates a compose preview domain only for the selected service', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com'],
+            'api' => ['domain' => 'https://api.example.com'],
+        ]),
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 48,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/48',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://custom-web.example.net'],
+            'api' => ['domain' => 'https://custom-api.example.net'],
+        ]),
+        'fqdn' => 'https://custom-web.example.net,https://custom-api.example.net',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->set('newDomainService', 'api')
+        ->call('generateDomain')
+        ->assertDispatched('success');
+
+    $domains = json_decode($preview->fresh()->docker_compose_domains, true);
+
+    expect($domains['web']['domain'])->toBe('https://custom-web.example.net')
+        ->and($domains['api']['domain'])->toStartWith('https://custom-api.example.net,')
+        ->and($domains['api']['domain'])->toContain('48.api.example.com');
+});
+
+it('keeps compose services without application domains private when configuring a preview', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  worker:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com'],
+            'worker' => ['domain' => ''],
+        ]),
+    ]);
+
+    Livewire::test(Previews::class, ['application' => $this->application->fresh()])
+        ->set('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ])
+        ->call('add', 43, 'https://github.com/coollabsio/coolify/pull/43');
+
+    $preview = ApplicationPreview::query()
+        ->where('application_id', $this->application->id)
+        ->where('pull_request_id', 43)
+        ->firstOrFail();
+    $composeDomains = json_decode($preview->docker_compose_domains, true);
+
+    expect($composeDomains['web']['domain'])
+        ->toContain('web.example.com')
+        ->and($composeDomains['worker']['domain'])->toBe('')
+        ->and($preview->fqdn)->toContain('web.example.com')
+        ->not->toContain('worker');
+});
+
+it('generates a domain when configuring a preview', function () {
+    Livewire::test(Previews::class, ['application' => $this->application->fresh()])
+        ->set('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ])
+        ->call('add', 43, 'https://github.com/coollabsio/coolify/pull/43')
+        ->assertDispatched('success');
+
+    $preview = ApplicationPreview::query()
+        ->where('application_id', $this->application->id)
+        ->where('pull_request_id', 43)
+        ->firstOrFail();
+
+    expect($preview->fqdn)
+        ->not->toBeNull()
+        ->toContain('43.');
+});
+
+it('manages preview domains and their dns status', function () {
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 44,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/44',
+        'fqdn' => 'https://44.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.url', 'https://44.example.com')
+        ->call('checkDomainDns', 0)
+        ->assertSet('domainRows.0.dns_status', 'skipped')
+        ->set('newDomainParts.host', 'second.example.com')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success')
+        ->assertCount('domainRows', 2)
+        ->call('removeDomain', 0)
+        ->assertCount('domainRows', 1);
+
+    expect($preview->fresh()->fqdn)->toBe('https://second.example.com')
+        ->and($preview->fresh()->domain_dns_statuses)->not->toBeNull();
+});
+
+it('removes the intended preview domains by stable identities after reindexing', function () {
+    $domains = [
+        'https://first.example.com',
+        'https://second.example.com',
+        'https://third.example.com',
+    ];
+    $domainKeys = array_map(fn (string $domain): string => hash('sha256', $domain.'|'), $domains);
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 47,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/47',
+        'fqdn' => implode(',', $domains),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('removeDomainByKey', $domainKeys[0])
+        ->assertSet('domainRows.0.url', $domains[1])
+        ->call('removeDomainByKey', $domainKeys[1])
+        ->assertCount('domainRows', 1)
+        ->assertSet('domainRows.0.url', $domains[2]);
+
+    expect($preview->fresh()->fqdn)->toBe($domains[2]);
+});
+
+it('renders preview domain delete confirmations with stable keys', function () {
+    $domains = [
+        'https://first.example.com',
+        'https://second.example.com',
+    ];
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 48,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/48',
+        'fqdn' => implode(',', $domains),
+    ]);
+
+    $renderedHtml = html_entity_decode(
+        Livewire::test(PreviewDomains::class, ['preview' => $preview])->html(),
+        ENT_QUOTES,
+    );
+
+    foreach ($domains as $domain) {
+        $domainKey = hash('sha256', $domain.'|');
+
+        expect($renderedHtml)->toMatch("/submitAction:\\s*[\"']removeDomainByKey\\({$domainKey}\\)[\"']/");
+    }
+
+    expect($renderedHtml)->not->toMatch('/submitAction:\\s*[\"\']removeDomain\\(\\d+\\)[\"\']/');
+});
+
+it('removes only the matching compose preview domain when services share a URL', function () {
+    $url = 'https://shared.example.com';
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  worker:\n    image: nginx:alpine\n",
+    ]);
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 49,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/49',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => $url],
+            'worker' => ['domain' => $url],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('removeDomainByKey', hash('sha256', $url.'|worker'))
+        ->assertCount('domainRows', 1)
+        ->assertSet('domainRows.0.url', $url)
+        ->assertSet('domainRows.0.service', 'web');
+
+    expect(json_decode($preview->fresh()->docker_compose_domains, true))->toBe([
+        'web' => ['domain' => $url],
+        'worker' => ['domain' => ''],
+    ]);
+});
+
+it('adds a preview domain and starts its dns check asynchronously', function () {
+    Queue::fake();
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 45,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/45',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->set('newDomainParts.host', 'preview.example.com')
+        ->call('addDomain')
+        ->assertCount('domainRows', 1)
+        ->assertSet('domainRows.0.dns_status', 'checking')
+        ->assertDispatched('success', 'Domain added. DNS check started.');
+
+    Queue::assertPushed(CheckDomainDnsJob::class, fn (CheckDomainDnsJob $job): bool => $job->resource->is($preview)
+        && $job->url === 'https://preview.example.com');
+
+    expect($preview->fresh()->fqdn)->toBe('https://preview.example.com')
+        ->and(collect($preview->fresh()->domain_dns_statuses)->first()['status'])->toBe('checking');
+});
+
+it('notifies when an asynchronous preview dns check finds a mismatch', function () {
+    $url = 'https://preview.example.com';
+    $statusKey = hash('sha256', $url.'|');
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 46,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/46',
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $statusKey => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'check_id' => 'preview-check',
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.dns_status', 'checking');
+
+    $preview->update([
+        'domain_dns_statuses' => [
+            $statusKey => [
+                'status' => 'failed',
+                'message' => 'Required DNS record type A pointing to 203.0.113.10',
+                'expected_ip' => '203.0.113.10',
+                'checked_at' => now()->toIso8601String(),
+            ],
+        ],
+    ]);
+
+    $component->call('pollDnsChecks')
+        ->assertSet('domainRows.0.dns_status', 'failed')
+        ->assertDispatched('error', 'DNS is not configured for preview.example.com. Review the required DNS record.');
+});
+
+it('does not overwrite a completed preview dns result with stale checking state', function () {
+    $url = 'https://preview.example.com';
+    $statusKey = hash('sha256', $url.'|');
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 48,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/48',
+        'fqdn' => $url,
+        'domain_dns_statuses' => [
+            $statusKey => [
+                'status' => 'checking',
+                'message' => 'Checking DNS...',
+                'check_id' => 'stale-check',
+            ],
+        ],
+    ]);
+
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+
+    $preview->update([
+        'domain_dns_statuses' => [
+            $statusKey => [
+                'status' => 'ok',
+                'message' => 'DNS looks correct.',
+                'check_id' => 'completed-check',
+            ],
+        ],
+    ]);
+
+    $method = new ReflectionMethod($component->instance(), 'persistDnsStatuses');
+    $method->invoke($component->instance());
+
+    expect($preview->fresh()->domain_dns_statuses[$statusKey])
+        ->toMatchArray([
+            'status' => 'ok',
+            'message' => 'DNS looks correct.',
+            'check_id' => 'completed-check',
+        ]);
 });
 
 it('lists existing domains as individual rows', function () {
@@ -360,7 +826,8 @@ it('updates a domain in place via modal', function () {
         ->assertHasNoErrors()
         ->assertSet('showEditDomainModal', false)
         ->assertDispatched('edit-domain-saved')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertNotDispatched('error');
 
     $this->application->refresh();
 
