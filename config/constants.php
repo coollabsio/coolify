@@ -2,9 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.3.12',
+        'version' => env('COOLIFY_VERSION') ?: '4.3.15',
         'helper_version' => '1.0.16',
-        'realtime_version' => '1.0.17',
+        'realtime_version' => '1.0.18',
         'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
@@ -14,6 +14,7 @@ return [
         'realtime_image' => env('REALTIME_IMAGE', env('REGISTRY_URL', 'docker.io').'/coollabsio/coolify-realtime'),
         'is_windows_docker_desktop' => env('IS_WINDOWS_DOCKER_DESKTOP', false),
         'cdn_url' => env('CDN_URL', 'https://cdn.coollabs.io'),
+        'avatar_cdn_url' => env('AVATAR_CDN_URL'),
         'versions_url' => env('VERSIONS_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/versions.json'),
         'upgrade_script_url' => env('UPGRADE_SCRIPT_URL', env('CDN_URL', 'https://cdn.coollabs.io').'/coolify/upgrade.sh'),
         'releases_url' => env('RELEASES_URL', 'https://cdn.coollabs.io/coolify/releases.json'),

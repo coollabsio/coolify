@@ -570,8 +570,16 @@ class ValidationPatterns
                 continue;
             }
 
-            if (blank(parse_url($url, PHP_URL_HOST))) {
+            $host = parse_url($url, PHP_URL_HOST);
+            if (blank($host)) {
                 $errors[] = "Invalid URL: {$url}";
+
+                continue;
+            }
+
+            $unwrappedHost = trim((string) $host, '[]');
+            if (! str_contains($unwrappedHost, '.') && filter_var($unwrappedHost, FILTER_VALIDATE_IP) === false) {
+                $errors[] = "Invalid URL: {$url}. The hostname must be a fully qualified domain name.";
             }
         }
 

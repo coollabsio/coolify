@@ -275,6 +275,23 @@ describe('StandaloneDocker/SwarmDocker ownedByCurrentTeam scope', function () {
 });
 
 describe('Destination/Show team scope', function () {
+    test('deleting a destination redirects without rendering the deleted destination', function () {
+        $destination = SwarmDocker::create([
+            'uuid' => fake()->uuid(),
+            'name' => 'swarm-a-'.fake()->unique()->word(),
+            'network' => 'swarm-a-'.fake()->unique()->word(),
+            'server_id' => $this->serverA->id,
+        ]);
+
+        $component = Livewire::test(DestinationShow::class, ['destination_uuid' => $destination->uuid])
+            ->call('delete')
+            ->assertRedirect(route('destination.index'));
+
+        expect($component->effects)
+            ->toHaveKey('redirectUsingNavigate', true);
+        expect($destination->fresh())->toBeNull();
+    });
+
     test('mount with other team destination UUID redirects to index', function () {
         $component = Livewire::test(DestinationShow::class, ['destination_uuid' => $this->destinationB->uuid]);
 

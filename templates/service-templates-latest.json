@@ -1400,6 +1400,24 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
+    "executor": {
+        "documentation": "https://executor.sh/docs/hosted/docker?utm_source=coolify.io",
+        "slogan": "Self-hosted AI agent integrations and code execution server.",
+        "compose": "c2VydmljZXM6CiAgZXhlY3V0b3I6CiAgICBpbWFnZTogJ2doY3IuaW8vcmh5c3N1bGxpdmFuL2V4ZWN1dG9yLXNlbGZob3N0OiR7RVhFQ1VUT1JfVkVSU0lPTjotbGF0ZXN0fScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX0VYRUNVVE9SXzQ3ODgKICAgICAgLSAnRVhFQ1VUT1JfV0VCX0JBU0VfVVJMPSR7U0VSVklDRV9VUkxfRVhFQ1VUT1JfNDc4OH0nCiAgICAgIC0gJ0VYRUNVVE9SX0hPU1Q9JHtFWEVDVVRPUl9IT1NUOi0wLjAuMC4wfScKICAgICAgLSAnUE9SVD0ke1BPUlQ6LTQ3ODh9JwogICAgICAtIEVYRUNVVE9SX0RBVEFfRElSPS9kYXRhCiAgICAgIC0gJ0VYRUNVVE9SX0RCX1BBVEg9JHtFWEVDVVRPUl9EQl9QQVRIOi0vZGF0YS9kYXRhLmRifScKICAgICAgLSAnRVhFQ1VUT1JfT1JHX05BTUU9JHtFWEVDVVRPUl9PUkdfTkFNRTotRGVmYXVsdH0nCiAgICAgIC0gJ0VYRUNVVE9SX09SR19TTFVHPSR7RVhFQ1VUT1JfT1JHX1NMVUc6LWRlZmF1bHR9JwogICAgICAtICdFWEVDVVRPUl9BTExPV19MT0NBTF9ORVRXT1JLPSR7RVhFQ1VUT1JfQUxMT1dfTE9DQUxfTkVUV09SSzotZmFsc2V9JwogICAgdm9sdW1lczoKICAgICAgLSAnZXhlY3V0b3ItZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBidW4KICAgICAgICAtICctZScKICAgICAgICAtICdmZXRjaChgaHR0cDovLzEyNy4wLjAuMToke3Byb2Nlc3MuZW52LlBPUlR8fDQ3ODh9L2FwaS9oZWFsdGhgKS50aGVuKHI9PnByb2Nlc3MuZXhpdChyLm9rPzA6MSksKCk9PnByb2Nlc3MuZXhpdCgxKSknCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogNQogICAgICBzdGFydF9wZXJpb2Q6IDIwcwp2b2x1bWVzOgogIGV4ZWN1dG9yLWRhdGE6IG51bGwK",
+        "tags": [
+            "executor",
+            "ai",
+            "agents",
+            "mcp",
+            "automation",
+            "development"
+        ],
+        "category": "development",
+        "logo": "svgs/executor.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "4788"
+    },
     "faraday": {
         "documentation": "https://faradaysec.com/?utm_source=coolify.io",
         "slogan": "Faraday is a powerful, open-source, web-based vulnerability management tool.",

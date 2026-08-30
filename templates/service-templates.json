@@ -1400,6 +1400,24 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
     },
+    "executor": {
+        "documentation": "https://executor.sh/docs/hosted/docker?utm_source=coolify.io",
+        "slogan": "Self-hosted AI agent integrations and code execution server.",
+        "compose": "c2VydmljZXM6CiAgZXhlY3V0b3I6CiAgICBpbWFnZTogJ2doY3IuaW8vcmh5c3N1bGxpdmFuL2V4ZWN1dG9yLXNlbGZob3N0OiR7RVhFQ1VUT1JfVkVSU0lPTjotbGF0ZXN0fScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9FWEVDVVRPUl80Nzg4CiAgICAgIC0gJ0VYRUNVVE9SX1dFQl9CQVNFX1VSTD0ke1NFUlZJQ0VfRlFETl9FWEVDVVRPUl80Nzg4fScKICAgICAgLSAnRVhFQ1VUT1JfSE9TVD0ke0VYRUNVVE9SX0hPU1Q6LTAuMC4wLjB9JwogICAgICAtICdQT1JUPSR7UE9SVDotNDc4OH0nCiAgICAgIC0gRVhFQ1VUT1JfREFUQV9ESVI9L2RhdGEKICAgICAgLSAnRVhFQ1VUT1JfREJfUEFUSD0ke0VYRUNVVE9SX0RCX1BBVEg6LS9kYXRhL2RhdGEuZGJ9JwogICAgICAtICdFWEVDVVRPUl9PUkdfTkFNRT0ke0VYRUNVVE9SX09SR19OQU1FOi1EZWZhdWx0fScKICAgICAgLSAnRVhFQ1VUT1JfT1JHX1NMVUc9JHtFWEVDVVRPUl9PUkdfU0xVRzotZGVmYXVsdH0nCiAgICAgIC0gJ0VYRUNVVE9SX0FMTE9XX0xPQ0FMX05FVFdPUks9JHtFWEVDVVRPUl9BTExPV19MT0NBTF9ORVRXT1JLOi1mYWxzZX0nCiAgICB2b2x1bWVzOgogICAgICAtICdleGVjdXRvci1kYXRhOi9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGJ1bgogICAgICAgIC0gJy1lJwogICAgICAgIC0gJ2ZldGNoKGBodHRwOi8vMTI3LjAuMC4xOiR7cHJvY2Vzcy5lbnYuUE9SVHx8NDc4OH0vYXBpL2hlYWx0aGApLnRoZW4ocj0+cHJvY2Vzcy5leGl0KHIub2s/MDoxKSwoKT0+cHJvY2Vzcy5leGl0KDEpKScKICAgICAgaW50ZXJ2YWw6IDMwcwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiA1CiAgICAgIHN0YXJ0X3BlcmlvZDogMjBzCnZvbHVtZXM6CiAgZXhlY3V0b3ItZGF0YTogbnVsbAo=",
+        "tags": [
+            "executor",
+            "ai",
+            "agents",
+            "mcp",
+            "automation",
+            "development"
+        ],
+        "category": "development",
+        "logo": "svgs/executor.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "4788"
+    },
     "faraday": {
         "documentation": "https://faradaysec.com/?utm_source=coolify.io",
         "slogan": "Faraday is a powerful, open-source, web-based vulnerability management tool.",

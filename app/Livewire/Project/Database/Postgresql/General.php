@@ -247,16 +247,16 @@ class General extends Component
         }
     }
 
-    public function save_init_script($script)
+    public function save_init_script($script, string $originalFilename)
     {
         $this->authorize('update', $this->database);
 
         $initScripts = collect($this->initScripts ?? []);
 
         $existingScript = $initScripts->firstWhere('filename', $script['filename']);
-        $oldScript = $initScripts->firstWhere('index', $script['index']);
+        $oldScript = $initScripts->firstWhere('filename', $originalFilename);
 
-        if ($existingScript && $existingScript['index'] !== $script['index']) {
+        if ($existingScript && $script['filename'] !== $originalFilename) {
             $this->dispatch('error', 'A script with this filename already exists.');
 
             return;
@@ -285,11 +285,10 @@ class General extends Component
             }
         }
 
-        $index = $initScripts->search(function ($item) use ($script) {
-            return $item['index'] === $script['index'];
-        });
+        $index = $initScripts->search(fn ($item) => $item['filename'] === $originalFilename);
 
         if ($index !== false) {
+            $script['index'] = $oldScript['index'];
             $initScripts[$index] = $script;
         } else {
             $initScripts->push($script);

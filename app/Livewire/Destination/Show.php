@@ -85,7 +85,7 @@ class Show extends Component
             }
             $this->destination->delete();
 
-            return redirect()->route('destination.index');
+            return redirectRoute($this, 'destination.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

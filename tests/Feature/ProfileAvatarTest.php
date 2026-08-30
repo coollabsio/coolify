@@ -2,6 +2,8 @@
 
 use App\Livewire\Profile\Index;
 use App\Models\InstanceSettings;
+use App\Models\S3Storage;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\AvatarStorageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -73,6 +75,71 @@ it('serves the authenticated users profile picture', function () {
         ->assertHeader('content-type', 'image/jpeg');
 });
 
+it('loads an S3 profile picture from the configured CDN', function () {
+    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com/media/');
+    Team::factory()->create(['id' => 0]);
+    $storage = S3Storage::query()->create([
+        'team_id' => 0,
+        'name' => 'Avatar storage',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'avatars',
+        'endpoint' => 'https://s3.example.com',
+        'is_usable' => true,
+    ]);
+    $user = User::factory()->create([
+        'avatar_path' => 'avatars/1/avatar.jpg',
+        'avatar_storage_type' => 's3',
+        'avatar_s3_storage_id' => $storage->id,
+    ]);
+
+    expect(profile_avatar_url($user))->toBe("https://avatars.example.com/media/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
+});
+
+it('loads an S3 profile picture directly from S3 when the CDN is not configured', function () {
+    config()->set('constants.coolify.avatar_cdn_url');
+    Team::factory()->create(['id' => 0]);
+    $storage = S3Storage::query()->create([
+        'team_id' => 0,
+        'name' => 'Avatar storage',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'avatars',
+        'endpoint' => 'https://s3.example.com',
+        'is_usable' => true,
+    ]);
+    $user = User::factory()->create([
+        'avatar_path' => 'avatars/1/avatar.jpg',
+        'avatar_storage_type' => 's3',
+        'avatar_s3_storage_id' => $storage->id,
+    ]);
+
+    expect(profile_avatar_url($user))->toBe("https://s3.example.com/avatars/avatars/1/avatar.jpg?v={$user->updated_at->timestamp}");
+});
+
+it('does not use an unrelated S3 storage URL for a profile picture', function () {
+    config()->set('constants.coolify.avatar_cdn_url', 'https://avatars.example.com');
+    $storage = S3Storage::query()->create([
+        'team_id' => Team::factory()->create()->id,
+        'name' => 'Unrelated storage',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'avatars',
+        'endpoint' => 'https://unrelated.example.com',
+        'is_usable' => true,
+    ]);
+    $user = User::factory()->create([
+        'avatar_path' => 'avatars/1/avatar.jpg',
+        'avatar_storage_type' => 's3',
+        'avatar_s3_storage_id' => $storage->id,
+    ]);
+
+    expect(profile_avatar_url($user))->toBe(route('profile.avatar', ['v' => $user->updated_at->timestamp]));
+});
+
 it('removes the current profile picture', function () {
     Storage::fake('images');
     $user = User::factory()->create([
@@ -120,7 +187,7 @@ it('automatically uploads a selected profile picture and keeps the current avata
         ->not->toContain('Upload picture')
         ->not->toContain('type="file" x-on:change')
         ->and($menu)
-        ->toContain("route('profile.avatar',");
+        ->toContain('profile_avatar_url($user)');
 });
 
 it('offers runtime local or existing S3 profile picture storage', function () {

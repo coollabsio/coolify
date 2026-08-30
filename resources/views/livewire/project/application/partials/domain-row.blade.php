@@ -37,9 +37,10 @@
         ->keys()
         ->first();
     $showDirection = ($showDirectionControl ?? true) && ! $isSuggested && $firstPairRowIndex === $index;
+    $domainKey = hash('sha256', $row['url'].'|'.($row['service'] ?? ''));
 @endphp
 
-<div wire:key="domain-row-{{ $index }}-{{ md5(($isSuggested ? 's:' : '') . $row['url'] . '|' . ($row['service'] ?? '')) }}"
+<div wire:key="domain-row-{{ md5(($isSuggested ? 's:' : '') . $row['url'] . '|' . ($row['service'] ?? '')) }}"
     class="env-table-item">
     <div @class([
         'data-table-row',
@@ -185,7 +186,7 @@
                             <x-reicon name="settings" class="size-3.5" />
                         </button>
                         <x-modal-confirmation class="!w-auto shrink-0" title="Remove domain?" buttonTitle="Remove"
-                            isErrorButton submitAction="removeDomain({{ $index }})" :actions="[
+                            isErrorButton submitAction="removeDomainByKey({{ $domainKey }})" :actions="[
                                 'This domain will be removed from the application.',
                                 'Redeploy or restart may be required for proxy changes.',
                             ]" :confirmWithPassword="false" :confirmWithText="false" step2ButtonText="Remove domain">

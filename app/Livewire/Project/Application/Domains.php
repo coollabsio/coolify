@@ -1007,6 +1007,7 @@ class Domains extends Component
         $skipDns = ! $this->dnsValidationEnabled
             || ! $server
             || $this->application->additional_servers->count() > 0;
+        $indexesToCheck = [];
 
         foreach ($this->domainRows as $index => $row) {
             $url = $row['url'] ?? null;
@@ -1320,6 +1321,28 @@ class Domains extends Component
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    public function removeDomainByKey(string $domainKey): void
+    {
+        $index = collect($this->domainRows)->search(
+            fn (array $row): bool => ! ($row['is_suggested'] ?? false)
+                && hash_equals($domainKey, $this->domainRowKey($row))
+        );
+
+        if ($index === false) {
+            return;
+        }
+
+        $this->removeDomain((int) $index);
+    }
+
+    /**
+     * @param  array{url: string, service?: ?string}  $row
+     */
+    private function domainRowKey(array $row): string
+    {
+        return hash('sha256', $row['url'].'|'.($row['service'] ?? ''));
     }
 
     public function generateDomain(?string $serviceName = null): void

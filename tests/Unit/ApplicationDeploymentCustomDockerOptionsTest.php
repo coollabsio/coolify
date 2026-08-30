@@ -64,7 +64,7 @@ function generateComposeServiceWithCustomDockerOptions(string $customDockerOptio
         'server' => $server,
         'mainServer' => $server,
         'pull_request_id' => 0,
-        'container_name' => $application->uuid,
+        'container_name' => 'custom-internal-name',
         'production_image_name' => 'example/app:latest',
         'deployment_uuid' => 'deployment-uuid',
         'workdir' => '/artifacts/custom-docker-options-app',
@@ -82,7 +82,8 @@ function generateComposeServiceWithCustomDockerOptions(string $customDockerOptio
 
 it('applies an entrypoint when consistent naming and a custom internal name are configured', function () {
     expect(generateComposeServiceWithCustomDockerOptions('--entrypoint "/bin/echo hello world"'))
-        ->toHaveKey('entrypoint', '/bin/echo hello world');
+        ->toHaveKey('entrypoint', '/bin/echo hello world')
+        ->toHaveKey('container_name', 'custom-internal-name');
 });
 
 it('preserves custom network aliases when a static IP is configured', function () {

@@ -127,6 +127,21 @@ it('groups configured domains and shows redirect settings in the table', functio
         ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
 });
 
+it('removes consecutive service domains by stable row identity after indexes change', function () {
+    $this->apiApp->update([
+        'fqdn' => 'https://first.example.com,https://second.example.com,https://third.example.com',
+    ]);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])]);
+
+    $component
+        ->call('removeDomainByKey', hash('sha256', 'https://first.example.com|'.$this->apiApp->id))
+        ->call('removeDomainByKey', hash('sha256', 'https://second.example.com|'.$this->apiApp->id))
+        ->assertDispatched('success');
+
+    expect($this->apiApp->fresh()->fqdn)->toBe('https://third.example.com');
+});
+
 it('shows and persists the HTTP redirect control for HTTPS service applications', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSee('Redirect HTTP to HTTPS')
@@ -176,6 +191,18 @@ it('resets the add domain dns gate when segmented domain fields change', functio
         ->assertSet('addDomainDnsFailed', false)
         ->assertSet('addDomainDnsMessage', '')
         ->assertSet('forceSaveDns', false);
+});
+
+it('does not add a single-label hostname as a service domain', function () {
+    $this->apiApp->update(['fqdn' => null]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->apiApp->id)
+        ->set('newDomainParts.host', 'aaa')
+        ->call('addDomain')
+        ->assertDispatched('error');
+
+    expect($this->apiApp->fresh()->fqdn)->toBeNull();
 });
 
 it('shows dns entries control next to Add', function () {
@@ -429,7 +456,8 @@ it('prunes the previous dns status when a service domain is renamed', function (
         ->call('updateDomain')
         ->assertHasNoErrors()
         ->assertDispatched('edit-domain-saved')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertNotDispatched('error');
 
     $this->apiApp->refresh();
 

@@ -77,3 +77,22 @@ it('places links and logs dropdowns beside preview actions', function () {
         ->toContain('title="Preview logs"')
         ->toContain('title="Preview actions"');
 });
+
+it('uses the shared domain list treatment for preview domains', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
+    $domainsView = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
+
+    expect($view)
+        ->toContain('<livewire:project.application.preview-domains')
+        ->and($domainsView)
+        ->toContain('Recheck DNS')
+        ->toContain('Add domain')
+        ->toContain('data-table-header')
+        ->toContain('domains-table-grid-service')
+        ->toContain('class="env-table-item"')
+        ->toContain('No domains configured')
+        ->toContain('class="data-table-row')
+        ->toContain('DNS OK')
+        ->toContain('Edit domain')
+        ->toContain('Remove domain');
+});
