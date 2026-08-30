@@ -1395,8 +1395,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             if ($this->build_pack !== 'dockercompose') {
                 $detectedPort = $this->application->detectPortFromEnvironment(false);
                 if ($detectedPort && ! empty($ports) && ! in_array($detectedPort, $ports)) {
+                    // With readonly labels disabled the Ports Exposes field is not editable,
+                    // so pointing the user at it would be a dead end.
+                    $where = $this->application->settings->is_container_label_readonly_enabled === false
+                        ? 'Readonly labels are disabled, so set the port in the labels section.'
+                        : 'Check the "General" page to fix it.';
                     $this->application_deployment_queue->addLogEntry(
-                        "Warning: PORT environment variable ({$detectedPort}) does not match configured ports_exposes: ".implode(',', $ports).'. It could case "bad gateway" or "no server" errors. Check the "General" page to fix it.',
+                        "Warning: PORT environment variable ({$detectedPort}) does not match configured ports_exposes: ".implode(',', $ports).'. It could case "bad gateway" or "no server" errors. '.$where,
                         'stderr'
                     );
                 }

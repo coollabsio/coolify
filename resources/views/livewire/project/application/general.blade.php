@@ -429,11 +429,20 @@
                             </svg>
                             <div>
                                 <span class="font-semibold">PORT mismatch detected</span>
-                                <p class="mt-1">Your PORT environment variable is set to
-                                    <strong>{{ $this->detectedPortInfo['port'] }}</strong>, but it's not in your Ports
-                                    Exposes
-                                    configuration. Ensure they match for proper proxy routing.
-                                </p>
+                                @if ($application->settings->is_container_label_readonly_enabled === false)
+                                    <p class="mt-1">Your PORT environment variable is set to
+                                        <strong>{{ $this->detectedPortInfo['port'] }}</strong>, but it's not in your
+                                        Ports Exposes configuration. Readonly labels are disabled, so the Ports Exposes
+                                        field cannot be edited here — set the port in the labels section instead.
+                                    </p>
+                                @else
+                                    <p class="mt-1">Your PORT environment variable is set to
+                                        <strong>{{ $this->detectedPortInfo['port'] }}</strong>, but it's not in your
+                                        Ports
+                                        Exposes
+                                        configuration. Ensure they match for proper proxy routing.
+                                    </p>
+                                @endif
                             </div>
                         </div>
                     @else
