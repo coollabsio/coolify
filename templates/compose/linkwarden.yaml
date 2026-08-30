@@ -1,0 +1,54 @@
+# documentation: https://docs.linkwarden.app/self-hosting/setup
+# slogan: A self-hostable collaborative bookmark manager to collect, organize, and preserve web pages.
+# category: productivity
+# tags: bookmarks,collaboration,archive,links,self-hosted
+# logo: svgs/linkwarden.svg
+# port: 3000
+
+services:
+  linkwarden:
+    image: ghcr.io/linkwarden/linkwarden:latest
+    environment:
+      - SERVICE_URL_LINKWARDEN_3000
+      - NEXTAUTH_URL=${SERVICE_URL_LINKWARDEN_3000}/api/v1/auth
+      - NEXTAUTH_SECRET=${SERVICE_PASSWORD_LINKWARDENNEXTAUTH}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/${POSTGRES_DB:-linkwarden}
+    volumes:
+      - linkwarden-data:/data/data
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 10s
+      timeout: 20s
+      retries: 10
+
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-linkwarden}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.12.8
+    environment:
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
+    volumes:
+      - meilisearch-data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:7700/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 10

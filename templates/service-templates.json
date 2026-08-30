@@ -435,7 +435,7 @@
         "category": "messaging",
         "logo": "svgs/buzz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": null,
+        "template_last_updated_at": "2026-07-23T17:25:53+02:00",
         "port": "3000"
     },
     "calibre-web-automated-book-downloader": {
@@ -552,7 +552,7 @@
         "category": "backend",
         "logo": "svgs/denoKV.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": null,
+        "template_last_updated_at": "2026-08-07T18:17:33+02:00",
         "port": "8080"
     },
     "changedetection": {
@@ -2487,7 +2487,7 @@
         "category": "development",
         "logo": "svgs/jean.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": null,
+        "template_last_updated_at": "2026-08-13T11:00:04+02:00",
         "port": "3456"
     },
     "jellyfin": {
@@ -2898,6 +2898,23 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-01-13T00:05:43+01:00",
         "port": "9090"
+    },
+    "linkwarden": {
+        "documentation": "https://docs.linkwarden.app/self-hosting/setup?utm_source=coolify.io",
+        "slogan": "A self-hostable collaborative bookmark manager to collect, organize, and preserve web pages.",
+        "compose": "c2VydmljZXM6CiAgbGlua3dhcmRlbjoKICAgIGltYWdlOiAnZ2hjci5pby9saW5rd2FyZGVuL2xpbmt3YXJkZW46bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0xJTktXQVJERU5fMzAwMAogICAgICAtICdORVhUQVVUSF9VUkw9JHtTRVJWSUNFX0ZRRE5fTElOS1dBUkRFTl8zMDAwfS9hcGkvdjEvYXV0aCcKICAgICAgLSAnTkVYVEFVVEhfU0VDUkVUPSR7U0VSVklDRV9QQVNTV09SRF9MSU5LV0FSREVOTkVYVEFVVEh9JwogICAgICAtICdNRUlMSV9NQVNURVJfS0VZPSR7U0VSVklDRV9QQVNTV09SRF9NRUlMSX0nCiAgICAgIC0gJ0RBVEFCQVNFX1VSTD1wb3N0Z3Jlc3FsOi8vJFNFUlZJQ0VfVVNFUl9QT1NUR1JFUzokU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU0Bwb3N0Z3Jlc3FsOjU0MzIvJHtQT1NUR1JFU19EQjotbGlua3dhcmRlbn0nCiAgICB2b2x1bWVzOgogICAgICAtICdsaW5rd2FyZGVuLWRhdGE6L2RhdGEvZGF0YScKICAgIGRlcGVuZHNfb246CiAgICAgIHBvc3RncmVzcWw6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgICAgbWVpbGlzZWFyY2g6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTozMDAwJwogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIHBvc3RncmVzcWw6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2LWFscGluZScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3Bvc3RncmVzcWwtZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBQT1NUR1JFU19VU0VSPSRTRVJWSUNFX1VTRVJfUE9TVEdSRVMKICAgICAgLSBQT1NUR1JFU19QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTX0RCOi1saW5rd2FyZGVufScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBtZWlsaXNlYXJjaDoKICAgIGltYWdlOiAnZ2V0bWVpbGkvbWVpbGlzZWFyY2g6djEuMTIuOCcKICAgIGVudmlyb25tZW50OgogICAgICAtICdNRUlMSV9NQVNURVJfS0VZPSR7U0VSVklDRV9QQVNTV09SRF9NRUlMSX0nCiAgICB2b2x1bWVzOgogICAgICAtICdtZWlsaXNlYXJjaC1kYXRhOi9tZWlsaV9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjc3MDAvaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "bookmarks",
+            "collaboration",
+            "archive",
+            "links",
+            "self-hosted"
+        ],
+        "category": "productivity",
+        "logo": "svgs/linkwarden.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "3000"
     },
     "listmonk": {
         "documentation": "https://listmonk.app/?utm_source=coolify.io",
@@ -3472,6 +3489,23 @@
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "3000"
     },
+    "nextcloud-collabora-with-postgres": {
+        "documentation": "https://docs.nextcloud.com?utm_source=coolify.io",
+        "slogan": "NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.",
+        "compose": "c2VydmljZXM6CiAgbmV4dGNsb3VkOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL25leHRjbG91ZDpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTkVYVENMT1VEXzgwCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gJ1RaPSR7VFo6LUV1cm9wZS9QYXJpc30nCiAgICAgIC0gJ1BPU1RHUkVTX0RCPSR7UE9TVEdSRVNfREI6LW5leHRjbG91ZH0nCiAgICAgIC0gJ1BPU1RHUkVTX1VTRVI9JHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9JwogICAgICAtICdQT1NUR1JFU19QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVN9JwogICAgICAtIFBPU1RHUkVTX0hPU1Q9bmV4dGNsb3VkLWRiCiAgICAgIC0gUkVESVNfSE9TVD1yZWRpcwogICAgICAtIFJFRElTX1BPUlQ9NjM3OQogICAgdm9sdW1lczoKICAgICAgLSAnbmV4dGNsb3VkLWNvbmZpZzovY29uZmlnJwogICAgICAtICduZXh0Y2xvdWQtZGF0YTovZGF0YScKICAgIGRlcGVuZHNfb246CiAgICAgIG5leHRjbG91ZC1kYjoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgICByZWRpczoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1CiAgbmV4dGNsb3VkLWRiOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNi1hbHBpbmUnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnUE9TVEdSRVNfVVNFUj0ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU30nCiAgICAgIC0gJ1BPU1RHUkVTX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU30nCiAgICAgIC0gJ1BPU1RHUkVTX0RCPSR7UE9TVEdSRVNfREI6LW5leHRjbG91ZH0nCiAgICB2b2x1bWVzOgogICAgICAtICduZXh0Y2xvdWQtcG9zdGdyZXNxbC1kYXRhOi92YXIvbGliL3Bvc3RncmVzcWwvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICByZWRpczoKICAgIGltYWdlOiAncmVkaXM6Ny40LWFscGluZScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ25leHRjbG91ZC1yZWRpcy1kYXRhOi9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHJlZGlzLWNsaQogICAgICAgIC0gUElORwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDIwCiAgY29sbGFib3JhOgogICAgaW1hZ2U6ICdjb2xsYWJvcmEvY29kZTpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fQ09MTEFCT1JBXzk5ODAKICAgICAgLSAndXNlcm5hbWU9JHtDT0xMQUJPUkFfVVNFUk5BTUU6LWFkbWlufScKICAgICAgLSAncGFzc3dvcmQ9JHtTRVJWSUNFX1BBU1NXT1JEX0NPTEFCT1JBfScKICAgICAgLSAnZGljdGlvbmFyaWVzPSR7Q09MTEFCT1JBX0RJQ1RJT05BUklFUzotZW59JwogICAgICAtIERPTlRfR0VOX1NTTF9DRVJUPXRydWUKICAgICAgLSBET05UX0VOQ1JZUFQ9eWVzCiAgICAgIC0gJ3NlcnZlcl9uYW1lPSR7Q09MTEFCT1JBX0hPU1ROQU1FOi1jb2xsYWJvcmF9JwogICAgICAtICdleHRyYV9wYXJhbXM9LS1vOnNzbC5lbmFibGU9ZmFsc2UgLS1vOnNzbC50ZXJtaW5hdGlvbj10cnVlJwogICAgY2FwX2FkZDoKICAgICAgLSBNS05PRAogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjk5ODAvaG9zdGluZy9kaXNjb3ZlcnknCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDMKICAgICAgc3RhcnRfcGVyaW9kOiA2MHMKdm9sdW1lczoKICBuZXh0Y2xvdWQtY29uZmlnOiBudWxsCiAgbmV4dGNsb3VkLWRhdGE6IG51bGwKICBuZXh0Y2xvdWQtcG9zdGdyZXNxbC1kYXRhOiBudWxsCiAgbmV4dGNsb3VkLXJlZGlzLWRhdGE6IG51bGwK",
+        "tags": [
+            "cloud",
+            "collaboration",
+            "communication",
+            "filestorage",
+            "data"
+        ],
+        "category": "storage",
+        "logo": "svgs/nextcloud.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "80"
+    },
     "nextcloud-with-mariadb": {
         "documentation": "https://docs.nextcloud.com?utm_source=coolify.io",
         "slogan": "NextCloud is a self-hosted, open-source platform that provides file storage, collaboration, and communication tools for seamless data management.",
@@ -3696,6 +3730,23 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
+    },
+    "obsidian-livesync": {
+        "documentation": "https://github.com/vrtmrz/obsidian-livesync/blob/main/docs/setup_own_server.md?utm_source=coolify.io",
+        "slogan": "Self-hosted sync backend for Obsidian LiveSync plugin using CouchDB",
+        "compose": "c2VydmljZXM6CiAgY291Y2hkYjoKICAgIGltYWdlOiAnY291Y2hkYjozLjQuMicKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DT1VDSERCXzU5ODQKICAgICAgLSAnQ09VQ0hEQl9VU0VSPSR7U0VSVklDRV9VU0VSX0NPVUNIREJ9JwogICAgICAtICdDT1VDSERCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF82NF9DT1VDSERCfScKICAgICAgLSAnTUFYX0RPQ1VNRU5UX1NJWkU9JHtNQVhfRE9DVU1FTlRfU0laRTotNTI0Mjg4MDB9JwogICAgICAtICdNQVhfSFRUUF9SRVFVRVNUX1NJWkU9JHtNQVhfSFRUUF9SRVFVRVNUX1NJWkU6LTY3MTA4ODY0fScKICAgIHZvbHVtZXM6CiAgICAgIC0KICAgICAgICB0eXBlOiBiaW5kCiAgICAgICAgc291cmNlOiAuL2xvY2FsLmluaQogICAgICAgIHRhcmdldDogL29wdC9jb3VjaGRiL2V0Yy9sb2NhbC5pbmkKICAgICAgICBjb250ZW50OiAiW2NvdWNoZGJdXG5zaW5nbGVfbm9kZT10cnVlXG5tYXhfZG9jdW1lbnRfc2l6ZSA9ICR7TUFYX0RPQ1VNRU5UX1NJWkV9XG5cbltjaHR0cGRdXG5yZXF1aXJlX3ZhbGlkX3VzZXIgPSB0cnVlXG5tYXhfaHR0cF9yZXF1ZXN0X3NpemUgPSAke01BWF9IVFRQX1JFUVVFU1RfU0laRX1cblxuW2NodHRwZF9hdXRoXVxucmVxdWlyZV92YWxpZF91c2VyID0gdHJ1ZVxuYXV0aGVudGljYXRpb25fcmVkaXJlY3QgPSAvX3V0aWxzL3Nlc3Npb24uaHRtbFxuXG5baHR0cGRdXG5XV1ctQXV0aGVudGljYXRlID0gQmFzaWMgcmVhbG09XCJjb3VjaGRiXCJcbmVuYWJsZV9jb3JzID0gdHJ1ZVxuXG5bY29yc11cbm9yaWdpbnMgPSBhcHA6Ly9vYnNpZGlhbi5tZCxjYXBhY2l0b3I6Ly9sb2NhbGhvc3QsaHR0cDovL2xvY2FsaG9zdFxuY3JlZGVudGlhbHMgPSB0cnVlXG5oZWFkZXJzID0gYWNjZXB0LCBhdXRob3JpemF0aW9uLCBjb250ZW50LXR5cGUsIG9yaWdpbiwgcmVmZXJlclxubWV0aG9kcyA9IEdFVCwgUFVULCBQT1NULCBIRUFELCBERUxFVEVcbm1heF9hZ2UgPSAzNjAwIgogICAgICAtICdjb3VjaGRiLWRhdGE6L29wdC9jb3VjaGRiL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ2N1cmwgLWYgLXUgIiQke0NPVUNIREJfVVNFUn06JCR7Q09VQ0hEQl9QQVNTV09SRH0iIGh0dHA6Ly9sb2NhbGhvc3Q6NTk4NC9fdXAnCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHN0YXJ0X3BlcmlvZDogNDBzCiAgICAgIHJldHJpZXM6IDMKdm9sdW1lczoKICBjb3VjaGRiLWRhdGE6IG51bGwK",
+        "tags": [
+            "obsidian",
+            "couchdb",
+            "sync",
+            "notes",
+            "markdown"
+        ],
+        "category": "storage",
+        "logo": "svgs/obsidian-livesync.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-08-24T09:10:19+02:00",
+        "port": "5984"
     },
     "odoo": {
         "documentation": "https://www.odoo.com/?utm_source=coolify.io",
@@ -5489,7 +5540,7 @@
         "category": "security",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
-        "template_last_updated_at": null,
+        "template_last_updated_at": "2026-08-24T09:04:51+02:00",
         "port": "8200"
     },
     "vaultwarden": {
