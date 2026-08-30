@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Services\ContainerStatusAggregator;
+use App\Services\RestartCountTracker;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -140,6 +141,9 @@ class GetContainersStatus
                     $application = $this->applications->where('id', $applicationId)->first();
                     if ($application) {
                         $foundApplications[] = $application->id;
+                        if ($application->container_present !== true) {
+                            $application->update(['container_present' => true]);
+                        }
                         // Store container status for aggregation
                         if (! isset($this->applicationContainerStatuses)) {
                             $this->applicationContainerStatuses = collect();
@@ -366,12 +370,18 @@ class GetContainersStatus
         $notRunningApplications = $this->applications->pluck('id')->diff($foundApplications);
         foreach ($notRunningApplications as $applicationId) {
             $application = $this->applications->where('id', $applicationId)->first();
-            if (str($application->status)->startsWith('exited')) {
-                continue;
-            }
 
             // Only protection: If no containers at all, Docker query might have failed
             if ($this->containers->isEmpty()) {
+                continue;
+            }
+
+            if (str($application->status)->startsWith('exited')) {
+                $application->update([
+                    'container_present' => false,
+                    'restart_limit_reached' => false,
+                ]);
+
                 continue;
             }
 
@@ -388,9 +398,11 @@ class GetContainersStatus
                 // Reset restart count when application exits completely
                 $application->update([
                     'status' => 'exited',
+                    'container_present' => false,
                     'restart_count' => 0,
                     'last_restart_at' => null,
                     'last_restart_type' => null,
+                    'restart_limit_reached' => false,
                 ]);
             }
         }
@@ -470,21 +482,25 @@ class GetContainersStatus
 
                 DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, &$restartLimitReached) {
                     $previousRestartCount = $application->restart_count ?? 0;
+                    $containerIsActive = $containerStatuses->contains(
+                        fn (string $status): bool => str($status)->startsWith(['running', 'restarting', 'starting'])
+                    );
+                    $restartState = (new RestartCountTracker)->evaluate(
+                        previousRestartCount: $previousRestartCount,
+                        observedRestartCount: $maxRestartCount,
+                        maxRestartCount: $application->max_restart_count ?? 0,
+                        containerIsActive: $containerIsActive,
+                    );
 
-                    if ($maxRestartCount > $previousRestartCount) {
-                        // Restart count increased - this is a crash restart
+                    if ($restartState['restart_count_changed']) {
+                        $hasCrashRestarts = $restartState['restart_count'] > 0;
                         $application->update([
-                            'restart_count' => $maxRestartCount,
-                            'last_restart_at' => now(),
-                            'last_restart_type' => 'crash',
+                            'restart_count' => $restartState['restart_count'],
+                            'last_restart_at' => $hasCrashRestarts ? now() : null,
+                            'last_restart_type' => $hasCrashRestarts ? 'crash' : null,
                         ]);
-
-                        // Check if restart limit has been reached
-                        $maxAllowedRestarts = $application->max_restart_count ?? 0;
-                        if ($maxAllowedRestarts > 0 && $maxRestartCount >= $maxAllowedRestarts && $previousRestartCount < $maxAllowedRestarts) {
-                            $restartLimitReached = true;
-                        }
                     }
+                    $restartLimitReached = $restartState['restart_limit_reached'];
 
                     // Aggregate status after tracking restart counts
                     $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
@@ -499,9 +515,22 @@ class GetContainersStatus
                 });
 
                 if ($restartLimitReached) {
-                    $application->refresh();
-                    StopApplication::dispatch($application, false, true, false);
-                    $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
+                    $restartLimitClaimed = Application::query()
+                        ->whereKey($application->getKey())
+                        ->where('restart_limit_reached', false)
+                        ->update(['restart_limit_reached' => true]) === 1;
+
+                    if ($restartLimitClaimed) {
+                        $application->refresh();
+                        StopApplication::dispatch(
+                            application: $application,
+                            previewDeployments: false,
+                            dockerCleanup: false,
+                            resetRestartCount: false,
+                            removeContainers: false,
+                        );
+                        $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
+                    }
                 }
             }
         }

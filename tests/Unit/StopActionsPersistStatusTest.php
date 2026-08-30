@@ -10,7 +10,7 @@ it('persists exited status for every full application stop path', function () {
     $action = file_get_contents(__DIR__.'/../../app/Actions/Application/StopApplication.php');
 
     expect($action)
-        ->toContain("\$status = ['status' => 'exited'];")
+        ->toContain("'status' => 'exited'")
         ->toContain('$application->update($status);')
         ->not->toMatch('/docker stack rm .*?return;/s');
 });

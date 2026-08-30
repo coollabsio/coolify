@@ -4978,6 +4978,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             'last_restart_type' => null,
         ]);
 
+        if ($this->pull_request_id === 0) {
+            $this->application->update(['restart_limit_reached' => false]);
+        }
+
         try {
             $this->application->markDeploymentConfigurationApplied($this->application_deployment_queue);
         } catch (Exception $e) {

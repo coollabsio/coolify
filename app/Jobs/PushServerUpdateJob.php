@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Application\StopApplication;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
@@ -23,8 +24,10 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
+use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Notifications\Container\ContainerRestarted;
 use App\Services\ContainerStatusAggregator;
+use App\Services\RestartCountTracker;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -95,6 +98,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public Collection $applicationContainerStatuses;
 
+    public Collection $applicationContainerRestartCounts;
+
     public Collection $serviceContainerStatuses;
 
     public bool $foundProxy = false;
@@ -122,6 +127,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->foundApplicationPreviewsIds = collect();
         $this->foundServiceDatabaseIds = collect();
         $this->applicationContainerStatuses = collect();
+        $this->applicationContainerRestartCounts = collect();
         $this->serviceContainerStatuses = collect();
         $this->allApplicationIds = collect();
         $this->allDatabaseUuids = collect();
@@ -141,6 +147,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         // Defensive initialization for Collection properties to handle queue deserialization edge cases
         $this->serviceContainerStatuses ??= collect();
         $this->applicationContainerStatuses ??= collect();
+        $this->applicationContainerRestartCounts ??= collect();
         $this->foundApplicationIds ??= collect();
         $this->foundDatabaseUuids ??= collect();
         $this->foundServiceApplicationIds ??= collect();
@@ -241,6 +248,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 $pullRequestId = $labels->get('coolify.pullRequestId', '0');
                 try {
                     if ($pullRequestId === '0') {
+                        $application = $this->applicationsById->get((string) $applicationId);
+                        if ($application && $application->container_present !== true) {
+                            $application->update(['container_present' => true]);
+                        }
                         if ($this->allApplicationIds->contains($applicationId)) {
                             $this->foundApplicationIds->push($applicationId);
                         }
@@ -251,6 +262,13 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         $containerName = $labels->get('com.docker.compose.service');
                         if ($containerName) {
                             $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                            $restartCount = data_get($container, 'restart_count');
+                            if (is_numeric($restartCount)) {
+                                if (! $this->applicationContainerRestartCounts->has($applicationId)) {
+                                    $this->applicationContainerRestartCounts->put($applicationId, collect());
+                                }
+                                $this->applicationContainerRestartCounts->get($applicationId)->put($containerName, (int) $restartCount);
+                            }
                         }
                     } else {
                         $previewKey = $applicationId.':'.$pullRequestId;
@@ -317,6 +335,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         $this->updateProxyStatus();
 
+        Application::whereIn('id', $this->foundApplicationIds->unique())
+            ->update(['container_present' => true]);
+
         $this->updateNotFoundApplicationStatus();
         $this->updateNotFoundApplicationPreviewStatus();
         $this->updateNotFoundDatabaseStatus();
@@ -349,11 +370,18 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     'uuid',
                     'name',
                     'status',
+                    'container_present',
                     'build_pack',
                     'docker_compose_raw',
+                    'environment_id',
                     'destination_id',
                     'destination_type',
                     'last_online_at',
+                    'restart_count',
+                    'max_restart_count',
+                    'restart_limit_reached',
+                    'last_restart_at',
+                    'last_restart_type',
                 ])
                 ->withCount('additional_servers')
                 ->where(fn ($query) => $this->scopeDestination($query, $standaloneDockerIds, $swarmDockerIds))
@@ -372,11 +400,18 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         'uuid',
                         'name',
                         'status',
+                        'container_present',
                         'build_pack',
                         'docker_compose_raw',
+                        'environment_id',
                         'destination_id',
                         'destination_type',
                         'last_online_at',
+                        'restart_count',
+                        'max_restart_count',
+                        'restart_limit_reached',
+                        'last_restart_at',
+                        'last_restart_type',
                     ])
                     ->withCount('additional_servers')
                     ->whereIn('id', $additionalApplicationIds)
@@ -495,6 +530,57 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 continue;
             }
 
+            $maxRestartCount = 0;
+            $restartCountsAvailable = $this->applicationContainerRestartCounts->has($applicationId);
+            if ($restartCountsAvailable) {
+                $maxRestartCount = $this->applicationContainerRestartCounts->get($applicationId)->max() ?? 0;
+                $containerIsActive = $containerStatuses->contains(
+                    fn (string $status): bool => str($status)->startsWith(['running', 'restarting', 'starting'])
+                );
+                $restartState = (new RestartCountTracker)->evaluate(
+                    previousRestartCount: $application->restart_count ?? 0,
+                    observedRestartCount: $maxRestartCount,
+                    maxRestartCount: $application->max_restart_count ?? 0,
+                    containerIsActive: $containerIsActive,
+                );
+
+                if ($restartState['restart_count_changed']) {
+                    $hasCrashRestarts = $restartState['restart_count'] > 0;
+                    $application->update([
+                        'restart_count' => $restartState['restart_count'],
+                        'last_restart_at' => $hasCrashRestarts ? now() : null,
+                        'last_restart_type' => $hasCrashRestarts ? 'crash' : null,
+                    ]);
+                }
+
+                if ($restartState['restart_limit_reached']) {
+                    $restartLimitClaimed = Application::query()
+                        ->whereKey($application->getKey())
+                        ->where('restart_limit_reached', false)
+                        ->update(['restart_limit_reached' => true]) === 1;
+
+                    if ($restartLimitClaimed) {
+                        $application->refresh();
+                        StopApplication::dispatch(
+                            application: $application,
+                            previewDeployments: false,
+                            dockerCleanup: false,
+                            resetRestartCount: false,
+                            removeContainers: false,
+                        );
+                        $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
+                    }
+                }
+            }
+
+            if ($application->stoppedAfterRestartLimit() && $containerStatuses->every(
+                fn (string $status): bool => str($status)->contains('exited')
+            )) {
+                $application->update(['status' => 'exited']);
+
+                continue;
+            }
+
             // Parse docker compose to check for excluded containers
             $dockerComposeRaw = data_get($application, 'docker_compose_raw');
             $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
@@ -519,7 +605,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             // Use ContainerStatusAggregator service for state machine logic
             // Use preserveRestarting: true so applications show "Restarting" instead of "Degraded"
             $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0, preserveRestarting: true);
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
 
             // Update application status with aggregated result
             if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
@@ -627,8 +713,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         // Batch update: mark all not-found applications as exited (excluding already exited ones)
         Application::whereIn('id', $notFoundApplicationIds)
-            ->where('status', 'not like', 'exited%')
-            ->update(['status' => 'exited']);
+            ->update([
+                'status' => 'exited',
+                'container_present' => false,
+                'restart_limit_reached' => false,
+            ]);
     }
 
     private function updateNotFoundApplicationPreviewStatus()

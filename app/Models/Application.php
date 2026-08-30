@@ -213,6 +213,8 @@ class Application extends BaseModel
         'last_online_at',
         'restart_count',
         'max_restart_count',
+        'restart_limit_reached',
+        'container_present',
         'last_restart_at',
         'last_restart_type',
         'uuid',
@@ -258,6 +260,8 @@ class Application extends BaseModel
             'domain_dns_statuses' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
+            'restart_limit_reached' => 'boolean',
+            'container_present' => 'boolean',
             'last_restart_at' => 'datetime',
         ];
     }
@@ -605,10 +609,8 @@ class Application extends BaseModel
     public function stoppedAfterRestartLimit(): bool
     {
         return str($this->status)->startsWith('exited')
-            && ($this->restart_count ?? 0) > 0
-            && ($this->max_restart_count ?? 0) > 0
-            && $this->restart_count >= $this->max_restart_count
-            && $this->last_restart_type === 'crash';
+            && $this->container_present === true
+            && $this->restart_limit_reached === true;
     }
 
     public function taskLink($task_uuid)

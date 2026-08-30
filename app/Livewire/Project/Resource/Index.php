@@ -187,6 +187,11 @@ class Index extends Component
             'fqdn' => $item->fqdn ?? null,
             'description' => $item->description ?? null,
             'status' => $item->status ?? '',
+            'restartLimitReached' => $type === 'application' && $item->stoppedAfterRestartLimit(),
+            'restartCount' => $type === 'application' && $item->stoppedAfterRestartLimit()
+                ? max($item->restart_count ?? 0, $item->max_restart_count ?? 0)
+                : ($item->restart_count ?? 0),
+            'maxRestartCount' => $item->max_restart_count ?? 0,
             'server_status' => $item->server_status ?? null,
             'hrefLink' => $item->hrefLink ?? '',
             'destination' => [
