@@ -618,7 +618,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return 'latest';
     }
 
-    private function deploy_docker_compose_buildpack()
+    private function deploy_docker_compose_buildpack(): void
     {
         $composeProjectName = generateDockerComposeProjectName($this->application->uuid, $this->pull_request_id);
         $legacyPreviewContainersExist = $this->legacyComposePreviewContainersExist();
@@ -904,13 +904,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         if ($this->pull_request_id === 0 && $legacyPreviewContainersExist) {
-            $this->removeStaleProductionComposeContainers($composeProjectName, array_keys(data_get($composeFile, 'services', [])));
+            $this->removeStaleProductionComposeContainers($composeProjectName, $this->currentComposeServiceNames($composeFile));
         }
 
         $this->application_deployment_queue->addLogEntry('New container started.');
         if ($this->pull_request_id !== 0 && $legacyPreviewContainersExist) {
             $this->removeHealthyLegacyComposePreviewContainers($composeProjectName, $composeFile);
         }
+    }
+
+    private function currentComposeServiceNames(array|string|Collection $composeFile): array
+    {
+        $parsedComposeFile = is_string($composeFile) ? Yaml::parse($composeFile) : $composeFile;
+
+        return collect(data_get($parsedComposeFile, 'services', []))->keys()->all();
     }
 
     private function removeStaleProductionComposeContainers(string $composeProjectName, array $currentServiceNames): void
@@ -1484,7 +1491,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function generate_runtime_environment_variables()
+    private function generate_runtime_environment_variables(): Collection
     {
         $envs = collect([]);
         $sort = $this->application->settings->is_env_sorting_enabled;
@@ -1774,7 +1781,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
-    private function generate_buildtime_environment_variables()
+    private function generate_buildtime_environment_variables(): Collection
     {
         if (isDev()) {
             $this->application_deployment_queue->addLogEntry('[DEBUG] ========================================');

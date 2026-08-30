@@ -47,7 +47,7 @@ function dockerContainerLabel(array|Collection $container, string $label): ?stri
 {
     $labels = data_get($container, 'Labels', []);
     if (is_array($labels)) {
-        return data_get($labels, $label);
+        return $labels[$label] ?? null;
     }
 
     if ($labels instanceof Collection) {
@@ -1749,7 +1749,7 @@ function injectDockerComposeRemoveOrphans(string $command, bool $enabled = true)
     }
 
     return preg_replace_callback(
-        '/(?<composeUp>docker\s+compose\b(?:(?!&&|\|\||;|\R).)*?\bup\b)(?<arguments>(?:(?!&&|\|\||;|\R).)*)/',
+        '/(?<composeUp>docker\s+compose\b(?:(?!&&|\|\||;|\R).)*?\bup(?=\s|$))(?<arguments>(?:(?!&&|\|\||;|\R).)*)/',
         function (array $matches): string {
             if (preg_match('/(?:^|\s)--remove-orphans(?:=\S+)?(?=\s|$)/', $matches['arguments'])) {
                 return $matches[0];

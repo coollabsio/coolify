@@ -1,9 +1,12 @@
 <?php
 
+use App\Jobs\ApplicationDeploymentJob;
+use Illuminate\Support\Collection;
+
 function dockerComposeDeploymentMethodSource(): string
 {
     $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $start = strpos($source, 'private function deploy_docker_compose_buildpack()');
+    $start = strpos($source, 'private function deploy_docker_compose_buildpack(): void');
     $end = strpos($source, 'private function deploy_dockerfile_buildpack()', $start);
 
     return substr($source, $start, $end - $start);
@@ -20,9 +23,24 @@ it('explicitly removes stale production services while preserving legacy preview
     expect($method)
         ->toContain('$legacyPreviewContainersExist = $this->legacyComposePreviewContainersExist();')
         ->toContain('$removeOrphans = $legacyPreviewContainersExist ? \'\' : \' --remove-orphans\';')
-        ->toContain('$this->removeStaleProductionComposeContainers($composeProjectName, array_keys(data_get($composeFile, \'services\', [])));')
+        ->toContain('$this->removeStaleProductionComposeContainers($composeProjectName, $this->currentComposeServiceNames($composeFile));')
         ->not->toContain(' up -d --remove-orphans');
 });
+
+it('gets current Compose service names from raw and parsed payloads', function (array|string|Collection $composeFile) {
+    $job = (new ReflectionClass(ApplicationDeploymentJob::class))->newInstanceWithoutConstructor();
+
+    expect((fn () => $this->currentComposeServiceNames($composeFile))->call($job))
+        ->toBe(['web', 'worker']);
+})->with([
+    'raw YAML' => "services:\n  web:\n    image: nginx\n  worker:\n    image: busybox\n",
+    'parsed collection' => collect([
+        'services' => [
+            'web' => ['image' => 'nginx'],
+            'worker' => ['image' => 'busybox'],
+        ],
+    ]),
+]);
 
 it('stale production cleanup excludes containers belonging to legacy previews', function () {
     $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
@@ -39,6 +57,11 @@ it('stale production cleanup excludes containers belonging to legacy previews', 
 it('adds orphan removal to a custom compose up command', function () {
     expect(injectDockerComposeRemoveOrphans('docker compose up -d'))
         ->toBe('docker compose up --remove-orphans -d');
+});
+
+it('preserves option values containing up when adding orphan removal', function () {
+    expect(injectDockerComposeRemoveOrphans('docker compose -f /artifacts/up.yml up -d'))
+        ->toBe('docker compose -f /artifacts/up.yml up --remove-orphans -d');
 });
 
 it('adds orphan removal to a bare custom compose up command', function () {
@@ -113,8 +136,26 @@ it('removes a legacy preview only after its replacement is healthy', function ()
     $end = strpos($source, 'private function ', $start + 20);
     $method = substr($source, $start, $end - $start);
 
-    expect(strpos($method, '$this->composeContainersAreHealthy($replacementContainerIds)'))
-        ->toBeLessThan(strpos($method, "'legacy_compose_preview_container_ids'"))
+    $healthCheckPosition = strpos($method, '$this->composeContainersAreHealthy($replacementContainerIds, $composeFile)');
+    $legacyContainerCleanupPosition = strpos($method, "'legacy_compose_preview_container_ids'");
+
+    expect($healthCheckPosition)
+        ->not->toBeFalse()
+        ->and($legacyContainerCleanupPosition)
+        ->not->toBeFalse()
+        ->and($healthCheckPosition)
+        ->toBeLessThan($legacyContainerCleanupPosition)
         ->and($method)
         ->toContain('docker rm -f');
+});
+
+it('uses the application compose project name when deleting volumes', function () {
+    $source = file_get_contents(__DIR__.'/../../app/Models/Application.php');
+    $start = strpos($source, 'public function deleteVolumes()');
+    $end = strpos($source, 'public function deleteConnectedNetworks()', $start);
+    $method = substr($source, $start, $end - $start);
+
+    expect($method)
+        ->toContain('$projectName = generateDockerComposeProjectName($this->uuid);')
+        ->toContain('docker compose --project-name {$projectName} down -v');
 });

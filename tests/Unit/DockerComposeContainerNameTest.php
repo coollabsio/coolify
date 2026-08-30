@@ -52,6 +52,16 @@ it('reads compose identity from docker container labels', function () {
         ->and(dockerContainerLabel($container, 'com.docker.compose.service'))->toBe('api');
 });
 
+it('reads dotted compose labels from a flat label array', function () {
+    $container = [
+        'Labels' => [
+            'com.docker.compose.service' => 'api',
+        ],
+    ];
+
+    expect(dockerContainerLabel($container, 'com.docker.compose.service'))->toBe('api');
+});
+
 it('keeps the container name environment variable informational', function () {
     $source = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
     $start = strpos($source, 'function applicationParser(');
