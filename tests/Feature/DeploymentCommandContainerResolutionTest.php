@@ -92,6 +92,34 @@ describe('resolveCommandContainer', function () {
         expect($result)->toBe(['Names' => 'worker-abc123', 'Labels' => '']);
     });
 
+    test('matches compose generated container names by service label', function () {
+        $containers = collect([
+            ['Names' => 'abc123-web-1', 'Labels' => 'com.docker.compose.project=abc123,com.docker.compose.service=web'],
+            ['Names' => 'abc123-worker-1', 'Labels' => 'com.docker.compose.project=abc123,com.docker.compose.service=worker'],
+        ]);
+        $instance = createJobWithProperties('abc123');
+        $result = invokeResolve($instance, $containers, 'worker', 'Pre-deployment');
+
+        expect($result)->toBe([
+            'Names' => 'abc123-worker-1',
+            'Labels' => 'com.docker.compose.project=abc123,com.docker.compose.service=worker',
+        ]);
+    });
+
+    test('matches explicitly configured container names by service label', function () {
+        $containers = collect([
+            ['Names' => 'custom-web', 'Labels' => 'com.docker.compose.project=abc123,com.docker.compose.service=web'],
+            ['Names' => 'custom-worker', 'Labels' => 'com.docker.compose.project=abc123,com.docker.compose.service=worker'],
+        ]);
+        $instance = createJobWithProperties('abc123');
+        $result = invokeResolve($instance, $containers, 'worker', 'Post-deployment');
+
+        expect($result)->toBe([
+            'Names' => 'custom-worker',
+            'Labels' => 'com.docker.compose.project=abc123,com.docker.compose.service=worker',
+        ]);
+    });
+
     test('returns null when specified container name does not match any container', function () {
         $containers = collect([
             ['Names' => 'web-abc123', 'Labels' => ''],

@@ -10,6 +10,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use phpseclib3\Crypt\EC;
 
 uses(RefreshDatabase::class);
@@ -209,6 +210,48 @@ YAML;
     expect($domains['frontend']['domain'])->toBe('https://existing.example.com')
         ->and($domains)->toHaveKey('backend')
         ->and($domains['backend']['domain'])->toStartWith('http://');
+});
+
+test('applicationParser keeps compose service identities and repository bind paths in previews', function () {
+    Bus::fake();
+
+    $dockerCompose = <<<'YAML'
+services:
+  api:
+    image: nginx:alpine
+    depends_on:
+      - prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: custom-prometheus
+    profiles:
+      - monitoring
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+YAML;
+
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $dockerCompose,
+        'fqdn' => null,
+    ]);
+
+    $parsed = applicationParser($application, pull_request_id: 9);
+
+    expect($parsed->get('services'))
+        ->toHaveKeys(['api', 'prometheus'])
+        ->not->toHaveKeys(['api-pr-9', 'prometheus-pr-9'])
+        ->and(data_get($parsed, 'services.api.depends_on')->all())->toBe(['prometheus'])
+        ->and(data_get($parsed, 'services.prometheus.profiles'))->toBe(['monitoring'])
+        ->and(data_get($parsed, 'services.prometheus.container_name'))->toBe('custom-prometheus-pr-9')
+        ->and(data_get($parsed, 'services.api.environment.SERVICE_NAME_API'))->toBe('api')
+        ->and(data_get($parsed, 'services.api.environment.COOLIFY_CONTAINER_NAME'))->toBe("{$application->uuid}-pr-9-api-1")
+        ->and(data_get($parsed, 'services.prometheus.volumes.0'))
+        ->toContain('prometheus.yml:/etc/prometheus/prometheus.yml:ro')
+        ->not->toContain('prometheus.yml-pr-9');
 });
 
 test('applicationParser stores domains under original hyphenated compose service names', function () {

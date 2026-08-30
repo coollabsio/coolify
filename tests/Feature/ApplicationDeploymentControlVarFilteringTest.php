@@ -205,7 +205,7 @@ it('filters buildpack control vars from preview build-time env files', function 
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
 });
 
-it('does not let preview docker compose service names override generated build-time service names', function () {
+it('uses original docker compose service names for preview build-time and runtime variables', function () {
     $compose = <<<'YAML'
 services:
   app:
@@ -245,9 +245,27 @@ YAML;
     $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
     $envString = $buildtimeEnvs->implode("\n");
 
-    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp-pr-241'");
+    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp'");
     expect($envString)->not->toContain('SERVICE_NAME_POSTGRESAPP=""');
     expect($envString)->not->toContain('SERVICE_URL_APP=');
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->contains(fn (string $env) => $env === 'SERVICE_NAME_POSTGRESAPP=postgresapp'))->toBeTrue()
+        ->and($runtimeEnvs->contains(fn (string $env) => str_contains($env, 'postgresapp-pr-241')))->toBeFalse();
+
+    $application->forceFill(['compose_parsing_version' => '2'])->save();
+    $jobApplication = readDeploymentJobProperty($job, $reflection, 'application');
+    $jobApplication->compose_parsing_version = '2';
+
+    /** @var Collection $legacyBuildtimeEnvs */
+    $legacyBuildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+    /** @var Collection $legacyRuntimeEnvs */
+    $legacyRuntimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($legacyBuildtimeEnvs->implode("\n"))->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp-pr-241'")
+        ->and($legacyRuntimeEnvs)->toContain('SERVICE_NAME_POSTGRESAPP=postgresapp-pr-241');
 });
 
 it('does not let production docker compose service names override generated build-time service names', function () {

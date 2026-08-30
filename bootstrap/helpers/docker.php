@@ -43,6 +43,24 @@ function traefikSafeServiceNameSegment(string $serviceName): string
     return $normalized.'-'.traefikServiceNameHash($serviceName);
 }
 
+function dockerContainerLabel(array|Collection $container, string $label): ?string
+{
+    $labels = data_get($container, 'Labels', []);
+    if (is_array($labels)) {
+        return data_get($labels, $label);
+    }
+
+    if ($labels instanceof Collection) {
+        return $labels->get($label);
+    }
+
+    if (preg_match('/(?:^|,)'.preg_quote($label, '/').'=([^,]*)/', (string) $labels, $matches) === 1) {
+        return $matches[1];
+    }
+
+    return null;
+}
+
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
     $containers = collect([]);
@@ -360,6 +378,32 @@ function generateApplicationContainerName(Application $application, $pull_reques
         return $application->uuid.'-'.$now;
     }
 }
+
+function generateDockerComposeProjectName(string $applicationUuid, int $pullRequestId = 0): string
+{
+    return addPreviewDeploymentSuffix($applicationUuid, $pullRequestId);
+}
+
+function generateDockerComposeContainerName(string $projectName, string $serviceName, ?string $configuredContainerName = null, int $pullRequestId = 0): string
+{
+    if (filled($configuredContainerName)) {
+        return addPreviewDeploymentSuffix($configuredContainerName, $pullRequestId);
+    }
+
+    return "{$projectName}-{$serviceName}-1";
+}
+
+function applyDockerComposeContainerName(Collection $service, ?string $configuredContainerName): Collection
+{
+    if (filled($configuredContainerName)) {
+        $service->put('container_name', $configuredContainerName);
+    } else {
+        $service->forget('container_name');
+    }
+
+    return $service;
+}
+
 function get_port_from_dockerfile($dockerfile): ?int
 {
     $dockerfile_array = explode("\n", $dockerfile);
@@ -1662,9 +1706,21 @@ function generateDockerEnvFlags($variables): string
  * Input:  "docker compose build"
  * Output: "docker compose -f ./docker-compose.yml --env-file .env build"
  */
-function injectDockerComposeFlags(string $command, string $composeFilePath, string $envFilePath): string
+function injectDockerComposeFlags(string $command, string $composeFilePath, string $envFilePath, ?string $projectName = null, bool $enforceProjectName = false): string
 {
     $dockerComposeReplacement = 'docker compose';
+
+    if ($projectName && $enforceProjectName) {
+        $command = preg_replace(
+            '/(?<prefix>^|\s)(?:-p(?:=|\s+)|--project-name(?:=|\s+))\S+/',
+            '${prefix}',
+            $command,
+        );
+    }
+
+    if ($projectName && ! preg_match('/(?:^|\s)(?:-p(?:=|\s)|--project-name(?:=|\s))/', $command)) {
+        $dockerComposeReplacement .= " --project-name {$projectName}";
+    }
 
     // Add -f flag if not present (checks for both -f and --file with various formats)
     // Detects: -f path, -f=path, -fpath (concatenated with path chars: . / ~), --file path, --file=path
@@ -1681,6 +1737,29 @@ function injectDockerComposeFlags(string $command, string $composeFilePath, stri
 
     // Replace only first occurrence to avoid modifying comments/strings/chained commands
     return preg_replace('/docker\s+compose/', $dockerComposeReplacement, $command, 1);
+}
+
+/**
+ * Add orphan reconciliation to the first Docker Compose up command.
+ */
+function injectDockerComposeRemoveOrphans(string $command, bool $enabled = true): string
+{
+    if (! $enabled) {
+        return $command;
+    }
+
+    return preg_replace_callback(
+        '/(?<composeUp>docker\s+compose\b(?:(?!&&|\|\||;|\R).)*?\bup\b)(?<arguments>(?:(?!&&|\|\||;|\R).)*)/',
+        function (array $matches): string {
+            if (preg_match('/(?:^|\s)--remove-orphans(?:=\S+)?(?=\s|$)/', $matches['arguments'])) {
+                return $matches[0];
+            }
+
+            return $matches['composeUp'].' --remove-orphans'.$matches['arguments'];
+        },
+        $command,
+        1,
+    );
 }
 
 /**

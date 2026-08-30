@@ -620,6 +620,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function deploy_docker_compose_buildpack()
     {
+        $composeProjectName = generateDockerComposeProjectName($this->application->uuid, $this->pull_request_id);
+        $legacyPreviewContainersExist = $this->legacyComposePreviewContainersExist();
+        $removeOrphans = $legacyPreviewContainersExist ? '' : ' --remove-orphans';
         if (data_get($this->application, 'docker_compose_location')) {
             $this->docker_compose_location = $this->validatePathField($this->application->docker_compose_location, 'docker_compose_location');
         }
@@ -731,7 +734,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $build_command = injectDockerComposeFlags(
                 $this->docker_compose_custom_build_command,
                 "{$this->workdir}{$this->docker_compose_location}",
-                self::BUILD_TIME_ENV_PATH
+                self::BUILD_TIME_ENV_PATH,
+                $composeProjectName,
+                $this->pull_request_id !== 0,
             );
 
             // Prepend DOCKER_BUILDKIT=1 if BuildKit is supported
@@ -773,9 +778,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             // Use build-time .env file from /artifacts (outside Docker context to prevent it from being in the image)
             $command .= ' --env-file '.self::BUILD_TIME_ENV_PATH;
             if ($this->force_rebuild) {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
+                $command .= " --project-name {$composeProjectName} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull --no-cache";
             } else {
-                $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
+                $command .= " --project-name {$composeProjectName} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build --pull";
             }
 
             if (! $this->application->settings->use_build_secrets && $this->build_args instanceof Collection && $this->build_args->isNotEmpty()) {
@@ -793,7 +798,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // This overwrites the build-time .env with ALL variables (build-time + runtime)
         $this->save_runtime_environment_variables();
 
-        $this->stop_running_container(force: true);
         $this->application_deployment_queue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
         if ($this->pull_request_id !== 0) {
@@ -821,8 +825,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $start_command = injectDockerComposeFlags(
                     $this->docker_compose_custom_start_command,
                     "{$server_workdir}{$this->docker_compose_location}",
-                    "{$server_workdir}/.env"
+                    "{$server_workdir}/.env",
+                    $composeProjectName,
+                    $this->pull_request_id !== 0,
                 );
+                $start_command = injectDockerComposeRemoveOrphans($start_command, ! $legacyPreviewContainersExist);
 
                 $this->write_deployment_configurations();
 
@@ -844,7 +851,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $command = "{$this->coolify_variables} docker compose";
                 // Always use .env file
                 $command .= " --env-file {$server_workdir}/.env";
-                $command .= " --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+                $command .= " --project-name {$composeProjectName} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d{$removeOrphans}";
                 $this->execute_remote_command(
                     ['command' => $command, 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                 );
@@ -857,8 +864,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $start_command = injectDockerComposeFlags(
                     $this->docker_compose_custom_start_command,
                     "{$workdir_path}{$this->docker_compose_location}",
-                    "{$workdir_path}/.env"
+                    "{$workdir_path}/.env",
+                    $composeProjectName,
+                    $this->pull_request_id !== 0,
                 );
+                $start_command = injectDockerComposeRemoveOrphans($start_command, ! $legacyPreviewContainersExist);
 
                 $this->write_deployment_configurations();
                 if ($this->preserveRepository) {
@@ -875,7 +885,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->preserveRepository) {
                     // Always use .env file
                     $command .= " --env-file {$server_workdir}/.env";
-                    $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+                    $command .= " --project-name {$composeProjectName} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d{$removeOrphans}";
                     $this->write_deployment_configurations();
 
                     $this->execute_remote_command(
@@ -884,7 +894,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     // Always use .env file
                     $command .= " --env-file {$this->workdir}/.env";
-                    $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                    $command .= " --project-name {$composeProjectName} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d{$removeOrphans}";
                     $this->execute_remote_command(
                         [executeInDocker($this->deployment_uuid, $command), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
@@ -893,7 +903,161 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
+        if ($this->pull_request_id === 0 && $legacyPreviewContainersExist) {
+            $this->removeStaleProductionComposeContainers($composeProjectName, array_keys(data_get($composeFile, 'services', [])));
+        }
+
         $this->application_deployment_queue->addLogEntry('New container started.');
+        if ($this->pull_request_id !== 0 && $legacyPreviewContainersExist) {
+            $this->removeHealthyLegacyComposePreviewContainers($composeProjectName, $composeFile);
+        }
+    }
+
+    private function removeStaleProductionComposeContainers(string $composeProjectName, array $currentServiceNames): void
+    {
+        $this->execute_remote_command([
+            "docker ps -a --filter 'label=com.docker.compose.project={$composeProjectName}' --format '{{json .}}'",
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => 'compose_project_containers',
+            'append' => false,
+        ]);
+
+        str($this->saved_outputs->get('compose_project_containers', ''))
+            ->explode("\n")
+            ->filter()
+            ->each(function (string $container) use ($currentServiceNames): void {
+                $container = json_decode($container, true);
+                $pullRequestId = dockerContainerLabel($container, 'coolify.pullRequestId');
+                if ($pullRequestId !== null && $pullRequestId !== '' && $pullRequestId !== '0') {
+                    return;
+                }
+
+                $serviceName = dockerContainerLabel($container, 'com.docker.compose.service');
+                if (in_array($serviceName, $currentServiceNames, true)) {
+                    return;
+                }
+
+                $containerId = data_get($container, 'ID');
+                if (filled($containerId)) {
+                    $this->execute_remote_command([
+                        "docker rm -f {$containerId}",
+                        'hidden' => true,
+                        'ignore_errors' => true,
+                    ]);
+                }
+            });
+    }
+
+    private function legacyComposePreviewContainersExist(): bool
+    {
+        $this->execute_remote_command([
+            "docker ps -a --filter 'label=com.docker.compose.project={$this->application->uuid}' --filter 'label=coolify.pullRequestId' --format '{{json .}}'",
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => 'legacy_compose_preview_containers',
+            'append' => false,
+        ]);
+
+        return str($this->saved_outputs->get('legacy_compose_preview_containers', ''))
+            ->explode("\n")
+            ->filter()
+            ->contains(function (string $container): bool {
+                $labels = data_get(json_decode($container, true), 'Labels', '');
+                $pullRequestId = dockerContainerLabel(['Labels' => $labels], 'coolify.pullRequestId');
+
+                return filled($pullRequestId) && $pullRequestId !== '0';
+            });
+    }
+
+    private function removeHealthyLegacyComposePreviewContainers(string $composeProjectName, array|string $composeFile): void
+    {
+        $replacementContainerIds = $this->composeProjectContainerIds($composeProjectName, 'replacement_compose_preview_containers');
+        if ($replacementContainerIds->isEmpty()) {
+            throw new DeploymentException('The replacement preview stack did not create any containers.');
+        }
+
+        Sleep::for($this->application->health_check_start_period)->seconds();
+        $attempts = max(1, $this->application->health_check_retries);
+        while ($attempts > 0) {
+            if ($this->composeContainersAreHealthy($replacementContainerIds, $composeFile)) {
+                break;
+            }
+
+            $attempts--;
+            if ($attempts > 0) {
+                Sleep::for($this->application->health_check_interval)->seconds();
+            }
+        }
+
+        if ($attempts === 0) {
+            throw new DeploymentException('The replacement preview stack is not healthy.');
+        }
+
+        $this->composeProjectContainerIds($this->application->uuid, 'legacy_compose_preview_container_ids', $this->pull_request_id)
+            ->each(function (string $containerId): void {
+                $this->execute_remote_command([
+                    "docker rm -f {$containerId}",
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ]);
+            });
+    }
+
+    private function composeContainersAreHealthy(Collection $containerIds, array|string $composeFile): bool
+    {
+        if (is_string($composeFile)) {
+            $composeFile = Yaml::parse($composeFile);
+        }
+
+        $expectedCompletedServices = collect(data_get($composeFile, 'services', []))
+            ->filter(fn ($service): bool => data_get($service, 'restart') === 'no')
+            ->keys();
+
+        return $containerIds->every(function (string $containerId) use ($expectedCompletedServices): bool {
+            $outputKey = 'replacement_compose_preview_health_'.md5($containerId);
+            $this->execute_remote_command([
+                "docker inspect --format '{{index .Config.Labels \"com.docker.compose.service\"}} {{.State.Status}} {{.State.ExitCode}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' {$containerId}",
+                'hidden' => true,
+                'ignore_errors' => true,
+                'save' => $outputKey,
+                'append' => false,
+            ]);
+
+            [$serviceName, $status, $exitCode, $health] = array_pad(
+                preg_split('/\s+/', trim((string) $this->saved_outputs->get($outputKey)), 4),
+                4,
+                ''
+            );
+
+            if ($expectedCompletedServices->contains($serviceName)) {
+                return "{$status} {$exitCode}" === 'exited 0';
+            }
+
+            return in_array(trim("{$status} {$health}"), ['running', 'running healthy'], true);
+        });
+    }
+
+    private function composeProjectContainerIds(string $projectName, string $outputKey, ?int $pullRequestId = null): Collection
+    {
+        $command = "docker ps -aq --filter 'label=com.docker.compose.project={$projectName}'";
+        if ($pullRequestId !== null) {
+            $command .= " --filter 'label=coolify.pullRequestId={$pullRequestId}'";
+        }
+
+        $this->execute_remote_command([
+            $command,
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => $outputKey,
+            'append' => false,
+        ]);
+
+        return str($this->saved_outputs->get($outputKey, ''))
+            ->explode("\n")
+            ->map(fn (string $containerId): string => trim($containerId))
+            ->filter()
+            ->values();
     }
 
     private function deploy_dockerfile_buildpack()
@@ -1436,7 +1600,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $serviceName = (int) $this->application->compose_parsing_version >= 3
+                        ? $rawServiceName
+                        : addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id);
+                    $envs->push('SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             }
 
@@ -1686,7 +1853,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $rawDockerCompose = Yaml::parse($this->application->docker_compose_raw);
                 $rawServices = data_get($rawDockerCompose, 'services', []);
                 foreach ($rawServices as $rawServiceName => $_) {
-                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue(addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id));
+                    $serviceName = (int) $this->application->compose_parsing_version >= 3
+                        ? $rawServiceName
+                        : addPreviewDeploymentSuffix($rawServiceName, $this->pull_request_id);
+                    $envs_dict['SERVICE_NAME_'.str($rawServiceName)->replace('-', '_')->replace('.', '_')->upper()] = escapeBashEnvValue($serviceName);
                 }
 
                 // Generate SERVICE_FQDN & SERVICE_URL for preview deployments with PR-specific domains
@@ -4784,7 +4954,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return null;
         }
 
-        // Multi-container: match by specified name prefix
+        $composeContainer = $containers->first(
+            fn ($container) => dockerContainerLabel($container, 'com.docker.compose.service') === $specifiedContainerName
+        );
+        if ($composeContainer !== null) {
+            return $composeContainer;
+        }
+
+        // Multi-container: fall back to the legacy specified name prefix
         $prefix = $specifiedContainerName.'-'.$this->application->uuid;
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
