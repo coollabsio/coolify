@@ -69,6 +69,20 @@ it('declares deploy authorization on the service container removal confirmation'
     );
 });
 
+it('declares update authorization on service backup mutation controls', function () {
+    $importBackupView = file_get_contents(resource_path('views/livewire/project/service/import-backup.blade.php'));
+    $volumeBackupView = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($importBackupView)->toMatch(
+        '/<x-forms\.listbox(?=[^>]*id="selectedDatabaseUuid")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/'
+    );
+
+    expect($volumeBackupView)
+        ->toMatch('/<x-modal-input(?=[^>]*:title="\'Edit backup schedule\'")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'database\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'storage\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/');
+});
+
 it('keeps mutable Livewire components behind authorization checks', function (string $path, array $requiredNeedles) {
     $source = file_get_contents(base_path($path));
 

@@ -59,8 +59,6 @@ class Index extends Component
 
     public bool $isLogDrainEnabled = false;
 
-    public bool $isImportSupported = false;
-
     // Application-specific properties
     public $docker_cleanup = true;
 
@@ -153,10 +151,6 @@ class Index extends Component
         $this->refreshFileStorages();
         $this->syncDatabaseData(false);
 
-        // Check if import is supported for this database type
-        $dbType = $this->serviceDatabase->databaseType();
-        $supportedTypes = ['mysql', 'mariadb', 'postgres', 'mongo'];
-        $this->isImportSupported = collect($supportedTypes)->contains(fn ($type) => str_contains($dbType, $type));
     }
 
     private function syncDatabaseData(bool $toModel = false): void
