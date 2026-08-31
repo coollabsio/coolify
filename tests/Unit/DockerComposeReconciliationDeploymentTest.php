@@ -2,14 +2,38 @@
 
 use App\Jobs\ApplicationDeploymentJob;
 use Illuminate\Support\Collection;
+use PHPUnit\Framework\AssertionFailedError;
+
+function sourceBetween(string $path, string $startMarker, string $endMarker): string
+{
+    $source = file_get_contents($path);
+
+    if ($source === false) {
+        throw new AssertionFailedError("Unable to read source file: {$path}");
+    }
+
+    $start = strpos($source, $startMarker);
+
+    if ($start === false) {
+        throw new AssertionFailedError("Start marker not found in {$path}: {$startMarker}");
+    }
+
+    $end = strpos($source, $endMarker, $start + strlen($startMarker));
+
+    if ($end === false) {
+        throw new AssertionFailedError("End marker not found in {$path}: {$endMarker}");
+    }
+
+    return substr($source, $start, $end - $start);
+}
 
 function dockerComposeDeploymentMethodSource(): string
 {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $start = strpos($source, 'private function deploy_docker_compose_buildpack(): void');
-    $end = strpos($source, 'private function deploy_dockerfile_buildpack()', $start);
-
-    return substr($source, $start, $end - $start);
+    return sourceBetween(
+        __DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php',
+        'private function deploy_docker_compose_buildpack(): void',
+        'private function deploy_dockerfile_buildpack()',
+    );
 }
 
 it('lets compose reconcile existing containers without a pre-stop', function () {
@@ -43,10 +67,11 @@ it('gets current Compose service names from raw and parsed payloads', function (
 ]);
 
 it('stale production cleanup excludes containers belonging to legacy previews', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $start = strpos($source, 'private function removeStaleProductionComposeContainers(');
-    $end = strpos($source, 'private function ', $start + 20);
-    $method = substr($source, $start, $end - $start);
+    $method = sourceBetween(
+        __DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php',
+        'private function removeStaleProductionComposeContainers(',
+        'private function ',
+    );
 
     expect($method)
         ->toContain('$pullRequestId !== null && $pullRequestId !== \'\' && $pullRequestId !== \'0\'')
@@ -106,10 +131,11 @@ it('migrates a preview before production can remove legacy orphans', function ()
 });
 
 it('accepts successfully completed one-shot services during preview migration', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $start = strpos($source, 'private function composeContainersAreHealthy(');
-    $end = strpos($source, 'private function ', $start + 20);
-    $method = substr($source, $start, $end - $start);
+    $method = sourceBetween(
+        __DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php',
+        'private function composeContainersAreHealthy(',
+        'private function ',
+    );
 
     expect($method)
         ->toContain("data_get(\$service, 'restart') === 'no'")
@@ -119,10 +145,11 @@ it('accepts successfully completed one-shot services during preview migration', 
 });
 
 it('keeps legacy previews when production deploys first', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $start = strpos($source, 'private function legacyComposePreviewContainersExist()');
-    $end = strpos($source, 'private function ', $start + 20);
-    $method = substr($source, $start, $end - $start);
+    $method = sourceBetween(
+        __DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php',
+        'private function legacyComposePreviewContainersExist()',
+        'private function ',
+    );
 
     expect($method)
         ->toContain('com.docker.compose.project={$this->application->uuid}')
@@ -131,10 +158,11 @@ it('keeps legacy previews when production deploys first', function () {
 });
 
 it('removes a legacy preview only after its replacement is healthy', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php');
-    $start = strpos($source, 'private function removeHealthyLegacyComposePreviewContainers(');
-    $end = strpos($source, 'private function ', $start + 20);
-    $method = substr($source, $start, $end - $start);
+    $method = sourceBetween(
+        __DIR__.'/../../app/Jobs/ApplicationDeploymentJob.php',
+        'private function removeHealthyLegacyComposePreviewContainers(',
+        'private function ',
+    );
 
     $healthCheckPosition = strpos($method, '$this->composeContainersAreHealthy($replacementContainerIds, $composeFile)');
     $legacyContainerCleanupPosition = strpos($method, "'legacy_compose_preview_container_ids'");
@@ -150,10 +178,11 @@ it('removes a legacy preview only after its replacement is healthy', function ()
 });
 
 it('uses the application compose project name when deleting volumes', function () {
-    $source = file_get_contents(__DIR__.'/../../app/Models/Application.php');
-    $start = strpos($source, 'public function deleteVolumes()');
-    $end = strpos($source, 'public function deleteConnectedNetworks()', $start);
-    $method = substr($source, $start, $end - $start);
+    $method = sourceBetween(
+        __DIR__.'/../../app/Models/Application.php',
+        'public function deleteVolumes()',
+        'public function deleteConnectedNetworks()',
+    );
 
     expect($method)
         ->toContain('$projectName = generateDockerComposeProjectName($this->uuid);')

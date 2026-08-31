@@ -159,6 +159,6 @@
                 </div>
             @endcan
         @endif
-        <x-storage-sharing-confirmation subject="path" />
+        <x-storage-sharing-confirmation subject="path" canGate="update" :canResource="$resource" />
     </div>
 </div>

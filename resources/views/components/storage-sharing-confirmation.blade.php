@@ -1,5 +1,7 @@
 @props([
     'subject' => 'storage',
+    'canGate' => null,
+    'canResource' => null,
 ])
 
 <div x-data="{ modalOpen: false }" @open-storage-sharing-modal.window="modalOpen = true"
@@ -24,10 +26,12 @@
                             Production and preview deployments will use the same data. Changes from either deployment can affect the other.
                         </x-callout>
                         <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                            <x-forms.button type="button" @click="modalOpen = false; $wire.cancelShareStorage()">
+                            <x-forms.button type="button" :canGate="$canGate" :canResource="$canResource"
+                                @click="modalOpen = false; $wire.cancelShareStorage()">
                                 Keep isolated
                             </x-forms.button>
-                            <x-forms.button type="button" isError wire:click="confirmShareStorage"
+                            <x-forms.button type="button" isError :canGate="$canGate" :canResource="$canResource"
+                                wire:click="confirmShareStorage"
                                 @click="modalOpen = false">
                                 Share {{ $subject }}
                             </x-forms.button>

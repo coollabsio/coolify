@@ -155,7 +155,7 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('volumes-col-backup')
         ->toContain('supportsPreviewSuffix')
         ->toContain('x-modal-input')
-        ->toContain('<x-forms.button type="button" class="!px-2.5 !text-xs">')
+        ->toContain('<x-forms.button canGate="update" :canResource="$resource" type="button"')
         ->not->toContain('title="Configure backup"')
         ->not->toContain('<x-reicon name="database"')
         ->not->toContain('wire:click="openBackupModal')
@@ -220,6 +220,18 @@ it('renders volumes as a data table with shared column headers', function () {
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)
         ->toMatch('/\.application-settings-form label\s*\{[^}]*font-size:\s*13px/s');
+});
+
+it('authorizes storage preview suffix and backup controls at the component level', function () {
+    $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
+
+    expect($allView)
+        ->toContain('<x-forms.listbox canGate="update" :canResource="$resource"')
+        ->and(substr_count($allView, '<x-forms.button canGate="update" :canResource="$resource" type="button"'))
+        ->toBe(3)
+        ->and($showView)
+        ->toContain('<x-forms.listbox canGate="update" :canResource="$resource"');
 });
 
 it('creates and exposes volume backups for service storage', function () {
@@ -301,16 +313,29 @@ it('confirms before sharing a persistent volume with preview deployments', funct
 
     $component->call('cancelShareStorage')
         ->assertSet('pendingSharedStorageId', null)
-        ->assertDispatched('storage-sharing-pending');
+        ->assertDispatched('storage-sharing-pending', storageId: $volume->id);
 
     expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
 
     $component->call('requestPreviewSuffixChange', $volume->id, false)
         ->call('confirmShareStorage')
         ->assertSet('pendingSharedStorageId', null)
-        ->assertDispatched('storage-sharing-confirmed');
+        ->assertDispatched('storage-sharing-confirmed', storageId: $volume->id);
 
     expect($volume->fresh()->is_preview_suffix_enabled)->toBeFalse();
+});
+
+it('denies storage sharing confirmation for users without update permission', function () {
+    [$application, $volume] = createApplicationWithVolume();
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    $this->user->unsetRelation('teams');
+
+    Livewire::test(All::class, ['resource' => $application])
+        ->set('pendingSharedStorageId', $volume->id)
+        ->call('confirmShareStorage')
+        ->assertForbidden();
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
 });
 
 it('confirms before sharing a persistent volume from the storage detail component', function () {
@@ -327,6 +352,17 @@ it('confirms before sharing a persistent volume from the storage detail componen
     $component->call('confirmShareStorage');
 
     expect($volume->fresh()->is_preview_suffix_enabled)->toBeFalse();
+});
+
+it('validates instant saves from the storage detail component', function () {
+    [$application, $volume] = createApplicationWithVolume();
+
+    Livewire::test(Show::class, ['storage' => $volume, 'resource' => $application])
+        ->set('mountPath', 'invalid-path')
+        ->call('instantSave')
+        ->assertHasErrors(['mountPath' => 'regex']);
+
+    expect($volume->fresh()->mount_path)->toBe('/data');
 });
 
 it('confirms before sharing a file path with preview deployments', function () {
@@ -366,8 +402,22 @@ it('warns that shared preview storage can modify production data', function () {
         ->toContain($helper)
         ->toContain('<x-helper')
         ->toContain('onChange="requestPreviewSuffixChange"')
+        ->toContain('$event.detail.storageId === {{ $id }}')
         ->and(file_get_contents(resource_path('views/livewire/project/service/file-storage.blade.php')))
         ->toContain($helper);
+});
+
+it('authorizes storage sharing confirmation controls', function () {
+    $confirmation = file_get_contents(resource_path('views/components/storage-sharing-confirmation.blade.php'));
+    $fileStorage = file_get_contents(resource_path('views/livewire/project/service/file-storage.blade.php'));
+
+    expect($confirmation)
+        ->toContain("'canGate' => null")
+        ->toContain("'canResource' => null")
+        ->toMatch('/<x-forms\.button(?=[^>]*:canGate="\$canGate")(?=[^>]*:canResource="\$canResource")[^>]*>\s*Keep isolated/s')
+        ->toMatch('/<x-forms\.button(?=[^>]*:canGate="\$canGate")(?=[^>]*:canResource="\$canResource")(?=[^>]*wire:click="confirmShareStorage")[^>]*>/s')
+        ->and($fileStorage)
+        ->toContain('<x-storage-sharing-confirmation subject="path" canGate="update" :canResource="$resource" />');
 });
 
 it('allows stale compose volume metadata to be deleted', function () {

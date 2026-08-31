@@ -106,7 +106,8 @@
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
-                                                <x-forms.button type="button" class="!px-2.5 !text-xs">
+                                                <x-forms.button canGate="update" :canResource="$resource" type="button"
+                                                    class="!px-2.5 !text-xs">
                                                     Backup
                                                 </x-forms.button>
                                             </x-slot:content>
@@ -171,10 +172,11 @@
                                         <span>PR suffix</span>
                                         <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
                                     </span>
-                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled"
+                                    <x-forms.listbox canGate="update" :canResource="$resource"
+                                        id="forms.{{ $id }}.isPreviewSuffixEnabled"
                                         onChange="requestPreviewSuffixChange" :onChangeArgs="[$id]"
-                                        x-on:storage-sharing-pending.window="value = true"
-                                        x-on:storage-sharing-confirmed.window="value = false" :options="[
+                                        x-on:storage-sharing-pending.window="$event.detail.storageId === {{ $id }} && (value = true)"
+                                        x-on:storage-sharing-confirmed.window="$event.detail.storageId === {{ $id }} && (value = false)" :options="[
                                         ['value' => true, 'label' => 'Add suffix'],
                                         ['value' => false, 'label' => 'Share volume'],
                                     ]" />
@@ -208,7 +210,8 @@
                                 @if ($showBackupAction)
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <x-forms.button type="button" class="!px-2.5 !text-xs">
+                                            <x-forms.button canGate="update" :canResource="$resource" type="button"
+                                                class="!px-2.5 !text-xs">
                                                 Backup
                                             </x-forms.button>
                                         </x-slot:content>
@@ -225,7 +228,8 @@
                                 @elseif (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable())
                                     <x-modal-input title="New Scheduled Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <x-forms.button type="button" class="!px-2.5 !text-xs">
+                                            <x-forms.button canGate="update" :canResource="$resource" type="button"
+                                                class="!px-2.5 !text-xs">
                                                 Backup
                                             </x-forms.button>
                                         </x-slot:content>

@@ -240,6 +240,8 @@ YAML;
     ]);
 
     $parsed = applicationParser($application, pull_request_id: 9);
+    $prometheusVolume = parseDockerVolumeString(data_get($parsed, 'services.prometheus.volumes.0'));
+    $prometheusVolumeType = sourceIsLocal($prometheusVolume['source']) ? 'bind' : 'volume';
 
     expect($parsed->get('services'))
         ->toHaveKeys(['api', 'prometheus'])
@@ -249,8 +251,8 @@ YAML;
         ->and(data_get($parsed, 'services.prometheus.container_name'))->toBe('custom-prometheus-pr-9')
         ->and(data_get($parsed, 'services.api.environment.SERVICE_NAME_API'))->toBe('api')
         ->and(data_get($parsed, 'services.api.environment.COOLIFY_CONTAINER_NAME'))->toBe("{$application->uuid}-pr-9-api-1")
-        ->and(data_get($parsed, 'services.prometheus.volumes.0'))
-        ->toContain('prometheus.yml-pr-9:/etc/prometheus/prometheus.yml:ro');
+        ->and((string) $prometheusVolume['source'])->toBe("/data/coolify/applications/{$application->uuid}/prometheus.yml-pr-9")
+        ->and($prometheusVolumeType)->toBe('bind');
 });
 
 test('applicationParser stores domains under original hyphenated compose service names', function () {

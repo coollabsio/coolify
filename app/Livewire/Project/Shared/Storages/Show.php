@@ -8,6 +8,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledVolumeBackup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Renderless;
 use Livewire\Component;
@@ -172,7 +173,17 @@ class Show extends Component
             return;
         }
 
-        $this->validate();
+        Validator::make(
+            [
+                'name' => $this->name,
+                'mountPath' => $this->mountPath,
+                'hostPath' => $this->hostPath,
+                'isPreviewSuffixEnabled' => $this->isPreviewSuffixEnabled,
+            ],
+            $this->rules(),
+            $this->messages(),
+            $this->validationAttributes,
+        )->validate();
 
         $this->syncData(true);
         $this->storage->save();
