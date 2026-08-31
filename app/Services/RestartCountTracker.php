@@ -18,12 +18,8 @@ class RestartCountTracker
         $restartCountIncreased = $observedRestartCount > $previousRestartCount;
         $restartCountChanged = $newGeneration || $restartCountIncreased;
 
-        $restartLimitReached = false;
-        if ($maxRestartCount > 0 && $restartCountChanged) {
-            $previousGenerationCount = $newGeneration ? 0 : $previousRestartCount;
-            $restartLimitReached = $observedRestartCount >= $maxRestartCount
-                && $previousGenerationCount < $maxRestartCount;
-        }
+        $restartLimitReached = $maxRestartCount > 0
+            && $observedRestartCount >= $maxRestartCount;
 
         return [
             'restart_count' => $restartCountChanged ? $observedRestartCount : $previousRestartCount,

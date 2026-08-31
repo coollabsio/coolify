@@ -78,3 +78,18 @@ it('detects a normal threshold crossing', function () {
         'new_generation' => false,
     ]);
 });
+
+it('detects a limit that is enabled below the current observed restart count', function () {
+    $result = (new RestartCountTracker)->evaluate(
+        previousRestartCount: 17,
+        observedRestartCount: 17,
+        maxRestartCount: 10,
+    );
+
+    expect($result)->toMatchArray([
+        'restart_count' => 17,
+        'restart_count_changed' => false,
+        'restart_limit_reached' => true,
+        'new_generation' => false,
+    ]);
+});

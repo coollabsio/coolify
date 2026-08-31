@@ -10,6 +10,7 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Events\ServiceChecked;
+use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;

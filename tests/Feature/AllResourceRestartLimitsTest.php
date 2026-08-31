@@ -113,6 +113,14 @@ it('uses selected service resource actions instead of parent complex status acti
         ->toContain('public function removeSelectedResourceContainer(): void');
 });
 
+it('imports the application model used when claiming a restart limit', function () {
+    $statusAction = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
+
+    expect($statusAction)
+        ->toContain('use App\\Models\\Application;')
+        ->toContain('Application::query()');
+});
+
 it('adds restart limit columns to previews services and standalone databases', function () {
     $migrations = collect(glob(database_path('migrations/*.php')))
         ->map(fn (string $path): string => file_get_contents($path))
@@ -165,6 +173,15 @@ it('atomically claims a resource restart limit once and can reset it', function 
 
     expect($resource->fresh()->restart_count)->toBe(0)
         ->and($resource->restart_limit_reached)->toBeFalse();
+
+    $resourceWithExistingRestarts = $resource->newInstance();
+    $resourceWithExistingRestarts->max_restart_count = 0;
+    $resourceWithExistingRestarts->save();
+    expect($resourceWithExistingRestarts->trackRestartCount(17))->toBeFalse();
+
+    $resourceWithExistingRestarts->update(['max_restart_count' => 10]);
+    expect($resourceWithExistingRestarts->trackRestartCount(17))->toBeTrue()
+        ->and($resourceWithExistingRestarts->fresh()->restart_limit_reached)->toBeTrue();
 
     Schema::drop('restart_limit_test_resources');
 });
