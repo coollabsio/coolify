@@ -3,7 +3,7 @@
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         @if ($resourceType === 'database')
-            <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" :isImportSupported="$isImportSupported" />
+            <x-service-database.sidebar :parameters="$parameters" :serviceDatabase="$serviceDatabase" />
         @else
             <aside class="application-settings-navigation min-w-0 xl:self-start">
                 <nav aria-label="Compose resource settings"

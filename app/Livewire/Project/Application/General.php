@@ -321,17 +321,6 @@ class General extends Component
             }
         }
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
-        if ($this->application->build_pack === 'dockercompose' && ! $this->application->docker_compose_raw) {
-            // Only load compose file if user has update permission
-            try {
-                $this->authorize('update', $this->application);
-                $this->initLoadingCompose = true;
-                $this->dispatch('info', 'Loading docker compose file.');
-            } catch (AuthorizationException $e) {
-                // User doesn't have update permission, skip loading compose file
-            }
-        }
-
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
             $this->dispatch('configurationChanged');
         }
@@ -608,14 +597,9 @@ class General extends Component
             $this->resetDefaultLabels(false);
         }
         if ($this->buildPack === 'dockercompose') {
-            // Only update if user has permission
-            try {
-                $this->authorize('update', $this->application);
-                $this->fqdn = null;
-                $this->application->fqdn = null;
-                $this->application->settings->save();
-            } catch (AuthorizationException $e) {
-                // User doesn't have update permission, just continue without saving
+            if (blank($this->dockerComposeLocation)) {
+                $this->dockerComposeLocation = '/docker-compose.yaml';
+                $this->application->docker_compose_location = $this->dockerComposeLocation;
             }
         }
         if ($this->buildPack === 'static') {

@@ -314,8 +314,6 @@
                                         class="relative z-10 max-w-full self-start truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
                                         :title="displayDomain(item.fqdn)" x-text="displayDomain(item.fqdn)"></a>
                                 </template>
-                                <span x-show="!item.fqdn"
-                                    class="text-[11px] text-neutral-400 dark:text-fg-faint">-</span>
                             </div>
                         </article>
                     </template>

@@ -119,8 +119,7 @@
                 @else
                     <div class="flex flex-col gap-5">
                         @if ($buildPack === 'dockercompose')
-                            <div class="flex flex-col gap-2"
-                                @can('update', $application) x-init="$wire.dispatch('loadCompose', true)" @endcan>
+                            <div class="flex flex-col gap-2">
                                 <div x-data="{
                                     baseDir: @entangle('baseDirectory'),
                                     composeLocation: @entangle('dockerComposeLocation'),

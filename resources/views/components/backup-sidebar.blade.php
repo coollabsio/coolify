@@ -15,7 +15,7 @@
             'danger' => 'project.application.backup.danger',
         ],
         'service' => [
-            'back' => 'project.service.database.backups',
+            'back' => 'project.service.volume-backups.index',
             'general' => 'project.service.database.backup.show',
             's3' => 'project.service.database.backup.s3',
             'retention' => 'project.service.database.backup.retention',
@@ -48,9 +48,11 @@
         ['key' => 'danger', 'label' => 'Danger Zone', 'icon' => 'shield-alert'],
     ];
     $backLabel = $context === 'database' ? 'Back to database' : 'Back to backups';
-    $backParameters = $context === 'database'
-        ? collect($parameters)->except('backup_uuid')->all()
-        : $parameters;
+    $backParameters = match ($context) {
+        'database' => collect($parameters)->except('backup_uuid')->all(),
+        'service' => collect($parameters)->except(['stack_service_uuid', 'backup_uuid'])->all(),
+        default => $parameters,
+    };
 @endphp
 
 <aside class="application-settings-navigation min-w-0 xl:self-start">
