@@ -86,7 +86,7 @@
         return isDifferentMonth;
         {{-- } --}}
     }
-}" @show-sponsorship-reminder.window="popups.sponsorship = true; reminders.sponsorship.compact = false">
+}" x-on:show-sponsorship-reminder.window="popups.sponsorship = true; reminders.sponsorship.compact = false">
     @auth
         <span x-show="popups.realtime === true">
             @if (!isCloud())
@@ -145,7 +145,7 @@
             <x-popup>
                 <x-slot:customActions>
                     <div class="relative mx-auto flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-modal transition-all duration-300 dark:border-white/[0.1] dark:bg-surface"
-                        @show-sponsorship-reminder.window="bannerVisible = true"
+                        x-on:show-sponsorship-reminder.window="bannerVisible = true"
                         :class="reminders.sponsorship.compact ? 'max-w-sm gap-3 p-4' : 'max-w-2xl gap-5 p-5 sm:p-6'">
                         <button type="button" aria-label="Dismiss sponsorship reminder"
                             class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
