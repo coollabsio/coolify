@@ -11,6 +11,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Renderless;
 use Livewire\Component;
 
 class All extends Component
@@ -44,6 +45,8 @@ class All extends Component
     public bool $canUpdate = false;
 
     public bool $deleteDockerVolume = false;
+
+    public ?int $pendingSharedStorageId = null;
 
     protected $listeners = ['refreshVolumeList' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
 
@@ -108,19 +111,53 @@ class All extends Component
         $this->submit($storageId);
     }
 
-    /**
-     * Livewire listbox onChange cannot pass args; PR suffix fields call this via updatedForms.
-     */
-    public function updatedForms($value, string $key): void
+    #[Renderless]
+    public function requestPreviewSuffixChange(int $storageId, bool $isEnabled): void
     {
-        if (! str_ends_with($key, '.isPreviewSuffixEnabled')) {
+        $this->authorize('update', $this->resource);
+
+        if (! isset($this->forms[$storageId]) || $this->forms[$storageId]['isReadOnly']) {
             return;
         }
 
-        $storageId = (int) explode('.', $key)[0];
-        if ($storageId > 0 && isset($this->forms[$storageId]) && ! $this->forms[$storageId]['isReadOnly']) {
-            $this->instantSave($storageId);
+        $storage = $this->findStorageOrFail($storageId);
+        if (! $isEnabled && $storage->is_preview_suffix_enabled) {
+            $this->forms[$storageId]['isPreviewSuffixEnabled'] = true;
+            $this->pendingSharedStorageId = $storageId;
+            $this->dispatch('storage-sharing-pending');
+            $this->dispatch('open-storage-sharing-modal');
+
+            return;
         }
+
+        $this->forms[$storageId]['isPreviewSuffixEnabled'] = $isEnabled;
+        $storage->is_preview_suffix_enabled = $isEnabled;
+        $storage->save();
+        $this->dispatch('success', 'Storage updated successfully');
+    }
+
+    #[Renderless]
+    public function confirmShareStorage(): void
+    {
+        if ($this->pendingSharedStorageId === null) {
+            return;
+        }
+
+        $storageId = $this->pendingSharedStorageId;
+        $this->forms[$storageId]['isPreviewSuffixEnabled'] = false;
+        $storage = $this->findStorageOrFail($storageId);
+        $storage->is_preview_suffix_enabled = false;
+        $storage->save();
+        $this->pendingSharedStorageId = null;
+        $this->dispatch('storage-sharing-confirmed');
+        $this->dispatch('success', 'Storage updated successfully');
+    }
+
+    #[Renderless]
+    public function cancelShareStorage(): void
+    {
+        $this->pendingSharedStorageId = null;
+        $this->dispatch('storage-sharing-pending');
     }
 
     public function delete(int $storageId, $password = '', $selectedActions = [])

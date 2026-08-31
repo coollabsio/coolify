@@ -212,7 +212,7 @@ YAML;
         ->and($domains['backend']['domain'])->toStartWith('http://');
 });
 
-test('applicationParser keeps compose service identities and repository bind paths in previews', function () {
+test('applicationParser keeps compose service identities and isolates bind paths in previews', function () {
     Bus::fake();
 
     $dockerCompose = <<<'YAML'
@@ -250,8 +250,7 @@ YAML;
         ->and(data_get($parsed, 'services.api.environment.SERVICE_NAME_API'))->toBe('api')
         ->and(data_get($parsed, 'services.api.environment.COOLIFY_CONTAINER_NAME'))->toBe("{$application->uuid}-pr-9-api-1")
         ->and(data_get($parsed, 'services.prometheus.volumes.0'))
-        ->toContain('prometheus.yml:/etc/prometheus/prometheus.yml:ro')
-        ->not->toContain('prometheus.yml-pr-9');
+        ->toContain('prometheus.yml-pr-9:/etc/prometheus/prometheus.yml:ro');
 });
 
 test('applicationParser stores domains under original hyphenated compose service names', function () {

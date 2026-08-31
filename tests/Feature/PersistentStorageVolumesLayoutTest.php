@@ -43,11 +43,14 @@ it('keeps nested storage component keys stable when mounts are added or deleted'
         ->not->toContain('wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"');
 });
 
+use App\Livewire\Project\Service\FileStorage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
+use App\Livewire\Project\Shared\Storages\Show;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\ScheduledVolumeBackup;
@@ -152,6 +155,9 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('volumes-col-backup')
         ->toContain('supportsPreviewSuffix')
         ->toContain('x-modal-input')
+        ->toContain('<x-forms.button type="button" class="!px-2.5 !text-xs">')
+        ->not->toContain('title="Configure backup"')
+        ->not->toContain('<x-reicon name="database"')
         ->not->toContain('wire:click="openBackupModal')
         ->toContain('data-table-row')
         ->toContain('volumes-mobile-label')
@@ -280,6 +286,88 @@ it('shows PR deployment suffix only for git-based applications', function () {
     Livewire::test(All::class, ['resource' => $nonGitComposeApp])
         ->assertSet('supportsPreviewSuffix', false)
         ->assertDontSee('Add suffix');
+});
+
+it('confirms before sharing a persistent volume with preview deployments', function () {
+    [$application, $volume] = createApplicationWithVolume();
+
+    $component = Livewire::test(All::class, ['resource' => $application])
+        ->call('requestPreviewSuffixChange', $volume->id, false)
+        ->assertSet("forms.{$volume->id}.isPreviewSuffixEnabled", true)
+        ->assertSet('pendingSharedStorageId', $volume->id)
+        ->assertDispatched('open-storage-sharing-modal');
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
+
+    $component->call('cancelShareStorage')
+        ->assertSet('pendingSharedStorageId', null)
+        ->assertDispatched('storage-sharing-pending');
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
+
+    $component->call('requestPreviewSuffixChange', $volume->id, false)
+        ->call('confirmShareStorage')
+        ->assertSet('pendingSharedStorageId', null)
+        ->assertDispatched('storage-sharing-confirmed');
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeFalse();
+});
+
+it('confirms before sharing a persistent volume from the storage detail component', function () {
+    [$application, $volume] = createApplicationWithVolume();
+
+    $component = Livewire::test(Show::class, ['storage' => $volume, 'resource' => $application])
+        ->set('isPreviewSuffixEnabled', false)
+        ->call('instantSave')
+        ->assertSet('isPreviewSuffixEnabled', true)
+        ->assertDispatched('open-storage-sharing-modal');
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeTrue();
+
+    $component->call('confirmShareStorage');
+
+    expect($volume->fresh()->is_preview_suffix_enabled)->toBeFalse();
+});
+
+it('confirms before sharing a file path with preview deployments', function () {
+    [$application] = createApplicationWithVolume();
+    $file = LocalFileVolume::withoutEvents(fn () => LocalFileVolume::forceCreate([
+        'uuid' => (string) Str::uuid(),
+        'fs_path' => '/data/config.yml',
+        'mount_path' => '/app/config.yml',
+        'content' => 'value',
+        'is_directory' => false,
+        'is_based_on_git' => true,
+        'is_preview_suffix_enabled' => true,
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]));
+
+    $component = Livewire::test(FileStorage::class, ['fileStorage' => $file])
+        ->set('isPreviewSuffixEnabled', false)
+        ->call('instantSave')
+        ->assertSet('isPreviewSuffixEnabled', true)
+        ->assertDispatched('open-storage-sharing-modal');
+
+    expect($file->fresh()->is_preview_suffix_enabled)->toBeTrue();
+
+    $component->call('confirmShareStorage');
+
+    expect($file->fresh()->is_preview_suffix_enabled)->toBeFalse();
+});
+
+it('warns that shared preview storage can modify production data', function () {
+    $warning = 'Production and preview deployments will use the same data';
+    $helper = 'Adds -pr-N to the storage name or path so each preview uses isolated data.';
+
+    expect(file_get_contents(resource_path('views/components/storage-sharing-confirmation.blade.php')))
+        ->toContain($warning)
+        ->and(file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php')))
+        ->toContain($helper)
+        ->toContain('<x-helper')
+        ->toContain('onChange="requestPreviewSuffixChange"')
+        ->and(file_get_contents(resource_path('views/livewire/project/service/file-storage.blade.php')))
+        ->toContain($helper);
 });
 
 it('allows stale compose volume metadata to be deleted', function () {

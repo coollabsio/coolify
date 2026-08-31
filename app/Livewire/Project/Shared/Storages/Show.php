@@ -9,6 +9,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Renderless;
 use Livewire\Component;
 
 class Show extends Component
@@ -158,14 +159,42 @@ class Show extends Component
         }
     }
 
+    #[Renderless]
     public function instantSave(): void
     {
         $this->authorize('update', $this->resource);
+
+        if (! $this->isPreviewSuffixEnabled && $this->storage->is_preview_suffix_enabled) {
+            $this->isPreviewSuffixEnabled = true;
+            $this->dispatch('storage-sharing-pending');
+            $this->dispatch('open-storage-sharing-modal');
+
+            return;
+        }
+
         $this->validate();
 
         $this->syncData(true);
         $this->storage->save();
         $this->dispatch('success', 'Storage updated successfully');
+    }
+
+    #[Renderless]
+    public function confirmShareStorage(): void
+    {
+        $this->authorize('update', $this->resource);
+        $this->isPreviewSuffixEnabled = false;
+        $this->storage->is_preview_suffix_enabled = false;
+        $this->storage->save();
+        $this->dispatch('storage-sharing-confirmed');
+        $this->dispatch('success', 'Storage updated successfully');
+    }
+
+    #[Renderless]
+    public function cancelShareStorage(): void
+    {
+        $this->isPreviewSuffixEnabled = true;
+        $this->dispatch('storage-sharing-pending');
     }
 
     public function submit()

@@ -122,6 +122,7 @@
     }" x-modelable="value" :class="{ 'pointer-events-none opacity-70': saving }"
         {{ $attributes->whereStartsWith('x-model') }}
         {{ $attributes->whereStartsWith('x-effect') }}
+        {{ $attributes->whereStartsWith('x-on:') }}
         @if ($preserveValue) wire:ignore @endif
         @click.outside="open = false" @keydown.escape="open = false" @resize.window="open && positionPanel()">
         <button x-ref="trigger" id="{{ $triggerId }}" type="button" class="listbox-trigger" @click="toggle()"

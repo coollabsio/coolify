@@ -21,9 +21,9 @@
                 <span class="volumes-col-source">Source Path</span>
                 <span>Destination Path</span>
                 @if ($supportsPreviewSuffix)
-                    <span class="volumes-col-pr"
-                        title="Whether preview deployments receive an isolated -pr-N volume suffix.">
-                        PR suffix
+                    <span class="volumes-col-pr flex items-center gap-1.5">
+                        <span>PR suffix</span>
+                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
                     </span>
                 @endif
                 <span class="volumes-col-backup text-center">Backup</span>
@@ -74,7 +74,10 @@
 
                             @if ($supportsPreviewSuffix)
                                 <div class="volumes-col-pr min-w-0">
-                                    <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
+                                    <span class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">
+                                        <span>PR suffix</span>
+                                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                                    </span>
                                     <span>{{ $form['isPreviewSuffixEnabled'] ? 'Add suffix' : 'Share volume' }}</span>
                                 </div>
                             @endif
@@ -103,10 +106,9 @@
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
-                                                <button type="button" class="icon-button" title="Configure backup"
-                                                    aria-label="Configure backup">
-                                                    <x-reicon name="database" class="size-4" />
-                                                </button>
+                                                <x-forms.button type="button" class="!px-2.5 !text-xs">
+                                                    Backup
+                                                </x-forms.button>
                                             </x-slot:content>
                                             @if ($resource instanceof \App\Models\Application)
                                                 <livewire:project.application.backup.create :application="$resource"
@@ -165,8 +167,14 @@
 
                             @if ($supportsPreviewSuffix)
                                 <div class="volumes-col-pr min-w-0">
-                                    <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
-                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" :options="[
+                                    <span class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">
+                                        <span>PR suffix</span>
+                                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                                    </span>
+                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled"
+                                        onChange="requestPreviewSuffixChange" :onChangeArgs="[$id]"
+                                        x-on:storage-sharing-pending.window="value = true"
+                                        x-on:storage-sharing-confirmed.window="value = false" :options="[
                                         ['value' => true, 'label' => 'Add suffix'],
                                         ['value' => false, 'label' => 'Share volume'],
                                     ]" />
@@ -200,10 +208,9 @@
                                 @if ($showBackupAction)
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <button type="button" class="icon-button" title="Configure backup"
-                                                aria-label="Configure backup">
-                                                <x-reicon name="database" class="size-4" />
-                                            </button>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs">
+                                                Backup
+                                            </x-forms.button>
                                         </x-slot:content>
                                         @if ($resource instanceof \App\Models\Application)
                                             <livewire:project.application.backup.create :application="$resource"
@@ -218,10 +225,9 @@
                                 @elseif (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable())
                                     <x-modal-input title="New Scheduled Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <button type="button" class="icon-button" title="Configure backup"
-                                                aria-label="Configure backup">
-                                                <x-reicon name="database" class="size-4" />
-                                            </button>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs">
+                                                Backup
+                                            </x-forms.button>
                                         </x-slot:content>
                                         <livewire:project.database.create-scheduled-backup :database="$resource"
                                             wire:key="configure-database-backup-{{ $id }}" />
@@ -243,4 +249,5 @@
         </div>
     @endif
 
+    <x-storage-sharing-confirmation subject="volume" />
 </div>

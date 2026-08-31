@@ -17,6 +17,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
@@ -286,9 +287,19 @@ class FileStorage extends Component
         }
     }
 
+    #[Renderless]
     public function instantSave(): void
     {
         $this->authorize('update', $this->resource);
+
+        if (! $this->isPreviewSuffixEnabled && $this->fileStorage->is_preview_suffix_enabled) {
+            $this->isPreviewSuffixEnabled = true;
+            $this->dispatch('storage-sharing-pending');
+            $this->dispatch('open-storage-sharing-modal');
+
+            return;
+        }
+
         if ($this->fileStorage->is_host_file) {
             $this->dispatch('error', 'Host file mounts are bind-only and cannot be edited from the UI.');
 
@@ -302,6 +313,24 @@ class FileStorage extends Component
         }
         $this->syncData(true);
         $this->dispatch('success', 'File updated.');
+    }
+
+    #[Renderless]
+    public function confirmShareStorage(): void
+    {
+        $this->authorize('update', $this->resource);
+        $this->isPreviewSuffixEnabled = false;
+        $this->fileStorage->is_preview_suffix_enabled = false;
+        $this->fileStorage->save();
+        $this->dispatch('storage-sharing-confirmed');
+        $this->dispatch('success', 'File updated.');
+    }
+
+    #[Renderless]
+    public function cancelShareStorage(): void
+    {
+        $this->isPreviewSuffixEnabled = true;
+        $this->dispatch('storage-sharing-pending');
     }
 
     public function render()

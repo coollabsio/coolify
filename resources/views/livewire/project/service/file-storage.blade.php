@@ -35,8 +35,9 @@
             @can('update', $resource)
                 <div class="w-full sm:w-96">
                     <x-forms.listbox id="isPreviewSuffixEnabled" label="PR deployment suffix"
-                        helper="Choose whether preview deployments receive an isolated -pr-N path suffix."
-                        onChange="instantSave" :options="[
+                        helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews."
+                        onChange="instantSave" x-on:storage-sharing-pending.window="value = true"
+                        x-on:storage-sharing-confirmed.window="value = false" :options="[
                             ['value' => true, 'label' => 'Add suffix'],
                             ['value' => false, 'label' => 'Share path'],
                         ]" />
@@ -158,5 +159,6 @@
                 </div>
             @endcan
         @endif
+        <x-storage-sharing-confirmation subject="path" />
     </div>
 </div>
