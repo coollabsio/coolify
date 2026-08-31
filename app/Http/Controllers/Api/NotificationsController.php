@@ -15,6 +15,7 @@ use App\Rules\ValidHostname;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
 class NotificationsController extends Controller
@@ -256,7 +257,7 @@ class NotificationsController extends Controller
         $body = $request->json()->all();
         $config = $this->channelConfig($channel);
 
-        $validator = customApiValidator($body, $config['rules']);
+        $validator = Validator::make($body, $config['rules']);
 
         $extraFields = array_diff(array_keys($body), $allowedFields);
         if ($validator->fails() || ! empty($extraFields)) {

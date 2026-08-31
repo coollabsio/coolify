@@ -9,6 +9,7 @@ it('uses a dedicated notification event for restart limits', function () {
         ->and($eventGrid)
         ->toContain("'Resources' => [")
         ->toContain("'key' => 'statusChange'")
+        ->toContain("'helper' => 'Notify when a resource stops or Coolify automatically restarts it.'")
         ->toContain("'key' => 'restartLimitReached'")
         ->toContain("'label' => 'Restart limit reached'")
         ->and($telegramChannel)
@@ -35,4 +36,13 @@ it('enables restart limit notifications by default in every channel migration', 
 
     expect($migrations)->toHaveCount(6);
     $migrations->each(fn (string $migration) => expect(file_get_contents($migration))->toContain('->default(true)'));
+});
+
+it('uses the inline validator facade for notification API updates', function () {
+    $controller = file_get_contents(app_path('Http/Controllers/Api/NotificationsController.php'));
+
+    expect($controller)
+        ->toContain('use Illuminate\\Support\\Facades\\Validator;')
+        ->toContain("Validator::make(\$body, \$config['rules'])")
+        ->not->toContain("customApiValidator(\$body, \$config['rules'])");
 });

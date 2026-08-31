@@ -14,7 +14,7 @@
             [
                 'key' => 'statusChange',
                 'label' => 'Resource status changes',
-                'helper' => 'Notify when Coolify automatically restarts a resource.',
+                'helper' => 'Notify when a resource stops or Coolify automatically restarts it.',
             ],
             [
                 'key' => 'restartLimitReached',

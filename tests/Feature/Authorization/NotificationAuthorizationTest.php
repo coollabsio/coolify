@@ -132,6 +132,80 @@ test('admin can update telegram notification settings', function () {
     expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
+test('telegram restart limit thread id accepts 255 characters', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TelegramNotification::class)
+        ->set('telegramNotificationsRestartLimitReachedThreadId', str_repeat('a', 255))
+        ->call('syncData', true)
+        ->assertHasNoErrors(['telegramNotificationsRestartLimitReachedThreadId']);
+
+    expect($this->team->telegramNotificationSettings->fresh()->telegram_notifications_restart_limit_reached_thread_id)
+        ->toBe(str_repeat('a', 255));
+});
+
+test('telegram restart limit thread id rejects 256 characters', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(TelegramNotification::class)
+        ->set('telegramNotificationsRestartLimitReachedThreadId', str_repeat('a', 256))
+        ->call('syncData', true)
+        ->assertHasErrors(['telegramNotificationsRestartLimitReachedThreadId' => 'max']);
+});
+
+test('member cannot view telegram thread ids', function () {
+    $threadIds = [
+        'telegram_notifications_deployment_success_thread_id' => 'deployment-success-thread',
+        'telegram_notifications_deployment_failure_thread_id' => 'deployment-failure-thread',
+        'telegram_notifications_status_change_thread_id' => 'status-change-thread',
+        'telegram_notifications_restart_limit_reached_thread_id' => 'restart-limit-thread',
+        'telegram_notifications_backup_success_thread_id' => 'backup-success-thread',
+        'telegram_notifications_backup_failure_thread_id' => 'backup-failure-thread',
+        'telegram_notifications_scheduled_task_success_thread_id' => 'scheduled-task-success-thread',
+        'telegram_notifications_scheduled_task_failure_thread_id' => 'scheduled-task-failure-thread',
+        'telegram_notifications_docker_cleanup_success_thread_id' => 'docker-cleanup-success-thread',
+        'telegram_notifications_docker_cleanup_failure_thread_id' => 'docker-cleanup-failure-thread',
+        'telegram_notifications_server_disk_usage_thread_id' => 'server-disk-usage-thread',
+        'telegram_notifications_server_reachable_thread_id' => 'server-reachable-thread',
+        'telegram_notifications_server_unreachable_thread_id' => 'server-unreachable-thread',
+        'telegram_notifications_server_patch_thread_id' => 'server-patch-thread',
+        'telegram_notifications_traefik_outdated_thread_id' => 'traefik-outdated-thread',
+    ];
+
+    $this->team->telegramNotificationSettings->update($threadIds);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(TelegramNotification::class);
+
+    foreach ($threadIds as $column => $threadId) {
+        $component
+            ->assertSet(str($column)->camel()->toString(), null)
+            ->assertDontSee($threadId);
+    }
+});
+
+test('admin can view telegram thread ids', function () {
+    $threadIds = [
+        'telegram_notifications_deployment_success_thread_id' => 'deployment-success-thread',
+        'telegram_notifications_restart_limit_reached_thread_id' => 'restart-limit-thread',
+    ];
+
+    $this->team->telegramNotificationSettings->update($threadIds);
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(TelegramNotification::class);
+
+    foreach ($threadIds as $column => $threadId) {
+        $component->assertSet(str($column)->camel()->toString(), $threadId);
+    }
+});
+
 // --- Email ---
 
 test('member cannot send test email notification', function () {
