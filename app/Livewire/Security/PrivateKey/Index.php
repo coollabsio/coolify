@@ -10,6 +10,13 @@ class Index extends Component
 {
     use AuthorizesRequests;
 
+    public function getListeners(): array
+    {
+        return [
+            'securityResourceChanged' => '$refresh',
+        ];
+    }
+
     public function generatePrivateKey(string $type)
     {
         try {
@@ -29,7 +36,7 @@ class Index extends Component
                 'team_id' => currentTeam()->id,
             ]);
 
-            return redirectRoute($this, 'security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
+            $this->dispatch('success', 'Private key generated successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

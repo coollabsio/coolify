@@ -95,6 +95,25 @@ describe('PATCH /api/v1/applications/{uuid} docker_registry_id', function () {
 
         expect($this->application->fresh()->docker_registry_id)->toBeNull();
     });
+
+    test('rejects a docker registry owned by another team', function () {
+        $otherTeamRegistry = DockerRegistry::create([
+            'name' => 'Other Team Registry',
+            'registry_url' => 'ghcr.io',
+            'username' => 'other-user',
+            'password' => 'other-token',
+            'team_id' => Team::factory()->create()->id,
+        ]);
+
+        $this->withHeaders(dockerRegistryIdApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+                'docker_registry_id' => $otherTeamRegistry->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('docker_registry_id');
+
+        expect($this->application->fresh()->docker_registry_id)->toBeNull();
+    });
 });
 
 describe('POST /api/v1/applications/dockerimage docker_registry_id', function () {
@@ -115,5 +134,29 @@ describe('POST /api/v1/applications/dockerimage docker_registry_id', function ()
 
         $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
         expect((int) $application->docker_registry_id)->toBe($this->registry->id);
+    });
+
+    test('rejects a docker registry owned by another team', function () {
+        $otherTeamRegistry = DockerRegistry::create([
+            'name' => 'Other Team Registry',
+            'registry_url' => 'ghcr.io',
+            'username' => 'other-user',
+            'password' => 'other-token',
+            'team_id' => Team::factory()->create()->id,
+        ]);
+
+        $this->withHeaders(dockerRegistryIdApiHeaders($this->bearerToken))
+            ->postJson('/api/v1/applications/dockerimage', [
+                'project_uuid' => $this->project->uuid,
+                'environment_uuid' => $this->environment->uuid,
+                'server_uuid' => $this->server->uuid,
+                'docker_registry_image_name' => 'ghcr.io/coollabsio/example',
+                'docker_registry_image_tag' => 'latest',
+                'docker_registry_id' => $otherTeamRegistry->id,
+                'ports_exposes' => '80',
+                'autogenerate_domain' => false,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('docker_registry_id');
     });
 });

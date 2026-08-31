@@ -2,10 +2,19 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\DB;
 
 class GithubApp extends BaseModel
 {
+    use Auditable;
+
+    public function delete(): ?bool
+    {
+        return DB::transaction(fn () => parent::delete());
+    }
+
     protected $fillable = [
         'team_id',
         'private_key_id',
@@ -97,5 +106,18 @@ class GithubApp extends BaseModel
                 }
             },
         );
+    }
+
+    /**
+     * A private GitHub App is connected once it has been registered and installed.
+     * Public sources do not require installation credentials.
+     */
+    public function isConnected(): bool
+    {
+        if ($this->is_public) {
+            return true;
+        }
+
+        return filled($this->app_id) && filled($this->installation_id);
     }
 }

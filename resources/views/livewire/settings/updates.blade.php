@@ -1,60 +1,65 @@
 <div>
     <x-slot:title>
-        Auto Update | Coolify
+        Update Settings | Coolify
     </x-slot>
-    <x-settings.navbar />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 sm:flex-row">
-        <x-settings.sidebar activeMenu="updates" />
-        <form wire:submit='submit' class="flex flex-col w-full">
-            <div class="flex items-center gap-2">
-                <h2>Updates</h2>
-                <x-forms.button type="submit">
-                    Save
-                </x-forms.button>
-            </div>
-            <div class="pb-4">Your instance's update settings.</div>
 
+    <x-settings.layout>
+        <form wire:submit="submit" class="application-settings-form flex min-w-0 flex-col gap-6">
+            {{-- Exclude is_auto_update_enabled (instantSave) so the bar does not flash. --}}
+            <x-unsaved-bar action="submit" targets="update_check_frequency,auto_update_frequency" />
 
-            <div class="flex flex-col gap-2">
-                <div class="flex items-end gap-2">
-                    <x-forms.input required id="update_check_frequency" label="Update Check Frequency"
-                        placeholder="0 * * * *"
-                        helper="Frequency (cron expression) to check for new Coolify versions and pull new Service Templates from CDN.<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every hour." />
-                    <x-forms.button wire:click='checkManually'>Check Manually</x-forms.button>
-                </div>
+            <x-application.settings-section title="Update Coolify"
+                helper="Install the latest Coolify version manually when an update is available.">
+                <livewire:upgrade :full-button="true" key="settings-upgrade" />
+            </x-application.settings-section>
 
-                <h4 class="pt-4">Auto Update</h4>
+            <x-application.settings-section title="Update checks">
+                <x-slot:actions>
+                    <x-forms.button type="button" wire:click="checkManually">
+                        <x-reicon name="refresh" class="size-3.5" />
+                        Check now
+                    </x-forms.button>
+                </x-slot:actions>
+                <x-forms.input required id="update_check_frequency" label="Check frequency"
+                    placeholder="0 * * * *"
+                    helper="A cron expression or preset such as hourly, daily, weekly, monthly, or yearly." />
+            </x-application.settings-section>
 
-                <div class="text-right md:w-64">
+            <x-application.settings-section title="Automatic updates">
+                <div class="grid gap-4 lg:grid-cols-2">
                     @if (!is_null(config('constants.coolify.autoupdate', null)))
-                        <div class="text-right">
-                            <x-forms.checkbox instantSave
-                                helper="AUTOUPDATE is set in .env file, you need to modify it there." disabled
-                                checked="{{ config('constants.coolify.autoupdate') }}" label="Enabled" />
-                        </div>
+                        <x-forms.listbox disabled id="is_auto_update_enabled" label="Automatic updates"
+                            helper="Controlled by the AUTOUPDATE environment variable." :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
                     @else
-                        <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Enabled" />
+                        <x-forms.listbox id="is_auto_update_enabled" label="Automatic updates"
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
+                    @endif
+
+                    @if (is_null(config('constants.coolify.autoupdate', null)) && $is_auto_update_enabled)
+                        <x-forms.input required id="auto_update_frequency" label="Update frequency"
+                            placeholder="0 0 * * *"
+                            helper="Cron expression or preset for installing updates." />
+                    @else
+                        <x-forms.input label="Update frequency" disabled placeholder="Disabled" />
                     @endif
                 </div>
-                @if (is_null(config('constants.coolify.autoupdate', null)) && $is_auto_update_enabled)
-                    <x-forms.input required id="auto_update_frequency" label="Frequency (cron expression)"
-                        placeholder="0 0 * * *"
-                        helper="Frequency (cron expression) (automatically update coolify).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every day at 00:00" />
-                @else
-                    <x-forms.input required label="Frequency (cron expression)" disabled placeholder="disabled"
-                        helper="Frequency (cron expression) (automatically update coolify).<br>You can use every_minute, hourly, daily, weekly, monthly, yearly.<br><br>Default is every day at 00:00" />
-                @endif
+            </x-application.settings-section>
 
-                <h4 class="pt-4">Docker Registry</h4>
-                <div class="md:w-96">
-                    <x-forms.select id="docker_registry_url" label="Docker Registry"
-                        helper="The Docker registry used to pull Coolify images during updates.<br>Switch to Docker Hub if you experience rate limiting with GitHub Container Registry.">
-                        <option value="docker.io">Docker Hub (docker.io)</option>
-                        <option value="ghcr.io">GitHub Container Registry (ghcr.io)</option>
-                    </x-forms.select>
+            <x-application.settings-section title="Image registry">
+                <div class="max-w-md">
+                    <x-forms.listbox id="docker_registry_url" label="Docker registry" :options="[
+                        ['value' => 'docker.io', 'label' => 'Docker Hub'],
+                        ['value' => 'ghcr.io', 'label' => 'GitHub Container Registry'],
+                    ]"
+                        helper="Switch registries if the current source is rate limited." />
                 </div>
-            </div>
-
+            </x-application.settings-section>
         </form>
-    </div>
+    </x-settings.layout>
 </div>

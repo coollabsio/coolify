@@ -34,7 +34,7 @@ class CloneMe extends Component
 
     public ?int $selectedServer = null;
 
-    public ?int $selectedDestination = null;
+    public ?string $selectedDestination = null;
 
     public ?Server $server = null;
 
@@ -76,9 +76,9 @@ class CloneMe extends Component
         return view('livewire.project.clone-me');
     }
 
-    public function selectServer($server_id, $destination_id)
+    public function selectServer($server_id, $destination_uuid)
     {
-        if ($server_id == $this->selectedServer && $destination_id == $this->selectedDestination) {
+        if ($server_id == $this->selectedServer && $destination_uuid === $this->selectedDestination) {
             $this->selectedServer = null;
             $this->selectedDestination = null;
             $this->server = null;
@@ -86,7 +86,7 @@ class CloneMe extends Component
             return;
         }
         $this->selectedServer = $server_id;
-        $this->selectedDestination = $destination_id;
+        $this->selectedDestination = $destination_uuid;
         $this->server = $this->servers->where('id', $server_id)->first();
     }
 
@@ -97,6 +97,18 @@ class CloneMe extends Component
             $this->validate([
                 'selectedDestination' => 'required',
                 'newName' => ValidationPatterns::nameRules(),
+            ]);
+            $selectedDestination = find_resource_destination_for_current_team($this->selectedDestination);
+            if (! $selectedDestination) {
+                throw new \Exception('Destination not found.');
+            }
+            auditLog('ui.project.clone_started', [
+                'team_id' => $this->project->team_id,
+                'project_uuid' => $this->project->uuid,
+                'project_name' => $this->project->name,
+                'clone_type' => $type,
+                'new_name' => $this->newName,
+                'destination_uuid' => $selectedDestination->uuid,
             ]);
             if ($type === 'project') {
                 $foundProject = Project::where('name', $this->newName)->first();
@@ -130,7 +142,6 @@ class CloneMe extends Component
             $databases = $this->environment->databases();
             $services = $this->environment->services;
             foreach ($applications as $application) {
-                $selectedDestination = $this->servers->flatMap(fn ($server) => $server->destinations())->where('id', $this->selectedDestination)->first();
                 clone_application($application, $selectedDestination, [
                     'environment_id' => $environment->id,
                 ], $this->cloneVolumeData);
@@ -147,7 +158,8 @@ class CloneMe extends Component
                     'status' => 'exited',
                     'started_at' => null,
                     'environment_id' => $environment->id,
-                    'destination_id' => $this->selectedDestination,
+                    'destination_id' => $selectedDestination->id,
+                    'destination_type' => $selectedDestination->getMorphClass(),
                 ]);
                 $newDatabase->save();
 
@@ -265,7 +277,9 @@ class CloneMe extends Component
                 ])->fill([
                     'uuid' => $uuid,
                     'environment_id' => $environment->id,
-                    'destination_id' => $this->selectedDestination,
+                    'destination_id' => $selectedDestination->id,
+                    'destination_type' => $selectedDestination->getMorphClass(),
+                    'server_id' => $selectedDestination->server_id,
                 ]);
                 $newService->save();
 

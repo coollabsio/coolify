@@ -2,17 +2,47 @@
     $currentTeam = auth()->user()->currentTeam();
     $teamInitial = strtoupper(mb_substr($currentTeam->name, 0, 1));
 @endphp
-<div>
-    <div :class="collapsed && 'lg:hidden'">
-        <x-forms.select wire:model.live="selectedTeamId">
-            <option value="default" disabled selected>Switch team</option>
+<div class="min-w-0">
+    {{-- Expanded: inline switcher (team name + up/down chevron) --}}
+    <div class="relative min-w-0" :class="collapsed && 'lg:hidden'"
+        x-data="{ open: false }" @keydown.escape.window="open = false">
+        <button type="button" @click="open = !open" @click.outside="open = false"
+            title="Switch team"
+            class="group/team flex h-8 items-center gap-1.5 rounded-lg px-2 -ml-1 text-left opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
+            <span class="whitespace-nowrap text-[13px] font-semibold text-black dark:text-fg">{{ $currentTeam->name }}</span>
+            <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
+                <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
+                    stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+        </button>
+        <div x-show="open" x-cloak x-transition.opacity.duration.120ms
+            class="listbox-panel left-0! z-[90]! max-h-72! min-w-56">
+            <div
+                class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-fg-faint">
+                Teams
+            </div>
             @foreach (auth()->user()->teams as $team)
-                <option value="{{ $team->id }}">{{ $team->name }}</option>
+                <button type="button" wire:click="switch_to({{ $team->id }}, window.location.href)" @click="open = false"
+                    class="listbox-option {{ $team->id === $currentTeam->id ? 'bg-neutral-100 font-medium dark:bg-white/[0.06]' : '' }}">
+                    <span class="min-w-0 flex-1 truncate">{{ $team->name }}</span>
+                </button>
             @endforeach
-        </x-forms.select>
+            <div class="mt-1 border-t border-neutral-200 pt-1 dark:border-white/[0.08]">
+                <x-modal-input title="New Team">
+                    <x-slot:content>
+                        <button type="button" class="listbox-option w-full" @click="open = false">
+                            <x-reicon name="plus" class="size-3.5 shrink-0" />
+                            <span class="min-w-0 flex-1 text-left">New team</span>
+                        </button>
+                    </x-slot:content>
+                    <livewire:team.create :key="'team-switcher-create-expanded'" />
+                </x-modal-input>
+            </div>
+        </div>
     </div>
-    <div class="hidden"
-        :class="collapsed && 'lg:block'"
+
+    {{-- Collapsed: square initial with flyout menu --}}
+    <div class="hidden" :class="collapsed && 'lg:block'"
         x-data="{
             teamOpen: false,
             teamX: 0,
@@ -24,26 +54,34 @@
                 this.teamOpen = !this.teamOpen;
             }
         }">
-        <button @click="openTeamMenu($event)" type="button"
-            title="Team: {{ $currentTeam->name }}"
-            class="flex items-center justify-center w-8 h-8 p-0 text-sm font-semibold text-coollabs dark:text-warning bg-neutral-100 dark:bg-coolgray-200 hover:bg-neutral-200 dark:hover:bg-coolgray-300 rounded-sm cursor-pointer transition-colors">
+        <button @click="openTeamMenu($event)" type="button" title="Team: {{ $currentTeam->name }}"
+            class="flex items-center justify-center w-8 h-8 p-0 text-[13px] font-semibold text-neutral-600 dark:text-fg bg-neutral-100 dark:bg-white/[0.06] hover:bg-neutral-200 dark:hover:bg-white/[0.1] rounded-lg cursor-pointer transition-colors">
             {{ $teamInitial }}
         </button>
-        <div x-show="teamOpen"
-            @click.outside="teamOpen = false"
-            x-transition.opacity.duration.100ms
-            x-cloak
+        <div x-show="teamOpen" @click.outside="teamOpen = false" x-transition.opacity.duration.100ms x-cloak
             :style="`left: ${teamX}px; top: ${teamY}px;`"
-            class="fixed z-[100] min-w-48 max-h-72 overflow-y-auto bg-white dark:bg-coolgray-100 border border-neutral-300 dark:border-coolgray-200 rounded-md shadow-lg py-1">
-            <div class="px-3 py-1.5 text-xs font-semibold text-neutral-500 dark:text-neutral-400 border-b border-neutral-200 dark:border-coolgray-200">Switch team</div>
+            class="listbox-panel fixed! top-auto! z-[100]! max-h-72! min-w-48">
+            <div
+                class="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-fg-faint">
+                Teams
+            </div>
             @foreach (auth()->user()->teams as $team)
-                <button type="button"
-                    wire:click="switch_to({{ $team->id }})"
-                    @click="teamOpen = false"
-                    class="w-full px-3 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-coolgray-200 dark:text-white {{ $team->id === $currentTeam->id ? 'font-semibold text-coollabs dark:text-warning' : '' }}">
-                    {{ $team->name }}
+                <button type="button" wire:click="switch_to({{ $team->id }}, window.location.href)" @click="teamOpen = false"
+                    class="listbox-option {{ $team->id === $currentTeam->id ? 'bg-neutral-100 font-medium dark:bg-white/[0.06]' : '' }}">
+                    <span class="min-w-0 flex-1 truncate">{{ $team->name }}</span>
                 </button>
             @endforeach
+            <div class="mt-1 border-t border-neutral-200 pt-1 dark:border-white/[0.08]">
+                <x-modal-input title="New Team">
+                    <x-slot:content>
+                        <button type="button" class="listbox-option w-full" @click="teamOpen = false">
+                            <x-reicon name="plus" class="size-3.5 shrink-0" />
+                            <span class="min-w-0 flex-1 text-left">New team</span>
+                        </button>
+                    </x-slot:content>
+                    <livewire:team.create :key="'team-switcher-create-collapsed'" />
+                </x-modal-input>
+            </div>
         </div>
     </div>
 </div>

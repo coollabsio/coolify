@@ -45,6 +45,11 @@ class Delete extends Component
         }
         try {
             $this->authorize('delete', $this->server);
+            if ($this->server->is_coolify_host) {
+                $this->dispatch('error', 'The Coolify host server cannot be deleted.');
+
+                return;
+            }
             if ($this->server->hasDefinedResources() && ! $this->force_delete_resources) {
                 $this->dispatch('error', 'Server has defined resources. Please delete them first or select "Delete all resources".');
 

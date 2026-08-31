@@ -25,6 +25,8 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public const MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024;
+
     /**
      * The number of times the job may be attempted.
      */
@@ -148,10 +150,12 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($this->containers as $containerName) {
                 if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
                     $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
-                    $exec = "docker exec {$containerName} {$cmd}";
+                    $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
+                    $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";
+                    $exec = $this->boundedTaskCommand($execCommand);
                     // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
                     // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = instant_remote_process([$exec], $this->server, true, false, $this->timeout, disableMultiplexing: true);
+                    $this->task_output = instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->timeout, disableMultiplexing: true);
                     $this->task_log->update([
                         'status' => 'success',
                         'message' => $this->task_output,
@@ -202,6 +206,14 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    private function boundedTaskCommand(string $command): string
+    {
+        $maxOutputBytes = self::MAX_OUTPUT_SIZE_BYTES;
+        $readLimit = $maxOutputBytes + 1;
+
+        return "output_file=\$(mktemp); trap 'rm -f \"\$output_file\"' EXIT; set +e; set -o pipefail; {$command} 2>&1 | { head -c {$readLimit} > \"\$output_file\"; cat > /dev/null; }; exit_code=\${PIPESTATUS[0]}; if [ \"\$(wc -c < \"\$output_file\")\" -gt {$maxOutputBytes} ]; then truncate -s {$maxOutputBytes} \"\$output_file\"; printf '\n\n[... Output truncated at 5MB limit ...]' >> \"\$output_file\"; fi; if [ \"\$exit_code\" -eq 0 ]; then cat \"\$output_file\"; else cat \"\$output_file\" >&2; fi; exit \$exit_code";
     }
 
     /**

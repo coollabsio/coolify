@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -7,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->user = User::factory()->create();
     $this->team = Team::factory()->personal()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -19,6 +21,18 @@ it('allows unauthenticated access to two-factor-challenge page', function () {
     // Fortify returns a redirect to /login if there's no login.id in session,
     // but the important thing is it does NOT return a 419 or 500
     expect($response->status())->toBeIn([200, 302]);
+});
+
+it('uses one mobile-friendly field for authenticator code paste and autofill', function () {
+    $challenge = file_get_contents(resource_path('views/auth/two-factor-challenge.blade.php'));
+
+    expect($challenge)
+        ->toContain('name="code"')
+        ->toContain('autocomplete="one-time-code"')
+        ->toContain('inputmode="numeric"')
+        ->toContain('maxlength="6"')
+        ->toContain('@input="submitAuthenticatorCode($event)"')
+        ->not->toContain('x-for="(digit, index) in digits"');
 });
 
 it('includes two-factor-challenge in allowed paths for unsubscribed accounts', function () {
@@ -59,7 +73,8 @@ it('renders 419 error page with login link instead of previous url', function ()
     $view = view('errors.419')->render();
 
     expect($view)->toContain('/login');
-    expect($view)->toContain('Back to Login');
+    expect($view)->toContain('Back to login');
     expect($view)->toContain('This page is definitely old, not like you!');
+    expect($view)->toContain('error-shell');
     expect($view)->not->toContain('url()->previous()');
 });

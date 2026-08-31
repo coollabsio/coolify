@@ -1,154 +1,142 @@
-<div class="flex flex-col gap-2">
-    @if ($ask)
-        This will revalidate the server, install / update Docker Engine, Docker Compose and all related
-        configuration. It will also restart Docker Engine, so your running containers will be unreachable
-        for the time being.
-        <x-forms.button isHighlighted wire:click='startValidatingAfterAsking'>Continue</x-forms.button>
-    @else
-        @if ($uptime)
-            <div class="flex w-64 gap-2">Server is reachable: <svg class="w-5 h-5 text-success" viewBox="0 0 256 256"
-                    xmlns="http://www.w3.org/2000/svg">
-                    <g fill="currentColor">
-                        <path
-                            d="m237.66 85.26l-128.4 128.4a8 8 0 0 1-11.32 0l-71.6-72a8 8 0 0 1 0-11.31l24-24a8 8 0 0 1 11.32 0l36.68 35.32a8 8 0 0 0 11.32 0l92.68-91.32a8 8 0 0 1 11.32 0l24 23.6a8 8 0 0 1 0 11.31"
-                            opacity=".2" />
-                        <path
-                            d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.58 0L104 136l-.11-.11l-36.64-35.27a16 16 0 0 0-22.57.06l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0l128.4-128.38a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24l.11.11l36.64 35.27a16 16 0 0 0 22.52 0L208.06 56L232 79.6Z" />
-                    </g>
-                </svg></div>
-        @else
-            @if ($error)
-                <div class="flex w-64 gap-2">Server is reachable: <svg class="w-5 h-5 text-error" viewBox="0 0 256 256"
-                        xmlns="http://www.w3.org/2000/svg">
-                        <path fill="currentColor"
-                            d="M208.49 191.51a12 12 0 0 1-17 17L128 145l-63.51 63.49a12 12 0 0 1-17-17L111 128L47.51 64.49a12 12 0 0 1 17-17L128 111l63.51-63.52a12 12 0 0 1 17 17L145 128Z" />
-                    </svg></div>
-            @else
-                <div class="w-64"><x-loading text="Server is reachable: " /></div>
-            @endif
-        @endif
-        @if ($uptime)
-            @if ($supported_os_type)
-                <div class="flex w-64 gap-2">Supported OS type: <svg class="w-5 h-5 text-success" viewBox="0 0 256 256"
-                        xmlns="http://www.w3.org/2000/svg">
-                        <g fill="currentColor">
-                            <path
-                                d="m237.66 85.26l-128.4 128.4a8 8 0 0 1-11.32 0l-71.6-72a8 8 0 0 1 0-11.31l24-24a8 8 0 0 1 11.32 0l36.68 35.32a8 8 0 0 0 11.32 0l92.68-91.32a8 8 0 0 1 11.32 0l24 23.6a8 8 0 0 1 0 11.31"
-                                opacity=".2" />
-                            <path
-                                d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.58 0L104 136l-.11-.11l-36.64-35.27a16 16 0 0 0-22.57.06l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0l128.4-128.38a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24l.11.11l36.64 35.27a16 16 0 0 0 22.52 0L208.06 56L232 79.6Z" />
-                        </g>
-                    </svg></div>
-            @else
-                @if ($error)
-                    <div class="flex w-64 gap-2">Supported OS type: <svg class="w-5 h-5 text-error"
-                            viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="currentColor"
-                                d="M208.49 191.51a12 12 0 0 1-17 17L128 145l-63.51 63.49a12 12 0 0 1-17-17L111 128L47.51 64.49a12 12 0 0 1 17-17L128 111l63.51-63.52a12 12 0 0 1 17 17L145 128Z" />
-                        </svg></div>
-                @else
-                    <div class="w-64"><x-loading text="Supported OS type:" /></div>
-                @endif
-            @endif
-        @endif
-        @if ($uptime && $supported_os_type)
-            @if ($prerequisites_installed)
-                <div class="flex w-64 gap-2">Prerequisites are installed: <svg class="w-5 h-5 text-success"
-                        viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                        <g fill="currentColor">
-                            <path
-                                d="m237.66 85.26l-128.4 128.4a8 8 0 0 1-11.32 0l-71.6-72a8 8 0 0 1 0-11.31l24-24a8 8 0 0 1 11.32 0l36.68 35.32a8 8 0 0 0 11.32 0l92.68-91.32a8 8 0 0 1 11.32 0l24 23.6a8 8 0 0 1 0 11.31"
-                                opacity=".2" />
-                            <path
-                                d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.58 0L104 136l-.11-.11l-36.64-35.27a16 16 0 0 0-22.57.06l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0l128.4-128.38a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24l.11.11l36.64 35.27a16 16 0 0 0 22.52 0L208.06 56L232 79.6Z" />
-                        </g>
-                    </svg></div>
-            @else
-                @if ($error)
-                    <div class="flex w-64 gap-2">Prerequisites are installed: <svg class="w-5 h-5 text-error"
-                            viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="currentColor"
-                                d="M208.49 191.51a12 12 0 0 1-17 17L128 145l-63.51 63.49a12 12 0 0 1-17-17L111 128L47.51 64.49a12 12 0 0 1 17-17L128 111l63.51-63.52a12 12 0 0 1 17 17L145 128Z" />
-                        </svg></div>
-                @else
-                    <div class="w-64"><x-loading text="Prerequisites are installed:" /></div>
-                @endif
-            @endif
-        @endif
-        @if ($uptime && $supported_os_type && $prerequisites_installed)
-            @if ($docker_installed)
-                <div class="flex w-64 gap-2">Docker is installed: <svg class="w-5 h-5 text-success"
-                        viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                        <g fill="currentColor">
-                            <path
-                                d="m237.66 85.26l-128.4 128.4a8 8 0 0 1-11.32 0l-71.6-72a8 8 0 0 1 0-11.31l24-24a8 8 0 0 1 11.32 0l36.68 35.32a8 8 0 0 0 11.32 0l92.68-91.32a8 8 0 0 1 11.32 0l24 23.6a8 8 0 0 1 0 11.31"
-                                opacity=".2" />
-                            <path
-                                d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.58 0L104 136l-.11-.11l-36.64-35.27a16 16 0 0 0-22.57.06l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0l128.4-128.38a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24l.11.11l36.64 35.27a16 16 0 0 0 22.52 0L208.06 56L232 79.6Z" />
-                        </g>
-                    </svg></div>
-            @else
-                @if ($error)
-                    <div class="flex w-64 gap-2">Docker is installed: <svg class="w-5 h-5 text-error"
-                            viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="currentColor"
-                                d="M208.49 191.51a12 12 0 0 1-17 17L128 145l-63.51 63.49a12 12 0 0 1-17-17L111 128L47.51 64.49a12 12 0 0 1 17-17L128 111l63.51-63.52a12 12 0 0 1 17 17L145 128Z" />
-                        </svg></div>
-                @else
-                    <div class="w-64"><x-loading text="Docker is installed:" /></div>
-                @endif
-            @endif
-            @if ($docker_compose_installed)
-                <div class="flex w-64 gap-2">Docker Compose is installed: <svg class="w-5 h-5 text-success"
-                        viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                        <g fill="currentColor">
-                            <path
-                                d="m237.66 85.26l-128.4 128.4a8 8 0 0 1-11.32 0l-71.6-72a8 8 0 0 1 0-11.31l24-24a8 8 0 0 1 11.32 0l36.68 35.32a8 8 0 0 0 11.32 0l92.68-91.32a8 8 0 0 1 11.32 0l24 23.6a8 8 0 0 1 0 11.31"
-                                opacity=".2" />
-                            <path
-                                d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.58 0L104 136l-.11-.11l-36.64-35.27a16 16 0 0 0-22.57.06l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0l128.4-128.38a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24l.11.11l36.64 35.27a16 16 0 0 0 22.52 0L208.06 56L232 79.6Z" />
-                        </g>
-                    </svg></div>
-                @isset($docker_version)
-                    @if ($docker_version)
-                        <div class="flex w-64 gap-2">Minimum Docker version: <svg class="w-5 h-5 text-success"
-                                viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                                <g fill="currentColor">
-                                    <path
-                                        d="m237.66 85.26l-128.4 128.4a8 8 0 0 1-11.32 0l-71.6-72a8 8 0 0 1 0-11.31l24-24a8 8 0 0 1 11.32 0l36.68 35.32a8 8 0 0 0 11.32 0l92.68-91.32a8 8 0 0 1 11.32 0l24 23.6a8 8 0 0 1 0 11.31"
-                                        opacity=".2" />
-                                    <path
-                                        d="m243.28 68.24l-24-23.56a16 16 0 0 0-22.58 0L104 136l-.11-.11l-36.64-35.27a16 16 0 0 0-22.57.06l-24 24a16 16 0 0 0 0 22.61l71.62 72a16 16 0 0 0 22.63 0l128.4-128.38a16 16 0 0 0-.05-22.67M103.62 208L32 136l24-24l.11.11l36.64 35.27a16 16 0 0 0 22.52 0L208.06 56L232 79.6Z" />
-                                </g>
-                            </svg></div>
-                    @else
-                        <div class="flex w-64 gap-2">Minimum Docker version: <svg class="w-5 h-5 text-error"
-                                viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                                <path fill="currentColor"
-                                    d="M208.49 191.51a12 12 0 0 1-17 17L128 145l-63.51 63.49a12 12 0 0 1-17-17L111 128L47.51 64.49a12 12 0 0 1 17-17L128 111l63.51-63.52a12 12 0 0 1 17 17L145 128Z" />
-                            </svg></div>
-                    @endif
-                @else
-                    <div class="w-64"><x-loading text="Minimum Docker version:" /></div>
-                @endisset
-            @else
-                @if ($error)
-                    <div class="flex w-64 gap-2">Docker Compose is installed: <svg class="w-5 h-5 text-error"
-                            viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="currentColor"
-                                d="M208.49 191.51a12 12 0 0 1-17 17L128 145l-63.51 63.49a12 12 0 0 1-17-17L111 128L47.51 64.49a12 12 0 0 1 17-17L128 111l63.51-63.52a12 12 0 0 1 17 17L145 128Z" />
-                        </svg></div>
-                @else
-                    <div class="w-64"><x-loading text="Docker Compose is installed:" /></div>
-                @endif
-            @endif
+@php
+    $resolveStatus = function (mixed $value, bool $visible, bool $hasError): string {
+        if (! $visible) {
+            return 'pending';
+        }
 
+        if ($value === true) {
+            return 'success';
+        }
+
+        if ($hasError) {
+            return 'error';
+        }
+
+        return 'running';
+    };
+
+    $showUptime = true;
+    $showOs = (bool) $uptime;
+    $showPrerequisites = (bool) ($uptime && $supported_os_type);
+    $showDocker = (bool) ($uptime && $supported_os_type && $prerequisites_installed);
+    $showCompose = $showDocker;
+    $showVersion = (bool) ($showDocker && $docker_compose_installed);
+    $validationComplete = (bool) ($uptime
+        && $supported_os_type
+        && $prerequisites_installed
+        && $docker_installed
+        && $docker_compose_installed
+        && $docker_version);
+
+    $checkpoints = [
+        [
+            'title' => 'Server is reachable',
+            'description' => 'Verify SSH connectivity and key-based authentication',
+            'status' => $resolveStatus($uptime === null ? null : (bool) $uptime, $showUptime, (bool) $error && ! $uptime),
+            'visible' => $showUptime,
+        ],
+        [
+            'title' => 'Supported OS type',
+            'description' => 'Confirm a supported Linux distribution',
+            'status' => $resolveStatus($supported_os_type === null ? null : (bool) $supported_os_type, $showOs, (bool) $error && $showOs && ! $supported_os_type),
+            'visible' => $showOs,
+        ],
+        [
+            'title' => 'Prerequisites are installed',
+            'description' => 'Install required system packages when missing',
+            'status' => $resolveStatus($prerequisites_installed === null ? null : (bool) $prerequisites_installed, $showPrerequisites, (bool) $error && $showPrerequisites && ! $prerequisites_installed),
+            'visible' => $showPrerequisites,
+        ],
+        [
+            'title' => 'Docker is installed',
+            'description' => 'Install or detect Docker Engine',
+            'status' => $resolveStatus($docker_installed === null ? null : (bool) $docker_installed, $showDocker, (bool) $error && $showDocker && ! $docker_installed),
+            'visible' => $showDocker,
+        ],
+        [
+            'title' => 'Docker Compose is installed',
+            'description' => 'Install or detect Docker Compose',
+            'status' => $resolveStatus($docker_compose_installed === null ? null : (bool) $docker_compose_installed, $showCompose, (bool) $error && $showCompose && ! $docker_compose_installed),
+            'visible' => $showCompose,
+        ],
+        [
+            'title' => 'Minimum Docker version',
+            'description' => 'Require Docker Engine '.str(config('constants.docker.minimum_required_version'))->before('.').' or newer',
+            'status' => $resolveStatus(
+                isset($docker_version) ? (bool) $docker_version : null,
+                $showVersion,
+                (bool) $error && $showVersion && isset($docker_version) && ! $docker_version
+            ),
+            'visible' => $showVersion,
+        ],
+    ];
+@endphp
+
+<div class="flex h-full min-h-0 flex-col gap-4 overflow-y-auto scrollbar">
+    @if ($ask)
+        <div
+            class="rounded-[10px] border border-neutral-200 bg-neutral-50 px-4 py-3 text-[13px] leading-5 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-dim">
+            This will revalidate the server, install or update Docker Engine, Docker Compose, and related
+            configuration. Docker Engine will restart, so running containers may be briefly unreachable.
+        </div>
+        <x-forms.button isHighlighted wire:click="startValidatingAfterAsking">
+            Continue
+        </x-forms.button>
+    @else
+        <div data-validation-checkpoints
+            class="shrink-0 overflow-hidden rounded-[10px] border border-neutral-200 dark:border-white/[0.08]">
+            <div class="border-b border-neutral-200 px-4 py-2.5 dark:border-white/[0.08]">
+                <h3 class="text-[13px] font-medium text-neutral-600 dark:text-fg-dim">Validation checkpoints</h3>
+            </div>
+            <div class="checkpoint-scroll-fade relative min-w-0" x-data="{
+                observer: null,
+                scrollToRunning() {
+                    this.$refs.track.querySelector('[data-checkpoint-status=running]')?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+                }
+            }"
+                x-init="$nextTick(() => scrollToRunning()); observer = new MutationObserver(() => $nextTick(() => scrollToRunning())); observer.observe($refs.track, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-checkpoint-status'] })"
+                x-destroy="observer?.disconnect()">
+                <div class="flex min-w-0 snap-x snap-mandatory overflow-x-auto overscroll-x-contain scroll-smooth scrollbar divide-x divide-neutral-200 dark:divide-white/[0.07]"
+                    x-ref="track">
+                    @foreach ($checkpoints as $checkpoint)
+                        <x-checkpoint-item :title="$checkpoint['title']" :description="$checkpoint['description']"
+                            :status="$checkpoint['status']" data-checkpoint-status="{{ $checkpoint['status'] }}"
+                            class="basis-[88%] shrink-0 snap-start sm:basis-72 lg:basis-80" />
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
+        @if ($validationComplete)
+            <div class="mt-auto flex shrink-0 items-center justify-between gap-3 rounded-[10px] border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
+                <div class="flex items-center gap-2 text-[13px] font-medium text-emerald-700 dark:text-emerald-300">
+                    <x-reicon name="check-circle" class="size-4 shrink-0" />
+                    Validation complete
+                </div>
+                <x-forms.button type="button" @click="processDialogOpen = false">
+                    Close
+                </x-forms.button>
+            </div>
+        @elseif ($isInstalling)
+            <section class="application-settings-section validation-installation-logs">
+                <div class="application-settings-section-body">
+                    <livewire:activity-monitor :header="$installationStep.' installation logs'" :showWaiting="false" />
+                </div>
+            </section>
         @endif
-        <livewire:activity-monitor header="{{ $installationStep }} Installation Logs" :showWaiting="false" />
+
         @isset($error)
-            <pre class="font-bold whitespace-pre-line text-error">{!! $error !!}</pre>
-            <x-forms.button canGate="update" :canResource="$server" wire:click="retry" class="mt-4">
-                Retry Validation
+            <div
+                class="rounded-[10px] border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-[13px] leading-5 text-red-700 dark:text-red-300">
+                <div class="mb-1 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.06em]">
+                    <x-reicon name="alert-circle" class="size-3.5 shrink-0" />
+                    Validation failed
+                </div>
+                <div class="font-mono text-[12px] leading-5 whitespace-pre-line">{!! $error !!}</div>
+            </div>
+            <x-forms.button canGate="update" :canResource="$server" wire:click="retry">
+                <x-reicon name="refresh" class="size-3.5" />
+                Retry validation
             </x-forms.button>
         @endisset
     @endif

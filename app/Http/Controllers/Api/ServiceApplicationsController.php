@@ -242,6 +242,13 @@ class ServiceApplicationsController extends Controller
                             nullable: true,
                             description: 'Comma-separated list of URLs (e.g. "http://app.example.com:8080,https://app2.example.com"). Stored as fqdn.'
                         ),
+                        'noindex_domains' => new OA\Property(
+                            property: 'noindex_domains',
+                            type: 'array',
+                            items: new OA\Items(type: 'string'),
+                            description: 'The subset of the service application domains served with an X-Robots-Tag: noindex, nofollow response header, keeping them out of search engines. Entries that are not among the domains are ignored.',
+                            nullable: true,
+                        ),
                         'human_name' => new OA\Property(property: 'human_name', type: 'string', nullable: true),
                         'description' => new OA\Property(property: 'description', type: 'string', nullable: true),
                         'image' => new OA\Property(property: 'image', type: 'string', nullable: true),
@@ -249,6 +256,7 @@ class ServiceApplicationsController extends Controller
                         'is_log_drain_enabled' => new OA\Property(property: 'is_log_drain_enabled', type: 'boolean', nullable: true),
                         'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean', nullable: true),
                         'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean', nullable: true),
+                        'is_force_https_enabled' => new OA\Property(property: 'is_force_https_enabled', type: 'boolean', nullable: true),
                     ]
                 )
             )
@@ -313,6 +321,7 @@ class ServiceApplicationsController extends Controller
 
         $allowedFields = [
             'url',
+            'noindex_domains',
             'human_name',
             'description',
             'image',
@@ -320,10 +329,13 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled',
             'is_gzip_enabled',
             'is_stripprefix_enabled',
+            'is_force_https_enabled',
         ];
 
         $validationRules = [
             'url' => 'nullable|string',
+            'noindex_domains' => 'sometimes|array|nullable',
+            'noindex_domains.*' => 'string',
             'human_name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'image' => 'nullable|string',
@@ -331,6 +343,7 @@ class ServiceApplicationsController extends Controller
             'is_log_drain_enabled' => 'sometimes|boolean',
             'is_gzip_enabled' => 'sometimes|boolean',
             'is_stripprefix_enabled' => 'sometimes|boolean',
+            'is_force_https_enabled' => 'sometimes|boolean',
         ];
 
         $validator = Validator::make($payload, $validationRules);
@@ -490,7 +503,7 @@ class ServiceApplicationsController extends Controller
             ], 400);
         }
 
-        $lines = (int) ($request->query('lines', 100) ?: 100);
+        $lines = normalizeLogLines($request->query('lines'));
         $logs = getContainerLogs($server, $containerName, $lines);
 
         return response()->json([
@@ -498,75 +511,6 @@ class ServiceApplicationsController extends Controller
         ]);
     }
 
-    #[OA\Get(
-        summary: 'Start or redeploy service application container',
-        description: 'Runs docker compose up for a single compose service (no-deps), optionally pulling the image and rebuilding.',
-        path: '/services/{uuid}/applications/{app_uuid}/start',
-        operationId: 'start-service-application-by-service-and-app-uuid',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Service applications'],
-        parameters: [
-            new OA\Parameter(
-                name: 'uuid',
-                in: 'path',
-                description: 'Service UUID.',
-                required: true,
-                schema: new OA\Schema(type: 'string')
-            ),
-            new OA\Parameter(
-                name: 'app_uuid',
-                in: 'path',
-                description: 'Service application UUID.',
-                required: true,
-                schema: new OA\Schema(type: 'string')
-            ),
-            new OA\Parameter(
-                name: 'force',
-                in: 'query',
-                description: 'When true, passes --build to docker compose up.',
-                required: false,
-                schema: new OA\Schema(type: 'boolean', default: false)
-            ),
-            new OA\Parameter(
-                name: 'latest',
-                in: 'query',
-                description: 'When true, pulls the image for this compose service before up.',
-                required: false,
-                schema: new OA\Schema(type: 'boolean', default: false)
-            ),
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Deploy request queued.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => new OA\Property(property: 'message', type: 'string'),
-                            ]
-                        )
-                    ),
-                ]
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 404,
-                ref: '#/components/responses/404',
-            ),
-            new OA\Response(
-                response: 501,
-                description: 'Swarm not supported.',
-            ),
-        ]
-    )]
     #[OA\Post(
         summary: 'Start or redeploy service application container',
         description: 'Runs docker compose up for a single compose service (no-deps), optionally pulling the image and rebuilding.',
@@ -635,61 +579,6 @@ class ServiceApplicationsController extends Controller
         ], 200);
     }
 
-    #[OA\Get(
-        summary: 'Restart service application container',
-        description: 'Restarts a single compose service container (docker restart).',
-        path: '/services/{uuid}/applications/{app_uuid}/restart',
-        operationId: 'restart-service-application-by-service-and-app-uuid',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Service applications'],
-        parameters: [
-            new OA\Parameter(
-                name: 'uuid',
-                in: 'path',
-                description: 'Service UUID.',
-                required: true,
-                schema: new OA\Schema(type: 'string')
-            ),
-            new OA\Parameter(
-                name: 'app_uuid',
-                in: 'path',
-                description: 'Service application UUID.',
-                required: true,
-                schema: new OA\Schema(type: 'string')
-            ),
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Restart queued.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => new OA\Property(property: 'message', type: 'string'),
-                            ]
-                        )
-                    ),
-                ]
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 404,
-                ref: '#/components/responses/404',
-            ),
-            new OA\Response(
-                response: 501,
-                description: 'Swarm not supported.',
-            ),
-        ]
-    )]
     #[OA\Post(
         summary: 'Restart service application container',
         description: 'Restarts a single compose service container.',
@@ -753,61 +642,6 @@ class ServiceApplicationsController extends Controller
         ], 200);
     }
 
-    #[OA\Get(
-        summary: 'Stop service application container',
-        description: 'Stops a single compose service container (docker stop).',
-        path: '/services/{uuid}/applications/{app_uuid}/stop',
-        operationId: 'stop-service-application-by-service-and-app-uuid',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        tags: ['Service applications'],
-        parameters: [
-            new OA\Parameter(
-                name: 'uuid',
-                in: 'path',
-                description: 'Service UUID.',
-                required: true,
-                schema: new OA\Schema(type: 'string')
-            ),
-            new OA\Parameter(
-                name: 'app_uuid',
-                in: 'path',
-                description: 'Service application UUID.',
-                required: true,
-                schema: new OA\Schema(type: 'string')
-            ),
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Stop queued.',
-                content: [
-                    new OA\MediaType(
-                        mediaType: 'application/json',
-                        schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'message' => new OA\Property(property: 'message', type: 'string'),
-                            ]
-                        )
-                    ),
-                ]
-            ),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 404,
-                ref: '#/components/responses/404',
-            ),
-            new OA\Response(
-                response: 501,
-                description: 'Swarm not supported.',
-            ),
-        ]
-    )]
     #[OA\Post(
         summary: 'Stop service application container',
         description: 'Stops a single compose service container.',

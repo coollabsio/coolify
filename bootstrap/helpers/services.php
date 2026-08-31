@@ -139,7 +139,7 @@ function replaceVariables(string $variable): Stringable
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
-        if ($oneService->getMorphClass() === \App\Models\Application::class) {
+        if ($oneService->getMorphClass() === Application::class) {
             $workdir = $oneService->workdir();
             $server = $oneService->destination->server;
         } else {
@@ -167,13 +167,11 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
 
             if ($isFile === 'OK') {
-                // If its a file & exists
-                $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
-                if ($fileVolume->is_based_on_git) {
-                    $fileVolume->content = $filesystemContent;
-                }
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
+                if ($fileVolume->is_based_on_git) {
+                    $fileVolume->loadStorageOnServer();
+                }
             } elseif ($isDir === 'OK') {
                 // If its a directory & exists
                 $fileVolume->content = null;
@@ -204,7 +202,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 instant_remote_process(["mkdir -p $fileLocation"], $server);
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
@@ -214,7 +212,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
         if (! $dockerComposeRaw) {
-            throw new \Exception('No compose file found or not a valid YAML file.');
+            throw new Exception('No compose file found or not a valid YAML file.');
         }
         $dockerCompose = Yaml::parse($dockerComposeRaw);
 
@@ -235,7 +233,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // IMPORTANT: Only extract variables that are DIRECTLY DECLARED for this service,
         // not variables that are merely referenced from other services
         $serviceConfig = data_get($dockerCompose, "services.{$name}");
-        $environment = data_get($serviceConfig, 'environment', []);
+        $environment = data_get($serviceConfig, 'environment') ?? [];
         $templateVariableNames = [];
 
         foreach ($environment as $key => $value) {
@@ -325,22 +323,13 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         }
 
         if ($resource->fqdn) {
-            $resourceFqdns = str($resource->fqdn)->explode(',');
-            $resourceFqdns = $resourceFqdns->first();
-            $url = Url::fromString($resourceFqdns);
+            $firstFqdn = firstDomainFromList($resource->fqdn);
+            $url = Url::fromString($firstFqdn);
             $port = $url->getPort();
-            $path = $url->getPath();
 
-            // Prepare URL value (with scheme and host)
-            $urlValue = $url->getScheme().'://'.$url->getHost();
-            $urlValue = ($path === '/') ? $urlValue : $urlValue.$path;
-
-            // Prepare FQDN value (host only, no scheme)
-            $fqdnHost = $url->getHost();
-            $fqdnValue = str($fqdnHost)->after('://');
-            if ($path !== '/') {
-                $fqdnValue = $fqdnValue.$path;
-            }
+            // Same helpers as application/service parsers (COOLIFY_URL / COOLIFY_FQDN).
+            $urlValue = getFqdnWithoutPort($firstFqdn);
+            $fqdnValue = getHostWithoutPort($firstFqdn);
 
             // For each service name found in template, create BOTH SERVICE_URL and SERVICE_FQDN pairs
             foreach ($serviceNamesToProcess as $serviceInfo) {
@@ -396,7 +385,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         return handleError($e);
     }
 }
@@ -495,7 +484,7 @@ function applyServiceApplicationPrerequisites(Service $service): void
                 }
             }
         }
-    } catch (\Throwable $e) {
+    } catch (Throwable $e) {
         // Log error but don't throw - prerequisites are nice-to-have, not critical
         Log::error('Failed to apply service application prerequisites', [
             'service_id' => $service->id,

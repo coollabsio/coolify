@@ -34,8 +34,6 @@ Follow the steps below for your operating system:
      - Download and install [Docker Desktop for Windows](https://docs.docker.com/desktop/install/windows-install/?ref=coolify)
      - Ensure WSL2 backend is enabled in Docker Desktop settings
 
-2. Install Spin:
-   - Follow the instructions to install Spin on Windows from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-windows#download-and-install-spin-into-wsl2?ref=coolify)
 
 </details>
 
@@ -48,8 +46,6 @@ Follow the steps below for your operating system:
    - Docker Desktop:
      - Download and install [Docker Desktop for Mac](https://docs.docker.com/desktop/install/mac-install/?ref=coolify)
 
-2. Install Spin:
-   - Follow the instructions to install Spin on MacOS from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-macos/#download-and-install-spin?ref=coolify)
 
 </details>
 
@@ -62,22 +58,20 @@ Follow the steps below for your operating system:
    - Docker Desktop:
      - If you want a GUI, you can use [Docker Desktop for Linux](https://docs.docker.com/desktop/install/linux-install/?ref=coolify)
 
-2. Install Spin:
-   - Follow the instructions to install Spin on Linux from the [Spin documentation](https://serversideup.net/open-source/spin/docs/installation/install-linux#configure-docker-permissions?ref=coolify)
 
 </details>
 
 
 ## 2. Verify Installation (Optional)
-After installing Docker (or Orbstack) and Spin, verify the installation:
+After installing Docker (or Orbstack), verify the installation:
 
 1. Open a terminal or command prompt
 2. Run the following commands:
    ```bash
    docker --version
-   spin --version
+   docker compose version
    ```
-   You should see version information for both Docker and Spin.
+   You should see version information for Docker and Docker Compose.
 
 
 ## 3. Fork and Setup Local Repository
@@ -105,7 +99,7 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 1. In the Code Editor, locate the `.env.development.example` file in the root directory of your local Coolify repository.
 2. Duplicate the `.env.development.example` file and rename the copy to `.env`.
 3. Open the new `.env` file and review its contents. Adjust any environment variables as needed for your development setup.
-4. If you encounter errors during database migrations, update the database connection settings in your `.env` file. Use the IP address or hostname of your PostgreSQL database container. You can find this information by running `docker ps` after executing `spin up`.
+4. If you encounter errors during database migrations, update the database connection settings in your `.env` file. Use the IP address or hostname of your PostgreSQL database container. You can find this information by running `docker ps` after executing `docker compose -f docker-compose.yml -f docker-compose.dev.yml up`.
 5. Save the changes to your `.env` file.
 
 
@@ -113,7 +107,7 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 1. Open a terminal in the local Coolify directory.
 2. Run the following command in the terminal (leave that terminal open):
    ```bash
-   spin up
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
    ```
 
 > [!NOTE]
@@ -121,11 +115,11 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
 
 3. If you encounter permission errors, especially on macOS, use:
    ```bash
-   sudo spin up
+   sudo docker compose -f docker-compose.yml -f docker-compose.dev.yml up
    ```
 
 > [!NOTE]
-> If you change environment variables afterwards or anything seems broken, press Ctrl + C to stop the process and run `spin up` again.
+> If you change environment variables afterwards or anything seems broken, press Ctrl + C to stop the process and run `docker compose -f docker-compose.yml -f docker-compose.dev.yml up` again.
 
 
 ## 6. Start Development
@@ -140,13 +134,19 @@ After installing Docker (or Orbstack) and Spin, verify the installation:
    |------|-----|------|
    | Laravel Horizon (scheduler) | `http://localhost:8000/horizon` | Only accessible when logged in as root user |
    | Mailpit (email catcher) | `http://localhost:8025` | |
-   | Telescope (debugging tool) | `http://localhost:8000/telescope` | Disabled by default |
 
-> [!NOTE]
-> To enable Telescope, add the following to your `.env` file:
-> ```env
-> TELESCOPE_ENABLED=true
-> ```
+   **Server-Timing + HUD** (headers + bottom-right pill on full HTML pages):
+
+   | Setting | Effect |
+   |---------|--------|
+   | `APP_ENV=local` and `SERVER_TIMING_ENABLED` unset | **On** (default in dev) |
+   | `SERVER_TIMING_ENABLED=true` | **On** in any env, including production |
+   | `SERVER_TIMING_ENABLED=false` | **Off** even when `APP_ENV=local` |
+
+   Metrics: `app` / `db` / `php` / `dbslow` (ms), `queries`, `html` (bytes), `mem` (MB).
+   HUD keeps a request log (click row → AI-ready dump). Production: enable only
+   temporarily (`SERVER_TIMING_ENABLED=true`); if you use `config:cache`, rebuild
+   or clear config after changing the env var.
 
 
 ## Development Notes
@@ -173,9 +173,9 @@ If you encounter issues or break your database or something else, follow these s
 
 1. Stop all running containers `ctrl + c`.
 
-2. Remove all Coolify containers:
+2. Force-remove all Coolify dev containers:
    ```bash
-   docker rm coolify coolify-db coolify-redis coolify-realtime coolify-testing-host coolify-minio coolify-vite-1 coolify-mail
+   npm run clean
    ```
 
 3. Remove Coolify volumes (it is possible that the volumes have no `coolify` prefix on your machine, in that case remove the prefix from the command):
@@ -190,7 +190,7 @@ If you encounter issues or break your database or something else, follow these s
 
 5. Start Coolify again:
    ```bash
-   spin up
+   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
    ```
 
 6. Run database migrations and seeders:

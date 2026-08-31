@@ -1,5 +1,9 @@
 <div>
-    <x-security.navbar />
+    <x-slot:title>
+        Docker Registries | Coolify
+    </x-slot>
+
+    <x-security.settings-layout>
     <div class="flex gap-2">
         <h2 class="pb-4">Docker Registries</h2>
         @can('create', App\Models\DockerRegistry::class)
@@ -53,4 +57,5 @@
             <div>No docker registries found.</div>
         @endforelse
     </div>
+    </x-security.settings-layout>
 </div>

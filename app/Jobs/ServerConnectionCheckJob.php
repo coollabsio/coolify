@@ -194,6 +194,20 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             $output = trim($output);
             if (! empty($output)) {
                 $dockerInfo = json_decode($output, true);
+                $dockerVersion = dockerEngineVersionFromJson($output);
+                if ($dockerVersion !== null) {
+                    $this->server->rememberDockerVersion($dockerVersion);
+                }
+
+                $composeOutput = instant_remote_process_with_timeout(
+                    ['docker compose version --short'],
+                    $this->server,
+                    false
+                );
+                $composeVersion = parseDockerEngineVersion($composeOutput);
+                if ($composeVersion !== null) {
+                    $this->server->rememberComposeVersion($composeVersion);
+                }
 
                 return isset($dockerInfo['Server']['Version']);
             }

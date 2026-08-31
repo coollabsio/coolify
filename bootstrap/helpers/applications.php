@@ -84,6 +84,15 @@ function queue_application_deployment(Application $application, string $deployme
         'only_this_server' => $only_this_server,
     ]);
 
+    if (auth()->check() && ! $is_webhook && ! $is_api && ! $rollback) {
+        auditLog($restart_only ? 'ui.application.restarted' : 'ui.application.deployed', [
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'deployment_uuid' => $deployment_uuid,
+            'force_rebuild' => $force_rebuild,
+        ]);
+    }
+
     if ($no_questions_asked) {
         $deployment->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
@@ -220,6 +229,7 @@ function clone_application(Application $source, $destination, array $overrides =
         'fqdn' => $url,
         'status' => 'exited',
         'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
     ], $overrides));
     $newApplication->save();
 

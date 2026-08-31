@@ -25,6 +25,7 @@ services:
       - ./databases:/var/www/html/storage/app/databases
       - ./services:/var/www/html/storage/app/services
       - ./backups:/var/www/html/storage/app/backups
+      - ./images:/var/www/html/storage/app/images
     env_file:
       - .env
     environment:
@@ -96,7 +97,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.16'
+    image: 'ghcr.io/coollabsio/coolify-realtime:1.0.17'
     pull_policy: always
     container_name: coolify-realtime
     restart: always

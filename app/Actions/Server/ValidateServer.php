@@ -25,6 +25,15 @@ class ValidateServer
 
     public function handle(Server $server)
     {
+        if (! $server->canBeValidated()) {
+            $this->error = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
+            $server->update([
+                'validation_logs' => $this->error,
+                'is_validating' => false,
+            ]);
+            throw new \Exception($this->error);
+        }
+
         $server->update([
             'validation_logs' => null,
         ]);

@@ -14,11 +14,14 @@ use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
 use App\Models\S3Storage;
+use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -35,6 +38,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
+use App\Models\Tag;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\WebhookNotificationSettings;
@@ -49,12 +53,15 @@ use App\Policies\DockerRegistryPolicy;
 use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
 use App\Policies\GithubAppPolicy;
+use App\Policies\GitlabAppPolicy;
 use App\Policies\InstanceSettingsPolicy;
+use App\Policies\IntegrationTokenPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
 use App\Policies\ProjectPolicy;
 use App\Policies\ResourceCreatePolicy;
 use App\Policies\S3StoragePolicy;
+use App\Policies\ScheduledTaskPolicy;
 use App\Policies\ServerPolicy;
 use App\Policies\ServiceApplicationPolicy;
 use App\Policies\ServiceDatabasePolicy;
@@ -62,6 +69,7 @@ use App\Policies\ServicePolicy;
 use App\Policies\SharedEnvironmentVariablePolicy;
 use App\Policies\StandaloneDockerPolicy;
 use App\Policies\SwarmDockerPolicy;
+use App\Policies\TagPolicy;
 use App\Policies\TeamPolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
@@ -117,13 +125,21 @@ class AuthServiceProvider extends ServiceProvider
         // S3 storage policy
         S3Storage::class => S3StoragePolicy::class,
 
+        // Scheduled task policy
+        ScheduledTask::class => ScheduledTaskPolicy::class,
+
         // Team policy
         Team::class => TeamPolicy::class,
 
         // Git source policies
         GithubApp::class => GithubAppPolicy::class,
+        GitlabApp::class => GitlabAppPolicy::class,
+
+        // Cloud provider policies
         CloudProviderToken::class => CloudProviderTokenPolicy::class,
+        IntegrationToken::class => IntegrationTokenPolicy::class,
         CloudInitScript::class => CloudInitScriptPolicy::class,
+        Tag::class => TagPolicy::class,
 
     ];
 

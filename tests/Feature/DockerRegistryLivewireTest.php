@@ -12,10 +12,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    // Create required InstanceSettings for the application
-    InstanceSettings::create([
-        'id' => 0,
-    ]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();

@@ -1,781 +1,288 @@
 <div x-data
     x-init="@if ($server->hetzner_server_id && $server->cloudProviderToken && !$hetznerServerStatus) $wire.checkHetznerServerStatus(); @endif @if ($server->vultr_instance_id && $server->cloudProviderToken) $wire.checkVultrInstanceStatus(); @endif @if ($server->digitalocean_droplet_id && $server->cloudProviderToken && !$digitalOceanDropletStatus) $wire.checkDigitalOceanDropletStatus(); @endif">
     <x-slot:title>
-        {{ data_get_str($server, 'name')->limit(10) }} > General | Coolify
+        {{ data_get_str($server, 'name')->limit(24) }} | Server | Coolify
     </x-slot>
-    <livewire:server.navbar :server="$server" />
-    <div class="flex flex-col h-full gap-4 md:gap-8 md:flex-row">
-        <x-server.sidebar :server="$server" activeMenu="general" />
-        <div class="w-full">
-            <form wire:submit.prevent='submit' class="flex flex-col">
-                <div class="flex gap-2">
-                    <h2>General</h2>
-                    @if ($server->hetzner_server_id)
-                        <div class="flex items-center">
-                            <div @class([
-                                'flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded transition-all',
-                                'bg-white dark:bg-coolgray-100 dark:text-white',
-                            ])
-                                @if (in_array($hetznerServerStatus, ['starting', 'initializing'])) wire:poll.5s="checkHetznerServerStatus" @endif>
-                                <svg class="w-4 h-4" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                                    <rect width="200" height="200" fill="#D50C2D" rx="8" />
-                                    <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z"
-                                        fill="white" />
-                                </svg>
-                                @if ($hetznerServerStatus)
-                                    <span class="pl-1.5">
-                                        @if (in_array($hetznerServerStatus, ['starting', 'initializing']))
-                                            <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-warning-500"
-                                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                    stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                </path>
-                                            </svg>
-                                        @endif
-                                        <span @class([
-                                            'text-green-500' => $hetznerServerStatus === 'running',
-                                            'text-red-500' => $hetznerServerStatus === 'off',
-                                        ])>
-                                            {{ ucfirst($hetznerServerStatus) }}
-                                        </span>
-                                    </span>
-                                @else
-                                    <span class="pl-1.5">
-                                        <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-warning-500"
-                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                            </path>
-                                        </svg>
-                                        <span>Checking status...</span>
-                                    </span>
-                                @endif
-                            </div>
-                            <button wire:loading.remove wire:target="checkHetznerServerStatus" title="Refresh Status"
-                                wire:click.prevent='checkHetznerServerStatus(true)'
-                                class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                            </button>
-                            <button wire:loading wire:target="checkHetznerServerStatus" title="Refreshing Status"
-                                class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                                <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                            </button>
-                        </div>
-                        @if ($server->cloudProviderToken && !$server->isFunctional() && $hetznerServerStatus === 'off')
-                            <x-forms.button wire:click.prevent='startHetznerServer' isHighlighted canGate="update"
-                                :canResource="$server">
-                                Power On
-                            </x-forms.button>
-                        @endif
-                    @endif
-                    @if ($server->vultr_instance_id)
-                        <div class="flex items-center">
-                            <div @class([
-                                'flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded transition-all',
-                                'bg-white dark:bg-coolgray-100 dark:text-white',
-                            ])
-                                @if (in_array($vultrInstanceStatus, ['pending', 'starting'])) wire:poll.5s="checkVultrInstanceStatus" @endif>
-                                <svg class="w-4 h-4" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                                    <rect width="200" height="200" fill="#007BFC" rx="8" />
-                                    <path d="M42 46 H73 L100 127 L127 46 H158 L114 154 H86 Z" fill="white" />
-                                </svg>
-                                @if ($vultrInstanceStatus)
-                                    <span class="pl-1.5">
-                                        @if (in_array($vultrInstanceStatus, ['pending', 'starting']))
-                                            <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-warning-500"
-                                                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                    stroke="currentColor" stroke-width="4"></circle>
-                                                <path class="opacity-75" fill="currentColor"
-                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                                </path>
-                                            </svg>
-                                        @endif
-                                        <span @class([
-                                            'text-green-500' => $vultrInstanceStatus === 'active',
-                                            'text-red-500' => in_array($vultrInstanceStatus, ['stopped', 'suspended', 'deleted']),
-                                        ])>
-                                            {{ ucfirst($vultrInstanceStatus) }}
-                                        </span>
-                                    </span>
-                                @else
-                                    <span class="pl-1.5">
-                                        <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-warning-500"
-                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                            </path>
-                                        </svg>
-                                        <span>Checking status...</span>
-                                    </span>
-                                @endif
-                            </div>
-                            <button wire:loading.remove wire:target="checkVultrInstanceStatus" title="Refresh Status"
-                                wire:click.prevent='checkVultrInstanceStatus(true)'
-                                class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                            </button>
-                            <button wire:loading wire:target="checkVultrInstanceStatus" title="Refreshing Status"
-                                class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                                <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                            </button>
-                        </div>
-                        @if ($server->cloudProviderToken && $vultrInstanceStatus === 'stopped')
-                            <x-forms.button wire:click.prevent='startVultrInstance' isHighlighted canGate="update"
-                                :canResource="$server">
-                                Power On
-                            </x-forms.button>
-                        @endif
-                    @endif
-                    @if ($server->digitalocean_droplet_id)
-                        <div class="flex items-center">
-                            <div @class([
-                                'flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded transition-all',
-                                'bg-white dark:bg-coolgray-100 dark:text-white',
-                            ])
-                                @if ($digitalOceanDropletStatus === 'new') wire:poll.5s="checkDigitalOceanDropletStatus" @endif>
-                                <x-digital-ocean-icon class="w-4 h-4" />
-                                <span class="pl-1.5">
-                                    @if ($digitalOceanDropletStatus === 'new')
-                                        <svg class="inline animate-spin h-3 w-3 mr-1 text-coollabs dark:text-warning-500"
-                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10"
-                                                stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor"
-                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                            </path>
-                                        </svg>
-                                    @endif
-                                    <span @class([
-                                        'text-green-500' => $digitalOceanDropletStatus === 'active',
-                                        'text-red-500' => in_array($digitalOceanDropletStatus, ['off', 'archive', 'deleted']),
-                                    ])>
-                                        {{ ucfirst($digitalOceanDropletStatus ?? 'checking') }}
-                                    </span>
-                                </span>
-                            </div>
-                            <button wire:loading.remove wire:target="checkDigitalOceanDropletStatus"
-                                title="Refresh Status" wire:click.prevent='checkDigitalOceanDropletStatus(true)'
-                                class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                                <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                            </button>
-                            <button wire:loading wire:target="checkDigitalOceanDropletStatus" title="Refreshing Status"
-                                class="mx-1 dark:hover:fill-white fill-black dark:fill-warning">
-                                <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24"
-                                    xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                            </button>
-                        </div>
-                        @if ($server->cloudProviderToken && $digitalOceanDropletStatus === 'off')
-                            <x-forms.button wire:click.prevent='startDigitalOceanDroplet' isHighlighted
-                                canGate="update" :canResource="$server">
-                                Power On
-                            </x-forms.button>
-                        @endif
-                    @endif
-                    @if ($isValidating)
-                        <div
-                            class="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded bg-warning-100 dark:bg-warning-900/30 text-warning-700 dark:text-warning-400">
-                            <svg class="inline animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                    stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                </path>
-                            </svg>
-                            <span>Validating...</span>
-                        </div>
-                    @endif
-                    @php
-                        $hasLinkableCloudProviders = (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
-                            || (!$server->vultr_instance_id && $availableVultrTokens->isNotEmpty())
-                            || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty());
-                    @endphp
-                    @if ($server->id === 0)
-                        <x-modal-confirmation title="Confirm Server Settings Change?" buttonTitle="Save"
-                            submitAction="submit" :actions="[
-                                'If you misconfigure the server, you could lose a lot of functionalities of Coolify.',
-                            ]" :confirmWithText="false" :confirmWithPassword="false"
-                            step2ButtonText="Save" canGate="update" :canResource="$server" />
-                    @else
-                        <x-forms.button type="submit" canGate="update" :canResource="$server"
-                            :disabled="$isValidating">Save</x-forms.button>
-                        @if ($hasLinkableCloudProviders)
-                            <div x-data="{ dropdownOpen: false }" class="relative w-fit" @click.outside="dropdownOpen = false">
-                                <x-forms.button @click="dropdownOpen = !dropdownOpen" type="button" canGate="update"
-                                    :canResource="$server" :disabled="$isValidating">
-                                    Link Cloud Provider
-                                    <svg class="w-4 h-4 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                                    </svg>
-                                </x-forms.button>
-                                <div x-show="dropdownOpen" @click.away="dropdownOpen=false"
-                                    x-transition:enter="ease-out duration-200"
-                                    x-transition:enter-start="-translate-y-2" x-transition:enter-end="translate-y-0"
-                                    class="absolute top-0 z-50 mt-10 min-w-max" x-cloak>
-                                    <div
-                                        class="p-1 mt-1 bg-white border rounded-sm shadow-sm dark:bg-coolgray-200 dark:border-coolgray-300 border-neutral-300">
-                                        <div class="flex flex-col gap-1">
-                                            @if (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
-                                                <x-modal-input title="Link to Hetzner Cloud" :wireIgnore="false">
-                                                    <x-slot:content>
-                                                        <div class="dropdown-item" @click="dropdownOpen = false">
-                                                            <svg class="size-4" fill="none" stroke="currentColor"
-                                                                viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                                    stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" />
-                                                            </svg>
-                                                            Hetzner
-                                                        </div>
-                                                    </x-slot:content>
-                                                    <div class="space-y-4">
-                                                        <p class="text-sm dark:text-neutral-400">
-                                                            Link this server to a Hetzner Cloud instance to enable power controls and status monitoring.
-                                                        </p>
-                                                        <div class="w-full">
-                                                            <x-forms.select wire:model.live="selectedHetznerTokenId"
-                                                                label="Hetzner Token" canGate="update" :canResource="$server">
-                                                                <option value="">Select a token...</option>
-                                                                @foreach ($availableHetznerTokens as $token)
-                                                                    <option value="{{ $token->id }}">{{ $token->name }}</option>
-                                                                @endforeach
-                                                            </x-forms.select>
-                                                        </div>
-                                                        <div class="space-y-4">
-                                                            <div class="flex items-end gap-2">
-                                                                <div class="flex-1">
-                                                                    <x-forms.input wire:model="manualHetznerServerId"
-                                                                        label="Server ID" placeholder="e.g., 12345678"
-                                                                        helper="Enter the Hetzner Server ID from your Hetzner Cloud console"
-                                                                        canGate="update" :canResource="$server" />
-                                                                </div>
-                                                                <x-forms.button wire:click="searchHetznerServerById"
-                                                                    wire:loading.attr="disabled" canGate="update"
-                                                                    :canResource="$server" :disabled="! $selectedHetznerTokenId">
-                                                                    <span wire:loading.remove wire:target="searchHetznerServerById">Search</span>
-                                                                    <span wire:loading wire:target="searchHetznerServerById">Searching...</span>
-                                                                </x-forms.button>
-                                                            </div>
-                                                            <div class="flex items-center gap-3 text-sm dark:text-neutral-500">
-                                                                <div class="h-px flex-1 bg-neutral-300 dark:bg-coolgray-300"></div>
-                                                                <span>OR</span>
-                                                                <div class="h-px flex-1 bg-neutral-300 dark:bg-coolgray-300"></div>
-                                                            </div>
-                                                            <x-forms.button wire:click="searchHetznerServer"
-                                                                wire:loading.attr="disabled" canGate="update"
-                                                                :canResource="$server" :disabled="! $selectedHetznerTokenId"
-                                                                class="w-full justify-center">
-                                                                <span wire:loading.remove wire:target="searchHetznerServer">Search by IP</span>
-                                                                <span wire:loading wire:target="searchHetznerServer">Searching...</span>
-                                                            </x-forms.button>
-                                                        </div>
-                                                        @if ($hetznerSearchError)
-                                                            <div class="p-4 border border-red-500 rounded-md bg-red-50 dark:bg-red-900/20">
-                                                                <p class="text-red-600 dark:text-red-400">{{ $hetznerSearchError }}</p>
-                                                            </div>
-                                                        @endif
-                                                        @if ($hetznerNoMatchFound)
-                                                            <div class="p-4 border border-yellow-500 rounded-md bg-yellow-50 dark:bg-yellow-900/20">
-                                                                <p class="text-yellow-600 dark:text-yellow-400">
-                                                                    @if ($manualHetznerServerId)
-                                                                        No Hetzner server found with ID: {{ $manualHetznerServerId }}
-                                                                    @else
-                                                                        No Hetzner server found matching IP: {{ $server->ip }}
-                                                                    @endif
-                                                                </p>
-                                                                <p class="mt-1 text-sm dark:text-neutral-400">
-                                                                    Try a different token, enter the Server ID manually, or verify the details are correct.
-                                                                </p>
-                                                            </div>
-                                                        @endif
-                                                        @if ($matchedHetznerServer)
-                                                            <div class="p-4 border border-green-500 rounded-md bg-green-50 dark:bg-green-900/20">
-                                                                <h4 class="mb-2 font-semibold text-green-700 dark:text-green-400">Match Found!</h4>
-                                                                <div class="grid gap-2 mb-4 text-sm lg:grid-cols-2">
-                                                                    <div><span class="font-medium">Name:</span> {{ $matchedHetznerServer['name'] }}</div>
-                                                                    <div><span class="font-medium">ID:</span> {{ $matchedHetznerServer['id'] }}</div>
-                                                                    <div><span class="font-medium">Status:</span> {{ ucfirst($matchedHetznerServer['status']) }}</div>
-                                                                    <div><span class="font-medium">Type:</span> {{ data_get($matchedHetznerServer, 'server_type.name', 'Unknown') }}</div>
-                                                                </div>
-                                                                <x-forms.button wire:click="linkToHetzner" isHighlighted canGate="update" :canResource="$server">
-                                                                    Link This Server
-                                                                </x-forms.button>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </x-modal-input>
-                                            @endif
-                                            @if (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty())
-                                                <x-modal-input title="Link to DigitalOcean" :wireIgnore="false">
-                                                    <x-slot:content>
-                                                        <div class="dropdown-item" @click="dropdownOpen = false">
-                                                            <svg class="size-4" fill="none" stroke="currentColor"
-                                                                viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                                    stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" />
-                                                            </svg>
-                                                            DigitalOcean
-                                                        </div>
-                                                    </x-slot:content>
-                                                    <div class="space-y-4">
-                                                        <p class="text-sm dark:text-neutral-400">
-                                                            Link this server to a DigitalOcean droplet to enable power controls and status monitoring.
-                                                        </p>
-                                                        <div class="w-full">
-                                                            <x-forms.select wire:model.live="selectedDigitalOceanTokenId"
-                                                                label="DigitalOcean Token" canGate="update" :canResource="$server">
-                                                                <option value="">Select a token...</option>
-                                                                @foreach ($availableDigitalOceanTokens as $token)
-                                                                    <option value="{{ $token->id }}">{{ $token->name }}</option>
-                                                                @endforeach
-                                                            </x-forms.select>
-                                                        </div>
-                                                        <div class="space-y-4">
-                                                            <div class="flex items-end gap-2">
-                                                                <div class="flex-1">
-                                                                    <x-forms.input wire:model="manualDigitalOceanDropletId"
-                                                                        label="Droplet ID" placeholder="e.g., 123456789"
-                                                                        helper="Enter the Droplet ID from your DigitalOcean dashboard"
-                                                                        canGate="update" :canResource="$server" />
-                                                                </div>
-                                                                <x-forms.button wire:click="searchDigitalOceanDropletById"
-                                                                    wire:loading.attr="disabled" canGate="update"
-                                                                    :canResource="$server" :disabled="! $selectedDigitalOceanTokenId">
-                                                                    <span wire:loading.remove wire:target="searchDigitalOceanDropletById">Search</span>
-                                                                    <span wire:loading wire:target="searchDigitalOceanDropletById">Searching...</span>
-                                                                </x-forms.button>
-                                                            </div>
-                                                            <div class="flex items-center gap-3 text-sm dark:text-neutral-500">
-                                                                <div class="h-px flex-1 bg-neutral-300 dark:bg-coolgray-300"></div>
-                                                                <span>OR</span>
-                                                                <div class="h-px flex-1 bg-neutral-300 dark:bg-coolgray-300"></div>
-                                                            </div>
-                                                            <x-forms.button wire:click="searchDigitalOceanDroplet"
-                                                                wire:loading.attr="disabled" canGate="update"
-                                                                :canResource="$server" :disabled="! $selectedDigitalOceanTokenId"
-                                                                class="w-full justify-center">
-                                                                <span wire:loading.remove wire:target="searchDigitalOceanDroplet">Search by IP</span>
-                                                                <span wire:loading wire:target="searchDigitalOceanDroplet">Searching...</span>
-                                                            </x-forms.button>
-                                                        </div>
-                                                        @if ($digitalOceanSearchError)
-                                                            <div class="p-4 border border-red-500 rounded-md bg-red-50 dark:bg-red-900/20">
-                                                                <p class="text-red-600 dark:text-red-400">{{ $digitalOceanSearchError }}</p>
-                                                            </div>
-                                                        @endif
-                                                        @if ($digitalOceanNoMatchFound)
-                                                            <div class="p-4 border border-yellow-500 rounded-md bg-yellow-50 dark:bg-yellow-900/20">
-                                                                <p class="text-yellow-600 dark:text-yellow-400">
-                                                                    @if ($manualDigitalOceanDropletId)
-                                                                        No DigitalOcean droplet found with ID: {{ $manualDigitalOceanDropletId }}
-                                                                    @else
-                                                                        No DigitalOcean droplet found matching IP: {{ $server->ip }}
-                                                                    @endif
-                                                                </p>
-                                                                <p class="mt-1 text-sm dark:text-neutral-400">
-                                                                    Try a different token, enter the Droplet ID manually, or verify the details are correct.
-                                                                </p>
-                                                            </div>
-                                                        @endif
-                                                        @if ($matchedDigitalOceanDroplet)
-                                                            <div class="p-4 border border-green-500 rounded-md bg-green-50 dark:bg-green-900/20">
-                                                                <h4 class="mb-2 font-semibold text-green-700 dark:text-green-400">Match Found!</h4>
-                                                                <div class="grid gap-2 mb-4 text-sm lg:grid-cols-2">
-                                                                    <div><span class="font-medium">Name:</span> {{ $matchedDigitalOceanDroplet['name'] ?? 'Unknown' }}</div>
-                                                                    <div><span class="font-medium">ID:</span> {{ $matchedDigitalOceanDroplet['id'] }}</div>
-                                                                    <div><span class="font-medium">Status:</span> {{ ucfirst($matchedDigitalOceanDroplet['status'] ?? 'unknown') }}</div>
-                                                                    <div><span class="font-medium">Size:</span> {{ data_get($matchedDigitalOceanDroplet, 'size.slug', 'Unknown') }}</div>
-                                                                </div>
-                                                                <x-forms.button wire:click="linkToDigitalOcean" isHighlighted canGate="update" :canResource="$server">
-                                                                    Link This Server
-                                                                </x-forms.button>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </x-modal-input>
-                                            @endif
-                                            @if (!$server->vultr_instance_id && $availableVultrTokens->isNotEmpty())
-                                                <x-modal-input title="Link to Vultr" :wireIgnore="false">
-                                                    <x-slot:content>
-                                                        <div class="dropdown-item" @click="dropdownOpen = false">
-                                                            <svg class="size-4" fill="none" stroke="currentColor"
-                                                                viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                                    stroke-width="2" d="M12 4.5v15m7.5-7.5h-15" />
-                                                            </svg>
-                                                            Vultr
-                                                        </div>
-                                                    </x-slot:content>
-                                                    <div class="space-y-4">
-                                                        <p class="text-sm dark:text-neutral-400">
-                                                            Link this server to a Vultr instance to enable power controls and status monitoring.
-                                                        </p>
-                                                        <div class="w-full">
-                                                            <x-forms.select wire:model.live="selectedVultrTokenId"
-                                                                label="Vultr Token" canGate="update" :canResource="$server">
-                                                                <option value="">Select a token...</option>
-                                                                @foreach ($availableVultrTokens as $token)
-                                                                    <option value="{{ $token->id }}">{{ $token->name }}</option>
-                                                                @endforeach
-                                                            </x-forms.select>
-                                                        </div>
-                                                        <div class="space-y-4">
-                                                            <div class="flex items-end gap-2">
-                                                                <div class="flex-1">
-                                                                    <x-forms.input wire:model="manualVultrInstanceId"
-                                                                        label="Instance ID" placeholder="e.g., 6d4b..."
-                                                                        helper="Enter the Vultr Instance ID from your Vultr dashboard"
-                                                                        canGate="update" :canResource="$server" />
-                                                                </div>
-                                                                <x-forms.button wire:click="searchVultrInstanceById"
-                                                                    wire:loading.attr="disabled" canGate="update"
-                                                                    :canResource="$server" :disabled="! $selectedVultrTokenId">
-                                                                    <span wire:loading.remove wire:target="searchVultrInstanceById">Search</span>
-                                                                    <span wire:loading wire:target="searchVultrInstanceById">Searching...</span>
-                                                                </x-forms.button>
-                                                            </div>
-                                                            <div class="flex items-center gap-3 text-sm dark:text-neutral-500">
-                                                                <div class="h-px flex-1 bg-neutral-300 dark:bg-coolgray-300"></div>
-                                                                <span>OR</span>
-                                                                <div class="h-px flex-1 bg-neutral-300 dark:bg-coolgray-300"></div>
-                                                            </div>
-                                                            <x-forms.button wire:click="searchVultrInstance"
-                                                                wire:loading.attr="disabled" canGate="update"
-                                                                :canResource="$server" :disabled="! $selectedVultrTokenId"
-                                                                class="w-full justify-center">
-                                                                <span wire:loading.remove wire:target="searchVultrInstance">Search by IP</span>
-                                                                <span wire:loading wire:target="searchVultrInstance">Searching...</span>
-                                                            </x-forms.button>
-                                                        </div>
-                                                        @if ($vultrSearchError)
-                                                            <div class="p-4 border border-red-500 rounded-md bg-red-50 dark:bg-red-900/20">
-                                                                <p class="text-red-600 dark:text-red-400">{{ $vultrSearchError }}</p>
-                                                            </div>
-                                                        @endif
-                                                        @if ($vultrNoMatchFound)
-                                                            <div class="p-4 border border-yellow-500 rounded-md bg-yellow-50 dark:bg-yellow-900/20">
-                                                                <p class="text-yellow-600 dark:text-yellow-400">
-                                                                    @if ($manualVultrInstanceId)
-                                                                        No Vultr instance found with ID: {{ $manualVultrInstanceId }}
-                                                                    @else
-                                                                        No Vultr instance found matching IP: {{ $server->ip }}
-                                                                    @endif
-                                                                </p>
-                                                                <p class="mt-1 text-sm dark:text-neutral-400">
-                                                                    Try a different token, enter the Instance ID manually, or verify the details are correct.
-                                                                </p>
-                                                            </div>
-                                                        @endif
-                                                        @if ($matchedVultrInstance)
-                                                            <div class="p-4 border border-green-500 rounded-md bg-green-50 dark:bg-green-900/20">
-                                                                <h4 class="mb-2 font-semibold text-green-700 dark:text-green-400">Match Found!</h4>
-                                                                <div class="grid gap-2 mb-4 text-sm lg:grid-cols-2">
-                                                                    <div><span class="font-medium">Name:</span> {{ $matchedVultrInstance['label'] ?? $matchedVultrInstance['hostname'] ?? 'Unknown' }}</div>
-                                                                    <div><span class="font-medium">ID:</span> {{ $matchedVultrInstance['id'] }}</div>
-                                                                    <div><span class="font-medium">Status:</span> {{ ucfirst($matchedVultrInstance['status'] ?? 'unknown') }}</div>
-                                                                    <div><span class="font-medium">Plan:</span> {{ $matchedVultrInstance['plan'] ?? 'Unknown' }}</div>
-                                                                </div>
-                                                                <x-forms.button wire:click="linkToVultr" isHighlighted canGate="update" :canResource="$server">
-                                                                    Link This Server
-                                                                </x-forms.button>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </x-modal-input>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
-                        @if ($server->isFunctional())
-                            <x-slide-over closeWithX fullScreen>
-                                <x-slot:title>Validate & configure</x-slot:title>
-                                <x-slot:content>
-                                    <livewire:server.validate-and-install :server="$server" ask />
-                                </x-slot:content>
-                                <x-forms.button @click="slideOverOpen=true" wire:click.prevent='validateServer'
-                                    isHighlighted canGate="update" :canResource="$server">
-                                    Revalidate server
-                                </x-forms.button>
-                            </x-slide-over>
-                        @endif
-                    @endif
-                </div>
-                @if ($server->isFunctional())
-                    Server is reachable and validated.
-                @else
-                    You can't use this server until it is validated.
-                @endif
-                @if ($this->limaStartCommand)
-                    <div
-                        class="mt-4 rounded border border-coolgray-200 bg-coolgray-100 p-3 text-sm dark:border-coolgray-300 dark:bg-coolgray-100">
-                        <div class="font-semibold">Start this Lima VM locally</div>
-                        <div class="mt-1 dark:text-neutral-400">
-                            Run this from the Coolify repository root before validating this server:
-                        </div>
-                        <code
-                            class="mt-2 block overflow-x-auto rounded bg-black px-3 py-2 font-mono text-xs text-white">
-                            {{ $this->limaStartCommand }}
-                        </code>
-                    </div>
-                @endif
-                @if ($isValidating)
-                    <div x-data="{ slideOverOpen: true }">
-                        <x-slide-over closeWithX fullScreen>
-                            <x-slot:title>Validation in Progress</x-slot:title>
-                            <x-slot:content>
-                                <livewire:server.validate-and-install :server="$server" />
-                            </x-slot:content>
-                        </x-slide-over>
-                    </div>
-                @endif
-                @if (
-                    (!$isReachable || !$isUsable) &&
-                        $server->id !== 0 &&
-                        !$isValidating &&
-                        !in_array($hetznerServerStatus, ['initializing', 'starting', 'stopping', 'off']) &&
-                        !in_array($vultrInstanceStatus, ['pending', 'starting', 'stopped', 'suspended', 'deleted']) &&
-                        !in_array($digitalOceanDropletStatus, ['new', 'off', 'archive', 'deleted']))
-                    <x-slide-over closeWithX fullScreen>
-                        <x-slot:title>Validate & configure</x-slot:title>
-                        <x-slot:content>
-                            <livewire:server.validate-and-install :server="$server" />
-                        </x-slot:content>
-                        <x-forms.button @click="slideOverOpen=true"
-                            class="mt-8 mb-4 w-full font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
-                            wire:click.prevent='validateServer' isHighlighted>
-                            Validate Server & Install Docker Engine
-                        </x-forms.button>
-                    </x-slide-over>
-                    @if ($server->validation_logs)
-                        <h4>Previous Validation Logs</h4>
-                        <div class="pb-8">
-                            {!! $server->validation_logs !!}
-                        </div>
-                    @endif
-                @endif
-                @if ((!$isReachable || !$isUsable) && $server->id === 0)
-                    <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
-                        wire:click.prevent='checkLocalhostConnection' isHighlighted>
-                        Validate Server
-                    </x-forms.button>
-                @endif
-                @if ($server->isForceDisabled() && isCloud())
-                    <x-callout type="danger" title="Server Disabled" class="mt-4">
-                        The system has disabled the server because you have exceeded the
-                        number of servers for which you have paid.
-                    </x-callout>
-                @endif
-                <div class="flex flex-col gap-2 pt-4">
-                    <div class="flex flex-col gap-2 w-full lg:flex-row">
-                        <x-forms.input canGate="update" :canResource="$server" id="name" label="Name" required
-                            :disabled="$isValidating" />
-                        <x-forms.input canGate="update" :canResource="$server" id="description" label="Description"
-                            :disabled="$isValidating" />
-                        @if (!$isSwarmWorker && !$isBuildServer)
-                            <x-forms.input canGate="update" :canResource="$server" placeholder="https://example.com"
-                                id="wildcardDomain" label="Wildcard Domain"
-                                helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".'
-                                :disabled="$isValidating" />
-                        @endif
 
-                    </div>
-                    <div class="flex flex-col gap-2 w-full lg:flex-row">
-                        <x-forms.input canGate="update" :canResource="$server" type="password" id="ip"
-                            label="IP Address/Domain"
-                            helper="An IP Address (127.0.0.1) or domain (example.com). Make sure there is no protocol like http(s):// so you provide a FQDN not a URL."
-                            required :disabled="$isValidating" />
-                        <div class="flex gap-2">
-                            <x-forms.input canGate="update" :canResource="$server" id="user" label="User" required
-                                :disabled="$isValidating" />
-                            <x-forms.input canGate="update" :canResource="$server" type="number" id="port"
-                                label="Port" required :disabled="$isValidating" />
-                        </div>
-                    </div>
-                    <div class="w-full lg:w-64">
-                        <x-forms.input canGate="update" :canResource="$server" type="number"
-                            id="connectionTimeout" label="SSH Connection Timeout (s)"
-                            helper="Seconds to wait for SSH connection before failing. Default: 10."
-                            min="1" max="300" required :disabled="$isValidating" />
-                    </div>
-                    <div class="w-full">
-                        <div class="flex items-center mb-1">
-                            <label for="serverTimezone">Server Timezone</label>
-                            <x-helper class="ml-2"
-                                helper="Server's timezone. This is used for backups, cron jobs, etc." />
-                        </div>
-                        @can('update', $server)
-                            @if ($isValidating)
-                                <div class="relative">
-                                    <div class="inline-flex relative items-center w-64">
-                                        <input readonly disabled autocomplete="off"
-                                            class="w-full input opacity-50 cursor-not-allowed"
-                                            value="{{ $serverTimezone ?: 'No timezone set' }}"
-                                            placeholder="Server Timezone">
-                                        <svg class="absolute right-0 mr-2 w-4 h-4 opacity-50"
-                                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="1.5" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                                        </svg>
-                                    </div>
-                                </div>
+    <livewire:server.navbar :server="$server" />
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="general" />
+        <div class="w-full min-w-0">
+            @if ($server->isLocalhost())
+                @include('livewire.server.partials.localhost-general')
+            @else
+                @php
+                    $provider = match (true) {
+                        filled($server->hetzner_server_id) => 'Hetzner',
+                        filled($server->digitalocean_droplet_id) => 'DigitalOcean',
+                        filled($server->vultr_instance_id) => 'Vultr',
+                        default => null,
+                    };
+                    $providerStatus = match ($provider) {
+                        'Hetzner' => $hetznerServerStatus,
+                        'DigitalOcean' => $digitalOceanDropletStatus,
+                        'Vultr' => $vultrInstanceStatus,
+                        default => null,
+                    };
+                    $providerStatusType = match (true) {
+                        in_array($providerStatus, ['running', 'active']) => 'success',
+                        in_array($providerStatus, ['starting', 'initializing', 'pending', 'new']) => 'warning',
+                        in_array($providerStatus, ['off', 'stopped', 'suspended', 'archive', 'deleted']) => 'error',
+                        default => 'neutral',
+                    };
+                    $hasLinkableCloudProviders = (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
+                        || (!$server->vultr_instance_id && $availableVultrTokens->isNotEmpty())
+                        || (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty());
+                    $hetznerMatch = $matchedHetznerServer
+                        ? [
+                            'name' => $matchedHetznerServer['name'] ?? 'Hetzner server',
+                            'id' => $matchedHetznerServer['id'] ?? null,
+                            'status' => $matchedHetznerServer['status'] ?? null,
+                        ]
+                        : null;
+                    $digitalOceanMatch = $matchedDigitalOceanDroplet
+                        ? [
+                            'name' => $matchedDigitalOceanDroplet['name'] ?? 'DigitalOcean Droplet',
+                            'id' => $matchedDigitalOceanDroplet['id'] ?? null,
+                            'status' => $matchedDigitalOceanDroplet['status'] ?? null,
+                        ]
+                        : null;
+                    $vultrMatch = $matchedVultrInstance
+                        ? [
+                            'name' => $matchedVultrInstance['label'] ?? $matchedVultrInstance['hostname'] ?? 'Vultr instance',
+                            'id' => $matchedVultrInstance['id'] ?? null,
+                            'status' => $matchedVultrInstance['status'] ?? null,
+                        ]
+                        : null;
+                @endphp
+
+                <form wire:submit.prevent="submit" class="application-settings-form flex flex-col gap-6">
+                    {{-- isBuildServer uses instantSave; keep dirty tracking on explicit-save fields. --}}
+                    <x-unsaved-bar action="submit"
+                        targets="name,description,ip,user,port,connectionTimeout,serverTimezone,wildcardDomain" />
+
+                    <x-application.settings-section id="server-overview-section" title="Server overview"
+                        helper="Connection health, provider state, operating system, and hardware details.">
+                        <x-slot:actions>
+                            @if ($provider)
+                                <x-status-badge :label="$provider . ($providerStatus ? ' · ' . ucfirst($providerStatus) : '')"
+                                    :type="$providerStatusType" />
+                                @if ($provider === 'Hetzner')
+                                    <x-forms.button type="button" class="size-8! px-0!"
+                                        wire:click.prevent="checkHetznerServerStatus(true)"
+                                        title="Refresh provider status">
+                                        <x-reicon name="refresh" class="size-3.5" />
+                                    </x-forms.button>
+                                @elseif ($provider === 'DigitalOcean')
+                                    <x-forms.button type="button" class="size-8! px-0!"
+                                        wire:click.prevent="checkDigitalOceanDropletStatus(true)"
+                                        title="Refresh provider status">
+                                        <x-reicon name="refresh" class="size-3.5" />
+                                    </x-forms.button>
+                                @elseif ($provider === 'Vultr')
+                                    <x-forms.button type="button" class="size-8! px-0!"
+                                        wire:click.prevent="checkVultrInstanceStatus(true)"
+                                        title="Refresh provider status">
+                                        <x-reicon name="refresh" class="size-3.5" />
+                                    </x-forms.button>
+                                @endif
+                            @endif
+                            @if ($server->server_metadata)
+                                <x-forms.button type="button" class="size-8! px-0!"
+                                    wire:click="refreshServerMetadata" title="Refresh server details">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                </x-forms.button>
+                            @endif
+                            @if ($server->isTransferredAway())
+                                <x-status-badge label="Transferred away" type="warning" />
                             @else
-                                <div x-data="{
-                                    open: false,
-                                    search: '{{ $serverTimezone ?: '' }}',
-                                    timezones: @js($this->timezones),
-                                    placeholder: '{{ $serverTimezone ? 'Search timezone...' : 'Select Server Timezone' }}',
-                                    init() {
-                                        this.$watch('search', value => {
-                                            if (value === '') {
-                                                this.open = true;
-                                            }
-                                        })
-                                    }
-                                }">
-                                    <div class="relative">
-                                        <div class="inline-flex relative items-center w-64">
-                                            <input autocomplete="off"
-                                                wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-                                                wire:dirty.class="dark:focus:ring-warning dark:ring-warning"
-                                                x-model="search" @focus="open = true" @click.away="open = false"
-                                                @input="open = true" class="w-full input" :placeholder="placeholder"
-                                                wire:model="serverTimezone">
-                                            <svg class="absolute right-0 mr-2 w-4 h-4" xmlns="http://www.w3.org/2000/svg"
-                                                fill="none" viewBox="0 0 24 24" stroke-width="1.5"
-                                                stroke="currentColor" @click="open = true">
-                                                <path stroke-linecap="round" stroke-linejoin="round"
-                                                    d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                                            </svg>
-                                        </div>
-                                        <div x-show="open"
-                                            class="overflow-auto overflow-x-hidden absolute z-50 mt-1 w-64 max-h-60 bg-white rounded-md border shadow-lg dark:bg-coolgray-100 dark:border-coolgray-200 scrollbar">
-                                            <template
-                                                x-for="timezone in timezones.filter(tz => tz.toLowerCase().includes(search.toLowerCase()))"
-                                                :key="timezone">
-                                                <div @click="search = timezone; open = false; $wire.set('serverTimezone', timezone); $wire.submit()"
-                                                    class="px-4 py-2 text-gray-800 cursor-pointer hover:bg-gray-100 dark:hover:bg-coolgray-300 dark:text-gray-200"
-                                                    x-text="timezone"></div>
-                                            </template>
-                                        </div>
+                                <x-status-badge :label="$server->isFunctional() ? 'Ready' : 'Validation required'"
+                                    :type="$server->isFunctional() ? 'success' : 'warning'" />
+                            @endif
+                        </x-slot:actions>
+
+                        <div class="flex items-start gap-3">
+                            <div
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+                                <x-reicon name="servers" class="size-4.5" />
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium text-neutral-950 dark:text-fg">
+                                    {{ $server->name }}
+                                </p>
+                                <p class="mt-1 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                                    @if ($server->isTransferredAway())
+                                        This server was migrated away from this Coolify instance and cannot be managed here.
+                                    @elseif ($server->isFunctional())
+                                        The server is reachable, validated, and ready to host resources.
+                                    @else
+                                        Validate the SSH connection before using this server.
+                                    @endif
+                                </p>
+                            </div>
+                        </div>
+
+                        @if ($server->server_metadata)
+                            @include('livewire.server.partials.server-details', ['server' => $server])
+                        @else
+                            <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                <x-forms.button type="button" wire:click="refreshServerMetadata">
+                                    <x-reicon name="refresh" class="size-3.5" />
+                                    Fetch server details
+                                </x-forms.button>
+                            </div>
+                        @endif
+                    </x-application.settings-section>
+
+                    <x-application.settings-section id="server-connection-section" title="Connection"
+                        helper="Configure how Coolify identifies, reaches, and validates this server.">
+                        <x-slot:actions>
+                            @if ($hasLinkableCloudProviders)
+                                <div x-data="{ open: false }" class="relative" @click.outside="open = false">
+                                    <button type="button" class="button" @click="open = !open">
+                                        <x-reicon name="plus" class="size-3.5" />
+                                        Link provider
+                                    </button>
+                                    <div x-cloak x-show="open" x-transition.origin.top.right
+                                        class="absolute top-9 right-0 z-50 w-56 rounded-lg border border-neutral-200 bg-white p-1 shadow-modal dark:border-white/[0.1] dark:bg-raised">
+                                        @if (!$server->hetzner_server_id && $availableHetznerTokens->isNotEmpty())
+                                            <x-server.provider-link-modal :server="$server" provider="hetzner"
+                                                providerLabel="Hetzner" tokenModel="selectedHetznerTokenId"
+                                                :tokens="$availableHetznerTokens" manualModel="manualHetznerServerId"
+                                                manualLabel="Server ID" manualPlaceholder="12345678"
+                                                searchByIdMethod="searchHetznerServerById"
+                                                searchByIpMethod="searchHetznerServer" linkMethod="linkToHetzner"
+                                                :searchError="$hetznerSearchError" :noMatch="$hetznerNoMatchFound"
+                                                :matched="$hetznerMatch" />
+                                        @endif
+                                        @if (!$server->digitalocean_droplet_id && $availableDigitalOceanTokens->isNotEmpty())
+                                            <x-server.provider-link-modal :server="$server" provider="digitalocean"
+                                                providerLabel="DigitalOcean"
+                                                tokenModel="selectedDigitalOceanTokenId"
+                                                :tokens="$availableDigitalOceanTokens"
+                                                manualModel="manualDigitalOceanDropletId"
+                                                manualLabel="Droplet ID" manualPlaceholder="12345678"
+                                                searchByIdMethod="searchDigitalOceanDropletById"
+                                                searchByIpMethod="searchDigitalOceanDroplet"
+                                                linkMethod="linkToDigitalOcean"
+                                                :searchError="$digitalOceanSearchError"
+                                                :noMatch="$digitalOceanNoMatchFound" :matched="$digitalOceanMatch" />
+                                        @endif
+                                        @if (!$server->vultr_instance_id && $availableVultrTokens->isNotEmpty())
+                                            <x-server.provider-link-modal :server="$server" provider="vultr"
+                                                providerLabel="Vultr" tokenModel="selectedVultrTokenId"
+                                                :tokens="$availableVultrTokens" manualModel="manualVultrInstanceId"
+                                                manualLabel="Instance ID" manualPlaceholder="6d4b…"
+                                                searchByIdMethod="searchVultrInstanceById"
+                                                searchByIpMethod="searchVultrInstance" linkMethod="linkToVultr"
+                                                :searchError="$vultrSearchError" :noMatch="$vultrNoMatchFound"
+                                                :matched="$vultrMatch" />
+                                        @endif
                                     </div>
                                 </div>
                             @endif
-                        @else
-                            <div class="relative">
-                                <div class="inline-flex relative items-center w-64">
-                                    <input readonly disabled autocomplete="off"
-                                        class="w-full input opacity-50 cursor-not-allowed"
-                                        value="{{ $serverTimezone ?: 'No timezone set' }}" placeholder="Server Timezone">
-                                    <svg class="absolute right-0 mr-2 w-4 h-4 opacity-50"
-                                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                        stroke-width="1.5" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                            d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-                                    </svg>
-                                </div>
-                            </div>
-                        @endcan
-                    </div>
 
-                    <div class="w-full">
+                            <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
+                                <x-slot:title>Validate and configure</x-slot:title>
+                                <x-slot:content>
+                                    <livewire:server.validate-and-install :server="$server"
+                                        :ask="$server->isFunctional() && ! $isValidating" />
+                                </x-slot:content>
+                                <x-forms.button type="button" :isHighlighted="! $server->isFunctional()"
+                                    @click="processDialogOpen = true" wire:click.prevent="validateServer">
+                                    <x-reicon :name="$server->isFunctional() ? 'refresh' : 'alert-circle'" class="size-3.5" />
+                                    {{ $server->isFunctional() ? 'Revalidate connection' : 'Validate connection' }}
+                                </x-forms.button>
+                            </x-process-dialog>
+                        </x-slot:actions>
+
+                        @if ($server->isTransferredAway())
+                            <x-callout type="warning" title="Transferred to another instance" class="mb-4">
+                                This server was migrated away from this Coolify instance. It cannot be revalidated or
+                                managed here. Use the target instance, or delete this server when you no longer need the
+                                archive.
+                            </x-callout>
+                        @endif
+
+                        @if ($this->limaStartCommand)
+                            <x-callout type="info" title="Start this Lima VM locally" class="mb-4">
+                                <code
+                                    class="mt-2 block overflow-x-auto rounded-lg bg-neutral-950 px-3 py-2 font-mono text-[11px] text-neutral-200">{{ $this->limaStartCommand }}</code>
+                            </x-callout>
+                        @endif
+
+                        @if ($server->isForceDisabled() && isCloud())
+                            <x-callout type="danger" title="Server disabled" class="mb-4">
+                                This server is disabled because the current plan server limit was exceeded.
+                            </x-callout>
+                        @endif
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-forms.input canGate="update" :canResource="$server" id="name" label="Name"
+                                required :disabled="$isValidating" />
+                            <x-forms.input canGate="update" :canResource="$server" id="description"
+                                label="Description" :disabled="$isValidating" />
+                        </div>
+
+                        <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="password" id="ip"
+                                label="IP address or domain"
+                                helper="Enter a hostname or IP address without http:// or https://."
+                                required :disabled="$isValidating" />
+                            <x-forms.input canGate="update" :canResource="$server" id="user" label="SSH user"
+                                required :disabled="$isValidating" />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" id="port"
+                                label="SSH port" required :disabled="$isValidating" />
+                        </div>
+
+                        <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="number"
+                                id="connectionTimeout" label="Connection timeout"
+                                helper="Seconds to wait before an SSH connection fails." min="1" max="300"
+                                required :disabled="$isValidating" />
+                            <x-forms.searchable-listbox id="serverTimezone" label="Server timezone"
+                                helper="Used for backups, cron jobs, and displayed timestamps."
+                                searchPlaceholder="Search timezones" emptyText="No matching timezone"
+                                :options="collect($this->timezones)->map(fn ($timezone) => [
+                                    'value' => $timezone,
+                                    'label' => $timezone,
+                                ])->all()" :disabled="$isValidating || !auth()->user()->can('update', $server)" />
+                            @if (!$isSwarmWorker && !$isBuildServer)
+                                <x-forms.input canGate="update" :canResource="$server"
+                                    placeholder="https://example.com" id="wildcardDomain" label="Wildcard domain"
+                                    helper="New resources can receive generated subdomains from this domain."
+                                    :disabled="$isValidating" />
+                            @endif
+                        </div>
+
                         @if (!$server->isLocalhost())
-                            <div class="w-full sm:w-96">
+                            <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 @if ($isBuildServerLocked)
-                                    <x-forms.checkbox disabled instantSave id="isBuildServer"
-                                        helper="You can't use this server as a build server because it has defined resources."
-                                        label="Use it as a build server?" />
+                                    <x-forms.checkbox disabled id="isBuildServer"
+                                        helper="This server already hosts resources and cannot become build-only."
+                                        label="Use as a dedicated build server" />
                                 @else
                                     <x-forms.checkbox canGate="update" :canResource="$server" instantSave
-                                        id="isBuildServer" label="Use it as a build server?" :disabled="$isValidating" />
+                                        id="isBuildServer" label="Use as a dedicated build server"
+                                        helper="Build servers compile applications but do not host deployments. Enabling this makes the server build-only."
+                                        :disabled="$isValidating" />
                                 @endif
                             </div>
+                        @endif
+                    </x-application.settings-section>
 
-                        @endif
-                    </div>
-                </div>
-            </form>
-            @if ($server->isFunctional())
-                <div class="pt-6">
-                    <div class="flex items-center gap-2 mb-3">
-                        <h3>Server Details</h3>
-                        @if ($server->server_metadata)
-                            <button wire:click="refreshServerMetadata" wire:loading.attr="disabled"
-                                wire:target="refreshServerMetadata" title="Refresh server details"
-                                class="dark:hover:fill-white fill-black dark:fill-warning">
-                                <svg wire:loading.remove wire:target="refreshServerMetadata" class="w-4 h-4"
-                                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                                <svg wire:loading wire:target="refreshServerMetadata" class="w-4 h-4 animate-spin"
-                                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path
-                                        d="M12 2a10.016 10.016 0 0 0-7 2.877V3a1 1 0 1 0-2 0v4.5a1 1 0 0 0 1 1h4.5a1 1 0 0 0 0-2H6.218A7.98 7.98 0 0 1 20 12a1 1 0 0 0 2 0A10.012 10.012 0 0 0 12 2zm7.989 13.5h-4.5a1 1 0 0 0 0 2h2.293A7.98 7.98 0 0 1 4 12a1 1 0 0 0-2 0a9.986 9.986 0 0 0 16.989 7.133V21a1 1 0 0 0 2 0v-4.5a1 1 0 0 0-1-1z" />
-                                </svg>
-                            </button>
-                        @endif
-                    </div>
-                    @if ($server->server_metadata)
-                        @php $meta = $server->server_metadata; @endphp
-                        <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm lg:grid-cols-3">
-                            <div><span class="font-medium dark:text-neutral-400">OS:</span>
-                                {{ $meta['os'] ?? 'N/A' }}</div>
-                            <div><span class="font-medium dark:text-neutral-400">Arch:</span>
-                                {{ $meta['arch'] ?? 'N/A' }}</div>
-                            <div><span class="font-medium dark:text-neutral-400">Kernel:</span>
-                                {{ $meta['kernel'] ?? 'N/A' }}</div>
-                            <div><span class="font-medium dark:text-neutral-400">CPU Cores:</span>
-                                {{ $meta['cpus'] ?? 'N/A' }}</div>
-                            <div><span class="font-medium dark:text-neutral-400">RAM:</span>
-                                {{ isset($meta['memory_bytes']) ? round($meta['memory_bytes'] / 1073741824, 1) . ' GB' : 'N/A' }}
+                    @if ($server->validation_logs)
+                        <x-application.settings-section title="Previous validation output"
+                            helper="The latest output produced while checking this server.">
+                            <div
+                                class="max-h-72 overflow-auto rounded-lg bg-neutral-950 p-4 font-mono text-xs leading-5 text-neutral-300">
+                                {!! $server->validation_logs !!}
                             </div>
-                            <div><span class="font-medium dark:text-neutral-400">Up Since:</span>
-                                {{ $meta['uptime_since'] ?? 'N/A' }}</div>
-                        </div>
-                        @if (isset($meta['collected_at']))
-                            <p class="mt-2 text-xs dark:text-neutral-500">Last updated:
-                                {{ \Carbon\Carbon::parse($meta['collected_at'])->diffForHumans() }}</p>
-                        @endif
-                    @else
-                        <x-forms.button wire:click="refreshServerMetadata" canGate="update"
-                            :canResource="$server">
-                            <span wire:loading.remove wire:target="refreshServerMetadata">Fetch Server
-                                Details</span>
-                            <span wire:loading wire:target="refreshServerMetadata">Fetching...</span>
-                        </x-forms.button>
+                        </x-application.settings-section>
                     @endif
-                </div>
+                </form>
             @endif
         </div>
     </div>

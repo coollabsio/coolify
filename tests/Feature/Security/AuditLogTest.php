@@ -397,7 +397,7 @@ describe('API mutation audit logging', function () {
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer '.$token,
-        ])->getJson('/api/v1/enable');
+        ])->postJson('/api/v1/enable');
 
         $response->assertStatus(403);
     });

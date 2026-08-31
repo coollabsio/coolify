@@ -598,7 +598,7 @@ class ValidationPatterns
      * Normalize URL components that are case-insensitive while preserving
      * case-sensitive path, query, and fragment components.
      */
-    private static function normalizeApplicationDomainUrl(string $url): string
+    public static function normalizeApplicationDomainUrl(string $url): string
     {
         $components = parse_url($url);
 

@@ -14,6 +14,8 @@ class Show extends Component
 
     public CloudProviderToken $cloudProviderToken;
 
+    public bool $modalMode = false;
+
     public string $name = '';
 
     public ?string $description = null;
@@ -33,8 +35,9 @@ class Show extends Component
         ];
     }
 
-    public function mount(string $cloud_token_uuid): void
+    public function mount(string $cloud_token_uuid, bool $modalMode = false): void
     {
+        $this->modalMode = $modalMode;
         try {
             $this->cloudProviderToken = CloudProviderToken::ownedByCurrentTeam()
                 ->whereUuid($cloud_token_uuid)
@@ -71,6 +74,7 @@ class Show extends Component
         ]);
 
         $this->dispatch('success', 'Cloud provider token updated.');
+        $this->dispatch('securityResourceChanged');
     }
 
     public function validateToken(): void
@@ -121,6 +125,13 @@ class Show extends Component
         ]);
 
         $this->cloudProviderToken->delete();
+
+        if ($this->modalMode) {
+            $this->dispatch('securityResourceChanged');
+            $this->dispatch('close-modal');
+
+            return null;
+        }
 
         return redirectRoute($this, 'security.cloud-tokens');
     }

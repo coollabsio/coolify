@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasNoindexDomains;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -9,7 +10,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class ServiceApplication extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasNoindexDomains, SoftDeletes;
 
     protected $fillable = [
         'service_id',
@@ -17,6 +18,9 @@ class ServiceApplication extends BaseModel
         'human_name',
         'description',
         'fqdn',
+        'noindex_domains',
+        'redirect',
+        'domain_dns_statuses',
         'ports',
         'exposes',
         'status',
@@ -27,9 +31,32 @@ class ServiceApplication extends BaseModel
         'is_include_timestamps',
         'is_gzip_enabled',
         'is_stripprefix_enabled',
+        'is_force_https_enabled',
         'last_online_at',
         'is_migrated',
     ];
+
+    /**
+     * Internal DNS check cache — not part of the public API surface.
+     *
+     * @var list<string>
+     */
+    protected $hidden = [
+        'domain_dns_statuses',
+    ];
+
+    protected $attributes = [
+        'is_force_https_enabled' => true,
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'domain_dns_statuses' => 'array',
+            'noindex_domains' => 'array',
+            'is_force_https_enabled' => 'boolean',
+        ];
+    }
 
     protected static function booted()
     {
@@ -41,6 +68,9 @@ class ServiceApplication extends BaseModel
         static::saving(function ($service) {
             if ($service->isDirty('status')) {
                 $service->last_online_at = now();
+            }
+            if ($service->isDirty('fqdn')) {
+                $service->syncNoindexDomains();
             }
         });
     }
@@ -98,6 +128,11 @@ class ServiceApplication extends BaseModel
     public function isGzipEnabled()
     {
         return data_get($this, 'is_gzip_enabled', true);
+    }
+
+    public function isForceHttpsEnabled(): bool
+    {
+        return $this->is_force_https_enabled;
     }
 
     public function type()

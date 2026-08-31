@@ -32,9 +32,7 @@ Coolify is currently at v4. While v4 is stable, it has some limitations, includi
 - A more complex user experience
 - Other smaller issues that need refinement
 
-These limitations will be addressed in Coolify v5, which is in the planning stage. Because of this, major features, architectural changes, or significant UI changes will not be accepted for v4 at this stage.
-
-We welcome contributions that help stabilize v4 for a bug free experience.
+These limitations will be addressed over time. Fixes and small improvements are accepted on the production line. New features and larger changes require prior discussion and must go through the development line.
 
 
 ## What Makes a Strong Contribution
@@ -188,8 +186,19 @@ If maintainers cannot reproduce working behavior, the PR will be closed without 
 - GitHub will auto-populate the PR template
 - The contributor agreement in PR description must remain intact
 - Pull requests without the contributor agreement will be closed
-- All pull requests must target the `next` branch
-- PRs targeting other branches will be closed without review
+
+Choose the branch based on the type of change:
+
+| Change | Start from | Pull request target |
+| --- | --- | --- |
+| Fixes and small improvements | `main` | `main` |
+| Security fixes | `main` | `main` |
+| New features and larger changes | `next` | `next` |
+
+- For a fix, branch from `main` and target `main`.
+- For a feature, branch from `next` and target `next`.
+- If a fix is discovered while developing a feature, submit it separately to `main`. Maintainers will merge `main` into `next` so the fix is included there too.
+- Pull requests targeting the wrong branch may be closed or asked to retarget.
 
 
 ## FAQ
@@ -218,6 +227,35 @@ A: Yes, but keep in mind a PR closure is feedback, not a rejection of your effor
 # Development Guides
 ## Local Development
 To build and run Coolify locally, see: [Development](./DEVELOPMENT.md)
+
+### Testing the Coolify Helper Locally
+
+Use `scripts/dev-helper` to build a local helper image and test it with the running development instance. The script requires the standard local Coolify container and the seeded Dockerfile, Docker Compose, and Nixpacks applications.
+
+Run the complete workflow:
+
+```bash
+./scripts/dev-helper test my-helper-test
+```
+
+This builds and selects the helper image, verifies its bundled tools and Docker socket access, runs a Docker Compose smoke test, and deploys all three seeded applications.
+
+You can also run each step separately:
+
+```bash
+./scripts/dev-helper build my-helper-test
+./scripts/dev-helper use my-helper-test
+./scripts/dev-helper verify my-helper-test
+./scripts/dev-helper deploy my-helper-test
+```
+
+Clear the helper override when finished:
+
+```bash
+./scripts/dev-helper reset
+```
+
+The default image repository is `docker.io/coollabsio/coolify-helper`. Set `HELPER_IMAGE_REPOSITORY` to test another repository, or `COOLIFY_CONTAINER` if the local Coolify container has a different name.
 
 ### macOS Development with Lima
 Mac users can use [Lima](https://lima-vm.io/) to run a lightweight Linux virtual machine for local Coolify development. This is useful if you prefer a Linux-based Docker environment on macOS.

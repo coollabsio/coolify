@@ -113,6 +113,7 @@ class Heading extends Component
         try {
             $this->authorizeService('deploy');
             $activity = StartService::run($this->service, pullLatestImages: true);
+            $this->auditServiceAction('ui.service.started');
             $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
@@ -146,6 +147,7 @@ class Heading extends Component
         try {
             $this->authorizeService('stop');
             StopService::dispatch($this->service, false, $this->docker_cleanup);
+            $this->auditServiceAction('ui.service.stopped');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -162,6 +164,7 @@ class Heading extends Component
                 return;
             }
             $activity = StartService::run($this->service, stopBeforeStart: true);
+            $this->auditServiceAction('ui.service.restarted');
             $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
@@ -180,6 +183,7 @@ class Heading extends Component
                 return;
             }
             $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
+            $this->auditServiceAction('ui.service.restarted');
             $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
@@ -194,6 +198,15 @@ class Heading extends Component
             ->firstOrFail();
 
         $this->authorize($ability, $this->service);
+    }
+
+    private function auditServiceAction(string $event): void
+    {
+        auditLog($event, [
+            'team_id' => $this->service->team()?->id,
+            'service_uuid' => $this->service->uuid,
+            'service_name' => $this->service->name,
+        ]);
     }
 
     public function render()

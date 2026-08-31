@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Notifications\Test;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 class Telegram extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     protected $listeners = ['refresh' => '$refresh'];
 
@@ -246,6 +247,34 @@ class Telegram extends Component
             $this->telegramEnabled = false;
 
             return handleError($e, $this);
+        } finally {
+            $this->dispatch('refresh');
+        }
+    }
+
+    public function toggleTelegramEnabled(): void
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->telegramEnabled) {
+                $this->telegramEnabled = false;
+            } else {
+                $this->validate([
+                    'telegramToken' => 'required',
+                    'telegramChatId' => 'required',
+                ], [
+                    'telegramToken.required' => 'Telegram Token is required.',
+                    'telegramChatId.required' => 'Telegram Chat ID is required.',
+                ]);
+                $this->telegramEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            handleError($e, $this);
         } finally {
             $this->dispatch('refresh');
         }

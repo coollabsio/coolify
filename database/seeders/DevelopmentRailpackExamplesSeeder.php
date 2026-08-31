@@ -26,27 +26,6 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
 
     public const REPOSITORY_PROJECT_ID = 603035348;
 
-    public const LIMA_SERVERS = [
-        [
-            'server_uuid' => 'lima-ubuntu-2404',
-            'server_name' => 'lima-ubuntu-2404',
-            'port' => 2222,
-            'environment_name' => 'ubuntu24',
-            'environment_uuid' => 'railpack-examples-ubuntu24',
-            'uuid_prefix' => 'ubuntu24-',
-        ],
-        [
-            'server_uuid' => 'lima-ubuntu-2604',
-            'server_name' => 'lima-ubuntu-2604',
-            'port' => 2223,
-            'environment_name' => 'ubuntu26',
-            'environment_uuid' => 'railpack-examples-ubuntu26',
-            'uuid_prefix' => 'ubuntu26-',
-        ],
-    ];
-
-    private const LIMA_SENTINEL_URL = 'http://host.lima.internal:8000';
-
     public function run(): void
     {
         if (! $this->isDevelopmentEnvironment()) {
@@ -64,15 +43,7 @@ class DevelopmentRailpackExamplesSeeder extends Seeder
         $this->cleanupLegacyLimaProjects();
         $this->cleanupLegacyProductionExamples();
 
-        foreach (self::LIMA_SERVERS as $limaServer) {
-            $this->seedEnvironment(
-                environmentUuid: $limaServer['environment_uuid'],
-                environmentName: $limaServer['environment_name'],
-                destination: $this->limaDestination($limaServer['server_uuid']),
-                uuidPrefix: $limaServer['uuid_prefix'],
-                nameSuffix: " ({$limaServer['environment_name']})",
-            );
-        }
+        $this->seedEnvironment(StandaloneDocker::query()->findOrFail(0));
     }
 
     /**
@@ -465,37 +436,6 @@ KEY,
             ],
         );
 
-        foreach (self::LIMA_SERVERS as $limaServer) {
-            $server = Server::query()->firstOrCreate(
-                ['uuid' => $limaServer['server_uuid']],
-                [
-                    'name' => $limaServer['server_name'],
-                    'description' => 'This is a Lima VM for local development testing',
-                    'ip' => 'host.docker.internal',
-                    'port' => $limaServer['port'],
-                    'team_id' => 0,
-                    'private_key_id' => 1,
-                    'proxy' => [
-                        'type' => ProxyTypes::TRAEFIK->value,
-                        'status' => ProxyStatus::EXITED->value,
-                    ],
-                ],
-            );
-
-            $server->settings->forceFill([
-                'sentinel_custom_url' => self::LIMA_SENTINEL_URL,
-            ])->saveQuietly();
-
-            StandaloneDocker::query()->firstOrCreate(
-                ['server_id' => $server->id],
-                [
-                    'uuid' => "{$limaServer['server_uuid']}-docker",
-                    'name' => "{$limaServer['server_name']} Docker",
-                    'network' => 'coolify',
-                ],
-            );
-        }
-
         StandaloneDocker::query()->firstOrCreate(
             ['id' => 0],
             [
@@ -545,21 +485,6 @@ KEY,
         return in_array(config('app.env'), ['local', 'development', 'dev'], true);
     }
 
-    private function limaDestination(string $serverUuid): StandaloneDocker
-    {
-        $limaDestination = Server::query()
-            ->where('uuid', $serverUuid)
-            ->first()
-            ?->standaloneDockers()
-            ->first();
-
-        if (! $limaDestination) {
-            throw new RuntimeException("Lima StandaloneDocker destination is required for {$serverUuid} before running DevelopmentRailpackExamplesSeeder.");
-        }
-
-        return $limaDestination;
-    }
-
     private function cleanupLegacyLimaProjects(): void
     {
         Project::query()
@@ -595,21 +520,16 @@ KEY,
             ->forceDelete();
     }
 
-    private function seedEnvironment(
-        string $environmentUuid,
-        string $environmentName,
-        StandaloneDocker $destination,
-        string $uuidPrefix = '',
-        string $nameSuffix = '',
-    ): void {
-        $environment = $this->prepareEnvironment($environmentUuid, $environmentName);
+    private function seedEnvironment(StandaloneDocker $destination): void
+    {
+        $environment = $this->prepareEnvironment();
 
         foreach (self::examples() as $example) {
-            $this->upsertApplication($environment, $destination, $example, $uuidPrefix, $nameSuffix);
+            $this->upsertApplication($environment, $destination, $example);
         }
     }
 
-    private function prepareEnvironment(string $environmentUuid, string $environmentName): Environment
+    private function prepareEnvironment(): Environment
     {
         $project = Project::query()->firstOrNew(['uuid' => self::PROJECT_UUID]);
         $project->fill([
@@ -619,31 +539,20 @@ KEY,
         ]);
         $project->save();
 
-        $environment = $project->environments()
-            ->where(function ($query) use ($environmentName, $environmentUuid): void {
-                $query
-                    ->where('name', $environmentName)
-                    ->orWhere('uuid', $environmentUuid);
-            })
-            ->first();
+        $environment = $project->environments()->firstOrCreate(['name' => 'production']);
 
-        $existingEnvironment = $project->environments()->first();
+        $project->environments()
+            ->whereKeyNot($environment->id)
+            ->get()
+            ->each(function (Environment $obsoleteEnvironment): void {
+                Application::withTrashed()
+                    ->where('environment_id', $obsoleteEnvironment->id)
+                    ->get()
+                    ->each
+                    ->forceDelete();
 
-        if (! $environment && $project->environments()->count() === 1 && $existingEnvironment?->name === 'production') {
-            $environment = $existingEnvironment;
-        }
-
-        if (! $environment) {
-            $environment = $project->environments()->create([
-                'name' => $environmentName,
-                'uuid' => $environmentUuid,
-            ]);
-        } else {
-            $environment->update([
-                'name' => $environmentName,
-                'uuid' => $environmentUuid,
-            ]);
-        }
+                $obsoleteEnvironment->delete();
+            });
 
         return $environment;
     }
@@ -651,10 +560,10 @@ KEY,
     /**
      * @param  array<string, mixed>  $example
      */
-    private function upsertApplication(Environment $environment, StandaloneDocker $destination, array $example, string $uuidPrefix = '', string $nameSuffix = ''): void
+    private function upsertApplication(Environment $environment, StandaloneDocker $destination, array $example): void
     {
-        $uuid = $uuidPrefix.$example['uuid'];
-        $name = $example['name'].$nameSuffix;
+        $uuid = $example['uuid'];
+        $name = $example['name'];
         $application = Application::withTrashed()->firstOrNew(['uuid' => $uuid]);
         $application->fill([
             'name' => $name,

@@ -2,8 +2,8 @@
     <x-slot:title>
         Docker Registry | Coolify
     </x-slot>
-    <x-security.navbar />
-    <form class="flex flex-col" wire:submit='save'>
+    <x-security.settings-layout>
+        <form class="flex flex-col" wire:submit='save'>
         <div class="flex items-start gap-2">
             <h2 class="pb-4">Docker Registry</h2>
             <x-forms.button canGate="update" :canResource="$registry" type="submit">
@@ -42,5 +42,6 @@
                 </div>
             </div>
         </div>
-    </form>
+        </form>
+    </x-security.settings-layout>
 </div>

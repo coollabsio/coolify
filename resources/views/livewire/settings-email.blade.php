@@ -2,80 +2,72 @@
     <x-slot:title>
         Transactional Email | Coolify
     </x-slot>
-    <x-settings.navbar />
-    <form wire:submit='submit' class="flex flex-col gap-2 pb-4">
-        <div class="flex items-center gap-2">
-            <h2>Transactional Email</h2>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
-            @if (is_transactional_emails_enabled() && auth()->user()->isAdminFromSession())
-                <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
-                    <form wire:submit.prevent="sendTestEmail" class="flex flex-col w-full gap-2">
-                        <x-forms.input wire:model="testEmailAddress" placeholder="test@example.com" id="testEmailAddress"
-                            label="Recipient" required />
-                        <x-forms.button type="submit" @click="modalOpen=false">
-                            Send Email
-                        </x-forms.button>
-                    </form>
-                </x-modal-input>
-            @endif
-        </div>
-        <div class="pb-4">Instance wide email settings for password resets, invitations, etc.</div>
-        <div class="flex gap-2">
-            <x-forms.input required id="smtpFromName" helper="Name used in emails." label="From Name" />
-            <x-forms.input required id="smtpFromAddress" helper="Email address used in emails." label="From Address" />
-        </div>
-    </form>
-    <div class="flex flex-col gap-4">
-        <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
-            <form wire:submit.prevent="submitSmtp" class="flex flex-col">
-                <div class="flex gap-2">
-                    <h3>SMTP Server</h3>
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
+
+    <x-settings.layout>
+    <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
+        {{-- One bar for the whole page. Three stacked bars made Save run
+             submitResend(), which required an API key even when Resend was off. --}}
+        <x-unsaved-bar action="submit"
+            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,smtpEhloDomain,resendApiKey" />
+
+        <form wire:submit="submit">
+            <x-application.settings-section title="Sender">
+                <x-slot:actions>
+                    @include('livewire.partials.settings-email-send-test')
+                </x-slot:actions>
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input required id="smtpFromName" helper="Name shown in outgoing email."
+                        label="From name" />
+                    <x-forms.input required id="smtpFromAddress" helper="Address used for outgoing email."
+                        label="From address" />
                 </div>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSave("SMTP")' id="smtpEnabled" label="Enabled" />
-                </div>
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
-                        <x-forms.input required id="smtpPort" type="number" placeholder="587" label="Port" />
-                        <x-forms.select required id="smtpEncryption" label="Encryption">
-                            <option value="starttls">StartTLS</option>
-                            <option value="tls">TLS/SSL</option>
-                            <option value="none">None</option>
-                        </x-forms.select>
+            </x-application.settings-section>
+        </form>
+
+        <form wire:submit.prevent="submitSmtp">
+            <x-application.settings-section title="SMTP server">
+                <div class="grid gap-4 lg:grid-cols-3">
+                    <div class="lg:col-span-3">
+                        <div class="w-full sm:w-72">
+                            <x-forms.listbox id="smtpEnabled" label="SMTP delivery"
+                                onChange="instantSaveSmtp" :options="[
+                                    ['value' => true, 'label' => 'Enabled'],
+                                    ['value' => false, 'label' => 'Disabled'],
+                                ]" />
+                        </div>
                     </div>
-                    <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input id="smtpUsername" label="SMTP Username" />
-                        <x-forms.input id="smtpPassword" type="password" label="SMTP Password"
-                            autocomplete="new-password" />
-                        <x-forms.input id="smtpTimeout" type="number" helper="Timeout value for sending emails." label="Timeout" />
-                    </div>
+                    <x-forms.input required id="smtpHost" placeholder="smtp.mailgun.org" label="Host" />
+                    <x-forms.input required id="smtpPort" type="number" placeholder="587" label="Port" />
+                    <x-forms.listbox required id="smtpEncryption" label="Encryption" :options="[
+                        ['value' => 'starttls', 'label' => 'StartTLS'],
+                        ['value' => 'tls', 'label' => 'TLS / SSL'],
+                        ['value' => 'none', 'label' => 'None'],
+                    ]" />
+                    <x-forms.input id="smtpUsername" label="Username" />
+                    <x-forms.input id="smtpPassword" type="password" label="Password"
+                        autocomplete="new-password" />
+                    <x-forms.input id="smtpTimeout" type="number"
+                        helper="Maximum delivery time in seconds." label="Timeout" />
+                    <x-forms.input id="smtpEhloDomain" placeholder="coolify.example.com"
+                        helper="Fully qualified domain sent in the SMTP EHLO command. Uses the system default when empty."
+                        label="EHLO domain" />
                 </div>
-            </form>
-        </div>
-        <div class="p-4 border dark:border-coolgray-300 border-neutral-200">
-            <form wire:submit.prevent="submitResend" class="flex flex-col">
-                <div class="flex gap-2">
-                    <h3>Resend</h3>
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
+            </x-application.settings-section>
+        </form>
+
+        <form wire:submit.prevent="submitResend">
+            <x-application.settings-section title="Resend">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox id="resendEnabled" label="Resend delivery"
+                        onChange="instantSaveResend" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                    <x-forms.input type="password" id="resendApiKey" placeholder="API key"
+                        :required="$resendEnabled" label="API key" autocomplete="new-password" />
                 </div>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSave("Resend")' id="resendEnabled" label="Enabled" />
-                </div>
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input type="password" id="resendApiKey" placeholder="API key" required label="API Key"
-                            autocomplete="new-password" />
-                    </div>
-                </div>
-            </form>
-        </div>
+            </x-application.settings-section>
+        </form>
     </div>
+    </x-settings.layout>
 </div>

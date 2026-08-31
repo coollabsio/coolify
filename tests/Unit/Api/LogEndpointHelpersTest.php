@@ -18,6 +18,20 @@ it('normalizes requested log line counts', function () {
         ->and(normalizeLogLines('50000'))->toBe(10000);
 });
 
+it('normalizes service resource log line counts before invoking Docker', function (string $controller, mixed $lines, int $expectedLines) {
+    $source = file_get_contents(__DIR__."/../../../app/Http/Controllers/Api/{$controller}.php");
+
+    expect($source)->toContain('$lines = normalizeLogLines($request->query(\'lines\'));')
+        ->and(normalizeLogLines($lines))->toBe($expectedLines);
+})->with([
+    'application invalid value' => ['ServiceApplicationsController', 'invalid', 100],
+    'application negative value' => ['ServiceApplicationsController', '-5', 100],
+    'application value above limit' => ['ServiceApplicationsController', '50000', 10000],
+    'database invalid value' => ['ServiceDatabasesController', 'invalid', 100],
+    'database negative value' => ['ServiceDatabasesController', '-5', 100],
+    'database value above limit' => ['ServiceDatabasesController', '50000', 10000],
+]);
+
 it('parses show_timestamps query values as booleans', function () {
     if (! function_exists('parseLogTimestampFlag')) {
         expect(function_exists('parseLogTimestampFlag'))->toBeTrue();
@@ -78,6 +92,18 @@ it('filters service sub containers in PHP instead of using user input in shell f
 
     expect(filterServiceSubContainersByName($containers, 'app-service-uuid')->pluck('ID')->all())
         ->toBe(['first', 'third']);
+});
+
+it('filters service containers when another Docker label contains commas', function () {
+    $containers = collect([
+        [
+            'ID' => 'app',
+            'Labels' => 'traefik.http.routers.app.rule=Host(`one.example.com`,`two.example.com`),coolify.name=app-service-uuid',
+        ],
+    ]);
+
+    expect(filterServiceSubContainersByName($containers, 'app-service-uuid')->pluck('ID')->all())
+        ->toBe(['app']);
 });
 
 it('does not interpolate the requested service name into the docker ps shell command', function () {

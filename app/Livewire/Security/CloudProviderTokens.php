@@ -27,6 +27,7 @@ class CloudProviderTokens extends Component
     {
         return [
             'tokenAdded' => 'loadTokens',
+            'securityResourceChanged' => 'loadTokens',
         ];
     }
 

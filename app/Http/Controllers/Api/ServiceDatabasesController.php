@@ -311,7 +311,7 @@ class ServiceDatabasesController extends Controller
             return response()->json(['message' => 'Service database container is not running.'], 400);
         }
 
-        $lines = (int) ($request->query('lines', 100) ?: 100);
+        $lines = normalizeLogLines($request->query('lines'));
 
         return response()->json([
             'logs' => getContainerLogs($server, $containerName, $lines),

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
 use App\Models\Team;
 use App\Models\WebhookNotificationSettings;
 use App\Notifications\Test;
@@ -12,7 +13,7 @@ use Livewire\Component;
 
 class Webhook extends Component
 {
-    use AuthorizesRequests;
+    use AuthorizesRequests, TogglesNotificationEvents;
 
     public Team $team;
 
@@ -138,6 +139,30 @@ class Webhook extends Component
             $this->saveModel();
         } catch (\Throwable $e) {
             $this->webhookEnabled = $original;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function toggleWebhookEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->webhookEnabled) {
+                $this->webhookEnabled = false;
+            } else {
+                $this->validate([
+                    'webhookUrl' => 'required',
+                ], [
+                    'webhookUrl.required' => 'Webhook URL is required.',
+                ]);
+                $this->webhookEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
 
             return handleError($e, $this);
         }
