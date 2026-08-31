@@ -103,6 +103,7 @@
                                     Preview #{{ data_get($preview, 'pull_request_id') }}
                                 </h4>
                                 <x-status-summary :status="data_get($preview, 'status')" title="Preview status" />
+                                <x-application.restart-limit-warning :application="$preview" />
                             </div>
                         </div>
                     </div>

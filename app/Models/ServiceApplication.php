@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\HasNoindexDomains;
+use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -10,7 +11,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class ServiceApplication extends BaseModel
 {
-    use HasFactory, HasNoindexDomains, SoftDeletes;
+    use HasFactory, HasNoindexDomains, HasRestartLimit, SoftDeletes;
 
     protected $fillable = [
         'service_id',
