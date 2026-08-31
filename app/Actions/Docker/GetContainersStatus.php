@@ -126,6 +126,9 @@ class GetContainersStatus
                 $containerStatus = "$containerStatus:$healthSuffix";
             }
             $labels = Arr::undot(format_docker_labels_to_json($labels));
+            if (filter_var(data_get($labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)) {
+                continue;
+            }
             $applicationId = data_get($labels, 'coolify.applicationId');
             if ($applicationId) {
                 $pullRequestId = data_get($labels, 'coolify.pullRequestId');

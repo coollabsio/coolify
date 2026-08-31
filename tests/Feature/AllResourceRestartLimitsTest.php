@@ -59,6 +59,16 @@ it('collects restart counts for preview and service containers from both status 
         ->toContain('serviceContainerRestartCounts');
 });
 
+it('ignores docker compose one-off job containers in both status sources', function () {
+    $dockerStatus = file_get_contents(app_path('Actions/Docker/GetContainersStatus.php'));
+    $sentinelStatus = file_get_contents(app_path('Jobs/PushServerUpdateJob.php'));
+
+    expect($dockerStatus)
+        ->toContain("filter_var(data_get(\$labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)")
+        ->and($sentinelStatus)
+        ->toContain("filter_var(\$labels->get('com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)");
+});
+
 it('shows restart limit warnings for every resource family', function () {
     $previews = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
     $serviceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
