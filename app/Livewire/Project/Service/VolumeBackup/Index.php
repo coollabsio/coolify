@@ -9,6 +9,7 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
 use App\Models\ServiceDatabase;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -28,7 +29,7 @@ class Index extends Component
 
     public ?ScheduledVolumeBackup $selectedVolumeBackup = null;
 
-    public $s3s;
+    public ?Collection $s3s = null;
 
     public function getListeners(): array
     {
@@ -41,9 +42,9 @@ class Index extends Component
         ];
     }
 
-    public function mount(): void
+    public function mount(?Service $service = null): void
     {
-        $this->service = $this->findService();
+        $this->service = $service ?? $this->findService();
         $this->authorize('view', $this->service);
         $this->parameters = get_route_parameters();
         $this->search = request()->string('search')->toString();

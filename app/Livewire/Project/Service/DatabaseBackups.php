@@ -30,7 +30,7 @@ class DatabaseBackups extends Component
 
     protected $listeners = ['refreshScheduledBackups' => '$refresh'];
 
-    public function mount()
+    public function mount(): mixed
     {
         try {
             $this->parameters = array_filter(

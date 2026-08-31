@@ -21,7 +21,8 @@
                 @else
                     <x-application.settings-section title="Import Backup"
                         helper="Choose the database that should receive the backup.">
-                        <x-forms.listbox id="selectedDatabaseUuid" label="Database" live required
+                        <x-forms.listbox id="selectedDatabaseUuid" label="Database" live required canGate="update"
+                            :canResource="$service"
                             :options="$databases->map(fn ($database) => [
                                 'value' => $database->uuid,
                                 'label' => $database->human_name ?: $database->name,

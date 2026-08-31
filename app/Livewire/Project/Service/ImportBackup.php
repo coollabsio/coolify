@@ -37,10 +37,11 @@ class ImportBackup extends Component
 
         $databaseUuid = request()->route('stack_service_uuid');
         if ($databaseUuid) {
-            $this->selectedDatabase = $this->databases->firstWhere('uuid', $databaseUuid);
-            abort_unless($this->selectedDatabase, 404);
-            $this->authorize('update', $this->selectedDatabase);
-            $this->selectedDatabaseUuid = $this->selectedDatabase->uuid;
+            $selectedDatabase = $this->databases->firstWhere('uuid', $databaseUuid);
+            abort_unless($selectedDatabase instanceof ServiceDatabase, 404);
+            $this->authorize('update', $selectedDatabase);
+            $this->selectedDatabase = $selectedDatabase;
+            $this->selectedDatabaseUuid = $selectedDatabase->uuid;
 
             if (request()->routeIs('project.service.database.import')) {
                 return redirect()->route('project.service.import-backup.database', $this->parameters);
@@ -58,7 +59,7 @@ class ImportBackup extends Component
     public function updatedSelectedDatabaseUuid(): mixed
     {
         $database = $this->databases->firstWhere('uuid', $this->selectedDatabaseUuid);
-        abort_unless($database, 404);
+        abort_unless($database instanceof ServiceDatabase, 404);
         $this->authorize('update', $database);
 
         return redirect()->route('project.service.import-backup.database', [

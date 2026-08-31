@@ -60,7 +60,8 @@
         @php
             $selectedSchedule = $selectedDatabaseBackup ?: $selectedVolumeBackup;
         @endphp
-        <x-modal-input :title="'Edit backup schedule'" wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge>
+        <x-modal-input :title="'Edit backup schedule'" wireOpen="scheduleModalOpen" :wireIgnore="false" isLarge
+            canGate="update" :canResource="$service">
             <x-slot:content><span></span></x-slot:content>
 
             <div x-data="{ activeSection: 'general' }" class="flex min-w-0 flex-col gap-6">
@@ -286,7 +287,7 @@
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
                             <span class="flex justify-end">
-                                <x-forms.button type="button"
+                                <x-forms.button type="button" canGate="update" :canResource="$service"
                                     wire:click.stop="backupNow('database', '{{ $databaseBackup->uuid }}')"
                                     wire:target="backupNow('database', '{{ $databaseBackup->uuid }}')">Back up now</x-forms.button>
                             </span>
@@ -331,7 +332,7 @@
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
                             </span>
                             <span class="flex justify-end">
-                                <x-forms.button type="button"
+                                <x-forms.button type="button" canGate="update" :canResource="$service"
                                     wire:click.stop="backupNow('storage', '{{ $backup->uuid }}')"
                                     wire:target="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-forms.button>
                             </span>

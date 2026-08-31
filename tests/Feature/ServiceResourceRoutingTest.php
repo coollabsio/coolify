@@ -1,9 +1,13 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
+use App\Jobs\VolumeBackupJob;
 use App\Livewire\Project\Database\Import as DatabaseImport;
 use App\Livewire\Project\Service\Heading;
+use App\Livewire\Project\Service\VolumeBackup\Index as ServiceVolumeBackupIndex;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -17,6 +21,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -211,6 +216,58 @@ test('service backup schedules open in place from the unified view', function ()
         ->assertSee("wire:click=\"openSchedule('{$backup->uuid}')\"", false);
 });
 
+test('service database backup schedules open in the Livewire component', function () {
+    Queue::fake();
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->teamA->id,
+        'frequency' => 'daily',
+        'database_id' => $this->ownServiceDatabase->id,
+        'database_type' => $this->ownServiceDatabase->getMorphClass(),
+    ]);
+
+    Livewire::test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService])
+        ->call('openSchedule', $backup->uuid)
+        ->assertSet('scheduleModalOpen', true)
+        ->assertSet('selectedDatabaseBackup.uuid', $backup->uuid)
+        ->assertSet('selectedVolumeBackup', null);
+});
+
+test('service database backups can be queued from the Livewire component', function () {
+    Queue::fake();
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->teamA->id,
+        'frequency' => 'daily',
+        'database_id' => $this->ownServiceDatabase->id,
+        'database_type' => $this->ownServiceDatabase->getMorphClass(),
+    ]);
+
+    Livewire::test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService])
+        ->call('backupNow', 'database', $backup->uuid)
+        ->assertDispatched('success', 'Backup queued.');
+
+    Queue::assertPushed(DatabaseBackupJob::class, fn (DatabaseBackupJob $job): bool => $job->backup->is($backup));
+});
+
+test('service storage backups can be queued from the Livewire component', function () {
+    Queue::fake();
+    $volume = LocalPersistentVolume::create([
+        'name' => 'service-data',
+        'mount_path' => '/data',
+        'resource_id' => $this->ownServiceDatabase->id,
+        'resource_type' => $this->ownServiceDatabase->getMorphClass(),
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $this->teamA->id,
+        'frequency' => 'daily',
+    ]);
+
+    Livewire::test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService])
+        ->call('backupNow', 'storage', $backup->uuid)
+        ->assertDispatched('success', 'Backup queued.');
+
+    Queue::assertPushed(VolumeBackupJob::class, fn (VolumeBackupJob $job): bool => $job->backup->is($backup));
+});
+
 test('service backup executions combine database execution history', function () {
     $backup = ScheduledDatabaseBackup::create([
         'team_id' => $this->teamA->id,
@@ -266,6 +323,84 @@ test('service import backup page selects from compatible databases', function ()
         ->assertOk()
         ->assertSee('analytics-db')
         ->assertSee('Start the database first');
+});
+
+test('service import backup redirects when exactly one compatible database exists', function () {
+    $this->get(route('project.service.import-backup', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]))->assertRedirectToRoute('project.service.import-backup.database', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+    ]);
+});
+
+test('service import backup excludes unsupported databases', function () {
+    $unsupportedDatabase = ServiceDatabase::create([
+        'service_id' => $this->ownService->id,
+        'name' => 'cache-db',
+        'image' => 'redis:7-alpine',
+        'custom_type' => 'redis',
+    ]);
+
+    $this->get(route('project.service.import-backup', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]))
+        ->assertRedirectToRoute('project.service.import-backup.database', [
+            'project_uuid' => $this->projectA->uuid,
+            'environment_uuid' => $this->environmentA->uuid,
+            'service_uuid' => $this->ownService->uuid,
+            'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+        ]);
+
+    $this->get(route('project.service.import-backup.database', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+        'stack_service_uuid' => $unsupportedDatabase->uuid,
+    ]))->assertNotFound();
+});
+
+test('service import backup opens the selected compatible database', function () {
+    $secondDatabase = ServiceDatabase::create([
+        'service_id' => $this->ownService->id,
+        'name' => 'analytics-db',
+        'image' => 'mysql:8',
+        'custom_type' => 'mysql',
+    ]);
+
+    $this->get(route('project.service.import-backup.database', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+        'stack_service_uuid' => $secondDatabase->uuid,
+    ]))
+        ->assertOk()
+        ->assertSee('analytics-db')
+        ->assertSee('Start the database first');
+});
+
+test('service import backup requires update authorization for the service and selected database', function () {
+    $member = User::factory()->create();
+    $member->teams()->attach($this->teamA, ['role' => 'member']);
+    $this->actingAs($member);
+
+    $parameters = [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ];
+
+    $this->get(route('project.service.import-backup', $parameters))->assertForbidden();
+    $this->get(route('project.service.import-backup.database', [
+        ...$parameters,
+        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+    ]))->assertForbidden();
 });
 
 test('legacy service database import redirects to the service import page with its database selected', function () {

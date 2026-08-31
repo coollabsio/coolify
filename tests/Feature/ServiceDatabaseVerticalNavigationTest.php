@@ -1,5 +1,7 @@
 <?php
 
+use App\Livewire\Project\Service\DatabaseBackups;
+
 it('moves service and database page navigation into their sidebars', function () {
     $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
@@ -110,7 +112,7 @@ it('combines service database and storage backups in one section', function () {
         ->toContain('class="data-table w-full overflow-x-auto"')
         ->toContain('backup-table-grid service-backup-table-grid')
         ->not->toContain('<span class="text-right">Executions</span>')
-        ->toContain('class="data-table-row backup-table-grid text-[13px]')
+        ->toMatch('/class="(?=[^"]*\\bdata-table-row\\b)(?=[^"]*\\bbackup-table-grid\\b)(?=[^"]*text-\\[13px\\])[^\"]*"/')
         ->toContain('class="listbox-option justify-start! gap-2.5!"')
         ->toContain('x-data="{ dropdownOpen: false }"')
         ->toContain('class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!"')
@@ -132,6 +134,13 @@ it('links service backup details back to the unified service backups page', func
     $sidebar = file_get_contents(resource_path('views/components/backup-sidebar.blade.php'));
 
     expect($sidebar)->toContain("'back' => 'project.service.volume-backups.index'");
+});
+
+it('declares the database backup mount return type', function () {
+    $returnType = (new ReflectionMethod(DatabaseBackups::class, 'mount'))->getReturnType();
+
+    expect($returnType)->not->toBeNull()
+        ->and($returnType->getName())->toBe('mixed');
 });
 
 it('keeps service navigation visible on backup detail pages and uses section tabs', function () {
