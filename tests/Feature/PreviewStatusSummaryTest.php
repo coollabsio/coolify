@@ -19,6 +19,16 @@ it('aggregates preview container and health check status', function () {
         ->toContain('w-[min(16rem,calc(100vw-1.5rem))]!');
 });
 
+it('shows degraded aggregate service status as a warning', function () {
+    $html = Blade::render('<x-status-summary status="degraded:unhealthy" title="Service status" container-name="Containers" />');
+    $summaryButton = str($html)->between('<button', '</button>')->toString();
+
+    expect($summaryButton)
+        ->toContain('Degraded')
+        ->toContain('bg-warning')
+        ->not->toContain('bg-error');
+});
+
 it('uses the aggregated preview status in the previews list', function () {
     $view = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
 
@@ -42,7 +52,7 @@ it('uses the aggregated status badge for databases and services', function () {
     expect($databaseStatus)
         ->toContain('<x-status-summary :status="$database->status" title="Database status" />')
         ->and($serviceStatus)
-        ->toContain('<x-status-summary :status="$service->status" title="Service status" container-name="Containers" />');
+        ->toContain('<x-status-summary :status="$displayStatus" :title="$selectedResource ? \'Resource status\' : \'Service status\'"');
 });
 
 it('groups preview deployment actions in a dropdown', function () {
