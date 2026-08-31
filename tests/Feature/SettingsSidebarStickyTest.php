@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\File;
 
 it('uses one aligned sticky rule for all settings sidebars', function () {
     $appCss = file_get_contents(resource_path('css/app.css'));
-    preg_match('/\.application-settings-navigation\s*\{([^}]+)\}/', $appCss, $matches);
+    preg_match('/@media\s*\(min-width:\s*1280px\)\s*\{[\s\S]*?\.application-settings-navigation\s*\{([^}]+)\}/', $appCss, $matches);
     $navigationCss = $matches[1] ?? '';
 
     expect($navigationCss)
