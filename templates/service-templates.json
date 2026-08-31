@@ -435,7 +435,7 @@
         "category": "messaging",
         "logo": "svgs/buzz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-07-23T17:25:53+02:00",
+        "template_last_updated_at": null,
         "port": "3000"
     },
     "calibre-web-automated-book-downloader": {
@@ -552,7 +552,7 @@
         "category": "backend",
         "logo": "svgs/denoKV.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-07T18:17:33+02:00",
+        "template_last_updated_at": null,
         "port": "8080"
     },
     "changedetection": {
@@ -1415,7 +1415,7 @@
         "category": "development",
         "logo": "svgs/executor.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-27T10:39:38+02:00",
+        "template_last_updated_at": null,
         "port": "4788"
     },
     "faraday": {
@@ -2487,7 +2487,7 @@
         "category": "development",
         "logo": "svgs/jean.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-13T11:00:04+02:00",
+        "template_last_updated_at": null,
         "port": "3456"
     },
     "jellyfin": {
@@ -2898,23 +2898,6 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-01-13T00:05:43+01:00",
         "port": "9090"
-    },
-    "linkwarden": {
-        "documentation": "https://docs.linkwarden.app/self-hosting/setup?utm_source=coolify.io",
-        "slogan": "A self-hostable collaborative bookmark manager to collect, organize, and preserve web pages.",
-        "compose": "c2VydmljZXM6CiAgbGlua3dhcmRlbjoKICAgIGltYWdlOiAnZ2hjci5pby9saW5rd2FyZGVuL2xpbmt3YXJkZW46djIuMTYuMScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9MSU5LV0FSREVOXzMwMDAKICAgICAgLSAnTkVYVEFVVEhfVVJMPSR7U0VSVklDRV9GUUROX0xJTktXQVJERU5fMzAwMH0vYXBpL3YxL2F1dGgnCiAgICAgIC0gJ05FWFRBVVRIX1NFQ1JFVD0ke1NFUlZJQ0VfUEFTU1dPUkRfTElOS1dBUkRFTk5FWFRBVVRIfScKICAgICAgLSAnTUVJTElfTUFTVEVSX0tFWT0ke1NFUlZJQ0VfUEFTU1dPUkRfTUVJTEl9JwogICAgICAtICdEQVRBQkFTRV9VUkw9cG9zdGdyZXNxbDovLyRTRVJWSUNFX1VTRVJfUE9TVEdSRVM6JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVNAcG9zdGdyZXNxbDo1NDMyLyR7UE9TVEdSRVNfREI6LWxpbmt3YXJkZW59JwogICAgdm9sdW1lczoKICAgICAgLSAnbGlua3dhcmRlbi1kYXRhOi9kYXRhL2RhdGEnCiAgICBkZXBlbmRzX29uOgogICAgICBwb3N0Z3Jlc3FsOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIG1laWxpc2VhcmNoOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly8xMjcuMC4wLjE6MzAwMCcKICAgICAgaW50ZXJ2YWw6IDEwcwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAKICBwb3N0Z3Jlc3FsOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNi1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotbGlua3dhcmRlbn0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCiAgbWVpbGlzZWFyY2g6CiAgICBpbWFnZTogJ2dldG1laWxpL21laWxpc2VhcmNoOnYxLjEyLjgnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnTUVJTElfTUFTVEVSX0tFWT0ke1NFUlZJQ0VfUEFTU1dPUkRfTUVJTEl9JwogICAgdm9sdW1lczoKICAgICAgLSAnbWVpbGlzZWFyY2gtZGF0YTovbWVpbGlfZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo3NzAwL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxMAo=",
-        "tags": [
-            "bookmarks",
-            "collaboration",
-            "archive",
-            "links",
-            "self-hosted"
-        ],
-        "category": "productivity",
-        "logo": "svgs/linkwarden.svg",
-        "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-31T15:30:12+03:00",
-        "port": "3000"
     },
     "listmonk": {
         "documentation": "https://listmonk.app/?utm_source=coolify.io",
@@ -3713,23 +3696,6 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2025-08-17T18:23:57+02:00",
         "port": "80"
-    },
-    "obsidian-livesync": {
-        "documentation": "https://github.com/vrtmrz/obsidian-livesync/blob/main/docs/setup_own_server.md?utm_source=coolify.io",
-        "slogan": "Self-hosted sync backend for Obsidian LiveSync plugin using CouchDB",
-        "compose": "c2VydmljZXM6CiAgY291Y2hkYjoKICAgIGltYWdlOiAnY291Y2hkYjozLjQuMicKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DT1VDSERCXzU5ODQKICAgICAgLSAnQ09VQ0hEQl9VU0VSPSR7U0VSVklDRV9VU0VSX0NPVUNIREJ9JwogICAgICAtICdDT1VDSERCX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF82NF9DT1VDSERCfScKICAgICAgLSAnTUFYX0RPQ1VNRU5UX1NJWkU9JHtNQVhfRE9DVU1FTlRfU0laRTotNTI0Mjg4MDB9JwogICAgICAtICdNQVhfSFRUUF9SRVFVRVNUX1NJWkU9JHtNQVhfSFRUUF9SRVFVRVNUX1NJWkU6LTY3MTA4ODY0fScKICAgIHZvbHVtZXM6CiAgICAgIC0KICAgICAgICB0eXBlOiBiaW5kCiAgICAgICAgc291cmNlOiAuL2xvY2FsLmluaQogICAgICAgIHRhcmdldDogL29wdC9jb3VjaGRiL2V0Yy9sb2NhbC5pbmkKICAgICAgICBjb250ZW50OiAiW2NvdWNoZGJdXG5zaW5nbGVfbm9kZT10cnVlXG5tYXhfZG9jdW1lbnRfc2l6ZSA9ICR7TUFYX0RPQ1VNRU5UX1NJWkV9XG5cbltjaHR0cGRdXG5yZXF1aXJlX3ZhbGlkX3VzZXIgPSB0cnVlXG5tYXhfaHR0cF9yZXF1ZXN0X3NpemUgPSAke01BWF9IVFRQX1JFUVVFU1RfU0laRX1cblxuW2NodHRwZF9hdXRoXVxucmVxdWlyZV92YWxpZF91c2VyID0gdHJ1ZVxuYXV0aGVudGljYXRpb25fcmVkaXJlY3QgPSAvX3V0aWxzL3Nlc3Npb24uaHRtbFxuXG5baHR0cGRdXG5XV1ctQXV0aGVudGljYXRlID0gQmFzaWMgcmVhbG09XCJjb3VjaGRiXCJcbmVuYWJsZV9jb3JzID0gdHJ1ZVxuXG5bY29yc11cbm9yaWdpbnMgPSBhcHA6Ly9vYnNpZGlhbi5tZCxjYXBhY2l0b3I6Ly9sb2NhbGhvc3QsaHR0cDovL2xvY2FsaG9zdFxuY3JlZGVudGlhbHMgPSB0cnVlXG5oZWFkZXJzID0gYWNjZXB0LCBhdXRob3JpemF0aW9uLCBjb250ZW50LXR5cGUsIG9yaWdpbiwgcmVmZXJlclxubWV0aG9kcyA9IEdFVCwgUFVULCBQT1NULCBIRUFELCBERUxFVEVcbm1heF9hZ2UgPSAzNjAwIgogICAgICAtICdjb3VjaGRiLWRhdGE6L29wdC9jb3VjaGRiL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ2N1cmwgLWYgLXUgIiQke0NPVUNIREJfVVNFUn06JCR7Q09VQ0hEQl9QQVNTV09SRH0iIGh0dHA6Ly9sb2NhbGhvc3Q6NTk4NC9fdXAnCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHN0YXJ0X3BlcmlvZDogNDBzCiAgICAgIHJldHJpZXM6IDMKdm9sdW1lczoKICBjb3VjaGRiLWRhdGE6IG51bGwK",
-        "tags": [
-            "obsidian",
-            "couchdb",
-            "sync",
-            "notes",
-            "markdown"
-        ],
-        "category": "storage",
-        "logo": "svgs/obsidian-livesync.svg",
-        "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-24T09:10:19+02:00",
-        "port": "5984"
     },
     "odoo": {
         "documentation": "https://www.odoo.com/?utm_source=coolify.io",
@@ -5523,7 +5489,7 @@
         "category": "security",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-24T09:04:51+02:00",
+        "template_last_updated_at": null,
         "port": "8200"
     },
     "vaultwarden": {
