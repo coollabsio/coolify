@@ -61,7 +61,7 @@ class RestartLimitReached extends CustomEmailNotification
 
     public function via(object $notifiable): array
     {
-        return $notifiable->getEnabledChannels('status_change');
+        return $notifiable->getEnabledChannels('restart_limit_reached');
     }
 
     public function toMail(): MailMessage

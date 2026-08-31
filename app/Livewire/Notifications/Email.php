@@ -80,6 +80,9 @@ class Email extends Component
     public bool $statusChangeEmailNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $restartLimitReachedEmailNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $backupSuccessEmailNotifications = false;
 
     #[Validate(['boolean'])]
@@ -155,6 +158,7 @@ class Email extends Component
             $this->settings->deployment_success_email_notifications = $this->deploymentSuccessEmailNotifications;
             $this->settings->deployment_failure_email_notifications = $this->deploymentFailureEmailNotifications;
             $this->settings->status_change_email_notifications = $this->statusChangeEmailNotifications;
+            $this->settings->restart_limit_reached_email_notifications = $this->restartLimitReachedEmailNotifications;
             $this->settings->backup_success_email_notifications = $this->backupSuccessEmailNotifications;
             $this->settings->backup_failure_email_notifications = $this->backupFailureEmailNotifications;
             $this->settings->scheduled_task_success_email_notifications = $this->scheduledTaskSuccessEmailNotifications;
@@ -193,6 +197,7 @@ class Email extends Component
             $this->deploymentSuccessEmailNotifications = $this->settings->deployment_success_email_notifications;
             $this->deploymentFailureEmailNotifications = $this->settings->deployment_failure_email_notifications;
             $this->statusChangeEmailNotifications = $this->settings->status_change_email_notifications;
+            $this->restartLimitReachedEmailNotifications = $this->settings->restart_limit_reached_email_notifications;
             $this->backupSuccessEmailNotifications = $this->settings->backup_success_email_notifications;
             $this->backupFailureEmailNotifications = $this->settings->backup_failure_email_notifications;
             $this->scheduledTaskSuccessEmailNotifications = $this->settings->scheduled_task_success_email_notifications;

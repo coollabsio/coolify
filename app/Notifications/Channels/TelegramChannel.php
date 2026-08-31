@@ -5,6 +5,7 @@ namespace App\Notifications\Channels;
 use App\Jobs\SendMessageToTelegramJob;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Notifications\Application\RestartLimitReached;
 use App\Notifications\Application\StatusChanged;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Database\BackupFailed;
@@ -35,6 +36,7 @@ class TelegramChannel
             DeploymentFailed::class => $settings->telegram_notifications_deployment_failure_thread_id,
             StatusChanged::class,
             ContainerRestarted::class => $settings->telegram_notifications_status_change_thread_id,
+            RestartLimitReached::class => $settings->telegram_notifications_restart_limit_reached_thread_id,
 
             BackupSuccess::class => $settings->telegram_notifications_backup_success_thread_id,
             BackupFailed::class => $settings->telegram_notifications_backup_failure_thread_id,

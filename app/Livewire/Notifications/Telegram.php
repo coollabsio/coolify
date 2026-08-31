@@ -42,6 +42,9 @@ class Telegram extends Component
     public bool $statusChangeTelegramNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $restartLimitReachedTelegramNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $backupSuccessTelegramNotifications = false;
 
     #[Validate(['boolean'])]
@@ -82,6 +85,9 @@ class Telegram extends Component
 
     #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsStatusChangeThreadId = null;
+
+    #[Validate(['nullable', 'string'])]
+    public ?string $telegramNotificationsRestartLimitReachedThreadId = null;
 
     #[Validate(['nullable', 'string'])]
     public ?string $telegramNotificationsBackupSuccessThreadId = null;
@@ -140,6 +146,7 @@ class Telegram extends Component
             $this->settings->deployment_success_telegram_notifications = $this->deploymentSuccessTelegramNotifications;
             $this->settings->deployment_failure_telegram_notifications = $this->deploymentFailureTelegramNotifications;
             $this->settings->status_change_telegram_notifications = $this->statusChangeTelegramNotifications;
+            $this->settings->restart_limit_reached_telegram_notifications = $this->restartLimitReachedTelegramNotifications;
             $this->settings->backup_success_telegram_notifications = $this->backupSuccessTelegramNotifications;
             $this->settings->backup_failure_telegram_notifications = $this->backupFailureTelegramNotifications;
             $this->settings->scheduled_task_success_telegram_notifications = $this->scheduledTaskSuccessTelegramNotifications;
@@ -155,6 +162,7 @@ class Telegram extends Component
             $this->settings->telegram_notifications_deployment_success_thread_id = $this->telegramNotificationsDeploymentSuccessThreadId;
             $this->settings->telegram_notifications_deployment_failure_thread_id = $this->telegramNotificationsDeploymentFailureThreadId;
             $this->settings->telegram_notifications_status_change_thread_id = $this->telegramNotificationsStatusChangeThreadId;
+            $this->settings->telegram_notifications_restart_limit_reached_thread_id = $this->telegramNotificationsRestartLimitReachedThreadId;
             $this->settings->telegram_notifications_backup_success_thread_id = $this->telegramNotificationsBackupSuccessThreadId;
             $this->settings->telegram_notifications_backup_failure_thread_id = $this->telegramNotificationsBackupFailureThreadId;
             $this->settings->telegram_notifications_scheduled_task_success_thread_id = $this->telegramNotificationsScheduledTaskSuccessThreadId;
@@ -181,6 +189,7 @@ class Telegram extends Component
             $this->deploymentSuccessTelegramNotifications = $this->settings->deployment_success_telegram_notifications;
             $this->deploymentFailureTelegramNotifications = $this->settings->deployment_failure_telegram_notifications;
             $this->statusChangeTelegramNotifications = $this->settings->status_change_telegram_notifications;
+            $this->restartLimitReachedTelegramNotifications = $this->settings->restart_limit_reached_telegram_notifications;
             $this->backupSuccessTelegramNotifications = $this->settings->backup_success_telegram_notifications;
             $this->backupFailureTelegramNotifications = $this->settings->backup_failure_telegram_notifications;
             $this->scheduledTaskSuccessTelegramNotifications = $this->settings->scheduled_task_success_telegram_notifications;
@@ -196,6 +205,7 @@ class Telegram extends Component
             $this->telegramNotificationsDeploymentSuccessThreadId = $this->settings->telegram_notifications_deployment_success_thread_id;
             $this->telegramNotificationsDeploymentFailureThreadId = $this->settings->telegram_notifications_deployment_failure_thread_id;
             $this->telegramNotificationsStatusChangeThreadId = $this->settings->telegram_notifications_status_change_thread_id;
+            $this->telegramNotificationsRestartLimitReachedThreadId = $this->settings->telegram_notifications_restart_limit_reached_thread_id;
             $this->telegramNotificationsBackupSuccessThreadId = $this->settings->telegram_notifications_backup_success_thread_id;
             $this->telegramNotificationsBackupFailureThreadId = $this->settings->telegram_notifications_backup_failure_thread_id;
             $this->telegramNotificationsScheduledTaskSuccessThreadId = $this->settings->telegram_notifications_scheduled_task_success_thread_id;
