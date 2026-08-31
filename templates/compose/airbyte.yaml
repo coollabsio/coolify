@@ -9,10 +9,10 @@ services:
   db:
     image: airbyte/db:2.2.0
     environment:
-      POSTGRES_DB: ${DATABASE_DB:-db-airbyte}
-      POSTGRES_USER: ${DATABASE_USER:-airbyte}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      - POSTGRES_DB=${DATABASE_DB:-db-airbyte}
+      - POSTGRES_USER=${DATABASE_USER:-airbyte}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - PGDATA=/var/lib/postgresql/data/pgdata
     healthcheck:
       test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
@@ -27,8 +27,8 @@ services:
     image: minio/minio:RELEASE.2023-11-20T22-40-07Z
     command: [server, /storage]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     volumes:
       - minio-data:/storage
     restart: unless-stopped
@@ -49,9 +49,9 @@ services:
     exclude_from_hc: true
     entrypoint: [/bin/sh, /scripts/init-minio.sh]
     environment:
-      MINIO_ENDPOINT: http://minio:9000
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     volumes:
       - type: bind
         read_only: true
@@ -77,20 +77,20 @@ services:
   temporal:
     image: temporalio/auto-setup:1.27.2
     environment:
-      AUTO_SETUP: "true"
-      DB: postgres12
-      DB_PORT: "5432"
-      POSTGRES_SEEDS: db
-      POSTGRES_USER: ${DATABASE_USER:-airbyte}
-      POSTGRES_PWD: ${SERVICE_PASSWORD_POSTGRES}
-      POSTGRES_TLS_ENABLED: "false"
-      POSTGRES_TLS_DISABLE_HOST_VERIFICATION: "false"
-      SQL_TLS_ENABLED: "false"
-      SQL_TLS_DISABLE_HOST_VERIFICATION: "false"
-      DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development.yaml
-      PROMETHEUS_ENDPOINT: 0.0.0.0:9090
-      BIND_ON_IP: 0.0.0.0
-      TEMPORAL_BROADCAST_ADDRESS: 0.0.0.0
+      - AUTO_SETUP=true
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_SEEDS=db
+      - POSTGRES_USER=${DATABASE_USER:-airbyte}
+      - POSTGRES_PWD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_TLS_ENABLED=false
+      - POSTGRES_TLS_DISABLE_HOST_VERIFICATION=false
+      - SQL_TLS_ENABLED=false
+      - SQL_TLS_DISABLE_HOST_VERIFICATION=false
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development.yaml
+      - PROMETHEUS_ENDPOINT=0.0.0.0:9090
+      - BIND_ON_IP=0.0.0.0
+      - TEMPORAL_BROADCAST_ADDRESS=0.0.0.0
     volumes:
       - type: bind
         read_only: true
@@ -167,8 +167,8 @@ services:
       - --tls-san=k3s
     privileged: true
     environment:
-      K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
-      K3S_KUBECONFIG_MODE: "0644"
+      - K3S_KUBECONFIG_OUTPUT=/output/kubeconfig.yaml
+      - K3S_KUBECONFIG_MODE=0644
     tmpfs:
       - /run
       - /var/run
@@ -214,14 +214,14 @@ services:
     exclude_from_hc: true
     entrypoint: [/bin/sh, /scripts/bootstrap-k3s.sh]
     environment:
-      AIRBYTE_ADMIN_PASSWORD: ${SERVICE_PASSWORD_AIRBYTEADMIN}
-      AIRBYTE_ADMIN_CLIENT_ID: ${SERVICE_PASSWORD_AIRBYTECLIENTID}
-      AIRBYTE_ADMIN_CLIENT_SECRET: ${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
-      AIRBYTE_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
-      DATABASE_USER: ${DATABASE_USER:-airbyte}
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
-      MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
+      - AIRBYTE_ADMIN_PASSWORD=${SERVICE_PASSWORD_AIRBYTEADMIN}
+      - AIRBYTE_ADMIN_CLIENT_ID=${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      - AIRBYTE_ADMIN_CLIENT_SECRET=${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      - AIRBYTE_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
     volumes:
       - k3s-kubeconfig:/kube
       - type: bind
@@ -643,29 +643,29 @@ services:
     image: airbyte/bootloader:2.2.0
     exclude_from_hc: true
     environment:
-      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
-      AB_AUTH_SECRET_CREATION_ENABLED: 'true'
-      AB_KUBERNETES_SECRET_NAME: airbyte-auth-secrets
-      AB_INSTANCE_ADMIN_PASSWORD: ${SERVICE_PASSWORD_AIRBYTEADMIN}
-      AB_INSTANCE_ADMIN_PASSWORD_SECRET_KEY: instance-admin-password
-      AB_INSTANCE_ADMIN_CLIENT_ID: ${SERVICE_PASSWORD_AIRBYTECLIENTID}
-      AB_INSTANCE_ADMIN_CLIENT_ID_SECRET_KEY: instance-admin-client-id
-      AB_INSTANCE_ADMIN_CLIENT_SECRET: ${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
-      AB_INSTANCE_ADMIN_CLIENT_SECRET_SECRET_KEY: instance-admin-client-secret
-      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
-      AB_JWT_SIGNATURE_SECRET_KEY: jwt-signature-secret
-      DATAPLANE_CLIENT_ID_SECRET_KEY: dataplane-client-id
-      DATAPLANE_CLIENT_SECRET_SECRET_KEY: dataplane-client-secret
-      AIRBYTE_VERSION: 2.2.0
-      CONNECTOR_REGISTRY_SEED_PROVIDER: remote
-      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
-      DATABASE_USER: ${DATABASE_USER:-airbyte}
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      RUN_DATABASE_MIGRATION_ON_STARTUP: 'true'
-      LOG_LEVEL: info
-      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
-      JOB_KUBE_NAMESPACE: default
-      KUBECONFIG: /kube/config.yaml
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_AUTH_SECRET_CREATION_ENABLED=true
+      - AB_KUBERNETES_SECRET_NAME=airbyte-auth-secrets
+      - AB_INSTANCE_ADMIN_PASSWORD=${SERVICE_PASSWORD_AIRBYTEADMIN}
+      - AB_INSTANCE_ADMIN_PASSWORD_SECRET_KEY=instance-admin-password
+      - AB_INSTANCE_ADMIN_CLIENT_ID=${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      - AB_INSTANCE_ADMIN_CLIENT_ID_SECRET_KEY=instance-admin-client-id
+      - AB_INSTANCE_ADMIN_CLIENT_SECRET=${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      - AB_INSTANCE_ADMIN_CLIENT_SECRET_SECRET_KEY=instance-admin-client-secret
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AB_JWT_SIGNATURE_SECRET_KEY=jwt-signature-secret
+      - DATAPLANE_CLIENT_ID_SECRET_KEY=dataplane-client-id
+      - DATAPLANE_CLIENT_SECRET_SECRET_KEY=dataplane-client-secret
+      - AIRBYTE_VERSION=2.2.0
+      - CONNECTOR_REGISTRY_SEED_PROVIDER=remote
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - RUN_DATABASE_MIGRATION_ON_STARTUP=true
+      - LOG_LEVEL=info
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - JOB_KUBE_NAMESPACE=default
+      - KUBECONFIG=/kube/config.yaml
     volumes:
       - k3s-kubeconfig:/kube:ro
     depends_on:
@@ -679,46 +679,46 @@ services:
     image: airbyte/server:2.2.0
     environment:
       - SERVICE_URL_AIRBYTE_8001
-      AB_INSTANCE_ADMIN_PASSWORD: ${SERVICE_PASSWORD_AIRBYTEADMIN}
-      AB_INSTANCE_ADMIN_CLIENT_ID: ${SERVICE_PASSWORD_AIRBYTECLIENTID}
-      AB_INSTANCE_ADMIN_CLIENT_SECRET: ${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
-      AB_COOKIE_SECURE: 'false'
-      AB_COOKIE_SAME_SITE: Lax
-      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
-      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
-      AIRBYTE_EDITION: community
-      AIRBYTE_VERSION: 2.2.0
-      AIRBYTE_URL: ${SERVICE_URL_AIRBYTE_8001}
-      AIRBYTE_API_HOST: ${SERVICE_URL_AIRBYTE_8001}/api/public
-      API_AUTHORIZATION_ENABLED: 'true'
-      MANIFEST_SERVER_API_HOST: http://manifest-server:8080
-      ENTERPRISE_SOURCE_STUBS_URL: https://connectors.airbyte.com/files/resources/connector_stubs/v1/connector_stubs.json
-      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
-      DATABASE_USER: ${DATABASE_USER:-airbyte}
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      CONFIG_DATABASE_REPLICA_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
-      CONFIG_DATABASE_REPLICA_USER: ${DATABASE_USER:-airbyte}
-      CONFIG_DATABASE_REPLICA_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.35.15.001
-      JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.29.15.001
-      JOB_ERROR_REPORTING_STRATEGY: logging
-      LOG_LEVEL: info
-      MICROMETER_METRICS_ENABLED: 'false'
-      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
-      AUDIT_LOGGING_ENABLED: 'false'
-      STORAGE_TYPE: minio
-      STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-bucket
-      STORAGE_BUCKET_AUDIT_LOGGING: airbyte-bucket
-      STORAGE_BUCKET_LOG: airbyte-bucket
-      STORAGE_BUCKET_STATE: airbyte-bucket
-      STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-bucket
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
-      MINIO_ENDPOINT: http://minio:9000
-      TEMPORAL_HOST: temporal:7233
-      USE_CUSTOM_NODE_SELECTOR: 'false'
-      WORKSPACE_ROOT: /workspace
-      CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED: 'true'
+      - AB_INSTANCE_ADMIN_PASSWORD=${SERVICE_PASSWORD_AIRBYTEADMIN}
+      - AB_INSTANCE_ADMIN_CLIENT_ID=${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      - AB_INSTANCE_ADMIN_CLIENT_SECRET=${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      - AB_COOKIE_SECURE=false
+      - AB_COOKIE_SAME_SITE=Lax
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - AIRBYTE_URL=${SERVICE_URL_AIRBYTE_8001}
+      - AIRBYTE_API_HOST=${SERVICE_URL_AIRBYTE_8001}/api/public
+      - API_AUTHORIZATION_ENABLED=true
+      - MANIFEST_SERVER_API_HOST=http://manifest-server:8080
+      - ENTERPRISE_SOURCE_STUBS_URL=https://connectors.airbyte.com/files/resources/connector_stubs/v1/connector_stubs.json
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - CONFIG_DATABASE_REPLICA_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - CONFIG_DATABASE_REPLICA_USER=${DATABASE_USER:-airbyte}
+      - CONFIG_DATABASE_REPLICA_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=0.35.15.001
+      - JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=0.29.15.001
+      - JOB_ERROR_REPORTING_STRATEGY=logging
+      - LOG_LEVEL=info
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - AUDIT_LOGGING_ENABLED=false
+      - STORAGE_TYPE=minio
+      - STORAGE_BUCKET_ACTIVITY_PAYLOAD=airbyte-bucket
+      - STORAGE_BUCKET_AUDIT_LOGGING=airbyte-bucket
+      - STORAGE_BUCKET_LOG=airbyte-bucket
+      - STORAGE_BUCKET_STATE=airbyte-bucket
+      - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=http://minio:9000
+      - TEMPORAL_HOST=temporal:7233
+      - USE_CUSTOM_NODE_SELECTOR=false
+      - WORKSPACE_ROOT=/workspace
+      - CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED=true
     expose:
       - 8001
     healthcheck:
@@ -746,7 +746,7 @@ services:
   manifest-server:
     image: airbyte/manifest-server:7.23.7
     environment:
-      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -766,17 +766,17 @@ services:
   workload-api-server:
     image: airbyte/workload-api-server:2.2.0
     environment:
-      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
-      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
-      AIRBYTE_EDITION: community
-      API_AUTHORIZATION_ENABLED: 'true'
-      INTERNAL_API_HOST: http://server:8001
-      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
-      DATABASE_USER: ${DATABASE_USER:-airbyte}
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      MICROMETER_METRICS_ENABLED: 'false'
-      LOG_LEVEL: info
-      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - API_AUTHORIZATION_ENABLED=true
+      - INTERNAL_API_HOST=http://server:8001
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - MICROMETER_METRICS_ENABLED=false
+      - LOG_LEVEL=info
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -802,40 +802,40 @@ services:
   worker:
     image: airbyte/worker:2.2.0
     environment:
-      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
-      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
-      AIRBYTE_EDITION: community
-      AIRBYTE_VERSION: 2.2.0
-      AIRBYTE_URL: ${SERVICE_URL_AIRBYTE_8001}
-      API_AUTHORIZATION_ENABLED: 'true'
-      INTERNAL_API_HOST: http://server:8001
-      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
-      DATABASE_USER: ${DATABASE_USER:-airbyte}
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      JOB_ERROR_REPORTING_STRATEGY: logging
-      LOG_LEVEL: info
-      MICROMETER_METRICS_ENABLED: 'false'
-      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
-      STORAGE_TYPE: minio
-      STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-bucket
-      STORAGE_BUCKET_AUDIT_LOGGING: airbyte-bucket
-      STORAGE_BUCKET_LOG: airbyte-bucket
-      STORAGE_BUCKET_STATE: airbyte-bucket
-      STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-bucket
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
-      MINIO_ENDPOINT: http://minio:9000
-      TEMPORAL_HOST: temporal:7233
-      MAX_CHECK_WORKERS: '30'
-      MAX_NOTIFY_WORKERS: '30'
-      MAX_SYNC_WORKERS: '5'
-      SYNC_JOB_MAX_ATTEMPTS: '3'
-      SYNC_JOB_MAX_TIMEOUT_DAYS: '3'
-      SYNC_JOB_INIT_RETRY_TIMEOUT_MINUTES: '5'
-      USE_CUSTOM_NODE_SELECTOR: 'false'
-      WORKSPACE_ROOT: /workspace
-      CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED: 'true'
-      WORKLOAD_API_HOST: http://workload-api-server:8007
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - AIRBYTE_URL=${SERVICE_URL_AIRBYTE_8001}
+      - API_AUTHORIZATION_ENABLED=true
+      - INTERNAL_API_HOST=http://server:8001
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - JOB_ERROR_REPORTING_STRATEGY=logging
+      - LOG_LEVEL=info
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - STORAGE_TYPE=minio
+      - STORAGE_BUCKET_ACTIVITY_PAYLOAD=airbyte-bucket
+      - STORAGE_BUCKET_AUDIT_LOGGING=airbyte-bucket
+      - STORAGE_BUCKET_LOG=airbyte-bucket
+      - STORAGE_BUCKET_STATE=airbyte-bucket
+      - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=http://minio:9000
+      - TEMPORAL_HOST=temporal:7233
+      - MAX_CHECK_WORKERS=30
+      - MAX_NOTIFY_WORKERS=30
+      - MAX_SYNC_WORKERS=5
+      - SYNC_JOB_MAX_ATTEMPTS=3
+      - SYNC_JOB_MAX_TIMEOUT_DAYS=3
+      - SYNC_JOB_INIT_RETRY_TIMEOUT_MINUTES=5
+      - USE_CUSTOM_NODE_SELECTOR=false
+      - WORKSPACE_ROOT=/workspace
+      - CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED=true
+      - WORKLOAD_API_HOST=http://workload-api-server:8007
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -861,23 +861,23 @@ services:
   cron:
     image: airbyte/cron:2.2.0
     environment:
-      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
-      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
-      AIRBYTE_EDITION: community
-      AIRBYTE_VERSION: 2.2.0
-      INTERNAL_API_HOST: http://server:8001
-      CONNECTOR_REGISTRY_SEED_PROVIDER: remote
-      UPDATE_DEFINITIONS_CRON_ENABLED: 'true'
-      RUN_DECLARATIVE_SOURCES_UPDATER: 'false'
-      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
-      DATABASE_USER: ${DATABASE_USER:-airbyte}
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.35.15.001
-      MICROMETER_METRICS_ENABLED: 'false'
-      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
-      TEMPORAL_HOST: temporal:7233
-      WORKSPACE_ROOT: /workspace
-      WORKLOAD_API_HOST: http://workload-api-server:8007
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - INTERNAL_API_HOST=http://server:8001
+      - CONNECTOR_REGISTRY_SEED_PROVIDER=remote
+      - UPDATE_DEFINITIONS_CRON_ENABLED=true
+      - RUN_DECLARATIVE_SOURCES_UPDATER=false
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION=0.35.15.001
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - TEMPORAL_HOST=temporal:7233
+      - WORKSPACE_ROOT=/workspace
+      - WORKLOAD_API_HOST=http://workload-api-server:8007
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -905,49 +905,49 @@ services:
     entrypoint: [/bin/sh, /scripts/start-workload-launcher.sh]
     command: [/bin/bash, -c, 'airbyte-app/bin/$${APPLICATION}']
     environment:
-      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
-      AIRBYTE_EDITION: community
-      AIRBYTE_VERSION: 2.2.0
-      AIRBYTE_URL: ${SERVICE_URL_AIRBYTE_8001}
-      INTERNAL_API_HOST: http://server:8001
-      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
-      DATABASE_USER: ${DATABASE_USER:-airbyte}
-      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-      JOB_KUBE_SERVICEACCOUNT: airbyte-admin
-      JOB_KUBE_NAMESPACE: default
-      JOB_KUBE_LOCAL_VOLUME_ENABLED: 'false'
-      JOB_ERROR_REPORTING_STRATEGY: logging
-      LOG_LEVEL: info
-      MICROMETER_METRICS_ENABLED: 'false'
-      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
-      STORAGE_TYPE: minio
-      STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-bucket
-      STORAGE_BUCKET_AUDIT_LOGGING: airbyte-bucket
-      STORAGE_BUCKET_LOG: airbyte-bucket
-      STORAGE_BUCKET_STATE: airbyte-bucket
-      STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-bucket
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
-      MINIO_ENDPOINT: http://minio:9000
-      S3_PATH_STYLE_ACCESS: 'true'
-      USE_CUSTOM_NODE_SELECTOR: 'false'
-      WORKSPACE_ROOT: /workspace
-      WORKLOAD_API_HOST: http://workload-api-server:8007
-      KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS: '100'
-      CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED: 'true'
-      FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT: 5G
-      FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST: 5G
-      CONTROL_PLANE_TOKEN_ENDPOINT: http://server:8001/api/v1/dataplanes/token
-      WORKLOAD_LAUNCHER_PARALLELISM: '10'
-      DATAPLANE_CLIENT_ID_SECRET_NAME: airbyte-auth-secrets
-      DATAPLANE_CLIENT_ID_SECRET_KEY: dataplane-client-id
-      DATAPLANE_CLIENT_SECRET_SECRET_NAME: airbyte-auth-secrets
-      DATAPLANE_CLIENT_SECRET_SECRET_KEY: dataplane-client-secret
-      CONNECTOR_PROFILER_IMAGE: airbyte/async-profiler:2.2.0
-      CONNECTOR_SIDECAR_IMAGE: airbyte/connector-sidecar:2.2.0
-      CONTAINER_ORCHESTRATOR_IMAGE: airbyte/container-orchestrator:2.2.0
-      WORKLOAD_INIT_IMAGE: airbyte/workload-init-container:2.2.0
-      KUBECONFIG: /kube/config.yaml
+      - JAVA_OPTS=-XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      - AIRBYTE_EDITION=community
+      - AIRBYTE_VERSION=2.2.0
+      - AIRBYTE_URL=${SERVICE_URL_AIRBYTE_8001}
+      - INTERNAL_API_HOST=http://server:8001
+      - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      - DATABASE_USER=${DATABASE_USER:-airbyte}
+      - DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - JOB_KUBE_SERVICEACCOUNT=airbyte-admin
+      - JOB_KUBE_NAMESPACE=default
+      - JOB_KUBE_LOCAL_VOLUME_ENABLED=false
+      - JOB_ERROR_REPORTING_STRATEGY=logging
+      - LOG_LEVEL=info
+      - MICROMETER_METRICS_ENABLED=false
+      - MICRONAUT_ENVIRONMENTS=k8s,control-plane,edition-community
+      - STORAGE_TYPE=minio
+      - STORAGE_BUCKET_ACTIVITY_PAYLOAD=airbyte-bucket
+      - STORAGE_BUCKET_AUDIT_LOGGING=airbyte-bucket
+      - STORAGE_BUCKET_LOG=airbyte-bucket
+      - STORAGE_BUCKET_STATE=airbyte-bucket
+      - STORAGE_BUCKET_WORKLOAD_OUTPUT=airbyte-bucket
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minio}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - MINIO_ENDPOINT=http://minio:9000
+      - S3_PATH_STYLE_ACCESS=true
+      - USE_CUSTOM_NODE_SELECTOR=false
+      - WORKSPACE_ROOT=/workspace
+      - WORKLOAD_API_HOST=http://workload-api-server:8007
+      - KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS=100
+      - CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED=true
+      - FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT=5G
+      - FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST=5G
+      - CONTROL_PLANE_TOKEN_ENDPOINT=http://server:8001/api/v1/dataplanes/token
+      - WORKLOAD_LAUNCHER_PARALLELISM=10
+      - DATAPLANE_CLIENT_ID_SECRET_NAME=airbyte-auth-secrets
+      - DATAPLANE_CLIENT_ID_SECRET_KEY=dataplane-client-id
+      - DATAPLANE_CLIENT_SECRET_SECRET_NAME=airbyte-auth-secrets
+      - DATAPLANE_CLIENT_SECRET_SECRET_KEY=dataplane-client-secret
+      - CONNECTOR_PROFILER_IMAGE=airbyte/async-profiler:2.2.0
+      - CONNECTOR_SIDECAR_IMAGE=airbyte/connector-sidecar:2.2.0
+      - CONTAINER_ORCHESTRATOR_IMAGE=airbyte/container-orchestrator:2.2.0
+      - WORKLOAD_INIT_IMAGE=airbyte/workload-init-container:2.2.0
+      - KUBECONFIG=/kube/config.yaml
     volumes:
       - k3s-kubeconfig:/kube:ro
       - dataplane-credentials:/credentials:ro
@@ -1003,4 +1003,3 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
-
