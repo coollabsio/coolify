@@ -74,10 +74,12 @@
                 <div class="relative flex w-full min-w-0 items-center gap-2">
                     <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
                         :container-name="$selectedResource ? 'Container' : 'Containers'" />
+                    <x-services.links :service="$service" compact />
+                </div>
+                <div class="flex w-full flex-wrap gap-1">
                     @if ($selectedResource)
                         <x-application.restart-limit-warning :application="$selectedResource" />
                     @endif
-                    <x-services.links :service="$service" compact />
                 </div>
             </div>
         </div>

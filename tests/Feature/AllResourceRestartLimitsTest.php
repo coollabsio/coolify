@@ -78,6 +78,32 @@ it('shows restart limit warnings for every resource family', function () {
         ->and($serviceHeading)->toContain('$selectedResource?->status ?? $service->status');
 });
 
+it('matches application restart badge layout on mobile resource headings', function () {
+    $applicationHeading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $databaseHeading = file_get_contents(resource_path('views/livewire/project/database/heading.blade.php'));
+    $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+
+    foreach ([$applicationHeading, $databaseHeading, $serviceHeading] as $heading) {
+        expect($heading)
+            ->toContain('class="relative flex w-full min-w-0 items-center gap-2"')
+            ->toContain('class="flex w-full flex-wrap gap-1"');
+    }
+});
+
+it('shows database restart limits in shared resource listings', function () {
+    $resourceIndex = file_get_contents(app_path('Livewire/Project/Resource/Index.php'));
+    $serverResources = file_get_contents(resource_path('views/livewire/server/resources.blade.php'));
+    $destination = file_get_contents(resource_path('views/livewire/project/shared/destination.blade.php'));
+
+    expect($resourceIndex)
+        ->toContain("method_exists(\$item, 'stoppedAfterRestartLimit')")
+        ->not->toContain("\$type === 'application' && \$item->stoppedAfterRestartLimit()")
+        ->and($serverResources)
+        ->toContain('<x-application.restart-limit-warning :application="$resource" />')
+        ->and($destination)
+        ->toContain('<x-application.restart-limit-warning :application="$resource" />');
+});
+
 it('keeps the service resource table readable with horizontal scrolling on mobile', function () {
     $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
     $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
