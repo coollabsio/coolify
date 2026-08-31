@@ -6,6 +6,7 @@ use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -113,6 +114,14 @@ test('does not open service database backups route from another team', function 
     ]));
 })->throws(NotFoundHttpException::class);
 
+test('does not open service import backup route from another team', function () {
+    $this->get(route('project.service.import-backup', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->otherService->uuid,
+    ]))->assertForbidden();
+});
+
 test('does not resolve service database import component from another team', function () {
     $component = app(DatabaseImport::class);
     $component->parameters = [
@@ -141,7 +150,7 @@ test('owner can still hydrate service heading with own service', function () {
         ->assertOk();
 });
 
-test('service database backup schedules use dedicated general retention and executions urls', function () {
+test('legacy service database backup detail urls redirect to unified backup views', function () {
     $backup = ScheduledDatabaseBackup::create([
         'team_id' => $this->teamA->id,
         'frequency' => 'daily',
@@ -156,51 +165,124 @@ test('service database backup schedules use dedicated general retention and exec
         'stack_service_uuid' => $this->ownServiceDatabase->uuid,
     ]);
     $generalUrl = $listUrl.'/'.$backup->uuid;
+    $parameters = [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ];
 
-    $this->get($listUrl)
-        ->assertOk()
-        ->assertSee('href="'.$generalUrl.'"', false);
+    $this->get($generalUrl)->assertRedirect(route('project.service.volume-backups.index', $parameters));
+    $this->get($generalUrl.'/s3')->assertRedirect(route('project.service.volume-backups.index', $parameters));
+    $this->get($generalUrl.'/retention')->assertRedirect(route('project.service.volume-backups.index', $parameters));
+    $this->get($generalUrl.'/danger')->assertRedirect(route('project.service.volume-backups.index', $parameters));
+    $this->get($generalUrl.'/executions')->assertRedirect(route('project.service.volume-backups.index', $parameters));
+});
 
-    $this->get($generalUrl)
-        ->assertOk()
-        ->assertSee('Frequency')
-        ->assertDontSee('S3 Enabled')
-        ->assertDontSee('Number of backups to keep')
-        ->assertDontSee('Cleanup Failed Backups')
-        ->assertDontSee('Delete Backups and Schedule');
+test('legacy service database backup list redirects to unified service backups', function () {
+    $legacyUrl = route('project.service.database.backups', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+    ]);
+    $centralBackupsUrl = route('project.service.volume-backups.index', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]);
 
-    $this->get($generalUrl.'/s3')
-        ->assertOk()
-        ->assertSee('S3 Storage')
-        ->assertDontSee('S3 Storage Retention')
-        ->assertDontSee('Local Backup Retention')
-        ->assertDontSee('Frequency')
-        ->assertDontSee('Cleanup Failed Backups');
+    $this->get($legacyUrl)->assertRedirect($centralBackupsUrl);
+});
 
-    $this->get($generalUrl.'/retention')
-        ->assertOk()
-        ->assertSee('Local Backup Retention')
-        ->assertSee('S3 Storage Retention')
-        ->assertSee('Number of backups to keep')
-        ->assertDontSee('Frequency')
-        ->assertDontSee('Cleanup Failed Backups');
+test('service backup schedules open in place from the unified view', function () {
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->teamA->id,
+        'frequency' => 'daily',
+        'database_id' => $this->ownServiceDatabase->id,
+        'database_type' => $this->ownServiceDatabase->getMorphClass(),
+    ]);
 
-    $this->get($generalUrl.'/executions')
+    $this->get(route('project.service.volume-backups.index', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]))
         ->assertOk()
-        ->assertSee('<h2 class="py-0">Executions</h2>', false)
-        ->assertDontSee('Executions <span', false)
-        ->assertSee('Cleanup Failed Backups')
-        ->assertDontSee('Frequency')
-        ->assertDontSee('Number of backups to keep');
+        ->assertSee("wire:click=\"openSchedule('{$backup->uuid}')\"", false);
+});
 
-    $this->get($generalUrl.'/danger')
+test('service backup executions combine database execution history', function () {
+    $backup = ScheduledDatabaseBackup::create([
+        'team_id' => $this->teamA->id,
+        'frequency' => 'daily',
+        'database_id' => $this->ownServiceDatabase->id,
+        'database_type' => $this->ownServiceDatabase->getMorphClass(),
+    ]);
+    $execution = ScheduledDatabaseBackupExecution::create([
+        'scheduled_database_backup_id' => $backup->id,
+        'status' => 'success',
+        'database_name' => 'coolify',
+        'size' => 2048,
+        'finished_at' => now(),
+    ]);
+
+    $this->get(route('project.service.volume-backups.index', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]))
         ->assertOk()
-        ->assertSee('Danger Zone')
-        ->assertSee('Delete Scheduled Backup')
-        ->assertSee('Delete Backups and Schedule')
-        ->assertDontSee('Frequency')
-        ->assertDontSee('Number of backups to keep')
-        ->assertDontSee('Cleanup Failed Backups');
+        ->assertSee('own-db')
+        ->assertSee('Success')
+        ->assertSee('2 KB');
+
+    $this->get(route('project.service.volume-backups.index', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]))->assertSee("wire:click=\"openExecution('{$execution->uuid}')\"", false);
+});
+
+test('service import backup page selects from compatible databases', function () {
+    $secondDatabase = ServiceDatabase::create([
+        'service_id' => $this->ownService->id,
+        'name' => 'analytics-db',
+        'image' => 'mysql:8',
+        'custom_type' => 'mysql',
+    ]);
+    $importUrl = route('project.service.import-backup', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+    ]);
+
+    $this->get($importUrl)
+        ->assertOk()
+        ->assertSee('Import Backup')
+        ->assertSee('own-db')
+        ->assertSee('analytics-db');
+
+    $this->get($importUrl.'/'.$secondDatabase->uuid)
+        ->assertOk()
+        ->assertSee('analytics-db')
+        ->assertSee('Start the database first');
+});
+
+test('legacy service database import redirects to the service import page with its database selected', function () {
+    $legacyUrl = route('project.service.database.import', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+    ]);
+    $selectedImportUrl = route('project.service.import-backup.database', [
+        'project_uuid' => $this->projectA->uuid,
+        'environment_uuid' => $this->environmentA->uuid,
+        'service_uuid' => $this->ownService->uuid,
+        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+    ]);
+
+    $this->get($legacyUrl)->assertRedirect($selectedImportUrl);
 });
 
 test('service storage backups page includes schedules from all compose databases', function () {
@@ -211,15 +293,15 @@ test('service storage backups page includes schedules from all compose databases
         'custom_type' => 'postgresql',
     ]);
 
-    foreach ([$this->ownServiceDatabase, $secondDatabase] as $database) {
-        ScheduledDatabaseBackup::create([
+    $backups = collect([$this->ownServiceDatabase, $secondDatabase])->map(function (ServiceDatabase $database) {
+        return ScheduledDatabaseBackup::create([
             'team_id' => $this->teamA->id,
             'description' => $database->name.' backup',
             'frequency' => 'daily',
             'database_id' => $database->id,
             'database_type' => $database->getMorphClass(),
         ]);
-    }
+    });
 
     $this->get(route('project.service.volume-backups.index', [
         'project_uuid' => $this->projectA->uuid,
@@ -230,10 +312,6 @@ test('service storage backups page includes schedules from all compose databases
         ->assertSee('>Database</span>', false)
         ->assertSee('own-db')
         ->assertSee('analytics-db')
-        ->assertSee(route('project.service.database.backups', [
-            'project_uuid' => $this->projectA->uuid,
-            'environment_uuid' => $this->environmentA->uuid,
-            'service_uuid' => $this->ownService->uuid,
-            'stack_service_uuid' => $this->ownServiceDatabase->uuid,
-        ]), false);
+        ->assertSee("wire:click=\"openSchedule('{$backups->first()->uuid}')\"", false)
+        ->assertSee("wire:click=\"backupNow('database', '{$backups->first()->uuid}')\"", false);
 });
