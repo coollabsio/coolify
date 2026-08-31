@@ -5,161 +5,6 @@
 # logo: svgs/airbyte.png
 # port: 8001
 
-name: airbyte
-
-x-airbyte-environment: &airbyte-environment
-  AIRBYTE_URL: ${SERVICE_URL_AIRBYTE_8001}
-  AIRBYTE_API_HOST: ${SERVICE_URL_AIRBYTE_8001}/api/public
-  AIRBYTE_SERVER_HOST: airbyte-airbyte-server-svc.default:8001
-  INTERNAL_API_HOST: http://airbyte-airbyte-server-svc.default:8001
-  MANIFEST_SERVER_API_HOST: http://airbyte-airbyte-manifest-server-svc.default:8080
-  CONTROL_PLANE_TOKEN_ENDPOINT: http://airbyte-airbyte-server-svc.default:8001/api/v1/dataplanes/token
-  WORKLOAD_API_HOST: http://airbyte-workload-api-server-svc.default:8007
-  TEMPORAL_HOST: airbyte-temporal:7233
-  MINIO_ENDPOINT: http://airbyte-minio-svc.default:9000
-  DATABASE_HOST: airbyte-db-svc.default.svc.cluster.local
-  DATABASE_DB: ${DATABASE_DB:-db-airbyte}
-  DATABASE_USER: ${DATABASE_USER:-airbyte}
-  DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-  DATABASE_URL: jdbc:postgresql://airbyte-db-svc.default.svc.cluster.local:5432/${DATABASE_DB}
-  CONFIG_DATABASE_REPLICA_URL: jdbc:postgresql://airbyte-db-svc.default.svc.cluster.local:5432/${DATABASE_DB}
-  CONFIG_DATABASE_REPLICA_USER: ${DATABASE_USER:-airbyte}
-  CONFIG_DATABASE_REPLICA_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
-  AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
-  AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
-  AB_INSTANCE_ADMIN_PASSWORD: ${SERVICE_PASSWORD_AIRBYTEADMIN}
-  AB_INSTANCE_ADMIN_CLIENT_ID: ${SERVICE_PASSWORD_AIRBYTECLIENTID}
-  AB_INSTANCE_ADMIN_CLIENT_SECRET: ${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
-  AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_AIRBYTEJWTSECRET_64}
-  CONNECTOR_PROFILER_IMAGE: airbyte/async-profiler:2.2.0
-  CONNECTOR_SIDECAR_IMAGE: airbyte/connector-sidecar:2.2.0
-  CONTAINER_ORCHESTRATOR_IMAGE: airbyte/container-orchestrator:2.2.0
-  WORKLOAD_INIT_IMAGE: airbyte/workload-init-container:2.2.0
-  JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
-
-x-airbyte-service-environment: &airbyte-service-environment
-  AB_AUTH_SECRET_CREATION_ENABLED: "true"
-  AB_KUBERNETES_SECRET_NAME: airbyte-auth-secrets
-  AB_INSTANCE_ADMIN_PASSWORD_SECRET_KEY: instance-admin-password
-  AB_INSTANCE_ADMIN_CLIENT_ID_SECRET_KEY: instance-admin-client-id
-  AB_INSTANCE_ADMIN_CLIENT_SECRET_SECRET_KEY: instance-admin-client-secret
-  AB_JWT_SIGNATURE_SECRET_KEY: jwt-signature-secret
-  DATAPLANE_CLIENT_ID_SECRET_NAME: airbyte-auth-secrets
-  DATAPLANE_CLIENT_ID_SECRET_KEY: dataplane-client-id
-  DATAPLANE_CLIENT_SECRET_SECRET_NAME: airbyte-auth-secrets
-  DATAPLANE_CLIENT_SECRET_SECRET_KEY: dataplane-client-secret
-  IDENTITY_PROVIDER_TYPE: simple
-  AB_AIRBYTE_AUTH_IDENTITY_PROVIDER_VERIFY_ISSUER: "false"
-  AB_AIRBYTE_AUTH_IDENTITY_PROVIDER_VERIFY_AUDIENCE: "false"
-  AB_COOKIE_SECURE: "false"
-  AB_COOKIE_SAME_SITE: Lax
-
-  AIRBYTE_EDITION: community
-  AIRBYTE_CLUSTER_TYPE: hybrid
-  CLUSTER_TYPE: hybrid
-  API_AUTHORIZATION_ENABLED: "true"
-  LOCAL: "false"
-  DEPLOYMENT_ENV: docker-compose
-  AIRBYTE_DUMMY_SECRET: dummy
-
-  CONNECTOR_REGISTRY_SEED_PROVIDER: remote
-  ENTERPRISE_SOURCE_STUBS_URL: https://connectors.airbyte.com/files/resources/connector_stubs/v1/connector_stubs.json
-  UPDATE_DEFINITIONS_CRON_ENABLED: "true"
-  RUN_DECLARATIVE_SOURCES_UPDATER: "false"
-  CONNECTOR_ROLLOUT_EXPIRATION_SECONDS: "604800"
-  CONNECTOR_ROLLOUT_WAIT_BETWEEN_ROLLOUTS_SECONDS: "10800"
-  CONNECTOR_ROLLOUT_WAIT_BETWEEN_SYNC_RESULTS_QUERIES_SECONDS: "3600"
-
-  DATABASE_PORT: "5432"
-  RUN_DATABASE_MIGRATION_ON_STARTUP: "true"
-  CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.35.15.001
-  JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.29.15.001
-
-  FEATURE_FLAG_CLIENT: configfile
-  FEATURE_FLAG_PATH: /etc/launchdarkly/flags.yml
-  JOB_KUBE_SERVICEACCOUNT: airbyte-admin
-  JOB_KUBE_NAMESPACE: default
-  JOB_KUBE_LOCAL_VOLUME_ENABLED: "false"
-  JOB_ERROR_REPORTING_STRATEGY: logging
-
-  LOG_LEVEL: info
-  MICROMETER_METRICS_ENABLED: "false"
-  MICROMETER_METRICS_STEP: PT1M
-  MICROMETER_METRICS_STATSD_FLAVOR: datadog
-  MICROMETER_METRICS_OTLP_ENABLED: "false"
-  MICROMETER_METRICS_STATSD_ENABLED: "false"
-  PUBLISH_METRICS: "true"
-  STATSD_HOST: 127.0.0.1
-  STATSD_PORT: "8125"
-  OTEL_SDK_DISABLED: "true"
-  DD_ENABLED: "false"
-  DD_INTEGRATIONS_ENABLED: "false"
-  DD_PROFILING_ENABLED: "false"
-
-  STIGG_ENABLED: "false"
-  AUDIT_LOGGING_ENABLED: "false"
-  STORAGE_TYPE: minio
-  STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-bucket
-  STORAGE_BUCKET_AUDIT_LOGGING: airbyte-bucket
-  STORAGE_BUCKET_LOG: airbyte-bucket
-  STORAGE_BUCKET_STATE: airbyte-bucket
-  STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-bucket
-  S3_PATH_STYLE_ACCESS: "true"
-
-  AUTO_SETUP: "true"
-  DYNAMIC_CONFIG_FILE_PATH: config/dynamicconfig/development.yaml
-  PROMETHEUS_ENDPOINT: 0.0.0.0:9090
-  BIND_ON_IP: 0.0.0.0
-  TEMPORAL_BROADCAST_ADDRESS: 0.0.0.0
-  TEMPORAL_CLOUD_ENABLED: "false"
-  TEMPORAL_SDK_RPC_TIMEOUT: 120s
-  TEMPORAL_SDK_RPC_LONG_POLL_TIMEOUT: 140s
-  TEMPORAL_SDK_RPC_QUERY_TIMEOUT: 20s
-  TEMPORAL_WORKER_PORTS: 9000 9001 9002 9003 9004 9005 9006 9007 9008 9009 9010 9011 9012 9013 9014 9015 9016 9017 9018 9019 9020 9021 9022 9023 9024 9025 9026 9027 9028 9029 9030 9031 9032 9033 9034 9035 9036 9037 9038 9039 9040
-
-  TRACKING_ENABLED: "true"
-  TRACKING_STRATEGY: segment
-  SEGMENT_WRITE_KEY: ${SERVICE_PASSWORD_AIRBYTESEGMENTWRITEKEY}
-
-  API_URL: /api/v1
-  CONFIG_ROOT: /configs
-  MAX_CHECK_WORKERS: "30"
-  MAX_NOTIFY_WORKERS: "30"
-  MAX_SYNC_WORKERS: "5"
-  SYNC_JOB_MAX_ATTEMPTS: "3"
-  SYNC_JOB_MAX_TIMEOUT_DAYS: "3"
-  SYNC_JOB_INIT_RETRY_TIMEOUT_MINUTES: "5"
-  USE_CUSTOM_NODE_SELECTOR: "false"
-  USE_STREAM_CAPABLE_STATE: "true"
-  WORKSPACE_DOCKER_MOUNT: airbyte_workspace
-  WORKSPACE_ROOT: /workspace
-  WORKER_ENVIRONMENT: kubernetes
-
-  WORKLOAD_API_SERVER_ENABLED: "true"
-  WORKLOAD_LAUNCHER_ENABLED: "true"
-  WORKLOAD_LAUNCHER_PARALLELISM: "10"
-  CONTAINER_ORCHESTRATOR_ENABLED: "true"
-  KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS: "100"
-  PUB_SUB_ENABLED: "false"
-  DATA_CHECK_TASK_QUEUES: CHECK_CONNECTION
-  DATA_DISCOVER_TASK_QUEUES: DISCOVER_SCHEMA
-  DATA_SYNC_TASK_QUEUES: SYNC
-  CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED: "true"
-  FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT: 5G
-  FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST: 5G
-
-  MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
-  LAUNCHER_MICRONAUT_ENVIRONMENTS: control-plane,oss
-  WORKERS_MICRONAUT_ENVIRONMENTS: control-plane
-  CRON_MICRONAUT_ENVIRONMENTS: control-plane
-  SERVER_MICRONAUT_ENVIRONMENTS: control-plane
-
-
-x-airbyte-service: &airbyte-service
-  environment:
-    <<: [*airbyte-environment, *airbyte-service-environment]
-  restart: unless-stopped
-
 services:
   db:
     image: airbyte/db:2.2.0
@@ -176,11 +21,6 @@ services:
       start_period: 10s
     volumes:
       - db-data:/var/lib/postgresql/data
-    networks:
-      airbyte:
-        aliases:
-          - airbyte-db-svc.default
-          - airbyte-db-svc.default.svc.cluster.local
     restart: unless-stopped
 
   minio:
@@ -191,18 +31,25 @@ services:
       MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
     volumes:
       - minio-data:/storage
-    networks:
-      airbyte:
-        aliases:
-          - airbyte-minio-svc.default
-          - airbyte-minio-svc.default.svc.cluster.local
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          /bin/mc alias set health http://127.0.0.1:9000
+          "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1
+          && /bin/mc ready health >/dev/null 2>&1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   minio-init:
     image: minio/minio:RELEASE.2023-11-20T22-40-07Z
+    exclude_from_hc: true
     entrypoint: [/bin/sh, /scripts/init-minio.sh]
     environment:
-      MINIO_ENDPOINT: http://airbyte-minio-svc.default:9000
+      MINIO_ENDPOINT: http://minio:9000
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
       MINIO_ROOT_PASSWORD: ${SERVICE_PASSWORD_MINIO}
     volumes:
@@ -225,8 +72,6 @@ services:
     depends_on:
       minio:
         condition: service_started
-    networks:
-      - airbyte
     restart: on-failure
 
   temporal:
@@ -235,7 +80,7 @@ services:
       AUTO_SETUP: "true"
       DB: postgres12
       DB_PORT: "5432"
-      POSTGRES_SEEDS: airbyte-db-svc.default.svc.cluster.local
+      POSTGRES_SEEDS: db
       POSTGRES_USER: ${DATABASE_USER:-airbyte}
       POSTGRES_PWD: ${SERVICE_PASSWORD_POSTGRES}
       POSTGRES_TLS_ENABLED: "false"
@@ -298,18 +143,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      airbyte:
-        aliases:
-          - airbyte-temporal
     restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - exec 3<>/dev/tcp/127.0.0.1/7233
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   k3s:
     image: rancher/k3s:v1.36.3-k3s1
     command:
       - server
       - --node-name=airbyte-k3s
-      - --node-ip=${AIRBYTE_K3S_IP}
       - --disable=traefik
       - --disable=servicelb
       - --disable=metrics-server
@@ -331,16 +181,11 @@ services:
       timeout: 5s
       retries: 60
       start_period: 20s
-    networks:
-      airbyte:
-        ipv4_address: ${AIRBYTE_K3S_IP:-172.30.0.20}
     restart: unless-stopped
 
   docker-dns:
     image: rancher/mirrored-coredns-coredns:1.14.7
     command: [-conf, /etc/coredns/Corefile]
-    environment:
-      AIRBYTE_K3S_IP: ${AIRBYTE_K3S_IP:-172.30.0.20}
     volumes:
       - type: bind
         read_only: true
@@ -348,7 +193,7 @@ services:
         target: /etc/coredns/Corefile
         content: |
           .:53 {
-            bind {$AIRBYTE_K3S_IP}
+            bind eth0
             errors
             cache 30
             forward . 127.0.0.11
@@ -358,16 +203,21 @@ services:
       k3s:
         condition: service_started
     restart: unless-stopped
+    healthcheck:
+      test: [CMD, /coredns, -version]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   k3s-bootstrap:
     image: rancher/k3s:v1.36.3-k3s1
+    exclude_from_hc: true
     entrypoint: [/bin/sh, /scripts/bootstrap-k3s.sh]
     environment:
-      AIRBYTE_K3S_IP: ${AIRBYTE_K3S_IP:-172.30.0.20}
       AIRBYTE_ADMIN_PASSWORD: ${SERVICE_PASSWORD_AIRBYTEADMIN}
       AIRBYTE_ADMIN_CLIENT_ID: ${SERVICE_PASSWORD_AIRBYTECLIENTID}
       AIRBYTE_ADMIN_CLIENT_SECRET: ${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
-      AIRBYTE_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_AIRBYTEJWTSECRET_64}
+      AIRBYTE_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
       DATABASE_USER: ${DATABASE_USER:-airbyte}
       DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
@@ -551,7 +401,7 @@ services:
                   bind 127.0.0.1
                   errors
                   rewrite stop name regex ^(.+?)(\.[^.]+\.svc\.cluster\.local|\.svc\.cluster\.local|\.cluster\.local)\.$ {1} answer auto
-                  forward . __AIRBYTE_K3S_IP__
+                  forward . {$AIRBYTE_K3S_IP}
               }
           ---
           apiVersion: apps/v1
@@ -588,6 +438,11 @@ services:
                     image: rancher/mirrored-coredns-coredns:1.14.7
                     imagePullPolicy: IfNotPresent
                     args: [-conf, /etc/coredns/Corefile]
+                    env:
+                      - name: AIRBYTE_K3S_IP
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: status.hostIP
                     resources:
                       limits:
                         memory: 170Mi
@@ -675,11 +530,7 @@ services:
             sleep 2
           done
 
-          sed \
-            -e "s|__AIRBYTE_K3S_IP__|${AIRBYTE_K3S_IP}|g" \
-            /config/k3s-resources.yaml > /tmp/k3s-resources.yaml
-
-          /bin/kubectl --kubeconfig "$client_config" apply -f /tmp/k3s-resources.yaml
+          /bin/kubectl --kubeconfig "$client_config" apply -f /config/k3s-resources.yaml
 
           /bin/kubectl --kubeconfig "$client_config" \
             --namespace kube-system rollout status deployment/coredns --timeout=180s
@@ -717,12 +568,11 @@ services:
         condition: service_healthy
       docker-dns:
         condition: service_started
-    networks:
-      - airbyte
     restart: on-failure
 
   dataplane-credentials:
     image: rancher/k3s:v1.36.3-k3s1
+    exclude_from_hc: true
     entrypoint: [/bin/sh, /scripts/export-dataplane-credentials.sh]
     volumes:
       - k3s-kubeconfig:/kube:ro
@@ -787,19 +637,35 @@ services:
     depends_on:
       bootloader:
         condition: service_completed_successfully
-    networks:
-      - airbyte
     restart: on-failure
 
   bootloader:
-    <<: *airbyte-service
     image: airbyte/bootloader:2.2.0
+    exclude_from_hc: true
     environment:
-      <<: *airbyte-environment
-      KUBECONFIG: /kube/config.yaml
+      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      AB_AUTH_SECRET_CREATION_ENABLED: 'true'
+      AB_KUBERNETES_SECRET_NAME: airbyte-auth-secrets
+      AB_INSTANCE_ADMIN_PASSWORD: ${SERVICE_PASSWORD_AIRBYTEADMIN}
+      AB_INSTANCE_ADMIN_PASSWORD_SECRET_KEY: instance-admin-password
+      AB_INSTANCE_ADMIN_CLIENT_ID: ${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      AB_INSTANCE_ADMIN_CLIENT_ID_SECRET_KEY: instance-admin-client-id
+      AB_INSTANCE_ADMIN_CLIENT_SECRET: ${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      AB_INSTANCE_ADMIN_CLIENT_SECRET_SECRET_KEY: instance-admin-client-secret
+      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      AB_JWT_SIGNATURE_SECRET_KEY: jwt-signature-secret
+      DATAPLANE_CLIENT_ID_SECRET_KEY: dataplane-client-id
+      DATAPLANE_CLIENT_SECRET_SECRET_KEY: dataplane-client-secret
+      AIRBYTE_VERSION: 2.2.0
+      CONNECTOR_REGISTRY_SEED_PROVIDER: remote
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      RUN_DATABASE_MIGRATION_ON_STARTUP: 'true'
+      LOG_LEVEL: info
       MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
       JOB_KUBE_NAMESPACE: default
-      DD_SERVICE: airbyte-bootloader
+      KUBECONFIG: /kube/config.yaml
     volumes:
       - k3s-kubeconfig:/kube:ro
     depends_on:
@@ -807,17 +673,52 @@ services:
         condition: service_healthy
       k3s-bootstrap:
         condition: service_completed_successfully
-    networks:
-      - airbyte
     restart: on-failure
 
   server:
-    <<: *airbyte-service
     image: airbyte/server:2.2.0
     environment:
-      <<: *airbyte-environment
       SERVICE_URL_AIRBYTE_8001: ${SERVICE_URL_AIRBYTE_8001}
-      DD_SERVICE: airbyte-server
+      AB_INSTANCE_ADMIN_PASSWORD: ${SERVICE_PASSWORD_AIRBYTEADMIN}
+      AB_INSTANCE_ADMIN_CLIENT_ID: ${SERVICE_PASSWORD_AIRBYTECLIENTID}
+      AB_INSTANCE_ADMIN_CLIENT_SECRET: ${SERVICE_PASSWORD_AIRBYTECLIENTSECRET}
+      AB_COOKIE_SECURE: 'false'
+      AB_COOKIE_SAME_SITE: Lax
+      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      AIRBYTE_EDITION: community
+      AIRBYTE_VERSION: 2.2.0
+      AIRBYTE_URL: ${SERVICE_URL_AIRBYTE_8001}
+      AIRBYTE_API_HOST: ${SERVICE_URL_AIRBYTE_8001}/api/public
+      API_AUTHORIZATION_ENABLED: 'true'
+      MANIFEST_SERVER_API_HOST: http://manifest-server:8080
+      ENTERPRISE_SOURCE_STUBS_URL: https://connectors.airbyte.com/files/resources/connector_stubs/v1/connector_stubs.json
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      CONFIG_DATABASE_REPLICA_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      CONFIG_DATABASE_REPLICA_USER: ${DATABASE_USER:-airbyte}
+      CONFIG_DATABASE_REPLICA_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.35.15.001
+      JOBS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.29.15.001
+      JOB_ERROR_REPORTING_STRATEGY: logging
+      LOG_LEVEL: info
+      MICROMETER_METRICS_ENABLED: 'false'
+      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
+      AUDIT_LOGGING_ENABLED: 'false'
+      STORAGE_TYPE: minio
+      STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-bucket
+      STORAGE_BUCKET_AUDIT_LOGGING: airbyte-bucket
+      STORAGE_BUCKET_LOG: airbyte-bucket
+      STORAGE_BUCKET_STATE: airbyte-bucket
+      STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-bucket
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
+      MINIO_ENDPOINT: http://minio:9000
+      TEMPORAL_HOST: temporal:7233
+      USE_CUSTOM_NODE_SELECTOR: 'false'
+      WORKSPACE_ROOT: /workspace
+      CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED: 'true'
     expose:
       - 8001
     healthcheck:
@@ -841,35 +742,41 @@ services:
         condition: service_completed_successfully
       temporal:
         condition: service_started
-    networks:
-      airbyte:
-        aliases:
-          - airbyte-airbyte-server-svc.default
-          - airbyte-airbyte-server-svc.default.svc.cluster.local
 
   manifest-server:
-    <<: *airbyte-service
     image: airbyte/manifest-server:7.23.7
     environment:
-      <<: *airbyte-environment
-      DD_SERVICE: airbyte-manifest-server
+      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
     depends_on:
       bootloader:
         condition: service_completed_successfully
       minio-init:
         condition: service_completed_successfully
-    networks:
-      airbyte:
-        aliases:
-          - airbyte-airbyte-manifest-server-svc.default
-          - airbyte-airbyte-manifest-server-svc.default.svc.cluster.local
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; response = urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=5); assert response.status == 200
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   workload-api-server:
-    <<: *airbyte-service
     image: airbyte/workload-api-server:2.2.0
     environment:
-      <<: *airbyte-environment
-      DD_SERVICE: airbyte-workload-api
+      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      AIRBYTE_EDITION: community
+      API_AUTHORIZATION_ENABLED: 'true'
+      INTERNAL_API_HOST: http://server:8001
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      MICROMETER_METRICS_ENABLED: 'false'
+      LOG_LEVEL: info
+      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -877,18 +784,58 @@ services:
         condition: service_completed_successfully
       temporal:
         condition: service_started
-    networks:
-      airbyte:
-        aliases:
-          - airbyte-workload-api-server-svc.default
-          - airbyte-workload-api-server-svc.default.svc.cluster.local
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8085
+          printf 'GET /health/liveness HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   worker:
-    <<: *airbyte-service
     image: airbyte/worker:2.2.0
     environment:
-      <<: *airbyte-environment
-      DD_SERVICE: airbyte-worker
+      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      AIRBYTE_EDITION: community
+      AIRBYTE_VERSION: 2.2.0
+      AIRBYTE_URL: ${SERVICE_URL_AIRBYTE_8001}
+      API_AUTHORIZATION_ENABLED: 'true'
+      INTERNAL_API_HOST: http://server:8001
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      JOB_ERROR_REPORTING_STRATEGY: logging
+      LOG_LEVEL: info
+      MICROMETER_METRICS_ENABLED: 'false'
+      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
+      STORAGE_TYPE: minio
+      STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-bucket
+      STORAGE_BUCKET_AUDIT_LOGGING: airbyte-bucket
+      STORAGE_BUCKET_LOG: airbyte-bucket
+      STORAGE_BUCKET_STATE: airbyte-bucket
+      STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-bucket
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
+      MINIO_ENDPOINT: http://minio:9000
+      TEMPORAL_HOST: temporal:7233
+      MAX_CHECK_WORKERS: '30'
+      MAX_NOTIFY_WORKERS: '30'
+      MAX_SYNC_WORKERS: '5'
+      SYNC_JOB_MAX_ATTEMPTS: '3'
+      SYNC_JOB_MAX_TIMEOUT_DAYS: '3'
+      SYNC_JOB_INIT_RETRY_TIMEOUT_MINUTES: '5'
+      USE_CUSTOM_NODE_SELECTOR: 'false'
+      WORKSPACE_ROOT: /workspace
+      CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED: 'true'
+      WORKLOAD_API_HOST: http://workload-api-server:8007
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -896,15 +843,41 @@ services:
         condition: service_started
       workload-api-server:
         condition: service_started
-    networks:
-      airbyte:
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/9000
+          printf 'GET / HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   cron:
-    <<: *airbyte-service
     image: airbyte/cron:2.2.0
     environment:
-      <<: *airbyte-environment
-      DD_SERVICE: airbyte-cron
+      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      AB_JWT_SIGNATURE_SECRET: ${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      AIRBYTE_EDITION: community
+      AIRBYTE_VERSION: 2.2.0
+      INTERNAL_API_HOST: http://server:8001
+      CONNECTOR_REGISTRY_SEED_PROVIDER: remote
+      UPDATE_DEFINITIONS_CRON_ENABLED: 'true'
+      RUN_DECLARATIVE_SOURCES_UPDATER: 'false'
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      CONFIGS_DATABASE_MINIMUM_FLYWAY_MIGRATION_VERSION: 0.35.15.001
+      MICROMETER_METRICS_ENABLED: 'false'
+      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
+      TEMPORAL_HOST: temporal:7233
+      WORKSPACE_ROOT: /workspace
+      WORKLOAD_API_HOST: http://workload-api-server:8007
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -912,20 +885,69 @@ services:
         condition: service_started
       workload-api-server:
         condition: service_started
-    networks:
-      airbyte:
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8085
+          printf 'GET /health HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   workload-launcher:
-    <<: *airbyte-service
     image: airbyte/workload-launcher:2.2.0
     entrypoint: [/bin/sh, /scripts/start-workload-launcher.sh]
     command: [/bin/bash, -c, 'airbyte-app/bin/$${APPLICATION}']
     environment:
-      <<: *airbyte-environment
-      KUBECONFIG: /kube/config.yaml
-      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
+      JAVA_OPTS: -XX:+ExitOnOutOfMemoryError -XX:MaxRAMPercentage=75.0 -XX:FlightRecorderOptions=stackdepth=256
+      AIRBYTE_EDITION: community
+      AIRBYTE_VERSION: 2.2.0
+      AIRBYTE_URL: ${SERVICE_URL_AIRBYTE_8001}
+      INTERNAL_API_HOST: http://server:8001
+      DATABASE_URL: jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
+      DATABASE_USER: ${DATABASE_USER:-airbyte}
+      DATABASE_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      JOB_KUBE_SERVICEACCOUNT: airbyte-admin
       JOB_KUBE_NAMESPACE: default
-      DD_SERVICE: airbyte-workload-launcher
+      JOB_KUBE_LOCAL_VOLUME_ENABLED: 'false'
+      JOB_ERROR_REPORTING_STRATEGY: logging
+      LOG_LEVEL: info
+      MICROMETER_METRICS_ENABLED: 'false'
+      MICRONAUT_ENVIRONMENTS: k8s,control-plane,edition-community
+      STORAGE_TYPE: minio
+      STORAGE_BUCKET_ACTIVITY_PAYLOAD: airbyte-bucket
+      STORAGE_BUCKET_AUDIT_LOGGING: airbyte-bucket
+      STORAGE_BUCKET_LOG: airbyte-bucket
+      STORAGE_BUCKET_STATE: airbyte-bucket
+      STORAGE_BUCKET_WORKLOAD_OUTPUT: airbyte-bucket
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio}
+      AWS_SECRET_ACCESS_KEY: ${SERVICE_PASSWORD_MINIO}
+      MINIO_ENDPOINT: http://minio:9000
+      S3_PATH_STYLE_ACCESS: 'true'
+      USE_CUSTOM_NODE_SELECTOR: 'false'
+      WORKSPACE_ROOT: /workspace
+      WORKLOAD_API_HOST: http://workload-api-server:8007
+      KUBERNETES_CLIENT_MAX_IDLE_CONNECTIONS: '100'
+      CONNECTOR_SPECIFIC_RESOURCE_DEFAULTS_ENABLED: 'true'
+      FILE_TRANSFER_EPHEMERAL_STORAGE_LIMIT: 5G
+      FILE_TRANSFER_EPHEMERAL_STORAGE_REQUEST: 5G
+      CONTROL_PLANE_TOKEN_ENDPOINT: http://server:8001/api/v1/dataplanes/token
+      WORKLOAD_LAUNCHER_PARALLELISM: '10'
+      DATAPLANE_CLIENT_ID_SECRET_NAME: airbyte-auth-secrets
+      DATAPLANE_CLIENT_ID_SECRET_KEY: dataplane-client-id
+      DATAPLANE_CLIENT_SECRET_SECRET_NAME: airbyte-auth-secrets
+      DATAPLANE_CLIENT_SECRET_SECRET_KEY: dataplane-client-secret
+      CONNECTOR_PROFILER_IMAGE: airbyte/async-profiler:2.2.0
+      CONNECTOR_SIDECAR_IMAGE: airbyte/connector-sidecar:2.2.0
+      CONTAINER_ORCHESTRATOR_IMAGE: airbyte/container-orchestrator:2.2.0
+      WORKLOAD_INIT_IMAGE: airbyte/workload-init-container:2.2.0
+      KUBECONFIG: /kube/config.yaml
     volumes:
       - k3s-kubeconfig:/kube:ro
       - dataplane-credentials:/credentials:ro
@@ -967,12 +989,24 @@ services:
         condition: service_started
       temporal:
         condition: service_started
-    networks:
-      airbyte:
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/8085
+          printf 'GET /health/readiness HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r status <&3
+          [[ "$$status" == *" 200 "* ]]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
-networks:
-  airbyte:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: ${AIRBYTE_COMPOSE_SUBNET:-172.30.0.0/24}
+volumes:
+  db-data:
+  minio-data:
+  k3s-data:
+  k3s-kubeconfig:
+  dataplane-credentials:
