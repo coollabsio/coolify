@@ -240,6 +240,20 @@ it('rejects unsafe Nixpacks plan variable keys before writing the build-time env
     'command substitution with arguments' => 'X$(docker run --rm -v /:/mnt alpine true)',
 ]);
 
+it('rejects persisted user build-time variable keys that bash cannot export', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'X.VALUE',
+        'value' => 'unsafe',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the build-time environment: X.VALUE');
+});
+
 it('skips unsafe reserved Nixpacks plan variable keys before validation', function (string $key) {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',
