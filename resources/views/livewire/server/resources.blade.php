@@ -61,10 +61,14 @@
                                     {{ str($resource->type())->headline() }}
                                 </div>
                                 <div>
-                                    <x-status-badge :status="str($resourceStatus)->headline()"
-                                        :type="str($resourceStatus)->contains('running')
-                                            ? 'success'
-                                            : (str($resourceStatus)->contains(['failed', 'exited']) ? 'error' : 'neutral')" />
+                                    @if (method_exists($resource, 'stoppedAfterRestartLimit') && $resource->stoppedAfterRestartLimit())
+                                        <x-application.restart-limit-warning :application="$resource" />
+                                    @else
+                                        <x-status-badge :status="str($resourceStatus)->headline()"
+                                            :type="str($resourceStatus)->contains('running')
+                                                ? 'success'
+                                                : (str($resourceStatus)->contains(['failed', 'exited']) ? 'error' : 'neutral')" />
+                                    @endif
                                 </div>
                             </div>
                         @endforeach

@@ -42,6 +42,13 @@
         ));
 
         $serviceStatus = str($service->status ?? 'exited');
+        $selectedResourceUuid = data_get($parameters, 'stack_service_uuid');
+        $selectedResource = $selectedResourceUuid
+            ? $service->applications->firstWhere('uuid', $selectedResourceUuid)
+                ?? $service->databases->firstWhere('uuid', $selectedResourceUuid)
+            : null;
+        $displayStatus = $selectedResource?->status ?? $service->status;
+        $selectedResourceStatus = str($selectedResource?->status ?? '');
         $environmentVariablesUrl = route('project.service.environment-variables', [
             'project_uuid' => $service->environment->project->uuid,
             'environment_uuid' => $service->environment->uuid,
@@ -65,8 +72,14 @@
                     {{ $service->name }}
                 </h1>
                 <div class="relative flex w-full min-w-0 items-center gap-2">
-                    <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                    <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
+                        :container-name="$selectedResource ? 'Container' : 'Containers'" />
                     <x-services.links :service="$service" compact />
+                </div>
+                <div class="flex w-full flex-wrap gap-1">
+                    @if ($selectedResource)
+                        <x-application.restart-limit-warning :application="$selectedResource" />
+                    @endif
                 </div>
             </div>
         </div>
@@ -91,7 +104,14 @@
 
                     <div x-cloak x-show="open" x-transition.origin.top.left
                         class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
-                        @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
+                        @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @click="open = false; document.getElementById('selected-resource-remove-trigger')?.click()"
+                                role="menuitem">
+                                <x-reicon name="trash" class="size-3.5 text-error" />
+                                Remove container
+                            </button>
+                        @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                             @can('deploy', $service)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('service-restart-trigger')?.click()"
@@ -195,6 +215,14 @@
                                 </button>
                                 <div x-cloak x-show="open" x-transition.origin.top.right
                                     class="listbox-panel top-full! right-0! left-auto! mt-1! w-64! min-w-0!" role="menu">
+                                    @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @click="open = false; document.getElementById('selected-resource-remove-trigger')?.click()"
+                                            role="menuitem">
+                                            <x-reicon name="trash" class="size-3.5 text-error" />
+                                            Remove container
+                                        </button>
+                                    @else
                                     @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @disabled(!auth()->user()->can('deploy', $service))
@@ -248,6 +276,7 @@
                                             Force Cleanup Containers
                                         </button>
                                     @endif
+                                    @endif
                                 </div>
                         </div>
                         @endcan
@@ -281,6 +310,17 @@
                     <button id="service-stop-trigger" type="button">Stop</button>
                 </x-slot:trigger>
             </x-modal-confirmation>
+            @if ($selectedResource)
+                <x-modal-confirmation title="Confirm Container Removal?" buttonTitle="Remove container"
+                    canGate="deploy" :canResource="$service" submitAction="removeSelectedResourceContainer"
+                    :actions="['The exited service resource container will be removed.', __('resource.non_persistent')]"
+                    :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
+                    step2ButtonText="Confirm">
+                    <x-slot:trigger>
+                        <button id="selected-resource-remove-trigger" type="button">Remove container</button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
+            @endif
         </div>
     @endif
 

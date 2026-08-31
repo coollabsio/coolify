@@ -220,7 +220,7 @@
                             x-text="item.typeLabel"></div>
 
                         <div>
-                            <x-status-badge dynamic>
+                            <x-status-badge dynamic x-bind:title="statusTitle(item)">
                                 <span class="size-1.5 shrink-0 rounded-full"
                                     x-bind:class="statusDotClass(item)"></span>
                                 <span class="truncate" x-text="statusLabel(item)"></span>
@@ -299,7 +299,7 @@
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="item.typeLabel"></p>
                                 </div>
-                                <x-status-badge dynamic>
+                                <x-status-badge dynamic x-bind:title="statusTitle(item)">
                                     <span class="size-1.5 shrink-0 rounded-full"
                                         x-bind:class="statusDotClass(item)"></span>
                                     <span class="truncate" x-text="statusLabel(item)"></span>
@@ -518,13 +518,32 @@
                 localStorage.setItem('environment-resource-view', mode);
             },
             statusState(item) {
+                if (item.restartLimitReached) {
+                    return 'restart-limit';
+                }
+
                 return String(item.status || 'unknown').split(':')[0].toLowerCase();
             },
             statusLabel(item) {
+                if (item.restartLimitReached) {
+                    return 'Restart limit reached';
+                }
+
                 const state = this.statusState(item);
                 return state.charAt(0).toUpperCase() + state.slice(1);
             },
+            statusTitle(item) {
+                if (item.restartLimitReached) {
+                    return `${item.restartCount}/${item.maxRestartCount} restarts. Container preserved.`;
+                }
+
+                return this.statusLabel(item);
+            },
             statusTone(item) {
+                if (item.restartLimitReached) {
+                    return 'warning';
+                }
+
                 const state = this.statusState(item);
                 if (state === 'running') {
                     return 'success';
@@ -539,6 +558,10 @@
                 return 'neutral';
             },
             statusDotClass(item) {
+                if (item.restartLimitReached) {
+                    return 'bg-warning';
+                }
+
                 return {
                     success: 'bg-emerald-500',
                     warning: 'bg-warning',
