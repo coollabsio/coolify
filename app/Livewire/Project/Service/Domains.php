@@ -1447,6 +1447,7 @@ class Domains extends Component
         $urlSet = array_fill_keys($urls, true);
         $server = $this->service->server;
         $skipDns = ! $this->dnsValidationEnabled || ! $server;
+        $indexesToCheck = [];
 
         foreach ($this->domainRows as $index => $row) {
             $url = $row['url'] ?? null;

@@ -456,7 +456,8 @@ it('prunes the previous dns status when a service domain is renamed', function (
         ->call('updateDomain')
         ->assertHasNoErrors()
         ->assertDispatched('edit-domain-saved')
-        ->assertDispatched('success');
+        ->assertDispatched('success')
+        ->assertNotDispatched('error');
 
     $this->apiApp->refresh();
 
