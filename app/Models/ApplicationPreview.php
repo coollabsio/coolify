@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Support\ValidationPatterns;
+use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RuntimeException;
 use Spatie\Url\Url;
 
 class ApplicationPreview extends BaseModel
 {
-    use SoftDeletes;
+    use HasRestartLimit, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -100,6 +101,11 @@ class ApplicationPreview extends BaseModel
     public function application()
     {
         return $this->belongsTo(Application::class);
+    }
+
+    public function restartLimitMaximum(): int
+    {
+        return $this->application->max_restart_count ?? $this->max_restart_count ?? 0;
     }
 
     public function persistentStorages()
