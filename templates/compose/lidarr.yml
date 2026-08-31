@@ -1,0 +1,27 @@
+# documentation: https://hub.docker.com/r/linuxserver/lidarr
+# slogan: Lidarr - a music collection manager for Usenet and BitTorrent users
+# category: media
+# tags: media, server, music, audio
+# logo: svgs/lidarr.svg
+# port: 8686
+
+services:
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-America/Toronto}
+    volumes:
+      - lidarr-config:/config
+      - lidarr-music:/music
+      - lidarr-downloads:/downloads
+    ports:
+      - 8686:8686
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8686"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
