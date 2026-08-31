@@ -42,8 +42,17 @@ test('sponsorship reminder is disabled in development', function () {
 
     expect($view)
         ->toContain('this.popups.sponsorship = !this.isDevelopment && this.shouldShowMonthlyPopup')
-        ->toContain('@show-sponsorship-reminder.window="popups.sponsorship = true')
-        ->toContain('@show-sponsorship-reminder.window="bannerVisible = true"');
+        ->toContain('x-on:show-sponsorship-reminder.window="popups.sponsorship = true')
+        ->toContain('x-on:show-sponsorship-reminder.window="bannerVisible = true"');
+});
+
+test('sponsorship reminder listener is not parsed as a blade directive', function () {
+    $view = file_get_contents(resource_path('views/livewire/layout-popups.blade.php'));
+    $compiledView = Blade::compileString($view);
+
+    expect($compiledView)
+        ->toContain('x-on:show-sponsorship-reminder.window=')
+        ->not->toContain('$__env->yieldSection()');
 });
 
 test('advanced settings provides a development-only sponsorship reminder preview', function () {
