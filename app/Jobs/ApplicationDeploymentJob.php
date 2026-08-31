@@ -1631,11 +1631,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 }
 
                 foreach ($planVariables as $key => $value) {
+                    $key = (string) $key;
+
                     // Skip COOLIFY_* and SERVICE_* - they'll be added later with higher priority
                     if (str_starts_with($key, 'COOLIFY_') || str_starts_with($key, 'SERVICE_')) {
                         continue;
                     }
 
+                    $key = $this->validatedBuildtimeEnvironmentVariableKey($key, 'the Nixpacks plan');
                     $escapedValue = escapeBashEnvValue($value);
                     $envs_dict[$key] = $escapedValue;
 
@@ -1823,6 +1826,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Convert dictionary back to collection in KEY=VALUE format
         $envs = collect([]);
         foreach ($envs_dict as $key => $value) {
+            $key = $this->validatedBuildtimeEnvironmentVariableKey((string) $key, 'the build-time environment');
             $envs->push($key.'='.$value);
         }
 
@@ -1834,6 +1838,55 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         return $envs;
+    }
+
+    private function validatedBuildtimeEnvironmentVariableKey(string $key, string $origin): string
+    {
+        try {
+            return ValidationPatterns::validatedShellEnvironmentVariableKey($key);
+        } catch (\InvalidArgumentException $exception) {
+            $this->logInvalidBuildtimeEnvironmentVariableKey($key, $origin);
+
+            throw new DeploymentException(
+                "Invalid environment variable name from {$origin}: ".ValidationPatterns::displayShellEnvironmentVariableKey($key).'. Names must start with a letter or underscore and contain only letters, numbers, and underscores.',
+                previous: $exception,
+            );
+        }
+    }
+
+    private function logInvalidBuildtimeEnvironmentVariableKey(string $key, string $origin): void
+    {
+        $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
+
+        $this->application_deployment_queue->addLogEntry('----------------------------------------', 'stderr');
+        $this->application_deployment_queue->addLogEntry("⚠️ Invalid environment variable name from {$origin}: {$displayKey}", 'stderr');
+        $this->application_deployment_queue->addLogEntry('Build-time variables are written to a file that bash sources during the image build. Names must start with a letter or underscore and contain only letters, numbers, and underscores (A-Z, a-z, 0-9, _).', 'stderr');
+        $this->application_deployment_queue->addLogEntry('💡 How to fix:', type: 'info');
+
+        if ($origin === 'the Nixpacks plan') {
+            $this->application_deployment_queue->addLogEntry('   1. Open nixpacks.toml and check the [variables] section. Quoted keys can contain characters that are not valid environment variable names.', type: 'info');
+            $this->application_deployment_queue->addLogEntry('   2. Rename the key to a plain name like MY_VARIABLE (underscores instead of dots, no spaces or $()).', type: 'info');
+            $this->logSuggestedShellEnvironmentVariableKey($key);
+            $this->application_deployment_queue->addLogEntry('   3. Commit, push, and redeploy.', type: 'info');
+            $this->application_deployment_queue->addLogEntry('Docs: https://nixpacks.com/docs/configuration/file', type: 'info');
+        } else {
+            $this->application_deployment_queue->addLogEntry('   Rename the environment variable to use only letters, numbers, and underscores, then redeploy.', type: 'info');
+            $this->logSuggestedShellEnvironmentVariableKey($key);
+        }
+
+        $this->application_deployment_queue->addLogEntry('----------------------------------------', 'stderr');
+    }
+
+    private function logSuggestedShellEnvironmentVariableKey(string $key): void
+    {
+        $suggestedKey = str_replace('.', '_', $key);
+        if ($suggestedKey === $key || preg_match(ValidationPatterns::SHELL_ENVIRONMENT_VARIABLE_KEY_PATTERN, $suggestedKey) !== 1) {
+            return;
+        }
+
+        $displaySuggestedKey = ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey);
+
+        $this->application_deployment_queue->addLogEntry("   Suggested name: {$displaySuggestedKey}", type: 'info');
     }
 
     private function save_buildtime_environment_variables()

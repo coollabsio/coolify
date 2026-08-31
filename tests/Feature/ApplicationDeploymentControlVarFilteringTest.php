@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -17,6 +18,8 @@ uses(RefreshDatabase::class);
 class TestableControlVarFilteringDeploymentJob extends ApplicationDeploymentJob
 {
     public array $recordedCommands = [];
+
+    public array $recordedLogEntries = [];
 
     public ?string $writtenDockerfile = null;
 
@@ -92,7 +95,11 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
     $reflection = new ReflectionClass(ApplicationDeploymentJob::class);
 
     $queue = Mockery::mock(ApplicationDeploymentQueue::class);
-    $queue->shouldReceive('addLogEntry')->andReturnNull();
+    $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout', bool $hidden = false) use ($job) {
+        $job->recordedLogEntries[] = $message;
+
+        return null;
+    });
 
     $properties = [
         'application' => $application->fresh(),
@@ -203,6 +210,154 @@ it('filters buildpack control vars from preview build-time env files', function 
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('APP_ENV=')))->toBeTrue();
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('NIXPACKS_NODE_VERSION=')))->toBeFalse();
     expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith('RAILPACK_NODE_VERSION=')))->toBeFalse();
+});
+
+it('rejects unsafe Nixpacks plan variable keys before writing the build-time env file', function (string $key) {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'value',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class);
+})->with([
+    'command substitution' => 'X$(id)',
+    'backticks' => 'X`id`',
+    'newline' => "X\nid",
+    'shell assignment' => 'X=value',
+    'dot notation unsupported by bash' => 'X.VALUE',
+    'semicolon' => 'X;id',
+    'pipe' => 'X|id',
+    'ampersand' => 'X&id',
+    'leading dollar' => '$(id)',
+    'command substitution with arguments' => 'X$(docker run --rm -v /:/mnt alpine true)',
+]);
+
+it('skips unsafe reserved Nixpacks plan variable keys before validation', function (string $key) {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'value',
+            ],
+        ]),
+    ]);
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    expect($buildtimeEnvs->contains(fn (string $env) => str($env)->startsWith($key.'=')))->toBeFalse();
+})->with([
+    'Coolify key' => 'COOLIFY_$(id)',
+    'service key' => 'SERVICE_$(id)',
+]);
+
+it('explains invalid Nixpacks plan variable keys in deployment logs', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'XPACK.SECURITY.ENABLED' => 'true',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class, 'Invalid environment variable name from the Nixpacks plan: XPACK.SECURITY.ENABLED');
+
+    $logs = implode("\n", $job->recordedLogEntries);
+
+    expect($logs)
+        ->toContain('Invalid environment variable name from the Nixpacks plan: XPACK.SECURITY.ENABLED')
+        ->toContain('bash sources during the image build')
+        ->toContain('How to fix')
+        ->toContain('nixpacks.toml')
+        ->toContain('Suggested name: XPACK_SECURITY_ENABLED')
+        ->toContain('https://nixpacks.com/docs/configuration/file');
+});
+
+it('truncates long Nixpacks plan variable keys in deployment logs', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $key = 'X$(docker run --rm alpine sh -c "'.str_repeat('a', 200).'TAIL_SHOULD_BE_TRUNCATED")';
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'x',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class);
+
+    $logs = implode("\n", $job->recordedLogEntries);
+
+    expect($logs)
+        ->toContain('Invalid environment variable name from the Nixpacks plan: X$(docker run --rm')
+        ->toContain('...')
+        ->not->toContain('TAIL_SHOULD_BE_TRUNCATED')
+        ->toContain('nixpacks.toml');
+});
+
+it('bounds every deployment log entry for long dotted Nixpacks variable keys', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    $key = 'X'.str_repeat('.', 10_000);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                $key => 'x',
+            ],
+        ]),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables'))
+        ->toThrow(DeploymentException::class);
+
+    $longestLogEntryLength = max(array_map(strlen(...), $job->recordedLogEntries));
+
+    expect($longestLogEntryLength)->toBeLessThanOrEqual(200);
+});
+
+it('keeps shell-safe Nixpacks plan variables in the build-time env file', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'nixpacks_plan_json' => collect([
+            'variables' => [
+                'APP_NAME' => 'coolify',
+                '_PRIVATE_VALUE' => 'secret',
+            ],
+        ]),
+    ]);
+
+    /** @var Collection $buildtimeEnvs */
+    $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
+
+    expect($buildtimeEnvs)->toContain("APP_NAME='coolify'")
+        ->toContain("_PRIVATE_VALUE='secret'");
 });
 
 it('does not let preview docker compose service names override generated build-time service names', function () {

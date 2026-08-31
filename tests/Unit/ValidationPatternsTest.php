@@ -161,6 +161,33 @@ KEY',
     'empty' => '',
 ]);
 
+it('accepts shell-safe keys for sourced build-time env files', function (string $key) {
+    expect(ValidationPatterns::validatedShellEnvironmentVariableKey($key))->toBe($key);
+})->with([
+    'letters' => 'APP_ENV',
+    'leading underscore' => '_TOKEN',
+    'digits after first character' => 'NODE_VERSION_20',
+]);
+
+it('rejects keys that bash would interpret when sourcing a build-time env file', function (string $key) {
+    expect(fn () => ValidationPatterns::validatedShellEnvironmentVariableKey($key))
+        ->toThrow(InvalidArgumentException::class);
+})->with([
+    'command substitution' => 'X$(id)',
+    'dot notation' => 'X.VALUE',
+    'command substitution with arguments' => 'X$(docker run --rm -v /:/mnt alpine true)',
+]);
+
+it('makes unsafe environment variable keys safe to show in logs', function () {
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey('APP_ENV'))->toBe('APP_ENV');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey("X\nid"))->toBe('X\\nid');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey("X\e[2Jid\x7F"))->toBe('X\\x1B[2Jid\\x7F');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey(''))->toBe('(empty)');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey(str_repeat('A', 100)))
+        ->toEndWith('...')
+        ->toBe(str_repeat('A', 80).'...');
+});
+
 it('generates environment variable key rules with correct defaults', function () {
     $rules = ValidationPatterns::environmentVariableKeyRules();
 
