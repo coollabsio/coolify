@@ -107,7 +107,7 @@
             @endcan
 
             @if (session()->has('token'))
-                <x-application.settings-section title="Copy your token"
+                <x-application.settings-section title="Your new token"
                     description="This value will not be shown again after you leave this page.">
                     <x-forms.copy-button :text="session('token')" />
                 </x-application.settings-section>
