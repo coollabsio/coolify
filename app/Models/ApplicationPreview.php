@@ -23,10 +23,12 @@ class ApplicationPreview extends BaseModel
         'docker_compose_domains',
         'docker_registry_image_tag',
         'last_online_at',
+        'domain_dns_statuses',
     ];
 
     protected $casts = [
         'pull_request_id' => 'integer',
+        'domain_dns_statuses' => 'array',
     ];
 
     protected static function booted(): void
@@ -105,13 +107,21 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn()
+    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false)
     {
-        if ($this->application->fqdn) {
-            if (str($this->application->fqdn)->contains(',')) {
-                $url = Url::fromString(str($this->application->fqdn)->explode(',')[0]);
+        $applicationFqdn = $this->application->fqdn;
+        if (! $applicationFqdn && $generateWithoutApplicationDomain) {
+            $applicationFqdn = generateUrl(
+                server: $this->application->destination->server,
+                random: $this->application->uuid,
+            );
+        }
+
+        if ($applicationFqdn) {
+            if (str($applicationFqdn)->contains(',')) {
+                $url = Url::fromString(str($applicationFqdn)->explode(',')[0]);
             } else {
-                $url = Url::fromString($this->application->fqdn);
+                $url = Url::fromString($applicationFqdn);
             }
             $template = $this->application->preview_url_template;
             $host = $url->getHost();
@@ -132,7 +142,7 @@ class ApplicationPreview extends BaseModel
         return $this;
     }
 
-    public function generate_preview_fqdn_compose()
+    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false)
     {
         $applicationDomains = json_decode($this->application->docker_compose_domains ?: '[]', true) ?: [];
         $previewDomains = json_decode(data_get($this, 'docker_compose_domains') ?: '[]', true) ?: [];
@@ -174,8 +184,15 @@ class ApplicationPreview extends BaseModel
         foreach ($serviceNames as $service_name) {
             $domain_string = getComposeServiceDomainString($applicationDomains, $service_name);
 
-            // If domain string is empty or null, don't auto-generate domain
-            // Only generate domains when main app already has domains set
+            if (empty($domain_string)) {
+                if ($generateWithoutApplicationDomain) {
+                    $domain_string = generateUrl(
+                        server: $this->application->destination->server,
+                        random: str($service_name)->slug().'-'.$this->application->uuid,
+                    );
+                }
+            }
+
             if (empty($domain_string)) {
                 $docker_compose_domains = putComposeServiceDomain(
                     $docker_compose_domains,

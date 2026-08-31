@@ -1007,6 +1007,7 @@ class Domains extends Component
         $skipDns = ! $this->dnsValidationEnabled
             || ! $server
             || $this->application->additional_servers->count() > 0;
+        $indexesToCheck = [];
 
         foreach ($this->domainRows as $index => $row) {
             $url = $row['url'] ?? null;
