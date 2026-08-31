@@ -1004,9 +1004,3 @@ services:
       retries: 10
       start_period: 30s
 
-volumes:
-  db-data:
-  minio-data:
-  k3s-data:
-  k3s-kubeconfig:
-  dataplane-credentials:
