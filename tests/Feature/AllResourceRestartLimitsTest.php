@@ -59,6 +59,60 @@ it('collects restart counts for preview and service containers from both status 
         ->toContain('serviceContainerRestartCounts');
 });
 
+it('shows restart limit warnings for every resource family', function () {
+    $previews = file_get_contents(resource_path('views/livewire/project/application/previews.blade.php'));
+    $serviceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
+    $applicationStatus = file_get_contents(resource_path('views/livewire/project/application/status.blade.php'));
+    $databaseStatus = file_get_contents(resource_path('views/livewire/project/database/status.blade.php'));
+
+    expect($previews)->toContain('<x-application.restart-limit-warning :application="$preview" />')
+        ->and($serviceCard)->toContain('<x-application.restart-limit-warning :application="$resource" />')
+        ->and($applicationStatus)->toContain('<x-application.restart-limit-warning :application="$application" />')
+        ->and($databaseStatus)->toContain('<x-application.restart-limit-warning :application="$database" />');
+
+    $serviceStatus = file_get_contents(resource_path('views/livewire/project/service/status.blade.php'));
+    $serviceHeading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    expect($serviceStatus)->toContain('<x-application.restart-limit-warning :application="$selectedResource" />')
+        ->and($serviceStatus)->toContain('$selectedResource?->status ?? $service->status')
+        ->and($serviceHeading)->toContain('<x-application.restart-limit-warning :application="$selectedResource" />')
+        ->and($serviceHeading)->toContain('$selectedResource?->status ?? $service->status');
+});
+
+it('keeps the service resource table readable with horizontal scrolling on mobile', function () {
+    $configuration = file_get_contents(resource_path('views/livewire/project/service/configuration.blade.php'));
+    $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
+
+    expect($configuration)
+        ->toContain("'overflow-x-auto rounded-xl")
+        ->toContain('min-w-[48rem]')
+        ->and($resourceCard)
+        ->toContain('min-w-[48rem]')
+        ->not->toContain('<div class="hidden truncate font-mono');
+});
+
+it('opens service resource settings when a table row is clicked', function () {
+    $resourceCard = file_get_contents(resource_path('views/livewire/project/service/resource-card.blade.php'));
+
+    expect($resourceCard)
+        ->toContain('x-on:click="openSettings($event)"')
+        ->toContain('x-on:keydown.enter="openSettings($event)"')
+        ->toContain("closest('a, button')")
+        ->toContain('role="link"')
+        ->toContain('tabindex="0"');
+});
+
+it('uses selected service resource actions instead of parent complex status actions', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $headingClass = file_get_contents(app_path('Livewire/Project/Service/Heading.php'));
+
+    expect($heading)
+        ->toContain("\$selectedResourceStatus->startsWith('exited')")
+        ->toContain('Remove container')
+        ->toContain('removeSelectedResourceContainer')
+        ->and($headingClass)
+        ->toContain('public function removeSelectedResourceContainer(): void');
+});
+
 it('adds restart limit columns to previews services and standalone databases', function () {
     $migrations = collect(glob(database_path('migrations/*.php')))
         ->map(fn (string $path): string => file_get_contents($path))

@@ -29,6 +29,8 @@ it('persists exited status when stopping an individual service resource', functi
 
     expect($action)
         ->toContain("\$serviceApplication->update(['status' => 'exited']);")
+        ->toContain('$commands = ["docker rm -f {$containerName}"];')
+        ->toContain('throwError: ! $removeContainer')
         ->toContain('ServiceStatusChanged::dispatch($service->environment->project->team->id);');
 });
 

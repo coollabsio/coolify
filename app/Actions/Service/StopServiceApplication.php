@@ -19,13 +19,15 @@ class StopServiceApplication
         $server = $service->destination->server;
         $containerName = escapeshellarg($serviceApplication->name.'-'.$service->uuid);
 
-        $commands = ["docker stop {$containerName}"];
         if ($removeContainer) {
-            $commands[] = "docker rm -f {$containerName}";
+            $commands = ["docker rm -f {$containerName}"];
         } else {
-            array_unshift($commands, "docker update --restart=no {$containerName}");
+            $commands = [
+                "docker update --restart=no {$containerName}",
+                "docker stop {$containerName}",
+            ];
         }
-        instant_remote_process($commands, $server);
+        instant_remote_process($commands, $server, throwError: ! $removeContainer);
 
         $serviceApplication->update(['status' => 'exited']);
         if ($resetRestartCount) {
