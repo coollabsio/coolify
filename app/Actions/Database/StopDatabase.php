@@ -4,6 +4,7 @@ namespace App\Actions\Database;
 
 use App\Actions\Server\CleanupDocker;
 use App\Events\ServiceStatusChanged;
+use App\Models\BaseModel;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -18,7 +19,7 @@ class StopDatabase
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse $database, bool $dockerCleanup = true, bool $resetRestartCount = true, bool $removeContainer = true): string
     {
         try {
             $server = $database->destination->server;
@@ -51,7 +52,7 @@ class StopDatabase
 
     }
 
-    private function stopContainer($database, string $containerName, int $timeout = 30, bool $removeContainer = true): void
+    private function stopContainer(BaseModel $database, string $containerName, int $timeout = 30, bool $removeContainer = true): void
     {
         $server = $database->destination->server;
         $commands = [dockerStopCommand($timeout, $containerName, $server)];

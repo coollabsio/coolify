@@ -4,6 +4,8 @@ use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
+use App\Models\BaseModel;
 use App\Models\Server;
 use App\Notifications\Application\RestartLimitReached;
 use Mockery\MockInterface;
@@ -182,4 +184,56 @@ it('uses the application link for restart limit notifications', function () {
     $notification = new RestartLimitReached($application);
 
     expect($notification->resource_url)->toBe('https://coolify.test/project/link-from-model');
+});
+
+it('uses the resolved environment project name in Slack restart limit notifications', function () {
+    $environment = (object) [
+        'uuid' => 'environment-uuid',
+        'name' => 'production',
+        'project' => (object) [
+            'uuid' => 'project-uuid',
+            'name' => 'Coolify',
+        ],
+    ];
+
+    $application = new class extends Application
+    {
+        public function link(): string
+        {
+            return 'https://coolify.test/application';
+        }
+    };
+    $application->forceFill(['name' => 'app']);
+    $application->setRelation('environment', $environment);
+
+    $preview = new ApplicationPreview;
+    $preview->forceFill([
+        'uuid' => 'preview-uuid',
+        'pull_request_id' => 42,
+        'restart_count' => 2,
+        'max_restart_count' => 2,
+    ]);
+    $preview->setRelation('application', $application);
+
+    $serviceResource = new class extends BaseModel {};
+    $serviceResource->forceFill([
+        'name' => 'database',
+        'uuid' => 'service-resource-uuid',
+        'restart_count' => 2,
+        'max_restart_count' => 2,
+    ]);
+    $serviceResource->setRelation('service', new class($environment)
+    {
+        public function __construct(public object $environment) {}
+
+        public function link(): string
+        {
+            return 'https://coolify.test/service';
+        }
+    });
+
+    expect((new RestartLimitReached($preview))->toSlack()->description)
+        ->toContain('*Project:* Coolify')
+        ->and((new RestartLimitReached($serviceResource))->toSlack()->description)
+        ->toContain('*Project:* Coolify');
 });

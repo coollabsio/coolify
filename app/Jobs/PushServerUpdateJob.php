@@ -808,7 +808,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         }
     }
 
-    private function updateDatabaseStatus(string $databaseUuid, string $containerStatus, mixed $restartCount = null, bool $tcpProxy = false)
+    private function updateDatabaseStatus(string $databaseUuid, string $containerStatus, mixed $restartCount = null, bool $tcpProxy = false): void
     {
         $database = $this->databasesByUuid->get($databaseUuid);
         if (! $database) {

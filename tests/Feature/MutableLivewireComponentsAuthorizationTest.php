@@ -61,6 +61,14 @@ it('declares deploy authorization on the application stop confirmation', functio
     );
 });
 
+it('declares deploy authorization on the service container removal confirmation', function () {
+    $source = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+
+    expect($source)->toMatch(
+        '/<x-modal-confirmation(?=[^>]*title="Confirm Container Removal\?")(?=[^>]*canGate="deploy")(?=[^>]*:canResource="\$service")[^>]*>/'
+    );
+});
+
 it('keeps mutable Livewire components behind authorization checks', function (string $path, array $requiredNeedles) {
     $source = file_get_contents(base_path($path));
 

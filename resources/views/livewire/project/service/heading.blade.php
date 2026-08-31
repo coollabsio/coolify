@@ -104,7 +104,7 @@
 
                     <div x-cloak x-show="open" x-transition.origin.top.left
                         class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
-                        @if ($selectedResource && $selectedResourceStatus->startsWith('exited'))
+                        @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                 @click="open = false; document.getElementById('selected-resource-remove-trigger')?.click()"
                                 role="menuitem">
@@ -215,7 +215,7 @@
                                 </button>
                                 <div x-cloak x-show="open" x-transition.origin.top.right
                                     class="listbox-panel top-full! right-0! left-auto! mt-1! w-64! min-w-0!" role="menu">
-                                    @if ($selectedResource && $selectedResourceStatus->startsWith('exited'))
+                                    @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('selected-resource-remove-trigger')?.click()"
                                             role="menuitem">
@@ -312,7 +312,7 @@
             </x-modal-confirmation>
             @if ($selectedResource)
                 <x-modal-confirmation title="Confirm Container Removal?" buttonTitle="Remove container"
-                    submitAction="removeSelectedResourceContainer"
+                    canGate="deploy" :canResource="$service" submitAction="removeSelectedResourceContainer"
                     :actions="['The exited service resource container will be removed.', __('resource.non_persistent')]"
                     :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
                     step2ButtonText="Confirm">

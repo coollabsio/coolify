@@ -131,8 +131,8 @@ it('uses selected service resource actions instead of parent complex status acti
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $headingClass = file_get_contents(app_path('Livewire/Project/Service/Heading.php'));
 
-    expect($heading)
-        ->toContain("\$selectedResourceStatus->startsWith('exited')")
+    expect(substr_count($heading, "\$selectedResource && \$selectedResource->container_present !== false && \$selectedResourceStatus->startsWith('exited')"))->toBe(2)
+        ->and($heading)
         ->toContain('Remove container')
         ->toContain('removeSelectedResourceContainer')
         ->and($headingClass)

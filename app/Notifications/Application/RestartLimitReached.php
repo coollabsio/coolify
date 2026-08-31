@@ -125,8 +125,11 @@ class RestartLimitReached extends CustomEmailNotification
     {
         $title = 'Restart limit reached';
         $description = "{$this->resource_name} has been stopped after {$this->restart_count} restarts (limit: {$this->max_restart_count})";
+        $environment = data_get($this->resource, 'environment')
+            ?? data_get($this->resource, 'application.environment')
+            ?? data_get($this->resource, 'service.environment');
 
-        $description .= "\n\n*Project:* ".data_get($this->resource, 'environment.project.name');
+        $description .= "\n\n*Project:* ".data_get($environment, 'project.name');
         $description .= "\n*Environment:* {$this->environment_name}";
         $description .= "\n*Resource URL:* {$this->resource_url}";
 
