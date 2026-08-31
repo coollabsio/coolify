@@ -33,10 +33,12 @@ it('shows accurate destructive actions and the restart warning on mobile', funct
         ->toString();
 
     expect($heading)->toContain('<x-application.restart-limit-warning :application="$application" />')
-        ->and($heading)->toContain('$application->container_present === true')
+        ->and(substr_count($heading, '$application->container_present !== false'))->toBe(2)
         ->and($heading)->toContain("\$application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy'")
         ->and($heading)->toContain("\$application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)'")
         ->and($heading)->toContain('Remove container')
+        ->and($mobileActions)->toContain('Deploy (without cache)')
+        ->and($mobileActions)->toContain('Remove container')
         ->and(strrpos($mobileActions, 'Remove container'))->toBeGreaterThan(strrpos($mobileActions, 'Deploy (without cache)'));
 });
 

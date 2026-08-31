@@ -53,6 +53,14 @@ it('hides resource action menus when the user cannot manage the resource', funct
     'server actions' => ['views/livewire/server/navbar.blade.php', 'manageProxy', 'server', 'server'],
 ]);
 
+it('declares deploy authorization on the application stop confirmation', function () {
+    $source = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+
+    expect($source)->toMatch(
+        '/<x-modal-confirmation\s+canGate="deploy" :canResource="\$application"/'
+    );
+});
+
 it('keeps mutable Livewire components behind authorization checks', function (string $path, array $requiredNeedles) {
     $source = file_get_contents(base_path($path));
 

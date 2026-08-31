@@ -3,8 +3,11 @@
 namespace App\Actions\Docker;
 
 use App\Actions\Application\StopApplication;
+use App\Actions\Application\StopApplicationPreview;
 use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Events\ServiceChecked;
 use App\Models\ApplicationPreview;
@@ -38,7 +41,11 @@ class GetContainersStatus
 
     protected ?Collection $applicationContainerRestartCounts;
 
+    protected ?Collection $previewContainerRestartCounts;
+
     protected ?Collection $serviceContainerStatuses;
+
+    protected ?Collection $serviceContainerRestartCounts;
 
     public function handle(Server $server, ?Collection $containers = null, ?Collection $containerReplicates = null)
     {
@@ -134,6 +141,12 @@ class GetContainersStatus
                         } else {
                             $preview->update(['last_online_at' => now()]);
                         }
+                        $key = $applicationId.':'.$pullRequestId;
+                        $this->previewContainerRestartCounts ??= collect();
+                        $this->previewContainerRestartCounts->push([
+                            'key' => $key,
+                            'count' => (int) data_get($container, 'RestartCount', 0),
+                        ]);
                     } else {
                         // Notify user that this container should not be there.
                     }
@@ -224,22 +237,18 @@ class GetContainersStatus
 
                             // Track restart count for databases (single-container)
                             $restartCount = data_get($container, 'RestartCount', 0);
-                            $previousRestartCount = $database->restart_count ?? 0;
-
                             if ($statusFromDb !== $containerStatus) {
                                 $updateData = ['status' => $containerStatus];
                             } else {
                                 $updateData = ['last_online_at' => now()];
                             }
 
-                            // Update restart tracking if restart count increased
-                            if ($restartCount > $previousRestartCount) {
-                                $updateData['restart_count'] = $restartCount;
-                                $updateData['last_restart_at'] = now();
-                                $updateData['last_restart_type'] = 'crash';
-                            }
-
                             $database->update($updateData);
+
+                            if ($database->trackRestartCount((int) $restartCount)) {
+                                StopDatabase::dispatch($database, false, false, false);
+                                $database->team()?->notify(new ApplicationRestartLimitReached($database));
+                            }
 
                             if ($isPublic) {
                                 $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
@@ -296,6 +305,11 @@ class GetContainersStatus
                 $containerName = data_get($labels, 'com.docker.compose.service');
                 if ($containerName) {
                     $this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);
+                    $this->serviceContainerRestartCounts ??= collect();
+                    if (! $this->serviceContainerRestartCounts->has($key)) {
+                        $this->serviceContainerRestartCounts->put($key, collect());
+                    }
+                    $this->serviceContainerRestartCounts->get($key)->put($containerName, (int) data_get($container, 'RestartCount', 0));
                 }
 
                 // Mark service as found
@@ -364,7 +378,15 @@ class GetContainersStatus
                 $url = null;
             }
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
-            $exitedService->update(['status' => 'exited']);
+            if (! $exitedService->stoppedAfterRestartLimit()) {
+                $exitedService->update([
+                    'status' => 'exited',
+                    'restart_count' => 0,
+                    'restart_limit_reached' => false,
+                    'last_restart_at' => null,
+                    'last_restart_type' => null,
+                ]);
+            }
         }
 
         $notRunningApplications = $this->applications->pluck('id')->diff($foundApplications);
@@ -423,6 +445,9 @@ class GetContainersStatus
         $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
         foreach ($notRunningDatabases as $database) {
             $database = $databases->where('id', $database)->first();
+            if ($database->stoppedAfterRestartLimit()) {
+                continue;
+            }
             if (str($database->status)->startsWith('exited')) {
                 continue;
             }
@@ -438,6 +463,7 @@ class GetContainersStatus
                 'restart_count' => 0,
                 'last_restart_at' => null,
                 'last_restart_type' => null,
+                'restart_limit_reached' => false,
             ]);
 
             // Stop proxy if database was public
@@ -462,6 +488,8 @@ class GetContainersStatus
             // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
         }
 
+        $this->trackPreviewRestartCounts($previews);
+
         // Aggregate multi-container application statuses
         if (isset($this->applicationContainerStatuses) && $this->applicationContainerStatuses->isNotEmpty()) {
             foreach ($this->applicationContainerStatuses as $applicationId => $containerStatuses) {
@@ -482,14 +510,10 @@ class GetContainersStatus
 
                 DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, &$restartLimitReached) {
                     $previousRestartCount = $application->restart_count ?? 0;
-                    $containerIsActive = $containerStatuses->contains(
-                        fn (string $status): bool => str($status)->startsWith(['running', 'restarting', 'starting'])
-                    );
                     $restartState = (new RestartCountTracker)->evaluate(
                         previousRestartCount: $previousRestartCount,
                         observedRestartCount: $maxRestartCount,
                         maxRestartCount: $application->max_restart_count ?? 0,
-                        containerIsActive: $containerIsActive,
                     );
 
                     if ($restartState['restart_count_changed']) {
@@ -591,6 +615,16 @@ class GetContainersStatus
                 continue;
             }
 
+            $restartCount = isset($this->serviceContainerRestartCounts)
+                ? ($this->serviceContainerRestartCounts->get($key)?->max() ?? 0)
+                : 0;
+            if ($subResource->trackRestartCount($restartCount)) {
+                StopServiceApplication::dispatch($subResource, false, false);
+                $subResource->team()?->notify(new ApplicationRestartLimitReached($subResource));
+
+                continue;
+            }
+
             // Parse docker compose from service to check for excluded containers
             $dockerComposeRaw = data_get($service, 'docker_compose_raw');
             $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
@@ -630,5 +664,25 @@ class GetContainersStatus
                 }
             }
         }
+    }
+
+    private function trackPreviewRestartCounts(Collection $previews): void
+    {
+        if (! isset($this->previewContainerRestartCounts)) {
+            return;
+        }
+
+        $this->previewContainerRestartCounts
+            ->groupBy('key')
+            ->each(function (Collection $counts, string $key) use ($previews): void {
+                [$applicationId, $pullRequestId] = explode(':', $key);
+                $preview = $previews->first(fn (ApplicationPreview $preview): bool => (string) $preview->application_id === $applicationId
+                    && (string) $preview->pull_request_id === $pullRequestId
+                );
+                if ($preview?->trackRestartCount((int) $counts->max('count'))) {
+                    StopApplicationPreview::dispatch($preview, false, false);
+                    $preview->application->environment->project->team?->notify(new ApplicationRestartLimitReached($preview));
+                }
+            });
     }
 }

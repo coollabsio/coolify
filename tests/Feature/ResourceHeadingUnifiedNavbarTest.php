@@ -269,6 +269,7 @@ it('shows stop in application action menus when the application is exited', func
 
     expect($mobileActions)->toContain('application-mobile-stop-trigger')
         ->and($desktopExitedActions)->toContain('application-mobile-stop-trigger')
+        ->and($mobileActions)->toContain('Deploy (without cache)')
         ->and(strrpos($mobileActions, 'Deploy (without cache)'))
         ->toBeLessThan(strrpos($mobileActions, 'application-mobile-stop-trigger'));
 });

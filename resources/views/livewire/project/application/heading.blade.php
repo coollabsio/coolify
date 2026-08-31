@@ -137,7 +137,7 @@
                                 </button>
                             @endcan
                         @endif
-                        @if (!str($application->status)->startsWith('exited') || $application->container_present === true)
+                        @if (!str($application->status)->startsWith('exited') || $application->container_present !== false)
                             <button type="button" class="listbox-option justify-start! gap-2.5!"
                                 @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                 role="menuitem">
@@ -151,6 +151,7 @@
             @endif
             <div class="hidden" aria-hidden="true">
                 <x-modal-confirmation
+                    canGate="deploy" :canResource="$application"
                     title="{{ str($application->status)->startsWith('exited') ? 'Confirm Container Removal?' : 'Confirm Application Stopping?' }}"
                     buttonTitle="{{ str($application->status)->startsWith('exited') ? 'Remove container' : 'Stop' }}"
                     submitAction="stop" :checkboxes="$checkboxes" :actions="[
@@ -213,7 +214,7 @@
                                             {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
                                         </button>
                                     @endif
-                                    @if ($application->container_present === true)
+                                    @if ($application->container_present !== false)
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                             role="menuitem">

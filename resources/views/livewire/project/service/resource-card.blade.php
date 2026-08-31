@@ -26,6 +26,7 @@
                     </div>
                 </div>
                 <x-status-badge :status="$statusLabel" :type="$statusType" />
+                <x-application.restart-limit-warning :application="$resource" />
             </div>
 
             @if ($resource->configuration_required)
@@ -92,6 +93,7 @@
         <div class="flex flex-wrap items-center justify-end gap-1 sm:contents">
             <div class="justify-self-start">
                 <x-status-badge :status="$statusLabel" :type="$statusType" />
+                <x-application.restart-limit-warning :application="$resource" />
             </div>
             <div class="flex items-center justify-end gap-1">
                 @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))

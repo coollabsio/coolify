@@ -64,6 +64,7 @@
                     {{ $database->name }}
                 </h1>
                 <x-status-summary :status="$database->status" title="Database status" />
+                <x-application.restart-limit-warning :application="$database" />
             </div>
         </div>
 

@@ -2,6 +2,7 @@
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\Server;
 use App\Notifications\Application\RestartLimitReached;
@@ -139,10 +140,14 @@ it('atomically claims the restart limit transition before stopping and notifying
 });
 
 it('clears the explicit restart limit state only after a successful main deployment', function () {
-    $deploymentJob = file_get_contents(app_path('Jobs/ApplicationDeploymentJob.php'));
+    $method = new ReflectionMethod(ApplicationDeploymentJob::class, 'handleSuccessfulDeployment');
+    $source = file($method->getFileName());
+    $deploymentJob = implode(array_slice($source, $method->getStartLine() - 1, $method->getEndLine() - $method->getStartLine() + 1));
 
-    expect(substr_count($deploymentJob, "'restart_limit_reached' => false"))->toBe(1)
-        ->and($deploymentJob)->toContain("if (\$this->pull_request_id === 0) {\n            \$this->application->update(['restart_limit_reached' => false]);\n        }");
+    expect(substr_count($deploymentJob, "'restart_limit_reached'] = false"))->toBe(1)
+        ->and($deploymentJob)->toContain("if (\$this->pull_request_id === 0) {\n            \$restartState['restart_limit_reached'] = false;\n        }")
+        ->and($deploymentJob)->toContain('$this->application->update($restartState);')
+        ->and(substr_count($deploymentJob, '$this->application->update('))->toBe(1);
 });
 
 it('preserves restart-limit applications only while their exited container exists', function () {

@@ -4972,14 +4972,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         // Reset restart count after successful deployment
         // This is done here (not in Livewire) to avoid race conditions
         // with GetContainersStatus reading old container restart counts
-        $this->application->update([
+        $restartState = [
             'restart_count' => 0,
             'last_restart_at' => null,
             'last_restart_type' => null,
-        ]);
+        ];
 
         if ($this->pull_request_id === 0) {
-            $this->application->update(['restart_limit_reached' => false]);
+            $restartState['restart_limit_reached'] = false;
+        }
+
+        if ($this->pull_request_id === 0) {
+            $this->application->update($restartState);
+        } else {
+            $this->preview?->resetRestartLimit();
         }
 
         try {

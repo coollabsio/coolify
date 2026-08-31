@@ -11,9 +11,10 @@ class RestartCountTracker
         int $previousRestartCount,
         int $observedRestartCount,
         int $maxRestartCount,
-        bool $containerIsActive,
+        bool $newGenerationConfirmed = false,
     ): array {
-        $newGeneration = $containerIsActive && $observedRestartCount < $previousRestartCount;
+        $newGeneration = $newGenerationConfirmed
+            && $observedRestartCount < $previousRestartCount;
         $restartCountIncreased = $observedRestartCount > $previousRestartCount;
         $restartCountChanged = $newGeneration || $restartCountIncreased;
 

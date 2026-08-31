@@ -7,7 +7,7 @@ it('starts a new generation when an active container restart count drops', funct
         previousRestartCount: 11,
         observedRestartCount: 0,
         maxRestartCount: 2,
-        containerIsActive: true,
+        newGenerationConfirmed: true,
     );
 
     expect($result)->toMatchArray([
@@ -23,7 +23,7 @@ it('evaluates the restart limit immediately in a new generation', function () {
         previousRestartCount: 11,
         observedRestartCount: 3,
         maxRestartCount: 2,
-        containerIsActive: true,
+        newGenerationConfirmed: true,
     );
 
     expect($result)->toMatchArray([
@@ -34,12 +34,26 @@ it('evaluates the restart limit immediately in a new generation', function () {
     ]);
 });
 
-it('does not reset the generation while the container remains exited', function () {
+it('does not reset the generation without explicit confirmation', function () {
     $result = (new RestartCountTracker)->evaluate(
         previousRestartCount: 11,
         observedRestartCount: 0,
         maxRestartCount: 2,
-        containerIsActive: false,
+    );
+
+    expect($result)->toMatchArray([
+        'restart_count' => 11,
+        'restart_count_changed' => false,
+        'restart_limit_reached' => false,
+        'new_generation' => false,
+    ]);
+});
+
+it('preserves the previous count when an active payload omits the container with the previous maximum', function () {
+    $result = (new RestartCountTracker)->evaluate(
+        previousRestartCount: 11,
+        observedRestartCount: 3,
+        maxRestartCount: 20,
     );
 
     expect($result)->toMatchArray([
@@ -55,7 +69,6 @@ it('detects a normal threshold crossing', function () {
         previousRestartCount: 1,
         observedRestartCount: 2,
         maxRestartCount: 2,
-        containerIsActive: true,
     );
 
     expect($result)->toMatchArray([
