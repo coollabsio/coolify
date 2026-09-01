@@ -1684,6 +1684,10 @@ class Application extends BaseModel
 
     private function withGitHttpTransportConfig(?string $gitConfigOptions = null): string
     {
+        if (env('COOLIFY_DISABLE_GIT_HTTP11', false)) {
+            return trim($gitConfigOptions ?? '');
+        }
+
         return trim(($gitConfigOptions ? "{$gitConfigOptions} " : '').'-c http.version=HTTP/1.1');
     }
 
