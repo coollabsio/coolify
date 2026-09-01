@@ -934,6 +934,14 @@ it('writes compose-safe runtime env files for user values', function () {
         'is_runtime' => true,
         'is_buildtime' => false,
     ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'MULTILINE_VALUE',
+        'value' => "\$BOTH_PHASES\nsecond line",
+        'is_literal' => false,
+        'is_multiline' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
 
     [$job, $reflection] = makeControlVarFilteringJob($application, $server);
 
@@ -944,5 +952,62 @@ it('writes compose-safe runtime env files for user values', function () {
         ->toContain('QUOTED_VALUE='.escapeComposeEnvFileValue('hello world; quotes" \'$`'))
         ->toContain('INJECT_CMD='.escapeComposeEnvFileValue('$(touch /tmp/coolify-value-injection)'))
         ->toContain('EXPAND_ME='.escapeComposeEnvFileValue('$BOTH_PHASES', allowInterpolation: true))
-        ->toContain('EDGE_QUOTES='.escapeComposeEnvFileValue("'keep these quotes'"));
+        ->toContain('EDGE_QUOTES='.escapeComposeEnvFileValue("'keep these quotes'"))
+        ->toContain('MULTILINE_VALUE='.escapeComposeEnvFileValue("\$BOTH_PHASES\nsecond line"));
+});
+
+it('writes compose-safe preview runtime env files for user values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'PREVIEW_QUOTED_VALUE',
+        'value' => 'preview quotes" \'$`',
+        'is_preview' => true,
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 42,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('PREVIEW_QUOTED_VALUE='.escapeComposeEnvFileValue('preview quotes" \'$`'));
+});
+
+it('writes compose-safe production fallbacks to preview runtime env files', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'PREVIEW_TRIGGER',
+        'value' => 'preview-value',
+        'is_preview' => true,
+        'is_literal' => false,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'FALLBACK_QUOTED_VALUE',
+        'value' => 'fallback quotes" \'$`',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    $application->environment_variables_preview()
+        ->where('key', 'FALLBACK_QUOTED_VALUE')
+        ->delete();
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 42,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('FALLBACK_QUOTED_VALUE='.escapeComposeEnvFileValue('fallback quotes" \'$`'));
 });

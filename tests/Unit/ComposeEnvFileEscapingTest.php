@@ -15,9 +15,7 @@ test('escapeComposeEnvFileValue keeps mixed quotes and dollars literal when inte
 test('escapeComposeEnvFileValue blocks command substitution when interpolation is off', function () {
     $escaped = escapeComposeEnvFileValue('$(touch /tmp/should-not-exist)', allowInterpolation: false);
 
-    expect($escaped)
-        ->toContain('\\$(')
-        ->not->toMatch('/^[^"]*\$\(/');
+    expect($escaped)->toBe('"\\$(touch /tmp/should-not-exist)"');
 });
 
 test('escapeComposeEnvFileValue leaves $VAR intact when interpolation is on', function () {
