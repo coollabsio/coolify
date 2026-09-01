@@ -198,6 +198,14 @@ class ValidationPatterns
     }
 
     /**
+     * Check if a string is a Docker secret-compatible environment variable key.
+     */
+    public static function isDockerSecretCompatibleKey(string $value): bool
+    {
+        return preg_match(self::SHELL_ENVIRONMENT_VARIABLE_KEY_PATTERN, $value) === 1;
+    }
+
+    /**
      * Make an environment variable key safe to show in deployment logs.
      *
      * Control characters are escaped and long values are truncated so an

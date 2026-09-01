@@ -357,7 +357,7 @@ it('keeps the original sourced environment path when build-time keys are shell s
         ->not->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH);
 });
 
-it('uses BuildKit secrets for dotted Nixpacks variables instead of invalid Dockerfile expansion', function () {
+it('rejects dotted Nixpacks plan keys instead of passing them as Docker secrets', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',
     ]);
@@ -365,45 +365,10 @@ it('uses BuildKit secrets for dotted Nixpacks variables instead of invalid Docke
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
         'dockerBuildkitSupported' => true,
         'dockerSecretsAvailable' => true,
-        'env_args' => collect(['X.VALUE' => 'dotted-buildtime-ok']),
-        'nixpacks_plan_json' => collect([
-            'variables' => ['X.VALUE' => 'dotted-buildtime-ok'],
-        ]),
-        'saved_outputs' => collect([
-            'dockerfile_content' => "FROM alpine\nARG SAFE X.VALUE\nENV SAFE=\$SAFE X.VALUE=\$X.VALUE\nRUN printenv X.VALUE",
-        ]),
-    ]);
-
-    invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables');
-
-    expect(readDeploymentJobProperty($job, $reflection, 'dockerSecretsSupported'))->toBeTrue();
-    expect(readDeploymentJobProperty($job, $reflection, 'build_secrets'))->toContain('--secret id=X.VALUE,env=X.VALUE');
-
-    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/.nixpacks/Dockerfile');
-
-    $dockerfile = $job->writtenArtifacts['/artifacts/test-app/.nixpacks/Dockerfile'];
-
-    expect($dockerfile)
-        ->not->toContain('ARG X.VALUE')
-        ->not->toContain('X.VALUE=$X.VALUE')
-        ->toContain('ARG SAFE')
-        ->toContain('ENV SAFE=$SAFE')
-        ->toContain('RUN --mount=type=secret,id=X.VALUE,env=X.VALUE')
-        ->toContain('printenv X.VALUE');
-});
-
-it('rejects dotted Nixpacks variables when Docker build secrets are unavailable', function () {
-    [$application, $server] = makeDeploymentControlVarFixture([
-        'build_pack' => 'nixpacks',
-    ]);
-
-    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
-        'dockerBuildkitSupported' => true,
-        'dockerSecretsAvailable' => false,
         'nixpacks_plan_json' => collect([
             'variables' => [
-                'X.VALUE' => 'dotted-buildtime-ok',
-                'ANOTHER.DOTTED.VALUE' => 'also-dotted',
+                'X.VALUE' => 'dotted-from-toml',
+                'SAFE_FROM_TOML' => 'ok-from-toml',
             ],
         ]),
     ]);
@@ -411,30 +376,35 @@ it('rejects dotted Nixpacks variables when Docker build secrets are unavailable'
     expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables'))
         ->toThrow(
             DeploymentException::class,
-            'Dotted Nixpacks build-time environment variable names require Docker BuildKit secret support: X.VALUE, ANOTHER.DOTTED.VALUE. Rename these keys to use underscores instead of dots, or upgrade Docker on the build server.'
+            'Dotted Nixpacks build-time environment variable names cannot be passed as Docker build secrets: X.VALUE. Rename these keys to use underscores instead of dots (for example X_VALUE).'
         );
+
+    $logs = implode("\n", $job->recordedLogEntries);
+
+    expect($logs)
+        ->toContain('X.VALUE')
+        ->toContain('Suggested name: X_VALUE')
+        ->toContain('nixpacks.toml');
+    expect(readDeploymentJobProperty($job, $reflection, 'dockerSecretsSupported'))->toBeFalse();
 });
 
-it('writes dotted Nixpacks ARG and ENV removal when the Dockerfile has no run command', function () {
+it('still allows underscore Nixpacks plan keys through generate_build_env_variables', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',
     ]);
 
     [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
-        'env_args' => collect(['X.VALUE' => 'dotted-buildtime-ok']),
         'nixpacks_plan_json' => collect([
-            'variables' => ['X.VALUE' => 'dotted-buildtime-ok'],
-        ]),
-        'build_secrets' => '--secret id=X.VALUE,env=X.VALUE',
-        'saved_outputs' => collect([
-            'dockerfile_content' => "FROM alpine\nARG X.VALUE=default\nENV X.VALUE=\$X.VALUE",
+            'variables' => [
+                'SAFE_FROM_TOML' => 'ok-from-toml',
+                'NIXPACKS_NODE_VERSION' => '22',
+            ],
         ]),
     ]);
 
-    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/.nixpacks/Dockerfile');
+    invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables');
 
-    expect($job->writtenArtifacts['/artifacts/test-app/.nixpacks/Dockerfile'])
-        ->not->toContain('X.VALUE');
+    expect(readDeploymentJobProperty($job, $reflection, 'dockerSecretsSupported'))->toBeFalse();
 });
 
 it('skips unsafe reserved Nixpacks plan variable keys before validation', function (string $key) {

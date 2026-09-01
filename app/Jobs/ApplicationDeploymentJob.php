@@ -1908,6 +1908,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry("   Suggested name: {$displaySuggestedKey}", type: 'info');
     }
 
+    private function logDottedDockerSecretKeys(array $keys, string $origin): void
+    {
+        $this->application_deployment_queue->addLogEntry('----------------------------------------', 'stderr');
+        foreach ($keys as $key) {
+            $displayKey = ValidationPatterns::displayShellEnvironmentVariableKey($key);
+            $this->application_deployment_queue->addLogEntry("⚠️ Dotted environment variable name from {$origin}: {$displayKey}", 'stderr');
+            $this->logSuggestedShellEnvironmentVariableKey($key);
+        }
+        $this->application_deployment_queue->addLogEntry('Docker secret IDs cannot contain dots.', 'stderr');
+
+        if ($origin === 'the Nixpacks plan') {
+            $this->application_deployment_queue->addLogEntry('   Open nixpacks.toml and check the [variables] section. Rename dotted keys to use underscores.', type: 'info');
+        }
+
+        $this->application_deployment_queue->addLogEntry('----------------------------------------', 'stderr');
+    }
+
     private function save_buildtime_environment_variables()
     {
         $environment_variables = $this->generate_buildtime_environment_variables();
@@ -4287,19 +4304,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->analyzeBuildTimeVariables($variables);
         }
 
-        $requiresDottedEnvironmentSecrets = $this->application->build_pack === 'nixpacks'
-            && $variables->keys()->contains(fn ($key): bool => str_contains((string) $key, '.'));
+        if ($this->build_pack === 'nixpacks') {
+            $incompatibleKeys = collect($variables->keys())
+                ->map(fn ($key): string => (string) $key)
+                ->filter(fn (string $key): bool => ! ValidationPatterns::isDockerSecretCompatibleKey($key) && str_contains($key, '.'))
+                ->values();
 
-        if ($requiresDottedEnvironmentSecrets) {
-            if (! $this->dockerSecretsAvailable) {
-                $dottedKeys = $variables->keys()
-                    ->filter(fn ($key): bool => str_contains((string) $key, '.'))
-                    ->implode(', ');
+            if ($incompatibleKeys->isNotEmpty()) {
+                $this->logDottedDockerSecretKeys($incompatibleKeys->all(), 'the Nixpacks plan');
 
-                throw new DeploymentException("Dotted Nixpacks build-time environment variable names require Docker BuildKit secret support: {$dottedKeys}. Rename these keys to use underscores instead of dots, or upgrade Docker on the build server.");
+                throw new DeploymentException(
+                    'Dotted Nixpacks build-time environment variable names cannot be passed as Docker build secrets: '.$incompatibleKeys->implode(', ').'. Rename these keys to use underscores instead of dots (for example '.$incompatibleKeys->map(fn (string $key): string => str_replace('.', '_', $key))->first().').'
+                );
             }
-
-            $this->dockerSecretsSupported = true;
         }
 
         if ($this->dockerSecretsSupported) {
