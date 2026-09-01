@@ -2,7 +2,7 @@
 # slogan: Open-source data movement for ELT pipelines and AI agents.
 # category: analytics
 # tags: analytics, data, elt, pipeline
-# logo: svgs/airbyte.png
+# logo: svgs/airbyte.svg
 # port: 8001
 
 services:
