@@ -747,6 +747,7 @@ services:
     image: airbyte/manifest-server:7.23.7
     environment:
       - AB_JWT_SIGNATURE_SECRET=${SERVICE_PASSWORD_64_AIRBYTEJWTSECRET}
+      - AIRBYTE_ENABLE_UNSAFE_CODE=${AIRBYTE_ENABLE_UNSAFE_CODE:-false}
     depends_on:
       bootloader:
         condition: service_completed_successfully
@@ -909,6 +910,7 @@ services:
       - AIRBYTE_EDITION=community
       - AIRBYTE_VERSION=2.2.0
       - AIRBYTE_URL=${SERVICE_URL_AIRBYTE_8001}
+      - AIRBYTE_ENABLE_UNSAFE_CODE=${AIRBYTE_ENABLE_UNSAFE_CODE:-false}
       - INTERNAL_API_HOST=http://server:8001
       - DATABASE_URL=jdbc:postgresql://db:5432/${DATABASE_DB:-db-airbyte}
       - DATABASE_USER=${DATABASE_USER:-airbyte}
