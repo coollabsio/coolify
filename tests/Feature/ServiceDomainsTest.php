@@ -525,7 +525,10 @@ YAML,
         ->call('confirmDomainUsage')
         ->assertSet('showDomainConflictModal', false)
         ->assertSet('showPortWarningModal', true)
-        ->assertSet('forceSaveDomains', true);
+        ->assertSet('forceSaveDomains', true)
+        ->assertSee('Remove required port?')
+        ->assertSee('Keep port')
+        ->assertSee('Remove port anyway');
 
     $component
         ->call('confirmRemovePort')
