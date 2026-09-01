@@ -263,70 +263,74 @@ it('keeps persisted dotted user build-time variable keys', function () {
 });
 
 it('loads shell variables and passes dotted variables through the build-time environment launcher', function () {
-    [$application, $server] = makeDeploymentControlVarFixture();
-
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'BASE_VALUE',
-        'value' => 'expanded',
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'X.VALUE',
-        'value' => '$BASE_VALUE',
-    ]);
-    createApplicationEnvironmentVariable($application, [
-        'key' => 'DOTTED.VALUE',
-        'value' => '$(touch /tmp/coolify-dotted-env-injection)',
-    ]);
-
-    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
-
-    invokeDeploymentJobMethod($job, $reflection, 'save_buildtime_environment_variables');
-
-    expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_PATH])
-        ->toContain('BASE_VALUE="expanded"')
-        ->toContain('X.VALUE="$BASE_VALUE"');
-    expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH])
-        ->toContain('BASE_VALUE="expanded"')
-        ->not->toContain('X.VALUE');
-    expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH])
-        ->toContain('source '.ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH)
-        ->toContain('X.VALUE="$BASE_VALUE"')
-        ->toContain('exec env');
-
-    $wrappedCommand = invokeDeploymentJobMethod($job, $reflection, 'wrap_build_command_with_env_export', 'printenv X.VALUE');
-
-    expect($wrappedCommand)
-        ->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH)
-        ->toContain("/bin/bash -c 'printenv X.VALUE'")
-        ->not->toContain('source '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH);
-
     $temporaryDirectory = sys_get_temp_dir().'/coolify-build-env-'.str()->random(8);
-    mkdir($temporaryDirectory);
+    expect(mkdir($temporaryDirectory))->toBeTrue();
     $shellEnvironmentPath = $temporaryDirectory.'/build-time-shell.env';
     $launcherPath = $temporaryDirectory.'/run-with-build-time-env';
-    file_put_contents($shellEnvironmentPath, $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH]);
-    file_put_contents(
-        $launcherPath,
-        str_replace(
-            ['source '.ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH, '#!/bin/bash'],
-            ['. '.$shellEnvironmentPath, '#!/bin/sh'],
-            $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH],
-        ),
-    );
-    chmod($launcherPath, 0700);
-    @unlink('/tmp/coolify-dotted-env-injection');
+    $injectionMarkerPath = $temporaryDirectory.'/injection-marker';
 
-    $process = new Process(['/bin/sh', $launcherPath, '/bin/sh', '-c', 'printenv X.VALUE; printenv DOTTED.VALUE']);
-    $process->mustRun();
+    try {
+        [$application, $server] = makeDeploymentControlVarFixture();
 
-    expect($process->getOutput())
-        ->toContain("expanded\n")
-        ->toContain('$(touch /tmp/coolify-dotted-env-injection)');
-    expect(file_exists('/tmp/coolify-dotted-env-injection'))->toBeFalse();
+        createApplicationEnvironmentVariable($application, [
+            'key' => 'BASE_VALUE',
+            'value' => 'expanded',
+        ]);
+        createApplicationEnvironmentVariable($application, [
+            'key' => 'X.VALUE',
+            'value' => '$BASE_VALUE',
+        ]);
+        createApplicationEnvironmentVariable($application, [
+            'key' => 'DOTTED.VALUE',
+            'value' => "$(touch {$injectionMarkerPath})",
+        ]);
 
-    unlink($launcherPath);
-    unlink($shellEnvironmentPath);
-    rmdir($temporaryDirectory);
+        [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+        invokeDeploymentJobMethod($job, $reflection, 'save_buildtime_environment_variables');
+
+        expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_PATH])
+            ->toContain('BASE_VALUE="expanded"')
+            ->toContain('X.VALUE="$BASE_VALUE"');
+        expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH])
+            ->toContain('BASE_VALUE="expanded"')
+            ->not->toContain('X.VALUE');
+        expect($job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH])
+            ->toContain('source '.ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH)
+            ->toContain('X.VALUE="$BASE_VALUE"')
+            ->toContain('exec env');
+
+        $wrappedCommand = invokeDeploymentJobMethod($job, $reflection, 'wrap_build_command_with_env_export', 'printenv X.VALUE');
+
+        expect($wrappedCommand)
+            ->toContain(ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH)
+            ->toContain("/bin/bash -c 'printenv X.VALUE'")
+            ->not->toContain('source '.ApplicationDeploymentJob::BUILD_TIME_ENV_PATH);
+
+        file_put_contents($shellEnvironmentPath, $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH]);
+        file_put_contents(
+            $launcherPath,
+            str_replace(
+                'source '.ApplicationDeploymentJob::BUILD_TIME_SHELL_ENV_PATH,
+                'source '.$shellEnvironmentPath,
+                $job->writtenArtifacts[ApplicationDeploymentJob::BUILD_TIME_ENV_LAUNCHER_PATH],
+            ),
+        );
+        chmod($launcherPath, 0700);
+
+        $process = new Process(['/bin/bash', $launcherPath, '/bin/bash', '-c', 'printenv X.VALUE; printenv DOTTED.VALUE']);
+        $process->mustRun();
+
+        expect($process->getOutput())
+            ->toContain("expanded\n")
+            ->toContain("$(touch {$injectionMarkerPath})");
+        expect(file_exists($injectionMarkerPath))->toBeFalse();
+    } finally {
+        @unlink($launcherPath);
+        @unlink($shellEnvironmentPath);
+        @unlink($injectionMarkerPath);
+        @rmdir($temporaryDirectory);
+    }
 });
 
 it('keeps the original sourced environment path when build-time keys are shell safe', function () {
@@ -397,12 +401,18 @@ it('rejects dotted Nixpacks variables when Docker build secrets are unavailable'
         'dockerBuildkitSupported' => true,
         'dockerSecretsAvailable' => false,
         'nixpacks_plan_json' => collect([
-            'variables' => ['X.VALUE' => 'dotted-buildtime-ok'],
+            'variables' => [
+                'X.VALUE' => 'dotted-buildtime-ok',
+                'ANOTHER.DOTTED.VALUE' => 'also-dotted',
+            ],
         ]),
     ]);
 
     expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_build_env_variables'))
-        ->toThrow(DeploymentException::class, 'require Docker BuildKit support');
+        ->toThrow(
+            DeploymentException::class,
+            'Dotted Nixpacks build-time environment variable names require Docker BuildKit secret support: X.VALUE, ANOTHER.DOTTED.VALUE. Rename these keys to use underscores instead of dots, or upgrade Docker on the build server.'
+        );
 });
 
 it('writes dotted Nixpacks ARG and ENV removal when the Dockerfile has no run command', function () {

@@ -1911,12 +1911,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function save_buildtime_environment_variables()
     {
         $environment_variables = $this->generate_buildtime_environment_variables();
-        $shell_environment_variables = $environment_variables->filter(function (string $environmentVariable): bool {
-            [$key] = explode('=', $environmentVariable, 2);
-
-            return preg_match(ValidationPatterns::SHELL_ENVIRONMENT_VARIABLE_KEY_PATTERN, $key) === 1;
-        });
-        $dotted_environment_variables = $environment_variables->reject(function (string $environmentVariable): bool {
+        [$shell_environment_variables, $dotted_environment_variables] = $environment_variables->partition(function (string $environmentVariable): bool {
             [$key] = explode('=', $environmentVariable, 2);
 
             return preg_match(ValidationPatterns::SHELL_ENVIRONMENT_VARIABLE_KEY_PATTERN, $key) === 1;
@@ -4297,7 +4292,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($requiresDottedEnvironmentSecrets) {
             if (! $this->dockerSecretsAvailable) {
-                throw new DeploymentException('Dotted Nixpacks build-time environment variable names require Docker BuildKit support.');
+                $dottedKeys = $variables->keys()
+                    ->filter(fn ($key): bool => str_contains((string) $key, '.'))
+                    ->implode(', ');
+
+                throw new DeploymentException("Dotted Nixpacks build-time environment variable names require Docker BuildKit secret support: {$dottedKeys}. Rename these keys to use underscores instead of dots, or upgrade Docker on the build server.");
             }
 
             $this->dockerSecretsSupported = true;

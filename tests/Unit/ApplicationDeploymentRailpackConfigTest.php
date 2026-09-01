@@ -281,8 +281,8 @@ it('filters reserved docker client variables from railpack build secrets', funct
     );
 
     expect($command)
-        ->toContain('id=RAILPACK_NODE_VERSION,env=RAILPACK_NODE_VERSION')
-        ->toContain('id=APP_ENV,env=APP_ENV')
+        ->toContain("--secret 'id=RAILPACK_NODE_VERSION,env=RAILPACK_NODE_VERSION'")
+        ->toContain("--secret 'id=APP_ENV,env=APP_ENV'")
         ->not->toContain('id=DOCKER_CONFIG')
         ->not->toContain('id=DOCKER_HOST')
         ->not->toContain("env 'DOCKER_CONFIG=")
@@ -309,19 +309,19 @@ it('builds railpack docker command with matching env and secret flags for all ra
         ],
     );
 
-    // The launcher sources shell-safe variables before the build, so user/Coolify
-    // variables must NOT be forwarded inline as literals.
+    // Build-time variables are interpolated by sourcing the build-time .env file before
+    // the build, so user/Coolify variables must NOT be forwarded inline as literals.
     expect($command)->toContain('set -a && source /artifacts/build-time.env && set +a');
-    expect($command)->toContain('RAILPACK_NODE_VERSION=22');
-    expect($command)->toContain('RAILPACK_INSTALL_CMD=npm ci && npm run postinstall');
-    expect($command)->toContain('RAILPACK_DEPLOY_APT_PACKAGES=curl wget');
+    expect($command)->toContain("env 'RAILPACK_NODE_VERSION=22'");
+    expect($command)->toContain("'RAILPACK_INSTALL_CMD=npm ci && npm run postinstall'");
+    expect($command)->toContain("'RAILPACK_DEPLOY_APT_PACKAGES=curl wget'");
     // SECRET_JSON is not a buildpack control variable, so it is provided via the sourced
     // build-time .env file (which supports $VAR interpolation) rather than inline `env`.
     expect($command)->not->toContain("'SECRET_JSON={\"token\":\"abc\"}'");
-    expect($command)->toContain('id=RAILPACK_NODE_VERSION,env=RAILPACK_NODE_VERSION');
-    expect($command)->toContain('id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD');
-    expect($command)->toContain('id=RAILPACK_DEPLOY_APT_PACKAGES,env=RAILPACK_DEPLOY_APT_PACKAGES');
-    expect($command)->toContain('id=SECRET_JSON,env=SECRET_JSON');
+    expect($command)->toContain("--secret 'id=RAILPACK_NODE_VERSION,env=RAILPACK_NODE_VERSION'");
+    expect($command)->toContain("--secret 'id=RAILPACK_INSTALL_CMD,env=RAILPACK_INSTALL_CMD'");
+    expect($command)->toContain("--secret 'id=RAILPACK_DEPLOY_APT_PACKAGES,env=RAILPACK_DEPLOY_APT_PACKAGES'");
+    expect($command)->toContain("--secret 'id=SECRET_JSON,env=SECRET_JSON'");
     expect($command)->toContain(' --build-arg secrets-hash=');
     expect($command)->toContain('--build-arg BUILDKIT_SYNTAX="ghcr.io/railwayapp/railpack-frontend:v'.config('constants.coolify.railpack_version').'"');
 });
@@ -350,8 +350,8 @@ it('interpolates build-time variable references for railpack by sourcing the bui
     expect($command)->toContain('set -a && source /artifacts/build-time.env && set +a');
     expect($command)->not->toContain("'BETTER_AUTH_URL=\$COOLIFY_URL'");
     expect($command)->not->toContain("env 'BETTER_AUTH_URL");
-    expect($command)->toContain('id=BETTER_AUTH_URL,env=BETTER_AUTH_URL');
-    expect($command)->toContain('id=COOLIFY_URL,env=COOLIFY_URL');
+    expect($command)->toContain("--secret 'id=BETTER_AUTH_URL,env=BETTER_AUTH_URL'");
+    expect($command)->toContain("--secret 'id=COOLIFY_URL,env=COOLIFY_URL'");
 });
 
 it('creates an empty build-time env file for railpack when there are no generated build-time variables', function () {
