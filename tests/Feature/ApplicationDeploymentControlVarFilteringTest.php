@@ -407,6 +407,29 @@ it('still allows underscore Nixpacks plan keys through generate_build_env_variab
     expect(readDeploymentJobProperty($job, $reflection, 'dockerSecretsSupported'))->toBeFalse();
 });
 
+it('mounts underscore nixpacks secrets on RUN lines when build secrets are enabled', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'nixpacks',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'env_args' => collect(['SAFE_FROM_TOML' => 'ok-from-toml']),
+        'nixpacks_plan_json' => collect([
+            'variables' => ['SAFE_FROM_TOML' => 'ok-from-toml'],
+        ]),
+        'build_secrets' => '--secret id=SAFE_FROM_TOML,env=SAFE_FROM_TOML',
+        'saved_outputs' => collect([
+            'dockerfile_content' => "FROM alpine\nARG SAFE_FROM_TOML\nRUN printenv SAFE_FROM_TOML",
+        ]),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'modify_dockerfile_for_secrets', '/artifacts/test-app/.nixpacks/Dockerfile');
+
+    expect($job->writtenArtifacts['/artifacts/test-app/.nixpacks/Dockerfile'])
+        ->toContain('RUN --mount=type=secret,id=SAFE_FROM_TOML,env=SAFE_FROM_TOML')
+        ->toContain('printenv SAFE_FROM_TOML');
+});
+
 it('skips unsafe reserved Nixpacks plan variable keys before validation', function (string $key) {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'nixpacks',

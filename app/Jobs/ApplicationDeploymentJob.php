@@ -4636,37 +4636,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return;
         }
 
-        $dottedKeys = $variables->keys()
-            ->map(fn ($key): string => (string) $key)
-            ->filter(fn (string $key): bool => str_contains($key, '.'));
-
-        if ($dottedKeys->isNotEmpty()) {
-            $originalDockerfile = $dockerfile;
-            $dockerfile = $dockerfile->map(function (string $line) use ($dottedKeys): ?string {
-                $trimmedLine = trim($line);
-
-                if (! str_starts_with($trimmedLine, 'ARG ') && ! str_starts_with($trimmedLine, 'ENV ')) {
-                    return $line;
-                }
-
-                [$instruction, $arguments] = explode(' ', $trimmedLine, 2);
-                $filteredArguments = collect(preg_split('/\s+/', $arguments))
-                    ->reject(function (string $argument) use ($dottedKeys): bool {
-                        $key = str($argument)->before('=')->toString();
-
-                        return $dottedKeys->contains($key);
-                    });
-
-                if ($filteredArguments->isEmpty()) {
-                    return null;
-                }
-
-                return $instruction.' '.$filteredArguments->implode(' ');
-            })->filter()->values();
-
-            $modified = $dockerfile->all() !== $originalDockerfile->values()->all();
-        }
-
         // Generate mount strings for all secrets
         $mountStrings = $variables->map(fn ($value, $key) => "--mount=type=secret,id={$key},env={$key}")->implode(' ');
 
