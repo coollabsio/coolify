@@ -7,20 +7,22 @@
 
 services:
   lidarr:
-    image: lscr.io/linuxserver/lidarr:latest
+    image: 'lscr.io/linuxserver/lidarr:3.1.0.4875-ls40'
     environment:
+      - SERVICE_URL_LIDARR_8686
       - PUID=1000
       - PGID=1000
-      - TZ=${TZ:-America/Toronto}
+      - 'TZ=${TZ:-America/Toronto}'
     volumes:
-      - lidarr-config:/config
-      - lidarr-music:/music
-      - lidarr-downloads:/downloads
-    ports:
-      - 8686:8686
-    restart: unless-stopped
+      - 'lidarr-config:/config'
+      - 'lidarr-music:/music'
+      - 'lidarr-downloads:/downloads'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8686"]
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:8686'
       interval: 2s
       timeout: 10s
       retries: 15
