@@ -13,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -186,6 +187,21 @@ test('member cannot submit application advanced settings', function () {
     Livewire::test(ApplicationAdvanced::class, ['application' => $this->application])
         ->call('submit')
         ->assertDispatched('error');
+});
+
+test('the private application advanced syncData helper is not remotely callable', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $original = (bool) $this->application->settings->is_force_https_enabled;
+
+    $component = Livewire::test(ApplicationAdvanced::class, ['application' => $this->application])
+        ->set('isForceHttpsEnabled', ! $original);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
+
+    expect((bool) $this->application->settings->fresh()->is_force_https_enabled)->toBe($original);
 });
 
 // --- Application Rollback Livewire actions ---

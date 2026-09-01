@@ -162,7 +162,7 @@ class Show extends Component
         $this->valuesLoaded = true;
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false)
     {
         if ($toModel) {
             $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);

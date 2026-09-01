@@ -128,7 +128,7 @@ class BackupEdit extends Component
         $this->status = $database->status;
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false)
     {
         if ($toModel) {
             $this->backup->enabled = $this->backupEnabled;

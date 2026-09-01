@@ -120,7 +120,7 @@ class FileStorage extends Component
             : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             if ($this->fileStorage->is_too_large) {

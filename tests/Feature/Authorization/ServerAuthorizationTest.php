@@ -3,6 +3,7 @@
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Livewire\Server\Create as ServerCreate;
 use App\Livewire\Server\Index as ServerIndex;
+use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\Navbar as ServerNavbar;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
@@ -12,6 +13,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -77,6 +79,20 @@ test('admin can view server', function () {
 
 test('member can view server', function () {
     expect($this->member->can('view', $this->server))->toBeTrue();
+});
+
+test('the private log drain syncData helper is not remotely callable', function () {
+    $this->withoutVite();
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
+        ->set('isLogDrainAxiomEnabled', true);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
+
+    expect((bool) $this->server->settings->fresh()->is_logdrain_axiom_enabled)->toBeFalse();
 });
 
 // --- Server Policy: manageProxy ---

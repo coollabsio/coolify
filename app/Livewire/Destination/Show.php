@@ -43,7 +43,7 @@ class Show extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false)
     {
         if ($toModel) {
             $this->validate();
