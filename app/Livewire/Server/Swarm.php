@@ -29,7 +29,7 @@ class Swarm extends Component
         }
     }
 
-    private function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->server->settings->is_swarm_manager = $this->isSwarmManager;

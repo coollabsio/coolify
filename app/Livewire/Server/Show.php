@@ -230,7 +230,7 @@ class Show extends Component
             ->toArray();
     }
 
-    private function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();

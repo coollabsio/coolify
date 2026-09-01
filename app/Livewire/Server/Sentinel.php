@@ -54,7 +54,7 @@ class Sentinel extends Component
         $this->syncData();
     }
 
-    private function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();

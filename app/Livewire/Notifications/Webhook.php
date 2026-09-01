@@ -82,7 +82,7 @@ class Webhook extends Component
         }
     }
 
-    private function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
