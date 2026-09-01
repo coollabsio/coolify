@@ -730,6 +730,48 @@ it('filters buildpack control vars from dockerfile arg injection', function () {
     expect($job->writtenDockerfile)->not->toContain('ARG RAILPACK_NODE_VERSION=');
 });
 
+it('rejects dotted keys when dockerfile builds use docker secrets', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockerfile',
+    ]);
+    $application->settings()->update(['use_build_secrets' => true]);
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'DOTTED.USER',
+        'value' => 'df-dotted',
+        'is_buildtime' => true,
+        'is_runtime' => true,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server, [
+        'dockerSecretsSupported' => true,
+        'env_args' => collect(['DOTTED.USER' => 'df-dotted', 'SAFE' => 'ok']),
+    ]);
+
+    expect(fn () => invokeDeploymentJobMethod($job, $reflection, 'generate_build_secrets', collect([
+        'DOTTED.USER' => 'df-dotted',
+        'SAFE' => 'ok',
+    ])))->toThrow(DeploymentException::class, 'DOTTED.USER');
+});
+
+it('keeps dotted dockerfile build args when secrets are not used', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'DOTTED.USER',
+        'value' => 'df-dotted',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    invokeDeploymentJobMethod($job, $reflection, 'generate_env_variables');
+
+    /** @var Collection $envArgs */
+    $envArgs = readDeploymentJobProperty($job, $reflection, 'env_args');
+
+    expect($envArgs->get('DOTTED.USER'))->toBe('df-dotted');
+});
+
 it('builds railpack variables from generic buildtime vars railpack vars and coolify vars only', function () {
     [$application, $server] = makeDeploymentControlVarFixture([
         'build_pack' => 'railpack',

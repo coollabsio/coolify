@@ -1925,6 +1925,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('----------------------------------------', 'stderr');
     }
 
+    private function assertDockerSecretCompatibleKeys(Collection $variables, string $origin): void
+    {
+        $incompatibleKeys = $variables->keys()
+            ->map(fn ($key): string => (string) $key)
+            ->filter(fn (string $key): bool => ! ValidationPatterns::isDockerSecretCompatibleKey($key))
+            ->values();
+
+        if ($incompatibleKeys->isEmpty()) {
+            return;
+        }
+
+        $this->logDottedDockerSecretKeys($incompatibleKeys->all(), $origin);
+
+        throw new DeploymentException(
+            'Dotted build-time environment variable names cannot be passed as Docker build secrets: '.$incompatibleKeys->implode(', ').'. Rename these keys to use underscores instead of dots, or disable build secrets and use a Dockerfile ARG.'
+        );
+    }
+
     private function save_buildtime_environment_variables()
     {
         $environment_variables = $this->generate_buildtime_environment_variables();
@@ -2875,6 +2893,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function railpack_build_secret_flags(Collection $variables): string
     {
+        $this->assertDockerSecretCompatibleKeys($variables, 'Railpack build secrets');
+
         if ($variables->isEmpty()) {
             return '';
         }
@@ -4400,6 +4420,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_build_secrets(Collection $variables)
     {
+        $this->assertDockerSecretCompatibleKeys($variables, 'Docker build secrets');
+
         if ($variables->isEmpty()) {
             $this->build_secrets = '';
 
