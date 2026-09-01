@@ -1403,7 +1403,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables as $env) {
-                $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
             // Check for PORT environment variable mismatch with ports_exposes
@@ -1470,7 +1470,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             });
 
             foreach ($runtime_environment_variables_preview as $env) {
-                $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                $envs->push($this->runtimeEnvironmentAssignment($env));
             }
 
             // Fall back to production env vars for keys not overridden by preview vars,
@@ -1484,7 +1484,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     return $env->is_runtime && ! in_array($env->key, $previewKeys);
                 });
                 foreach ($fallback_production_vars as $env) {
-                    $envs->push($env->key.'='.$env->getResolvedValueWithServer($this->mainServer));
+                    $envs->push($this->runtimeEnvironmentAssignment($env));
                 }
             }
 
@@ -1502,6 +1502,23 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Return the generated environment variables instead of storing them globally
         return $envs;
+    }
+
+    private function runtimeEnvironmentAssignment(EnvironmentVariable $environmentVariable): string
+    {
+        $resolvedValue = $environmentVariable->get_real_environment_variables_with_server(
+            $environmentVariable->value,
+            $environmentVariable->resourceable,
+            $this->mainServer,
+        );
+        $isJson = json_validate((string) $resolvedValue)
+            && (str_starts_with((string) $resolvedValue, '{') || str_starts_with((string) $resolvedValue, '['));
+        $allowInterpolation = ! $isJson && ! $environmentVariable->is_literal && ! $environmentVariable->is_multiline;
+
+        return $environmentVariable->key.'='.escapeComposeEnvFileValue(
+            $resolvedValue,
+            allowInterpolation: $allowInterpolation,
+        );
     }
 
     private function isGeneratedDockerComposeEnvironmentVariable(EnvironmentVariable $environmentVariable): bool

@@ -1552,6 +1552,17 @@ function escapeBashEnvValue(?string $value): string
     return "'{$escaped}'";
 }
 
+function escapeComposeEnvFileValue(?string $value, bool $allowInterpolation = false): string
+{
+    $escaped = str_replace(['\\', '"'], ['\\\\', '\\"'], $value ?? '');
+
+    if (! $allowInterpolation) {
+        $escaped = str_replace('$', '\\$', $escaped);
+    }
+
+    return '"'.$escaped.'"';
+}
+
 /**
  * Escape a value for bash double-quoted strings (allows $VAR expansion)
  *

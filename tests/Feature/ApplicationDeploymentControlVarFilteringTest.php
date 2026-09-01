@@ -895,3 +895,54 @@ it('builds preview railpack variables without leaking stale nixpacks vars', func
     expect($variables->has('NIXPACKS_NODE_VERSION'))->toBeFalse();
     expect($variables->has('PREVIEW_RUNTIME_ONLY'))->toBeFalse();
 });
+
+it('writes compose-safe runtime env files for user values', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'QUOTED_VALUE',
+        'value' => 'hello world; quotes" \'$`',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'EXPAND_ME',
+        'value' => '$BOTH_PHASES',
+        'is_literal' => false,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'BOTH_PHASES',
+        'value' => 'both-phases-value',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'INJECT_CMD',
+        'value' => '$(touch /tmp/coolify-value-injection)',
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => true,
+    ]);
+    createApplicationEnvironmentVariable($application, [
+        'key' => 'EDGE_QUOTES',
+        'value' => "'keep these quotes'",
+        'is_literal' => true,
+        'is_runtime' => true,
+        'is_buildtime' => false,
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application, $server);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs)
+        ->toContain('QUOTED_VALUE='.escapeComposeEnvFileValue('hello world; quotes" \'$`'))
+        ->toContain('INJECT_CMD='.escapeComposeEnvFileValue('$(touch /tmp/coolify-value-injection)'))
+        ->toContain('EXPAND_ME='.escapeComposeEnvFileValue('$BOTH_PHASES', allowInterpolation: true))
+        ->toContain('EDGE_QUOTES='.escapeComposeEnvFileValue("'keep these quotes'"));
+});
