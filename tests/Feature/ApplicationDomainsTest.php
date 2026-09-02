@@ -745,9 +745,14 @@ it('composes the complete port on the server without duplicating an existing www
         ->assertHasNoErrors()
         ->assertDispatched('success');
 
-    expect(explode(',', (string) $this->application->fresh()->fqdn))->toBe([
-        'https://www.example.com:3000',
-        'https://example.com:3000',
+    $application = $this->application->fresh();
+
+    expect(explode(',', (string) $application->fqdn))->toBe([
+        'https://www.example.com',
+        'https://example.com',
+    ])->and($application->domain_port_overrides)->toBe([
+        'https://www.example.com' => 3000,
+        'https://example.com' => 3000,
     ]);
 });
 
@@ -822,7 +827,8 @@ it('updates a domain in place via modal', function () {
         ->assertSet('editingDomain', 'https://old.example.com')
         ->assertSee('Direction')
         ->assertSee('Search engine indexing')
-        ->set('editingDomain', 'https://new.example.com')
+        ->set('editingDomainParts.scheme', 'https')
+        ->set('editingDomainParts.host', 'new.example.com')
         ->call('updateDomain')
         ->assertHasNoErrors()
         ->assertSet('showEditDomainModal', false)
@@ -846,7 +852,8 @@ it('blocks editing a domain with bad dns until the user continues', function () 
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('startEdit', 0)
-        ->set('editingDomain', 'https://this-domain-should-not-resolve-for-coolify-tests.invalid')
+        ->set('editingDomainParts.scheme', 'https')
+        ->set('editingDomainParts.host', 'this-domain-should-not-resolve-for-coolify-tests.invalid')
         ->call('updateDomain')
         ->assertSet('editDomainDnsFailed', true)
         ->assertSet('showEditDomainModal', true)
@@ -1694,7 +1701,10 @@ it('saves after confirming a domain conflict on add', function () {
         ->assertSet('pendingAction', null)
         ->assertDispatched('success');
 
-    expect($this->application->fresh()->fqdn)->toBe('https://shared.example.com');
+    expect(explode(',', (string) $this->application->fresh()->fqdn))->toBe([
+        'https://shared.example.com',
+        'https://www.shared.example.com',
+    ]);
 });
 
 it('saves after confirming a domain conflict on edit', function () {
@@ -1712,7 +1722,8 @@ it('saves after confirming a domain conflict on edit', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('startEdit', 0)
-        ->set('editingDomain', 'https://taken.example.com')
+        ->set('editingDomainParts.scheme', 'https')
+        ->set('editingDomainParts.host', 'taken.example.com')
         ->call('updateDomain')
         ->assertSet('showDomainConflictModal', true)
         ->assertSet('pendingAction', 'update')
