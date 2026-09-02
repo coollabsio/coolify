@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\DomainPortOverrides;
+use App\Support\DomainUrlParts;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -13,6 +14,8 @@ use Symfony\Component\Yaml\Yaml;
 class ServiceApplication extends BaseModel
 {
     use HasFactory, HasNoindexDomains, HasRestartLimit, SoftDeletes;
+
+    protected $appends = ['url'];
 
     protected $fillable = [
         'service_id',
@@ -198,6 +201,45 @@ class ServiceApplication extends BaseModel
     }
 
     /**
+     * Return the public URLs with their persisted internal port overrides.
+     */
+    protected function url(): Attribute
+    {
+        return Attribute::make(
+            get: function (): ?string {
+                if (blank($this->fqdn)) {
+                    return null;
+                }
+
+                $overrides = $this->domain_port_overrides ?? [];
+
+                return collect(explode(',', $this->fqdn))
+                    ->map(function (string $url) use ($overrides): string {
+                        $url = trim($url);
+                        $canonical = DomainPortOverrides::withoutPort($url);
+                        $port = $overrides[$canonical] ?? null;
+
+                        if ($port === null) {
+                            return $canonical;
+                        }
+
+                        $parts = DomainUrlParts::split($canonical);
+
+                        return DomainUrlParts::compose($parts['scheme'], $parts['host'], (string) $port, $parts['path']);
+                    })
+                    ->implode(',');
+            },
+        );
+    }
+
+    public function setEditableUrls(?string $urls): void
+    {
+        $normalized = DomainPortOverrides::normalize($urls, null);
+        $this->fqdn = $normalized['fqdn'];
+        $this->domain_port_overrides = $normalized['overrides'];
+    }
+
+    /**
      * Extract port number from a given FQDN URL.
      * Returns null if no port is specified.
      */
@@ -216,6 +258,46 @@ class ServiceApplication extends BaseModel
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * True when saving this URL should confirm that it does not use the required template port.
+     */
+    public function portRequiresConfirmation(string $fqdn, ?int $requiredPort, ?string $previousFqdn = null): bool
+    {
+        if ($requiredPort === null) {
+            return false;
+        }
+
+        $fqdn = trim($fqdn);
+        if ($fqdn === '') {
+            return false;
+        }
+
+        $canonical = DomainPortOverrides::withoutPort($fqdn);
+        $explicit = self::extractPortFromUrl($fqdn);
+
+        if ($explicit === $requiredPort) {
+            return false;
+        }
+
+        if ($explicit === null) {
+            $previous = collect(explode(',', (string) $previousFqdn))
+                ->filter();
+            $previousUrl = $previous->first(
+                fn (string $url): bool => DomainPortOverrides::withoutPort(trim($url)) === $canonical
+            );
+
+            if (is_string($previousUrl) && self::extractPortFromUrl($previousUrl) !== null) {
+                return true;
+            }
+
+            return $previousUrl === null;
+        }
+
+        $existingOverride = $this->domain_port_overrides[$canonical] ?? null;
+
+        return (int) $existingOverride !== $explicit;
     }
 
     public static function withoutPort(string $url): string
@@ -294,6 +376,7 @@ class ServiceApplication extends BaseModel
             // Extract SERVICE_URL and SERVICE_FQDN variables DIRECTLY DECLARED in this service's environment
             // (not variables that are merely referenced with ${VAR} syntax)
             $portFound = null;
+            $declaresHttpUrl = false;
             foreach ($environment as $key => $value) {
                 if (is_int($key) && is_string($value)) {
                     // List-style: "- SERVICE_URL_APP_3000" or "- SERVICE_URL_APP_3000=value"
@@ -302,6 +385,7 @@ class ServiceApplication extends BaseModel
 
                     // Only process direct declarations
                     if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                        $declaresHttpUrl = true;
                         // Parse to check if it has a port suffix
                         $parsed = parseServiceEnvironmentVariable($envVarName->value());
                         if ($parsed['has_port'] && $parsed['port']) {
@@ -316,6 +400,7 @@ class ServiceApplication extends BaseModel
 
                     // Only process direct declarations
                     if ($envVarName->startsWith('SERVICE_FQDN_') || $envVarName->startsWith('SERVICE_URL_')) {
+                        $declaresHttpUrl = true;
                         // Parse to check if it has a port suffix
                         $parsed = parseServiceEnvironmentVariable($envVarName->value());
                         if ($parsed['has_port'] && $parsed['port']) {
@@ -332,8 +417,12 @@ class ServiceApplication extends BaseModel
                 return $portFound;
             }
 
-            // No port-specific variables found for this service, return null
-            // (DO NOT fall back to service-level port, as that applies to all services)
+            // HTTP-facing compose services that only declare SERVICE_URL/FQDN (no _PORT
+            // suffix), such as WordPress, inherit the one-click template `# port:`.
+            if ($declaresHttpUrl) {
+                return $this->service->getRequiredPort();
+            }
+
             return null;
         } catch (\Throwable $e) {
             return null;

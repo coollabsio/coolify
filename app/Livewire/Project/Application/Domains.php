@@ -71,6 +71,14 @@ class Domains extends Component
 
     public bool $showDomainConflictModal = false;
 
+    public bool $showPortWarningModal = false;
+
+    public bool $forceUseUnknownPort = false;
+
+    public ?int $unrecognizedPort = null;
+
+    public ?string $pendingPortAction = null;
+
     public bool $forceSaveDomains = false;
 
     public bool $forceSaveDns = false;
@@ -554,12 +562,59 @@ class Domains extends Component
         }
 
         $exposed = $this->application->ports_exposes_array;
-        $defaultPort = isset($exposed[0]) && filled($exposed[0]) ? (int) $exposed[0] : null;
+        $defaultPort = isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
+            ? (int) $exposed[0]
+            : null;
 
         return [
             'internal_port' => $defaultPort,
             'has_port_override' => false,
         ];
+    }
+
+    /**
+     * @param  array{scheme: string, host: string, port: string, path: string}  $parts
+     */
+    protected function portFromParts(array $parts): ?int
+    {
+        $port = trim((string) ($parts['port'] ?? ''));
+        if ($port === '' || ! ctype_digit($port) || (int) $port <= 0) {
+            return null;
+        }
+
+        return (int) $port;
+    }
+
+    protected function currentRowPort(string $url): ?int
+    {
+        $canonical = DomainPortOverrides::withoutPort($url);
+        $override = ($this->application->domain_port_overrides ?? [])[$canonical] ?? null;
+        if (filled($override) && (int) $override > 0) {
+            return (int) $override;
+        }
+
+        $legacy = DomainUrlParts::split($url)['port'] ?? '';
+
+        return $legacy !== '' && ctype_digit($legacy) ? (int) $legacy : null;
+    }
+
+    protected function shouldConfirmPort(?int $port, ?int $currentPort = null): bool
+    {
+        if ($this->forceUseUnknownPort || $port === null) {
+            return false;
+        }
+        if ($currentPort !== null && $port === $currentPort) {
+            return false;
+        }
+
+        return $this->application->portRequiresConfirmation($port);
+    }
+
+    protected function openPortWarning(?int $port, string $action): void
+    {
+        $this->unrecognizedPort = $port;
+        $this->pendingPortAction = $action;
+        $this->showPortWarningModal = true;
     }
 
     /**
@@ -863,6 +918,31 @@ class Domains extends Component
         $this->addDomain();
     }
 
+    public function confirmUseUnknownPort(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->forceUseUnknownPort = true;
+        $this->showPortWarningModal = false;
+        $action = $this->pendingPortAction;
+        $this->pendingPortAction = null;
+
+        if ($action === 'update') {
+            $this->updateDomain();
+
+            return;
+        }
+
+        $this->addDomain();
+    }
+
+    public function cancelUseUnknownPort(): void
+    {
+        $this->showPortWarningModal = false;
+        $this->forceUseUnknownPort = false;
+        $this->unrecognizedPort = null;
+        $this->pendingPortAction = null;
+    }
+
     /**
      * Clear pending conflict state when the modal is dismissed without confirmation.
      * confirmDomainUsage sets forceSaveDomains before closing the modal.
@@ -906,13 +986,22 @@ class Domains extends Component
                 ->values()
                 ->all();
             $current = $this->currentDomainList($this->newDomainService);
+            $currentCanonicalDomains = $current->map(
+                fn (string $url): string => DomainPortOverrides::withoutPort($url)
+            );
 
             foreach ($newUrls as $url) {
-                if ($current->contains($url)) {
+                if ($currentCanonicalDomains->contains(DomainPortOverrides::withoutPort($url))) {
                     $this->addError('newDomain', "Domain {$url} is already configured.");
 
                     return;
                 }
+            }
+
+            if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts))) {
+                $this->openPortWarning($this->portFromParts($this->newDomainParts), 'add');
+
+                return;
             }
 
             $merged = $current->merge($newUrls)->merge($pairedUrls)->unique()->values();
@@ -923,6 +1012,7 @@ class Domains extends Component
 
             $this->forceSaveDomains = false;
             $this->pendingAction = null;
+            $this->forceUseUnknownPort = false;
             $serviceForCheck = $this->newDomainService;
             $this->resetAddDomainForm();
             $this->dispatch('close-modal');
@@ -1296,8 +1386,17 @@ class Domains extends Component
             }
 
             $current = $this->currentDomainList($service);
-            if ($newUrl !== $oldUrl && $current->contains($newUrl)) {
+            $otherCanonicalDomains = $current
+                ->reject(fn (string $url): bool => $url === $oldUrl)
+                ->map(fn (string $url): string => DomainPortOverrides::withoutPort($url));
+            if ($otherCanonicalDomains->contains(DomainPortOverrides::withoutPort($newUrl))) {
                 $this->addError('editingDomain', "Domain {$newUrl} is already configured.");
+
+                return;
+            }
+
+            if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl))) {
+                $this->openPortWarning($this->portFromParts($this->editingDomainParts), 'update');
 
                 return;
             }
@@ -1329,6 +1428,7 @@ class Domains extends Component
 
             $this->forceSaveDomains = false;
             $this->pendingAction = null;
+            $this->forceUseUnknownPort = false;
             $this->cancelEdit();
             $this->dispatch('edit-domain-saved');
             $this->dispatch('success', 'Domain updated.');

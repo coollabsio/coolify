@@ -1267,21 +1267,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 } else {
                     $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId, $resource) {
                         $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pullRequestId);
-                        $url = Url::fromString($fqdn);
-                        $template = $resource->preview_url_template;
-                        $host = $url->getHost();
-                        $schema = $url->getScheme();
-                        $portInt = $url->getPort();
-                        $port = $portInt !== null ? ':'.$portInt : '';
-                        $random = new_public_id();
-                        $preview_fqdn = str_replace('{{random}}', $random, $template);
-                        $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                        $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
-                        $preview_fqdn = "$schema://$preview_fqdn{$port}";
-                        $preview->fqdn = $preview_fqdn;
+                        $generated = $preview->generatedPreviewDomain((string) $fqdn);
+                        $preview->fqdn = $generated['url'];
+                        if (filled($generated['port'])) {
+                            $overrides = $preview->domain_port_overrides ?? [];
+                            $overrides[$generated['url']] = $generated['port'];
+                            $preview->domain_port_overrides = $overrides;
+                        }
                         $preview->save();
 
-                        return $preview_fqdn;
+                        return $generated['url'];
                     });
                 }
             }
@@ -1359,12 +1354,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                 ? $composeRedirect
                 : 'both';
-            $domainPortOverrides = $isPullRequest ? [] : ($originalResource->domain_port_overrides ?? []);
-            $onlyPort = null;
-            if (! $isPullRequest) {
-                $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
-                $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
-            }
+            $previewForPorts = $isPullRequest
+                ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
+                : null;
+            $domainPortOverrides = $isPullRequest
+                ? ($previewForPorts?->domain_port_overrides ?? [])
+                : ($originalResource->domain_port_overrides ?? []);
+            $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
+            $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -2646,6 +2643,9 @@ function serviceParser(Service $resource): Collection
             $redirectDirection = in_array(data_get($originalResource, 'redirect'), ['www', 'non-www', 'both'], true)
                 ? data_get($originalResource, 'redirect')
                 : 'both';
+            $onlyPort = $originalResource instanceof ServiceApplication
+                ? ($originalResource->getRequiredPort() ?? $predefinedPort)
+                : $predefinedPort;
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -2661,7 +2661,7 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
-                            onlyPort: $predefinedPort,
+                            onlyPort: $onlyPort,
                             domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
@@ -2678,6 +2678,7 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             predefinedPort: $predefinedPort,
                             domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
@@ -2695,7 +2696,7 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
-                    onlyPort: $predefinedPort,
+                    onlyPort: $onlyPort,
                     domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
@@ -2710,6 +2711,7 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     predefinedPort: $predefinedPort,
                     domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,

@@ -3103,6 +3103,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $redirectDirection = in_array(data_get($savedService, 'redirect'), ['www', 'non-www', 'both'], true)
                             ? data_get($savedService, 'redirect')
                             : 'both';
+                        $domainPortOverrides = $savedService instanceof ServiceApplication
+                            ? ($savedService->domain_port_overrides ?? [])
+                            : [];
+                        $onlyPort = $savedService instanceof ServiceApplication
+                            ? $savedService->getRequiredPort()
+                            : $predefinedPort;
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3115,8 +3121,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
+                                        onlyPort: $onlyPort,
                                         noindex_domains: $noindexDomains,
-                                        redirect_direction: $redirectDirection
+                                        redirect_direction: $redirectDirection,
+                                        domainPortOverrides: $domainPortOverrides,
                                     ));
                                     break;
                                 case ProxyTypes::CADDY->value:
@@ -3130,8 +3138,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                         service_name: $serviceName,
                                         image: data_get($service, 'image'),
+                                        onlyPort: $onlyPort,
+                                        predefinedPort: $predefinedPort,
                                         noindex_domains: $noindexDomains,
-                                        redirect_direction: $redirectDirection
+                                        redirect_direction: $redirectDirection,
+                                        domainPortOverrides: $domainPortOverrides,
                                     ));
                                     break;
                             }
@@ -3145,8 +3156,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
+                                onlyPort: $onlyPort,
                                 noindex_domains: $noindexDomains,
-                                redirect_direction: $redirectDirection
+                                redirect_direction: $redirectDirection,
+                                domainPortOverrides: $domainPortOverrides,
                             ));
                             $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                                 network: $resource->destination->network,
@@ -3158,8 +3171,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                                 service_name: $serviceName,
                                 image: data_get($service, 'image'),
+                                onlyPort: $onlyPort,
+                                predefinedPort: $predefinedPort,
                                 noindex_domains: $noindexDomains,
-                                redirect_direction: $redirectDirection
+                                redirect_direction: $redirectDirection,
+                                domainPortOverrides: $domainPortOverrides,
                             ));
                         }
                     }
@@ -3869,19 +3885,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             } else {
                                 $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
                                     $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
-                                    $url = Url::fromString($fqdn);
-                                    $template = $resource->preview_url_template;
-                                    $host = $url->getHost();
-                                    $schema = $url->getScheme();
-                                    $random = new_public_id();
-                                    $preview_fqdn = str_replace('{{random}}', $random, $template);
-                                    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                                    $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
-                                    $preview_fqdn = "$schema://$preview_fqdn";
-                                    $preview->fqdn = $preview_fqdn;
+                                    $generated = $preview->generatedPreviewDomain((string) $fqdn);
+                                    $preview->fqdn = $generated['url'];
+                                    if (filled($generated['port'])) {
+                                        $overrides = $preview->domain_port_overrides ?? [];
+                                        $overrides[$generated['url']] = $generated['port'];
+                                        $preview->domain_port_overrides = $overrides;
+                                    }
                                     $preview->save();
 
-                                    return $preview_fqdn;
+                                    return $generated['url'];
                                 });
                             }
                         }
@@ -3891,12 +3904,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                             ? $composeRedirect
                             : 'both';
-                        $domainPortOverrides = $pull_request_id === 0 ? ($resource->domain_port_overrides ?? []) : [];
-                        $onlyPort = null;
-                        if ($pull_request_id === 0) {
-                            $exposedPorts = $resource->settings->is_static ? [80] : $resource->ports_exposes_array;
-                            $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
-                        }
+                        $domainPortOverrides = $pull_request_id === 0
+                            ? ($resource->domain_port_overrides ?? [])
+                            : ($preview?->domain_port_overrides ?? []);
+                        $exposedPorts = $resource->settings->is_static ? [80] : $resource->ports_exposes_array;
+                        $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:

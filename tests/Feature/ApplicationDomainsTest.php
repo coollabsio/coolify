@@ -2066,6 +2066,19 @@ it('updates search engine indexing from the domains view', function () {
         ->toBe(['https://staging.example.com']);
 });
 
+it('keeps noindex domains when normalizing a custom domain port', function () {
+    $this->application->update([
+        'fqdn' => 'https://staging.example.com:8080',
+        'noindex_domains' => ['https://staging.example.com:8080'],
+    ]);
+
+    expect($this->application->refresh())
+        ->fqdn->toBe('https://staging.example.com')
+        ->noindex_domains->toBe(['https://staging.example.com'])
+        ->and($this->application->domain_port_overrides)
+        ->toBe(['https://staging.example.com' => 8080]);
+});
+
 it('saves a port override from the segmented add-domain form', function () {
     $this->application->update(['ports_exposes' => '3000,8080']);
 
@@ -2085,6 +2098,43 @@ it('saves a port override from the segmented add-domain form', function () {
         ->not->toContain('https://example.com:8080')
         ->and($this->application->domain_port_overrides['https://example.com'] ?? null)
         ->toBe(8080);
+});
+
+it('rejects adding a domain whose portless URL is already configured', function () {
+    $this->application->update([
+        'fqdn' => 'https://example.com:3000',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'example.com')
+        ->set('newDomainParts.port', '8080')
+        ->call('addDomain')
+        ->assertHasErrors('newDomain');
+
+    expect($this->application->fresh()->fqdn)->toBe('https://example.com')
+        ->and($this->application->fresh()->domain_port_overrides)
+        ->toBe(['https://example.com' => 3000]);
+});
+
+it('rejects renaming a domain to a port variant of another configured domain', function () {
+    $this->application->update([
+        'fqdn' => 'https://first.example.com:3000,https://second.example.com:4000',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 1)
+        ->set('editingDomainParts.host', 'first.example.com')
+        ->set('editingDomainParts.port', '8080')
+        ->call('updateDomain')
+        ->assertHasErrors('editingDomain');
+
+    expect($this->application->fresh()->fqdn)
+        ->toBe('https://first.example.com,https://second.example.com')
+        ->and($this->application->fresh()->domain_port_overrides)
+        ->toBe([
+            'https://first.example.com' => 3000,
+            'https://second.example.com' => 4000,
+        ]);
 });
 
 it('composes segmented add-domain fields into a port override when the changed flag is false', function () {
@@ -2218,6 +2268,34 @@ it('renders a portless domain link with an internal port badge for overrides', f
         ->not->toContain('href="https://example.com:8080"')
         ->toContain('Custom internal port for this domain')
         ->not->toContain('Inherited from Ports Exposes');
+});
+
+it('shows an error badge when a domain has no internal port and ports exposes is empty', function () {
+    $this->application->update([
+        'ports_exposes' => null,
+        'fqdn' => 'https://example.com',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', null)
+        ->assertSee('No internal port')
+        ->assertDontSee('Internal port ')
+        ->assertSee('table-badge-danger', false);
+});
+
+it('keeps the internal port badge when a domain override exists without ports exposes', function () {
+    $this->application->update([
+        'ports_exposes' => null,
+        'fqdn' => 'https://example.com',
+        'domain_port_overrides' => [
+            'https://example.com' => 8080,
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Internal port 8080')
+        ->assertDontSee('No internal port');
 });
 
 it('distinguishes an inherited internal port from a domain port override', function () {
@@ -2418,4 +2496,67 @@ it('application domain port override API update of an unrelated field does not r
     expect($application->fqdn)->toBe('https://legacy.example.com:9090')
         ->and($application->description)->toBe('unrelated')
         ->and($application->domain_port_overrides)->toBeNull();
+});
+
+it('treats ports exposes and existing domain ports as available internal ports', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://one.example.com:9090',
+    ]);
+
+    $application = $this->application->fresh();
+
+    expect($application->availableInternalPorts())->toBe([3000, 8080, 9090])
+        ->and($application->portRequiresConfirmation(3000))->toBeFalse()
+        ->and($application->portRequiresConfirmation(8080))->toBeFalse()
+        ->and($application->portRequiresConfirmation(9090))->toBeFalse()
+        ->and($application->portRequiresConfirmation(5555))->toBeTrue()
+        ->and($application->portRequiresConfirmation(null))->toBeFalse();
+});
+
+it('shows a port warning when an application domain uses a port that is not exposed or already used', function () {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'example.com')
+        ->set('newDomainParts.port', '5555')
+        ->call('addDomain')
+        ->assertSet('showPortWarningModal', true)
+        ->assertSet('unrecognizedPort', 5555)
+        ->assertSee('Use a different port?');
+
+    expect($this->application->fresh()->fqdn)->toBeNull();
+});
+
+it('saves an unrecognized application domain port after confirming the warning', function () {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'example.com')
+        ->set('newDomainParts.port', '5555')
+        ->call('addDomain')
+        ->assertSet('showPortWarningModal', true)
+        ->call('confirmUseUnknownPort')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    $application = $this->application->fresh();
+
+    expect(explode(',', (string) $application->fqdn))
+        ->toContain('https://example.com')
+        ->and($application->domain_port_overrides['https://example.com'] ?? null)->toBe(5555);
+});
+
+it('does not warn when editing an application domain to a port already used by another domain', function () {
+    $this->application->update([
+        'ports_exposes' => '3000',
+        'fqdn' => 'https://one.example.com:9090,https://two.example.com',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 1)
+        ->set('editingDomainParts.port', '9090')
+        ->call('updateDomain')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
 });

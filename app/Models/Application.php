@@ -8,6 +8,7 @@ use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
+use App\Support\DomainUrlParts;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -979,6 +980,46 @@ class Application extends BaseModel
     public function main_port()
     {
         return $this->settings->is_static ? [80] : $this->ports_exposes_array;
+    }
+
+    /**
+     * Ports the container is expected to listen on: Ports Exposes plus ports already used by application domains.
+     *
+     * @return list<int>
+     */
+    public function availableInternalPorts(): array
+    {
+        $ports = collect($this->settings?->is_static ? [80] : $this->ports_exposes_array)
+            ->filter(fn (mixed $port): bool => is_numeric($port) && (int) $port > 0)
+            ->map(fn (mixed $port): int => (int) $port);
+
+        foreach ($this->domain_port_overrides ?? [] as $port) {
+            if (is_numeric($port) && (int) $port > 0) {
+                $ports->push((int) $port);
+            }
+        }
+
+        foreach (explode(',', (string) $this->fqdn) as $url) {
+            $url = trim($url);
+            if ($url === '') {
+                continue;
+            }
+            $legacyPort = DomainUrlParts::split($url)['port'] ?? '';
+            if ($legacyPort !== '' && is_numeric($legacyPort) && (int) $legacyPort > 0) {
+                $ports->push((int) $legacyPort);
+            }
+        }
+
+        return $ports->unique()->sort()->values()->all();
+    }
+
+    public function portRequiresConfirmation(?int $port): bool
+    {
+        if ($port === null || $port <= 0) {
+            return false;
+        }
+
+        return ! in_array($port, $this->availableInternalPorts(), true);
     }
 
     public function detectPortFromEnvironment(?bool $isPreview = false): ?int

@@ -19,6 +19,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Bus::fake();
+    config()->set('app.maintenance.store', 'array');
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(['id' => 0]));
 
     $this->team = Team::factory()->create();
@@ -128,5 +129,105 @@ describe('DELETE /api/v1/applications/{uuid}/previews/{pull_request_id}', functi
             ->deleteJson("/api/v1/applications/{$this->application->uuid}/previews/7");
 
         $response->assertForbidden();
+    });
+});
+
+describe('PATCH /api/v1/applications/{uuid}/previews/{pull_request_id}', function () {
+    test('stores preview domain ports separately from portless public domains', function () {
+        $preview = createPreview($this->application, 42);
+
+        $response = $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/42", [
+                'domains' => 'https://one.example.com:3000,https://two.example.com:8080',
+            ])
+            ->assertOk()
+            ->assertJsonPath('domains', 'https://one.example.com,https://two.example.com');
+
+        expect($response->json('domain_port_overrides'))->toBe([
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ]);
+
+        expect($preview->fresh()->fqdn)->toBe('https://one.example.com,https://two.example.com')
+            ->and($preview->fresh()->domain_port_overrides)->toBe([
+                'https://one.example.com' => 3000,
+                'https://two.example.com' => 8080,
+            ]);
+    });
+
+    test('clears an existing preview domain override when the submitted domain is portless', function () {
+        $preview = createPreview($this->application, 43);
+        $preview->update(['fqdn' => 'https://preview.example.com:8080']);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/43", [
+                'domains' => 'https://preview.example.com',
+            ])
+            ->assertOk()
+            ->assertJsonPath('domain_port_overrides', null);
+
+        expect($preview->fresh()->fqdn)->toBe('https://preview.example.com')
+            ->and($preview->fresh()->domain_port_overrides)->toBeNull();
+    });
+
+    test('rejects invalid preview domains', function () {
+        createPreview($this->application, 44);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/44", [
+                'domains' => 'not-a-domain',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('domains');
+    });
+
+    test('returns 403 when token lacks write ability', function () {
+        $readOnlyToken = createTeamApiToken($this->user, $this->team, ['read']);
+        createPreview($this->application, 45);
+
+        $this->withHeaders(previewAuthHeaders($readOnlyToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/45", [
+                'domains' => 'https://preview.example.com:3000',
+            ])
+            ->assertForbidden();
+    });
+
+    test('rejects a non-integer pull request id', function () {
+        createPreview($this->application, 1);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/1.9", [
+                'domains' => 'https://preview.example.com:3000',
+            ])
+            ->assertUnprocessable()
+            ->assertJson(['message' => 'Invalid pull_request_id.']);
+    });
+
+    test('detects conflicts after removing the submitted internal port', function () {
+        $otherApplication = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'fqdn' => 'https://taken.example.com',
+        ]);
+        createPreview($this->application, 46);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/46", [
+                'domains' => 'https://taken.example.com:3000',
+            ])
+            ->assertConflict()
+            ->assertJsonPath('conflicts.0.resource_uuid', $otherApplication->uuid);
+    });
+
+    test('detects conflicts with another preview domain', function () {
+        createPreview($this->application, 47)->update(['fqdn' => 'https://taken-preview.example.com:3000']);
+        createPreview($this->application, 48);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/48", [
+                'domains' => 'https://taken-preview.example.com:8080',
+            ])
+            ->assertConflict();
     });
 });
