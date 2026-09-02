@@ -89,6 +89,7 @@ class Heading extends Component
 
             $this->dispatch('info', 'Gracefully stopping database.');
             StopDatabase::dispatch($this->database, false, $this->docker_cleanup);
+            $this->auditDatabaseAction('ui.database.stopped');
         } catch (\Exception $e) {
             $this->dispatch('error', $e->getMessage());
         }
@@ -100,6 +101,7 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = RestartDatabase::run($this->database);
+            $this->auditDatabaseAction('ui.database.restarted');
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
         } catch (\Throwable $e) {
@@ -113,6 +115,7 @@ class Heading extends Component
             $this->authorize('manage', $this->database);
 
             $activity = StartDatabase::run($this->database);
+            $this->auditDatabaseAction('ui.database.started');
             $this->js("window.dispatchEvent(new CustomEvent('startdatabase'))");
             $this->dispatch('activityMonitor', $activity->id, ServiceStatusChanged::class);
         } catch (\Throwable $e) {
@@ -126,6 +129,15 @@ class Heading extends Component
             'checkboxes' => [
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
             ],
+        ]);
+    }
+
+    private function auditDatabaseAction(string $event): void
+    {
+        auditLog($event, [
+            'team_id' => $this->database->team()?->id,
+            'database_uuid' => $this->database->uuid,
+            'database_name' => $this->database->name,
         ]);
     }
 }

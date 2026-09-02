@@ -134,15 +134,22 @@
                     <div class="flex items-end gap-2">
                         <x-forms.input id="email" label="Email" readonly />
                         <x-forms.button @click="openEmailModal()" type="button"
-                            x-bind:disabled="emailModalOpen">
+                            :disabled="$uses_sso" x-bind:disabled="emailModalOpen || @js($uses_sso)">
                             Change
                         </x-forms.button>
                     </div>
                 </div>
-            </section>
-        </form>
+             </section>
+         </form>
 
-        <template x-teleport="body">
+         @if ($uses_sso)
+             <x-callout type="info" title="Email managed by SSO">
+                 Signed in with SSO @if ($sso_provider_label) ({{ $sso_provider_label }}) @endif. Email is managed by your SSO provider.
+             </x-callout>
+         @endif
+
+         @if (! $uses_sso)
+         <template x-teleport="body">
             <div x-show="emailModalOpen" x-cloak
                 class="fixed inset-0 z-99 flex h-screen w-screen items-center justify-center p-4">
                 <div class="absolute inset-0 h-full w-full bg-black/55 backdrop-blur-[3px]"></div>
@@ -191,7 +198,8 @@
                     @endif
                 </div>
             </div>
-        </template>
+         </template>
+         @endif
 
         <form wire:submit="resetPassword">
             <section class="application-settings-section">
@@ -249,9 +257,9 @@
                             </form>
                             <div x-data="{ showCode: false }">
                                 <div x-cloak x-show="showCode" class="space-y-2 pb-3">
-                                    <x-forms.copy-button
+                                    <x-forms.copy-input
                                         text="{{ decrypt(request()->user()->two_factor_secret) }}" />
-                                    <x-forms.copy-button text="{{ request()->user()->twoFactorQrCodeUrl() }}" />
+                                    <x-forms.copy-input text="{{ request()->user()->twoFactorQrCodeUrl() }}" />
                                 </div>
                                 <x-forms.button type="button" x-on:click="showCode = !showCode">
                                     <span x-text="showCode ? 'Hide manual setup' : 'Show manual setup'"></span>

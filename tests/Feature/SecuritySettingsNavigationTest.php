@@ -8,6 +8,7 @@ it('uses shared sidebar navigation for keys and tokens pages', function () {
         'security/private-key/index.blade.php',
         'security/private-key/show.blade.php',
         'security/cloud-tokens.blade.php',
+        'security/integration-tokens.blade.php',
         'security/cloud-provider-token/show.blade.php',
         'security/cloud-init-scripts.blade.php',
         'security/cloud-init-script/show.blade.php',
@@ -22,6 +23,7 @@ it('uses shared sidebar navigation for keys and tokens pages', function () {
         ->toContain('application-settings-navigation')
         ->toContain("'label' => 'Private Keys'")
         ->toContain("'label' => 'Cloud Tokens'")
+        ->toContain("'label' => 'Integration Tokens'")
         ->toContain("'label' => 'Cloud-Init Scripts'")
         ->toContain("'label' => 'API Tokens'");
 

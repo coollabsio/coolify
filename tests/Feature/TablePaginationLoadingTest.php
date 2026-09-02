@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Gate;
 
 it('renders the shared page size selector', function () {
     $html = Blade::render('<x-page-size-select model="perPage" livewire storage-key="tests.page-size" />');
@@ -28,6 +29,18 @@ it('renders the shared page size selector', function () {
         ->toContain('Custom…')
         ->toContain('min="1"')
         ->toContain('max="100"');
+});
+
+it('disables page size controls when the gate denies access', function () {
+    Gate::define('view-audit-log-test', fn (): bool => false);
+
+    $html = Blade::render(<<<'BLADE'
+        <x-page-size-select model="perPage" livewire
+            canGate="view-audit-log-test" :canResource="new stdClass" />
+    BLADE);
+
+    expect($html)->toMatch('/<button[^>]*aria-label="Items per page"[^>]*\sdisabled(?:[=\s>])/')
+        ->toMatch('/<input[^>]*aria-label="Custom items per page"[^>]*\sdisabled(?:[=\s>])/');
 });
 
 it('positions table dropdown panels outside overflowing containers', function () {

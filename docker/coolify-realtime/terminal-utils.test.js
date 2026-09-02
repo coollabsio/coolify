@@ -36,6 +36,14 @@ test('extractSshArgs preserves proxy command as a single normalized ssh option v
     assert.equal(sshArgs[4], 'root@example.com');
 });
 
+test('extractSshArgs supports the generated bash or sh fallback command', () => {
+    const sshArgs = extractSshArgs(
+        "timeout 3600 ssh -o StrictHostKeyChecking=no 'root'@'10.0.0.5' 'if command -v bash >/dev/null 2>&1; then exec bash -se; else exec sh -se; fi' << \\\\$abc\necho hi\nabc"
+    );
+
+    assert.equal(extractTargetHost(sshArgs), '10.0.0.5');
+});
+
 test('isAuthorizedTargetHost matches normalized hosts against plain allowlist values', () => {
     assert.equal(isAuthorizedTargetHost("'10.0.0.5'", ['10.0.0.5']), true);
     assert.equal(isAuthorizedTargetHost('"host.docker.internal"', ['host.docker.internal']), true);
