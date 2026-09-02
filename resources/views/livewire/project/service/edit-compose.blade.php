@@ -25,7 +25,7 @@
     </div>
 
     <div
-        class="flex flex-wrap items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-1 dark:border-white/[0.08] dark:bg-white/[0.025]">
+        class="flex flex-col items-stretch gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-1 sm:flex-row sm:flex-wrap sm:items-center dark:border-white/[0.08] dark:bg-white/[0.025]">
         <x-forms.checkbox label="Escape special characters in labels"
             helper="By default, $ (and other characters) is escaped. A $ in a label is saved as $$. Turn this off to use environment variables inside labels."
             id="isContainerLabelEscapeEnabled" instantSave />
