@@ -106,6 +106,13 @@ class Index extends Component
             if ($serviceApplication) {
                 $this->service = $serviceApplication->service;
                 $this->authorize('view', $this->service);
+                $this->parameters = [
+                    'project_uuid' => $this->service->environment->project->uuid,
+                    'environment_uuid' => $this->service->environment->uuid,
+                    'service_uuid' => $this->service->uuid,
+                    'stack_service_uuid' => $serviceApplication->uuid,
+                ];
+                $this->query = request()->query();
                 $this->serviceApplication = $serviceApplication;
                 $this->resourceType = 'application';
                 $this->initializeApplicationProperties();

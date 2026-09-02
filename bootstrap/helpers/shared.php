@@ -5,6 +5,7 @@ use App\Enums\ProxyTypes;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -3873,6 +3874,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $fqdns = str($fqdns)->explode(',');
                         if ($pull_request_id !== 0) {
                             $preview = $resource->previews()->find($preview_id);
+                            if (! $preview) {
+                                try {
+                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
+                                } catch (ModelNotFoundException) {
+                                    throw new RuntimeException('Preview not found.');
+                                }
+                            }
                             $docker_compose_domains = json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: [];
                             if (count($docker_compose_domains) > 0) {
                                 $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
@@ -3887,10 +3895,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 );
                                 $fqdns = $generatedDomains->pluck('url');
                                 $preview->fqdn = $fqdns->implode(',');
-                                $preview->domain_port_overrides = $generatedDomains
+                                $generatedOverrides = $generatedDomains
                                     ->filter(fn (array $generated): bool => filled($generated['port']))
                                     ->mapWithKeys(fn (array $generated): array => [$generated['url'] => $generated['port']])
                                     ->all();
+                                $preview->domain_port_overrides = array_replace(
+                                    $preview->domain_port_overrides ?? [],
+                                    $generatedOverrides,
+                                );
                                 $preview->save();
                             }
                         }

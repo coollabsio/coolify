@@ -99,6 +99,20 @@ it('loads a persisted port override in the service application editor', function
         ->assertOk();
 });
 
+it('initializes route state when mounting a service application directly', function () {
+    Livewire::test(Index::class, [
+        'serviceApplication' => $this->serviceApplication,
+    ])
+        ->assertSet('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'service_uuid' => $this->service->uuid,
+            'stack_service_uuid' => $this->serviceApplication->uuid,
+        ])
+        ->assertSet('query', [])
+        ->assertOk();
+});
+
 it('loads the EditDomain component with required port', function () {
     Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
         ->assertSet('requiredPort', 8000)

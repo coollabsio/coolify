@@ -347,9 +347,79 @@ YAML,
 
     $preview->refresh();
 
-    expect(explode(',', (string) $preview->fqdn))->toHaveCount(2)
+    $previewDomains = explode(',', (string) $preview->fqdn);
+
+    expect($previewDomains)->toHaveCount(2)
+        ->and(collect($previewDomains)
+            ->filter(fn (string $domain): bool => parse_url($domain, PHP_URL_PORT) !== null))
+        ->toBeEmpty()
         ->and($preview->domain_port_overrides)->toHaveCount(2)
+        ->and(array_keys($preview->domain_port_overrides))->toBe($previewDomains)
         ->and(array_values($preview->domain_port_overrides))->toBe([3000, 8080]);
+});
+
+it('finds the legacy compose preview by pull request when its id is unavailable', function (?int $previewId) {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '2',
+        'docker_compose_raw' => "services:\n  frontend:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://app.example.com:3000'],
+        ]),
+    ]);
+
+    $preview = createPreviewForPortTests($this->application, 125);
+
+    parseDockerComposeFile($this->application->fresh(), pull_request_id: 125, preview_id: $previewId);
+
+    expect($preview->fresh()->fqdn)->not->toBeNull();
+})->with([
+    'missing id' => null,
+    'stale id' => PHP_INT_MAX,
+]);
+
+it('throws a controlled exception when the legacy compose preview does not exist', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '2',
+        'docker_compose_raw' => "services:\n  frontend:\n    image: nginx:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://app.example.com:3000'],
+        ]),
+    ]);
+
+    expect(fn () => parseDockerComposeFile(
+        $this->application->fresh(),
+        pull_request_id: 126,
+        preview_id: PHP_INT_MAX,
+    ))->toThrow(RuntimeException::class, 'Preview not found.');
+});
+
+it('preserves an existing preview port override in the legacy compose parser', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '2',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:alpine
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]);
+
+    $preview = createPreviewForPortTests($this->application, 126, [
+        'fqdn' => 'https://126.frontend.example.com',
+        'domain_port_overrides' => [
+            'https://126.frontend.example.com' => 8080,
+        ],
+    ]);
+
+    parseDockerComposeFile($this->application->fresh(), pull_request_id: 126, preview_id: $preview->id);
+
+    expect($preview->fresh()->domain_port_overrides)
+        ->toBe(['https://126.frontend.example.com' => 8080]);
 });
 
 it('does not copy production domain port overrides onto preview proxy labels', function () {
