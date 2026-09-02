@@ -7,6 +7,7 @@ use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
+use App\Support\DomainPortOverrides;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -135,6 +136,7 @@ class Application extends BaseModel
         'description',
         'fqdn',
         'noindex_domains',
+        'domain_port_overrides',
         'git_repository',
         'git_branch',
         'git_commit_sha',
@@ -246,6 +248,7 @@ class Application extends BaseModel
         'docker_compose_raw',
         'custom_labels',
         'domain_dns_statuses',
+        'domain_port_overrides',
     ];
 
     protected function casts(): array
@@ -258,6 +261,7 @@ class Application extends BaseModel
             'manual_webhook_secret_gitea' => 'encrypted',
             'noindex_domains' => 'array',
             'domain_dns_statuses' => 'array',
+            'domain_port_overrides' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
             'restart_limit_reached' => 'boolean',
@@ -286,6 +290,9 @@ class Application extends BaseModel
                 if ($application->fqdn === '') {
                     $application->fqdn = null;
                 }
+                $normalized = DomainPortOverrides::normalize($application->fqdn, $application->domain_port_overrides);
+                $application->fqdn = $normalized['fqdn'];
+                $application->domain_port_overrides = $normalized['overrides'];
                 $payload['fqdn'] = $application->fqdn;
                 $application->syncNoindexDomains();
             }

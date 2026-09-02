@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DomainPortOverrides;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -22,6 +23,7 @@ class ServiceApplication extends BaseModel
         'noindex_domains',
         'redirect',
         'domain_dns_statuses',
+        'domain_port_overrides',
         'ports',
         'exposes',
         'status',
@@ -44,6 +46,7 @@ class ServiceApplication extends BaseModel
      */
     protected $hidden = [
         'domain_dns_statuses',
+        'domain_port_overrides',
     ];
 
     protected $attributes = [
@@ -54,6 +57,7 @@ class ServiceApplication extends BaseModel
     {
         return [
             'domain_dns_statuses' => 'array',
+            'domain_port_overrides' => 'array',
             'noindex_domains' => 'array',
             'is_force_https_enabled' => 'boolean',
         ];
@@ -71,6 +75,7 @@ class ServiceApplication extends BaseModel
                 $service->last_online_at = now();
             }
             if ($service->isDirty('fqdn')) {
+                $service->normalizeDomainPortOverrides();
                 $service->syncNoindexDomains();
             }
         });
@@ -211,6 +216,18 @@ class ServiceApplication extends BaseModel
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    public static function withoutPort(string $url): string
+    {
+        return DomainPortOverrides::withoutPort($url);
+    }
+
+    protected function normalizeDomainPortOverrides(): void
+    {
+        $normalized = DomainPortOverrides::normalize($this->fqdn, $this->domain_port_overrides);
+        $this->fqdn = $normalized['fqdn'];
+        $this->domain_port_overrides = $normalized['overrides'];
     }
 
     /**

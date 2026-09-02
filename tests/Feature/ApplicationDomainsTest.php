@@ -1966,6 +1966,72 @@ it('auto-adds missing www pair for a single compose service redirect', function 
         ->and($webDomains)->toContain('https://www.web.example.com');
 });
 
+it('saves domain port overrides separately from the public FQDN', function () {
+    $this->application->update([
+        'fqdn' => 'https://one.example.com:3000,https://two.example.com:8080',
+    ]);
+
+    $this->application->refresh();
+
+    expect($this->application->fqdn)
+        ->toBe('https://one.example.com,https://two.example.com')
+        ->and($this->application->domain_port_overrides)
+        ->toBe([
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ]);
+});
+
+it('retains an existing domain port override when saving a portless domain', function () {
+    $this->application->update([
+        'fqdn' => 'https://one.example.com:3000',
+    ]);
+
+    $this->application->update([
+        'fqdn' => 'https://one.example.com',
+    ]);
+
+    expect($this->application->fresh()->fqdn)
+        ->toBe('https://one.example.com')
+        ->and($this->application->fresh()->domain_port_overrides)
+        ->toBe(['https://one.example.com' => 3000]);
+});
+
+it('prunes a domain port override when that domain is removed', function () {
+    $this->application->update([
+        'fqdn' => 'https://one.example.com:3000,https://two.example.com:8080',
+    ]);
+
+    $this->application->update([
+        'fqdn' => 'https://two.example.com',
+    ]);
+
+    expect($this->application->fresh()->fqdn)
+        ->toBe('https://two.example.com')
+        ->and($this->application->fresh()->domain_port_overrides)
+        ->toBe(['https://two.example.com' => 8080]);
+});
+
+it('keeps a legacy port-bearing application domain after refresh and reparse', function () {
+    $this->application->update([
+        'fqdn' => 'https://legacy.example.com',
+    ]);
+
+    DB::table('applications')->where('id', $this->application->id)->update([
+        'fqdn' => 'https://legacy.example.com:9090',
+    ]);
+
+    $application = Application::find($this->application->id);
+    $application->refresh();
+
+    expect($application->fqdn)->toBe('https://legacy.example.com:9090');
+
+    applicationParser($application);
+    $application->update(['description' => 'unrelated reparse']);
+
+    expect($application->fresh()->fqdn)->toBe('https://legacy.example.com:9090');
+});
+
 it('updates search engine indexing from the domains view', function () {
     $this->application->update(['fqdn' => 'https://app.example.com,https://staging.example.com']);
 
