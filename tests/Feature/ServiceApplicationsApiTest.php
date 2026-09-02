@@ -271,6 +271,19 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
         $response->assertStatus(422);
     });
 
+    test('returns 422 for a url port outside the valid TCP range', function (string $url) {
+        $ctx = createServiceWithApplicationForApiTest($this);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'url' => $url,
+        ])->assertUnprocessable();
+    })->with([
+        'zero' => 'https://example.com:0',
+        'above maximum' => 'https://example.com:65536',
+    ]);
+
     test('returns 422 when enabling log drain but server has no log drain', function () {
         $ctx = createServiceWithApplicationForApiTest($this);
 

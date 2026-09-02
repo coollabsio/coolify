@@ -182,6 +182,20 @@ describe('PATCH /api/v1/applications/{uuid}/previews/{pull_request_id}', functio
             ->assertJsonValidationErrors('domains');
     });
 
+    test('rejects preview domain ports outside the valid TCP range', function (string $domain) {
+        createPreview($this->application, 59);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/59", [
+                'domains' => $domain,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('domains');
+    })->with([
+        'zero' => 'https://preview.example.com:0',
+        'above maximum' => 'https://preview.example.com:65536',
+    ]);
+
     test('returns 403 when token lacks write ability', function () {
         $readOnlyToken = createTeamApiToken($this->user, $this->team, ['read']);
         createPreview($this->application, 45);
