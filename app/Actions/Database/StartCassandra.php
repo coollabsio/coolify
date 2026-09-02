@@ -3,12 +3,14 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneCassandra;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartCassandra
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneCassandra $database;
 
@@ -16,7 +18,11 @@ class StartCassandra
 
     public string $configuration_dir;
 
-    public function handle(StandaloneCassandra $database)
+    private string $resolvedCassandraUser;
+
+    private string $resolvedCassandraPassword;
+
+    public function handle(StandaloneCassandra $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -51,7 +57,7 @@ class StartCassandra
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD-SHELL', 'cqlsh -u '.escapeshellarg((string) $this->database->cassandra_admin_user).' -p '.escapeshellarg((string) $this->database->cassandra_admin_password)." -e 'SELECT release_version FROM system.local' > /dev/null 2>&1",
+                        'CMD-SHELL', 'cqlsh -u '.escapeshellarg($this->resolvedCassandraUser).' -p '.escapeshellarg($this->resolvedCassandraPassword)." -e 'SELECT release_version FROM system.local' > /dev/null 2>&1",
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -104,12 +110,12 @@ class StartCassandra
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
-        $this->commands[] = "docker stop -t 10 $container_name 2>/dev/null || true";
+        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -147,8 +153,17 @@ class StartCassandra
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedCassandraUser = (string) $this->database->cassandra_admin_user;
+        $this->resolvedCassandraPassword = (string) $this->database->cassandra_admin_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'CASSANDRA_USER') {
+                $this->resolvedCassandraUser = $rawValue;
+            } elseif ($env->key === 'CASSANDRA_PASSWORD') {
+                $this->resolvedCassandraPassword = $rawValue;
+            }
         }
 
         if ($environment_variables->filter(fn ($env) => str($env)->contains('CASSANDRA_USER'))->isEmpty()) {
