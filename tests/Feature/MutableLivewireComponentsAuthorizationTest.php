@@ -69,6 +69,41 @@ it('declares deploy authorization on the service container removal confirmation'
     );
 });
 
+it('declares update authorization on service backup mutation controls', function () {
+    $importBackupView = file_get_contents(resource_path('views/livewire/project/service/import-backup.blade.php'));
+    $volumeBackupView = file_get_contents(resource_path('views/livewire/project/service/volume-backup/index.blade.php'));
+
+    expect($importBackupView)->toMatch(
+        '/<x-forms\.listbox(?=[^>]*id="selectedDatabaseUuid")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/'
+    );
+
+    expect($volumeBackupView)
+        ->toMatch('/<x-modal-input(?=[^>]*:title="\'Edit backup schedule\'")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'database\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click\.stop="backupNow\(\'storage\',[^"]+")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$service")[^>]*>/');
+});
+
+it('declares update authorization on application port controls', function () {
+    $domainsView = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
+    $previewDomainsView = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
+    $generalView = file_get_contents(resource_path('views/livewire/project/application/general.blade.php'));
+
+    expect($domainsView)
+        ->toMatch('/<x-forms\.button(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>\s*Cancel/s')
+        ->toMatch('/<x-forms\.button(?=[^>]*wire:click="confirmUseUnknownPort")(?=[^>]*canGate="update")(?=[^>]*:canResource="\$application")[^>]*>/s');
+
+    expect($previewDomainsView)
+        ->toMatch('/<x-forms\.button[^\n]*canGate="update" :canResource="\$preview->application"[\s\S]{0,150}?Cancel/')
+        ->toMatch('/<x-forms\.button[^\n]*wire:click="confirmUseUnknownPort" canGate="update"\s+:canResource="\$preview->application"/');
+
+    $portsExposesControls = str($generalView)
+        ->after("@if (\$isStatic || \$buildPack === 'static')")
+        ->before('<p class="mt-1.5 text-xs');
+
+    expect($portsExposesControls->substrCount('id="portsExposes"'))->toBe(3)
+        ->and($portsExposesControls->substrCount('canGate="update" :canResource="$application"'))->toBe(3);
+});
+
 it('keeps mutable Livewire components behind authorization checks', function (string $path, array $requiredNeedles) {
     $source = file_get_contents(base_path($path));
 

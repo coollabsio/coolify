@@ -6,7 +6,6 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class BackupExecutions extends Component
@@ -37,12 +36,12 @@ class BackupExecutions extends Component
 
     public $delete_backup_sftp = false;
 
-    public function getListeners()
+    public function getListeners(): array
     {
-        $userId = Auth::id();
+        $teamId = currentTeam()->id;
 
         return [
-            "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
+            "echo-private:team.{$teamId},BackupCreated" => 'refreshBackupExecutions',
         ];
     }
 

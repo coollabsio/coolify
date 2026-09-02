@@ -10,6 +10,7 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -43,13 +44,14 @@ test('member cannot send test notification on discord', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update discord notification settings', function () {
+test('the private discord syncData helper is not remotely callable', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(DiscordNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
+    $component = Livewire::test(DiscordNotification::class);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
 });
 
 test('admin can update discord notification settings', function () {
@@ -78,13 +80,14 @@ test('member cannot send test notification on slack', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update slack notification settings', function () {
+test('the private slack syncData helper is not remotely callable', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(SlackNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
+    $component = Livewire::test(SlackNotification::class);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
 });
 
 test('admin can update slack notification settings', function () {
@@ -114,13 +117,14 @@ test('member cannot send test notification on telegram', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update telegram notification settings', function () {
+test('the private telegram syncData helper is not remotely callable', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(TelegramNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
+    $component = Livewire::test(TelegramNotification::class);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
 });
 
 test('admin can update telegram notification settings', function () {
@@ -138,7 +142,7 @@ test('telegram restart limit thread id accepts 255 characters', function () {
 
     Livewire::test(TelegramNotification::class)
         ->set('telegramNotificationsRestartLimitReachedThreadId', str_repeat('a', 255))
-        ->call('syncData', true)
+        ->call('submit')
         ->assertHasNoErrors(['telegramNotificationsRestartLimitReachedThreadId']);
 
     expect($this->team->telegramNotificationSettings->fresh()->telegram_notifications_restart_limit_reached_thread_id)
@@ -151,8 +155,11 @@ test('telegram restart limit thread id rejects 256 characters', function () {
 
     Livewire::test(TelegramNotification::class)
         ->set('telegramNotificationsRestartLimitReachedThreadId', str_repeat('a', 256))
-        ->call('syncData', true)
-        ->assertHasErrors(['telegramNotificationsRestartLimitReachedThreadId' => 'max']);
+        ->call('submit')
+        ->assertDispatched('error');
+
+    expect($this->team->telegramNotificationSettings->fresh()->telegram_notifications_restart_limit_reached_thread_id)
+        ->not->toBe(str_repeat('a', 256));
 });
 
 test('member cannot view telegram thread ids', function () {
@@ -226,13 +233,14 @@ test('member cannot send test email notification', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update email notification settings', function () {
+test('the private email syncData helper is not remotely callable', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(EmailNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
+    $component = Livewire::test(EmailNotification::class);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
 });
 
 test('member cannot update smtp email transport directly', function () {
@@ -330,13 +338,14 @@ test('member cannot send test notification on pushover', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update pushover notification settings', function () {
+test('the private pushover syncData helper is not remotely callable', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(PushoverNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
+    $component = Livewire::test(PushoverNotification::class);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
 });
 
 test('admin can update pushover notification settings', function () {
@@ -365,13 +374,14 @@ test('member cannot send test notification on webhook', function () {
         ->assertDispatched('error');
 });
 
-test('member cannot update webhook notification settings', function () {
+test('the private webhook syncData helper is not remotely callable', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(WebhookNotification::class)
-        ->call('syncData', true)
-        ->assertForbidden();
+    $component = Livewire::test(WebhookNotification::class);
+
+    expect(fn () => $component->call('syncData', true))
+        ->toThrow(MethodNotFoundException::class);
 });
 
 test('admin can update webhook notification settings', function () {

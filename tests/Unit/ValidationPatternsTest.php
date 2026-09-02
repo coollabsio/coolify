@@ -161,6 +161,33 @@ KEY',
     'empty' => '',
 ]);
 
+it('accepts shell-safe keys for sourced build-time env files', function (string $key) {
+    expect(ValidationPatterns::validatedShellEnvironmentVariableKey($key))->toBe($key);
+})->with([
+    'letters' => 'APP_ENV',
+    'leading underscore' => '_TOKEN',
+    'digits after first character' => 'NODE_VERSION_20',
+]);
+
+it('rejects keys that bash would interpret when sourcing a build-time env file', function (string $key) {
+    expect(fn () => ValidationPatterns::validatedShellEnvironmentVariableKey($key))
+        ->toThrow(InvalidArgumentException::class);
+})->with([
+    'command substitution' => 'X$(id)',
+    'dot notation' => 'X.VALUE',
+    'command substitution with arguments' => 'X$(docker run --rm -v /:/mnt alpine true)',
+]);
+
+it('makes unsafe environment variable keys safe to show in logs', function () {
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey('APP_ENV'))->toBe('APP_ENV');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey("X\nid"))->toBe('X\\nid');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey("X\e[2Jid\x7F"))->toBe('X\\x1B[2Jid\\x7F');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey(''))->toBe('(empty)');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey(str_repeat('A', 100)))
+        ->toEndWith('...')
+        ->toBe(str_repeat('A', 80).'...');
+});
+
 it('generates environment variable key rules with correct defaults', function () {
     $rules = ValidationPatterns::environmentVariableKeyRules();
 
@@ -197,3 +224,17 @@ it('rejects single-label application hostnames but allows IP addresses', functio
         ->and(ValidationPatterns::validateApplicationDomains('https://localhost'))->not->toBeEmpty()
         ->and(ValidationPatterns::validateApplicationDomains('http://192.0.2.10:8000'))->toBeEmpty();
 });
+
+it('rejects application domain ports outside the valid TCP range', function (string $domain) {
+    expect(ValidationPatterns::validateApplicationDomains($domain))->not->toBeEmpty();
+})->with([
+    'zero' => 'https://example.com:0',
+    'above maximum' => 'https://example.com:65536',
+]);
+
+it('accepts application domain ports at the TCP range boundaries', function (string $domain) {
+    expect(ValidationPatterns::validateApplicationDomains($domain))->toBeEmpty();
+})->with([
+    'minimum' => 'https://example.com:1',
+    'maximum' => 'https://example.com:65535',
+]);

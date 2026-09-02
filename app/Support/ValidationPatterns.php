@@ -109,6 +109,11 @@ class ValidationPatterns
     public const ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[A-Za-z_][A-Za-z0-9_.]*\z/u';
 
     /**
+     * Pattern for environment variable keys written to shell-sourced files.
+     */
+    public const SHELL_ENVIRONMENT_VARIABLE_KEY_PATTERN = '/\A[A-Za-z_][A-Za-z0-9_]*\z/u';
+
+    /**
      * Characters that are valid in some URL positions but unsafe for values
      * that are later reused in shell assignment contexts.
      */
@@ -190,6 +195,43 @@ class ValidationPatterns
     public static function isValidEnvironmentVariableKey(string $value): bool
     {
         return preg_match(self::ENVIRONMENT_VARIABLE_KEY_PATTERN, $value) === 1;
+    }
+
+    /**
+     * Make an environment variable key safe to show in deployment logs.
+     *
+     * Control characters are escaped and long values are truncated so an
+     * unexpected key cannot corrupt or overflow the deployment log output.
+     */
+    public static function displayShellEnvironmentVariableKey(string $value, int $maxLength = 80): string
+    {
+        $printable = str($value)
+            ->replace(["\0", "\r", "\n", "\t"], ['\\0', '\\r', '\\n', '\\t'])
+            ->value();
+
+        $printable = preg_replace_callback(
+            '/[\x00-\x1F\x7F]/',
+            fn (array $matches): string => sprintf('\\x%02X', ord($matches[0])),
+            $printable,
+        );
+
+        if ($printable === '') {
+            return '(empty)';
+        }
+
+        return str($printable)->limit($maxLength)->value();
+    }
+
+    /**
+     * Validate an environment variable key before writing it to a shell-sourced file.
+     */
+    public static function validatedShellEnvironmentVariableKey(string $value): string
+    {
+        if (preg_match(self::SHELL_ENVIRONMENT_VARIABLE_KEY_PATTERN, $value) !== 1) {
+            throw new \InvalidArgumentException('Invalid environment variable name '.self::displayShellEnvironmentVariableKey($value).'. Names must start with a letter or underscore and contain only letters, numbers, and underscores.');
+        }
+
+        return $value;
     }
 
     /**
@@ -573,6 +615,13 @@ class ValidationPatterns
             $host = parse_url($url, PHP_URL_HOST);
             if (blank($host)) {
                 $errors[] = "Invalid URL: {$url}";
+
+                continue;
+            }
+
+            $port = parse_url($url, PHP_URL_PORT);
+            if ($port !== null && ($port < 1 || $port > 65535)) {
+                $errors[] = "Invalid port for URL: {$url}. The port must be between 1 and 65535.";
 
                 continue;
             }

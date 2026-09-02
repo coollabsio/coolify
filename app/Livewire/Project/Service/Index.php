@@ -59,8 +59,6 @@ class Index extends Component
 
     public bool $isLogDrainEnabled = false;
 
-    public bool $isImportSupported = false;
-
     // Application-specific properties
     public $docker_cleanup = true;
 
@@ -101,10 +99,27 @@ class Index extends Component
         'isStripprefixEnabled' => 'nullable|boolean',
     ];
 
-    public function mount()
+    public function mount(?ServiceApplication $serviceApplication = null)
     {
         try {
             $this->services = collect([]);
+            if ($serviceApplication) {
+                $this->service = $serviceApplication->service;
+                $this->authorize('view', $this->service);
+                $this->parameters = [
+                    'project_uuid' => $this->service->environment->project->uuid,
+                    'environment_uuid' => $this->service->environment->uuid,
+                    'service_uuid' => $this->service->uuid,
+                    'stack_service_uuid' => $serviceApplication->uuid,
+                ];
+                $this->query = request()->query();
+                $this->serviceApplication = $serviceApplication;
+                $this->resourceType = 'application';
+                $this->initializeApplicationProperties();
+                $this->s3s = currentTeam()->s3s;
+
+                return;
+            }
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             $this->currentRoute = request()->route()->getName();
@@ -153,10 +168,6 @@ class Index extends Component
         $this->refreshFileStorages();
         $this->syncDatabaseData(false);
 
-        // Check if import is supported for this database type
-        $dbType = $this->serviceDatabase->databaseType();
-        $supportedTypes = ['mysql', 'mariadb', 'postgres', 'mongo'];
-        $this->isImportSupported = collect($supportedTypes)->contains(fn ($type) => str_contains($dbType, $type));
     }
 
     private function syncDatabaseData(bool $toModel = false): void
@@ -356,7 +367,7 @@ class Index extends Component
         if ($toModel) {
             $this->serviceApplication->human_name = $this->humanName;
             $this->serviceApplication->description = $this->description;
-            $this->serviceApplication->fqdn = $this->fqdn;
+            $this->serviceApplication->setEditableUrls($this->fqdn);
             $this->serviceApplication->image = $this->image;
             $this->serviceApplication->exclude_from_status = $this->excludeFromStatus;
             $this->serviceApplication->is_log_drain_enabled = $this->isLogDrainEnabled;
@@ -365,7 +376,7 @@ class Index extends Component
         } else {
             $this->humanName = $this->serviceApplication->human_name;
             $this->description = $this->serviceApplication->description;
-            $this->fqdn = $this->serviceApplication->fqdn;
+            $this->fqdn = $this->serviceApplication->url;
             $this->image = $this->serviceApplication->image;
             $this->excludeFromStatus = data_get($this->serviceApplication, 'exclude_from_status', false);
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
@@ -491,6 +502,10 @@ class Index extends Component
     public function submitApplication()
     {
         try {
+            $persistedApplication = $this->serviceApplication->fresh();
+            $previousEditableUrls = $persistedApplication->url;
+            $previousFqdn = $persistedApplication->fqdn;
+            $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->serviceApplication);
             $this->validate([
                 'fqdn' => ValidationPatterns::applicationDomainRules(),
@@ -520,27 +535,20 @@ class Index extends Component
                 $requiredPort = $this->serviceApplication->getRequiredPort();
 
                 if ($requiredPort !== null) {
-                    $fqdns = str($this->fqdn)->trim()->explode(',');
-                    $missingPort = false;
-
-                    foreach ($fqdns as $fqdn) {
-                        $fqdn = trim($fqdn);
-                        if (empty($fqdn)) {
+                    foreach (str($this->fqdn)->trim()->explode(',') as $fqdn) {
+                        $fqdn = trim((string) $fqdn);
+                        if ($fqdn === '') {
                             continue;
                         }
 
-                        $port = ServiceApplication::extractPortFromUrl($fqdn);
-                        if ($port === null) {
-                            $missingPort = true;
-                            break;
+                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                            $this->requiredPort = $requiredPort;
+                            $this->showPortWarningModal = true;
+                            $this->serviceApplication->fqdn = $previousFqdn;
+                            $this->serviceApplication->domain_port_overrides = $previousPortOverrides;
+
+                            return;
                         }
-                    }
-
-                    if ($missingPort) {
-                        $this->requiredPort = $requiredPort;
-                        $this->showPortWarningModal = true;
-
-                        return;
                     }
                 }
             } else {
