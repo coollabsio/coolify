@@ -36,7 +36,10 @@ class CleanupHelperContainersJob implements ShouldBeEncrypted, ShouldBeUnique, S
                 'active_deployment_uuids' => $activeDeployments,
             ]);
 
-            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("'.config('constants.coolify.registry_url').'/coollabsio/coolify-helper")))\''], $this->server, false);
+            // docker ps elides the default registry, so Image is "coollabsio/coolify-helper:…"
+            // not "docker.io/coollabsio/coolify-helper:…". Match the un-prefixed name
+            // (still matches ghcr.io/… and docker.io/… if they ever appear). See #11511.
+            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("coollabsio/coolify-helper")))\''], $this->server, false);
             $helperContainers = collect(json_decode($containers));
 
             if ($helperContainers->count() > 0) {
