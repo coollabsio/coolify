@@ -65,10 +65,13 @@ test('member cannot update server', function () {
 test('member cannot invoke server validation write steps', function (string $method) {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
+    $before = $this->server->fresh()->getAttributes();
 
     Livewire::test(ValidateAndInstall::class, ['server' => $this->server])
         ->call($method)
         ->assertForbidden();
+
+    expect($this->server->fresh()->getAttributes())->toBe($before);
 })->with([
     'init',
     'validateOS',

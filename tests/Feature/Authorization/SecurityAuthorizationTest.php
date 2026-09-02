@@ -1,10 +1,13 @@
 <?php
 
+use App\Livewire\Security\CloudInitScripts;
 use App\Livewire\Security\CloudProviderTokenForm;
+use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
@@ -34,4 +37,21 @@ test('member cannot create a cloud provider token through the public action', fu
         ->assertForbidden();
 
     expect(CloudProviderToken::query()->count())->toBe(0);
+});
+
+test('member cannot load cloud-init scripts through the public action', function () {
+    $script = CloudInitScript::query()->create([
+        'team_id' => $this->team->id,
+        'name' => 'Protected script',
+        'script' => '#cloud-config',
+    ]);
+
+    CloudInitScript::query()->whereKey($script)->update(['uuid' => null]);
+
+    $component = app(CloudInitScripts::class);
+
+    expect(fn () => $component->loadScripts())
+        ->toThrow(AuthorizationException::class);
+
+    expect($script->refresh()->uuid)->toBeNull();
 });
