@@ -120,13 +120,10 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
             // Store execution ID for timeout handling
             $this->executionId = $this->task_log->id;
 
-            if ($this->resource->type() === 'application') {
+            $isApplication = $this->resource->type() === 'application';
+            if ($isApplication) {
                 $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
-                if ($containers->count() > 0) {
-                    $containers->each(function ($container) {
-                        $this->containers[] = str_replace('/', '', $container['Names']);
-                    });
-                }
+                $this->containers = self::runningContainerNames($containers);
             } elseif ($this->resource->type() === 'service') {
                 $this->resource->applications()->get()->each(function ($application) {
                     if (str(data_get($application, 'status'))->contains('running')) {
@@ -143,32 +140,34 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 throw new \Exception('ScheduledTaskJob failed: No containers running.');
             }
 
-            if (count($this->containers) > 1 && empty($this->task->container)) {
+            $containerName = self::pickScheduledTaskContainer(
+                $this->containers,
+                $this->task->container,
+                (string) $this->resource->uuid,
+                $isApplication,
+            );
+            if ($containerName === null) {
+                if ($isApplication) {
+                    throw new NonReportableException('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
+                }
                 throw new \Exception('ScheduledTaskJob failed: More than one container exists but no container name was provided.');
             }
 
-            foreach ($this->containers as $containerName) {
-                if (count($this->containers) == 1 || str_starts_with($containerName, $this->task->container.'-'.$this->resource->uuid)) {
-                    $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
-                    $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
-                    $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";
-                    $exec = $this->boundedTaskCommand($execCommand);
-                    // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
-                    // See: https://github.com/coollabsio/coolify/issues/6736
-                    $this->task_output = instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->timeout, disableMultiplexing: true);
-                    $this->task_log->update([
-                        'status' => 'success',
-                        'message' => $this->task_output,
-                    ]);
+            $cmd = "sh -c '".str_replace("'", "'\''", $this->task->command)."'";
+            $dockerCommand = $this->server->isNonRoot() ? 'sudo docker' : 'docker';
+            $execCommand = "{$dockerCommand} exec {$containerName} {$cmd}";
+            $exec = $this->boundedTaskCommand($execCommand);
+            // Disable SSH multiplexing to prevent race conditions when multiple tasks run concurrently
+            // See: https://github.com/coollabsio/coolify/issues/6736
+            $this->task_output = instant_remote_process([$exec], $this->server, throwError: true, no_sudo: true, timeout: $this->timeout, disableMultiplexing: true);
+            $this->task_log->update([
+                'status' => 'success',
+                'message' => $this->task_output,
+            ]);
 
-                    $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
+            $this->team?->notify(new TaskSuccess($this->task, $this->task_output));
 
-                    return;
-                }
-            }
-
-            // No valid container was found.
-            throw new NonReportableException('ScheduledTaskJob failed: No valid container was found. Is the container name correct?');
+            return;
         } catch (\Throwable $e) {
             if ($this->task_log) {
                 $this->task_log->update([
@@ -206,6 +205,74 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    public static function runningContainerNames(iterable $containers): array
+    {
+        $names = [];
+        foreach ($containers as $container) {
+            $state = strtolower((string) data_get($container, 'State', ''));
+            if ($state !== '' && $state !== 'running') {
+                continue;
+            }
+            $name = str_replace('/', '', (string) data_get($container, 'Names', ''));
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    public static function applicationContainerOrdinal(string $name): string
+    {
+        if (preg_match('/-(\d{12})$/', $name, $matches)) {
+            return $matches[1];
+        }
+
+        return '0';
+    }
+
+    public static function containerMatchesScheduledTask(string $containerName, string $configuredContainer, string $resourceUuid, bool $isApplication): bool
+    {
+        if ($isApplication) {
+            return $containerName === $configuredContainer
+                || str_starts_with($containerName, $configuredContainer.'-');
+        }
+
+        return str_starts_with($containerName, $configuredContainer.'-'.$resourceUuid);
+    }
+
+    public static function pickScheduledTaskContainer(array $runningNames, ?string $configuredContainer, string $resourceUuid, bool $isApplication): ?string
+    {
+        $runningNames = array_values(array_filter($runningNames, fn ($name) => is_string($name) && $name !== ''));
+        if ($runningNames === []) {
+            return null;
+        }
+
+        if (filled($configuredContainer)) {
+            foreach ($runningNames as $name) {
+                if (self::containerMatchesScheduledTask($name, $configuredContainer, $resourceUuid, $isApplication)) {
+                    return $name;
+                }
+            }
+
+            return null;
+        }
+
+        if (count($runningNames) === 1) {
+            return $runningNames[0];
+        }
+
+        if (! $isApplication) {
+            return null;
+        }
+
+        usort($runningNames, function (string $a, string $b) {
+            return self::applicationContainerOrdinal($a) <=> self::applicationContainerOrdinal($b);
+        });
+
+        return $runningNames[0];
     }
 
     private function boundedTaskCommand(string $command): string
