@@ -394,11 +394,12 @@
                             </x-callout>
 
                             <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
-                                <x-forms.button type="button"
+                                <x-forms.button type="button" canGate="update" :canResource="$application"
                                     @click="modalOpen = false; $wire.call('cancelUseUnknownPort')">
                                     Cancel
                                 </x-forms.button>
-                                <x-forms.button type="button" wire:click="confirmUseUnknownPort"
+                                <x-forms.button type="button" wire:click="confirmUseUnknownPort" canGate="update"
+                                    :canResource="$application"
                                     @click="modalOpen = false" isError>
                                     Use this port anyway
                                 </x-forms.button>

@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
@@ -229,6 +230,29 @@ describe('PATCH /api/v1/applications/{uuid}/previews/{pull_request_id}', functio
                 'domains' => 'https://taken-preview.example.com:8080',
             ])
             ->assertConflict();
+    });
+
+    test('filters preview conflict candidates in the database', function () {
+        createPreview($this->application, 56)->update(['fqdn' => 'https://taken-preview.example.com']);
+        createPreview($this->application, 57)->update(['fqdn' => 'https://current-preview.example.com']);
+        createPreview($this->application, 58)->update(['fqdn' => 'https://unrelated.example.com']);
+
+        $queries = collect();
+        DB::listen(function ($query) use ($queries): void {
+            if (str_contains($query->sql, 'from "application_previews"')) {
+                $queries->push($query->sql);
+            }
+        });
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/57", [
+                'domains' => 'https://taken-preview.example.com',
+            ])
+            ->assertConflict();
+
+        expect($queries->first(fn (string $sql): bool => str_contains($sql, '"application_id" in (select')
+            && str_contains($sql, '"fqdn" is not null')
+            && str_contains($sql, '"fqdn" like ?')))->not->toBeNull();
     });
 
     test('updates Docker Compose preview domains with per-domain ports', function () {

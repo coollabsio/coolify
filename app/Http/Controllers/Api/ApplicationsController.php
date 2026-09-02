@@ -2674,14 +2674,29 @@ class ApplicationsController extends Controller
             ], 409);
         }
 
-        $conflictingPreview = ApplicationPreview::query()
-            ->whereIn('application_id', Application::ownedByCurrentTeamAPI($teamId)->get()->pluck('id'))
-            ->whereKeyNot($preview->id)
-            ->get(['uuid', 'pull_request_id', 'fqdn'])
-            ->first(fn (ApplicationPreview $otherPreview): bool => collect(ValidationPatterns::applicationDomainList($otherPreview->fqdn))
-                ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
-                ->intersect($urls)
-                ->isNotEmpty());
+        $hostCandidates = $urls
+            ->map(fn (string $url): string => (string) parse_url($url, PHP_URL_HOST))
+            ->filter();
+        $conflictingPreview = null;
+        if ($hostCandidates->isNotEmpty()) {
+            $conflictingPreview = ApplicationPreview::query()
+                ->whereIn('application_id', Application::ownedByCurrentTeamAPI($teamId)
+                    ->withoutGlobalScope('withRelations')
+                    ->reorder()
+                    ->select('applications.id'))
+                ->whereKeyNot($preview->id)
+                ->whereNotNull('fqdn')
+                ->where(function ($query) use ($hostCandidates): void {
+                    foreach ($hostCandidates as $host) {
+                        $query->orWhere('fqdn', 'like', '%'.$host.'%');
+                    }
+                })
+                ->get(['uuid', 'pull_request_id', 'fqdn'])
+                ->first(fn (ApplicationPreview $otherPreview): bool => collect(ValidationPatterns::applicationDomainList($otherPreview->fqdn))
+                    ->map(fn (string $domain): string => DomainPortOverrides::withoutPort($domain))
+                    ->intersect($urls)
+                    ->isNotEmpty());
+        }
 
         if ($conflictingPreview && ! $request->boolean('force_domain_override')) {
             return response()->json([

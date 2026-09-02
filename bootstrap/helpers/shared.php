@@ -5,7 +5,6 @@ use App\Enums\ProxyTypes;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -3107,7 +3106,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ? ($savedService->domain_port_overrides ?? [])
                             : [];
                         $onlyPort = $savedService instanceof ServiceApplication
-                            ? $savedService->getRequiredPort()
+                            ? ($savedService->getRequiredPort() ?? $predefinedPort)
                             : $predefinedPort;
                         if ($shouldGenerateLabelsExactly) {
                             switch ($resource->server->proxyType()) {
@@ -3883,19 +3882,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $fqdns = collect([]);
                                 }
                             } else {
-                                $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
-                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
-                                    $generated = $preview->generatedPreviewDomain((string) $fqdn);
-                                    $preview->fqdn = $generated['url'];
-                                    if (filled($generated['port'])) {
-                                        $overrides = $preview->domain_port_overrides ?? [];
-                                        $overrides[$generated['url']] = $generated['port'];
-                                        $preview->domain_port_overrides = $overrides;
-                                    }
-                                    $preview->save();
-
-                                    return $generated['url'];
-                                });
+                                $generatedDomains = $fqdns->map(
+                                    fn ($fqdn) => $preview->generatedPreviewDomain((string) $fqdn)
+                                );
+                                $fqdns = $generatedDomains->pluck('url');
+                                $preview->fqdn = $fqdns->implode(',');
+                                $preview->domain_port_overrides = $generatedDomains
+                                    ->filter(fn (array $generated): bool => filled($generated['port']))
+                                    ->mapWithKeys(fn (array $generated): array => [$generated['url'] => $generated['port']])
+                                    ->all();
+                                $preview->save();
                             }
                         }
                         $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();

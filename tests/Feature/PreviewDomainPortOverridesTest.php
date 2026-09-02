@@ -317,6 +317,41 @@ it('copies the parent domain port override onto a generated preview domain', fun
         ->toBe([8080]);
 });
 
+it('saves generated preview domains once in the application parser', function () {
+    $parser = file_get_contents(base_path('bootstrap/helpers/parsers.php'));
+    $previewGeneration = Str::of($parser)
+        ->after('// If the domain is set, we need to generate the FQDNs for the preview')
+        ->before('$defaultLabels = defaultLabels');
+
+    expect($previewGeneration->substrCount('$preview->save();'))->toBe(1)
+        ->and((string) $previewGeneration)->toContain('$preview->fqdn = $fqdns->implode(\',\');');
+});
+
+it('keeps every generated preview domain port override in the legacy compose parser', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '2',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: nginx:alpine
+YAML,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://one.example.com:3000,https://two.example.com:8080'],
+        ]),
+    ]);
+
+    $preview = createPreviewForPortTests($this->application, 124);
+
+    parseDockerComposeFile($this->application->fresh(), pull_request_id: 124, preview_id: $preview->id);
+
+    $preview->refresh();
+
+    expect(explode(',', (string) $preview->fqdn))->toHaveCount(2)
+        ->and($preview->domain_port_overrides)->toHaveCount(2)
+        ->and(array_values($preview->domain_port_overrides))->toBe([3000, 8080]);
+});
+
 it('does not copy production domain port overrides onto preview proxy labels', function () {
     $this->application->update([
         'fqdn' => 'https://app.example.com',

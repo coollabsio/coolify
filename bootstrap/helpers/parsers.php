@@ -1265,19 +1265,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $fqdns = collect([]);
                     }
                 } else {
-                    $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId, $resource) {
-                        $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pullRequestId);
-                        $generated = $preview->generatedPreviewDomain((string) $fqdn);
-                        $preview->fqdn = $generated['url'];
-                        if (filled($generated['port'])) {
-                            $overrides = $preview->domain_port_overrides ?? [];
-                            $overrides[$generated['url']] = $generated['port'];
-                            $preview->domain_port_overrides = $overrides;
-                        }
-                        $preview->save();
-
-                        return $generated['url'];
-                    });
+                    $generatedDomains = $fqdns->map(
+                        fn ($fqdn) => $preview->generatedPreviewDomain((string) $fqdn)
+                    );
+                    $fqdns = $generatedDomains->pluck('url');
+                    $preview->fqdn = $fqdns->implode(',');
+                    $preview->domain_port_overrides = $generatedDomains
+                        ->filter(fn (array $generated): bool => filled($generated['port']))
+                        ->mapWithKeys(fn (array $generated): array => [$generated['url'] => $generated['port']])
+                        ->all();
+                    $preview->save();
                 }
             }
         }

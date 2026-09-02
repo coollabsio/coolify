@@ -472,15 +472,18 @@
                     @if ($isStatic || $buildPack === 'static')
                         <x-forms.input id="portsExposes" label="Ports exposes" readonly
                             :helper="$portsExposesDomainHint"
+                            canGate="update" :canResource="$application"
                             x-bind:disabled="!canUpdate" />
                     @else
                         @if ($application->settings->is_container_label_readonly_enabled === false)
                             <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports exposes" readonly
                                 :helper="'Readonly labels are disabled. You can set the ports manually in the labels section.<br><br>'.$portsExposesDomainHint"
+                                canGate="update" :canResource="$application"
                                 x-bind:disabled="!canUpdate" />
                         @else
                             <x-forms.input placeholder="3000,3001" id="portsExposes" label="Ports exposes"
                                 :helper="'A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly.<br><br>'.$portsExposesDomainHint"
+                                canGate="update" :canResource="$application"
                                 x-bind:disabled="!canUpdate" />
                         @endif
                     @endif

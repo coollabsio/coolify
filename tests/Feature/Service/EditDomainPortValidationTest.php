@@ -77,6 +77,28 @@ beforeEach(function () {
     }
 });
 
+it('loads a persisted port override in the service application editor', function () {
+    $this->serviceApplication->update([
+        'fqdn' => 'https://web.example.com',
+        'domain_port_overrides' => [
+            'https://web.example.com' => 8080,
+        ],
+    ]);
+
+    Livewire::test(Index::class, [
+        'serviceApplication' => $this->serviceApplication->fresh(),
+        'parameters' => [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'service_uuid' => $this->service->uuid,
+            'stack_service_uuid' => $this->serviceApplication->uuid,
+        ],
+        'query' => [],
+    ])
+        ->assertSet('fqdn', 'https://web.example.com:8080')
+        ->assertOk();
+});
+
 it('loads the EditDomain component with required port', function () {
     Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
         ->assertSet('requiredPort', 8000)
@@ -104,23 +126,6 @@ it('loads a persisted port override and moves it when the hostname changes', fun
         ->domain_port_overrides->toBe([
             'https://new.example.com' => 8080,
         ]);
-});
-
-it('loads a persisted port override in the service application editor', function () {
-    $this->serviceApplication->update([
-        'fqdn' => 'https://web.example.com',
-        'domain_port_overrides' => [
-            'https://web.example.com' => 8080,
-        ],
-    ]);
-
-    $component = new Index;
-    $component->serviceApplication = $this->serviceApplication->fresh();
-
-    $syncApplicationData = new ReflectionMethod($component, 'syncApplicationData');
-    $syncApplicationData->invoke($component, false);
-
-    expect($component->fqdn)->toBe('https://web.example.com:8080');
 });
 
 it('marks noindex changes as pending configuration', function () {

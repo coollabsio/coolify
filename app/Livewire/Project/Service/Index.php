@@ -99,10 +99,20 @@ class Index extends Component
         'isStripprefixEnabled' => 'nullable|boolean',
     ];
 
-    public function mount()
+    public function mount(?ServiceApplication $serviceApplication = null)
     {
         try {
             $this->services = collect([]);
+            if ($serviceApplication) {
+                $this->service = $serviceApplication->service;
+                $this->authorize('view', $this->service);
+                $this->serviceApplication = $serviceApplication;
+                $this->resourceType = 'application';
+                $this->initializeApplicationProperties();
+                $this->s3s = currentTeam()->s3s;
+
+                return;
+            }
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             $this->currentRoute = request()->route()->getName();
