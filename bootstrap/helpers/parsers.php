@@ -1359,6 +1359,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                 ? $composeRedirect
                 : 'both';
+            $domainPortOverrides = $isPullRequest ? [] : ($originalResource->domain_port_overrides ?? []);
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -1375,7 +1376,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             service_name: $serviceName,
                             image: $image,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            domainPortOverrides: $domainPortOverrides,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1391,7 +1393,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             image: $image,
                             predefinedPort: $predefinedPort,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            domainPortOverrides: $domainPortOverrides,
                         ));
                         break;
                 }
@@ -1406,7 +1409,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     service_name: $serviceName,
                     image: $image,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    domainPortOverrides: $domainPortOverrides,
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
@@ -1420,7 +1424,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     image: $image,
                     predefinedPort: $predefinedPort,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    domainPortOverrides: $domainPortOverrides,
                 ));
             }
         }
@@ -1849,11 +1854,7 @@ function serviceParser(Service $resource): Collection
                 // Only save fqdn to ServiceApplication, not ServiceDatabase
                 if ($isServiceApplication && is_null($savedService->fqdn)) {
                     // Save URL (with scheme) to database, not FQDN
-                    if ((int) $resource->compose_parsing_version >= 5 && version_compare(config('constants.coolify.version'), '4.0.0-beta.420.7', '>=')) {
-                        $savedService->fqdn = $urlWithPort;
-                    } else {
-                        $savedService->fqdn = $urlWithPort;
-                    }
+                    $savedService->fqdn = $url;
                     $savedService->save();
                 }
 
@@ -2651,6 +2652,8 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $predefinedPort,
+                            domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
@@ -2667,6 +2670,7 @@ function serviceParser(Service $resource): Collection
                             service_name: $serviceName,
                             image: $image,
                             predefinedPort: $predefinedPort,
+                            domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
@@ -2682,6 +2686,8 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $predefinedPort,
+                    domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
@@ -2696,6 +2702,7 @@ function serviceParser(Service $resource): Collection
                     service_name: $serviceName,
                     image: $image,
                     predefinedPort: $predefinedPort,
+                    domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));

@@ -3891,6 +3891,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                             ? $composeRedirect
                             : 'both';
+                        $domainPortOverrides = $pull_request_id === 0 ? ($resource->domain_port_overrides ?? []) : [];
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3906,6 +3907,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
+                                            domainPortOverrides: $domainPortOverrides,
                                         )
                                     );
                                     break;
@@ -3922,6 +3924,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
+                                            domainPortOverrides: $domainPortOverrides,
                                         )
                                     );
                                     break;
@@ -3939,6 +3942,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
+                                    domainPortOverrides: $domainPortOverrides,
                                 )
                             );
                             $serviceLabels = $serviceLabels->merge(
@@ -3953,6 +3957,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
+                                    domainPortOverrides: $domainPortOverrides,
                                 )
                             );
                         }
