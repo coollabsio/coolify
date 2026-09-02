@@ -1,8 +1,11 @@
 <?php
 
 use App\Livewire\Project\Application\Advanced as ApplicationAdvanced;
+use App\Livewire\Project\Application\General as ApplicationGeneral;
 use App\Livewire\Project\Application\Heading as ApplicationHeading;
 use App\Livewire\Project\Application\Rollback as ApplicationRollback;
+use App\Livewire\Project\Shared\EnvironmentVariable\Show as EnvironmentVariableShow;
+use App\Livewire\Project\Shared\GetLogs;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -10,6 +13,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -167,6 +171,60 @@ test('member cannot call force deploy on application heading', function () {
 
 test('member cannot update application general settings', function () {
     expect($this->member->can('update', $this->application))->toBeFalse();
+});
+
+test('member cannot reset application labels', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $originalLabels = $this->application->custom_labels;
+
+    $component = app(ApplicationGeneral::class);
+    $component->application = $this->application;
+    $component->isContainerLabelReadonlyEnabled = true;
+
+    expect(fn () => $component->resetDefaultLabels(true))
+        ->toThrow(AuthorizationException::class);
+
+    expect($this->application->fresh()->custom_labels)->toBe($originalLabels);
+});
+
+test('member cannot load application environment variable values', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $environmentVariable = $this->application->environment_variables()->create([
+        'key' => 'SECRET_KEY',
+        'value' => 'super-secret-value',
+        'is_preview' => false,
+    ]);
+
+    Livewire::test(EnvironmentVariableShow::class, [
+        'env' => $environmentVariable,
+        'type' => 'application',
+    ])
+        ->call('loadValues')
+        ->assertForbidden()
+        ->assertSet('valuesLoaded', false)
+        ->assertSet('value', null);
+});
+
+test('member cannot save application log timestamp settings', function () {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $originalValue = $this->application->settings->is_include_timestamps;
+
+    Livewire::test(GetLogs::class, [
+        'resource' => $this->application,
+        'server' => $this->server,
+        'container' => $this->application->uuid,
+    ])
+        ->set('showTimeStamps', ! $originalValue)
+        ->call('instantSave')
+        ->assertSuccessful();
+
+    expect($this->application->settings->fresh()->is_include_timestamps)->toBe($originalValue);
 });
 
 // --- Application Advanced Livewire actions ---
