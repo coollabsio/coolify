@@ -332,10 +332,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     $allContainers = collect($allContainers)->sort()->values();
                     foreach ($allContainers as $container) {
                         $containerName = data_get($container, 'Name');
-                        if ($containerName === 'coolify-proxy') {
-                            continue;
-                        }
-                        if (preg_match('/-(\d{12})/', $containerName)) {
+                        if (self::shouldSkipBuildAddHost($containerName, (string) $this->deployment_uuid)) {
                             continue;
                         }
                         $containerIp = data_get($container, 'IPv4Address');
@@ -5246,5 +5243,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }
         }
+    }
+
+    /**
+     * Extra hosts are part of BuildKit's RUN cache key. Skip the current
+     * coolify-helper (named after the deployment uuid) so unchanged Dockerfiles
+     * can reuse cached RUN layers across deploys.
+     */
+    public static function shouldSkipBuildAddHost(?string $containerName, string $deploymentUuid): bool
+    {
+        if ($containerName === null || $containerName === '') {
+            return true;
+        }
+        if ($containerName === 'coolify-proxy') {
+            return true;
+        }
+        if (preg_match('/-(\d{12})/', $containerName)) {
+            return true;
+        }
+
+        return $containerName === $deploymentUuid;
     }
 }
