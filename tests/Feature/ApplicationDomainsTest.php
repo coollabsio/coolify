@@ -24,6 +24,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->withoutVite();
+    config(['app.maintenance.driver' => 'file']);
 
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(
         ['id' => 0],
@@ -2302,4 +2303,108 @@ it('prunes a compose domain port override when that domain is removed', function
         ->not->toHaveKey('https://web.example.com')
         ->toHaveKey('https://api.example.com', 4000)
         ->and($this->application->fqdn)->toBeNull();
+});
+
+function applicationDomainPortOverrideApiToken(User $user, Team $team): string
+{
+    $plainTextToken = Str::random(40);
+    $token = $user->tokens()->create([
+        'name' => 'application-domain-port-override-api',
+        'token' => hash('sha256', $plainTextToken),
+        'abilities' => ['*'],
+        'team_id' => $team->id,
+    ]);
+    auth()->logout();
+
+    return $token->getKey().'|'.$plainTextToken;
+}
+
+it('application domain port override API update containing a port persists a portless FQDN and override', function () {
+    $bearer = applicationDomainPortOverrideApiToken($this->user, $this->team);
+
+    $this->withToken($bearer)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'domains' => 'https://example.com:8080',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+
+    expect($application->fqdn)->toBe('https://example.com')
+        ->and($application->domain_port_overrides)
+        ->toBe(['https://example.com' => 8080]);
+});
+
+it('application domain port override API update omitting ports preserves overrides for unchanged domains', function () {
+    $this->application->update([
+        'fqdn' => 'https://one.example.com:3000,https://two.example.com:8080',
+    ]);
+
+    $bearer = applicationDomainPortOverrideApiToken($this->user, $this->team);
+
+    $this->withToken($bearer)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'domains' => 'https://one.example.com,https://two.example.com',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+
+    expect($application->fqdn)->toBe('https://one.example.com,https://two.example.com')
+        ->and($application->domain_port_overrides)
+        ->toBe([
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ]);
+});
+
+it('application domain port override API domain removal prunes the override', function () {
+    $this->application->update([
+        'fqdn' => 'https://one.example.com:3000,https://two.example.com:8080',
+    ]);
+
+    $bearer = applicationDomainPortOverrideApiToken($this->user, $this->team);
+
+    $this->withToken($bearer)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'domains' => 'https://two.example.com',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+
+    expect($application->fqdn)->toBe('https://two.example.com')
+        ->and($application->domain_port_overrides)
+        ->toBe(['https://two.example.com' => 8080]);
+});
+
+it('application domain port override API update of an unrelated field does not rewrite a legacy FQDN', function () {
+    $this->application->update([
+        'fqdn' => 'https://legacy.example.com',
+        'description' => 'before',
+    ]);
+
+    DB::table('applications')->where('id', $this->application->id)->update([
+        'fqdn' => 'https://legacy.example.com:9090',
+    ]);
+
+    $bearer = applicationDomainPortOverrideApiToken($this->user, $this->team);
+
+    $this->withToken($bearer)
+        ->getJson("/api/v1/applications/{$this->application->uuid}")
+        ->assertOk();
+
+    expect($this->application->fresh()->fqdn)->toBe('https://legacy.example.com:9090');
+
+    $this->withToken($bearer)
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'description' => 'unrelated',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+
+    expect($application->fqdn)->toBe('https://legacy.example.com:9090')
+        ->and($application->description)->toBe('unrelated')
+        ->and($application->domain_port_overrides)->toBeNull();
 });
