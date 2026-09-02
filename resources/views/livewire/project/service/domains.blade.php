@@ -296,7 +296,7 @@
                         class="application-settings-form application-settings-section relative w-full lg:min-w-[36rem] lg:max-w-2xl"
                         style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
                         <header>
-                            <h3>Remove required port?</h3>
+                            <h3>Use a different port?</h3>
                             <button type="button"
                                 @click="modalOpen = false; $wire.call('cancelRemovePort')"
                                 class="icon-button" aria-label="Close">
@@ -306,17 +306,17 @@
                         <div class="application-settings-section-body">
                             <x-callout type="warning" title="Port requirement" class="mb-4">
                                 This service requires port <strong>{{ $requiredPort }}</strong> to function correctly.
-                                One or more of your domains are missing a port number.
+                                One or more of your domains use a different port, or none.
                             </x-callout>
 
                             <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
                                 <x-forms.button type="button"
                                     @click="modalOpen = false; $wire.call('cancelRemovePort')">
-                                    Keep port
+                                    Keep required port
                                 </x-forms.button>
                                 <x-forms.button type="button" wire:click="confirmRemovePort"
                                     @click="modalOpen = false" isError>
-                                    Remove port anyway
+                                    Use this port anyway
                                 </x-forms.button>
                             </div>
                         </div>

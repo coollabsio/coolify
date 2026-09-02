@@ -76,6 +76,17 @@
                                 <a href="{{ getFqdnWithoutPort($row['url']) }}" target="_blank"
                                     class="min-w-0 flex-1 text-[13px] text-black underline decoration-neutral-300 underline-offset-2 hover:decoration-coollabs sm:truncate dark:text-fg dark:decoration-white/20 dark:hover:decoration-warning"
                                     title="{{ $row['url'] }}">{{ $row['url'] }}</a>
+                                @if (filled($row['internal_port'] ?? null) && (int) $row['internal_port'] > 0)
+                                    <span class="table-badge shrink-0"
+                                        title="{{ ($row['has_port_override'] ?? false) ? 'Custom internal port for this domain' : 'Inherited from Ports Exposes' }}">
+                                        Internal port {{ $row['internal_port'] }}
+                                    </span>
+                                @else
+                                    <span class="table-badge table-badge-danger shrink-0"
+                                        title="Set Ports Exposes or a per-domain internal port so the proxy can route this domain.">
+                                        No internal port
+                                    </span>
+                                @endif
                                 @if (filled($row['service']))
                                     <span class="table-badge shrink-0">{{ $row['service'] }}</span>
                                 @endif
@@ -149,4 +160,48 @@
             </div>
         </div>
     </template>
+
+    @if ($showPortWarningModal)
+        <div x-data="{ modalOpen: true }"
+            @keydown.escape.window="modalOpen = false; $wire.call('cancelUseUnknownPort')"
+            class="relative z-40">
+            <template x-teleport="body">
+                <div x-show="modalOpen"
+                    class="fixed inset-0 z-99 flex min-h-full items-center justify-center overflow-y-auto p-4" x-cloak>
+                    <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px]"></div>
+                    <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                        class="application-settings-form application-settings-section relative w-full lg:min-w-[36rem] lg:max-w-2xl"
+                        style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                        <header>
+                            <h3>Use a different port?</h3>
+                            <button type="button"
+                                @click="modalOpen = false; $wire.call('cancelUseUnknownPort')"
+                                class="icon-button" aria-label="Close">
+                                <x-reicon name="x" class="size-4" />
+                            </button>
+                        </header>
+                        <div class="application-settings-section-body">
+                            <x-callout type="warning" title="Unrecognized internal port" class="mb-4">
+                                Port <strong>{{ $unrecognizedPort }}</strong> is not listed in Ports Exposes
+                                and is not used by any application domain. The proxy will still route to it,
+                                but the container may not be listening there.
+                            </x-callout>
+
+                            <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                                <x-forms.button type="button" canGate="update" :canResource="$preview->application"
+                                    @click="modalOpen = false; $wire.call('cancelUseUnknownPort')">
+                                    Cancel
+                                </x-forms.button>
+                                <x-forms.button type="button" wire:click="confirmUseUnknownPort" canGate="update"
+                                    :canResource="$preview->application"
+                                    @click="modalOpen = false" isError>
+                                    Use this port anyway
+                                </x-forms.button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    @endif
 </div>
