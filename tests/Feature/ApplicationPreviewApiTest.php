@@ -230,4 +230,137 @@ describe('PATCH /api/v1/applications/{uuid}/previews/{pull_request_id}', functio
             ])
             ->assertConflict();
     });
+
+    test('updates Docker Compose preview domains with per-domain ports', function () {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: nginx:alpine\n",
+        ]);
+        $preview = createPreview($this->application, 49);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/49", [
+                'docker_compose_domains' => [
+                    ['name' => 'web', 'domain' => 'https://web-preview.example.com:8080'],
+                    ['name' => 'api', 'domain' => 'https://api-preview.example.com:3000'],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('docker_compose_domains.0.name', 'web')
+            ->assertJsonPath('docker_compose_domains.0.domain', 'https://web-preview.example.com')
+            ->assertJsonPath('docker_compose_domains.1.name', 'api')
+            ->assertJsonPath('docker_compose_domains.1.domain', 'https://api-preview.example.com');
+
+        $preview->refresh();
+
+        expect(json_decode($preview->docker_compose_domains, true))->toBe([
+            'web' => ['domain' => 'https://web-preview.example.com'],
+            'api' => ['domain' => 'https://api-preview.example.com'],
+        ])->and($preview->fqdn)->toBe('https://web-preview.example.com,https://api-preview.example.com')
+            ->and($preview->domain_port_overrides)->toBe([
+                'https://web-preview.example.com' => 8080,
+                'https://api-preview.example.com' => 3000,
+            ]);
+    });
+
+    test('clears Docker Compose preview port overrides with portless domains', function () {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        ]);
+        $preview = createPreview($this->application, 50);
+        $preview->update([
+            'fqdn' => 'https://web-preview.example.com:8080',
+            'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://web-preview.example.com']]),
+        ]);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/50", [
+                'docker_compose_domains' => [
+                    ['name' => 'web', 'domain' => 'https://web-preview.example.com'],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('domain_port_overrides', null);
+
+        expect($preview->fresh()->domain_port_overrides)->toBeNull();
+    });
+
+    test('rejects unknown Docker Compose preview services', function () {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        ]);
+        createPreview($this->application, 51);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/51", [
+                'docker_compose_domains' => [
+                    ['name' => 'unknown', 'domain' => 'https://unknown.example.com:8080'],
+                ],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('docker_compose_domains');
+    });
+
+    test('rejects the same Docker Compose preview domain on different internal ports', function () {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: nginx:alpine\n",
+        ]);
+        createPreview($this->application, 52);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/52", [
+                'docker_compose_domains' => [
+                    ['name' => 'web', 'domain' => 'https://duplicate.example.com:8080'],
+                    ['name' => 'api', 'domain' => 'https://duplicate.example.com:3000'],
+                ],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('docker_compose_domains');
+    });
+
+    test('rejects missing Compose services without changing the preview', function () {
+        $this->application->update(['build_pack' => 'dockercompose', 'docker_compose_raw' => '']);
+        $preview = createPreview($this->application, 53);
+        $originalFqdn = $preview->fresh()->fqdn;
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/53", [
+                'docker_compose_domains' => [],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('docker_compose_domains');
+
+        expect($preview->fresh()->fqdn)->toBe($originalFqdn);
+    });
+
+    test('rejects the domain field for Compose previews', function () {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n",
+        ]);
+        createPreview($this->application, 54);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/54", [
+                'domains' => 'https://ignored.example.com',
+                'docker_compose_domains' => [],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('domains');
+    });
+
+    test('rejects Docker Compose domains for non-Compose previews', function () {
+        createPreview($this->application, 55);
+
+        $this->withHeaders(previewAuthHeaders($this->bearerToken))
+            ->patchJson("/api/v1/applications/{$this->application->uuid}/previews/55", [
+                'domains' => 'https://preview.example.com',
+                'docker_compose_domains' => [],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('docker_compose_domains');
+    });
 });
