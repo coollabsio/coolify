@@ -1360,6 +1360,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ? $composeRedirect
                 : 'both';
             $domainPortOverrides = $isPullRequest ? [] : ($originalResource->domain_port_overrides ?? []);
+            $onlyPort = null;
+            if (! $isPullRequest) {
+                $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
+                $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
+            }
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -1375,6 +1380,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection,
                             domainPortOverrides: $domainPortOverrides,
@@ -1391,6 +1397,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             predefinedPort: $predefinedPort,
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection,
@@ -1408,6 +1415,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection,
                     domainPortOverrides: $domainPortOverrides,
@@ -1422,6 +1430,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     predefinedPort: $predefinedPort,
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection,

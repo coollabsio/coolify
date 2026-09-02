@@ -3892,6 +3892,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ? $composeRedirect
                             : 'both';
                         $domainPortOverrides = $pull_request_id === 0 ? ($resource->domain_port_overrides ?? []) : [];
+                        $onlyPort = null;
+                        if ($pull_request_id === 0) {
+                            $exposedPorts = $resource->settings->is_static ? [80] : $resource->ports_exposes_array;
+                            $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
+                        }
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
@@ -3905,6 +3910,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            onlyPort: $onlyPort,
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                             domainPortOverrides: $domainPortOverrides,
@@ -3922,6 +3928,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                             is_gzip_enabled: $resource->isGzipEnabled(),
                                             is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            onlyPort: $onlyPort,
                                             noindex_domains: $noindexDomains,
                                             redirect_direction: $redirectDirection,
                                             domainPortOverrides: $domainPortOverrides,
@@ -3940,6 +3947,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    onlyPort: $onlyPort,
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                     domainPortOverrides: $domainPortOverrides,
@@ -3955,6 +3963,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     is_force_https_enabled: $resource->isForceHttpsEnabled(),
                                     is_gzip_enabled: $resource->isGzipEnabled(),
                                     is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    onlyPort: $onlyPort,
                                     noindex_domains: $noindexDomains,
                                     redirect_direction: $redirectDirection,
                                     domainPortOverrides: $domainPortOverrides,

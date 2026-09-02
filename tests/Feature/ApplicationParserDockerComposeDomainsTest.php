@@ -569,3 +569,33 @@ YAML,
         ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
         ->toBeTrue();
 });
+
+test('applicationParser compose labels use the first ports_exposes value when a portless domain has no override', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000,8080',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $parsedCompose = applicationParser($application->fresh());
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=3000')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 3000}}')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
+        ->toBeTrue();
+});
