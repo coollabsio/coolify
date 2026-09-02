@@ -8,6 +8,7 @@ use App\Livewire\Concerns\InteractsWithCloudflareDomainConnect;
 use App\Livewire\Project\Shared\ConfigurationChecker;
 use App\Models\Application;
 use App\Models\Server;
+use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -57,7 +58,7 @@ class Domains extends Component
 
     public ?string $editingService = null;
 
-    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool}> */
+    /** @var array<int, array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at?: ?string, is_suggested?: bool, suggested_for?: ?string, suggestion_label?: ?string, needs_force_add?: bool, internal_port?: ?int, has_port_override?: bool}> */
     public array $domainRows = [];
 
     /** When set, the next addSuggestedDomain call for this index skips the DNS block. */
@@ -485,32 +486,19 @@ class Domains extends Component
 
     /**
      * @param  array<string, array{status?: string, message?: string, expected_ip?: ?string, checked_at?: ?string}>  $stored
-     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool}
+     * @return array{url: string, service: ?string, dns_status: string, dns_message: string, expected_ip: ?string, checked_at: ?string, is_suggested: bool, suggested_for: ?string, suggestion_label: ?string, needs_force_add: bool, internal_port: ?int, has_port_override: bool}
      */
     protected function domainRowFromStored(string $url, ?string $service, array $stored): array
     {
         $key = $this->domainDnsStatusKey($url, $service);
         $entry = $stored[$key] ?? null;
+        $port = $this->effectiveDomainInternalPort($url);
 
-        if (is_array($entry) && filled(data_get($entry, 'status'))) {
-            return [
-                'url' => $url,
-                'service' => $service,
-                'dns_status' => (string) data_get($entry, 'status', 'pending'),
-                'dns_message' => (string) data_get($entry, 'message', 'Not checked yet.'),
-                'expected_ip' => data_get($entry, 'expected_ip') ?: $this->serverIp,
-                'checked_at' => data_get($entry, 'checked_at'),
-                'check_id' => data_get($entry, 'check_id'),
-                'is_suggested' => false,
-                'suggested_for' => null,
-                'suggestion_label' => null,
-                'needs_force_add' => false,
-            ];
-        }
-
-        return [
+        $row = [
             'url' => $url,
             'service' => $service,
+            'internal_port' => $port['internal_port'],
+            'has_port_override' => $port['has_port_override'],
             'dns_status' => 'pending',
             'dns_message' => 'Not checked yet.',
             'expected_ip' => $this->serverIp,
@@ -520,6 +508,57 @@ class Domains extends Component
             'suggested_for' => null,
             'suggestion_label' => null,
             'needs_force_add' => false,
+        ];
+
+        if (is_array($entry) && filled(data_get($entry, 'status'))) {
+            $row['dns_status'] = (string) data_get($entry, 'status', 'pending');
+            $row['dns_message'] = (string) data_get($entry, 'message', 'Not checked yet.');
+            $row['expected_ip'] = data_get($entry, 'expected_ip') ?: $this->serverIp;
+            $row['checked_at'] = data_get($entry, 'checked_at');
+            $row['check_id'] = data_get($entry, 'check_id');
+        }
+
+        return $row;
+    }
+
+    /**
+     * @return array{internal_port: ?int, has_port_override: bool}
+     */
+    protected function effectiveDomainInternalPort(string $url): array
+    {
+        $canonical = DomainPortOverrides::withoutPort($url);
+        $overrides = $this->application->domain_port_overrides ?? [];
+        $legacyPortPart = DomainUrlParts::split($url)['port'] ?? '';
+        $legacyPort = $legacyPortPart !== '' ? (int) $legacyPortPart : null;
+        $hasMapEntry = array_key_exists($canonical, $overrides);
+
+        if ($hasMapEntry) {
+            return [
+                'internal_port' => (int) $overrides[$canonical],
+                'has_port_override' => true,
+            ];
+        }
+
+        if ($legacyPort !== null) {
+            return [
+                'internal_port' => $legacyPort,
+                'has_port_override' => true,
+            ];
+        }
+
+        if ($this->application->settings?->is_static) {
+            return [
+                'internal_port' => 80,
+                'has_port_override' => false,
+            ];
+        }
+
+        $exposed = $this->application->ports_exposes_array;
+        $defaultPort = isset($exposed[0]) && filled($exposed[0]) ? (int) $exposed[0] : null;
+
+        return [
+            'internal_port' => $defaultPort,
+            'has_port_override' => false,
         ];
     }
 
@@ -848,7 +887,7 @@ class Domains extends Component
                 return;
             }
 
-            if ($this->newDomainPartsChanged) {
+            if ($this->newDomainPartsChanged || filled($this->newDomainParts['host'] ?? null)) {
                 $this->newDomain = DomainUrlParts::compose(...$this->newDomainParts);
             }
             $this->validateOnly('newDomain');
@@ -1110,6 +1149,11 @@ class Domains extends Component
         $this->editingIndex = $index;
         $this->editingDomain = $this->domainRows[$index]['url'];
         $this->editingDomainParts = DomainUrlParts::split($this->editingDomain);
+        $canonical = DomainPortOverrides::withoutPort($this->editingDomain);
+        $savedPort = ($this->application->domain_port_overrides ?? [])[$canonical] ?? null;
+        if (filled($savedPort)) {
+            $this->editingDomainParts['port'] = (string) $savedPort;
+        }
         $this->editingDomainPartsChanged = false;
         $this->editingService = $this->domainRows[$index]['service'];
         $this->resetEditDomainDnsGate();
@@ -1227,7 +1271,7 @@ class Domains extends Component
                 return;
             }
 
-            if ($this->editingDomainPartsChanged) {
+            if ($this->editingDomainPartsChanged || filled($this->editingDomainParts['host'] ?? null)) {
                 $this->editingDomain = DomainUrlParts::compose(...$this->editingDomainParts);
             }
             $this->validateOnly('editingDomain');
@@ -1243,6 +1287,13 @@ class Domains extends Component
             $oldUrl = $this->domainRows[$this->editingIndex]['url'];
             $service = $this->editingService;
             $wasNoindexed = $this->application->isDomainNoindexed($oldUrl);
+
+            if (blank(DomainUrlParts::split($newUrl)['port'] ?? null)) {
+                $portOverrides = $this->application->domain_port_overrides ?? [];
+                unset($portOverrides[DomainPortOverrides::withoutPort($oldUrl)]);
+                unset($portOverrides[DomainPortOverrides::withoutPort($newUrl)]);
+                $this->application->domain_port_overrides = $portOverrides ?: null;
+            }
 
             $current = $this->currentDomainList($service);
             if ($newUrl !== $oldUrl && $current->contains($newUrl)) {
@@ -1823,6 +1874,8 @@ class Domains extends Component
             }
         }
 
+        $intendedComposeOverrides = null;
+
         if ($this->isCompose) {
             if (blank($serviceName)) {
                 $this->dispatch('error', 'A service is required for compose domains.');
@@ -1838,6 +1891,15 @@ class Domains extends Component
                 $allDomains = [];
             }
 
+            $previousServiceUrls = $this->currentDomainList($serviceName);
+            $normalizedPorts = DomainPortOverrides::normalize($domainString, $this->application->domain_port_overrides);
+            $domainString = $normalizedPorts['fqdn'];
+            $intendedComposeOverrides = $this->mergeComposeDomainPortOverrides(
+                $previousServiceUrls,
+                $domainString,
+                $normalizedPorts['overrides'] ?? null,
+            );
+
             $existing = is_array($allDomains[$serviceName] ?? null) ? $allDomains[$serviceName] : [];
             // Preserve stored redirect only — pending Direction dropdown values must not
             // persist until setServiceRedirect() runs.
@@ -1846,6 +1908,7 @@ class Domains extends Component
             ]);
 
             $this->application->docker_compose_domains = json_encode($allDomains);
+            $this->application->domain_port_overrides = $intendedComposeOverrides;
             $this->application->fqdn = null;
         } else {
             $this->application->fqdn = $domainString;
@@ -1872,10 +1935,45 @@ class Domains extends Component
         }
 
         $this->application->save();
+
+        if ($this->isCompose && ($this->application->domain_port_overrides ?? null) !== $intendedComposeOverrides) {
+            $this->application->domain_port_overrides = $intendedComposeOverrides;
+            $this->application->save();
+        }
+
         $this->resetDefaultLabels();
         $this->dispatch('configurationChanged');
 
         return true;
+    }
+
+    /**
+     * @param  Collection<int, string>  $previousServiceUrls
+     * @param  array<string, int>|null  $incomingOverrides
+     * @return array<string, int>|null
+     */
+    protected function mergeComposeDomainPortOverrides(
+        Collection $previousServiceUrls,
+        ?string $newDomainString,
+        ?array $incomingOverrides,
+    ): ?array {
+        $merged = $this->application->domain_port_overrides ?? [];
+        $newCanonical = collect($this->splitDomains($newDomainString))
+            ->map(fn (string $url): string => DomainPortOverrides::withoutPort($url))
+            ->all();
+
+        foreach ($previousServiceUrls as $url) {
+            $canonical = DomainPortOverrides::withoutPort($url);
+            if (! in_array($canonical, $newCanonical, true)) {
+                unset($merged[$canonical]);
+            }
+        }
+
+        foreach ($incomingOverrides ?? [] as $url => $port) {
+            $merged[$url] = (int) $port;
+        }
+
+        return $merged ?: null;
     }
 
     protected function resetDefaultLabels(): void

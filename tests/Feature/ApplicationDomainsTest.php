@@ -2053,3 +2053,253 @@ it('updates search engine indexing from the domains view', function () {
     expect($this->application->refresh()->noindexDomains()->all())
         ->toBe(['https://staging.example.com']);
 });
+
+it('saves a port override from the segmented add-domain form', function () {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'example.com')
+        ->set('newDomainParts.port', '8080')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success')
+        ->assertSee('Internal port 8080')
+        ->assertDontSee('https://example.com:8080');
+
+    $this->application->refresh();
+
+    expect(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://example.com')
+        ->not->toContain('https://example.com:8080')
+        ->and($this->application->domain_port_overrides['https://example.com'] ?? null)
+        ->toBe(8080);
+});
+
+it('composes segmented add-domain fields into a port override when the changed flag is false', function () {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'example.com')
+        ->set('newDomainParts.port', '8080')
+        ->set('newDomainPartsChanged', false)
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->fqdn)
+        ->toContain('https://example.com')
+        ->not->toContain(':8080')
+        ->and($this->application->fresh()->domain_port_overrides)
+        ->toHaveKey('https://example.com', 8080);
+});
+
+it('retains different port overrides for two application domains', function () {
+    $this->application->update(['ports_exposes' => '3000,8080']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainParts.host', 'one.example.com')
+        ->set('newDomainParts.port', '3000')
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->set('newDomainParts.host', 'two.example.com')
+        ->set('newDomainParts.port', '8080')
+        ->call('addDomain')
+        ->assertHasNoErrors();
+
+    $this->application->refresh();
+
+    expect($this->application->domain_port_overrides['https://one.example.com'] ?? null)->toBe(3000)
+        ->and($this->application->domain_port_overrides['https://two.example.com'] ?? null)->toBe(8080)
+        ->and(explode(',', (string) $this->application->fqdn))
+        ->toContain('https://one.example.com')
+        ->toContain('https://two.example.com')
+        ->not->toContain('https://one.example.com:3000')
+        ->not->toContain('https://two.example.com:8080');
+});
+
+it('reopens edit with the saved domain port override', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://example.com:8080',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.url', 'https://example.com')
+        ->assertSet('domainRows.0.internal_port', 8080)
+        ->assertSet('domainRows.0.has_port_override', true)
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '8080')
+        ->assertSet('editingDomainParts.host', 'example.com');
+});
+
+it('does not prefill the default internal port when editing a domain without a port override', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://example.com',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', 3000)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '');
+});
+
+it('clears a domain port override and shows the default internal port', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://one.example.com:8080,https://two.example.com:9090',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Internal port 8080')
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '8080')
+        ->set('editingDomainParts.port', '')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
+        ->assertSee('Internal port 3000')
+        ->assertSee('Internal port 9090')
+        ->assertDontSee('Internal port 8080');
+
+    $this->application->refresh();
+
+    expect($this->application->fqdn)
+        ->toContain('https://one.example.com')
+        ->and($this->application->domain_port_overrides)
+        ->not->toHaveKey('https://one.example.com')
+        ->toHaveKey('https://two.example.com', 9090);
+});
+
+it('prunes a domain port override when removing the domain from the ui', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://one.example.com:8080,https://two.example.com:3000',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomain', 0)
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+
+    expect($this->application->fqdn)->toBe('https://two.example.com')
+        ->and($this->application->domain_port_overrides)
+        ->toBe(['https://two.example.com' => 3000]);
+});
+
+it('renders a portless domain link with an internal port badge for overrides', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://example.com:8080',
+    ]);
+
+    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Internal port 8080')
+        ->assertSee('https://example.com')
+        ->assertDontSee('https://example.com:8080')
+        ->html();
+
+    expect($html)
+        ->toContain('href="'.getFqdnWithoutPort('https://example.com').'"')
+        ->not->toContain('href="https://example.com:8080"')
+        ->toContain('Custom internal port for this domain')
+        ->not->toContain('Inherited from Ports Exposes');
+});
+
+it('distinguishes an inherited internal port from a domain port override', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://example.com',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('Internal port 3000')
+        ->assertSee('Inherited from Ports Exposes', false)
+        ->assertDontSee('Custom internal port for this domain', false);
+});
+
+it('keeps a legacy port-bearing url port in the edit field as an internal port override', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://legacy.example.com',
+    ]);
+
+    DB::table('applications')->where('id', $this->application->id)->update([
+        'fqdn' => 'https://legacy.example.com:9090',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.url', 'https://legacy.example.com:9090')
+        ->assertSet('domainRows.0.internal_port', 9090)
+        ->assertSet('domainRows.0.has_port_override', true)
+        ->assertSee('Internal port 9090')
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '9090');
+});
+
+it('stores compose domain port overrides without wiping other services', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'ports_exposes' => '3000,8080',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
+        ]),
+        'domain_port_overrides' => [
+            'https://api.example.com' => 4000,
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->set('newDomainService', 'web')
+        ->set('newDomainParts.host', 'web.example.com')
+        ->set('newDomainParts.port', '8080')
+        ->set('newDomainPartsChanged', false)
+        ->call('addDomain')
+        ->assertHasNoErrors()
+        ->assertSee('Internal port 8080');
+
+    $this->application->refresh();
+    $domains = json_decode($this->application->docker_compose_domains, true);
+
+    expect(data_get($domains, 'web.domain'))
+        ->toContain('https://web.example.com')
+        ->not->toContain(':8080')
+        ->and($this->application->fqdn)->toBeNull()
+        ->and($this->application->domain_port_overrides)
+        ->toHaveKey('https://web.example.com', 8080)
+        ->toHaveKey('https://api.example.com', 4000);
+});
+
+it('prunes a compose domain port override when that domain is removed', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'ports_exposes' => '3000,8080',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: node:alpine\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com', 'redirect' => 'both'],
+            'api' => ['domain' => 'https://api.example.com', 'redirect' => 'both'],
+        ]),
+        'domain_port_overrides' => [
+            'https://web.example.com' => 8080,
+            'https://api.example.com' => 4000,
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('removeDomain', 0)
+        ->assertDispatched('success');
+
+    $this->application->refresh();
+
+    expect($this->application->domain_port_overrides)
+        ->not->toHaveKey('https://web.example.com')
+        ->toHaveKey('https://api.example.com', 4000)
+        ->and($this->application->fqdn)->toBeNull();
+});

@@ -74,6 +74,12 @@
                         title="{{ $row['url'] }}">
                         {{ $row['url'] }}
                     </a>
+                    @if (filled($row['internal_port'] ?? null))
+                        <span class="table-badge shrink-0"
+                            title="{{ ($row['has_port_override'] ?? false) ? 'Custom internal port for this domain' : 'Inherited from Ports Exposes' }}">
+                            Internal port {{ $row['internal_port'] }}
+                        </span>
+                    @endif
                 @endif
                 @if ($isSuggested && ! empty($row['suggestion_label']))
                     <span class="table-badge table-badge-warning shrink-0">{{ $row['suggestion_label'] }}</span>
