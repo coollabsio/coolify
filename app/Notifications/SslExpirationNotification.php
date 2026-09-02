@@ -148,4 +148,21 @@ class SslExpirationNotification extends CustomEmailNotification
             color: SlackMessage::warningColor()
         );
     }
+
+    public function toWebhook(): array
+    {
+        $resourceNames = $this->resources->pluck('name')->join(', ');
+
+        return [
+            'success' => true,
+            'message' => "SSL certificates have been renewed for: {$resourceNames}. These resources need to be redeployed manually.",
+            'event' => 'ssl_certificate_renewal',
+            'resources' => $this->resources->map(fn ($resource) => [
+                'name' => $resource->name,
+                'uuid' => data_get($resource, 'uuid'),
+                'type' => method_exists($resource, 'type') ? $resource->type() : null,
+                'url' => $this->urls[$resource->name] ?? null,
+            ])->values()->all(),
+        ];
+    }
 }
