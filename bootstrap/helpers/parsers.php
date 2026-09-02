@@ -35,6 +35,9 @@ function validateDockerComposeForInjection(string $composeYaml): void
     if (! is_array($parsed) || ! isset($parsed['services']) || ! is_array($parsed['services'])) {
         throw new Exception('Docker Compose file must contain a "services" section');
     }
+    if (count($parsed['services']) === 0) {
+        throw new Exception('Docker Compose file must define at least one service.');
+    }
     // Validate service names
     foreach ($parsed['services'] as $serviceName => $serviceConfig) {
         try {

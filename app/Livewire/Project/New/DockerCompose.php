@@ -21,6 +21,8 @@ class DockerCompose extends Component
 
     public array $query;
 
+    public bool $isSubmitting = false;
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -32,6 +34,12 @@ class DockerCompose extends Component
 
     public function submit()
     {
+        if ($this->isSubmitting) {
+            return;
+        }
+
+        $this->isSubmitting = true;
+
         try {
             $this->authorize('create', Service::class);
 
@@ -88,7 +96,14 @@ class DockerCompose extends Component
                 'environment_uuid' => $environment->uuid,
                 'project_uuid' => $project->uuid,
             ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->isSubmitting = false;
+            $this->dispatch('compose-create-finished');
+            throw $e;
         } catch (\Throwable $e) {
+            $this->isSubmitting = false;
+            $this->dispatch('compose-create-finished');
+
             return handleError($e, $this);
         }
     }
