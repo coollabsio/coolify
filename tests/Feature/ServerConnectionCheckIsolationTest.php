@@ -78,3 +78,21 @@ it('does not call cloud provider APIs during an SSH connection check', function 
 
     Http::assertNothingSent();
 });
+
+it('resets unreachable_count after a successful connection check', function () {
+    $server = createServerForConnectionIsolationTest(['ip' => '203.0.113.10']);
+    // unreachable_count is not mass-assignable, so it must be set directly.
+    $server->unreachable_count = 5;
+    $server->save();
+
+    Process::fake([
+        '*' => Process::result(
+            output: '{"Server":{"Version":"27.0.0"}}',
+            exitCode: 0,
+        ),
+    ]);
+
+    (new ServerConnectionCheckJob($server->fresh(), disableMux: false))->handle();
+
+    expect($server->fresh()->unreachable_count)->toBe(0);
+});

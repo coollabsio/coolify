@@ -4,6 +4,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -212,6 +213,40 @@ it('keeps deployment history fields and the log status badge accessible on mobil
         ->toContain(".deployment-table-grid {\n        min-width: 0;")
         ->not->toContain('.deployment-table-grid > :nth-child')
         ->toContain(".logs-viewer-primary .logs-viewer-actions {\n    width: auto;\n    flex: 1 1 auto;");
+});
+
+it('links deployment commit hashes to the source commit page', function () {
+    $githubApp = GithubApp::query()->create([
+        'team_id' => $this->team->id,
+        'name' => 'GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+    ]);
+    $this->application->update([
+        'source_id' => $githubApp->id,
+        'source_type' => $githubApp->getMorphClass(),
+        'git_repository' => 'coollabsio/coolify',
+        'git_branch' => 'main',
+    ]);
+    ApplicationDeploymentQueue::query()->create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'deploy-commit-link-test',
+        'server_id' => $this->server->id,
+        'status' => ApplicationDeploymentStatus::FINISHED->value,
+        'commit' => '1234567890abcdef1234567890abcdef12345678',
+    ]);
+
+    $response = $this->get(route('project.application.deployment.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]));
+
+    $response->assertSuccessful();
+    $response->assertSee(
+        'href="https://github.com/coollabsio/coolify/commit/1234567890abcdef1234567890abcdef12345678" target="_blank" rel="noopener noreferrer"',
+        false,
+    );
 });
 
 it('places cancel deployment controls inside the deployment logs toolbar', function () {

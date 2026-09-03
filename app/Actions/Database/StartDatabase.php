@@ -33,6 +33,7 @@ public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|St
         if (! $server->isFunctional()) {
             return 'Server is not functional';
         }
+        $database->resetRestartLimit();
 
         $activity = activity()
             ->withProperties([
@@ -49,6 +50,7 @@ public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|St
 
         if ($activity === null) {
             return 'Database start could not be queued because activity logging is disabled.';
+
         }
 
         DatabaseStartJob::dispatch(

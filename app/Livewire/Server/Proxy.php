@@ -57,6 +57,7 @@ class Proxy extends Component
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
         $this->syncData(false);
         $this->loadProxyConfiguration();
+        $this->clearAppliedTraefikBranchWarning();
     }
 
     private function syncData(bool $toModel = false): void
@@ -276,6 +277,8 @@ class Proxy extends Component
                 return null;
             }
 
+            $configuredBranch = $this->getConfiguredTraefikBranch();
+
             // Check if we have outdated info stored for this server (faster than computing)
             $outdatedInfo = $this->server->traefik_outdated_info;
             $storedCurrentVersion = ltrim((string) data_get($outdatedInfo, 'current'), 'v');
@@ -283,9 +286,15 @@ class Proxy extends Component
             if ($storedCurrentVersion === $detectedCurrentVersion && data_get($outdatedInfo, 'type') === 'minor_upgrade') {
                 // Use the upgrade_target field if available (e.g., "v3.6")
                 if (isset($outdatedInfo['upgrade_target'])) {
-                    return str_starts_with($outdatedInfo['upgrade_target'], 'v')
+                    $upgradeTarget = str_starts_with($outdatedInfo['upgrade_target'], 'v')
                         ? $outdatedInfo['upgrade_target']
                         : "v{$outdatedInfo['upgrade_target']}";
+
+                    if ($configuredBranch && version_compare($configuredBranch, ltrim($upgradeTarget, 'v'), '>=')) {
+                        return null;
+                    }
+
+                    return $upgradeTarget;
                 }
             }
 
@@ -315,9 +324,53 @@ class Proxy extends Component
                 }
             }
 
-            return $newestBranch ? "v{$newestBranch}" : null;
+            if (! $newestBranch || ($configuredBranch && version_compare($configuredBranch, $newestBranch, '>='))) {
+                return null;
+            }
+
+            return "v{$newestBranch}";
         } catch (\Throwable $e) {
             return null;
         }
+    }
+
+    private function getConfiguredTraefikBranch(): ?string
+    {
+        if ($this->server->proxy->get('status') !== 'running' || $this->server->hasPendingProxyConfiguration()) {
+            return null;
+        }
+
+        if (! is_string($this->proxySettings)) {
+            return null;
+        }
+
+        if (! preg_match('/^\s*image:\s*[\'\"]?traefik:v?(\d+\.\d+)(?:\.\d+)?[\'\"]?\s*$/mi', $this->proxySettings, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    private function clearAppliedTraefikBranchWarning(): void
+    {
+        $outdatedInfo = $this->server->traefik_outdated_info;
+
+        if (data_get($outdatedInfo, 'type') !== 'minor_upgrade') {
+            return;
+        }
+
+        $configuredBranch = $this->getConfiguredTraefikBranch();
+        $upgradeTarget = ltrim((string) data_get($outdatedInfo, 'upgrade_target'), 'v');
+
+        if (! $configuredBranch || ! $upgradeTarget || version_compare($configuredBranch, $upgradeTarget, '<')) {
+            return;
+        }
+
+        Server::query()
+            ->whereKey($this->server->id)
+            ->where('traefik_outdated_info->type', data_get($outdatedInfo, 'type'))
+            ->where('traefik_outdated_info->current', data_get($outdatedInfo, 'current'))
+            ->where('traefik_outdated_info->upgrade_target', data_get($outdatedInfo, 'upgrade_target'))
+            ->update(['traefik_outdated_info' => null]);
     }
 }

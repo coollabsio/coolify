@@ -27,15 +27,13 @@ class StopDatabase
                 return 'Server is not functional';
             }
 
-            $this->stopContainer($database, $database->uuid, 30);
+            $this->stopContainer($database, $database->uuid, 30, $removeContainer);
 
             // Reset restart tracking when database is manually stopped
-            $database->update([
-                'status' => 'exited',
-                'restart_count' => 0,
-                'last_restart_at' => null,
-                'last_restart_type' => null,
-            ]);
+            $database->update(['status' => 'exited']);
+            if ($resetRestartCount) {
+                $database->resetRestartLimit();
+            }
 
             if ($dockerCleanup) {
                 CleanupDocker::dispatch($server, false, false);
@@ -54,12 +52,15 @@ class StopDatabase
 
     }
 
-    private function stopContainer($database, string $containerName, int $timeout = 30): void
+    private function stopContainer(BaseModel $database, string $containerName, int $timeout = 30, bool $removeContainer = true): void
     {
         $server = $database->destination->server;
-        instant_remote_process(command: [
-            dockerStopCommand($timeout, $containerName, $server),
-            "docker rm -f $containerName",
-        ], server: $server, throwError: false);
+        $commands = [dockerStopCommand($timeout, $containerName, $server)];
+        if ($removeContainer) {
+            $commands[] = "docker rm -f $containerName";
+        } else {
+            array_unshift($commands, "docker update --restart=no $containerName");
+        }
+        instant_remote_process(command: $commands, server: $server, throwError: false);
     }
 }

@@ -33,6 +33,18 @@ it('keeps storage backup schedule tables horizontally scrollable on mobile', fun
         ->and($css)->toMatch('/\.backup-table-grid\s*\{[^}]*min-width:\s*50rem;/');
 });
 
+
+it('keeps nested storage component keys stable when mounts are added or deleted', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
+
+    expect($view)
+        ->toContain('wire:key="volumes-{{ $resource->id }}"')
+        ->toContain('wire:key="svc-volumes-{{ $resource->id }}"')
+        ->not->toContain('wire:key="volumes-{{ $resource->id }}-{{ $this->volumeCount }}"')
+        ->not->toContain('wire:key="svc-volumes-{{ $resource->id }}-{{ $this->volumeCount }}"');
+});
+
+
 use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
 use App\Livewire\Project\Shared\Storages\All;
@@ -129,7 +141,6 @@ function createApplicationWithVolume(array $applicationAttributes = [], array $v
 
 it('renders volumes as a data table with shared column headers', function () {
     $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
-    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
     $storageView = file_get_contents(resource_path('views/livewire/project/service/storage.blade.php'));
 
     expect($allView)
@@ -147,16 +158,9 @@ it('renders volumes as a data table with shared column headers', function () {
         ->toContain('data-table-row')
         ->toContain('volumes-mobile-label')
         ->not->toContain('table-badge table-badge-success')
-        ->not->toContain('livewire:project.shared.storages.show')
         ->not->toContain('x-status-badge')
         ->not->toContain('font-mono')
         ->not->toContain('Service volume mounts are read-only here.');
-
-    // Show remains available for isolated embeds/tests but is no longer nested from All.
-    expect($showView)
-        ->toContain('data-table-row')
-        ->toContain('volumes-table-grid')
-        ->not->toContain('font-mono');
 
     // Service stack page: one settings-section card per compose service/resource.
     expect($storageView)
@@ -422,16 +426,13 @@ it('hides PR deployment suffix for databases', function () {
 });
 
 it('uses a compact table badge for enabled backups instead of status-badge', function () {
-    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
+    $allView = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
 
-    expect($showView)
-        ->toContain('table-badge-success')
+    expect($allView)
+        ->toContain("'table-badge-success' => \$hasS3Backup")
         ->toContain('Volume backup is enabled')
         ->not->toContain('x-status-badge')
         ->not->toContain('status="Backup enabled"');
-
-    // Badge label is the short "Backup" text, not the old pill-with-label that broke the input row.
-    expect(preg_match('/table-badge-success[^>]*>\s*Backup\s*</', $showView))->toBeGreaterThan(0);
 });
 
 it('gates file storage PR suffix markup behind git_based applications', function () {

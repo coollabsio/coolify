@@ -198,6 +198,47 @@ YAML;
     expect($result)->toBe(3000);
 });
 
+it('falls back to the one-click template port when SERVICE_URL has no port suffix', function () {
+    $yaml = <<<'YAML'
+services:
+  wordpress:
+    environment:
+      - SERVICE_URL_WORDPRESS
+      - WORDPRESS_DB_HOST=mysql
+YAML;
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->docker_compose_raw = $yaml;
+    $service->shouldReceive('getRequiredPort')->andReturn(80);
+
+    $app = Mockery::mock(ServiceApplication::class)->makePartial();
+    $app->name = 'wordpress';
+    $app->shouldReceive('getAttribute')->with('service')->andReturn($service);
+    $app->service = $service;
+
+    expect($app->getRequiredPort())->toBe(80);
+});
+
+it('does not apply the template port to a container without SERVICE_URL or SERVICE_FQDN', function () {
+    $yaml = <<<'YAML'
+services:
+  mysql:
+    environment:
+      - MYSQL_DATABASE=wordpress
+YAML;
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->docker_compose_raw = $yaml;
+    $service->shouldReceive('getRequiredPort')->andReturn(80);
+
+    $app = Mockery::mock(ServiceApplication::class)->makePartial();
+    $app->name = 'mysql';
+    $app->shouldReceive('getAttribute')->with('service')->andReturn($service);
+    $app->service = $service;
+
+    expect($app->getRequiredPort())->toBeNull();
+});
+
 it('returns null for map-style environment without port', function () {
     $yaml = <<<'YAML'
 services:

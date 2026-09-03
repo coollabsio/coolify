@@ -121,7 +121,7 @@ class FileStorage extends Component
             : route('project.application.backup.show', [...$parameters, 'backup_uuid' => $backup->uuid]);
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             if ($this->fileStorage->is_too_large) {
@@ -161,7 +161,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
     }
 
@@ -180,7 +180,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
     }
 
@@ -208,7 +208,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
     }
 
@@ -243,7 +243,7 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
-            $this->dispatch('refreshStorages');
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
         }
 
         return true;

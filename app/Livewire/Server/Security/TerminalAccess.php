@@ -62,10 +62,9 @@ class TerminalAccess extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
             $this->validate();
             // No other fields to sync for terminal access
         } else {

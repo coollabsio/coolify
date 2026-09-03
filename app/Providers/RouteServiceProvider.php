@@ -58,5 +58,34 @@ class RouteServiceProvider extends ServiceProvider
         RateLimiter::for('feedback', function (Request $request) {
             return Limit::perMinute(3)->by($request->user()?->id ?: $request->ip());
         });
+
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by((string) $request->email.'|'.auth_rate_limit_ip($request));
+        });
+
+        RateLimiter::for('two-factor', function (Request $request) {
+            return Limit::perMinute(5)->by($request->session()->get('login.id'));
+        });
+
+        RateLimiter::for('forgot-password', function (Request $request) {
+            $limits = [
+                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1(auth_rate_limit_ip($request))),
+            ];
+
+            $emailIdentity = normalize_email_identity($request->input('email'));
+            if ($emailIdentity !== null) {
+                $limits[] = Limit::perHour(3)->by('forgot-password:email-identity:'.sha1($emailIdentity));
+            }
+
+            return $limits;
+        });
+
+        RateLimiter::for('magic-link', function (Request $request) {
+            return Limit::perMinute(5)->by(hash('sha256', (string) $request->input('token').'|'.auth_rate_limit_ip($request)));
+        });
+
+        RateLimiter::for('force-password-reset', function (Request $request) {
+            return Limit::perMinute(15)->by($request->user()->id);
+        });
     }
 }

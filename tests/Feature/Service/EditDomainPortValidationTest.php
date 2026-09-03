@@ -2,7 +2,9 @@
 
 use App\Livewire\Project\Service\Domains;
 use App\Livewire\Project\Service\EditDomain;
+use App\Livewire\Project\Service\Index;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -10,14 +12,21 @@ use App\Models\ServiceApplication;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
+uses(RefreshDatabase::class);
+
 beforeEach(function () {
+    $this->withoutVite();
+    InstanceSettings::forceCreate(['id' => 0]);
+
     // Create user and team
     $this->user = User::factory()->create();
     $this->team = Team::factory()->create();
     $this->user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($this->user);
+    session(['currentTeam' => $this->team]);
 
     // Create server
     $this->server = Server::factory()->create([
@@ -25,9 +34,7 @@ beforeEach(function () {
     ]);
 
     // Create standalone docker destination
-    $this->destination = StandaloneDocker::factory()->create([
-        'server_id' => $this->server->id,
-    ]);
+    $this->destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
 
     // Create project and environment
     $this->project = Project::factory()->create([
@@ -48,8 +55,10 @@ beforeEach(function () {
     ]);
 
     // Create service application
-    $this->serviceApplication = ServiceApplication::factory()->create([
+    $this->serviceApplication = ServiceApplication::create([
         'service_id' => $this->service->id,
+        'name' => 'web',
+        'image' => 'nginx:alpine',
         'fqdn' => 'http://example.com:8000',
     ]);
 
@@ -68,11 +77,69 @@ beforeEach(function () {
     }
 });
 
+it('loads a persisted port override in the service application editor', function () {
+    $this->serviceApplication->update([
+        'fqdn' => 'https://web.example.com',
+        'domain_port_overrides' => [
+            'https://web.example.com' => 8080,
+        ],
+    ]);
+
+    Livewire::test(Index::class, [
+        'serviceApplication' => $this->serviceApplication->fresh(),
+        'parameters' => [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'service_uuid' => $this->service->uuid,
+            'stack_service_uuid' => $this->serviceApplication->uuid,
+        ],
+        'query' => [],
+    ])
+        ->assertSet('fqdn', 'https://web.example.com:8080')
+        ->assertOk();
+});
+
+it('initializes route state when mounting a service application directly', function () {
+    Livewire::test(Index::class, [
+        'serviceApplication' => $this->serviceApplication,
+    ])
+        ->assertSet('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'service_uuid' => $this->service->uuid,
+            'stack_service_uuid' => $this->serviceApplication->uuid,
+        ])
+        ->assertSet('query', [])
+        ->assertOk();
+});
+
 it('loads the EditDomain component with required port', function () {
     Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
         ->assertSet('requiredPort', 8000)
         ->assertSet('fqdn', 'http://example.com:8000')
         ->assertOk();
+});
+
+it('loads a persisted port override and moves it when the hostname changes', function () {
+    $this->serviceApplication->update([
+        'fqdn' => 'https://old.example.com',
+        'domain_port_overrides' => [
+            'https://old.example.com' => 8080,
+        ],
+    ]);
+
+    Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
+        ->assertSet('fqdn', 'https://old.example.com:8080')
+        ->set('fqdn', 'https://new.example.com:8080')
+        ->call('submit')
+        ->assertSet('showPortWarningModal', false)
+        ->assertSet('fqdn', 'https://new.example.com:8080');
+
+    expect($this->serviceApplication->fresh())
+        ->fqdn->toBe('https://new.example.com')
+        ->domain_port_overrides->toBe([
+            'https://new.example.com' => 8080,
+        ]);
 });
 
 it('marks noindex changes as pending configuration', function () {
@@ -107,7 +174,7 @@ it('allows port removal when user confirms', function () {
 });
 
 it('cancels port removal when user cancels', function () {
-    $originalFqdn = $this->serviceApplication->fqdn;
+    $originalFqdn = $this->serviceApplication->url;
 
     Livewire::test(EditDomain::class, ['applicationId' => $this->serviceApplication->id])
         ->set('fqdn', 'http://example.com') // Remove port
@@ -126,7 +193,10 @@ it('allows saving when port is changed to different port', function () {
 
     // Verify the FQDN was updated
     $this->serviceApplication->refresh();
-    expect($this->serviceApplication->fqdn)->toBe('http://example.com:3000');
+    expect($this->serviceApplication->fqdn)->toBe('http://example.com')
+        ->and($this->serviceApplication->domain_port_overrides)->toBe([
+            'http://example.com' => 3000,
+        ]);
 });
 
 it('allows saving when all domains have ports (multiple domains)', function () {
@@ -153,8 +223,10 @@ it('does not show warning for services without required port', function () {
         'environment_id' => $this->environment->id,
     ]);
 
-    $appWithoutPort = ServiceApplication::factory()->create([
+    $appWithoutPort = ServiceApplication::create([
         'service_id' => $serviceWithoutPort->id,
+        'name' => 'web',
+        'image' => 'nginx:alpine',
         'fqdn' => 'http://example.com',
     ]);
 
