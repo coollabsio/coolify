@@ -92,6 +92,40 @@ beforeEach(function () {
     ]);
 });
 
+it('marks service application port-only changes as pending configuration', function () {
+    $this->webApp->update([
+        'fqdn' => 'http://example.com',
+        'domain_port_overrides' => ['http://example.com' => 8000],
+    ]);
+    $this->service->isConfigurationChanged(save: true);
+
+    $this->webApp->update([
+        'domain_port_overrides' => ['http://example.com' => 3000],
+    ]);
+
+    expect($this->service->refresh()->isConfigurationChanged())->toBeTrue();
+});
+
+it('does not mark reordered service application port overrides as changed', function () {
+    $this->webApp->update([
+        'fqdn' => 'http://one.example.com,http://two.example.com',
+        'domain_port_overrides' => [
+            'http://one.example.com' => 8000,
+            'http://two.example.com' => 3000,
+        ],
+    ]);
+    $this->service->isConfigurationChanged(save: true);
+
+    $this->webApp->update([
+        'domain_port_overrides' => [
+            'http://two.example.com' => 3000,
+            'http://one.example.com' => 8000,
+        ],
+    ]);
+
+    expect($this->service->refresh()->isConfigurationChanged())->toBeFalse();
+});
+
 it('groups configured domains and shows redirect settings in the table', function () {
     $this->apiApp->update([
         'fqdn' => 'https://api.example.com,https://admin.example.com',
@@ -504,6 +538,133 @@ it('does not restore stale dns status when a removed service domain is re-added'
         ->and($this->apiApp->domain_dns_statuses['https://api.example.com']['message'] ?? null)->not->toBe('Stale DNS result.');
 });
 
+it('shows the port warning modal when adding a domain with a non-default port', function () {
+    $this->service->update([
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    environment:
+      - SERVICE_FQDN_WEB_8000
+  api:
+    image: node:alpine
+YAML,
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->webApp->id)
+        ->set('newDomainParts.host', 'web.example.com')
+        ->set('newDomainParts.port', '3000')
+        ->set('newDomainPartsChanged', true)
+        ->call('addDomain')
+        ->assertSet('showPortWarningModal', true)
+        ->assertSet('requiredPort', 8000)
+        ->assertSee('Use a different port?');
+
+    expect($this->webApp->fresh()->fqdn)->toBeNull();
+});
+
+it('saves a non-default domain port after confirming the warning', function () {
+    $this->service->update([
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    environment:
+      - SERVICE_FQDN_WEB_8000
+  api:
+    image: node:alpine
+YAML,
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->webApp->id)
+        ->set('newDomainParts.host', 'web.example.com')
+        ->set('newDomainParts.port', '3000')
+        ->set('newDomainPartsChanged', true)
+        ->call('addDomain')
+        ->assertSet('showPortWarningModal', true)
+        ->call('confirmRemovePort')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    $this->webApp->refresh();
+
+    expect($this->webApp->fqdn)->toContain('https://web.example.com')
+        ->and($this->webApp->domain_port_overrides['https://web.example.com'] ?? null)->toBe(3000);
+});
+
+it('clears a service domain port override when saving without a port', function () {
+    $this->service->update([
+        'docker_compose_raw' => <<<'YAML'
+services:
+  api:
+    image: node:alpine
+    environment:
+      - SERVICE_FQDN_API_3000
+  web:
+    image: nginx:alpine
+YAML,
+    ]);
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com',
+        'domain_port_overrides' => [
+            'https://api.example.com' => 8080,
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '8080')
+        ->set('editingDomainParts.port', '')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
+        ->assertSee('Internal port 3000')
+        ->assertDontSee('Internal port 8080');
+
+    expect($this->apiApp->fresh()->domain_port_overrides ?? [])
+        ->not->toHaveKey('https://api.example.com');
+});
+
+it('reopens service domain edit with the saved port override', function () {
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com',
+        'domain_port_overrides' => [
+            'https://api.example.com' => 8080,
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSet('domainRows.0.url', 'https://api.example.com')
+        ->assertSet('domainRows.0.internal_port', 8080)
+        ->call('startEdit', 0)
+        ->assertSet('editingDomainParts.port', '8080')
+        ->assertSet('editingDomainParts.host', 'api.example.com');
+});
+
+it('does not show the port warning modal when the domain uses the required port', function () {
+    $this->service->update([
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    environment:
+      - SERVICE_FQDN_WEB_8000
+  api:
+    image: node:alpine
+YAML,
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->set('newServiceApplicationId', $this->webApp->id)
+        ->set('newDomainParts.host', 'web.example.com')
+        ->set('newDomainParts.port', '8000')
+        ->set('newDomainPartsChanged', true)
+        ->call('addDomain')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+});
+
 it('saves after confirming both a domain conflict and a missing required port', function () {
     $this->service->update([
         'docker_compose_raw' => <<<'YAML'
@@ -526,9 +687,9 @@ YAML,
         ->assertSet('showDomainConflictModal', false)
         ->assertSet('showPortWarningModal', true)
         ->assertSet('forceSaveDomains', true)
-        ->assertSee('Remove required port?')
-        ->assertSee('Keep port')
-        ->assertSee('Remove port anyway');
+        ->assertSee('Use a different port?')
+        ->assertSee('Keep required port')
+        ->assertSee('Use this port anyway');
 
     $component
         ->call('confirmRemovePort')
@@ -689,4 +850,66 @@ it('updates search engine indexing from the service domains view', function () {
 
     expect(file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php')))
         ->not->toContain('<select');
+});
+
+it('keeps noindex domains when normalizing a custom service domain port', function () {
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com:8080',
+        'noindex_domains' => ['https://api.example.com:8080'],
+    ]);
+
+    expect($this->apiApp->refresh())
+        ->fqdn->toBe('https://api.example.com')
+        ->noindex_domains->toBe(['https://api.example.com'])
+        ->and($this->apiApp->domain_port_overrides)
+        ->toBe(['https://api.example.com' => 8080]);
+});
+
+it('shows an inherited internal port badge from the coolify service env port', function () {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  api:\n    image: node:alpine\n    environment:\n      - SERVICE_FQDN_API_3000\n",
+    ]);
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSet('domainRows.0.internal_port', 3000)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertSee('Internal port 3000')
+        ->assertSee('Inherited from the Coolify service port', false)
+        ->assertDontSee('No internal port');
+});
+
+it('shows a custom internal port badge for a service domain override', function () {
+    $this->service->update([
+        'docker_compose_raw' => "services:\n  api:\n    image: node:alpine\n    environment:\n      - SERVICE_FQDN_API_3000\n",
+    ]);
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com',
+        'domain_port_overrides' => [
+            'https://api.example.com' => 8080,
+        ],
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSet('domainRows.0.internal_port', 8080)
+        ->assertSet('domainRows.0.has_port_override', true)
+        ->assertSee('Internal port 8080')
+        ->assertSee('Custom internal port for this domain', false)
+        ->assertDontSee('Internal port 3000');
+});
+
+it('does not show an internal port badge when the service has no env port', function () {
+    $this->apiApp->update([
+        'fqdn' => 'https://api.example.com',
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
+        ->assertSet('domainRows.0.internal_port', null)
+        ->assertDontSee('No internal port')
+        ->assertDontSee('Internal port ')
+        ->assertDontSee('table-badge-danger', false);
 });

@@ -224,3 +224,17 @@ it('rejects single-label application hostnames but allows IP addresses', functio
         ->and(ValidationPatterns::validateApplicationDomains('https://localhost'))->not->toBeEmpty()
         ->and(ValidationPatterns::validateApplicationDomains('http://192.0.2.10:8000'))->toBeEmpty();
 });
+
+it('rejects application domain ports outside the valid TCP range', function (string $domain) {
+    expect(ValidationPatterns::validateApplicationDomains($domain))->not->toBeEmpty();
+})->with([
+    'zero' => 'https://example.com:0',
+    'above maximum' => 'https://example.com:65536',
+]);
+
+it('accepts application domain ports at the TCP range boundaries', function (string $domain) {
+    expect(ValidationPatterns::validateApplicationDomains($domain))->toBeEmpty();
+})->with([
+    'minimum' => 'https://example.com:1',
+    'maximum' => 'https://example.com:65535',
+]);
