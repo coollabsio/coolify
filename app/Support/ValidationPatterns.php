@@ -619,6 +619,13 @@ class ValidationPatterns
                 continue;
             }
 
+            $port = parse_url($url, PHP_URL_PORT);
+            if ($port !== null && ($port < 1 || $port > 65535)) {
+                $errors[] = "Invalid port for URL: {$url}. The port must be between 1 and 65535.";
+
+                continue;
+            }
+
             $unwrappedHost = trim((string) $host, '[]');
             if (! str_contains($unwrappedHost, '.') && filter_var($unwrappedHost, FILTER_VALIDATE_IP) === false) {
                 $errors[] = "Invalid URL: {$url}. The hostname must be a fully qualified domain name.";
