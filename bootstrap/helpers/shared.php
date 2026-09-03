@@ -1541,7 +1541,14 @@ function generateDeployWebhook($resource)
 function generateGitManualWebhook($resource, $type)
 {
     if ($resource->source_id !== 0 && ! is_null($resource->source_id)) {
-        return null;
+        // GitHub Apps register webhooks at the app level (hook_attributes in
+        // the app manifest), so there is nothing to configure per repository.
+        // Other Git App providers (GitLab) have no app-level webhook
+        // registration and Coolify never creates their project webhooks, so
+        // the manual endpoint must stay visible for them.
+        if ($resource->source_type === GithubApp::class) {
+            return null;
+        }
     }
     if ($resource->getMorphClass() === Application::class) {
         $baseUrl = base_url();
