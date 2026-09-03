@@ -134,6 +134,16 @@ YAML;
         ->toThrow(Exception::class, 'Docker Compose file must contain a "services" section');
 });
 
+test('validateDockerComposeForInjection rejects empty services section', function () {
+    $invalidCompose = <<<'YAML'
+services: {}
+YAML;
+
+    expect(fn () => validateDockerComposeForInjection($invalidCompose))
+        ->toThrow(Exception::class, 'Docker Compose file must define at least one service.');
+});
+
+
 test('validateDockerComposeForInjection handles empty volumes array', function () {
     $validCompose = <<<'YAML'
 services:
