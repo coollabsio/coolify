@@ -111,6 +111,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public bool $foundProxy = false;
 
+    public ?string $foundProxyState = null;
+
     public bool $foundLogDrainContainer = false;
 
     private ?array $cachedDestinationIds = null;
@@ -335,8 +337,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             } else {
                 $uuid = $labels->get('com.docker.compose.service');
                 $type = $labels->get('coolify.type');
-                if ($name === 'coolify-proxy' && $this->isRunning($containerStatus)) {
-                    $this->foundProxy = true;
+                if ($name === 'coolify-proxy') {
+                    $this->foundProxyState = data_get($container, 'state', 'exited');
+                    if ($this->isRunning($containerStatus)) {
+                        $this->foundProxy = true;
+                    }
                 } elseif ($type === 'service' && $this->isRunning($containerStatus)) {
                 } else {
                     if ($this->allDatabaseUuids->contains($uuid) && $this->isActiveOrTransient($containerStatus)) {
@@ -800,6 +805,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 } catch (\Throwable $e) {
                 }
             } else {
+                $observed = self::proxyStatusToPersist(true, $this->foundProxyState);
+                if ($observed !== null && ($this->server->proxy->status ?? null) !== $observed) {
+                    $this->server->proxy->status = $observed;
+                    $this->server->save();
+                }
                 // Connect proxy to networks periodically as a safety net to avoid excessive job dispatches.
                 // On-demand triggers (new network, service deploy) use dispatchSync() and bypass this.
                 $proxyCacheKey = 'connect-proxy:'.$this->server->id;
@@ -934,6 +944,22 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     private function isRunning(string $containerStatus)
     {
         return str($containerStatus)->contains('running');
+    }
+
+    /**
+     * Sentinel already observed the proxy container. Persist the docker state
+     * (without a health suffix) so the dashboard does not stay on onboarding's
+     * "exited" / StartProxy's "starting" while the proxy is up.
+     */
+    public static function proxyStatusToPersist(bool $foundProxy, ?string $observedState): ?string
+    {
+        if (! $foundProxy) {
+            return null;
+        }
+
+        $state = $observedState ?: 'running';
+
+        return str($state)->before(':')->toString();
     }
 
     /**
