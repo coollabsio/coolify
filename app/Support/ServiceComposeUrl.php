@@ -25,15 +25,7 @@ class ServiceComposeUrl
             ->map(fn ($url) => trim((string) $url))
             ->filter();
 
-        foreach ($urls as $url) {
-            if (! filter_var($url, FILTER_VALIDATE_URL)) {
-                $errors[] = "Invalid URL: {$url}";
-            }
-            $scheme = parse_url($url, PHP_URL_SCHEME) ?? '';
-            if (! in_array(strtolower($scheme), ['http', 'https'], true)) {
-                $errors[] = "Invalid URL scheme: {$scheme} for URL: {$url}. Only http and https are supported.";
-            }
-        }
+        $errors = ValidationPatterns::validateApplicationDomains($urls->implode(','));
 
         $duplicates = $urls->duplicates()->unique()->values();
         if ($duplicates->isNotEmpty() && ! $forceDomainOverride) {

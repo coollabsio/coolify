@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -25,11 +26,17 @@ class ApplicationPreview extends BaseModel
         'docker_registry_image_tag',
         'last_online_at',
         'domain_dns_statuses',
+        'domain_port_overrides',
+    ];
+
+    protected $hidden = [
+        'domain_port_overrides',
     ];
 
     protected $casts = [
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
+        'domain_port_overrides' => 'array',
     ];
 
     protected static function booted(): void
@@ -85,6 +92,14 @@ class ApplicationPreview extends BaseModel
             if ($preview->isDirty('status')) {
                 $preview->last_online_at = now();
             }
+            if ($preview->isDirty('fqdn')) {
+                if ($preview->fqdn === '') {
+                    $preview->fqdn = null;
+                }
+                $normalized = DomainPortOverrides::normalize($preview->fqdn, $preview->domain_port_overrides);
+                $preview->fqdn = $normalized['fqdn'];
+                $preview->domain_port_overrides = $normalized['overrides'];
+            }
         });
     }
 
@@ -124,24 +139,14 @@ class ApplicationPreview extends BaseModel
         }
 
         if ($applicationFqdn) {
-            if (str($applicationFqdn)->contains(',')) {
-                $url = Url::fromString(str($applicationFqdn)->explode(',')[0]);
-            } else {
-                $url = Url::fromString($applicationFqdn);
-            }
-            $template = $this->application->preview_url_template;
-            $host = $url->getHost();
-            $schema = $url->getScheme();
-            $portInt = $url->getPort();
-            $port = $portInt !== null ? ':'.$portInt : '';
-            $urlPath = $url->getPath();
-            $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
-            $random = new_public_id();
-            $preview_fqdn = str_replace('{{random}}', $random, $template);
-            $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-            $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
-            $preview_fqdn = "$schema://$preview_fqdn{$port}{$path}";
-            $this->fqdn = $preview_fqdn;
+            $sourceDomain = str($applicationFqdn)->contains(',')
+                ? str($applicationFqdn)->explode(',')[0]
+                : $applicationFqdn;
+            $generated = $this->generatedPreviewDomain((string) $sourceDomain);
+            $this->fqdn = $generated['url'];
+            $this->domain_port_overrides = filled($generated['port'])
+                ? [$generated['url'] => $generated['port']]
+                : null;
             $this->save();
         }
 
@@ -187,6 +192,7 @@ class ApplicationPreview extends BaseModel
             ->all();
 
         $docker_compose_domains = [];
+        $previewPortOverrides = [];
         foreach ($serviceNames as $service_name) {
             $domain_string = getComposeServiceDomainString($applicationDomains, $service_name);
 
@@ -218,20 +224,11 @@ class ApplicationPreview extends BaseModel
                     continue;
                 }
 
-                $url = Url::fromString($domain);
-                $template = $this->application->preview_url_template;
-                $host = $url->getHost();
-                $schema = $url->getScheme();
-                $portInt = $url->getPort();
-                $port = $portInt !== null ? ':'.$portInt : '';
-                $urlPath = $url->getPath();
-                $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
-                $random = new_public_id();
-                $preview_fqdn = str_replace('{{random}}', $random, $template);
-                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
-                $preview_fqdn = "$schema://$preview_fqdn{$port}{$path}";
-                $preview_domains[] = $preview_fqdn;
+                $generated = $this->generatedPreviewDomain((string) $domain);
+                $preview_domains[] = $generated['url'];
+                if (filled($generated['port'])) {
+                    $previewPortOverrides[$generated['url']] = $generated['port'];
+                }
             }
 
             $docker_compose_domains = putComposeServiceDomain(
@@ -255,8 +252,34 @@ class ApplicationPreview extends BaseModel
             ->implode(',');
 
         $this->fqdn = ! empty($allDomains) ? $allDomains : null;
+        $this->domain_port_overrides = $previewPortOverrides ?: null;
 
         $this->save();
+    }
+
+    /**
+     * @return array{url: string, port: ?int}
+     */
+    public function generatedPreviewDomain(string $sourceDomain): array
+    {
+        $url = Url::fromString($sourceDomain);
+        $template = $this->application->preview_url_template;
+        $host = $url->getHost();
+        $schema = $url->getScheme();
+        $urlPath = $url->getPath();
+        $path = ($urlPath !== '' && $urlPath !== '/') ? $urlPath : '';
+        $random = new_public_id();
+        $previewFqdn = str_replace('{{random}}', $random, $template);
+        $previewFqdn = str_replace('{{domain}}', $host, $previewFqdn);
+        $previewFqdn = str_replace('{{pr_id}}', (string) $this->pull_request_id, $previewFqdn);
+        $previewUrl = "{$schema}://{$previewFqdn}{$path}";
+        $sourceCanonical = DomainPortOverrides::withoutPort($sourceDomain);
+        $port = $url->getPort() ?? ($this->application->domain_port_overrides[$sourceCanonical] ?? null);
+
+        return [
+            'url' => $previewUrl,
+            'port' => $port !== null ? (int) $port : null,
+        ];
     }
 
     /**

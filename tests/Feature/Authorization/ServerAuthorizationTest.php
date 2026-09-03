@@ -5,6 +5,7 @@ use App\Livewire\Server\Create as ServerCreate;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\Navbar as ServerNavbar;
+use App\Livewire\Server\ValidateAndInstall;
 use App\Models\CloudProviderToken;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -60,6 +61,24 @@ test('admin can update server', function () {
 test('member cannot update server', function () {
     expect($this->member->can('update', $this->server))->toBeFalse();
 });
+
+test('member cannot invoke server validation write steps', function (string $method) {
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+    $before = $this->server->fresh()->getAttributes();
+
+    Livewire::test(ValidateAndInstall::class, ['server' => $this->server])
+        ->call($method)
+        ->assertForbidden();
+
+    expect($this->server->fresh()->getAttributes())->toBe($before);
+})->with([
+    'init',
+    'validateOS',
+    'validatePrerequisites',
+    'validateDockerEngine',
+    'validateDockerVersion',
+]);
 
 // --- Server Policy: delete ---
 
