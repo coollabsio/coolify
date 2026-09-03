@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://pterodactyl.io/
 # slogan: Pterodactyl is a free, open-source game server management panel
 # category: media
@@ -34,7 +33,7 @@ services:
       timeout: 1s
       retries: 3
   pterodactyl:
-    image: 'ghcr.io/pterodactyl/panel:v1.12.0'
+    image: 'ghcr.io/pterodactyl/panel:v1.12.3'
     volumes:
       - 'panel-var:/app/var/'
       - 'panel-nginx:/etc/nginx/http.d/'

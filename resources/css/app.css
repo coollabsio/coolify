@@ -2521,8 +2521,25 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .service-backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr);
-    min-width: 45rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 7.5rem;
+    width: 100%;
+}
+
+.data-table-row.service-backup-table-grid {
+    background: var(--coollabs-base);
+    border-bottom: 1px solid var(--coollabs-fill);
+}
+
+.data-table-row.service-backup-table-grid:last-child {
+    border-bottom: 0;
+}
+
+.data-table-row.service-backup-table-grid:hover {
+    background: color-mix(in srgb, var(--coollabs-base) 98%, black);
+}
+
+.dark .data-table-row.service-backup-table-grid:hover {
+    background: color-mix(in srgb, var(--coollabs-base) 98%, white);
 }
 
 /* Persistent storage volumes: Name | Source | Destination | [PR suffix] | Backup | [Actions] */

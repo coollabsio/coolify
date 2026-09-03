@@ -147,6 +147,16 @@ it('dispatches the job when container state changes', function () use ($running)
     Queue::assertPushed(PushServerUpdateJob::class, 2);
 });
 
+it('dispatches the job when only the container restart count changes', function () {
+    $beforeRestart = [['name' => 'app-1', 'state' => 'running', 'restart_count' => 0]];
+    $afterRestart = [['name' => 'app-1', 'state' => 'running', 'restart_count' => 1]];
+
+    pushSentinel($this->token, sentinelPayload($beforeRestart))->assertOk();
+    pushSentinel($this->token, sentinelPayload($afterRestart))->assertOk();
+
+    Queue::assertPushed(PushServerUpdateJob::class, 2);
+});
+
 it('ignores health status changes while container lifecycle state is unchanged', function () {
     $healthy = [['name' => 'app-1', 'state' => 'running', 'health_status' => 'healthy']];
     $unhealthy = [['name' => 'app-1', 'state' => 'running', 'health_status' => 'unhealthy']];

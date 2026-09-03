@@ -107,9 +107,13 @@
             @endcan
 
             @if (session()->has('token'))
-                <x-application.settings-section title="Copy your token"
-                    description="This value will not be shown again after you leave this page.">
-                    <x-forms.copy-button :text="session('token')" />
+                <x-application.settings-section title="Copy your token">
+                    <div class="flex flex-col gap-3">
+                        <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                            This value will not be shown again after you leave this page.
+                        </p>
+                        <x-forms.copy-button :text="session('token')" />
+                    </div>
                 </x-application.settings-section>
             @endif
 

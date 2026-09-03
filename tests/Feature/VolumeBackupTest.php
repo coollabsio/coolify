@@ -7,6 +7,7 @@ use App\Jobs\VolumeBackupRecoveryJob;
 use App\Livewire\Project\Application\Backup\Create as CreateScheduledVolumeBackup;
 use App\Livewire\Project\Service\FileStorage;
 use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
+use App\Livewire\Project\Service\VolumeBackup\Index as ServiceVolumeBackupIndex;
 use App\Livewire\Project\Shared\Storages\Show;
 use App\Livewire\Project\Shared\Storages\VolumeBackups;
 use App\Models\Application;
@@ -26,6 +27,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -43,6 +45,14 @@ use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
+
+it('types service backup S3 storage state as a nullable Eloquent collection', function () {
+    $property = new ReflectionProperty(ServiceVolumeBackupIndex::class, 's3s');
+
+    expect($property->getType()?->getName())->toBe(Collection::class)
+        ->and($property->getType()?->allowsNull())->toBeTrue()
+        ->and($property->getDefaultValue())->toBeNull();
+});
 
 it('provides the volume backup domain classes and relationship', function () {
     expect(class_exists(ScheduledVolumeBackup::class))->toBeTrue()

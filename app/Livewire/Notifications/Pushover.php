@@ -42,6 +42,9 @@ class Pushover extends Component
     public bool $statusChangePushoverNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $restartLimitReachedPushoverNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $backupSuccessPushoverNotifications = false;
 
     #[Validate(['boolean'])]
@@ -86,11 +89,10 @@ class Pushover extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->pushover_enabled = $this->pushoverEnabled;
             $this->settings->pushover_user_key = $this->pushoverUserKey;
             $this->settings->pushover_api_token = $this->pushoverApiToken;
@@ -98,6 +100,7 @@ class Pushover extends Component
             $this->settings->deployment_success_pushover_notifications = $this->deploymentSuccessPushoverNotifications;
             $this->settings->deployment_failure_pushover_notifications = $this->deploymentFailurePushoverNotifications;
             $this->settings->status_change_pushover_notifications = $this->statusChangePushoverNotifications;
+            $this->settings->restart_limit_reached_pushover_notifications = $this->restartLimitReachedPushoverNotifications;
             $this->settings->backup_success_pushover_notifications = $this->backupSuccessPushoverNotifications;
             $this->settings->backup_failure_pushover_notifications = $this->backupFailurePushoverNotifications;
             $this->settings->scheduled_task_success_pushover_notifications = $this->scheduledTaskSuccessPushoverNotifications;
@@ -125,6 +128,7 @@ class Pushover extends Component
             $this->deploymentSuccessPushoverNotifications = $this->settings->deployment_success_pushover_notifications;
             $this->deploymentFailurePushoverNotifications = $this->settings->deployment_failure_pushover_notifications;
             $this->statusChangePushoverNotifications = $this->settings->status_change_pushover_notifications;
+            $this->restartLimitReachedPushoverNotifications = $this->settings->restart_limit_reached_pushover_notifications;
             $this->backupSuccessPushoverNotifications = $this->settings->backup_success_pushover_notifications;
             $this->backupFailurePushoverNotifications = $this->settings->backup_failure_pushover_notifications;
             $this->scheduledTaskSuccessPushoverNotifications = $this->settings->scheduled_task_success_pushover_notifications;
@@ -162,6 +166,7 @@ class Pushover extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -174,6 +179,7 @@ class Pushover extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -183,6 +189,8 @@ class Pushover extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
         $this->dispatch('success', 'Settings saved.');

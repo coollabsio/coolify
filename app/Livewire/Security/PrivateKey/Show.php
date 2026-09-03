@@ -76,7 +76,9 @@ class Show extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->private_key->name;
             $this->description = $this->private_key->description;
-            $this->privateKeyValue = $this->private_key->private_key;
+            $this->privateKeyValue = auth()->user()->can('update', $this->private_key)
+                ? $this->private_key->private_key
+                : '';
             $this->isGitRelated = $this->private_key->is_git_related;
         }
     }

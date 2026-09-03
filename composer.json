@@ -21,7 +21,7 @@
         "laravel/mcp": "^0.6.7",
         "laravel/nightwatch": "^1.28.6",
         "laravel/pail": "^1.2.7",
-        "laravel/prompts": "^0.3.22|^0.3.22|^0.3.22",
+        "laravel/prompts": "^0.3.22",
         "laravel/sanctum": "^4.3.3",
         "laravel/socialite": "^5.29.0",
         "laravel/tinker": "^2.11.1",

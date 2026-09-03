@@ -2,9 +2,9 @@
 
 return [
     'coolify' => [
-        'version' => env('COOLIFY_VERSION') ?: '4.3.12',
+        'version' => env('COOLIFY_VERSION') ?: '4.3.15',
         'helper_version' => '1.0.16',
-        'realtime_version' => '1.0.17',
+        'realtime_version' => '1.0.18',
         'railpack_version' => '0.23.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
