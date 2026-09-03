@@ -1,4 +1,12 @@
-<div>
+<div x-data="{
+    settingsUrl: @js(route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid])),
+    openSettings(event) {
+        if (event.target.closest('a, button')) {
+            return;
+        }
+        Livewire.navigate(this.settingsUrl);
+    }
+}">
     @php
         [$statusType, $statusLabel] = match (true) {
             str($resource->status)->contains('running') => ['success', formatContainerStatus($resource->status)],
@@ -26,6 +34,7 @@
                     </div>
                 </div>
                 <x-status-badge :status="$statusLabel" :type="$statusType" />
+                <x-application.restart-limit-warning :application="$resource" />
             </div>
 
             @if ($resource->configuration_required)
@@ -76,7 +85,9 @@
     </div>
 
     <div x-cloak x-show="viewMode === 'table'"
-        class="grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem_5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+        x-on:click="openSettings($event)" x-on:keydown.enter="openSettings($event)"
+        role="link" tabindex="0" aria-label="Open {{ $resourceName }} settings"
+        class="grid min-h-14 min-w-[48rem] cursor-pointer grid-cols-[minmax(14rem,1fr)_minmax(12rem,1fr)_12rem_5rem] items-center gap-3 border-b border-neutral-200 px-4 py-2.5 last:border-b-0 hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
         <div class="flex min-w-0 items-center gap-3">
             <div
                 class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-500 dark:bg-white/[0.06] dark:text-fg-dim">
@@ -86,14 +97,14 @@
                 <div class="truncate text-[13px] font-semibold text-black dark:text-fg">{{ $resourceName }}</div>
             </div>
         </div>
-        <div class="hidden truncate font-mono text-xs text-neutral-500 sm:block dark:text-fg-faint">
+        <div class="truncate font-mono text-xs text-neutral-500 dark:text-fg-faint">
             {{ $resource->image }}
         </div>
-        <div class="flex flex-wrap items-center justify-end gap-1 sm:contents">
-            <div class="justify-self-start">
-                <x-status-badge :status="$statusLabel" :type="$statusType" />
-            </div>
-            <div class="flex items-center justify-end gap-1">
+        <div class="flex flex-wrap items-center gap-1">
+            <x-status-badge :status="$statusLabel" :type="$statusType" />
+            <x-application.restart-limit-warning :application="$resource" />
+        </div>
+        <div class="flex items-center justify-end gap-1">
                 @if ($isDatabase && ($resource->isBackupSolutionAvailable() || $resource->is_migrated))
                     <a class="icon-button" title="Service backups" aria-label="Service backups" {{ wireNavigate() }}
                         href="{{ route('project.service.volume-backups.index', $parameters) }}">
@@ -109,10 +120,9 @@
                     @endcan
                 @endif
                 <a class="icon-button" title="Resource settings" aria-label="Resource settings" {{ wireNavigate() }}
-                    href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
+            href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $resource->uuid]) }}">
                     <x-reicon name="settings" class="size-4" />
                 </a>
-            </div>
         </div>
     </div>
 </div>

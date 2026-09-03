@@ -255,6 +255,25 @@ it('groups application lifecycle options in an Actions dropdown', function () {
         ->not->toContain('Force deploy without cache');
 });
 
+it('shows stop in application action menus when the application is exited', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $desktopExitedActions = str($heading)
+        ->after("@if (str(\$application->status)->startsWith('exited'))")
+        ->before('@else')
+        ->toString();
+
+    $mobileActions = str($heading)
+        ->after('id="application-mobile-actions"')
+        ->before('<div class="hidden" aria-hidden="true">')
+        ->toString();
+
+    expect($mobileActions)->toContain('application-mobile-stop-trigger')
+        ->and($desktopExitedActions)->toContain('application-mobile-stop-trigger')
+        ->and($mobileActions)->toContain('Deploy (without cache)')
+        ->and(strrpos($mobileActions, 'Deploy (without cache)'))
+        ->toBeLessThan(strrpos($mobileActions, 'application-mobile-stop-trigger'));
+});
+
 it('places the state-aware no-cache action immediately after deploy or redeploy', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
     $actions = str($heading)->after('id="application-desktop-actions"')->before('@endteleport')->toString();

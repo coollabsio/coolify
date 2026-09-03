@@ -5,8 +5,11 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Actions\Service\StopServiceApplication;
 use App\Enums\ProcessStatus;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
@@ -167,6 +170,29 @@ class Heading extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function removeSelectedResourceContainer(): void
+    {
+        $resource = $this->selectedResource();
+        if (! $resource) {
+            return;
+        }
+
+        $this->authorize('update', $resource);
+        StopServiceApplication::run($resource, true, true);
+        $this->dispatch('success', 'Container removed.');
+    }
+
+    private function selectedResource(): ServiceApplication|ServiceDatabase|null
+    {
+        $uuid = data_get($this->parameters, 'stack_service_uuid');
+        if (! $uuid) {
+            return null;
+        }
+
+        return $this->service->applications()->whereUuid($uuid)->first()
+            ?? $this->service->databases()->whereUuid($uuid)->first();
     }
 
     public function pullAndRestartEvent()

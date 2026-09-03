@@ -2,6 +2,7 @@
 
 namespace App\Traits;
 
+use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Support\Collection;
 
@@ -19,7 +20,7 @@ trait HasNoindexDomains
     {
         return collect($this->noindex_domains ?? [])
             ->filter(fn ($domain) => is_string($domain) && filled($domain))
-            ->map(fn (string $domain) => ValidationPatterns::normalizeApplicationDomainUrl($domain))
+            ->map(fn (string $domain) => $this->normalizeNoindexDomain($domain))
             ->unique()
             ->values();
     }
@@ -27,7 +28,7 @@ trait HasNoindexDomains
     public function isDomainNoindexed(string $domain): bool
     {
         return $this->noindexDomains()->contains(
-            ValidationPatterns::normalizeApplicationDomainUrl($domain)
+            $this->normalizeNoindexDomain($domain)
         );
     }
 
@@ -35,7 +36,7 @@ trait HasNoindexDomains
     {
         $this->noindex_domains = collect($domains)
             ->filter(fn ($domain) => is_string($domain) && filled($domain))
-            ->map(fn (string $domain) => ValidationPatterns::normalizeApplicationDomainUrl($domain))
+            ->map(fn (string $domain) => $this->normalizeNoindexDomain($domain))
             ->intersect($this->currentDomains())
             ->unique()
             ->values()
@@ -58,6 +59,13 @@ trait HasNoindexDomains
     private function currentDomains(): Collection
     {
         return collect(ValidationPatterns::applicationDomainList($this->fqdn))
-            ->map(fn (string $domain) => ValidationPatterns::normalizeApplicationDomainUrl($domain));
+            ->map(fn (string $domain) => $this->normalizeNoindexDomain($domain));
+    }
+
+    private function normalizeNoindexDomain(string $domain): string
+    {
+        return DomainPortOverrides::withoutPort(
+            ValidationPatterns::normalizeApplicationDomainUrl($domain)
+        );
     }
 }
