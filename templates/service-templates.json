@@ -1,22 +1,4 @@
 {
-    "9router": {
-        "documentation": "https://github.com/decolua/9router?utm_source=coolify.io",
-        "slogan": "FREE AI coding gateway. Routes Claude Code, Codex, Cursor, Cline, Copilot requests to 40+ LLM providers with auto-fallback and token savings.",
-        "compose": "c2VydmljZXM6CiAgOXJvdXRlcjoKICAgIGltYWdlOiAnZGVjb2x1YS85cm91dGVyOiR7OVJPVVRFUl9WRVJTSU9OOi1sYXRlc3R9JwogICAgdm9sdW1lczoKICAgICAgLSAnOXJvdXRlcjovYXBwL2RhdGEnCiAgICBwb3J0czoKICAgICAgLSAnMjAxMjg6MjAxMjgvdGNwJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROXzlST1VURVJfMjAxMjgKICAgICAgLSBEQVRBX0RJUj0vYXBwL2RhdGEKICAgICAgLSAnSU5JVElBTF9QQVNTV09SRD0ke0lOSVRJQUxfUEFTU1dPUkQ6PzEyMzQ1Nn0nCiAgICAgIC0gJ0pXVF9TRUNSRVQ9JHtTRVJWSUNFX1BBU1NXT1JEV0lUSFNZTUJPTFNfNjRfOVJPVVRFUi1KV1QtU0VDUkVUfScKICAgICAgLSAnQVBJX0tFWV9TRUNSRVQ9JHtTRVJWSUNFX1BBU1NXT1JEV0lUSFNZTUJPTFNfOVJPVVRFUi1LRVktU0VDUkVUfScKICAgICAgLSAnTUFDSElORV9JRF9TQUxUPSR7U0VSVklDRV9IRVhfNjRfOVJPVVRFUi1ITUFDLVNBTFR9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjIwMTI4LycKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiA1Cg==",
-        "tags": [
-            "ai",
-            "gateway",
-            "routing",
-            "coding",
-            "llm",
-            "providers"
-        ],
-        "category": "ai",
-        "logo": "svgs/9router.svg",
-        "minversion": "0.0.0",
-        "template_last_updated_at": null,
-        "port": "20128"
-    },
     "activepieces": {
         "documentation": "https://www.activepieces.com/docs/getting-started/introduction?utm_source=coolify.io",
         "slogan": "Open source no-code business automation.",
@@ -457,7 +439,7 @@
         "category": "messaging",
         "logo": "svgs/buzz.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-07-23T17:25:53+02:00",
+        "template_last_updated_at": null,
         "port": "3000"
     },
     "calibre-web-automated-book-downloader": {
@@ -574,7 +556,7 @@
         "category": "backend",
         "logo": "svgs/denoKV.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-07T18:17:33+02:00",
+        "template_last_updated_at": null,
         "port": "8080"
     },
     "changedetection": {
@@ -2516,7 +2498,7 @@
         "category": "development",
         "logo": "svgs/jean.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-08-13T11:00:04+02:00",
+        "template_last_updated_at": null,
         "port": "3456"
     },
     "jellyfin": {
