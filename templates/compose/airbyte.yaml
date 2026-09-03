@@ -758,7 +758,7 @@ services:
         - CMD
         - python
         - -c
-        - import urllib.request; response = urllib.request.urlopen("http://127.0.0.1:8080/health", timeout=5); assert response.status == 200
+        - import urllib.request; response = urllib.request.urlopen("http://127.0.0.1:8080/health/", timeout=5); assert response.status == 200
       interval: 10s
       timeout: 5s
       retries: 10
