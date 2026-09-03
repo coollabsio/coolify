@@ -5,12 +5,12 @@ namespace App\Livewire\Project\Application;
 use App\Actions\Shared\CheckDomainDns;
 use App\Jobs\CheckDomainDnsJob;
 use App\Models\ApplicationPreview;
+use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class PreviewDomains extends Component
 {
@@ -27,6 +27,14 @@ class PreviewDomains extends Component
     public array $editingDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
     public ?int $editingIndex = null;
+
+    public bool $showPortWarningModal = false;
+
+    public bool $forceUseUnknownPort = false;
+
+    public ?int $unrecognizedPort = null;
+
+    public ?string $pendingPortAction = null;
 
     public function mount(): void
     {
@@ -57,8 +65,17 @@ class PreviewDomains extends Component
         if ($domain === null) {
             return;
         }
-        if (collect($this->domainRows)->contains(fn (array $row): bool => $row['url'] === $domain && $row['service'] === $this->newDomainService)) {
+        $canonicalDomain = DomainPortOverrides::withoutPort($domain);
+        if (collect($this->domainRows)->contains(
+            fn (array $row): bool => DomainPortOverrides::withoutPort($row['url']) === $canonicalDomain
+                && $row['service'] === $this->newDomainService
+        )) {
             $this->addError('newDomainParts.host', 'This domain is already configured.');
+
+            return;
+        }
+        if ($this->shouldConfirmPort($this->portFromParts($this->newDomainParts))) {
+            $this->openPortWarning($this->portFromParts($this->newDomainParts), 'add');
 
             return;
         }
@@ -71,10 +88,12 @@ class PreviewDomains extends Component
         if (! $this->persistDomains()) {
             return;
         }
+        $domain = $this->domainRows[$index]['url'] ?? DomainPortOverrides::withoutPort($domain);
         $this->newDomainParts = DomainUrlParts::empty();
         $this->newDomainService = $this->preview->application->build_pack === 'dockercompose'
             ? ($this->composeServices()[0] ?? null)
             : null;
+        $this->forceUseUnknownPort = false;
         $this->dispatch('close-modal');
 
         try {
@@ -109,7 +128,8 @@ class PreviewDomains extends Component
                 $service = $this->newDomainService ?? data_get($this->domainRows, '0.service');
                 foreach ($this->generateComposeDomains((string) $service) as $domain) {
                     $alreadyExists = collect($this->domainRows)->contains(
-                        fn (array $row): bool => $row['url'] === $domain && $row['service'] === $service
+                        fn (array $row): bool => DomainPortOverrides::withoutPort($row['url']) === DomainPortOverrides::withoutPort($domain)
+                            && $row['service'] === $service
                     );
                     if (! $alreadyExists) {
                         $this->domainRows[] = $this->makeRow($domain, $service);
@@ -134,6 +154,11 @@ class PreviewDomains extends Component
         }
         $this->editingIndex = $index;
         $this->editingDomainParts = DomainUrlParts::split($this->domainRows[$index]['url']);
+        $canonical = DomainPortOverrides::withoutPort($this->domainRows[$index]['url']);
+        $savedPort = ($this->preview->domain_port_overrides ?? [])[$canonical] ?? null;
+        if (filled($savedPort)) {
+            $this->editingDomainParts['port'] = (string) $savedPort;
+        }
         $this->dispatch('open-preview-domain-edit');
     }
 
@@ -147,6 +172,18 @@ class PreviewDomains extends Component
         if ($domain === null) {
             return;
         }
+        $oldUrl = $this->domainRows[$this->editingIndex]['url'];
+        if ($this->shouldConfirmPort($this->portFromParts($this->editingDomainParts), $this->currentRowPort($oldUrl))) {
+            $this->openPortWarning($this->portFromParts($this->editingDomainParts), 'update');
+
+            return;
+        }
+        if (blank(DomainUrlParts::split($domain)['port'] ?? null)) {
+            $portOverrides = $this->preview->domain_port_overrides ?? [];
+            unset($portOverrides[DomainPortOverrides::withoutPort($oldUrl)]);
+            unset($portOverrides[DomainPortOverrides::withoutPort($domain)]);
+            $this->preview->domain_port_overrides = $portOverrides ?: null;
+        }
         $this->domainRows[$this->editingIndex]['url'] = $domain;
         $this->domainRows[$this->editingIndex]['dns_status'] = 'pending';
         $this->domainRows[$this->editingIndex]['dns_message'] = 'DNS has not been checked yet.';
@@ -155,9 +192,35 @@ class PreviewDomains extends Component
         if (! $this->persistDomains()) {
             return;
         }
+        $this->forceUseUnknownPort = false;
         $this->dispatch('close-preview-domain-edit');
         $this->dispatch('success', 'Domain updated.');
         $this->checkDomainDns($index);
+    }
+
+    public function confirmUseUnknownPort(): void
+    {
+        $this->authorize('update', $this->preview->application);
+        $this->forceUseUnknownPort = true;
+        $this->showPortWarningModal = false;
+        $action = $this->pendingPortAction;
+        $this->pendingPortAction = null;
+
+        if ($action === 'update') {
+            $this->updateDomain();
+
+            return;
+        }
+
+        $this->addDomain();
+    }
+
+    public function cancelUseUnknownPort(): void
+    {
+        $this->showPortWarningModal = false;
+        $this->forceUseUnknownPort = false;
+        $this->unrecognizedPort = null;
+        $this->pendingPortAction = null;
     }
 
     public function removeDomain(int $index): void
@@ -299,8 +362,24 @@ class PreviewDomains extends Component
         } else {
             $this->preview->fqdn = collect($this->domainRows)->pluck('url')->implode(',') ?: null;
         }
+        $normalized = DomainPortOverrides::normalize($this->preview->fqdn, $this->preview->domain_port_overrides);
+        $this->preview->fqdn = $normalized['fqdn'];
+        $this->preview->domain_port_overrides = $normalized['overrides'];
+        if ($this->preview->application->build_pack === 'dockercompose' && is_array($domains ?? null)) {
+            foreach ($domains as $service => $entry) {
+                $serviceDomains = $this->splitDomains(composeDomainEntryString($entry));
+                $domains[$service]['domain'] = collect($serviceDomains)
+                    ->map(fn (string $url): string => DomainPortOverrides::withoutPort($url))
+                    ->implode(',');
+            }
+            $this->preview->docker_compose_domains = json_encode($domains);
+        }
+        foreach ($this->domainRows as $index => $row) {
+            $this->domainRows[$index]['url'] = DomainPortOverrides::withoutPort($row['url']);
+        }
         $this->preview->save();
         $this->persistDnsStatuses();
+        $this->refreshDomains();
         $this->dispatch('update_links');
         $this->dispatch('previewDomainsChanged');
 
@@ -360,13 +439,104 @@ class PreviewDomains extends Component
     private function makeRow(string $url, ?string $service, array $statuses = []): array
     {
         $status = $statuses[$this->statusKey($url, $service)] ?? [];
+        $port = $this->effectiveDomainInternalPort($url);
 
         return [
             'url' => $url,
             'service' => $service,
+            'internal_port' => $port['internal_port'],
+            'has_port_override' => $port['has_port_override'],
             'dns_status' => $status['status'] ?? 'pending',
             'dns_message' => $status['message'] ?? 'DNS has not been checked yet.',
             'check_id' => $status['check_id'] ?? null,
+        ];
+    }
+
+    /**
+     * @param  array{scheme: string, host: string, port: string, path: string}  $parts
+     */
+    private function portFromParts(array $parts): ?int
+    {
+        $port = trim((string) ($parts['port'] ?? ''));
+        if ($port === '' || ! ctype_digit($port) || (int) $port <= 0) {
+            return null;
+        }
+
+        return (int) $port;
+    }
+
+    private function currentRowPort(string $url): ?int
+    {
+        $canonical = DomainPortOverrides::withoutPort($url);
+        $override = ($this->preview->domain_port_overrides ?? [])[$canonical] ?? null;
+        if (filled($override) && (int) $override > 0) {
+            return (int) $override;
+        }
+
+        $legacy = DomainUrlParts::split($url)['port'] ?? '';
+
+        return $legacy !== '' && ctype_digit($legacy) ? (int) $legacy : null;
+    }
+
+    private function shouldConfirmPort(?int $port, ?int $currentPort = null): bool
+    {
+        if ($this->forceUseUnknownPort || $port === null) {
+            return false;
+        }
+        if ($currentPort !== null && $port === $currentPort) {
+            return false;
+        }
+
+        return $this->preview->application->portRequiresConfirmation($port);
+    }
+
+    private function openPortWarning(?int $port, string $action): void
+    {
+        $this->unrecognizedPort = $port;
+        $this->pendingPortAction = $action;
+        $this->showPortWarningModal = true;
+    }
+
+    /**
+     * @return array{internal_port: ?int, has_port_override: bool}
+     */
+    private function effectiveDomainInternalPort(string $url): array
+    {
+        $canonical = DomainPortOverrides::withoutPort($url);
+        $overrides = $this->preview->domain_port_overrides ?? [];
+        $legacyPortPart = DomainUrlParts::split($url)['port'] ?? '';
+        $legacyPort = $legacyPortPart !== '' ? (int) $legacyPortPart : null;
+        $hasMapEntry = array_key_exists($canonical, $overrides);
+
+        if ($hasMapEntry) {
+            return [
+                'internal_port' => (int) $overrides[$canonical],
+                'has_port_override' => true,
+            ];
+        }
+
+        if ($legacyPort !== null) {
+            return [
+                'internal_port' => $legacyPort,
+                'has_port_override' => true,
+            ];
+        }
+
+        if ($this->preview->application->settings?->is_static) {
+            return [
+                'internal_port' => 80,
+                'has_port_override' => false,
+            ];
+        }
+
+        $exposed = $this->preview->application->ports_exposes_array;
+        $defaultPort = isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
+            ? (int) $exposed[0]
+            : null;
+
+        return [
+            'internal_port' => $defaultPort,
+            'has_port_override' => false,
         ];
     }
 
@@ -393,14 +563,14 @@ class PreviewDomains extends Component
         }
 
         return collect($this->splitDomains($domainString))->map(function (string $domain): string {
-            $url = Url::fromString($domain);
-            $generatedDomain = str_replace('{{random}}', new_public_id(), $this->preview->application->preview_url_template);
-            $generatedDomain = str_replace('{{domain}}', $url->getHost(), $generatedDomain);
-            $generatedDomain = str_replace('{{pr_id}}', (string) $this->preview->pull_request_id, $generatedDomain);
-            $port = $url->getPort() !== null ? ':'.$url->getPort() : '';
-            $path = ! in_array($url->getPath(), ['', '/'], true) ? $url->getPath() : '';
+            $generated = $this->preview->generatedPreviewDomain($domain);
+            if (filled($generated['port'])) {
+                $overrides = $this->preview->domain_port_overrides ?? [];
+                $overrides[$generated['url']] = $generated['port'];
+                $this->preview->domain_port_overrides = $overrides;
+            }
 
-            return "{$url->getScheme()}://{$generatedDomain}{$port}{$path}";
+            return $generated['url'];
         })->all();
     }
 
@@ -413,7 +583,6 @@ class PreviewDomains extends Component
                 return [];
             }
 
-            $usesLegacyServiceKeys = (int) $this->preview->application->compose_parsing_version < 3;
             $previewSuffix = '-pr-'.$this->preview->pull_request_id;
             $serviceNames = [];
             foreach ($services as $serviceName => $service) {
@@ -422,7 +591,7 @@ class PreviewDomains extends Component
                 }
 
                 $serviceName = (string) $serviceName;
-                if ($usesLegacyServiceKeys && str_ends_with($serviceName, $previewSuffix)) {
+                if (str_ends_with($serviceName, $previewSuffix)) {
                     $serviceName = substr($serviceName, 0, -strlen($previewSuffix));
                 }
                 $serviceNames[] = $serviceName;
