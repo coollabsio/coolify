@@ -47,9 +47,10 @@ class Kernel extends ConsoleKernel
             ->when(fn () => config('constants.ssh.mux_enabled') && ! config('constants.coolify.is_windows_docker_desktop'));
         $this->scheduleInstance->command('cleanup:redis --clear-locks')->daily();
         $this->scheduleInstance->command('cleanup:stucked-resources')
-            ->daily()
+            ->dailyAt('03:17')
             ->onOneServer()
-            ->withoutOverlapping(60);
+            ->withoutOverlapping(60)
+            ->runInBackground();
         $this->scheduleInstance->command('sanctum:prune-expired --hours=1')->hourly()->onOneServer();
         $this->scheduleInstance->job(new ApiTokenExpirationWarningJob)->hourly()->onOneServer();
 
