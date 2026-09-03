@@ -5,6 +5,7 @@ use App\Livewire\Project\Shared\Danger;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\OauthIdentity;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -85,6 +86,21 @@ test('delete redirects before dispatching resource cleanup after the response', 
 
     expect(Service::find($service->id))->not->toBeNull();
     Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($service));
+});
+
+test('delete succeeds without password for an oauth user', function () {
+    OauthIdentity::create([
+        'user_id' => $this->user->id,
+        'provider' => 'oidc',
+        'issuer' => 'https://idp.example.com',
+        'provider_user_id' => 'oauth-user-id',
+    ]);
+
+    Livewire::test(Danger::class, ['resource' => $this->application])
+        ->call('delete', '')
+        ->assertHasNoErrors();
+
+    expect(Application::find($this->application->id))->toBeNull();
 });
 
 test('delete applies selectedActions from checkbox state', function () {

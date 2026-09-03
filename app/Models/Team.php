@@ -8,6 +8,7 @@ use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
+use App\Traits\Auditable;
 use App\Traits\HasNotificationSettings;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -39,7 +40,7 @@ use OpenApi\Attributes as OA;
 
 class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
 {
-    use HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
+    use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute, Notifiable;
 
     protected $fillable = [
         'name',
@@ -86,8 +87,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             }
 
             // Transfer instance-wide sources to root team so they remain available
-            GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
-            GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->update(['team_id' => 0]);
+            $systemWideSources = GithubApp::where('team_id', $team->id)->where('is_system_wide', true)->get()
+                ->concat(GitlabApp::where('team_id', $team->id)->where('is_system_wide', true)->get());
+            foreach ($systemWideSources as $source) {
+                $source->update(['team_id' => 0]);
+            }
 
             // Delete non-instance-wide sources owned by this team
             $teamSources = GithubApp::where('team_id', $team->id)->get()
@@ -311,6 +315,11 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function cloudProviderTokens()
     {
         return $this->hasMany(CloudProviderToken::class);
+    }
+
+    public function integrationTokens()
+    {
+        return $this->hasMany(IntegrationToken::class);
     }
 
     public function sources()

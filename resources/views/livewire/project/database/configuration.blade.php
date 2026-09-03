@@ -31,6 +31,7 @@
                     @endif
                 @elseif ($currentRoute === 'project.database.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$database" />
+                    <livewire:project.shared.secret-manager-links :resource="$database" />
                 @elseif ($currentRoute === 'project.database.servers')
                     <livewire:project.shared.destination :resource="$database" />
                 @elseif ($currentRoute === 'project.database.persistent-storage')

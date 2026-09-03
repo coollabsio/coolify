@@ -5,12 +5,14 @@ namespace App\Actions\Database;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
 use App\Models\StandaloneRedis;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartRedis
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneRedis $database;
 
@@ -20,7 +22,11 @@ class StartRedis
 
     private ?SslCertificate $ssl_certificate = null;
 
-    public function handle(StandaloneRedis $database)
+    private ?string $resolvedRedisPassword = null;
+
+    private ?string $resolvedRedisUsername = null;
+
+    public function handle(StandaloneRedis $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -209,7 +215,7 @@ class StartRedis
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -249,23 +255,40 @@ class StartRedis
         $environment_variables = collect();
 
         foreach ($this->database->runtime_environment_variables as $env) {
+            $usesSecretManager = $this->database->environmentVariableUsesSecretManager($env);
+
             if ($env->is_shared) {
-                $environment_variables->push("$env->key=$env->real_value");
+                $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
 
                 if ($env->key === 'REDIS_PASSWORD') {
-                    $this->database->update(['redis_password' => $env->real_value]);
+                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+                    if (! $usesSecretManager) {
+                        $this->database->update(['redis_password' => $this->resolvedRedisPassword]);
+                    }
                 }
 
                 if ($env->key === 'REDIS_USERNAME') {
-                    $this->database->update(['redis_username' => $env->real_value]);
+                    $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+
+                    if (! $usesSecretManager) {
+                        $this->database->update(['redis_username' => $this->resolvedRedisUsername]);
+                    }
                 }
             } else {
-                if ($env->key === 'REDIS_PASSWORD') {
+                if ($env->key === 'REDIS_PASSWORD' && ! $usesSecretManager) {
                     $env->update(['value' => $this->database->redis_password]);
-                } elseif ($env->key === 'REDIS_USERNAME') {
+                } elseif ($env->key === 'REDIS_USERNAME' && ! $usesSecretManager) {
                     $env->update(['value' => $this->database->redis_username]);
                 }
-                $environment_variables->push("$env->key=$env->real_value");
+
+                if ($env->key === 'REDIS_PASSWORD') {
+                    $this->resolvedRedisPassword = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                } elseif ($env->key === 'REDIS_USERNAME') {
+                    $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+                }
+
+                $environment_variables->push($env->key.'='.$this->database->resolveSecretManagerEnvironmentVariable($env));
             }
         }
 
@@ -276,6 +299,7 @@ class StartRedis
 
     private function buildStartCommand(): string
     {
+        $redisPassword = $this->resolvedRedisPassword ?? $this->database->redis_password;
         $hasRedisConf = ! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf);
         $redisConfPath = '/usr/local/etc/redis/redis.conf';
 
@@ -286,10 +310,10 @@ class StartRedis
             if ($hasRequirePass) {
                 $command = "redis-server $redisConfPath";
             } else {
-                $command = "redis-server $redisConfPath --requirepass {$this->database->redis_password}";
+                $command = "redis-server $redisConfPath --requirepass {$redisPassword}";
             }
         } else {
-            $command = "redis-server --requirepass {$this->database->redis_password} --appendonly yes";
+            $command = "redis-server --requirepass {$redisPassword} --appendonly yes";
         }
 
         if ($this->database->enable_ssl) {

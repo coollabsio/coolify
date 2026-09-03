@@ -103,6 +103,13 @@ class InviteLink extends Component
                 'link' => $link,
                 'via' => $sendEmail ? 'email' : 'link',
             ]);
+            auditLog('ui.team_invitation.created', [
+                'team_id' => currentTeam()->id,
+                'invitation_uuid' => $invitation->uuid,
+                'invitation_email' => $invitation->email,
+                'role' => $invitation->role,
+                'via' => $invitation->via,
+            ]);
             if ($sendEmail) {
                 $mail = new MailMessage;
                 $mail->view('emails.invitation-link', [
