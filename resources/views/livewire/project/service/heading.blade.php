@@ -75,7 +75,12 @@
             @if ($service->isDeployable)
                 @can('deploy', $service)
                     <x-split-action id="service-mobile-actions" class="mb-3 flex w-full">
-                        @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
+                        @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
+                            <x-slot:main @click="document.getElementById('selected-resource-remove-trigger')?.click()">
+                                <x-reicon name="trash" class="size-3.5" />
+                                Remove container
+                            </x-slot:main>
+                        @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                             <x-slot:main x-bind:disabled="deploying"
                                 @click="document.getElementById('service-restart-trigger')?.click()">
                                 <x-reicon name="restart" class="size-3.5" />
@@ -141,7 +146,12 @@
                         </div>
                         @can('deploy', $service)
                             <x-split-action id="service-desktop-actions">
-                                @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
+                                @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
+                            <x-slot:main @click="document.getElementById('selected-resource-remove-trigger')?.click()">
+                                <x-reicon name="trash" class="size-3.5" />
+                                Remove container
+                            </x-slot:main>
+                        @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                                     <x-slot:main x-bind:disabled="deploying"
                                         @click="document.getElementById('service-restart-trigger')?.click()">
                                         <x-reicon name="restart" class="size-3.5" />
@@ -217,6 +227,17 @@
                     <button id="service-stop-trigger" type="button">Stop</button>
                 </x-slot:trigger>
             </x-modal-confirmation>
+            @if ($selectedResource)
+                <x-modal-confirmation title="Confirm Container Removal?" buttonTitle="Remove container"
+                    canGate="deploy" :canResource="$service" submitAction="removeSelectedResourceContainer"
+                    :actions="['The exited service resource container will be removed.', __('resource.non_persistent')]"
+                    :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
+                    step2ButtonText="Confirm">
+                    <x-slot:trigger>
+                        <button id="selected-resource-remove-trigger" type="button">Remove container</button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
+            @endif
         </div>
     @endif
 

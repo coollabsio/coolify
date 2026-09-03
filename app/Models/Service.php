@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Enums\ProcessStatus;
 use App\Services\ContainerStatusAggregator;
+use App\Support\DomainPortOverrides;
 use App\Traits\Auditable;
+
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
@@ -94,11 +96,18 @@ class Service extends BaseModel
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
+        $applications = $this->applications()->get();
+        $domains = $applications->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
-        $noindexDomains = $this->applications()->get()->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $noindexDomains = $applications->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $domainPortOverrides = $applications
+            ->mapWithKeys(fn (ServiceApplication $application): array => [
+                $application->id => DomainPortOverrides::sorted($application->domain_port_overrides),
+            ])
+            ->sortKeys()
+            ->all();
 
-        $applicationImages = $this->applications()->get()->pluck('image')->sort();
+        $applicationImages = $applications->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
         $images = $applicationImages->merge($databaseImages);
         $images = implode(',', $images->toArray());
@@ -107,7 +116,7 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains;
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
@@ -1498,7 +1507,7 @@ class Service extends BaseModel
     {
         try {
             $services = get_service_templates();
-            $serviceName = str($this->name)->beforeLast('-')->value();
+            $serviceName = $this->service_type ?: str($this->name)->beforeLast('-')->value();
             $service = data_get($services, $serviceName, []);
             $port = data_get($service, 'port');
 

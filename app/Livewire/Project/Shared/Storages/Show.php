@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Livewire\Project\Service\Storage as StorageComponent;
 use App\Models\Application;
 use App\Models\LocalPersistentVolume;
 use App\Models\ScheduledVolumeBackup;
@@ -192,7 +193,7 @@ class Show extends Component
         }
 
         $this->storage->delete();
-        $this->dispatch('refreshStorages');
+        $this->dispatch('storageCountsChanged')->to(StorageComponent::class);
         $this->dispatch('configurationChanged');
 
         return true;

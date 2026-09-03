@@ -18,6 +18,7 @@
             ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
             ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
             ['label' => 'Backups', 'route' => 'project.service.volume-backups.index', 'icon' => 'database'],
+            ['label' => 'Import Backup', 'route' => 'project.service.import-backup', 'icon' => 'upload', 'navigate' => false],
             ['label' => 'Runtime Logs', 'route' => 'project.service.logs', 'icon' => 'unordered-list', 'navigate' => false],
             ['label' => 'Terminal', 'route' => 'project.service.command', 'icon' => 'browser-terminal', 'navigate' => false, 'visible' => auth()->user()?->can('canAccessTerminal')],
             ['label' => 'Scheduled Tasks', 'route' => 'project.service.scheduled-tasks.show', 'icon' => 'calendar'],
@@ -35,7 +36,7 @@
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
             'Observe & troubleshoot' => ['Runtime Logs', 'Terminal'],
-            'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
+            'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups', 'Import Backup'],
             'Operations' => ['Resource Operations', 'Tags', 'Danger Zone'],
         ];
 
@@ -143,12 +144,12 @@
 
                         <div :class="viewMode === 'grid'
                             ? 'grid grid-cols-1 gap-3 sm:grid-cols-2'
-                            : 'overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]'">
+                            : 'overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.025]'">
                             @if ($applications->isNotEmpty() || $databases->isNotEmpty())
                                 <div x-cloak x-show="viewMode === 'table'"
-                                    class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_8rem_5rem] dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
+                                    class="grid min-w-[48rem] grid-cols-[minmax(14rem,1fr)_minmax(12rem,1fr)_12rem_5rem] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.025] dark:text-fg-faint">
                                     <div>Resource</div>
-                                    <div class="hidden sm:block">Image</div>
+                                    <div>Image</div>
                                     <div class="justify-self-start">Status</div>
                                     <div></div>
                                 </div>

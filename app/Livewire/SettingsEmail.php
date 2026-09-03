@@ -74,7 +74,7 @@ class SettingsEmail extends Component
         $this->testEmailAddress = auth()->user()->email;
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();

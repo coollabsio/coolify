@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasRestartLimit;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasRestartLimit, SoftDeletes;
 
     protected $fillable = [
         'service_id',
