@@ -3916,7 +3916,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ? ($resource->domain_port_overrides ?? [])
                             : ($preview?->domain_port_overrides ?? []);
                         $exposedPorts = $resource->settings->is_static ? [80] : $resource->ports_exposes_array;
-                        $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
+                        $onlyPort = firstDockerComposeServicePort($service) ?? ($exposedPorts[0] ?? null);
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:

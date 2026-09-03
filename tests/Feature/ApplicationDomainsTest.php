@@ -2311,6 +2311,48 @@ it('distinguishes an inherited internal port from a domain port override', funct
         ->assertDontSee('Custom internal port for this domain', false);
 });
 
+it('shows the detected compose service port as the inherited internal port', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose:\n      - '8069'\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://example.com'],
+        ]),
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', 8069)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertSee('Internal port 8069')
+        ->assertDontSee('Internal port 3000');
+});
+
+it('shows the detected compose service port for preview domains', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    ports:\n      - '18069:8069'\n",
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 8069,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/8069',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://preview.example.com'],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.internal_port', 8069)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertSee('Internal port 8069')
+        ->assertDontSee('Internal port 3000');
+});
+
 it('keeps a legacy port-bearing url port in the edit field as an internal port override', function () {
     $this->application->update([
         'ports_exposes' => '3000,8080',

@@ -1358,7 +1358,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ? ($previewForPorts?->domain_port_overrides ?? [])
                 : ($originalResource->domain_port_overrides ?? []);
             $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
-            $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
+            $onlyPort = firstDockerComposeServicePort($service) ?? ($exposedPorts[0] ?? null);
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
