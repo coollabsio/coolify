@@ -2586,6 +2586,8 @@ class DatabasesController extends Controller
 
         $this->authorize('delete', $database);
 
+        $database->delete();
+
         DeleteResourceJob::dispatch(
             resource: $database,
             deleteVolumes: $request->boolean('delete_volumes', true),

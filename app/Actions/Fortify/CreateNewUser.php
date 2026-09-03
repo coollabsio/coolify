@@ -2,9 +2,9 @@
 
 namespace App\Actions\Fortify;
 
+use App\Jobs\SendVerificationEmailJob;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
@@ -21,8 +21,6 @@ class CreateNewUser implements CreatesNewUsers
     private const REGISTRATION_EMAIL_IDENTITY_MAX_ATTEMPTS = 3;
 
     private const REGISTRATION_EMAIL_IDENTITY_DECAY_SECONDS = 3600;
-
-    public function __construct(private readonly Request $request) {}
 
     /**
      * Validate and create a newly registered user.
@@ -77,7 +75,7 @@ class CreateNewUser implements CreatesNewUsers
             ]);
             $team = $user->teams()->first();
             if (isCloud()) {
-                $user->sendVerificationEmail();
+                SendVerificationEmailJob::dispatch($user);
             } else {
                 $user->markEmailAsVerified();
             }
@@ -95,7 +93,7 @@ class CreateNewUser implements CreatesNewUsers
     {
         $keys = [
             [
-                'key' => 'registration:ip:'.sha1($this->realIp()),
+                'key' => 'registration:ip:'.sha1(auth_rate_limit_ip(request())),
                 'max' => self::REGISTRATION_IP_MAX_ATTEMPTS,
                 'decay' => self::REGISTRATION_IP_DECAY_SECONDS,
             ],
@@ -119,10 +117,5 @@ class CreateNewUser implements CreatesNewUsers
         foreach ($keys as $limit) {
             RateLimiter::hit($limit['key'], $limit['decay']);
         }
-    }
-
-    private function realIp(): string
-    {
-        return $this->request->server('REMOTE_ADDR') ?? $this->request->ip();
     }
 }

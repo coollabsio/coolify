@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\DeleteResourceJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Models\Application;
 use App\Models\CloudInitScript;
@@ -273,6 +274,60 @@ describe('POST /api/v1/services/{uuid}/clone', function () {
                 'destination_uuid' => $this->destination->uuid,
             ])
             ->assertNotFound();
+    });
+});
+
+describe('DELETE resource endpoints', function () {
+    test('soft deletes an application before queuing cleanup', function () {
+        Queue::fake();
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/applications/{$this->application->uuid}")
+            ->assertOk();
+
+        expect(Application::find($this->application->id))->toBeNull()
+            ->and(Application::withTrashed()->find($this->application->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
+    });
+
+    test('soft deletes a service before queuing cleanup', function () {
+        Queue::fake();
+        $service = Service::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'server_id' => $this->server->id,
+        ]);
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/services/{$service->uuid}")
+            ->assertOk();
+
+        expect(Service::find($service->id))->toBeNull()
+            ->and(Service::withTrashed()->find($service->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
+    });
+
+    test('soft deletes a database before queuing cleanup', function () {
+        Queue::fake();
+        $database = StandalonePostgresql::create([
+            'name' => 'database-to-delete',
+            'image' => 'postgres:17-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->withHeaders($this->headers)
+            ->deleteJson("/api/v1/databases/{$database->uuid}")
+            ->assertOk();
+
+        expect(StandalonePostgresql::find($database->id))->toBeNull()
+            ->and(StandalonePostgresql::withTrashed()->find($database->id)?->trashed())->toBeTrue();
+        Queue::assertPushed(DeleteResourceJob::class);
     });
 });
 

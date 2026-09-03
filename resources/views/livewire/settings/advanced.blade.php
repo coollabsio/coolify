@@ -127,11 +127,18 @@
                             ['value' => false, 'label' => 'Enabled'],
                             ['value' => true, 'label' => 'Disabled'],
                         ]" />
-                    <x-forms.listbox id="is_sponsorship_popup_enabled" label="Sponsorship reminders"
-                        helper="Show the monthly project sponsorship reminder." onChange="instantSave" :options="[
-                            ['value' => true, 'label' => 'Enabled'],
-                            ['value' => false, 'label' => 'Disabled'],
-                        ]" />
+                    <div class="flex flex-col gap-2">
+                        <x-forms.listbox id="is_sponsorship_popup_enabled" label="Sponsorship reminders"
+                            helper="Show the monthly project sponsorship reminder." onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
+                        @if (isDev())
+                            <x-forms.button type="button" @click="$dispatch('show-sponsorship-reminder')">
+                                Show sponsorship reminder
+                            </x-forms.button>
+                        @endif
+                    </div>
                 </div>
             </x-application.settings-section>
 

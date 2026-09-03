@@ -100,7 +100,10 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             ]);
 
             if ($this->server->unreachable_count > 0) {
-                $this->server->update(['unreachable_count' => 0]);
+                // Direct assignment: unreachable_count is not mass-assignable,
+                // so update() would silently drop the reset.
+                $this->server->unreachable_count = 0;
+                $this->server->save();
             }
 
             $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, true);

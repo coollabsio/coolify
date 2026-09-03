@@ -22,9 +22,7 @@
             title="Container has restarted {{ $resource->restart_count }} time{{ $resource->restart_count > 1 ? 's' : '' }}. Last restart: {{ $resource->last_restart_at?->diffForHumans() }}" />
     @endif
     @if ($stoppedAfterRestartLimit)
-        <x-status-badge status="Stopped after reaching restart limit ({{ $resource->restart_count }}/{{ $resource->max_restart_count }})."
-            type="warning"
-            title="Container has crashed and Coolify stopped it after {{ $resource->restart_count }} restart attempts." />
+        <x-application.restart-limit-warning :application="$resource" />
     @endif
     @if (!str($resource->status)->contains('exited') && $showRefreshButton)
         <x-status-badge as="button" wire:target="manualCheckStatus" wire:loading.attr="disabled"
