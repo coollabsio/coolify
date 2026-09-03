@@ -116,7 +116,7 @@
             @if ($supportsPreviewSuffix)
                 <div class="volumes-col-pr min-w-0">
                     <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
-                    <x-forms.listbox id="isPreviewSuffixEnabled" onChange="instantSave" :options="[
+                    <x-forms.listbox id="isPreviewSuffixEnabled" onChange="instantSave" portal :options="[
                         ['value' => true, 'label' => 'Add suffix'],
                         ['value' => false, 'label' => 'Share volume'],
                     ]" />
