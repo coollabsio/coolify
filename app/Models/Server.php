@@ -901,9 +901,29 @@ $siteAddress {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
     }
 
-    public static function buildServers($teamId)
+    public static function buildServers(int $teamId): Builder
     {
-        return Server::whereTeamId($teamId)->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_build_server', true);
+        return self::accessibleDeploymentExecutionServersForTeam($teamId)
+            ->whereRelation('settings', 'is_reachable', true)
+            ->whereRelation('settings', 'is_build_server', true);
+    }
+
+    public static function accessibleDeploymentExecutionServersForTeam(int $teamId): Builder
+    {
+        return self::query()
+            ->where(function (Builder $query) use ($teamId) {
+                $query
+                    ->where('team_id', $teamId)
+                    ->orWhere(function (Builder $sharedQuery) use ($teamId) {
+                        $sharedQuery
+                            ->whereRelation('settings', 'is_build_server', true)
+                            ->whereHas('sharedTeams', function (Builder $teamQuery) use ($teamId) {
+                                $teamQuery
+                                    ->where('teams.id', $teamId)
+                                    ->where('server_team.can_build', true);
+                            });
+                    });
+            });
     }
 
     public function isForceDisabled()
@@ -1304,6 +1324,13 @@ $siteAddress {
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function sharedTeams()
+    {
+        return $this->belongsToMany(Team::class)
+            ->withPivot('can_build')
+            ->withTimestamps();
     }
 
     /**
