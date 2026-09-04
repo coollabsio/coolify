@@ -47,6 +47,7 @@ return [
 
     'migration' => [
         'is_migration_enabled' => env('MIGRATION_ENABLED', true),
+        'backup_before_migration' => env('MIGRATION_BACKUP_ENABLED', true),
     ],
 
     'seeder' => [
