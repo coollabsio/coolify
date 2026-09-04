@@ -1475,14 +1475,15 @@ html[data-theme="custom"] textarea:disabled {
         align-self: start;
         max-height: calc(100dvh - 5.5rem);
         padding-right: 0.375rem;
+        padding-bottom: 5rem;
         overflow-x: hidden;
         overflow-y: auto;
-        overscroll-behavior: contain;
+        overscroll-behavior: auto;
         scrollbar-width: thin;
     }
 
     /* Resource pages have a second fixed header row below the main header. */
-    .application-settings-workspace > .application-settings-navigation {
+    .application-settings-workspace .application-settings-navigation {
         top: 4rem;
         max-height: calc(100dvh - 5rem);
     }
@@ -1491,6 +1492,7 @@ html[data-theme="custom"] textarea:disabled {
         position: static;
         max-height: none;
         overflow: visible;
+        padding-bottom: 0;
     }
 }
 

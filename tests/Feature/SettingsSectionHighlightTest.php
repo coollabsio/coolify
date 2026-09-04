@@ -19,7 +19,7 @@ test('settings section highlight animation is defined for 500ms', function () {
 test('settings navigation leaves room for the default tab focus ring', function () {
     $appCss = file_get_contents(resource_path('css/app.css'));
 
-    preg_match('/\.application-settings-navigation\s*\{[^}]*\}/s', $appCss, $nav);
+    preg_match('/@media\s*\(min-width:\s*1280px\)\s*\{[\s\S]*?\.application-settings-navigation\s*\{[^}]*\}/s', $appCss, $nav);
 
     // Tab focus keeps the global ring-2 + ring-offset-2; do not thin it.
     expect($appCss)
@@ -30,7 +30,7 @@ test('settings navigation leaves room for the default tab focus ring', function 
 });
 
 test('configuration sidebar subitems trigger section highlight on scroll', function () {
-    $blade = file_get_contents(resource_path('views/livewire/project/application/configuration.blade.php'));
+    $blade = file_get_contents(resource_path('views/components/application/configuration-sidebar.blade.php'));
     $appJs = file_get_contents(resource_path('js/app.js'));
 
     expect($blade)
