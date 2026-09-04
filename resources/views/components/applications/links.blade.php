@@ -96,14 +96,16 @@
                 @else
                     @foreach (data_get($application, 'previews') as $preview)
                         @if (data_get($preview, 'fqdn'))
-                            <a class="{{ $linkItemClasses }}" target="_blank"
-                                href="{{ getFqdnWithoutPort(data_get($preview, 'fqdn')) }}">
-                                <span
-                                    class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs ring-1 ring-coollabs/20 dark:bg-warning/10 dark:text-warning dark:ring-warning/20">
-                                    PR #{{ data_get($preview, 'pull_request_id') }}
-                                </span>
-                                <span class="min-w-0 truncate">{{ getFqdnWithoutPort(data_get($preview, 'fqdn')) }}</span>
-                            </a>
+                            @foreach (str(data_get($preview, 'fqdn'))->explode(',')->map(fn($domain) => trim($domain))->filter() as $previewFqdn)
+                                <a class="{{ $linkItemClasses }}" target="_blank"
+                                    href="{{ getFqdnWithoutPort($previewFqdn) }}">
+                                    <span
+                                        class="shrink-0 rounded-md bg-coollabs/10 px-1.5 py-0.5 text-[10px] font-semibold text-coollabs ring-1 ring-coollabs/20 dark:bg-warning/10 dark:text-warning dark:ring-warning/20">
+                                        PR #{{ data_get($preview, 'pull_request_id') }}
+                                    </span>
+                                    <span class="min-w-0 truncate">{{ getFqdnWithoutPort($previewFqdn) }}</span>
+                                </a>
+                            @endforeach
                         @endif
                     @endforeach
                 @endif
