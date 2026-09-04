@@ -714,7 +714,7 @@ class Application extends BaseModel
         );
     }
 
-    public function gitCommitLink($link): string
+    public function gitCommitLink($link): ?string
     {
         if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
@@ -729,6 +729,10 @@ class Application extends BaseModel
             $git_repository = preg_replace('/^git@([^:]+):/', 'https://$1/', $git_repository);
         } elseif (str($this->git_repository)->startsWith('ssh://')) {
             $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
+        }
+
+        if (! filter_var($git_repository, FILTER_VALIDATE_URL)) {
+            return null;
         }
 
         $url = Url::fromString(Str::replaceEnd('.git', '', $git_repository));
