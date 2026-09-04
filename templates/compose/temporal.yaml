@@ -1,0 +1,76 @@
+# documentation: https://docs.temporal.io/self-hosted-guide
+# slogan: Temporal is a durable execution platform that lets you write reliable, fault-tolerant distributed applications as plain code, with workflows that automatically survive failures, retries, and restarts.
+# category: developer-tools
+# tags: workflow,orchestration,durable-execution,distributed-systems,microservices,automation
+# port: 8080
+
+services:
+  postgresql:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-temporal}
+    volumes:
+      - temporal-postgresql-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: 'temporalio/auto-setup:${TEMPORAL_VERSION:-latest}'
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PWD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_SEEDS=postgresql
+      - POSTGRES_DB=${POSTGRES_DB:-temporal}
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - ENABLE_ES=false
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    volumes:
+      - temporal-data:/etc/temporal
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c ':> /dev/tcp/127.0.0.1/7233' || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  temporal-admin-tools:
+    image: 'temporalio/admin-tools:${TEMPORAL_VERSION:-latest}'
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CLI_ADDRESS=temporal:7233
+    depends_on:
+      temporal:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+    exclude_from_hc: true
+
+  temporal-ui:
+    image: 'temporalio/ui:${TEMPORAL_UI_VERSION:-latest}'
+    environment:
+      - SERVICE_URL_TEMPORAL_UI_8080
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_UI_PORT=8080
+      - TEMPORAL_CORS_ORIGINS=${SERVICE_URL_TEMPORAL_UI}
+    depends_on:
+      temporal:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - bash -c ':> /dev/tcp/127.0.0.1/8080' || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 10
