@@ -78,5 +78,7 @@ class StopApplication
         $application->update($status);
 
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
+
+        return null;
     }
 }
