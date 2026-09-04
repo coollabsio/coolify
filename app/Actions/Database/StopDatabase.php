@@ -32,7 +32,11 @@ class StopDatabase
             // Reset restart tracking when database is manually stopped
             $database->update(['status' => 'exited']);
             if ($resetRestartCount) {
-                $database->resetRestartLimit();
+                $database->update([
+                    'restart_count' => 0,
+                    'last_restart_at' => null,
+                    'last_restart_type' => null,
+                ]);
             }
 
             if ($dockerCleanup) {
@@ -58,8 +62,6 @@ class StopDatabase
         $commands = [dockerStopCommand($timeout, $containerName, $server)];
         if ($removeContainer) {
             $commands[] = "docker rm -f $containerName";
-        } else {
-            array_unshift($commands, "docker update --restart=no $containerName");
         }
         instant_remote_process(command: $commands, server: $server, throwError: false);
     }

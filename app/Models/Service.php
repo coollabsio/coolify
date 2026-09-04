@@ -15,7 +15,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
-use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
@@ -1156,7 +1155,7 @@ class Service extends BaseModel
                     break;
                 case $image->contains('coollabsio/openclaw'):
                     $data = collect([]);
-                    $username = $this->environment_variables()->where('key', 'AUTH_USERNAME')->first();
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_OPENCLAW')->first();
                     $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
                     $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
                     if ($username) {
@@ -1458,32 +1457,6 @@ class Service extends BaseModel
                 'environment_uuid' => data_get($this, 'environment.uuid'),
                 'service_uuid' => data_get($this, 'uuid'),
             ]);
-        }
-
-        return null;
-    }
-
-    public function taskLink($task_uuid)
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            $route = route('project.service.scheduled-tasks', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_uuid' => data_get($this, 'environment.uuid'),
-                'service_uuid' => data_get($this, 'uuid'),
-                'task_uuid' => $task_uuid,
-            ]);
-            $settings = InstanceSettings::get();
-            if (data_get($settings, 'fqdn')) {
-                $url = Url::fromString($route);
-                $url = $url->withPort(null);
-                $fqdn = data_get($settings, 'fqdn');
-                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
-                $url = $url->withHost($fqdn);
-
-                return $url->__toString();
-            }
-
-            return $route;
         }
 
         return null;
