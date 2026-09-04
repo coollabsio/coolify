@@ -15,6 +15,7 @@ it('allows admin to create service application', function () {
 it('denies member from creating service application', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ServiceApplicationPolicy;
     expect($policy->create($user))->toBeFalse();

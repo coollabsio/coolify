@@ -67,6 +67,7 @@ it('allows admin to create an environment', function () {
 it('denies member to create an environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new EnvironmentPolicy;
     expect($policy->create($user))->toBeFalse();
@@ -86,6 +87,7 @@ it('allows team admin to update their own team environment', function () {
 it('denies team member to update their own team environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $environment = Mockery::mock(Environment::class)->makePartial();
     $environment->shouldReceive('getAttribute')->with('project')->andReturn((object) ['team_id' => 1]);
@@ -118,6 +120,7 @@ it('allows team admin to delete their own team environment', function () {
 it('denies team member to delete their own team environment', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $environment = Mockery::mock(Environment::class)->makePartial();
     $environment->shouldReceive('getAttribute')->with('project')->andReturn((object) ['team_id' => 1]);

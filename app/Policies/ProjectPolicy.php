@@ -28,7 +28,7 @@ class ProjectPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->canManageResources();
     }
 
     /**
@@ -36,7 +36,7 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
-        return $user->isAdminOfTeam($project->team_id);
+        return $user->canManageResourcesOfTeam($project->team_id);
     }
 
     /**
@@ -44,7 +44,7 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
-        return $user->isAdminOfTeam($project->team_id);
+        return $user->canManageResourcesOfTeam($project->team_id);
     }
 
     /**

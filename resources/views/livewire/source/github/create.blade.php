@@ -1,4 +1,4 @@
-@can('createAnyResource')
+@can('create', App\Models\GithubApp::class)
     <form wire:submit="createGitHubApp" class="flex w-full flex-col gap-4">
         <p class="text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
             Connect a GitHub App for private repositories, webhooks, and commit / pull request deployments.

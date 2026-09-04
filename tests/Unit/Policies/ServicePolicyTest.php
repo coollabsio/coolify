@@ -67,6 +67,7 @@ it('allows admin to create a service', function () {
 it('denies member to create a service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdmin')->andReturn(false);
+    $user->shouldReceive('isOperator')->andReturn(false);
 
     $policy = new ServicePolicy;
     expect($policy->create($user))->toBeFalse();
@@ -86,6 +87,7 @@ it('allows team admin to update their own team service', function () {
 it('denies team member to update their own team service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $service = Mockery::mock(Service::class)->makePartial();
     $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -108,6 +110,7 @@ it('allows team admin to delete their own team service', function () {
 it('denies team member to delete their own team service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $service = Mockery::mock(Service::class)->makePartial();
     $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -126,6 +129,29 @@ it('denies delete when service has no team', function () {
     expect($policy->delete($user, $service))->toBeFalse();
 });
 
+it('allows team operator to deploy their own team service', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('operator');
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
+
+    $policy = new ServicePolicy;
+    expect($policy->deploy($user, $service))->toBeTrue();
+});
+
+it('denies team operator to access terminal', function () {
+    $user = Mockery::mock(User::class)->makePartial();
+    $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
+
+    $policy = new ServicePolicy;
+    expect($policy->accessTerminal($user, $service))->toBeFalse();
+});
+
 it('allows team admin to deploy their own team service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(true);
@@ -140,6 +166,7 @@ it('allows team admin to deploy their own team service', function () {
 it('denies team member to deploy their own team service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $service = Mockery::mock(Service::class)->makePartial();
     $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -162,6 +189,7 @@ it('allows team admin to stop their own team service', function () {
 it('denies team member to stop their own team service', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $service = Mockery::mock(Service::class)->makePartial();
     $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
@@ -184,6 +212,7 @@ it('allows team admin to manage service environment variables', function () {
 it('denies team member to manage service environment variables', function () {
     $user = Mockery::mock(User::class)->makePartial();
     $user->shouldReceive('isAdminOfTeam')->with(1)->andReturn(false);
+    $user->shouldReceive('roleInTeam')->with(1)->andReturn('member');
 
     $service = Mockery::mock(Service::class)->makePartial();
     $service->shouldReceive('team')->andReturn((object) ['id' => 1]);
