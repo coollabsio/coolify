@@ -13,6 +13,8 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\SslCertificate;
+use App\Models\StandaloneCassandra;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -154,7 +156,16 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
         }
         try {
-            $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->lazyById();
+            $cassandras = StandaloneCassandra::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($cassandras as $cassandra) {
+                echo "Deleting stuck cassandra: {$cassandra->name}\n";
+                DeleteResourceJob::dispatch($cassandra);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck cassandra: {$e->getMessage()}\n";
+        }
+        try {
+            $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->get();
             foreach ($mongodbs as $mongodb) {
                 echo "Deleting stuck mongodb: {$mongodb->name}\n";
                 DeleteResourceJob::dispatch($mongodb);

@@ -112,11 +112,18 @@ class Select extends Component
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
             $serviceKey = (string) $key;
+            $logoIsUrl = str_starts_with($logo, 'http://') || str_starts_with($logo, 'https://') || str_starts_with($logo, '//');
+            $logoUrl = $logoIsUrl || str_starts_with($logo, '/') ? $logo : '/'.$logo;
 
             return [
                 'id' => $serviceKey,
                 'name' => str($serviceKey)->headline(),
                 'docsSlug' => str($serviceKey)->lower()->value(),
+                'has_logo' => $hasLogo,
+                'logo' => asset($logo),
+                'logo_github_url' => file_exists($local_logo_path)
+                    ? 'https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/'.$logo
+                    : $logoUrl,
                 'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
             ] + service_logo_urls(data_get($service, 'logo')) + (array) $service;
         })->all();
@@ -255,6 +262,12 @@ class Select extends Component
                 'description' => 'A column-oriented database for real-time analytics over large datasets.',
                 'logo' => asset('svgs/resources/clickhouse.svg'),
             ],
+            [
+                'id' => 'cassandra',
+                'name' => 'Cassandra',
+                'description' => 'Cassandra is a distributed wide-column NoSQL database designed to handle large amounts of data across many commodity servers.',
+                'logo' => asset('svgs/resources/cassandra.svg'),
+            ],
 
         ];
 
@@ -368,6 +381,7 @@ class Select extends Component
             case 'keydb':
             case 'dragonfly':
             case 'clickhouse':
+            case 'cassandra':
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
