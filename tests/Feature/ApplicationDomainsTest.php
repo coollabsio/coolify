@@ -716,6 +716,63 @@ it('lists dns entries for domains that still need dns and omits working configur
         ->not->toContain('app.example.com');
 });
 
+it('does not use instance network addresses for dns entries on a remote server', function () {
+    InstanceSettings::get()->update([
+        'public_ipv4' => '198.51.100.20',
+        'public_ipv6' => '2001:db8::20',
+    ]);
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    $records = $component->instance()->dnsRecordHints();
+
+    expect($records)->toBe([
+        [
+            'type' => 'A',
+            'name' => 'app.example.com',
+            'value' => '203.0.113.10',
+        ],
+    ]);
+});
+
+it('uses instance network addresses for dns entries on the localhost server', function () {
+    InstanceSettings::get()->update([
+        'public_ipv4' => '198.51.100.20',
+        'public_ipv6' => '2001:db8::20',
+    ]);
+    $localhost = Server::factory()->create([
+        'id' => 0,
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->server->private_key_id,
+        'ip' => 'localhost',
+    ]);
+    $destination = StandaloneDocker::withoutEvents(fn () => StandaloneDocker::forceCreate([
+        'uuid' => (string) Str::uuid(),
+        'name' => 'localhost-docker',
+        'network' => 'coolify-localhost',
+        'server_id' => $localhost->id,
+    ]));
+    $this->application->update([
+        'destination_id' => $destination->id,
+        'fqdn' => 'https://app.example.com',
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+
+    expect($component->instance()->dnsRecordHints())->toBe([
+        [
+            'type' => 'A',
+            'name' => 'app.example.com',
+            'value' => '198.51.100.20',
+        ],
+        [
+            'type' => 'AAAA',
+            'name' => 'app.example.com',
+            'value' => '2001:db8::20',
+        ],
+    ]);
+});
+
 it('shows cloudflare domain connect only on cloud with a key', function () {
     config([
         'constants.coolify.self_hosted' => false,

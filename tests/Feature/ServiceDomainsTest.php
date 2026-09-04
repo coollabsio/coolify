@@ -280,6 +280,24 @@ it('lists dns entries for service hosts that still need dns', function () {
         ->not->toContain('web.example.com');
 });
 
+it('does not use instance network addresses for service dns entries on a remote server', function () {
+    InstanceSettings::get()->update([
+        'public_ipv4' => '198.51.100.20',
+        'public_ipv6' => '2001:db8::20',
+    ]);
+    $this->apiApp->update(['fqdn' => 'https://api.example.com']);
+
+    $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])]);
+
+    expect($component->instance()->dnsRecordHints())->toBe([
+        [
+            'type' => 'A',
+            'name' => 'api.example.com',
+            'value' => '203.0.113.10',
+        ],
+    ]);
+});
+
 it('persists a service redirect when its dropdown changes', function () {
     $this->webApp->update(['fqdn' => 'https://web.example.com', 'redirect' => 'both']);
 
