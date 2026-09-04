@@ -7,7 +7,7 @@
 
 services:
   solidtime:
-    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-0.20.0}'
     user: '1000:1000'
     environment:
       - SERVICE_URL_SOLIDTIME_8000
@@ -19,7 +19,7 @@ services:
       - APP_FORCE_HTTPS=${APP_FORCE_HTTPS:-false}
       - APP_ENABLE_REGISTRATION=${APP_ENABLE_REGISTRATION:-true}
       - SUPER_ADMINS=${SUPER_ADMINS}
-      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-0.0.0.0/0,2000:0:0:0:0:0:0:0/3}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       - AUTO_DB_MIGRATE=true
       - CONTAINER_MODE=http
       - LOG_CHANNEL=stderr_daily
@@ -61,7 +61,7 @@ services:
       start_period: 30s
 
   scheduler:
-    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-0.20.0}'
     user: '1000:1000'
     environment:
       - APP_NAME=${APP_NAME:-solidtime}
@@ -71,7 +71,7 @@ services:
       - APP_KEY=base64:${SERVICE_REALBASE64_APPKEY}
       - APP_FORCE_HTTPS=${APP_FORCE_HTTPS:-false}
       - SUPER_ADMINS=${SUPER_ADMINS}
-      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-0.0.0.0/0,2000:0:0:0:0:0:0:0/3}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       - CONTAINER_MODE=scheduler
       - LOG_CHANNEL=stderr_daily
       - DB_CONNECTION=pgsql
@@ -108,7 +108,7 @@ services:
       start_period: 15s
 
   queue:
-    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-0.20.0}'
     user: '1000:1000'
     environment:
       - APP_NAME=${APP_NAME:-solidtime}
@@ -118,7 +118,7 @@ services:
       - APP_KEY=base64:${SERVICE_REALBASE64_APPKEY}
       - APP_FORCE_HTTPS=${APP_FORCE_HTTPS:-false}
       - SUPER_ADMINS=${SUPER_ADMINS}
-      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-0.0.0.0/0,2000:0:0:0:0:0:0:0/3}
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       - CONTAINER_MODE=worker
       - WORKER_COMMAND=php /var/www/html/artisan queue:work
       - LOG_CHANNEL=stderr_daily
@@ -156,7 +156,7 @@ services:
       start_period: 15s
 
   keygen:
-    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-latest}'
+    image: 'solidtime/solidtime:${SOLIDTIME_IMAGE_TAG:-0.20.0}'
     user: '1000:1000'
     environment:
       - APP_ENV=production
