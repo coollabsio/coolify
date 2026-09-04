@@ -621,32 +621,6 @@ class Application extends BaseModel
             && $this->restart_limit_reached === true;
     }
 
-    public function taskLink($task_uuid)
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            $route = route('project.application.scheduled-tasks', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_uuid' => data_get($this, 'environment.uuid'),
-                'application_uuid' => data_get($this, 'uuid'),
-                'task_uuid' => $task_uuid,
-            ]);
-            $settings = instanceSettings();
-            if (data_get($settings, 'fqdn')) {
-                $url = Url::fromString($route);
-                $url = $url->withPort(null);
-                $fqdn = data_get($settings, 'fqdn');
-                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
-                $url = $url->withHost($fqdn);
-
-                return $url->__toString();
-            }
-
-            return $route;
-        }
-
-        return null;
-    }
-
     public function settings()
     {
         return $this->hasOne(ApplicationSetting::class);
