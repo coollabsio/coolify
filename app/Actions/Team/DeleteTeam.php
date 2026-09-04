@@ -50,8 +50,13 @@ class DeleteTeam
                 ->get()
                 ->each(function (User $member) use ($team): void {
                     $member->teams()->detach($team);
+                    $member->clearStoredTeamIfMatches($team->id);
                     DB::table('sessions')->where('user_id', $member->id)->delete();
                 });
+
+            // The deleting owner is excluded from the loop above; clear their
+            // stored team too so the deleted id is not restored on next login.
+            $user->clearStoredTeamIfMatches($team->id);
 
             $team->delete();
 

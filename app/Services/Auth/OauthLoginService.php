@@ -28,8 +28,16 @@ class OauthLoginService
             : $this->resolveOauthUser($oauthUser, $oauthSetting, $email);
 
         Auth::login($user);
-        $team = $user->currentTeam() ?? $user->teams()->first() ?? $user->recreate_personal_team();
-        session(['currentTeam' => $user->currentTeam = $team]);
+        // Restore the last active team; only fall back when unambiguous.
+        $team = $user->currentTeam() ?? $user->resolveStoredTeam();
+        if (! $team && $user->teams()->count() === 0) {
+            $team = $user->recreate_personal_team();
+        }
+        if ($team) {
+            session(['currentTeam' => $user->currentTeam = $team]);
+        }
+        // Otherwise (multiple teams, no stored choice) leave the session team
+        // unset so the user is sent to the team-selection screen.
 
         return $user;
     }

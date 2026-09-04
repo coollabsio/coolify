@@ -570,8 +570,11 @@ function refreshSession(?Team $team = null): void
             $team = Team::find($currentTeam->id);
         }
         if (! $team) {
-            // Fall back to any team the user still belongs to.
-            $team = User::query()->find(Auth::id())?->teams()->first();
+            // Fall back to the user's resolvable team (stored choice, or their
+            // sole team). Returns null for a multi-team user with no valid stored
+            // choice, so an arbitrary first team is never silently persisted —
+            // the user is sent to the selection screen instead.
+            $team = User::query()->find(Auth::id())?->resolveStoredTeam();
         }
     }
 
@@ -581,8 +584,13 @@ function refreshSession(?Team $team = null): void
     if (! $team) {
         // The user has no team left (e.g. just deleted their current team and
         // belongs to no other): clear the stale session reference instead of
-        // dereferencing null.
+        // dereferencing null, and drop the persisted choice so it is not
+        // restored on next login.
         session()->forget('currentTeam');
+        $user = Auth::user();
+        if ($user && ! is_null($user->current_team_id)) {
+            $user->forceFill(['current_team_id' => null])->saveQuietly();
+        }
 
         return;
     }
@@ -593,6 +601,13 @@ function refreshSession(?Team $team = null): void
         return $team;
     });
     session(['currentTeam' => $team]);
+
+    // Persist the active team so it can be restored after logout/login.
+    $user = Auth::user();
+    if ($user && $user->current_team_id !== $team->id) {
+        $user->current_team_id = $team->id;
+        $user->saveQuietly();
+    }
 }
 function handleError(?Throwable $error = null, ?Component $livewire = null, ?string $customErrorMessage = null)
 {
