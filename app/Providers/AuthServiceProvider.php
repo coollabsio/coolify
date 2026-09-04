@@ -145,6 +145,14 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::before(function ($user) {
+            if ($user->isInstanceAdmin()) {
+                return true;
+            }
+
+            return null;
+        });
+
         // Register gates for resource creation policy
         Gate::define('createAnyResource', [ResourceCreatePolicy::class, 'createAny']);
 
