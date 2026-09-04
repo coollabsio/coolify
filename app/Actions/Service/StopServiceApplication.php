@@ -22,10 +22,7 @@ class StopServiceApplication
         if ($removeContainer) {
             $commands = ["docker rm -f {$containerName}"];
         } else {
-            $commands = [
-                "docker update --restart=no {$containerName}",
-                "docker stop {$containerName}",
-            ];
+            $commands = ["docker stop {$containerName}"];
         }
         instant_remote_process($commands, $server, throwError: ! $removeContainer);
 

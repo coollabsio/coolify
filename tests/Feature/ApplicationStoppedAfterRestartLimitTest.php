@@ -126,7 +126,7 @@ it('can stop an application without removing its containers', function () {
 
     expect($removeContainers)->not->toBeNull()
         ->and($removeContainers->getDefaultValue())->toBeTrue()
-        ->and($action)->toContain('docker update --restart=no')
+        ->and($action)->not->toContain('docker update --restart=no')
         ->and($action)->toContain('if ($removeContainers)');
 });
 
