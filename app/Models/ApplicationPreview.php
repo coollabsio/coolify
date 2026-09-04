@@ -128,8 +128,15 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false)
+    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false, bool $force = false)
     {
+        // Domains already on the preview are kept: they may have been added or
+        // edited in the preview domains UI, and every deployment calls this.
+        // Only an explicit regeneration overwrites them.
+        if (filled($this->fqdn) && ! $force) {
+            return $this;
+        }
+
         $applicationFqdn = $this->application->fqdn;
         if (! $applicationFqdn && $generateWithoutApplicationDomain) {
             $applicationFqdn = generateUrl(
@@ -138,17 +145,24 @@ class ApplicationPreview extends BaseModel
             );
         }
 
-        if ($applicationFqdn) {
-            $sourceDomain = str($applicationFqdn)->contains(',')
-                ? str($applicationFqdn)->explode(',')[0]
-                : $applicationFqdn;
-            $generated = $this->generatedPreviewDomain((string) $sourceDomain);
-            $this->fqdn = $generated['url'];
-            $this->domain_port_overrides = filled($generated['port'])
-                ? [$generated['url'] => $generated['port']]
-                : null;
-            $this->save();
+        $sourceDomains = ValidationPatterns::applicationDomainList($applicationFqdn);
+        if ($sourceDomains === []) {
+            return $this;
         }
+
+        $previewDomains = [];
+        $previewPortOverrides = [];
+        foreach ($sourceDomains as $sourceDomain) {
+            $generated = $this->generatedPreviewDomain($sourceDomain);
+            $previewDomains[] = $generated['url'];
+            if (filled($generated['port'])) {
+                $previewPortOverrides[$generated['url']] = $generated['port'];
+            }
+        }
+
+        $this->fqdn = collect($previewDomains)->unique()->implode(',');
+        $this->domain_port_overrides = $previewPortOverrides ?: null;
+        $this->save();
 
         return $this;
     }
