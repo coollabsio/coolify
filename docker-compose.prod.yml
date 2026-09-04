@@ -62,7 +62,7 @@ services:
       retries: 10
       timeout: 2s
   soketi:
-    image: '${REGISTRY_URL:-docker.io}/coollabsio/coolify-realtime:1.0.17'
+    image: '${REGISTRY_URL:-docker.io}/coollabsio/coolify-realtime:1.0.18'
     ports:
       - "${SOKETI_PORT:-6001}:6001"
       - "6002:6002"

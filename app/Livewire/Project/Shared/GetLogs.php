@@ -17,12 +17,15 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Process;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class GetLogs extends Component
 {
+    use AuthorizesRequests;
+
     public const MAX_LOG_LINES = 50000;
 
     public const MAX_DISPLAY_SIZE_BYTES = 5 * 1024 * 1024;
@@ -82,6 +85,10 @@ class GetLogs extends Component
     public function instantSave()
     {
         if (! is_null($this->resource)) {
+            if (auth()->user()->cannot('update', $this->resource)) {
+                return;
+            }
+
             if ($this->resource->getMorphClass() === Application::class) {
                 $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
                 $this->resource->settings->save();

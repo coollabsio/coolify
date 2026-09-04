@@ -86,7 +86,7 @@ class HealthChecks extends Component
         }
     }
 
-    public function syncData(bool $toModel = false): void
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();

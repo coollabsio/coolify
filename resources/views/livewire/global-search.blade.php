@@ -655,7 +655,9 @@
                                             class="search-result-item command-palette-item">
                                             <template x-if="item.logo">
                                                 <div class="command-palette-item-icon">
-                                                    <img :src="'/' + item.logo" :alt="item.name">
+                                                    <img :src="item.logo.startsWith('http') ? item.logo : '/' + item.logo"
+                                                        :alt="item.name"
+                                                        x-on:error="if (item.logo_cdn_url && !$el.dataset.cdnTried) { $el.dataset.cdnTried = 'true'; $el.src = item.logo_cdn_url; } else if (item.logo_default_url && !$el.dataset.defaultTried) { $el.dataset.defaultTried = 'true'; $el.src = item.logo_default_url; }">
                                                 </div>
                                             </template>
                                             <template x-if="!item.logo">

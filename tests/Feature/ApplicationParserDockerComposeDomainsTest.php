@@ -10,9 +10,19 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use phpseclib3\Crypt\EC;
 
 uses(RefreshDatabase::class);
+
+function disableExactProxyLabels(Application $application): Application
+{
+    $settings = $application->destination->server->settings;
+    $settings->generate_exact_labels = false;
+    $settings->save();
+
+    return $application;
+}
 
 beforeEach(function () {
     $this->user = User::factory()->create();
@@ -454,3 +464,170 @@ YAML,
         ->toContain('traefik.docker.network=custom-network')
         ->not->toContain("traefik.docker.network={$application->uuid}");
 });
+
+test('generateLabelsApplication routes portless domains to saved internal port overrides for Traefik and Caddy', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '80',
+        'fqdn' => 'https://one.example.com,https://two.example.com',
+        'domain_port_overrides' => [
+            'https://one.example.com' => 3000,
+            'https://two.example.com' => 8080,
+        ],
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    $labels = collect(generateLabelsApplication($application));
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-'.$application->uuid.'.rule=Host(`one.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=3000')
+        ->toContain('traefik.http.routers.https-1-'.$application->uuid.'.rule=Host(`two.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-1-'.$application->uuid.'.loadbalancer.server.port=8080')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 3000}}')
+        ->toContain('caddy_1.handle_path.1_reverse_proxy={{upstreams 8080}}')
+        ->not->toContain('Host(`one.example.com:3000`)')
+        ->not->toContain('Host(`two.example.com:8080`)');
+});
+
+test('generateLabelsApplication uses the first ports_exposes value when a portless domain has no override', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '4000,5000',
+        'fqdn' => 'https://plain.example.com',
+        'domain_port_overrides' => null,
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    $labels = collect(generateLabelsApplication($application));
+
+    expect($labels)
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=4000')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 4000}}');
+});
+
+test('generateLabelsApplication keeps routing a legacy port-bearing FQDN without an override map', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'ports_exposes' => '80',
+        'fqdn' => 'https://legacy.example.com',
+        'redirect' => 'both',
+        'is_http_basic_auth_enabled' => false,
+    ]));
+
+    DB::table('applications')->where('id', $application->id)->update([
+        'fqdn' => 'https://legacy.example.com:9090',
+        'domain_port_overrides' => null,
+    ]);
+
+    $labels = collect(generateLabelsApplication($application->fresh()));
+
+    expect($labels)
+        ->toContain('traefik.http.routers.https-0-'.$application->uuid.'.rule=Host(`legacy.example.com`) && PathPrefix(`/`)')
+        ->toContain('traefik.http.services.https-0-'.$application->uuid.'.loadbalancer.server.port=9090')
+        ->toContain('caddy_0.handle_path.0_reverse_proxy={{upstreams 9090}}');
+});
+
+test('applicationParser compose labels receive the application domain port override map', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $application->update([
+        'domain_port_overrides' => [
+            'https://frontend.example.com' => 8080,
+        ],
+    ]);
+
+    $parsedCompose = applicationParser($application->fresh());
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8080')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 8080}}')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
+        ->toBeTrue();
+});
+
+test('applicationParser compose labels use the first ports_exposes value when a portless domain has no override', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000,8080',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  frontend:
+    image: myapp/frontend:latest
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $parsedCompose = applicationParser($application->fresh());
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=3000')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 3000}}')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
+        ->toBeTrue();
+});
+
+test('applicationParser compose labels prefer the service exposed port over application ports_exposes', function (string $portConfiguration) {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => <<<YAML
+services:
+  frontend:
+    image: myapp/frontend:latest
+{$portConfiguration}
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $labels = collect(data_get(applicationParser($application->fresh()), 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8069')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 8069}}')))
+        ->toBeTrue();
+})->with([
+    'expose' => "    expose:\n      - '8069'",
+    'short port syntax' => "    ports:\n      - '18069:8069'",
+    'long port syntax' => "    ports:\n      - target: 8069\n        published: 18069",
+]);

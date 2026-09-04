@@ -7,6 +7,8 @@ use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
+use App\Support\DomainPortOverrides;
+use App\Support\DomainUrlParts;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasConfiguration;
 use App\Traits\HasMetrics;
@@ -135,6 +137,7 @@ class Application extends BaseModel
         'description',
         'fqdn',
         'noindex_domains',
+        'domain_port_overrides',
         'git_repository',
         'git_branch',
         'git_commit_sha',
@@ -213,6 +216,8 @@ class Application extends BaseModel
         'last_online_at',
         'restart_count',
         'max_restart_count',
+        'restart_limit_reached',
+        'container_present',
         'last_restart_at',
         'last_restart_type',
         'uuid',
@@ -244,6 +249,7 @@ class Application extends BaseModel
         'docker_compose_raw',
         'custom_labels',
         'domain_dns_statuses',
+        'domain_port_overrides',
     ];
 
     protected function casts(): array
@@ -256,8 +262,11 @@ class Application extends BaseModel
             'manual_webhook_secret_gitea' => 'encrypted',
             'noindex_domains' => 'array',
             'domain_dns_statuses' => 'array',
+            'domain_port_overrides' => 'array',
             'restart_count' => 'integer',
             'max_restart_count' => 'integer',
+            'restart_limit_reached' => 'boolean',
+            'container_present' => 'boolean',
             'last_restart_at' => 'datetime',
         ];
     }
@@ -282,6 +291,9 @@ class Application extends BaseModel
                 if ($application->fqdn === '') {
                     $application->fqdn = null;
                 }
+                $normalized = DomainPortOverrides::normalize($application->fqdn, $application->domain_port_overrides);
+                $application->fqdn = $normalized['fqdn'];
+                $application->domain_port_overrides = $normalized['overrides'];
                 $payload['fqdn'] = $application->fqdn;
                 $application->syncNoindexDomains();
             }
@@ -605,36 +617,8 @@ class Application extends BaseModel
     public function stoppedAfterRestartLimit(): bool
     {
         return str($this->status)->startsWith('exited')
-            && ($this->restart_count ?? 0) > 0
-            && ($this->max_restart_count ?? 0) > 0
-            && $this->restart_count >= $this->max_restart_count
-            && $this->last_restart_type === 'crash';
-    }
-
-    public function taskLink($task_uuid)
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            $route = route('project.application.scheduled-tasks', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_uuid' => data_get($this, 'environment.uuid'),
-                'application_uuid' => data_get($this, 'uuid'),
-                'task_uuid' => $task_uuid,
-            ]);
-            $settings = instanceSettings();
-            if (data_get($settings, 'fqdn')) {
-                $url = Url::fromString($route);
-                $url = $url->withPort(null);
-                $fqdn = data_get($settings, 'fqdn');
-                $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
-                $url = $url->withHost($fqdn);
-
-                return $url->__toString();
-            }
-
-            return $route;
-        }
-
-        return null;
+            && $this->container_present === true
+            && $this->restart_limit_reached === true;
     }
 
     public function settings()
@@ -730,7 +714,7 @@ class Application extends BaseModel
         );
     }
 
-    public function gitCommitLink($link): string
+    public function gitCommitLink($link): ?string
     {
         if (! is_null(data_get($this, 'source.html_url')) && ! is_null(data_get($this, 'git_repository')) && ! is_null(data_get($this, 'git_branch'))) {
             if (str($this->source->html_url)->contains('bitbucket')) {
@@ -745,6 +729,10 @@ class Application extends BaseModel
             $git_repository = preg_replace('/^git@([^:]+):/', 'https://$1/', $git_repository);
         } elseif (str($this->git_repository)->startsWith('ssh://')) {
             $git_repository = 'https://'.parse_url($git_repository, PHP_URL_HOST).parse_url($git_repository, PHP_URL_PATH);
+        }
+
+        if (! filter_var($git_repository, FILTER_VALIDATE_URL)) {
+            return null;
         }
 
         $url = Url::fromString(Str::replaceEnd('.git', '', $git_repository));
@@ -970,6 +958,46 @@ class Application extends BaseModel
     public function main_port()
     {
         return $this->settings->is_static ? [80] : $this->ports_exposes_array;
+    }
+
+    /**
+     * Ports the container is expected to listen on: Ports Exposes plus ports already used by application domains.
+     *
+     * @return list<int>
+     */
+    public function availableInternalPorts(): array
+    {
+        $ports = collect($this->settings?->is_static ? [80] : $this->ports_exposes_array)
+            ->filter(fn (mixed $port): bool => is_numeric($port) && (int) $port > 0)
+            ->map(fn (mixed $port): int => (int) $port);
+
+        foreach ($this->domain_port_overrides ?? [] as $port) {
+            if (is_numeric($port) && (int) $port > 0) {
+                $ports->push((int) $port);
+            }
+        }
+
+        foreach (explode(',', (string) $this->fqdn) as $url) {
+            $url = trim($url);
+            if ($url === '') {
+                continue;
+            }
+            $legacyPort = DomainUrlParts::split($url)['port'] ?? '';
+            if ($legacyPort !== '' && is_numeric($legacyPort) && (int) $legacyPort > 0) {
+                $ports->push((int) $legacyPort);
+            }
+        }
+
+        return $ports->unique()->sort()->values()->all();
+    }
+
+    public function portRequiresConfirmation(?int $port): bool
+    {
+        if ($port === null || $port <= 0) {
+            return false;
+        }
+
+        return ! in_array($port, $this->availableInternalPorts(), true);
     }
 
     public function detectPortFromEnvironment(?bool $isPreview = false): ?int

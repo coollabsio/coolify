@@ -11,7 +11,7 @@
     reminderCollapseAfter: 10000,
     isDevelopment: {{ isDev() ? 'true' : 'false' }},
     init() {
-        this.popups.sponsorship = this.shouldShowMonthlyPopup('popupSponsorship');
+        this.popups.sponsorship = !this.isDevelopment && this.shouldShowMonthlyPopup('popupSponsorship');
         this.popups.notification = this.shouldShowMonthlyPopup('popupNotification');
         this.popups.realtime = localStorage.getItem('popupRealtime');
 
@@ -86,7 +86,7 @@
         return isDifferentMonth;
         {{-- } --}}
     }
-}">
+}" x-on:show-sponsorship-reminder.window="popups.sponsorship = true; reminders.sponsorship.compact = false">
     @auth
         <span x-show="popups.realtime === true">
             @if (!isCloud())
@@ -140,11 +140,12 @@
             @endif
         </span>
     @endauth
-    @if (instanceSettings()->is_sponsorship_popup_enabled && !isCloud())
+    @if ((isDev() || instanceSettings()->is_sponsorship_popup_enabled) && ! isCloud())
         <span x-show="popups.sponsorship">
             <x-popup>
                 <x-slot:customActions>
                     <div class="relative mx-auto flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-modal transition-all duration-300 dark:border-white/[0.1] dark:bg-surface"
+                        x-on:show-sponsorship-reminder.window="bannerVisible = true"
                         :class="reminders.sponsorship.compact ? 'max-w-sm gap-3 p-4' : 'max-w-2xl gap-5 p-5 sm:p-6'">
                         <button type="button" aria-label="Dismiss sponsorship reminder"
                             class="absolute top-3 right-3 flex size-7 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"

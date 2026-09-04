@@ -35,6 +35,9 @@ class Webhook extends Component
     public bool $statusChangeWebhookNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $restartLimitReachedWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $backupSuccessWebhookNotifications = false;
 
     #[Validate(['boolean'])]
@@ -79,17 +82,17 @@ class Webhook extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
-            $this->authorize('update', $this->settings);
             $this->settings->webhook_enabled = $this->webhookEnabled;
             $this->settings->webhook_url = $this->webhookUrl;
 
             $this->settings->deployment_success_webhook_notifications = $this->deploymentSuccessWebhookNotifications;
             $this->settings->deployment_failure_webhook_notifications = $this->deploymentFailureWebhookNotifications;
             $this->settings->status_change_webhook_notifications = $this->statusChangeWebhookNotifications;
+            $this->settings->restart_limit_reached_webhook_notifications = $this->restartLimitReachedWebhookNotifications;
             $this->settings->backup_success_webhook_notifications = $this->backupSuccessWebhookNotifications;
             $this->settings->backup_failure_webhook_notifications = $this->backupFailureWebhookNotifications;
             $this->settings->scheduled_task_success_webhook_notifications = $this->scheduledTaskSuccessWebhookNotifications;
@@ -113,6 +116,7 @@ class Webhook extends Component
             $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
             $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;
             $this->statusChangeWebhookNotifications = $this->settings->status_change_webhook_notifications;
+            $this->restartLimitReachedWebhookNotifications = $this->settings->restart_limit_reached_webhook_notifications;
             $this->backupSuccessWebhookNotifications = $this->settings->backup_success_webhook_notifications;
             $this->backupFailureWebhookNotifications = $this->settings->backup_failure_webhook_notifications;
             $this->scheduledTaskSuccessWebhookNotifications = $this->settings->scheduled_task_success_webhook_notifications;
@@ -147,6 +151,7 @@ class Webhook extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -157,6 +162,7 @@ class Webhook extends Component
     {
         try {
             $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
             $this->syncData(true);
             $this->saveModel();
         } catch (\Throwable $e) {
@@ -166,6 +172,8 @@ class Webhook extends Component
 
     public function saveModel()
     {
+        $this->authorize('update', $this->settings);
+
         $this->syncData(true);
         refreshSession();
 

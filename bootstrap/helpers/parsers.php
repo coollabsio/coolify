@@ -525,8 +525,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $originalServiceName = findComposeServiceName($normalizedServiceName, array_keys($services));
                 if ($originalServiceName !== null) {
                     $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
-                    $domainExists = getComposeServiceDomainString($domains, $originalServiceName);
-                    if (is_null($domainExists)) {
+                    if (! hasComposeServiceDomainEntry($domains, $originalServiceName)) {
                         $serviceNameForDomain = str($parsed['service_name'])->replace('_', '-')->value();
                         $domainValue = generateUrl(server: $server, random: "$serviceNameForDomain-$uuid");
                         if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
@@ -648,12 +647,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         // Only add domain if the service exists
                         if ($composeServiceName !== null) {
                             $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
-                            $domainExists = getComposeServiceDomainString($domains, $composeServiceName);
-
                             // Update domain using URL with port if applicable
                             $domainValue = $port ? $urlWithPort : $url;
 
-                            if (is_null($domainExists)) {
+                            if (! hasComposeServiceDomainEntry($domains, $composeServiceName)) {
                                 $resource->docker_compose_domains = json_encode(putComposeServiceDomain(
                                     $domains,
                                     $composeServiceName,
@@ -1265,24 +1262,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         $fqdns = collect([]);
                     }
                 } else {
-                    $fqdns = $fqdns->map(function ($fqdn) use ($pullRequestId, $resource) {
-                        $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pullRequestId);
-                        $url = Url::fromString($fqdn);
-                        $template = $resource->preview_url_template;
-                        $host = $url->getHost();
-                        $schema = $url->getScheme();
-                        $portInt = $url->getPort();
-                        $port = $portInt !== null ? ':'.$portInt : '';
-                        $random = new_public_id();
-                        $preview_fqdn = str_replace('{{random}}', $random, $template);
-                        $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                        $preview_fqdn = str_replace('{{pr_id}}', $pullRequestId, $preview_fqdn);
-                        $preview_fqdn = "$schema://$preview_fqdn{$port}";
-                        $preview->fqdn = $preview_fqdn;
-                        $preview->save();
-
-                        return $preview_fqdn;
-                    });
+                    $generatedDomains = $fqdns->map(
+                        fn ($fqdn) => $preview->generatedPreviewDomain((string) $fqdn)
+                    );
+                    $fqdns = $generatedDomains->pluck('url');
+                    $preview->fqdn = $fqdns->implode(',');
+                    $preview->domain_port_overrides = $generatedDomains
+                        ->filter(fn (array $generated): bool => filled($generated['port']))
+                        ->mapWithKeys(fn (array $generated): array => [$generated['url'] => $generated['port']])
+                        ->all();
+                    $preview->save();
                 }
             }
         }
@@ -1359,6 +1348,14 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
                 ? $composeRedirect
                 : 'both';
+            $previewForPorts = $isPullRequest
+                ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
+                : null;
+            $domainPortOverrides = $isPullRequest
+                ? ($previewForPorts?->domain_port_overrides ?? [])
+                : ($originalResource->domain_port_overrides ?? []);
+            $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
+            $onlyPort = firstDockerComposeServicePort($service) ?? ($exposedPorts[0] ?? null);
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -1374,8 +1371,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            domainPortOverrides: $domainPortOverrides,
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -1389,9 +1388,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             predefinedPort: $predefinedPort,
                             noindex_domains: $noindexDomains,
-                            redirect_direction: $redirectDirection
+                            redirect_direction: $redirectDirection,
+                            domainPortOverrides: $domainPortOverrides,
                         ));
                         break;
                 }
@@ -1405,8 +1406,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    domainPortOverrides: $domainPortOverrides,
                 ));
                 $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
                     network: $labelNetwork,
@@ -1418,9 +1421,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     predefinedPort: $predefinedPort,
                     noindex_domains: $noindexDomains,
-                    redirect_direction: $redirectDirection
+                    redirect_direction: $redirectDirection,
+                    domainPortOverrides: $domainPortOverrides,
                 ));
             }
         }
@@ -1849,11 +1854,7 @@ function serviceParser(Service $resource): Collection
                 // Only save fqdn to ServiceApplication, not ServiceDatabase
                 if ($isServiceApplication && is_null($savedService->fqdn)) {
                     // Save URL (with scheme) to database, not FQDN
-                    if ((int) $resource->compose_parsing_version >= 5 && version_compare(config('constants.coolify.version'), '4.0.0-beta.420.7', '>=')) {
-                        $savedService->fqdn = $urlWithPort;
-                    } else {
-                        $savedService->fqdn = $urlWithPort;
-                    }
+                    $savedService->fqdn = $url;
                     $savedService->save();
                 }
 
@@ -2636,6 +2637,9 @@ function serviceParser(Service $resource): Collection
             $redirectDirection = in_array(data_get($originalResource, 'redirect'), ['www', 'non-www', 'both'], true)
                 ? data_get($originalResource, 'redirect')
                 : 'both';
+            $onlyPort = $originalResource instanceof ServiceApplication
+                ? ($originalResource->getRequiredPort() ?? $predefinedPort)
+                : $predefinedPort;
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }
@@ -2651,6 +2655,8 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
+                            domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
@@ -2666,7 +2672,9 @@ function serviceParser(Service $resource): Collection
                             is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                             service_name: $serviceName,
                             image: $image,
+                            onlyPort: $onlyPort,
                             predefinedPort: $predefinedPort,
+                            domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                             noindex_domains: $noindexDomains,
                             redirect_direction: $redirectDirection
                         ));
@@ -2682,6 +2690,8 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
+                    domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));
@@ -2695,7 +2705,9 @@ function serviceParser(Service $resource): Collection
                     is_stripprefix_enabled: $originalResource->isStripprefixEnabled(),
                     service_name: $serviceName,
                     image: $image,
+                    onlyPort: $onlyPort,
                     predefinedPort: $predefinedPort,
+                    domainPortOverrides: $originalResource->domain_port_overrides ?? [],
                     noindex_domains: $noindexDomains,
                     redirect_direction: $redirectDirection
                 ));

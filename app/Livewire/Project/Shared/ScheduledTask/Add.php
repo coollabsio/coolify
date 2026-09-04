@@ -102,7 +102,7 @@ class Add extends Component
         }
     }
 
-    public function saveScheduledTask()
+    private function saveScheduledTask(): void
     {
         try {
             $task = new ScheduledTask;
@@ -128,7 +128,7 @@ class Add extends Component
             $this->dispatch('refreshTasks');
             $this->dispatch('success', 'Scheduled task added.');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 

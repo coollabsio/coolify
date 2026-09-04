@@ -63,7 +63,12 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $database->name }}
                 </h1>
-                <x-status-summary :status="$database->status" title="Database status" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$database->status" title="Database status" />
+                </div>
+                <div class="flex w-full flex-wrap gap-1">
+                    <x-application.restart-limit-warning :application="$database" />
+                </div>
             </div>
         </div>
 

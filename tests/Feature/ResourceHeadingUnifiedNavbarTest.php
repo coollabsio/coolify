@@ -82,13 +82,31 @@ it('docks desktop resource actions in the top bar instead of floating over conte
     }
 });
 
-it('links the service header missing variables warning to environment variables', function () {
+it('shows disabled deploy actions when service variables are missing', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $mobileActions = str($heading)
+        ->after('<div class="w-full xl:hidden">')
+        ->before("@teleport('#resource-action-hud-slot')")
+        ->toString();
+    $desktopActions = str($heading)
+        ->after("@teleport('#resource-action-hud-slot')")
+        ->before('@endteleport')
+        ->toString();
 
-    expect($heading)
-        ->toContain("route('project.service.environment-variables'")
-        ->toContain('Required variables missing')
-        ->toContain('href="{{ $environmentVariablesUrl }}"');
+    expect($mobileActions)
+        ->toContain('id="service-mobile-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline')
+        ->and($desktopActions)
+        ->toContain('id="service-desktop-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline');
 });
 
 it('places the account menu beside the desktop sidebar toggle while retaining it on mobile', function () {
@@ -253,6 +271,25 @@ it('groups application lifecycle options in an Actions dropdown', function () {
     expect($mobile)
         ->toContain('Deploy (without cache)')
         ->not->toContain('Force deploy without cache');
+});
+
+it('shows stop in application action menus when the application is exited', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $desktopExitedActions = str($heading)
+        ->after("@if (str(\$application->status)->startsWith('exited'))")
+        ->before('@else')
+        ->toString();
+
+    $mobileActions = str($heading)
+        ->after('id="application-mobile-actions"')
+        ->before('<div class="hidden" aria-hidden="true">')
+        ->toString();
+
+    expect($mobileActions)->toContain('application-mobile-stop-trigger')
+        ->and($desktopExitedActions)->toContain('application-mobile-stop-trigger')
+        ->and($mobileActions)->toContain('Deploy (without cache)')
+        ->and(strrpos($mobileActions, 'Deploy (without cache)'))
+        ->toBeLessThan(strrpos($mobileActions, 'application-mobile-stop-trigger'));
 });
 
 it('places the state-aware no-cache action immediately after deploy or redeploy', function () {
