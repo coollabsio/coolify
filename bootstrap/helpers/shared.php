@@ -860,7 +860,7 @@ function s3_image_url(?int $storageId, ?string $path, int $version): ?string
         return null;
     }
 
-    $baseUrl = config('constants.coolify.avatar_cdn_url') ?: $storage->awsUrl();
+    $baseUrl = instanceSettings()->image_cdn_url ?: $storage->awsUrl();
 
     return rtrim($baseUrl, '/').'/'.ltrim($path, '/').'?v='.$version;
 }
