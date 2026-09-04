@@ -30,7 +30,7 @@ class StopServiceApplication
         instant_remote_process($commands, $server, throwError: ! $removeContainer);
 
         $serviceApplication->update(['status' => 'exited']);
-        if ($resetRestartCount) {
+        if ($resetRestartCount && $serviceApplication instanceof ServiceApplication) {
             $serviceApplication->resetRestartLimit();
         }
         ServiceStatusChanged::dispatch($service->environment->project->team->id);

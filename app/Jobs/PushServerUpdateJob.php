@@ -5,7 +5,6 @@ namespace App\Jobs;
 use App\Actions\Application\StopApplication;
 use App\Actions\Application\StopApplicationPreview;
 use App\Actions\Database\StartDatabaseProxy;
-use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
@@ -483,7 +482,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             ])
             ->with([
                 'applications:id,service_id,status,last_online_at,restart_count,max_restart_count,restart_limit_reached,last_restart_at,last_restart_type',
-                'databases:id,service_id,status,last_online_at,is_public,name,restart_count,max_restart_count,restart_limit_reached,last_restart_at,last_restart_type',
+                'databases:id,service_id,status,last_online_at,is_public,name',
             ])
             ->get();
     }
@@ -506,8 +505,6 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             'restart_count',
             'last_restart_at',
             'last_restart_type',
-            'max_restart_count',
-            'restart_limit_reached',
         ];
 
         return collect([
@@ -675,7 +672,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             }
 
             $restartCount = $this->serviceContainerRestartCounts->get($key)?->max() ?? 0;
-            if ($subResource->trackRestartCount($restartCount)) {
+            if (! $subResource instanceof ServiceDatabase && $subResource->trackRestartCount($restartCount)) {
                 StopServiceApplication::dispatch($subResource, false, false);
                 $subResource->team()?->notify(new ApplicationRestartLimitReached($subResource));
 
@@ -821,11 +818,12 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             $database->status = $containerStatus;
             $database->save();
         }
-        if (is_numeric($restartCount) && $database->trackRestartCount((int) $restartCount)) {
-            StopDatabase::dispatch($database, false, false, false);
-            $database->team()?->notify(new ApplicationRestartLimitReached($database));
-
-            return;
+        if (is_numeric($restartCount) && $restartCount > ($database->restart_count ?? 0)) {
+            $database->update([
+                'restart_count' => (int) $restartCount,
+                'last_restart_at' => now(),
+                'last_restart_type' => 'crash',
+            ]);
         }
         if (! $this->isCompleteSnapshot()) {
             return;
@@ -883,16 +881,12 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $notFoundDatabaseUuids->each(function ($databaseUuid) {
             $database = $this->databasesByUuid->get($databaseUuid);
             if ($database) {
-                if ($database->stoppedAfterRestartLimit()) {
-                    return;
-                }
                 if (! str($database->status)->startsWith('exited')) {
                     $database->update([
                         'status' => 'exited',
                         'restart_count' => 0,
                         'last_restart_at' => null,
                         'last_restart_type' => null,
-                        'restart_limit_reached' => false,
                     ]);
                 }
                 if ($database->is_public) {
@@ -918,9 +912,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         // Batch update service databases
         if ($notFoundServiceDatabaseIds->isNotEmpty()) {
             ServiceDatabase::whereIn('id', $notFoundServiceDatabaseIds)
-                ->where('restart_limit_reached', false)
                 ->where('status', '!=', 'exited')
-                ->update(['status' => 'exited', 'restart_count' => 0, 'last_restart_at' => null, 'last_restart_type' => null]);
+                ->update(['status' => 'exited']);
         }
     }
 

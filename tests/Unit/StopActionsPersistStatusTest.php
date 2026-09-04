@@ -21,7 +21,7 @@ it('persists exited status for all children when stopping a service', function (
         ->toContain("\$application->update(['status' => 'exited']);")
         ->toContain('$application->resetRestartLimit();')
         ->toContain("\$database->update(['status' => 'exited']);")
-        ->toContain('$database->resetRestartLimit();');
+        ->not->toContain('$database->resetRestartLimit();');
 });
 
 it('persists exited status when stopping an individual service resource', function () {
