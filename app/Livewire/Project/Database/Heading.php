@@ -2,11 +2,15 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Actions\Database\FlushCacheDatabase;
 use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneRedis;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
@@ -95,6 +99,23 @@ class Heading extends Component
         }
     }
 
+    public function flush()
+    {
+        try {
+            $this->authorize('manage', $this->database);
+
+            if (! $this->isCacheDatabase()) {
+                throw new \RuntimeException('This database type does not support cache flushing.');
+            }
+
+            FlushCacheDatabase::run($this->database);
+            $this->auditDatabaseAction('ui.database.flushed');
+            $this->dispatch('success', 'Cache flushed successfully.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
     public function restart()
     {
         try {
@@ -129,7 +150,15 @@ class Heading extends Component
             'checkboxes' => [
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
             ],
+            'isCacheDatabase' => $this->isCacheDatabase(),
         ]);
+    }
+
+    private function isCacheDatabase(): bool
+    {
+        return $this->database instanceof StandaloneRedis
+            || $this->database instanceof StandaloneKeydb
+            || $this->database instanceof StandaloneDragonfly;
     }
 
     private function auditDatabaseAction(string $event): void
