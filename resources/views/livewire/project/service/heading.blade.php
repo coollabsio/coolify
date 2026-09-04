@@ -188,6 +188,12 @@
                 </div>
                 @endcan
             @else
+                @can('deploy', $service)
+                    <button type="button" class="button mb-2 w-full justify-between" disabled>
+                        <span>Deploy</span>
+                        <span class="text-xs font-normal opacity-70">Fill required variables first</span>
+                    </button>
+                @endcan
                 <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
                     class="mb-3 inline-flex" aria-label="Open required environment variables">
                     <x-status-badge status="Required variables missing" type="error" />

@@ -84,11 +84,19 @@ it('docks desktop resource actions in the top bar instead of floating over conte
 
 it('links the service header missing variables warning to environment variables', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $mobileActions = str($heading)
+        ->after('<div class="w-full xl:hidden">')
+        ->before("@teleport('#resource-action-hud-slot')")
+        ->toString();
 
     expect($heading)
         ->toContain("route('project.service.environment-variables'")
         ->toContain('Required variables missing')
-        ->toContain('href="{{ $environmentVariablesUrl }}"');
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->and($mobileActions)
+        ->toContain('Fill required variables first')
+        ->toContain('disabled')
+        ->toContain('Deploy');
 });
 
 it('places the account menu beside the desktop sidebar toggle while retaining it on mobile', function () {
