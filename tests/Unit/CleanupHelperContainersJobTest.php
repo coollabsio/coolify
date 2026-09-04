@@ -13,6 +13,11 @@ it('matches helper image references without matching similarly named images', fu
         'docker.io/coollabsio/coolify-helper:1.0.16',
         'ghcr.io/coollabsio/coolify-helper@sha256:abc',
         'registry.example/team/coollabsio/coolify-helper:latest',
+        'coollabsio/coolify:latest',
+        'coollabsio/coolify:4.3.12',
+        'coollabsio/coolify-realtime:1.0.10',
+        'coolify-helper:latest',
+        'someone/coolify-helper:1.0.16',
         'evil/coollabsio/coolify-helper-copy:latest',
         'coollabsio/not-coolify-helper:latest',
     ];
@@ -31,7 +36,7 @@ it('matches helper image references without matching similarly named images', fu
         $process->mustRun();
 
         expect(array_column(json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR), 'Image'))
-            ->toBe(array_slice($images, 0, 3));
+            ->toBe(array_slice($images, 0, 4));
     } finally {
         unlink($docker);
         rmdir($directory);
