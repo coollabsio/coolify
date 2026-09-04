@@ -65,6 +65,7 @@
     <section class="{{ $selected_uuid === 'default' ? 'w-full' : 'terminal-page-console min-h-0 w-full flex-1 overflow-hidden' }}"
         x-on:terminal-theme-selected="setTheme($event.detail.theme)"
         x-on:terminal-starting.window="syncTheme()"
+        x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode; hasShell = $event.detail.hasShell"
         x-data="{
             targets: @js($terminalOptions),
             multipleServers: @js($servers->count() > 1),
@@ -76,6 +77,10 @@
             themeAccents: @js($consoleThemeAccents),
             consoleTheme: 'system',
             themeOpen: false,
+            attachAvailable: false,
+            hasShell: true,
+            terminalMode: 'shell',
+            modeOpen: false,
             get filteredTargetGroups() {
                 const query = this.targetSearch.trim().toLowerCase();
                 const targets = query
@@ -97,6 +102,15 @@
                 this.themeOpen = false;
                 localStorage.setItem('coolify-console-theme', theme);
                 window.dispatchEvent(new CustomEvent('terminal-theme-change', { detail: { theme } }));
+            },
+            setTerminalMode(mode) {
+                this.modeOpen = false;
+                if (this.terminalMode === mode || (mode === 'shell' && !this.hasShell)) {
+                    return;
+                }
+                this.terminalMode = mode;
+                window.dispatchEvent(new CustomEvent('terminal-starting'));
+                Livewire.dispatch('set-terminal-mode', { mode });
             },
             syncTheme() {
                 const savedTheme = localStorage.getItem('coolify-console-theme');
@@ -260,8 +274,11 @@
                     @endif
                 </div>
 
-                <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
+                <div class="ml-auto flex items-center gap-2">
+                    <x-terminal.mode-selector />
+                    <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
                         :theme-accents="$consoleThemeAccents" />
+                </div>
             </header>
 
             <div class="terminal-session-panel mt-8 flex min-h-0 flex-1 flex-col overflow-hidden">

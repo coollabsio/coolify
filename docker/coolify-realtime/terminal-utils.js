@@ -9,6 +9,12 @@ export function extractTimeout(commandString) {
     return timeoutMatch ? parseInt(timeoutMatch[1], 10) : null;
 }
 
+// A `docker attach` session shares the container's main process. On disconnect we
+// must detach from it instead of killing it, otherwise we stop the running app.
+export function isAttachCommand(commandString) {
+    return /(?:^|\s)docker\s+attach(?:\s|$)/.test(commandString || '');
+}
+
 function normalizeShellArgument(argument) {
     if (!argument) {
         return argument;

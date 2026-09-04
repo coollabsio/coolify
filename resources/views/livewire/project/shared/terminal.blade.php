@@ -12,7 +12,8 @@
         <div class="hidden" aria-hidden="true" wire:poll.keep-alive.30s="keepTerminalPageAlive"></div>
     @endif
 
-    @if (!$hasShell)
+    {{-- Attach (console) mode does not need a shell, so only warn while Shell mode is active. --}}
+    @if (!$hasShell && $terminalMode === 'shell')
         @if ($isApplicationConsole)
             <div class="flex h-full min-h-[32rem] items-center justify-center">
                 <x-empty size="lg" title="Shell unavailable"
@@ -76,7 +77,26 @@
                     : 'terminal-host h-[510px] max-h-[calc(100dvh-10rem)] overflow-hidden px-2 py-1 rounded-sm bg-black')">
         </div>
 
-        <div x-show="terminalActive" x-cloak class="sm:hidden"
+        {{-- Command box for console (attach) mode — a terminal input line, never raw keystrokes. --}}
+        <div x-cloak x-show="terminalActive && $wire.terminalMode === 'attach'"
+            class="terminal-console-input relative z-[2] mt-2 flex shrink-0 items-center gap-2 rounded-md bg-white/[0.03] px-3 ring-1 ring-white/[0.06] transition focus-within:bg-white/[0.05] focus-within:ring-white/[0.12]"
+            :class="fullscreen ? 'mb-1' : ''"
+            @click="$refs.consoleInput?.focus()">
+            <span class="shrink-0 font-mono text-xs leading-none text-white/35 select-none" aria-hidden="true">&gt;</span>
+            <input type="text" x-ref="consoleInput" x-model="consoleCommand"
+                @keydown.enter.prevent="submitConsoleCommand()"
+                @keydown.arrow-up.prevent="recallConsoleCommand(-1)"
+                @keydown.arrow-down.prevent="recallConsoleCommand(1)"
+                autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                placeholder="Type a command and press Enter"
+                class="console-command-field min-w-0 flex-1 border-0! bg-transparent! px-0! py-2! font-mono text-xs text-white! shadow-none! ring-0! outline-none! placeholder:text-white/30 focus:border-0! focus:shadow-none! focus:ring-0! focus:outline-none!" />
+            <button type="button" @click.stop="submitConsoleCommand()"
+                class="-mr-1 shrink-0 rounded px-1.5 py-1 font-mono text-[11px] text-white/40 transition-colors hover:text-white/80">
+                Send
+            </button>
+        </div>
+
+        <div x-show="terminalActive && $wire.terminalMode !== 'attach'" x-cloak class="sm:hidden"
             :class="fullscreen ? 'relative z-[2] shrink-0 px-2 pb-2' : (keyboardInset > 0 ? 'fixed inset-x-0 z-[100002] px-2 pb-2' : 'relative z-[2] mt-2 shrink-0')"
             :style="!fullscreen && keyboardInset > 0 ? `top: ${keyboardAnchorTop}px; transform: translateY(-100%)` : ''"
             data-terminal-mobile-toolbar>
