@@ -20,8 +20,6 @@ class StopApplicationPreview
             $commands = [dockerStopCommand($application->settings->stopGracePeriodSeconds(), $containerName, $server)];
             if ($removeContainer) {
                 $commands[] = "docker rm -f $containerName";
-            } else {
-                array_unshift($commands, "docker update --restart=no $containerName");
             }
             instant_remote_process($commands, $server, false);
         }

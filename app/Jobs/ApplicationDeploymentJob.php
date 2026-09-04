@@ -2362,12 +2362,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 destination: $destination,
                 no_questions_asked: true,
             );
-            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: ".route('project.application.deployment.show', [
-                'project_uuid' => data_get($this->application, 'environment.project.uuid'),
-                'application_uuid' => data_get($this->application, 'uuid'),
-                'deployment_uuid' => $deployment_uuid,
-                'environment_uuid' => data_get($this->application, 'environment.uuid'),
-            ]));
+            $deployment_url = base_url().'/project/'.data_get($this->application, 'environment.project.uuid').'/environment/'.data_get($this->application, 'environment.uuid').'/application/'.data_get($this->application, 'uuid')."/deployment/{$deployment_uuid}";
+            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: {$deployment_url}");
         }
     }
 

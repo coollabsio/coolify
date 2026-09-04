@@ -525,8 +525,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $originalServiceName = findComposeServiceName($normalizedServiceName, array_keys($services));
                 if ($originalServiceName !== null) {
                     $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
-                    $domainExists = getComposeServiceDomainString($domains, $originalServiceName);
-                    if (is_null($domainExists)) {
+                    if (! hasComposeServiceDomainEntry($domains, $originalServiceName)) {
                         $serviceNameForDomain = str($parsed['service_name'])->replace('_', '-')->value();
                         $domainValue = generateUrl(server: $server, random: "$serviceNameForDomain-$uuid");
                         if ($value && get_class($value) === Stringable::class && $value->startsWith('/')) {
@@ -648,12 +647,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         // Only add domain if the service exists
                         if ($composeServiceName !== null) {
                             $domains = json_decode(data_get($resource, 'docker_compose_domains') ?: '[]', true) ?: [];
-                            $domainExists = getComposeServiceDomainString($domains, $composeServiceName);
-
                             // Update domain using URL with port if applicable
                             $domainValue = $port ? $urlWithPort : $url;
 
-                            if (is_null($domainExists)) {
+                            if (! hasComposeServiceDomainEntry($domains, $composeServiceName)) {
                                 $resource->docker_compose_domains = json_encode(putComposeServiceDomain(
                                     $domains,
                                     $composeServiceName,
@@ -1358,7 +1355,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ? ($previewForPorts?->domain_port_overrides ?? [])
                 : ($originalResource->domain_port_overrides ?? []);
             $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
-            $onlyPort = count($exposedPorts) > 0 ? $exposedPorts[0] : null;
+            $onlyPort = firstDockerComposeServicePort($service) ?? ($exposedPorts[0] ?? null);
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }

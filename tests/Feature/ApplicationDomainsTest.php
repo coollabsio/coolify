@@ -111,6 +111,33 @@ it('does not add a single-label hostname as an application domain', function () 
     expect($this->application->fresh()->fqdn)->toBeNull();
 });
 
+it('keeps a compose domain removed when the service declares a magic URL variable', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  web:
+    image: nginx:alpine
+    environment:
+      SERVICE_URL_WEB: /api
+YAML,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://web.example.com/api'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
+    $domainKey = hash('sha256', 'https://web.example.com/api|web');
+
+    $component
+        ->call('removeDomainByKey', $domainKey)
+        ->assertDispatched('success')
+        ->assertSet('domainRows', []);
+
+    expect(json_decode($this->application->fresh()->docker_compose_domains, true))
+        ->toMatchArray(['web' => ['domain' => null]]);
+});
+
 it('generates a preview domain when the application has no domain', function () {
     $preview = ApplicationPreview::create([
         'application_id' => $this->application->id,
@@ -2066,6 +2093,28 @@ it('updates search engine indexing from the domains view', function () {
         ->toBe(['https://staging.example.com']);
 });
 
+it('updates search engine indexing for a git docker compose domain', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://compose.example.com'],
+        ]),
+    ]);
+
+    $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('toggleNoindexDomain', 'https://compose.example.com', 'noindex')
+        ->assertDispatched('configurationChanged')
+        ->assertDispatched('success');
+
+    expect($this->application->refresh()->noindexDomains()->all())
+        ->toBe(['https://compose.example.com']);
+
+    $component->call('toggleNoindexDomain', 'https://compose.example.com', 'index');
+
+    expect($this->application->refresh()->noindexDomains()->all())->toBe([]);
+});
+
 it('keeps noindex domains when normalizing a custom domain port', function () {
     $this->application->update([
         'fqdn' => 'https://staging.example.com:8080',
@@ -2309,6 +2358,48 @@ it('distinguishes an inherited internal port from a domain port override', funct
         ->assertSee('Internal port 3000')
         ->assertSee('Inherited from Ports Exposes', false)
         ->assertDontSee('Custom internal port for this domain', false);
+});
+
+it('shows the detected compose service port as the inherited internal port', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose:\n      - '8069'\n",
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://example.com'],
+        ]),
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', 8069)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertSee('Internal port 8069')
+        ->assertDontSee('Internal port 3000');
+});
+
+it('shows the detected compose service port for preview domains', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    ports:\n      - '18069:8069'\n",
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 8069,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/8069',
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://preview.example.com'],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.internal_port', 8069)
+        ->assertSet('domainRows.0.has_port_override', false)
+        ->assertSee('Internal port 8069')
+        ->assertDontSee('Internal port 3000');
 });
 
 it('keeps a legacy port-bearing url port in the edit field as an internal port override', function () {

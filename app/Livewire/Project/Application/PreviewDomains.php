@@ -439,7 +439,7 @@ class PreviewDomains extends Component
     private function makeRow(string $url, ?string $service, array $statuses = []): array
     {
         $status = $statuses[$this->statusKey($url, $service)] ?? [];
-        $port = $this->effectiveDomainInternalPort($url);
+        $port = $this->effectiveDomainInternalPort($url, $service);
 
         return [
             'url' => $url,
@@ -500,7 +500,7 @@ class PreviewDomains extends Component
     /**
      * @return array{internal_port: ?int, has_port_override: bool}
      */
-    private function effectiveDomainInternalPort(string $url): array
+    private function effectiveDomainInternalPort(string $url, ?string $service = null): array
     {
         $canonical = DomainPortOverrides::withoutPort($url);
         $overrides = $this->preview->domain_port_overrides ?? [];
@@ -525,6 +525,14 @@ class PreviewDomains extends Component
         if ($this->preview->application->settings?->is_static) {
             return [
                 'internal_port' => 80,
+                'has_port_override' => false,
+            ];
+        }
+
+        $composePort = dockerComposeServicePort($this->preview->application->docker_compose_raw, $service);
+        if ($composePort !== null) {
+            return [
+                'internal_port' => $composePort,
                 'has_port_override' => false,
             ];
         }

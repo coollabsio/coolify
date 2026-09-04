@@ -7,7 +7,6 @@ use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Collection;
-use Spatie\Url\Url;
 
 class SslExpirationNotification extends CustomEmailNotification
 {
@@ -19,39 +18,9 @@ class SslExpirationNotification extends CustomEmailNotification
     {
         $this->onQueue('high');
         $this->resources = collect($resources);
-
-        // Collect URLs for each resource
-        $this->resources->each(function ($resource) {
-            if (data_get($resource, 'environment.project.uuid')) {
-                $routeName = match ($resource->type()) {
-                    'application' => 'project.application.configuration',
-                    'database' => 'project.database.configuration',
-                    'service' => 'project.service.configuration',
-                    default => null
-                };
-
-                if ($routeName) {
-                    $route = route($routeName, [
-                        'project_uuid' => data_get($resource, 'environment.project.uuid'),
-                        'environment_uuid' => data_get($resource, 'environment.uuid'),
-                        $resource->type().'_uuid' => data_get($resource, 'uuid'),
-                    ]);
-
-                    $settings = instanceSettings();
-                    if (data_get($settings, 'fqdn')) {
-                        $url = Url::fromString($route);
-                        $url = $url->withPort(null);
-                        $fqdn = data_get($settings, 'fqdn');
-                        $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
-                        $url = $url->withHost($fqdn);
-
-                        $this->urls[$resource->name] = $url->__toString();
-                    } else {
-                        $this->urls[$resource->name] = $route;
-                    }
-                }
-            }
-        });
+        $this->urls = $this->resources->mapWithKeys(fn ($resource) => [
+            $resource->name => base_url().'/project/'.data_get($resource, 'environment.project.uuid').'/environment/'.data_get($resource, 'environment.uuid')."/database/{$resource->uuid}",
+        ])->all();
     }
 
     public function via(object $notifiable): array
