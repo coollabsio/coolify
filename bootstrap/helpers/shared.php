@@ -527,6 +527,32 @@ function currentTeam()
     return Auth::user()?->currentTeam() ?? null;
 }
 
+/**
+ * Application types that may use deployment servers shared with the current team.
+ *
+ * @return list<string>
+ */
+function shared_deployment_application_types(): array
+{
+    return [
+        'public',
+        'private-deploy-key',
+        'private-gh-app',
+        'private-gitlab-app',
+        'dockerfile',
+        'docker-image',
+    ];
+}
+
+function is_shared_deployment_application_type(string $type): bool
+{
+    return in_array(
+        $type,
+        shared_deployment_application_types(),
+        true
+    );
+}
+
 function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
 {
     if (blank($uuid) || ! currentTeam()) {
@@ -535,6 +561,28 @@ function find_destination_for_current_team(?string $uuid): StandaloneDocker|Swar
 
     return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
         ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
+}
+
+function find_deployable_resource_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    if (blank($uuid) || ! currentTeam()) {
+        return null;
+    }
+
+    $teamId = (int) currentTeam()->id;
+
+    $destination = StandaloneDocker::deployableByTeam($teamId)
+        ->where('uuid', $uuid)
+        ->first()
+        ?? SwarmDocker::deployableByTeam($teamId)
+            ->where('uuid', $uuid)
+            ->first();
+
+    if (! $destination?->server?->canHostResources()) {
+        return null;
+    }
+
+    return $destination;
 }
 
 function find_resource_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
