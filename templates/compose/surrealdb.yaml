@@ -1,0 +1,20 @@
+# documentation: https://surrealdb.com/docs/surrealdb/installation/running/docker
+# slogan: A scalable, distributed, collaborative, document-graph database for the realtime web.
+# category: database
+# tags: surrealdb, database, multi-model, sql, nosql, graph, realtime
+# logo: svgs/surrealdb.svg
+# port: 8000
+
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:v2.6.1
+    command: start --user root --pass ${SERVICE_PASSWORD_SURREALDB} rocksdb:///data
+    environment:
+      - SERVICE_URL_SURREALDB_8000
+    volumes:
+      - surrealdb-data:/data
+    healthcheck:
+      test: ["CMD", "surreal", "isready", "--endpoint", "http://127.0.0.1:8000"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
