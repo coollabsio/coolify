@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\ApplicationDeploymentJob;
+
 /**
  * Test to verify that custom Docker Compose build commands properly inject flags.
  *
@@ -614,6 +616,36 @@ it('produces correct preview path with normalized baseDirectory', function () {
         expect($path)->toBe($case['expected'], "Failed for baseDir: {$case['baseDir']}");
         expect($path)->not->toContain('//', "Double slash found for baseDir: {$case['baseDir']}");
     }
+});
+
+it('uses the compose file directory as the project directory for nested compose builds', function () {
+    $reflection = new \ReflectionClass(ApplicationDeploymentJob::class);
+    $job = $reflection->newInstanceWithoutConstructor();
+
+    $workdir = $reflection->getProperty('workdir');
+    $workdir->setValue($job, '/artifacts/deployment-uuid');
+
+    $composeLocation = $reflection->getProperty('docker_compose_location');
+    $composeLocation->setValue($job, '/docker/docker-compose.yml');
+
+    $method = $reflection->getMethod('dockerComposeBuildProjectDirectory');
+
+    expect($method->invoke($job))->toBe('/artifacts/deployment-uuid/docker');
+});
+
+it('uses the workdir as the project directory for root compose builds', function () {
+    $reflection = new \ReflectionClass(ApplicationDeploymentJob::class);
+    $job = $reflection->newInstanceWithoutConstructor();
+
+    $workdir = $reflection->getProperty('workdir');
+    $workdir->setValue($job, '/artifacts/deployment-uuid');
+
+    $composeLocation = $reflection->getProperty('docker_compose_location');
+    $composeLocation->setValue($job, '/docker-compose.yml');
+
+    $method = $reflection->getMethod('dockerComposeBuildProjectDirectory');
+
+    expect($method->invoke($job))->toBe('/artifacts/deployment-uuid');
 });
 
 // Tests for injectDockerComposeBuildArgs() helper function
