@@ -15,10 +15,6 @@
     'isLarge' => false,
 ])
 
-@php
-    $modalId = 'modal-' . uniqid();
-@endphp
-
 <div x-data="{ modalOpen: @if ($wireOpen) $wire.entangle(@js($wireOpen)) @else false @endif }"
     x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch('modalClosed') } })"
     :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
@@ -48,7 +44,7 @@
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
                 class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
             <div @if ($closeOutside) @click.self="modalOpen=false" @endif class="relative flex min-h-full items-start justify-center p-2 sm:items-center sm:p-4">
-                <div id="{{ $modalId }}" x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
                     x-transition:enter="ease-out duration-100"
                     x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
                     x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
