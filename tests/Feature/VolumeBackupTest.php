@@ -960,6 +960,38 @@ it('enables and disables volume S3 backups from the S3 title action', function (
     expect($backup->refresh()->save_s3)->toBeFalse();
 });
 
+it('persists S3 settings the first time when a volume backup schedule does not exist yet', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Volume backups',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+
+    Livewire::test(VolumeBackups::class, [
+        'storage' => $volume,
+        'resource' => $application,
+        'section' => 's3',
+    ])
+        ->assertSet('s3StorageId', $s3Storage->id)
+        ->call('toggleS3')
+        ->assertSet('saveToS3', true)
+        ->assertDispatched('success');
+
+    $backup = ScheduledVolumeBackup::query()->sole();
+
+    expect($backup->enabled)->toBeFalse()
+        ->and($backup->save_s3)->toBeTrue()
+        ->and($backup->s3_storage_id)->toBe($s3Storage->id);
+});
+
 it('shows and saves volume S3 retention while S3 backups are disabled', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);
