@@ -26,6 +26,17 @@
                         placeholder="59e02939b1bf39f16c93138a28727aec…"
                         helper="Use the 64-character digest without the sha256: prefix." />
                 </div>
+                <div class="grid gap-4 md:grid-cols-2">
+                    <x-forms.select id="dockerRegistryId" label="Registry credentials"
+                        helper="Optional. Manage credentials in Keys &amp; Tokens &gt; Docker Registries.">
+                        <option value="">No credentials (public)</option>
+                        @foreach ($dockerRegistries as $registry)
+                            <option value="{{ $registry->id }}">
+                                {{ $registry->name }} ({{ $registry->registry_url ?? 'docker.io' }})
+                            </option>
+                        @endforeach
+                    </x-forms.select>
+                </div>
             </div>
         </section>
     </form>
