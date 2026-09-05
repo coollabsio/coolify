@@ -152,10 +152,8 @@
                                 </label>
                                 <div class="relative">
                                     @if (!$valuesLoaded)
-                                        <div class="input input-with-password-toggle flex w-full items-center text-neutral-500 dark:text-fg-dim"
-                                            aria-busy="true">
-                                            <x-loading text="Loading value..." />
-                                        </div>
+                                        <x-forms.input loading loadingText="Loading value..."
+                                            defaultClass="input input-with-password-toggle" />
                                     @else
                                         <x-forms.env-var-input id="value" type="password"
                                             canGate="manageEnvironment" :canResource="$this->resource"

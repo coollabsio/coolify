@@ -2,11 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Actions\Application\StopApplication;
+use App\Actions\Application\StopApplicationPreview;
 use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Database\StopDatabase;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\StartLogDrain;
+use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -23,8 +27,10 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\SwarmDocker;
+use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
 use App\Notifications\Container\ContainerRestarted;
 use App\Services\ContainerStatusAggregator;
+use App\Services\RestartCountTracker;
 use App\Traits\CalculatesExcludedStatus;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -95,7 +101,13 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public Collection $applicationContainerStatuses;
 
+    public Collection $applicationContainerRestartCounts;
+
     public Collection $serviceContainerStatuses;
+
+    public Collection $previewContainerRestartCounts;
+
+    public Collection $serviceContainerRestartCounts;
 
     public bool $foundProxy = false;
 
@@ -122,7 +134,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->foundApplicationPreviewsIds = collect();
         $this->foundServiceDatabaseIds = collect();
         $this->applicationContainerStatuses = collect();
+        $this->applicationContainerRestartCounts = collect();
         $this->serviceContainerStatuses = collect();
+        $this->previewContainerRestartCounts = collect();
+        $this->serviceContainerRestartCounts = collect();
         $this->allApplicationIds = collect();
         $this->allDatabaseUuids = collect();
         $this->allTcpProxyUuids = collect();
@@ -140,7 +155,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
     {
         // Defensive initialization for Collection properties to handle queue deserialization edge cases
         $this->serviceContainerStatuses ??= collect();
+        $this->previewContainerRestartCounts ??= collect();
+        $this->serviceContainerRestartCounts ??= collect();
         $this->applicationContainerStatuses ??= collect();
+        $this->applicationContainerRestartCounts ??= collect();
         $this->foundApplicationIds ??= collect();
         $this->foundDatabaseUuids ??= collect();
         $this->foundServiceApplicationIds ??= collect();
@@ -231,6 +249,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             if (! $coolify_managed) {
                 continue;
             }
+            if (filter_var($labels->get('com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)) {
+                continue;
+            }
 
             $name = data_get($container, 'name');
             if ($name === 'coolify-log-drain' && $this->isRunning($containerStatus)) {
@@ -241,6 +262,10 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 $pullRequestId = $labels->get('coolify.pullRequestId', '0');
                 try {
                     if ($pullRequestId === '0') {
+                        $application = $this->applicationsById->get((string) $applicationId);
+                        if ($application && $application->container_present !== true) {
+                            $application->update(['container_present' => true]);
+                        }
                         if ($this->allApplicationIds->contains($applicationId)) {
                             $this->foundApplicationIds->push($applicationId);
                         }
@@ -251,6 +276,13 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         $containerName = $labels->get('com.docker.compose.service');
                         if ($containerName) {
                             $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                            $restartCount = data_get($container, 'restart_count');
+                            if (is_numeric($restartCount)) {
+                                if (! $this->applicationContainerRestartCounts->has($applicationId)) {
+                                    $this->applicationContainerRestartCounts->put($applicationId, collect());
+                                }
+                                $this->applicationContainerRestartCounts->get($applicationId)->put($containerName, (int) $restartCount);
+                            }
                         }
                     } else {
                         $previewKey = $applicationId.':'.$pullRequestId;
@@ -258,6 +290,13 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                             $this->foundApplicationPreviewsIds->push($previewKey);
                         }
                         $this->updateApplicationPreviewStatus($applicationId, $pullRequestId, $containerStatus);
+                        $restartCount = data_get($container, 'restart_count');
+                        if (is_numeric($restartCount)) {
+                            $this->previewContainerRestartCounts->push([
+                                'key' => $previewKey,
+                                'count' => (int) $restartCount,
+                            ]);
+                        }
                     }
                 } catch (\Exception $e) {
                 }
@@ -278,6 +317,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     $containerName = $labels->get('com.docker.compose.service');
                     if ($containerName) {
                         $this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);
+                        $this->storeServiceRestartCount($key, $containerName, data_get($container, 'restart_count'));
                     }
                 } elseif ($subType === 'database') {
                     $this->foundServiceDatabaseIds->push($subId);
@@ -289,6 +329,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     $containerName = $labels->get('com.docker.compose.service');
                     if ($containerName) {
                         $this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);
+                        $this->storeServiceRestartCount($key, $containerName, data_get($container, 'restart_count'));
                     }
                 }
             } else {
@@ -302,9 +343,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         $this->foundDatabaseUuids->push($uuid);
                         // TCP proxy should only be started/managed when database is actually running
                         if ($this->allTcpProxyUuids->contains($uuid) && $this->isRunning($containerStatus)) {
-                            $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: true);
+                            $this->updateDatabaseStatus($uuid, $containerStatus, data_get($container, 'restart_count'), tcpProxy: true);
                         } else {
-                            $this->updateDatabaseStatus($uuid, $containerStatus, tcpProxy: false);
+                            $this->updateDatabaseStatus($uuid, $containerStatus, data_get($container, 'restart_count'), tcpProxy: false);
                         }
                     }
                 }
@@ -317,12 +358,17 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         $this->updateProxyStatus();
 
+        Application::whereIn('id', $this->foundApplicationIds->unique())
+            ->update(['container_present' => true]);
+
         $this->updateNotFoundApplicationStatus();
         $this->updateNotFoundApplicationPreviewStatus();
         $this->updateNotFoundDatabaseStatus();
         $this->updateNotFoundServiceStatus();
 
         $this->updateAdditionalServersStatus();
+
+        $this->trackPreviewRestartCounts();
 
         // Aggregate multi-container application statuses
         $this->aggregateMultiContainerStatuses();
@@ -349,11 +395,18 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     'uuid',
                     'name',
                     'status',
+                    'container_present',
                     'build_pack',
                     'docker_compose_raw',
+                    'environment_id',
                     'destination_id',
                     'destination_type',
                     'last_online_at',
+                    'restart_count',
+                    'max_restart_count',
+                    'restart_limit_reached',
+                    'last_restart_at',
+                    'last_restart_type',
                 ])
                 ->withCount('additional_servers')
                 ->where(fn ($query) => $this->scopeDestination($query, $standaloneDockerIds, $swarmDockerIds))
@@ -372,11 +425,18 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                         'uuid',
                         'name',
                         'status',
+                        'container_present',
                         'build_pack',
                         'docker_compose_raw',
+                        'environment_id',
                         'destination_id',
                         'destination_type',
                         'last_online_at',
+                        'restart_count',
+                        'max_restart_count',
+                        'restart_limit_reached',
+                        'last_restart_at',
+                        'last_restart_type',
                     ])
                     ->withCount('additional_servers')
                     ->whereIn('id', $additionalApplicationIds)
@@ -402,6 +462,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 'pull_request_id',
                 'status',
                 'last_online_at',
+                'restart_count',
+                'max_restart_count',
+                'restart_limit_reached',
+                'last_restart_at',
+                'last_restart_type',
             ])
             ->whereIn('application_id', $applicationIds)
             ->get();
@@ -417,8 +482,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 'docker_compose_raw',
             ])
             ->with([
-                'applications:id,service_id,status,last_online_at',
-                'databases:id,service_id,status,last_online_at,is_public,name',
+                'applications:id,service_id,status,last_online_at,restart_count,max_restart_count,restart_limit_reached,last_restart_at,last_restart_type',
+                'databases:id,service_id,status,last_online_at,is_public,name,restart_count,max_restart_count,restart_limit_reached,last_restart_at,last_restart_type',
             ])
             ->get();
     }
@@ -441,6 +506,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             'restart_count',
             'last_restart_at',
             'last_restart_type',
+            'max_restart_count',
+            'restart_limit_reached',
         ];
 
         return collect([
@@ -495,6 +562,53 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 continue;
             }
 
+            $maxRestartCount = 0;
+            $restartCountsAvailable = $this->applicationContainerRestartCounts->has($applicationId);
+            if ($restartCountsAvailable) {
+                $maxRestartCount = $this->applicationContainerRestartCounts->get($applicationId)->max() ?? 0;
+                $restartState = (new RestartCountTracker)->evaluate(
+                    previousRestartCount: $application->restart_count ?? 0,
+                    observedRestartCount: $maxRestartCount,
+                    maxRestartCount: $application->max_restart_count ?? 0,
+                );
+
+                if ($restartState['restart_count_changed']) {
+                    $hasCrashRestarts = $restartState['restart_count'] > 0;
+                    $application->update([
+                        'restart_count' => $restartState['restart_count'],
+                        'last_restart_at' => $hasCrashRestarts ? now() : null,
+                        'last_restart_type' => $hasCrashRestarts ? 'crash' : null,
+                    ]);
+                }
+
+                if ($restartState['restart_limit_reached']) {
+                    $restartLimitClaimed = Application::query()
+                        ->whereKey($application->getKey())
+                        ->where('restart_limit_reached', false)
+                        ->update(['restart_limit_reached' => true]) === 1;
+
+                    if ($restartLimitClaimed) {
+                        $application->refresh();
+                        StopApplication::dispatch(
+                            application: $application,
+                            previewDeployments: false,
+                            dockerCleanup: false,
+                            resetRestartCount: false,
+                            removeContainers: false,
+                        );
+                        $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
+                    }
+                }
+            }
+
+            if ($application->stoppedAfterRestartLimit() && $containerStatuses->every(
+                fn (string $status): bool => str($status)->contains('exited')
+            )) {
+                $application->update(['status' => 'exited']);
+
+                continue;
+            }
+
             // Parse docker compose to check for excluded containers
             $dockerComposeRaw = data_get($application, 'docker_compose_raw');
             $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
@@ -519,7 +633,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             // Use ContainerStatusAggregator service for state machine logic
             // Use preserveRestarting: true so applications show "Restarting" instead of "Degraded"
             $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0, preserveRestarting: true);
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, $maxRestartCount, preserveRestarting: true);
 
             // Update application status with aggregated result
             if ($aggregatedStatus && $application->status !== $aggregatedStatus) {
@@ -560,6 +674,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                 continue;
             }
 
+            $restartCount = $this->serviceContainerRestartCounts->get($key)?->max() ?? 0;
+            if ($subResource->trackRestartCount($restartCount)) {
+                StopServiceApplication::dispatch($subResource, false, false);
+                $subResource->team()?->notify(new ApplicationRestartLimitReached($subResource));
+
+                continue;
+            }
+
             // Parse docker compose from service to check for excluded containers
             $dockerComposeRaw = data_get($service, 'docker_compose_raw');
             $excludedContainers = $this->getExcludedContainersFromDockerCompose($dockerComposeRaw);
@@ -581,10 +703,9 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             }
 
             // Use ContainerStatusAggregator service for state machine logic
-            // NOTE: Sentinel does NOT provide restart count data, so maxRestartCount is always 0
             // Use preserveRestarting: true so individual sub-resources show "Restarting" instead of "Degraded"
             $aggregator = new ContainerStatusAggregator;
-            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, 0, preserveRestarting: true);
+            $aggregatedStatus = $aggregator->aggregateFromStrings($relevantStatuses, $restartCount, preserveRestarting: true);
 
             // Update service sub-resource status with aggregated result
             if ($aggregatedStatus && $subResource->status !== $aggregatedStatus) {
@@ -627,8 +748,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
         // Batch update: mark all not-found applications as exited (excluding already exited ones)
         Application::whereIn('id', $notFoundApplicationIds)
-            ->where('status', 'not like', 'exited%')
-            ->update(['status' => 'exited']);
+            ->update([
+                'status' => 'exited',
+                'container_present' => false,
+                'restart_limit_reached' => false,
+            ]);
     }
 
     private function updateNotFoundApplicationPreviewStatus()
@@ -687,7 +811,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         }
     }
 
-    private function updateDatabaseStatus(string $databaseUuid, string $containerStatus, bool $tcpProxy = false)
+    private function updateDatabaseStatus(string $databaseUuid, string $containerStatus, mixed $restartCount = null, bool $tcpProxy = false): void
     {
         $database = $this->databasesByUuid->get($databaseUuid);
         if (! $database) {
@@ -696,6 +820,12 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         if ($database->status !== $containerStatus) {
             $database->status = $containerStatus;
             $database->save();
+        }
+        if (is_numeric($restartCount) && $database->trackRestartCount((int) $restartCount)) {
+            StopDatabase::dispatch($database, false, false, false);
+            $database->team()?->notify(new ApplicationRestartLimitReached($database));
+
+            return;
         }
         if (! $this->isCompleteSnapshot()) {
             return;
@@ -719,6 +849,30 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         }
     }
 
+    private function storeServiceRestartCount(string $key, string $containerName, mixed $restartCount): void
+    {
+        if (! is_numeric($restartCount)) {
+            return;
+        }
+        if (! $this->serviceContainerRestartCounts->has($key)) {
+            $this->serviceContainerRestartCounts->put($key, collect());
+        }
+        $this->serviceContainerRestartCounts->get($key)->put($containerName, (int) $restartCount);
+    }
+
+    private function trackPreviewRestartCounts(): void
+    {
+        $this->previewContainerRestartCounts
+            ->groupBy('key')
+            ->each(function (Collection $counts, string $key): void {
+                $preview = $this->previewsByKey->get($key);
+                if ($preview?->trackRestartCount((int) $counts->max('count'))) {
+                    StopApplicationPreview::dispatch($preview, false, false);
+                    $preview->application->environment->project->team?->notify(new ApplicationRestartLimitReached($preview));
+                }
+            });
+    }
+
     private function updateNotFoundDatabaseStatus()
     {
         $notFoundDatabaseUuids = $this->allDatabaseUuids->diff($this->foundDatabaseUuids);
@@ -729,12 +883,16 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $notFoundDatabaseUuids->each(function ($databaseUuid) {
             $database = $this->databasesByUuid->get($databaseUuid);
             if ($database) {
+                if ($database->stoppedAfterRestartLimit()) {
+                    return;
+                }
                 if (! str($database->status)->startsWith('exited')) {
                     $database->update([
                         'status' => 'exited',
                         'restart_count' => 0,
                         'last_restart_at' => null,
                         'last_restart_type' => null,
+                        'restart_limit_reached' => false,
                     ]);
                 }
                 if ($database->is_public) {
@@ -752,15 +910,17 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         // Batch update service applications
         if ($notFoundServiceApplicationIds->isNotEmpty()) {
             ServiceApplication::whereIn('id', $notFoundServiceApplicationIds)
+                ->where('restart_limit_reached', false)
                 ->where('status', '!=', 'exited')
-                ->update(['status' => 'exited']);
+                ->update(['status' => 'exited', 'restart_count' => 0, 'last_restart_at' => null, 'last_restart_type' => null]);
         }
 
         // Batch update service databases
         if ($notFoundServiceDatabaseIds->isNotEmpty()) {
             ServiceDatabase::whereIn('id', $notFoundServiceDatabaseIds)
+                ->where('restart_limit_reached', false)
                 ->where('status', '!=', 'exited')
-                ->update(['status' => 'exited']);
+                ->update(['status' => 'exited', 'restart_count' => 0, 'last_restart_at' => null, 'last_restart_type' => null]);
         }
     }
 

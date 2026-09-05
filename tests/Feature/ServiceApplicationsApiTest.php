@@ -20,6 +20,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Queue::fake();
+    config()->set('app.maintenance.store', 'array');
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
 
     $this->team = Team::factory()->create();
@@ -173,6 +174,23 @@ describe('GET /api/v1/services/{uuid}/applications/{app_uuid}', function () {
         $response->assertStatus(200);
         $response->assertJsonFragment(['uuid' => $ctx->serviceApplication->uuid, 'name' => 'web']);
     });
+
+    test('returns an editable url with persisted port overrides', function () {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update([
+            'fqdn' => 'https://web.example.com',
+            'domain_port_overrides' => [
+                'https://web.example.com' => 8080,
+            ],
+        ]);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->getJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}")
+            ->assertSuccessful()
+            ->assertJsonPath('url', 'https://web.example.com:8080')
+            ->assertJsonMissingPath('domain_port_overrides');
+    });
 });
 
 describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
@@ -197,6 +215,34 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
         $response->assertJsonFragment(['human_name' => 'Web UI']);
         $ctx->serviceApplication->refresh();
         expect($ctx->serviceApplication->human_name)->toBe('Web UI');
+    });
+
+    test('round trips and moves a port override when renaming a domain', function () {
+        $ctx = createServiceWithApplicationForApiTest($this);
+        $ctx->serviceApplication->update([
+            'fqdn' => 'https://old.example.com',
+            'domain_port_overrides' => [
+                'https://old.example.com' => 8080,
+            ],
+        ]);
+
+        $url = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->getJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}")
+            ->json('url');
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'url' => str_replace('old.example.com', 'new.example.com', $url),
+        ])->assertSuccessful()
+            ->assertJsonPath('url', 'https://new.example.com:8080');
+
+        expect($ctx->serviceApplication->fresh())
+            ->fqdn->toBe('https://new.example.com')
+            ->domain_port_overrides->toBe([
+                'https://new.example.com' => 8080,
+            ]);
     });
 
     test('updates the HTTP to HTTPS redirect setting', function () {
@@ -224,6 +270,19 @@ describe('PATCH /api/v1/services/{uuid}/applications/{app_uuid}', function () {
 
         $response->assertStatus(422);
     });
+
+    test('returns 422 for a url port outside the valid TCP range', function (string $url) {
+        $ctx = createServiceWithApplicationForApiTest($this);
+
+        $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->patchJson("/api/v1/services/{$ctx->service->uuid}/applications/{$ctx->serviceApplication->uuid}", [
+            'url' => $url,
+        ])->assertUnprocessable();
+    })->with([
+        'zero' => 'https://example.com:0',
+        'above maximum' => 'https://example.com:65536',
+    ]);
 
     test('returns 422 when enabling log drain but server has no log drain', function () {
         $ctx = createServiceWithApplicationForApiTest($this);

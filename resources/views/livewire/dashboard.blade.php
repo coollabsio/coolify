@@ -66,7 +66,7 @@
                                 <div
                                     class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                                     @if ($project->icon_path)
-                                        <img src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                                        <img src="{{ project_icon_url($project) }}"
                                             alt="{{ $project->name }} icon"
                                             class="h-full w-full rounded-lg object-cover">
                                     @else

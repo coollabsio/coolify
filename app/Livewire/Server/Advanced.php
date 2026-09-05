@@ -42,10 +42,9 @@ class Advanced extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
-            $this->authorize('update', $this->server);
             $this->validate();
             $this->server->settings->concurrent_builds = $this->concurrentBuilds;
             $this->server->settings->dynamic_timeout = $this->dynamicTimeout;
@@ -67,6 +66,7 @@ class Advanced extends Component
     public function instantSave()
     {
         try {
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
@@ -81,6 +81,7 @@ class Advanced extends Component
                 $this->serverDiskUsageCheckFrequency = $this->server->settings->getOriginal('server_disk_usage_check_frequency');
                 throw new \Exception('Invalid Cron / Human expression for Disk Usage Check Frequency.');
             }
+            $this->authorize('update', $this->server);
             $this->syncData(true);
             $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
