@@ -1958,6 +1958,55 @@ it('streams S3-only volume backups without creating or copying a local archive',
         ->and($execution->local_storage_deleted)->toBeTrue();
 });
 
+it('fails an unsupported S3 stream without falling back to a local archive', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Unsupported streaming destination',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.amazonaws.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $s3Storage->id,
+    ]);
+    $sshDisk = Storage::fake('ssh-keys');
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('files')->zeroOrMoreTimes()->andReturn([]);
+    $disk->shouldReceive('delete')->once()->andReturnTrue();
+    Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+    Storage::shouldReceive('build')->zeroOrMoreTimes()->andReturn($disk);
+    Process::fake([
+        '*mc pipe*' => Process::result(errorOutput: 'streaming upload is unsupported', exitCode: 1),
+        '*' => '',
+    ]);
+
+    expect(fn () => (new VolumeBackupJob($backup))->handle())
+        ->toThrow(RuntimeException::class, 'Enable local backups to use the local archive upload method.');
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    expect($execution->status)->toBe('failed')
+        ->and($execution->message)->toContain('The S3 destination may not support streaming uploads.')
+        ->and($execution->message)->toContain('Enable local backups to use the local archive upload method.')
+        ->and($execution->filename)->toBeNull()
+        ->and($execution->local_storage_deleted)->toBeTrue();
+    Process::assertRan(fn ($process) => str_contains($process->command, 'mc pipe')
+        && ! str_contains($process->command, 'mc cp')
+        && ! str_contains($process->command, ' > '));
+    Process::assertNotRan(fn ($process) => str_contains($process->command, 'mkdir -p')
+        || (str_contains($process->command, 'rm -f') && str_contains($process->command, '.tar.gz')));
+});
+
 it('keeps local-first archive creation and mc copy when retaining a local volume backup', function () {
     config(['broadcasting.default' => 'null']);
     InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));

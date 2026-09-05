@@ -195,6 +195,14 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             $recoveryError = $this->recoverIncompleteBackup($this->execution);
             $archiveDeleted = $streamToS3;
 
+            if ($streamToS3) {
+                $exception = new \RuntimeException(
+                    'S3-only streaming backup failed: '.$exception->getMessage()
+                    .'. The S3 destination may not support streaming uploads. Enable local backups to use the local archive upload method.',
+                    previous: $exception,
+                );
+            }
+
             if (! $streamToS3) {
                 try {
                     deleteBackupsLocally($backupLocation, $server, throwError: true);
