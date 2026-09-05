@@ -28,6 +28,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -1900,6 +1901,101 @@ it('keeps the upload destination on the volume backup execution', function () {
 
     expect($execution->s3_storage_id)->toBe($s3Storage->id)
         ->and($execution->s3->is($s3Storage))->toBeTrue();
+});
+
+it('streams S3-only volume backups without creating or copying a local archive', function () {
+    config(['broadcasting.default' => 'null']);
+    defined('CURLOPT_RESOLVE') || define('CURLOPT_RESOLVE', 10203);
+    Carbon::setTestNow('2026-08-15 12:00:00');
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Streaming destination',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.amazonaws.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+        'disable_local_backup' => true,
+        's3_storage_id' => $s3Storage->id,
+    ]);
+    $sshDisk = Storage::fake('ssh-keys');
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('files')->once()->andReturn([]);
+    $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
+    Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+    Storage::shouldReceive('build')->once()->andReturn($disk);
+    Process::fake([
+        '*mc pipe*' => "Added `temporary` successfully.\n128 bytes -> `temporary/bucket/archive.tar.gz`\n128",
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    $execution = ScheduledVolumeBackupExecution::query()->sole();
+    $expectedFilename = 'volume-app-data-1786795200.tar.gz';
+    Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
+        && str_contains($process->command, 'mc pipe')
+        && str_contains($process->command, 'temporary/bucket/')
+        && str_contains($process->command, $expectedFilename)
+        && substr_count($process->command, '--resolve') === 3
+        && substr_count($process->command, '>/dev/null') >= 2
+        && ! str_contains($process->command, ' > ')
+        && ! str_contains($process->command, 'mc cp'));
+    expect($execution->status)->toBe('success')
+        ->and($execution->size)->toBe(128)
+        ->and($execution->s3_uploaded)->toBeTrue()
+        ->and($execution->local_storage_deleted)->toBeTrue();
+});
+
+it('keeps local-first archive creation and mc copy when retaining a local volume backup', function () {
+    config(['broadcasting.default' => 'null']);
+    InstanceSettings::unguarded(fn () => InstanceSettings::create(['id' => 0]));
+    $team = Team::factory()->create();
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Copied destination',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.amazonaws.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'save_s3' => true,
+        'disable_local_backup' => false,
+        's3_storage_id' => $s3Storage->id,
+    ]);
+    $sshDisk = Storage::fake('ssh-keys');
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    $disk->shouldReceive('files')->once()->andReturn([]);
+    $disk->shouldReceive('delete')->zeroOrMoreTimes()->andReturnTrue();
+    Storage::shouldReceive('disk')->with('ssh-keys')->andReturn($sshDisk);
+    Storage::shouldReceive('build')->once()->andReturn($disk);
+    Process::fake([
+        '*du -b*' => '128',
+        '*' => '',
+    ]);
+
+    (new VolumeBackupJob($backup))->handle();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'tar -I')
+        && str_contains($process->command, '>')
+        && ! str_contains($process->command, 'mc pipe'));
+    Process::assertRan(fn ($process) => str_contains($process->command, 'mc cp')
+        && ! str_contains($process->command, 'mc pipe'));
 });
 
 it('removes local volume backups older than the configured retention days', function () {
