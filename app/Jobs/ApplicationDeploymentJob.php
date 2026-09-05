@@ -2785,7 +2785,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 $is_laravel = data_get($parsed, 'variables.IS_LARAVEL', false);
                 if ($is_laravel) {
                     $variables = $this->laravel_finetunes();
-                    data_set($parsed, 'variables.NIXPACKS_PHP_FALLBACK_PATH', $variables[0]->value);
+                    // Fix #7867: Do NOT set NIXPACKS_PHP_FALLBACK_PATH for Laravel apps.
+                    // When IS_LARAVEL=true, Nixpacks nginx template already creates "location /" block.
+                    // Setting NIXPACKS_PHP_FALLBACK_PATH would create a duplicate, causing nginx to fail.
+                    // data_set($parsed, 'variables.NIXPACKS_PHP_FALLBACK_PATH', $variables[0]->value);
                     data_set($parsed, 'variables.NIXPACKS_PHP_ROOT_DIR', $variables[1]->value);
                 }
                 if ($this->nixpacks_type === 'elixir') {
