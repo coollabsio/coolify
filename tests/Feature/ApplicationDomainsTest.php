@@ -2436,6 +2436,25 @@ it('shows the detected compose service port as the inherited internal port', fun
         ->assertDontSee('Internal port 3000');
 });
 
+it('does not show an application port as the inherited port for a compose service without a declared port', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  backend:\n    build: ./backend\n  frontend:\n    build: ./frontend\n",
+        'docker_compose_domains' => json_encode([
+            'backend' => ['domain' => 'https://api.example.com'],
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', null)
+        ->assertSet('domainRows.1.internal_port', null)
+        ->assertDontSee('Internal port 3000');
+});
+
 it('shows the detected compose service port for preview domains', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
@@ -2456,6 +2475,27 @@ it('shows the detected compose service port for preview domains', function () {
         ->assertSet('domainRows.0.internal_port', 8069)
         ->assertSet('domainRows.0.has_port_override', false)
         ->assertSee('Internal port 8069')
+        ->assertDontSee('Internal port 3000');
+});
+
+it('does not show an application port for a preview compose service without a declared port', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  backend:\n    build: ./backend\n  frontend:\n    build: ./frontend\n",
+    ]);
+
+    $preview = ApplicationPreview::create([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 8070,
+        'pull_request_html_url' => 'https://github.com/coollabsio/coolify/pull/8070',
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://preview.example.com'],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.internal_port', null)
         ->assertDontSee('Internal port 3000');
 });
 
@@ -2512,6 +2552,31 @@ it('stores compose domain port overrides without wiping other services', functio
         ->and($this->application->domain_port_overrides)
         ->toHaveKey('https://web.example.com', 8080)
         ->toHaveKey('https://api.example.com', 4000);
+});
+
+it('saves an unrecognized compose domain port after confirming the warning', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'fqdn' => null,
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => "services:\n  frontend:\n    build: ./frontend\n",
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+        'domain_port_overrides' => null,
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.port', '80')
+        ->call('updateDomain')
+        ->assertSet('showPortWarningModal', true)
+        ->call('confirmUseUnknownPort')
+        ->assertSet('showPortWarningModal', false)
+        ->assertDispatched('success');
+
+    expect($this->application->fresh()->domain_port_overrides)
+        ->toBe(['https://app.example.com' => 80]);
 });
 
 it('prunes a compose domain port override when that domain is removed', function () {

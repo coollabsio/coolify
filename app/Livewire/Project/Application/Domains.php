@@ -569,6 +569,13 @@ class Domains extends Component
             ];
         }
 
+        if ($this->isCompose && $service !== null && count($this->composeServices) > 1) {
+            return [
+                'internal_port' => null,
+                'has_port_override' => false,
+            ];
+        }
+
         $exposed = $this->application->ports_exposes_array;
         $defaultPort = isset($exposed[0]) && is_numeric($exposed[0]) && (int) $exposed[0] > 0
             ? (int) $exposed[0]

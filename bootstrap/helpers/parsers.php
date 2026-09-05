@@ -390,6 +390,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         return collect([]);
     }
     $services = data_get($yaml, 'services', collect([]));
+    $applicationServiceCount = collect($services)
+        ->reject(fn (mixed $service): bool => isDatabaseImage(data_get($service, 'image')))
+        ->count();
     $topLevel = collect([
         'volumes' => collect(data_get($yaml, 'volumes', [])),
         'networks' => collect(data_get($yaml, 'networks', [])),
@@ -1355,7 +1358,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 ? ($previewForPorts?->domain_port_overrides ?? [])
                 : ($originalResource->domain_port_overrides ?? []);
             $exposedPorts = $originalResource->settings->is_static ? [80] : $originalResource->ports_exposes_array;
-            $onlyPort = firstDockerComposeServicePort($service) ?? ($exposedPorts[0] ?? null);
+            $onlyPort = firstDockerComposeServicePort($service)
+                ?? ($applicationServiceCount === 1 ? ($exposedPorts[0] ?? null) : null);
             if (! $use_network_mode && (! $shouldGenerateLabelsExactly || $server->proxyType() === ProxyTypes::TRAEFIK->value)) {
                 $serviceLabels = addTraefikDockerNetworkLabel($serviceLabels, $baseNetwork->first());
             }

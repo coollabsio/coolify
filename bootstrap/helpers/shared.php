@@ -3318,7 +3318,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $usesSharedApplicationPort = collect($services)
+            ->reject(fn (mixed $service): bool => isDatabaseImage(data_get($service, 'image')))
+            ->count() === 1;
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id, $usesSharedApplicationPort) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -3916,7 +3919,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             ? ($resource->domain_port_overrides ?? [])
                             : ($preview?->domain_port_overrides ?? []);
                         $exposedPorts = $resource->settings->is_static ? [80] : $resource->ports_exposes_array;
-                        $onlyPort = firstDockerComposeServicePort($service) ?? ($exposedPorts[0] ?? null);
+                        $onlyPort = firstDockerComposeServicePort($service)
+                            ?? ($usesSharedApplicationPort ? ($exposedPorts[0] ?? null) : null);
                         if ($shouldGenerateLabelsExactly) {
                             switch ($server->proxyType()) {
                                 case ProxyTypes::TRAEFIK->value:
