@@ -643,3 +643,69 @@ YAML,
         ->and($labels->contains(fn (string $label): bool => str_contains($label, 'Host(`frontend.example.com`)')))
         ->toBeTrue();
 });
+
+test('applicationParser compose labels prefer the service exposed port over application ports_exposes', function (string $portConfiguration) {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => <<<YAML
+services:
+  frontend:
+    image: myapp/frontend:latest
+{$portConfiguration}
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'frontend' => ['domain' => 'https://frontend.example.com'],
+        ]),
+    ]));
+
+    $labels = collect(data_get(applicationParser($application->fresh()), 'services.frontend.labels'));
+
+    expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8069')))
+        ->toBeTrue()
+        ->and($labels->contains(fn (string $label): bool => str_contains($label, 'reverse_proxy={{upstreams 8069}}')))
+        ->toBeTrue();
+})->with([
+    'expose' => "    expose:\n      - '8069'",
+    'short port syntax' => "    ports:\n      - '18069:8069'",
+    'long port syntax' => "    ports:\n      - target: 8069\n        published: 18069",
+]);
+
+test('applicationParser does not apply an application port to compose services without a declared port', function () {
+    $application = disableExactProxyLabels(Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'ports_exposes' => '3000',
+        'docker_compose_raw' => <<<'YAML'
+services:
+  postgres:
+    image: postgres:16-alpine
+  backend:
+    build: ./backend
+  frontend:
+    build: ./frontend
+YAML,
+        'fqdn' => null,
+        'domain_port_overrides' => null,
+        'docker_compose_domains' => json_encode([
+            'backend' => ['domain' => 'https://api.example.com'],
+            'frontend' => ['domain' => 'https://app.example.com'],
+        ]),
+    ]));
+
+    $services = data_get(applicationParser($application->fresh()), 'services');
+    $backendLabels = collect(data_get($services, 'backend.labels'));
+    $frontendLabels = collect(data_get($services, 'frontend.labels'));
+
+    expect($backendLabels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
+        ->toBeFalse()
+        ->and($frontendLabels->contains(fn (string $label): bool => str_contains($label, '.loadbalancer.server.port=')))
+        ->toBeFalse();
+});

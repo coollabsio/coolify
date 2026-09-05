@@ -459,6 +459,11 @@ class Domains extends Component
         $this->authorize('update', $this->service);
     }
 
+    protected function usesInstanceNetworkAddressesForDnsHints(): bool
+    {
+        return $this->service->server?->id === 0;
+    }
+
     public function checkAllDns(): void
     {
         $this->authorize('update', $this->service);

@@ -1,5 +1,13 @@
 export const MAX_TERMINAL_SESSION_TIMEOUT_SECONDS = 8 * 60 * 60;
 
+const DEFAULT_TERMINAL_PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin';
+
+export function getTerminalProcessEnv(environment = process.env) {
+    return {
+        PATH: environment.PATH || DEFAULT_TERMINAL_PATH,
+    };
+}
+
 export function getTerminalSessionTimeout() {
     return MAX_TERMINAL_SESSION_TIMEOUT_SECONDS;
 }

@@ -307,34 +307,46 @@ class Index extends Component
 
     public function instantSave()
     {
+        $this->authorize('update', $this->serviceDatabase);
         try {
-            $this->authorize('update', $this->serviceDatabase);
-            if ($this->isPublic && ! $this->publicPort) {
-                $this->dispatch('error', 'Public port is required.');
-                $this->isPublic = false;
-
-                return;
-            }
-            $this->syncDatabaseData(true);
-            if ($this->serviceDatabase->is_public) {
-                if (! str($this->serviceDatabase->status)->startsWith('running')) {
-                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
+            if ($this->isPublic) {
+                if (! $this->publicPort) {
+                    $this->dispatch('error', 'Public port is required.');
                     $this->isPublic = false;
-                    $this->serviceDatabase->is_public = false;
 
                     return;
                 }
+                if (! str($this->serviceDatabase->status)->startsWith('running')) {
+                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                    $this->isPublic = false;
+
+                    return;
+                }
+                $this->persistPublicAccess();
                 StartDatabaseProxy::run($this->serviceDatabase);
                 $this->db_url_public = $this->serviceDatabase->getServiceDatabaseUrl();
                 $this->dispatch('success', 'Database is now publicly accessible.');
             } else {
+                $this->persistPublicAccess();
                 StopDatabaseProxy::run($this->serviceDatabase);
                 $this->db_url_public = null;
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
         } catch (\Throwable $e) {
+            $this->isPublic = ! $this->isPublic;
+            $this->persistPublicAccess();
+
             return handleError($e, $this);
         }
+    }
+
+    private function persistPublicAccess(): void
+    {
+        $this->serviceDatabase->update([
+            'is_public' => $this->isPublic,
+            'public_port' => $this->publicPort ?: null,
+            'public_port_timeout' => $this->publicPortTimeout ?: null,
+        ]);
     }
 
     public function submitDatabase()

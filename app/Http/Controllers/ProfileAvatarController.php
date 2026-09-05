@@ -14,7 +14,7 @@ class ProfileAvatarController extends Controller
 
         return response($contents, 200, [
             'Content-Type' => 'image/jpeg',
-            'Cache-Control' => 'private, max-age=300',
+            'Cache-Control' => 'private, max-age=31536000, immutable',
         ]);
     }
 }

@@ -6,9 +6,20 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\BaseModel;
+use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\StandalonePostgresql;
 use App\Notifications\Application\RestartLimitReached;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0, 'fqdn' => 'https://coolify.test']);
+});
 
 function applicationWithRestartState(array $attributes = []): Application
 {
@@ -115,7 +126,7 @@ it('can stop an application without removing its containers', function () {
 
     expect($removeContainers)->not->toBeNull()
         ->and($removeContainers->getDefaultValue())->toBeTrue()
-        ->and($action)->toContain('docker update --restart=no')
+        ->and($action)->not->toContain('docker update --restart=no')
         ->and($action)->toContain('if ($removeContainers)');
 });
 
@@ -161,14 +172,8 @@ it('preserves restart-limit applications only while their exited container exist
         ->and($sentinelJob)->toContain('if ($application->stoppedAfterRestartLimit() && $containerStatuses->every(');
 });
 
-it('uses the application link for restart limit notifications', function () {
-    $application = new class extends Application
-    {
-        public function link()
-        {
-            return 'https://coolify.test/project/link-from-model';
-        }
-    };
+it('builds restart limit notification urls from the instance base url', function () {
+    $application = new Application;
     $application->forceFill([
         'name' => 'crashy-app',
         'uuid' => 'application-uuid',
@@ -183,7 +188,33 @@ it('uses the application link for restart limit notifications', function () {
 
     $notification = new RestartLimitReached($application);
 
-    expect($notification->resource_url)->toBe('https://coolify.test/project/link-from-model');
+    expect($notification->resource_url)->toBe('https://coolify.test/project/project-uuid/environment/environment-uuid/application/application-uuid');
+});
+
+it('links preview, service resource and database restart limit notifications to their pages', function () {
+    $environment = (object) ['uuid' => 'environment-uuid', 'name' => 'production', 'project' => (object) ['uuid' => 'project-uuid']];
+
+    $application = new Application;
+    $application->forceFill(['name' => 'app', 'uuid' => 'application-uuid']);
+    $application->setRelation('environment', $environment);
+    $preview = new ApplicationPreview;
+    $preview->forceFill(['uuid' => 'preview-uuid', 'pull_request_id' => 42, 'restart_count' => 2, 'max_restart_count' => 2]);
+    $preview->setRelation('application', $application);
+
+    $service = new Service;
+    $service->forceFill(['uuid' => 'service-uuid']);
+    $service->setRelation('environment', $environment);
+    $serviceApplication = new ServiceApplication;
+    $serviceApplication->forceFill(['name' => 'database', 'uuid' => 'service-application-uuid', 'restart_count' => 2, 'max_restart_count' => 2]);
+    $serviceApplication->setRelation('service', $service);
+
+    $database = new StandalonePostgresql;
+    $database->forceFill(['name' => 'postgres', 'uuid' => 'database-uuid', 'restart_count' => 2, 'max_restart_count' => 2]);
+    $database->setRelation('environment', $environment);
+
+    expect((new RestartLimitReached($preview))->resource_url)->toBe('https://coolify.test/project/project-uuid/environment/environment-uuid/application/application-uuid')
+        ->and((new RestartLimitReached($serviceApplication))->resource_url)->toBe('https://coolify.test/project/project-uuid/environment/environment-uuid/service/service-uuid')
+        ->and((new RestartLimitReached($database))->resource_url)->toBe('https://coolify.test/project/project-uuid/environment/environment-uuid/database/database-uuid');
 });
 
 it('uses the resolved environment project name in Slack restart limit notifications', function () {

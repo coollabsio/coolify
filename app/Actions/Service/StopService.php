@@ -55,7 +55,6 @@ class StopService
             });
             $dbs->each(function ($database): void {
                 $database->update(['status' => 'exited']);
-                $database->resetRestartLimit();
             });
 
             if ($deleteConnectedNetworks) {

@@ -58,7 +58,16 @@ trait HasNoindexDomains
 
     private function currentDomains(): Collection
     {
-        return collect(ValidationPatterns::applicationDomainList($this->fqdn))
+        $domains = collect(ValidationPatterns::applicationDomainList($this->fqdn));
+        $composeDomains = json_decode((string) ($this->getAttributes()['docker_compose_domains'] ?? null), true);
+
+        if (is_array($composeDomains)) {
+            foreach ($composeDomains as $entry) {
+                $domains->push(...ValidationPatterns::applicationDomainList(composeDomainEntryString($entry)));
+            }
+        }
+
+        return $domains
             ->map(fn (string $domain) => $this->normalizeNoindexDomain($domain));
     }
 

@@ -17,6 +17,7 @@ use App\Notifications\Server\DockerCleanupSuccess;
 use App\Notifications\Server\HighDiskUsage;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\ServerPatchCheck;
+use App\Notifications\Server\TraefikVersionOutdated;
 use App\Notifications\Server\Unreachable;
 
 class TelegramChannel
@@ -50,7 +51,7 @@ class TelegramChannel
             Unreachable::class => $settings->telegram_notifications_server_unreachable_thread_id,
             Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
             ServerPatchCheck::class => $settings->telegram_notifications_server_patch_thread_id,
-
+            TraefikVersionOutdated::class => $settings->telegram_notifications_traefik_outdated_thread_id,
             default => null,
         };
 

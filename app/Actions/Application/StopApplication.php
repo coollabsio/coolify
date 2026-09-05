@@ -44,8 +44,6 @@ class StopApplication
                     $commands = [dockerStopCommand($timeout, $containerName, $server)];
                     if ($removeContainers) {
                         $commands[] = "docker rm -f $containerName";
-                    } else {
-                        array_unshift($commands, "docker update --restart=no $containerName");
                     }
 
                     instant_remote_process(command: $commands, server: $server, throwError: false);
@@ -78,5 +76,7 @@ class StopApplication
         $application->update($status);
 
         ServiceStatusChanged::dispatch($application->environment->project->team->id);
+
+        return null;
     }
 }

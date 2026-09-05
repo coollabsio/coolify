@@ -2673,7 +2673,10 @@ input[type="search"]::-webkit-search-results-decoration {
     }
 
     .volumes-col-backup {
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
     }
 
     .volumes-cell-actions {

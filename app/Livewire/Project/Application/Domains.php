@@ -500,7 +500,7 @@ class Domains extends Component
     {
         $key = $this->domainDnsStatusKey($url, $service);
         $entry = $stored[$key] ?? null;
-        $port = $this->effectiveDomainInternalPort($url);
+        $port = $this->effectiveDomainInternalPort($url, $service);
 
         $row = [
             'url' => $url,
@@ -532,7 +532,7 @@ class Domains extends Component
     /**
      * @return array{internal_port: ?int, has_port_override: bool}
      */
-    protected function effectiveDomainInternalPort(string $url): array
+    protected function effectiveDomainInternalPort(string $url, ?string $service = null): array
     {
         $canonical = DomainPortOverrides::withoutPort($url);
         $overrides = $this->application->domain_port_overrides ?? [];
@@ -557,6 +557,21 @@ class Domains extends Component
         if ($this->application->settings?->is_static) {
             return [
                 'internal_port' => 80,
+                'has_port_override' => false,
+            ];
+        }
+
+        $composePort = dockerComposeServicePort($this->application->docker_compose_raw, $service);
+        if ($composePort !== null) {
+            return [
+                'internal_port' => $composePort,
+                'has_port_override' => false,
+            ];
+        }
+
+        if ($this->isCompose && $service !== null && count($this->composeServices) > 1) {
+            return [
+                'internal_port' => null,
                 'has_port_override' => false,
             ];
         }
@@ -651,6 +666,11 @@ class Domains extends Component
     protected function authorizeUpdateForDomainConnect(): void
     {
         $this->authorize('update', $this->application);
+    }
+
+    protected function usesInstanceNetworkAddressesForDnsHints(): bool
+    {
+        return $this->application->destination?->server?->id === 0;
     }
 
     public function checkAllDns(): void
