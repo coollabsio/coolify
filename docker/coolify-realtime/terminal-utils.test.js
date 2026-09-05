@@ -21,6 +21,23 @@ test('getTerminalProcessEnv preserves the PATH needed by SSH proxy commands', ()
     });
 });
 
+test('getTerminalProcessEnv uses the default PATH when PATH is absent', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        APP_KEY: 'must-not-be-inherited',
+    }), {
+        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    });
+});
+
+test('getTerminalProcessEnv uses the default PATH when PATH is empty', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        PATH: '',
+        APP_KEY: 'must-not-be-inherited',
+    }), {
+        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    });
+});
+
 test('extractTargetHost normalizes quoted IPv4 hosts from generated ssh commands', () => {
     const sshArgs = extractSshArgs(
         "timeout 3600 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ServerAliveInterval=20 -o ConnectTimeout=10 'root'@'10.0.0.5' 'bash -se' << \\\\$abc\necho hi\nabc"
