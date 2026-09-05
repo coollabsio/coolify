@@ -1047,7 +1047,7 @@ it('creates ScheduledTaskExecution with all fillable attributes', function () {
         'finished_at' => now()->toISOString(),
         'started_at' => now()->subMinute()->toISOString(),
         'retry_count' => 0,
-        'duration' => 60.25,
+        'duration' => '60.25',
         'error_details' => null,
     ]);
 
