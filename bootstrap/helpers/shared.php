@@ -3095,6 +3095,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     subId: $savedService->id,
                     subName: $savedService->name,
                     environment: $resource->environment->name,
+                    tags: $resource->tags,
                 );
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (! $isDatabase && $fqdns->count() > 0) {
@@ -4001,7 +4002,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 resourceName: $resource->name,
                 environment: $resource->environment->name,
                 pull_request_id: $pull_request_id,
-                type: 'application'
+                type: 'application',
+                tags: $resource->tags,
             );
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 

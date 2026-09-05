@@ -378,6 +378,23 @@ function get_port_from_dockerfile($dockerfile): ?int
     return null;
 }
 
+function formatTagsForDockerLabel($tags, int $limit = 50): string
+{
+    if (! $tags || $tags->isEmpty()) {
+        return '';
+    }
+
+    return $tags->take($limit)
+        ->pluck('name')
+        ->map(function ($tag) {
+            // Sanitize to only allow characters safe for Docker labels
+            // Allows: alphanumeric, hyphens, underscores, periods, colons, forward slashes
+            return preg_replace('/[^a-zA-Z0-9\-_.:\/]/', '', $tag);
+        })
+        ->filter() // Remove empty strings after sanitization
+        ->implode(' ');
+}
+
 function defaultDatabaseLabels($database)
 {
     $labels = collect([]);
@@ -390,10 +407,15 @@ function defaultDatabaseLabels($database)
     $labels->push('coolify.environmentName='.Str::slug($database->environment->name));
     $labels->push('coolify.database.subType='.$database->type());
 
+    $tagsLabel = formatTagsForDockerLabel($database->tags ?? collect());
+    if ($tagsLabel) {
+        $labels->push('coolify.tags='.$tagsLabel);
+    }
+
     return $labels;
 }
 
-function defaultLabels($id, $name, string $projectName, string $resourceName, string $environment, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null, $subName = null)
+function defaultLabels($id, $name, string $projectName, string $resourceName, string $environment, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null, $subName = null, $tags = null)
 {
     $labels = collect([]);
     $labels->push('coolify.managed=true');
@@ -411,6 +433,13 @@ function defaultLabels($id, $name, string $projectName, string $resourceName, st
         $subId && $labels->push('coolify.service.subId='.$subId);
         $subType && $labels->push('coolify.service.subType='.$subType);
         $subName && $labels->push('coolify.service.subName='.Str::slug($subName));
+    }
+
+    if ($tags) {
+        $tagsLabel = formatTagsForDockerLabel($tags);
+        if ($tagsLabel) {
+            $labels->push('coolify.tags='.$tagsLabel);
+        }
     }
 
     return $labels;
