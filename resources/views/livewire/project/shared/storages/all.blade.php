@@ -21,10 +21,10 @@
                 <span class="volumes-col-source">Source Path</span>
                 <span>Destination Path</span>
                 @if ($supportsPreviewSuffix)
-                    <span class="volumes-col-pr"
-                        title="Whether preview deployments receive an isolated -pr-N volume suffix.">
-                        PR suffix
-                    </span>
+                    <div class="volumes-col-pr flex items-center gap-1.5">
+                        <span>PR suffix</span>
+                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                    </div>
                 @endif
                 <span class="volumes-col-backup text-center">Backup</span>
                 @if ($showActionsColumn)
@@ -74,7 +74,10 @@
 
                             @if ($supportsPreviewSuffix)
                                 <div class="volumes-col-pr min-w-0">
-                                    <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
+                                    <div class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">
+                                        <span>PR suffix</span>
+                                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                                    </div>
                                     <span>{{ $form['isPreviewSuffixEnabled'] ? 'Add suffix' : 'Share volume' }}</span>
                                 </div>
                             @endif
@@ -82,16 +85,22 @@
                             <div class="volumes-col-backup flex items-center justify-center gap-1.5">
                                 <span class="volumes-mobile-label volumes-field-label">Backup</span>
                                 @if ($hasEnabledBackup)
-                                    <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="2" stroke="currentColor" class="size-4">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                        </svg>
-                                    </a>
-                                    <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
-                                        title="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
-                                        {{ $hasS3Backup ? 'S3' : 'Local' }}
-                                    </span>
+                                    @if ($backupUrl)
+                                        <a href="{{ $backupUrl }}" @class([
+                                            'table-badge underline-offset-2 hover:underline',
+                                            'table-badge-success' => $hasS3Backup,
+                                        ])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </a>
+                                    @else
+                                        <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </span>
+                                    @endif
                                 @else
                                     <span class="data-table-cell-dash">-</span>
                                 @endif
@@ -103,10 +112,10 @@
                                     @if ($canUpdate)
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
-                                                <button type="button" class="icon-button" title="Configure backup"
-                                                    aria-label="Configure backup">
-                                                    <x-reicon name="database" class="size-4" />
-                                                </button>
+                                                <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
+                                                    :canResource="$resource">
+                                                    Backup
+                                                </x-forms.button>
                                             </x-slot:content>
                                             @if ($resource instanceof \App\Models\Application)
                                                 <livewire:project.application.backup.create :application="$resource"
@@ -165,27 +174,36 @@
 
                             @if ($supportsPreviewSuffix)
                                 <div class="volumes-col-pr min-w-0">
-                                    <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
-                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" :options="[
+                                    <div class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">
+                                        <span>PR suffix</span>
+                                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                                    </div>
+                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal :options="[
                                         ['value' => true, 'label' => 'Add suffix'],
                                         ['value' => false, 'label' => 'Share volume'],
-                                    ]" />
+                                    ]" canGate="update" :canResource="$resource" />
                                 </div>
                             @endif
 
                             <div class="volumes-col-backup flex items-center justify-center gap-1.5">
                                 <span class="volumes-mobile-label volumes-field-label">Backup</span>
                                 @if ($hasEnabledBackup)
-                                    <a @if ($backupUrl) href="{{ $backupUrl }}" @endif title="Volume backup is enabled">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                            stroke-width="2" stroke="currentColor" class="size-4">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                        </svg>
-                                    </a>
-                                    <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
-                                        title="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
-                                        {{ $hasS3Backup ? 'S3' : 'Local' }}
-                                    </span>
+                                    @if ($backupUrl)
+                                        <a href="{{ $backupUrl }}" @class([
+                                            'table-badge underline-offset-2 hover:underline',
+                                            'table-badge-success' => $hasS3Backup,
+                                        ])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </a>
+                                    @else
+                                        <span @class(['table-badge', 'table-badge-success' => $hasS3Backup])
+                                            title="Volume backup is enabled"
+                                            aria-label="{{ $hasS3Backup ? 'Backups are saved to S3' : 'Backups are stored locally only' }}">
+                                            {{ $hasS3Backup ? 'S3' : 'Local' }}
+                                        </span>
+                                    @endif
                                 @else
                                     <span class="data-table-cell-dash">-</span>
                                 @endif
@@ -200,10 +218,10 @@
                                 @if ($showBackupAction)
                                     <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <button type="button" class="icon-button" title="Configure backup"
-                                                aria-label="Configure backup">
-                                                <x-reicon name="database" class="size-4" />
-                                            </button>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
+                                                :canResource="$resource">
+                                                Backup
+                                            </x-forms.button>
                                         </x-slot:content>
                                         @if ($resource instanceof \App\Models\Application)
                                             <livewire:project.application.backup.create :application="$resource"
@@ -218,10 +236,10 @@
                                 @elseif (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable())
                                     <x-modal-input title="New Scheduled Backup" :wireIgnore="false">
                                         <x-slot:content>
-                                            <button type="button" class="icon-button" title="Configure backup"
-                                                aria-label="Configure backup">
-                                                <x-reicon name="database" class="size-4" />
-                                            </button>
+                                            <x-forms.button type="button" class="!px-2.5 !text-xs" canGate="update"
+                                                :canResource="$resource">
+                                                Backup
+                                            </x-forms.button>
                                         </x-slot:content>
                                         <livewire:project.database.create-scheduled-backup :database="$resource"
                                             wire:key="configure-database-backup-{{ $id }}" />
