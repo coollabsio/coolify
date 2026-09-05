@@ -358,6 +358,21 @@ function parseDockerVolumeString(string $volumeString): array
     ];
 }
 
+/**
+ * Checks if a top-level volume definition is marked as external.
+ * Supports `external: true`, `external: "true"` and the legacy `external: { name: ... }` format.
+ */
+function isExternalVolume(mixed $topLevelVolume): bool
+{
+    $external = data_get($topLevelVolume, 'external');
+
+    if (is_array($external)) {
+        return filled(data_get($external, 'name'));
+    }
+
+    return filter_var($external, FILTER_VALIDATE_BOOLEAN);
+}
+
 function addTraefikDockerNetworkLabel(Collection $labels, string $network): Collection
 {
     $hasUserDefinedNetwork = $labels->contains(
@@ -854,6 +869,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 } elseif ($type->value() === 'volume') {
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
+                        if (isExternalVolume($temp)) {
+                            // External volumes are owned outside of Coolify, so the name is kept
+                            // as-is and no persistent storage is tracked for them.
+                            $volumesParsed->put($index, $volume);
+
+                            continue;
+                        }
                         if (data_get($temp, 'driver_opts.type') === 'cifs') {
                             continue;
                         }
@@ -2244,6 +2266,13 @@ function serviceParser(Service $resource): Collection
                 } elseif ($type->value() === 'volume') {
                     if ($topLevel->get('volumes')->has($source->value())) {
                         $temp = $topLevel->get('volumes')->get($source->value());
+                        if (isExternalVolume($temp)) {
+                            // External volumes are owned outside of Coolify, so the name is kept
+                            // as-is and no persistent storage is tracked for them.
+                            $volumesParsed->put($index, $volume);
+
+                            continue;
+                        }
                         if (data_get($temp, 'driver_opts.type') === 'cifs') {
                             continue;
                         }
