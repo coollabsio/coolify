@@ -1047,14 +1047,15 @@ it('creates ScheduledTaskExecution with all fillable attributes', function () {
         'finished_at' => now()->toISOString(),
         'started_at' => now()->subMinute()->toISOString(),
         'retry_count' => 0,
-        'duration' => 60,
+        'duration' => 60.25,
         'error_details' => null,
     ]);
 
     expect($execution->exists)->toBeTrue();
     expect($execution->scheduled_task_id)->toBe($task->id);
     expect($execution->status)->toBe('success');
-    expect((float) $execution->duration)->toBe(60.0);
+    expect($execution->duration)->toBe(60.25);
+    expect($execution->toArray()['duration'])->toBe(60.25);
     expect($execution->retry_count)->toBe(0);
 });
 
