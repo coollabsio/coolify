@@ -372,8 +372,8 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         $destination = 'temporary/'.$s3->bucket.$backupLocation;
         $streamScript = 'set -o pipefail; mc alias set'.$resolveOptions.' temporary '
             .escapeshellarg($s3->endpoint).' '.escapeshellarg($s3->key).' '.escapeshellarg($s3->secret)
-            .' >/dev/null; '.$archiveScript.' | mc pipe --quiet'.$resolveOptions.' '.escapeshellarg($destination).' >/dev/null'
-            .'; mc stat --json'.$resolveOptions.' '.escapeshellarg($destination)
+            .' >/dev/null && ('.$archiveScript.' | mc pipe --quiet'.$resolveOptions.' '.escapeshellarg($destination).' >/dev/null)'
+            .' && mc stat --json'.$resolveOptions.' '.escapeshellarg($destination)
             .' | sed -n '.escapeshellarg('s/.*"size":\([0-9][0-9]*\).*/\1/p');
 
         return 'docker run --rm --name '.escapeshellarg($containerName)
