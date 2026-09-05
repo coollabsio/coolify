@@ -19,6 +19,11 @@ class StatusInfo extends Component
         return 'Mongo';
     }
 
+    protected function sslPemKeyFileRequired(): bool
+    {
+        return true;
+    }
+
     protected function sslModeOptions(): array
     {
         return [
