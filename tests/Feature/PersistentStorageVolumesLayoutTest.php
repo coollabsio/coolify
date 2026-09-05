@@ -161,6 +161,16 @@ it('renders volumes as a data table with shared column headers', function () {
         ->not->toContain('font-mono')
         ->not->toContain('Service volume mounts are read-only here.');
 
+    expect($allView)
+        ->toContain('<x-forms.button type="button" class="!px-2.5 !text-xs">')
+        ->toContain('Backup')
+        ->not->toContain('<x-reicon name="database" class="size-4" />');
+
+    expect($allView)
+        ->toContain('<x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />')
+        ->toContain('volumes-col-pr flex items-center gap-1.5')
+        ->toContain('volumes-mobile-label volumes-field-label flex items-center gap-1.5');
+
     // Show remains available for isolated embeds/tests but is no longer nested from All.
     expect($showView)
         ->toContain('data-table-row')
@@ -214,6 +224,14 @@ it('renders volumes as a data table with shared column headers', function () {
     // Settings form labels are 13px (not Tailwind text-sm 14px).
     expect($css)
         ->toMatch('/\.application-settings-form label\s*\{[^}]*font-size:\s*13px/s');
+});
+
+it('renders the PR suffix listbox outside the table overflow container', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+
+    expect($view)->toContain(
+        '<x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal :options="['
+    );
 });
 
 it('creates and exposes volume backups for service storage', function () {
