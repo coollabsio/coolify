@@ -4,12 +4,22 @@ import {
     MAX_TERMINAL_SESSION_TIMEOUT_SECONDS,
     extractSshArgs,
     extractTargetHost,
+    getTerminalProcessEnv,
     getTerminalSessionTimeout,
     isAuthorizedTargetHost,
     normalizeHostForAuthorization,
     sanitizeSshArgs,
     validateSshArgs,
 } from './terminal-utils.js';
+
+test('getTerminalProcessEnv preserves the PATH needed by SSH proxy commands', () => {
+    assert.deepEqual(getTerminalProcessEnv({
+        PATH: '/usr/local/bin:/usr/bin:/bin',
+        APP_KEY: 'must-not-be-inherited',
+    }), {
+        PATH: '/usr/local/bin:/usr/bin:/bin',
+    });
+});
 
 test('extractTargetHost normalizes quoted IPv4 hosts from generated ssh commands', () => {
     const sshArgs = extractSshArgs(
