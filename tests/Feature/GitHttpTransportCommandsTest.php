@@ -134,3 +134,29 @@ it('applies http 1 transport to custom bitbucket pull request checkout', functio
     expect($result['commands'])
         ->toContain("git -c http.version=HTTP/1.1 checkout 'abc123def456abc123def456abc123def456abc1'");
 });
+
+it('omits http 1 transport when COOLIFY_DISABLE_GIT_HTTP11 is set', function () {
+    putenv('COOLIFY_DISABLE_GIT_HTTP11=true');
+    try {
+        $application = applicationWithGitSettings();
+
+        $source = new GithubApp;
+        $source->forceFill([
+            'html_url' => 'https://github.com',
+            'api_url' => 'https://api.github.com',
+            'is_public' => true,
+        ]);
+        $application->setRelation('source', $source);
+
+        $result = $application->generateGitImportCommands(
+            deployment_uuid: 'test-deployment',
+            exec_in_docker: false,
+        );
+
+        expect($result['commands'])
+            ->not->toContain('http.version=HTTP/1.1')
+            ->toContain("git clone --depth=1 -b 'main' 'https://github.com/coollabsio/private-app' '/artifacts/test-deployment'");
+    } finally {
+        putenv('COOLIFY_DISABLE_GIT_HTTP11');
+    }
+});
