@@ -2267,18 +2267,18 @@ class Application extends BaseModel
 
     public function parseContainerLabels(?ApplicationPreview $preview = null)
     {
-        $customLabels = data_get($this, 'custom_labels');
-        if (! $customLabels) {
+        $storedLabels = data_get($this, 'custom_labels');
+        if (! $storedLabels) {
             return;
         }
-        if (base64_encode(base64_decode($customLabels, true)) !== $customLabels) {
-            $this->custom_labels = str($customLabels)->replace(',', "\n");
-            $this->custom_labels = base64_encode($customLabels);
-        }
-        $customLabels = base64_decode($this->custom_labels);
-        if (mb_detect_encoding($customLabels, 'UTF-8', true) === false) {
+
+        $customLabels = decodeBase64EncodedLabels($storedLabels);
+        if ($customLabels === null && ! isBase64Encoded($storedLabels)) {
+            $customLabels = str($storedLabels)->replace(',', "\n")->value();
+        } elseif ($customLabels === null) {
             $customLabels = str(implode('|coolify|', generateLabelsApplication($this, $preview)))->replace('|coolify|', "\n");
         }
+
         $this->custom_labels = base64_encode($customLabels);
         $this->save();
 
