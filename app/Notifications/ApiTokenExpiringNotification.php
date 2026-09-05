@@ -100,4 +100,16 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
             color: SlackMessage::warningColor(),
         );
     }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => "API token '{$this->tokenName}' expires on {$this->expiresAt}. Rotate this token before it expires to avoid API outages.",
+            'event' => 'api_token_expiring',
+            'token_name' => $this->tokenName,
+            'expires_at' => $this->expiresAt,
+            'url' => $this->manageUrl,
+        ];
+    }
 }
