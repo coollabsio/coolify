@@ -6,6 +6,8 @@ use App\Jobs\VolumeBackupJob;
 use App\Jobs\VolumeBackupRecoveryJob;
 use App\Livewire\Project\Application\Backup\Create as CreateScheduledVolumeBackup;
 use App\Livewire\Project\Service\FileStorage;
+use App\Livewire\Project\Service\VolumeBackup\Create as CreateServiceVolumeBackup;
+use App\Livewire\Project\Service\VolumeBackup\Index as ServiceVolumeBackupIndex;
 use App\Livewire\Project\Shared\Storages\Show;
 use App\Livewire\Project\Shared\Storages\VolumeBackups;
 use App\Models\Application;
@@ -20,10 +22,12 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -42,6 +46,14 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 uses(RefreshDatabase::class);
 
+it('types service backup S3 storage state as a nullable Eloquent collection', function () {
+    $property = new ReflectionProperty(ServiceVolumeBackupIndex::class, 's3s');
+
+    expect($property->getType()?->getName())->toBe(Collection::class)
+        ->and($property->getType()?->allowsNull())->toBeTrue()
+        ->and($property->getDefaultValue())->toBeNull();
+});
+
 it('provides the volume backup domain classes and relationship', function () {
     expect(class_exists(ScheduledVolumeBackup::class))->toBeTrue()
         ->and(class_exists(ScheduledVolumeBackupExecution::class))->toBeTrue()
@@ -49,6 +61,43 @@ it('provides the volume backup domain classes and relationship', function () {
         ->and(class_exists(VolumeBackups::class))->toBeTrue()
         ->and(method_exists(LocalPersistentVolume::class, 'scheduledBackups'))->toBeTrue()
         ->and(method_exists(LocalFileVolume::class, 'scheduledBackups'))->toBeTrue();
+});
+
+it('allows large volume backups to run for ten hours by default', function () {
+    $backup = new ScheduledVolumeBackup;
+    $job = new VolumeBackupJob($backup);
+
+    expect($job->timeout)->toBe(36000)
+        ->and((new VolumeBackups)->timeout)->toBe(36000)
+        ->and(config('horizon.defaults.s6.timeout'))->toBeGreaterThan($job->timeout)
+        ->and(config('queue.connections.redis.retry_after'))->toBeGreaterThan(config('horizon.defaults.s6.timeout'));
+});
+
+it('changes the default volume backup timeout without changing existing timeouts', function () {
+    $team = Team::factory()->create();
+    [$application, $defaultVolume] = createVolumeBackupApplication($team);
+    $customVolume = LocalPersistentVolume::create([
+        'name' => 'custom-timeout-data',
+        'mount_path' => '/custom-data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+    $defaultBackup = $defaultVolume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'timeout' => 3600,
+    ]);
+    $customBackup = $customVolume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        'timeout' => 7200,
+    ]);
+
+    $migration = require database_path('migrations/2026_08_15_000000_increase_default_volume_backup_timeout.php');
+    $migration->up();
+
+    expect($defaultBackup->fresh()->timeout)->toBe(3600)
+        ->and($customBackup->fresh()->timeout)->toBe(7200);
 });
 
 it('includes parallel gzip support in the Coolify helper image', function () {
@@ -150,6 +199,45 @@ it('creates a scheduled backup with a preselected volume from the shared modal',
         ->and($backup->s3_storage_id)->toBeNull();
 });
 
+it('shows readable service storage backup target labels', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application] = createVolumeBackupApplication($team);
+    $service = Service::factory()->create([
+        'environment_id' => $application->environment_id,
+        'destination_id' => $application->destination_id,
+        'destination_type' => $application->destination_type,
+    ]);
+    $resource = ServiceApplication::create([
+        'uuid' => new_public_id(),
+        'name' => 'directus',
+        'service_id' => $service->id,
+    ]);
+    LocalPersistentVolume::create([
+        'name' => $service->uuid.'_directus-templates',
+        'mount_path' => '/directus/templates',
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ]);
+    LocalFileVolume::unguarded(fn () => LocalFileVolume::withoutEvents(fn () => LocalFileVolume::create([
+        'uuid' => new_public_id(),
+        'fs_path' => './uploads',
+        'mount_path' => '/directus/uploads',
+        'is_directory' => true,
+        'is_based_on_git' => false,
+        'is_preview_suffix_enabled' => true,
+        'resource_id' => $resource->id,
+        'resource_type' => $resource->getMorphClass(),
+    ])));
+
+    Livewire::test(CreateServiceVolumeBackup::class, ['service' => $service])
+        ->assertSet('targets.0.name', 'directus-templates')
+        ->assertSet('targets.0.type', 'Directus')
+        ->assertSet('targets.1.name', './uploads (directory)')
+        ->assertSet('targets.1.type', 'Directus')
+        ->assertSee('Directus: directus-templates');
+});
+
 it('handles scheduled backup persistence failures', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);
@@ -220,6 +308,18 @@ it('creates a scheduled backup for a preselected application directory', functio
         ->assertDispatched('success');
 
     expect(ScheduledVolumeBackup::query()->sole()->backupable->is($directory))->toBeTrue();
+});
+
+it('renders the backup form for an application with only a directory target', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $volume->delete();
+    $directory = createApplicationBackupDirectory($application);
+
+    Livewire::test(CreateScheduledVolumeBackup::class, ['application' => $application])
+        ->assertSet('targetKey', 'directory:'.$directory->id)
+        ->assertSuccessful();
 });
 
 it('rejects files and directory mounts owned by another application as backup targets', function () {

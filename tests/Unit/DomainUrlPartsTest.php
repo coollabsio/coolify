@@ -28,3 +28,8 @@ it('defaults empty values for an invalid URL', function () {
 it('preserves an explicitly configured default port', function () {
     expect(DomainUrlParts::split('https://app.example.com:443')['port'])->toBe('443');
 });
+
+it('composes a domain when Livewire hydrates an empty numeric port as null', function () {
+    expect(DomainUrlParts::compose('https', 'app.example.com', null))
+        ->toBe('https://app.example.com');
+});

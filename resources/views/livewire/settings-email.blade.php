@@ -4,11 +4,11 @@
     </x-slot>
 
     <x-settings.layout>
-    <div class="application-settings-form mx-auto flex w-full max-w-[1180px] min-w-0 flex-col gap-6">
+    <div class="application-settings-form mx-auto flex w-full max-w-none min-w-0 flex-col gap-6">
         {{-- One bar for the whole page. Three stacked bars made Save run
              submitResend(), which required an API key even when Resend was off. --}}
         <x-unsaved-bar action="submit"
-            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,resendApiKey" />
+            targets="smtpFromName,smtpFromAddress,smtpHost,smtpPort,smtpEncryption,smtpUsername,smtpPassword,smtpTimeout,smtpEhloDomain,resendApiKey" />
 
         <form wire:submit="submit">
             <x-application.settings-section title="Sender">
@@ -48,6 +48,9 @@
                         autocomplete="new-password" />
                     <x-forms.input id="smtpTimeout" type="number"
                         helper="Maximum delivery time in seconds." label="Timeout" />
+                    <x-forms.input id="smtpEhloDomain" placeholder="coolify.example.com"
+                        helper="Fully qualified domain sent in the SMTP EHLO command. Uses the system default when empty."
+                        label="EHLO domain" />
                 </div>
             </x-application.settings-section>
         </form>

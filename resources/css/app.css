@@ -373,24 +373,24 @@ tr td:first-child {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
 
-/* Loading feedback uses the Coolify brand accent consistently in dark mode. */
+/* Loading feedback uses the higher-contrast warning accent in dark mode. */
 .dark .animate-spin {
-    color: var(--color-coollabs) !important;
+    color: var(--color-warning) !important;
 }
 
 .dark #nprogress .bar {
-    background: var(--color-coollabs) !important;
+    background: var(--color-warning) !important;
 }
 
 .dark #nprogress .peg {
     box-shadow:
-        0 0 10px var(--color-coollabs),
-        0 0 5px var(--color-coollabs) !important;
+        0 0 10px var(--color-warning),
+        0 0 5px var(--color-warning) !important;
 }
 
 .dark #nprogress .spinner-icon {
-    border-top-color: var(--color-coollabs) !important;
-    border-left-color: var(--color-coollabs) !important;
+    border-top-color: var(--color-warning) !important;
+    border-left-color: var(--color-warning) !important;
 }
 
 html[data-theme="custom"] .loading-indicator,
@@ -398,9 +398,12 @@ html[data-theme="custom"] .animate-spin {
     color: var(--theme-bright-color) !important;
 }
 
-/* Opt out of the brand spinner when the surrounding surface is a selected/neutral control. */
+/* Opt out of the brand spinner when the surrounding surface is a selected/neutral control
+   or a highlighted button, whose accent surface would camouflage a brand-colored spinner. */
 .dark .animate-spin.spinner-current,
-html[data-theme="custom"] .animate-spin.spinner-current {
+html[data-theme="custom"] .animate-spin.spinner-current,
+html[data-theme="custom"] .button-highlighted .animate-spin,
+html[data-theme="custom"] button[isHighlighted] .animate-spin {
     color: inherit !important;
 }
 
@@ -993,8 +996,7 @@ html[data-theme="custom"] {
 }
 
 html[data-theme="custom"] .control-selected,
-html[data-theme="custom"] .logs-viewer-btn-active,
-html[data-theme="custom"] .button-highlighted:hover {
+html[data-theme="custom"] .logs-viewer-btn-active {
     color: var(--color-accent-foreground);
 }
 
@@ -1905,7 +1907,13 @@ html[data-theme="custom"] textarea:disabled {
 
 .listbox-trigger:disabled {
     cursor: not-allowed;
-    opacity: 0.5;
+    background-color: var(--color-neutral-100);
+    color: var(--color-neutral-400);
+}
+
+.dark .listbox-trigger:disabled {
+    background-color: color-mix(in oklab, var(--color-white) 3%, transparent);
+    color: var(--color-fg-faint);
 }
 
 .listbox-trigger:focus-visible {
@@ -1937,6 +1945,21 @@ html[data-theme="custom"] textarea:disabled {
     border: 1px solid var(--coollabs-line);
     background: var(--coollabs-recessed);
     box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 767px) {
+    /* The mobile top bar's backdrop filter makes it the containing block for
+       fixed descendants. Keep this menu anchored below its trigger instead
+       of centering it within the short top bar. */
+    .listbox-panel.top-user-menu-panel {
+        position: absolute !important;
+        top: calc(100% + 0.25rem) !important;
+        right: 0 !important;
+        left: auto !important;
+        max-height: calc(100dvh - 4.5rem) !important;
+        overflow-y: auto !important;
+        transform: none !important;
+    }
 }
 
 .listbox-option {
@@ -2098,7 +2121,45 @@ input[type="search"]::-webkit-search-results-decoration {
     width: 100%;
 }
 
+.validation-installation-logs {
+    border: 1px solid var(--coollabs-fill);
+}
+
+.checkpoint-scroll-fade::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 2rem;
+    background: linear-gradient(to left, var(--coollabs-base), transparent);
+    pointer-events: none;
+}
+
+@media (max-width: 639px) {
+    .process-dialog-mobile-fullscreen {
+        height: 100dvh !important;
+        min-height: 100dvh;
+        max-height: 100dvh;
+        border-radius: 0;
+        box-shadow: inset 0 0 0 1px var(--coollabs-hairline) !important;
+    }
+
+    .process-dialog-mobile-fullscreen .process-dialog-body {
+        border-radius: 0;
+    }
+}
+
 /* Data table (layer-card body, full-bleed) */
+.data-table {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
 .data-table-header {
     display: grid;
     align-items: center;
@@ -2460,8 +2521,25 @@ input[type="search"]::-webkit-search-results-decoration {
 }
 
 .service-backup-table-grid {
-    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr);
-    min-width: 45rem;
+    grid-template-columns: minmax(10rem, 1.7fr) 6rem minmax(7rem, 0.8fr) 7.5rem 6.5rem minmax(8rem, 1fr) 7.5rem;
+    width: 100%;
+}
+
+.data-table-row.service-backup-table-grid {
+    background: var(--coollabs-base);
+    border-bottom: 1px solid var(--coollabs-fill);
+}
+
+.data-table-row.service-backup-table-grid:last-child {
+    border-bottom: 0;
+}
+
+.data-table-row.service-backup-table-grid:hover {
+    background: color-mix(in srgb, var(--coollabs-base) 98%, black);
+}
+
+.dark .data-table-row.service-backup-table-grid:hover {
+    background: color-mix(in srgb, var(--coollabs-base) 98%, white);
 }
 
 /* Persistent storage volumes: Name | Source | Destination | [PR suffix] | Backup | [Actions] */
@@ -2690,6 +2768,14 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: 6.5rem minmax(7rem, 0.8fr) minmax(14rem, 1.5fr) 7rem 5rem 4rem minmax(8rem, 1fr) 5rem;
     gap: 0.75rem;
     min-width: 66rem;
+}
+
+.backup-executions-table-scroll {
+    overflow-x: auto;
+}
+
+.backup-execution-row:last-child > .data-table-row {
+    border-bottom: 0;
 }
 
 .volume-backup-executions-grid {
@@ -3084,7 +3170,6 @@ html[data-theme="custom"] .logs-viewer-timestamp {
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
-    isolation: isolate;
 }
 
 .logs-viewer-actions::-webkit-scrollbar {

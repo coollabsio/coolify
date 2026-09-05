@@ -1,4 +1,4 @@
-<div class="application-settings-form w-full max-w-[1180px]">
+<div class="application-settings-form w-full max-w-none">
     <x-slot:title>
         Subscribe | Coolify
     </x-slot>

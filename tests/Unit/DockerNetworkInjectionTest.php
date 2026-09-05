@@ -27,6 +27,14 @@ it('StandaloneDocker accepts valid network names', function (string $network) {
     'alphanumeric' => 'network123',
 ]);
 
+it('creates standalone destinations with a bridge network', function () {
+    $model = new StandaloneDocker;
+    $model->network = 'test-network';
+
+    expect($model->networkCreateCommand())
+        ->toBe("docker network inspect 'test-network' >/dev/null 2>&1 || docker network create --attachable 'test-network' >/dev/null");
+});
+
 it('SwarmDocker rejects network names with shell metacharacters', function (string $network) {
     $model = new SwarmDocker;
     $model->network = $network;

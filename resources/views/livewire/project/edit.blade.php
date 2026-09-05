@@ -1,6 +1,6 @@
 <div>
     <x-slot:title>{{ data_get_str($project, 'name')->limit(10) }} > Edit | Coolify</x-slot>
-    <div class="w-full max-w-[1180px]">
+    <div class="w-full max-w-none">
         <header class="mb-5">
             <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $project->name }}</h1>
             <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">Project settings</p>
@@ -65,7 +65,7 @@
                 <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
                     <img x-cloak x-show="preview" :src="preview" alt="Project icon preview" class="h-full w-full object-cover">
                     @if ($project->icon_path)
-                        <img x-show="!preview" src="{{ route('project.icon', ['project_uuid' => $project->uuid, 'v' => $project->updated_at->timestamp]) }}"
+                        <img x-show="!preview" src="{{ project_icon_url($project) }}"
                             alt="{{ $project->name }} icon" class="h-full w-full object-cover">
                     @else
                         <x-reicon x-show="!preview" name="projects" class="size-6" />

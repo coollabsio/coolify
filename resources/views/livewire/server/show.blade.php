@@ -7,7 +7,7 @@
     <livewire:server.navbar :server="$server" />
 
     <div
-        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-[1180px] min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-10">
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
         <x-server.sidebar :server="$server" activeMenu="general" />
         <div class="w-full min-w-0">
             @if ($server->isLocalhost())
@@ -184,7 +184,7 @@
                                 </div>
                             @endif
 
-                            <x-process-dialog closeWithX size="xl" :open="$isValidating">
+                            <x-process-dialog closeWithX mobileFullscreen size="xl" :open="$isValidating">
                                 <x-slot:title>Validate and configure</x-slot:title>
                                 <x-slot:content>
                                     <livewire:server.validate-and-install :server="$server"

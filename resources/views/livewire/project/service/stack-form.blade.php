@@ -14,7 +14,7 @@
                         <x-slot:headerActions>
                             <div x-data="{ preview: false, validating: false, saving: false }"
                                 @compose-validate-finished.window="validating = false"
-                                @compose-save-finished.window="saving = false" class="flex items-center gap-2">
+                                @compose-save-finished.window="saving = false" class="flex w-full items-center gap-2 overflow-x-auto sm:w-auto">
                                 <x-forms.button
                                     @click="preview = !preview; $dispatch('compose-preview-toggle')">
                                     <x-reicon name="eye" class="size-3.5" />
@@ -52,7 +52,7 @@
 
     <x-application.settings-section title="Network"
         description="Control whether this Compose stack joins Coolify's predefined network.">
-        <x-forms.listbox id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
+        <x-forms.listbox canGate="update" :canResource="$service" id="connectToDockerNetwork" label="Network attachment" live onChange="instantSave"
             :disabled="! auth()->user()->can('update', $service)" :options="[
                 ['value' => false, 'label' => 'Use the stack network only'],
                 ['value' => true, 'label' => 'Connect to the predefined Coolify network'],

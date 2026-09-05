@@ -20,17 +20,12 @@
                     </div>
 
                     <div class="flex shrink-0 items-center gap-2">
-                        <div class="relative" @click.outside="filterOpen = false">
-                            <button type="button" class="button" @click="filterOpen = !filterOpen"
-                                aria-haspopup="listbox" aria-controls="resource-type-filter-options"
-                                :aria-expanded="filterOpen">
+                        <x-table.dropdown panel-class="w-48!">
+                            <x-slot:trigger><button type="button" class="button"
+                                aria-haspopup="listbox" :aria-expanded="open">
                                 <x-reicon name="filter" class="size-3.5" />
                                 Filter
-                            </button>
-                            <div id="resource-type-filter-options" x-show="filterOpen" x-cloak
-                                x-transition.opacity.duration.120ms role="listbox" aria-label="Resource type"
-                                @keydown.escape.stop="filterOpen = false; $el.previousElementSibling.focus()"
-                                class="listbox-panel left-auto! right-0! z-[90]! min-w-48!">
+                            </button></x-slot:trigger>
                                 <div
                                     class="px-2 py-1 text-[10px] font-semibold tracking-wide text-neutral-400 uppercase dark:text-fg-faint">
                                     Resource type
@@ -38,14 +33,13 @@
                                 <template x-for="option in resourceTypeOptions" :key="option.value">
                                     <button type="button" class="listbox-option" role="option"
                                         :aria-selected="resourceType === option.value"
-                                        @click="resourceType = option.value; filterOpen = false">
+                                        @click="resourceType = option.value; close()">
                                         <span x-text="option.label"></span>
                                         <x-reicon name="check-circle" class="size-3.5 text-accent"
                                             x-show="resourceType === option.value" />
                                     </button>
                                 </template>
-                            </div>
-                        </div>
+                        </x-table.dropdown>
 
                         <div class="relative w-48" @click.outside="closeCategoryFilter()">
                             <button type="button" class="listbox-trigger"
@@ -293,15 +287,8 @@
                                     <div class="flex min-w-0 items-start gap-3">
                                         <div
                                             class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50 dark:border-white/[0.08] dark:bg-white/[0.04]">
-                                            <template x-if="service.has_logo">
-                                                <img class="h-full w-full object-contain p-2" :src="service.logo"
-                                                    onerror="this.onerror=null; this.src=this.getAttribute('data-fallback');"
-                                                    :data-fallback="service.logo_github_url" />
-                                            </template>
-                                            <template x-if="!service.has_logo">
-                                                <x-reicon name="layers"
-                                                    class="size-6 text-neutral-400 dark:text-fg-faint" />
-                                            </template>
+                                            <img class="h-full w-full object-contain p-2" :src="service.logo"
+                                                x-on:error="if (!$el.dataset.cdnTried) { $el.dataset.cdnTried = 'true'; $el.src = service.logo_cdn_url; } else if (!$el.dataset.defaultTried) { $el.dataset.defaultTried = 'true'; $el.src = service.logo_default_url; }" />
                                         </div>
                                         <div class="min-w-0 flex-1">
                                             <h3 class="truncate text-[13px] font-semibold text-black dark:text-fg"

@@ -57,6 +57,10 @@
                 <div class="space-y-4">
             @if ($resourceDbType === 'standalone-postgresql')
                 @if ($dumpAll)
+                            <x-callout type="warning" title="Full restore overwrites administrator passwords">
+                                The backup replaces PostgreSQL administrator role passwords, including the destination administrator password.
+                                <span class="mt-1 block">If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
+                            </x-callout>
                             <x-forms.textarea rows="6" readonly label="Import command"
                                 wire:model="restoreCommandText" canGate="update"
                                 :canResource="$this->resource" />

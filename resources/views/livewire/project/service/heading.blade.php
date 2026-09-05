@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $servicePageItems = [
             [
@@ -42,6 +42,13 @@
         ));
 
         $serviceStatus = str($service->status ?? 'exited');
+        $selectedResourceUuid = data_get($parameters, 'stack_service_uuid');
+        $selectedResource = $selectedResourceUuid
+            ? $service->applications->firstWhere('uuid', $selectedResourceUuid)
+                ?? $service->databases->firstWhere('uuid', $selectedResourceUuid)
+            : null;
+        $displayStatus = $selectedResource?->status ?? $service->status;
+        $selectedResourceStatus = str($selectedResource?->status ?? '');
         $environmentVariablesUrl = route('project.service.environment-variables', [
             'project_uuid' => $service->environment->project->uuid,
             'environment_uuid' => $service->environment->uuid,
@@ -64,12 +71,22 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $service->name }}
                 </h1>
-                <x-status-summary :status="$service->status" title="Service status" container-name="Containers" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
+                        :container-name="$selectedResource ? 'Container' : 'Containers'" />
+                    <x-services.links :service="$service" compact />
+                </div>
+                <div class="flex w-full flex-wrap gap-1">
+                    @if ($selectedResource)
+                        <x-application.restart-limit-warning :application="$selectedResource" />
+                    @endif
+                </div>
             </div>
         </div>
 
         <div class="w-full xl:hidden">
             @if ($service->isDeployable)
+                @can('deploy', $service)
                 <div id="service-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
@@ -87,7 +104,14 @@
 
                     <div x-cloak x-show="open" x-transition.origin.top.left
                         class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
-                        @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
+                        @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @click="open = false; document.getElementById('selected-resource-remove-trigger')?.click()"
+                                role="menuitem">
+                                <x-reicon name="trash" class="size-3.5 text-error" />
+                                Remove container
+                            </button>
+                        @elseif ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                             @can('deploy', $service)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     @click="open = false; document.getElementById('service-restart-trigger')?.click()"
@@ -162,16 +186,33 @@
                         @endif
                     </div>
                 </div>
+                @endcan
             @else
-                <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
-                    class="mb-3 inline-flex" aria-label="Open required environment variables">
-                    <x-status-badge status="Required variables missing" type="error" />
-                </a>
+                @can('deploy', $service)
+                    <div id="service-mobile-actions" class="relative mb-3"
+                        x-data="{ open: false }" @click.outside="open = false"
+                        @keydown.escape.window="open = false">
+                        <button type="button" class="button w-full justify-between" @click="open = !open"
+                            :aria-expanded="open" aria-haspopup="menu">
+                            <span>Actions</span>
+                            <span class="inline-flex transition-transform" :class="open && 'rotate-180'">
+                                <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                            </span>
+                        </button>
+
+                        <div x-cloak x-show="open" x-transition.origin.top.left
+                            class="listbox-panel top-full! left-0! right-0! mt-1! w-full! min-w-0!" role="menu">
+                            <div class="listbox-option cursor-default! justify-start! gap-2.5! text-neutral-400! dark:text-fg-faint!"
+                                role="menuitem" aria-disabled="true">
+                                <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                <span>Deploy (<a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                                        class="cursor-pointer underline underline-offset-2">missing required env vars</a>)</span>
+                            </div>
+                        </div>
+                    </div>
+                @endcan
             @endif
 
-            <div class="resource-heading-menus w-full">
-                <x-services.links :service="$service" full-width />
-            </div>
         </div>
 
         @teleport('#resource-action-hud-slot')
@@ -183,6 +224,7 @@
                         <div class="resource-heading-menus shrink-0">
                             <x-services.links :service="$service" />
                         </div>
+                        @can('deploy', $service)
                         <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
                                 x-effect="$dispatch('resource-actions-toggled', { open })"
                                 @click.outside="open = false" @keydown.escape.window="open = false">
@@ -192,6 +234,14 @@
                                 </button>
                                 <div x-cloak x-show="open" x-transition.origin.top.right
                                     class="listbox-panel top-full! right-0! left-auto! mt-1! w-64! min-w-0!" role="menu">
+                                    @if ($selectedResource && $selectedResource->container_present !== false && $selectedResourceStatus->startsWith('exited'))
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @click="open = false; document.getElementById('selected-resource-remove-trigger')?.click()"
+                                            role="menuitem">
+                                            <x-reicon name="trash" class="size-3.5 text-error" />
+                                            Remove container
+                                        </button>
+                                    @else
                                     @if ($serviceStatus->contains('running') || $serviceStatus->contains('degraded'))
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @disabled(!auth()->user()->can('deploy', $service))
@@ -245,13 +295,31 @@
                                             Force Cleanup Containers
                                         </button>
                                     @endif
+                                    @endif
                                 </div>
                         </div>
+                        @endcan
                     @else
-                        <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
-                            aria-label="Open required environment variables">
-                            <x-status-badge status="Required variables missing" type="error" />
-                        </a>
+                        @can('deploy', $service)
+                            <div id="service-desktop-actions" class="relative" x-data="{ open: false }"
+                                x-effect="$dispatch('resource-actions-toggled', { open })"
+                                @click.outside="open = false" @keydown.escape.window="open = false">
+                                <button type="button" class="button button-highlighted" @click="open = !open"
+                                    :aria-expanded="open" aria-haspopup="menu">
+                                    Actions
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                                </button>
+                                <div x-cloak x-show="open" x-transition.origin.top.right
+                                    class="listbox-panel top-full! right-0! left-auto! mt-1! w-64! min-w-0!" role="menu">
+                                    <div class="listbox-option cursor-default! justify-start! gap-2.5! text-neutral-400! dark:text-fg-faint!"
+                                        role="menuitem" aria-disabled="true">
+                                        <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                        <span>Deploy (<a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
+                                                class="cursor-pointer underline underline-offset-2">missing required env vars</a>)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endcan
                     @endif
                 </div>
             </div>
@@ -277,6 +345,17 @@
                     <button id="service-stop-trigger" type="button">Stop</button>
                 </x-slot:trigger>
             </x-modal-confirmation>
+            @if ($selectedResource)
+                <x-modal-confirmation title="Confirm Container Removal?" buttonTitle="Remove container"
+                    canGate="deploy" :canResource="$service" submitAction="removeSelectedResourceContainer"
+                    :actions="['The exited service resource container will be removed.', __('resource.non_persistent')]"
+                    :confirmWithText="false" :confirmWithPassword="false" step1ButtonText="Continue"
+                    step2ButtonText="Confirm">
+                    <x-slot:trigger>
+                        <button id="selected-resource-remove-trigger" type="button">Remove container</button>
+                    </x-slot:trigger>
+                </x-modal-confirmation>
+            @endif
         </div>
     @endif
 

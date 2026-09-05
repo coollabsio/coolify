@@ -1,4 +1,4 @@
-<nav wire:poll.10000ms="checkStatus" class="w-full max-w-[1180px] pb-4 md:pb-6 lg:pb-0">
+<nav wire:poll.10000ms="checkStatus" class="w-full max-w-none pb-4 md:pb-6 lg:pb-0">
     @php
         $routeIs = fn (string|array $routes): bool => \Illuminate\Support\Str::is($routes, $activeRouteName);
         // Settings covers all configuration sub-pages (General, Webhooks, Domains, …),
@@ -30,12 +30,19 @@
                 <h1 class="min-w-0 max-w-full truncate text-[24px]! leading-7! font-semibold! tracking-tight! text-black dark:text-fg">
                     {{ $application->name }}
                 </h1>
-                <x-status-summary :status="$application->status" />
+                <div class="relative flex w-full min-w-0 items-center gap-2">
+                    <x-status-summary :status="$application->status" />
+                    <x-applications.links :application="$application" compact />
+                </div>
+                <div class="flex w-full flex-wrap gap-1">
+                    <x-application.restart-limit-warning :application="$application" />
+                </div>
             </div>
         </div>
 
         <div class="w-full xl:hidden">
             @if (!($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw)))
+                @can('deploy', $application)
                 <div id="application-mobile-actions" class="relative mb-3"
                     x-data="{ open: false }" @click.outside="open = false"
                     @keydown.escape.window="open = false">
@@ -99,32 +106,18 @@
                                     @endcan
                                 @endif
                             @endif
-                            @can('deploy', $application)
-                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
-                                    role="menuitem">
-                                    <x-reicon name="stop-circle" class="size-3.5 text-error" />
-                                    Stop
-                                </button>
-                            @else
-                                <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
-                                    role="menuitem">
-                                    <x-reicon name="stop-circle" class="size-3.5 opacity-70" />
-                                    Stop
-                                </button>
-                            @endcan
                         @else
                             @can('deploy', $application)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
                                     wire:click="deploy" @click="open = false" role="menuitem">
                                     <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                    Deploy
+                                    {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                 </button>
                             @else
                                 <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
                                     role="menuitem">
                                     <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                    Deploy
+                                    {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                 </button>
                             @endcan
                         @endif
@@ -134,27 +127,36 @@
                                     wire:click="{{ $application->status === 'running' ? 'force_deploy_without_cache' : 'deploy(true)' }}"
                                     @click="open = false" role="menuitem">
                                     <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Deploy (without cache)
+                                    {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
                                 </button>
                             @else
                                 <button type="button" class="listbox-option justify-start! gap-2.5!" disabled
                                     role="menuitem">
                                     <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Deploy (without cache)
+                                    {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
                                 </button>
                             @endcan
                         @endif
+                        @if (!str($application->status)->startsWith('exited') || $application->container_present !== false)
+                            <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
+                                role="menuitem">
+                                <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                {{ str($application->status)->startsWith('exited') ? 'Remove container' : 'Stop' }}
+                            </button>
+                        @endif
                     </div>
                 </div>
+                @endcan
             @endif
-            <div class="resource-heading-menus w-full">
-                <x-applications.links :application="$application" full-width />
-            </div>
             <div class="hidden" aria-hidden="true">
-                <x-modal-confirmation title="Confirm Application Stopping?" buttonTitle="Stop"
+                <x-modal-confirmation
+                    canGate="deploy" :canResource="$application"
+                    title="{{ str($application->status)->startsWith('exited') ? 'Confirm Container Removal?' : 'Confirm Application Stopping?' }}"
+                    buttonTitle="{{ str($application->status)->startsWith('exited') ? 'Remove container' : 'Stop' }}"
                     submitAction="stop" :checkboxes="$checkboxes" :actions="[
-                        'This application will be stopped.',
-                        'All non-persistent data of this application will be deleted.',
+                        str($application->status)->startsWith('exited') ? 'The exited application container will be removed.' : 'This application will be stopped.',
+                        str($application->status)->startsWith('exited') ? 'Anonymous volumes may become eligible for Docker cleanup.' : 'All non-persistent data of this application will be deleted.',
                     ]" :confirmWithText="false" :confirmWithPassword="false"
                     step1ButtonText="Continue" step2ButtonText="Confirm">
                     <x-slot:trigger>
@@ -185,6 +187,7 @@
                         <div class="resource-heading-menus shrink-0">
                             <x-applications.links :application="$application" />
                         </div>
+                        @can('deploy', $application)
                         <div id="application-desktop-actions" class="relative" x-data="{ open: false }"
                             x-effect="$dispatch('resource-actions-toggled', { open })"
                             @click.outside="open = false" @keydown.escape.window="open = false">
@@ -201,14 +204,22 @@
                                         @disabled(!auth()->user()->can('deploy', $application))
                                         wire:click="deploy" @click="open = false" role="menuitem">
                                         <x-reicon name="play-circle" class="size-3.5 opacity-70" />
-                                        Deploy
+                                        {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                     </button>
                                     @if (!$application->destination->server->isSwarm())
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @disabled(!auth()->user()->can('deploy', $application))
                                             wire:click="deploy(true)" @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                            Deploy (without cache)
+                                            {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
+                                        </button>
+                                    @endif
+                                    @if ($application->container_present !== false)
+                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                            @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
+                                            role="menuitem">
+                                            <x-reicon name="stop-circle" class="size-3.5 text-error" />
+                                            Remove container
                                         </button>
                                     @endif
                                 @else
@@ -279,6 +290,7 @@
                                 @endif
                             </div>
                         </div>
+                        @endcan
                     @endif
                 </div>
             </div>

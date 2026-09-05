@@ -99,8 +99,29 @@ function loginAsRoot(): mixed
 ```
 
 - See `tests/v4/Browser/LoginTest.php`, `tests/v4/Browser/DashboardTest.php`, and `tests/v4/Browser/RegistrationTest.php` for conventions.
-- Chrome driver runs on `localhost:4444`, app on `localhost:8000` (configured in `tests/DuskTestCase.php`).
 - Legacy Dusk macros in `app/Providers/DuskServiceProvider.php` use the old `type()`/`press()` API — do not mix with Pest Browser Plugin's `fill()`/`click()` API.
+
+### How Browser Tests Actually Run (no Docker, no display needed)
+
+`visit()` does NOT hit the dev app on `localhost:8000` and does NOT use the Dusk ChromeDriver on `:4444` (that config in `tests/DuskTestCase.php` is legacy). Instead the Pest Browser Plugin:
+
+1. Starts a local Playwright server (`node node_modules/.bin/playwright run-server`) and launches a **headless Chromium** from `~/.cache/ms-playwright` (install once with `npm install && npx playwright install chromium`).
+2. Boots an **in-process amphp HTTP server** on a random port that serves the Laravel app from the test process itself.
+
+Because the "server" and the test share one PHP process, they share the phpunit env (sqlite `:memory:`, array cache) — so `config()->set(...)`, model writes, and `Cache` calls in the test are visible to browser-issued requests, and `RefreshDatabase` never touches the dev Postgres.
+
+`->screenshot(filename: '...')` writes real PNGs to `tests/Browser/Screenshots/` — read them to visually verify UI state (toasts, modals, stray elements).
+
+### Browser Test Gotchas
+
+- **`Class "Redis" not found` thrown by the HTTP server**: host PHP has no phpredis, and the maintenance-mode store is hard-wired to redis (`config/app.php` → `'maintenance' => ['store' => 'redis']`). Add `config()->set('app.maintenance.store', 'array');` in `beforeEach`.
+- **Every path redirects to onboarding** for a fresh user (`DecideWhatToDoWithUser` + `showBoarding()`). Finish boarding before navigating: `Team::query()->update(['show_boarding' => false]); Cache::flush();` — the `Cache::flush()` is required because `User::currentTeam()` caches the Team for an hour and the in-process server shares that cache.
+- **`->navigate('/path')` races form-submit redirects.** After `->click('Login')`, assert something on the destination page (e.g. `->assertSee('Welcome to Coolify')`) before calling `navigate()`.
+- **Failure messages print the *initial* `visit()` URL**, not the current URL. Read the auto-saved screenshot in `tests/Browser/Screenshots/` to see where the browser actually ended up.
+- **Runs hang forever**: stale Playwright servers from a previously killed run. Fix: `pkill -f "playwright run-server"` and rerun. Healthy runs take seconds.
+- **Guest pages miss `DOMPurify`** (`public/js/purify.min.js` loads only `@auth` in `layouts/base.blade.php`), so toast descriptions fail on unauthenticated pages — log in first for toast-related assertions.
+- Layouts that call `@livewireScripts` manually must also call `@livewireStyles`, otherwise Livewire's asset auto-injection is disabled and `[wire\:loading]`/`[x-cloak]` elements render visible.
+- Run browser test files in their own `php artisan test` invocation — combining them with non-browser test paths in one command can hang the runner.
 
 ## Architecture
 
@@ -127,6 +148,11 @@ function loginAsRoot(): mixed
 - Custom gates: `createAnyResource`, `canAccessTerminal`
 - Role hierarchy: `Role::MEMBER` (1) < `Role::ADMIN` (2) < `Role::OWNER` (3) with `lt()`/`gt()` comparison methods
 - Multi-tenancy via Teams — team auto-initializes notification settings on creation
+- Authorize every server-side read and mutation where access can vary by user, role, team, or resource. Use policies, gates, or `$this->authorize(...)`; never rely on hidden Blade/Livewire controls such as `@can` for security.
+- Scope queries to the current team before returning records. Treat route and model identifiers as untrusted, and prevent users from reading or changing resources owned by another team.
+- Apply authorization consistently across Livewire actions, API and web controllers, actions, downloads, exports, search, event listeners, and any other path that exposes or changes protected data.
+- Default to denying access when a policy or ownership relationship is missing or ambiguous. Members must not gain access to administrative, credential, security, billing, or instance-wide data merely because they belong to the team.
+- Add authorization regression tests for protected changes. Cover permitted access, member restrictions where applicable, and cross-team access; verify unauthorized reads and writes return `403` or otherwise reveal no protected data.
 
 ### Event Broadcasting
 - Soketi WebSocket server for real-time updates (ports 6001-6002 in dev)
@@ -170,6 +196,23 @@ Coolify seeds **instance-owned** rows at primary key `0`. That value is a sentin
 - Exception handler: `app/Exceptions/Handler.php`
 - Service providers in `app/Providers/`
 
+## Livewire conventions
+
+### Dynamic lists and snapshot errors
+
+When an add, delete, or conversion leaves controls unresponsive and the browser reports `Snapshot missing on Livewire component`, inspect both component keys and refresh events. Stable keys alone may not fix it.
+
+- Give every Livewire component rendered in a loop a stable key based on the record ID, UUID, filename, or another immutable identity. Never include a collection count, `$loop->index`, or a reindexed array position in the key.
+- Pass the same stable identity to edit/delete actions. A keyed row can survive reordering while a `wire:ignore` or teleported Alpine modal keeps its original `submitAction`; an action such as `removeItem($index)` then targets a stale position after the first deletion. Resolve the current row server-side from an ID, UUID, or stable row hash instead.
+- Do not broadcast one refresh event to both a parent list component and children that the parent may insert, remove, or hide during the same operation. This can queue a child update after its snapshot has been removed from the DOM.
+- Split refresh responsibilities into targeted events. Refresh the parent for counts and tab visibility, and refresh an existing child list with a separate event. Use `$this->dispatch('event')->to(Component::class)` instead of a page-wide event when possible.
+- Before targeting a child list, confirm that it existed before the mutation, still exists afterward, and is on the active tab. A newly inserted child loads current data during `mount()` and does not need an immediate refresh. A removed or hidden child must not receive one.
+- A child that deletes itself should finish its own update, then target only the parent to refresh counts. The parent should not send a refresh back to that child when the list became empty.
+- Apply the same pattern to file, directory, conversion, and external reload paths such as Compose edits. One remaining broad event can reproduce the race.
+- Add regression tests that assert the scoped event names, assert the old broad event is not dispatched, and verify that keys do not depend on counts or positions. Manually repeat add/delete operations while watching the browser console.
+
+The persistent-storage implementation is the reference pattern: `Project\Service\Storage` handles `storageCountsChanged`, while `Project\Shared\Storages\All` handles `refreshVolumeList`.
+
 ## Key Conventions
 
 - Use `php artisan make:*` commands with `--no-interaction` to create files
@@ -179,6 +222,7 @@ Coolify seeds **instance-owned** rows at primary key `0`. That value is a sentin
 - Run `vendor/bin/pint --dirty --format agent` before finalizing changes
 - Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
 - Check sibling files for conventions before creating new files
+- When adding remote shell commands, account for servers using non-root SSH users: commands pass through `parseCommandsByLineForSudo()`, so test pipelines, redirects, substitutions, and `sh -c`/`bash -c` scripts with the non-root sudo parser.
 
 ## Git Workflow
 

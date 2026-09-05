@@ -2,6 +2,8 @@
 
 use App\Actions\User\DeleteUserResources;
 use App\Models\Server;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
 
@@ -14,6 +16,38 @@ beforeEach(function () {
 
 afterEach(function () {
     Mockery::close();
+});
+
+it('keeps different database types with the same primary key in the preview', function () {
+    $teamPivot = (object) ['role' => 'owner'];
+    $team = Mockery::mock(Team::class);
+    $team->shouldReceive('getAttribute')->with('pivot')->andReturn($teamPivot);
+    $team->shouldReceive('getAttribute')->with('members')->andReturn(collect([$this->user]));
+    $team->shouldReceive('setAttribute')->andReturnSelf();
+    $team->pivot = $teamPivot;
+    $team->members = collect([$this->user]);
+
+    $redis = new StandaloneRedis;
+    $redis->id = 42;
+    $mariadb = new StandaloneMariadb;
+    $mariadb->id = 42;
+
+    $server = Mockery::mock(Server::class);
+    $server->shouldReceive('applications')->andReturn(collect());
+    $server->shouldReceive('databases')->andReturn(collect([$redis, $mariadb]));
+    $server->shouldReceive('services->get')->andReturn(collect());
+
+    $teamsRelation = Mockery::mock();
+    $teamsRelation->shouldReceive('get')->andReturn(collect([$team]));
+    $this->user->shouldReceive('teams')->andReturn($teamsRelation);
+
+    $serversRelation = Mockery::mock();
+    $serversRelation->shouldReceive('get')->andReturn(collect([$server]));
+    $team->shouldReceive('servers')->andReturn($serversRelation);
+
+    $preview = (new DeleteUserResources($this->user, true))->getResourcesPreview();
+
+    expect($preview['databases'])->toHaveCount(2);
 });
 
 it('only collects resources from teams where user is the sole member', function () {

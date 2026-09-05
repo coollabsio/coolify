@@ -9,7 +9,7 @@
                  listboxes (API, MCP, telemetry, …) update the snapshot on the server
                  immediately; without wire:target they briefly flash this bar. --}}
             <x-unsaved-bar action="submit"
-                targets="custom_dns_servers,allowed_ips,webhook_allowed_internal_hosts,webhook_allow_localhost,domain_connect_private_key" />
+                targets="custom_dns_servers,allowed_ips,webhook_allowed_internal_hosts,webhook_allow_localhost,domain_connect_private_key,image_cdn_url" />
 
             <x-application.settings-section id="access-section" title="Access">
                 <div class="grid gap-4 lg:grid-cols-2">
@@ -127,19 +127,28 @@
                             ['value' => false, 'label' => 'Enabled'],
                             ['value' => true, 'label' => 'Disabled'],
                         ]" />
-                    <x-forms.listbox id="is_sponsorship_popup_enabled" label="Sponsorship reminders"
-                        helper="Show the monthly project sponsorship reminder." onChange="instantSave" :options="[
-                            ['value' => true, 'label' => 'Enabled'],
-                            ['value' => false, 'label' => 'Disabled'],
-                        ]" />
+                    <div class="flex flex-col gap-2">
+                        <x-forms.listbox id="is_sponsorship_popup_enabled" label="Sponsorship reminders"
+                            helper="Show the monthly project sponsorship reminder." onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
+                        @if (isDev())
+                            <x-forms.button type="button" @click="$dispatch('show-sponsorship-reminder')">
+                                Show sponsorship reminder
+                            </x-forms.button>
+                        @endif
+                    </div>
                 </div>
             </x-application.settings-section>
 
             <x-application.settings-section id="avatar-storage-section" title="Image storage"
                 helper="Choose where compressed profile pictures and project icons are stored. Use S3 for multi-instance or cloud deployments so every application replica can access the same files.">
-                <div class="max-w-md">
+                <div class="flex max-w-md flex-col gap-4">
                     <x-forms.listbox id="avatar_storage" label="Storage destination" onChange="instantSave"
                         :options="$avatar_storage_options" />
+                    <x-forms.input id="image_cdn_url" label="Image CDN URL"
+                        helper="Optional public CDN URL for profile pictures and project icons stored on S3. Leave empty to use the S3 endpoint." placeholder="https://images.example.com" />
                 </div>
                 @if (count($avatar_storage_options) === 1)
                     <x-callout type="info" title="No usable S3 storage configured" class="mt-4">

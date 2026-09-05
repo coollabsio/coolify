@@ -2,9 +2,6 @@
 
 namespace App\Models;
 
-use App\Models\V5\Application as V5Application;
-use App\Models\V5\ResourceConnection as V5ResourceConnection;
-use App\Support\V5\V5Feature;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -147,11 +144,7 @@ class Project extends BaseModel
 
     public function isEmpty()
     {
-        return (! V5Feature::enabled() || (
-            ! V5Application::query()->where('project_id', $this->id)->exists() &&
-            ! V5ResourceConnection::query()->where('project_id', $this->id)->exists()
-        )) &&
-            $this->applications()->count() == 0 &&
+        return $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
             $this->mysqls()->count() == 0 &&
@@ -166,13 +159,13 @@ class Project extends BaseModel
     public function databases(array $with = []): Collection
     {
         return $this->postgresqls()->with($with)->get()
-            ->merge($this->redis()->with($with)->get())
-            ->merge($this->mongodbs()->with($with)->get())
-            ->merge($this->mysqls()->with($with)->get())
-            ->merge($this->mariadbs()->with($with)->get())
-            ->merge($this->keydbs()->with($with)->get())
-            ->merge($this->dragonflies()->with($with)->get())
-            ->merge($this->clickhouses()->with($with)->get());
+            ->concat($this->redis()->with($with)->get())
+            ->concat($this->mongodbs()->with($with)->get())
+            ->concat($this->mysqls()->with($with)->get())
+            ->concat($this->mariadbs()->with($with)->get())
+            ->concat($this->keydbs()->with($with)->get())
+            ->concat($this->dragonflies()->with($with)->get())
+            ->concat($this->clickhouses()->with($with)->get());
     }
 
     public function navigateTo()

@@ -236,7 +236,6 @@
                             @foreach ($checkboxes as $index => $checkbox)
                                 <div class="flex justify-between items-center mb-2">
                                     <x-forms.checkbox fullWidth :label="$checkbox['label']" :id="$checkbox['id']"
-                                        :wire:model="$checkbox['id']"
                                         x-on:change="toggleAction('{{ $checkbox['id'] }}')" :checked="$this->{$checkbox['id']}"
                                         x-bind:checked="selectedActions.includes('{{ $checkbox['id'] }}')" />
                                 </div>
@@ -335,12 +334,15 @@
                                         step++;
                                     } else {
                                         submitting = true;
-                                        submitForm().then((result) => {
-                                            submitting = false;
-                                            modalOpen = false;
-                                            resetModal();
-                                        }).catch(() => {
-                                            submitting = false;
+                                        modalOpen = false;
+                                        $nextTick(() => {
+                                            submitForm().then((result) => {
+                                                submitting = false;
+                                                resetModal();
+                                            }).catch(() => {
+                                                submitting = false;
+                                                modalOpen = true;
+                                            });
                                         });
                                     }
                                 ">
@@ -389,17 +391,21 @@
                                         $wire.dispatch(dispatchEventType, dispatchEventMessage);
                                     }
                                     submitting = true;
-                                    submitForm().then((result) => {
-                                        submitting = false;
-                                        if (result === true) {
-                                            modalOpen = false;
-                                            resetModal();
-                                        } else {
-                                            passwordError = result;
-                                            password = '';
-                                        }
-                                    }).catch(() => {
-                                        submitting = false;
+                                    modalOpen = false;
+                                    $nextTick(() => {
+                                        submitForm().then((result) => {
+                                            submitting = false;
+                                            if (result === true) {
+                                                resetModal();
+                                            } else {
+                                                modalOpen = true;
+                                                passwordError = result;
+                                                password = '';
+                                            }
+                                        }).catch(() => {
+                                            submitting = false;
+                                            modalOpen = true;
+                                        });
                                     });
                                     ">
                                     <x-loading-on-button x-show="submitting" x-cloak />

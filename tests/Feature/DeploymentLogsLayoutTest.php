@@ -4,6 +4,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
@@ -75,10 +76,18 @@ it('renders deployment logs in a full-height layout', function () {
     $response->assertSee('logs-viewer-actions', false);
     $response->assertSee('logs-viewer-viewport', false);
     $response->assertSee('logs-viewer-line', false);
-    $response->assertSee('h-[calc(100dvh-7.5rem)]', false);
+    $response->assertSee('min-h-[calc(100dvh-7.5rem)] flex-col', false);
     $response->assertSee('flex flex-1 min-h-0 flex-col overflow-hidden', false);
+    $response->assertSee('h-[calc(100dvh-8rem)]', false);
+    $response->assertSee('xl:h-[32rem]', false);
+    $response->assertSee('xl:flex-none', false);
 
-    expect($response->getContent())->not->toContain('max-h-[30rem]');
+    expect($response->getContent())
+        ->not->toContain('max-h-[30rem]')
+        ->not->toContain('xl:h-[calc(100dvh-7.5rem)]')
+        ->not->toContain('xl:overflow-hidden')
+        ->not->toContain('h-[calc(100dvh-20rem)]')
+        ->not->toContain('deployment-logs-panel');
 });
 
 it('uses a mobile-friendly stacked logs toolbar markup', function () {
@@ -97,6 +106,11 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain('logs-viewer-timestamp')
         ->toContain('logs-viewer-line-text')
         ->toContain('livewire:project.application.deployment-navbar')
+        ->not->toContain('xl:h-[calc(100dvh-7.5rem)]')
+        ->not->toContain('xl:overflow-hidden')
+        ->toContain('xl:h-[32rem]')
+        ->toContain('xl:flex-none')
+        ->not->toContain('h-[calc(100dvh-20rem)]')
         ->and($sharedLogsView)
         ->toContain('logs-viewer-toolbar')
         ->toContain('logs-viewer-toolbar-controls')
@@ -122,6 +136,13 @@ it('uses a mobile-friendly stacked logs toolbar markup', function () {
         ->toContain(".logs-viewer-viewport::after {\n    content: \"\";\n    flex: 0 0 2rem;")
         ->toContain('flex-direction: column')
         ->toContain('@media (min-width: 640px)');
+
+    $actionsCss = str($appCss)
+        ->after('.logs-viewer-actions {')
+        ->before('}')
+        ->toString();
+
+    expect($actionsCss)->not->toContain('isolation: isolate');
 
     $primaryGroup = str($deploymentView)
         ->after('class="logs-viewer-primary"')
@@ -192,6 +213,40 @@ it('keeps deployment history fields and the log status badge accessible on mobil
         ->toContain(".deployment-table-grid {\n        min-width: 0;")
         ->not->toContain('.deployment-table-grid > :nth-child')
         ->toContain(".logs-viewer-primary .logs-viewer-actions {\n    width: auto;\n    flex: 1 1 auto;");
+});
+
+it('links deployment commit hashes to the source commit page', function () {
+    $githubApp = GithubApp::query()->create([
+        'team_id' => $this->team->id,
+        'name' => 'GitHub',
+        'api_url' => 'https://api.github.com',
+        'html_url' => 'https://github.com',
+    ]);
+    $this->application->update([
+        'source_id' => $githubApp->id,
+        'source_type' => $githubApp->getMorphClass(),
+        'git_repository' => 'coollabsio/coolify',
+        'git_branch' => 'main',
+    ]);
+    ApplicationDeploymentQueue::query()->create([
+        'application_id' => $this->application->id,
+        'deployment_uuid' => 'deploy-commit-link-test',
+        'server_id' => $this->server->id,
+        'status' => ApplicationDeploymentStatus::FINISHED->value,
+        'commit' => '1234567890abcdef1234567890abcdef12345678',
+    ]);
+
+    $response = $this->get(route('project.application.deployment.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'application_uuid' => $this->application->uuid,
+    ]));
+
+    $response->assertSuccessful();
+    $response->assertSee(
+        'href="https://github.com/coollabsio/coolify/commit/1234567890abcdef1234567890abcdef12345678" target="_blank" rel="noopener noreferrer"',
+        false,
+    );
 });
 
 it('places cancel deployment controls inside the deployment logs toolbar', function () {

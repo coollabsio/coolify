@@ -21,7 +21,7 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
         $this->onQueue('high');
         $this->tokenName = $token->name;
         $this->expiresAt = $token->expires_at?->format('Y-m-d H:i:s') ?? '';
-        $this->manageUrl = route('security.api-tokens');
+        $this->manageUrl = base_url().'/security/api-tokens';
     }
 
     public function via(object $notifiable): array
@@ -99,5 +99,17 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
             description: $description,
             color: SlackMessage::warningColor(),
         );
+    }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => "API token '{$this->tokenName}' expires on {$this->expiresAt}. Rotate this token before it expires to avoid API outages.",
+            'event' => 'api_token_expiring',
+            'token_name' => $this->tokenName,
+            'expires_at' => $this->expiresAt,
+            'url' => $this->manageUrl,
+        ];
     }
 }

@@ -82,13 +82,31 @@ it('docks desktop resource actions in the top bar instead of floating over conte
     }
 });
 
-it('links the service header missing variables warning to environment variables', function () {
+it('shows disabled deploy actions when service variables are missing', function () {
     $heading = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
+    $mobileActions = str($heading)
+        ->after('<div class="w-full xl:hidden">')
+        ->before("@teleport('#resource-action-hud-slot')")
+        ->toString();
+    $desktopActions = str($heading)
+        ->after("@teleport('#resource-action-hud-slot')")
+        ->before('@endteleport')
+        ->toString();
 
-    expect($heading)
-        ->toContain("route('project.service.environment-variables'")
-        ->toContain('Required variables missing')
-        ->toContain('href="{{ $environmentVariablesUrl }}"');
+    expect($mobileActions)
+        ->toContain('id="service-mobile-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline')
+        ->and($desktopActions)
+        ->toContain('id="service-desktop-actions"')
+        ->toContain('aria-disabled="true"')
+        ->toContain('Deploy')
+        ->toContain('missing required env vars')
+        ->toContain('href="{{ $environmentVariablesUrl }}"')
+        ->toContain('underline');
 });
 
 it('places the account menu beside the desktop sidebar toggle while retaining it on mobile', function () {
@@ -253,6 +271,25 @@ it('groups application lifecycle options in an Actions dropdown', function () {
     expect($mobile)
         ->toContain('Deploy (without cache)')
         ->not->toContain('Force deploy without cache');
+});
+
+it('shows stop in application action menus when the application is exited', function () {
+    $heading = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
+    $desktopExitedActions = str($heading)
+        ->after("@if (str(\$application->status)->startsWith('exited'))")
+        ->before('@else')
+        ->toString();
+
+    $mobileActions = str($heading)
+        ->after('id="application-mobile-actions"')
+        ->before('<div class="hidden" aria-hidden="true">')
+        ->toString();
+
+    expect($mobileActions)->toContain('application-mobile-stop-trigger')
+        ->and($desktopExitedActions)->toContain('application-mobile-stop-trigger')
+        ->and($mobileActions)->toContain('Deploy (without cache)')
+        ->and(strrpos($mobileActions, 'Deploy (without cache)'))
+        ->toBeLessThan(strrpos($mobileActions, 'application-mobile-stop-trigger'));
 });
 
 it('places the state-aware no-cache action immediately after deploy or redeploy', function () {
@@ -592,7 +629,7 @@ it('shows an icon in application and service Links controls', function () {
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
     $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
 
-    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false])")
+    expect($applicationLinks)->toContain("@props(['application', 'fullWidth' => false, 'compact' => false])")
         ->toContain('<x-reicon name="external-link"')
         ->and($serviceLinksComponent)->toContain('public bool $fullWidth = false')
         ->and($serviceLinks)
@@ -610,41 +647,59 @@ it('visually distinguishes production and pull request application links', funct
         ->not->toContain("PR{{ data_get(\$preview, 'pull_request_id') }} |");
 });
 
-it('shows application and service Links on mobile headings', function () {
+it('shows application Links as a compact badge beside the mobile status', function () {
     $application = file_get_contents(resource_path('views/livewire/project/application/heading.blade.php'));
-    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
-
-    $mobileApplicationSection = str($application)->between('class="w-full xl:hidden"', 'class="hidden w-full items-center xl:fixed')->toString();
-    $mobileServiceSection = str($service)->between('class="w-full md:hidden"', 'class="hidden w-full items-center md:flex')->toString();
-
-    expect($mobileApplicationSection)
-        ->toContain('<x-applications.links')
-        ->toContain('full-width')
-        ->toContain('resource-heading-menus')
-        ->not->toContain('<x-resource-heading-tabs')
-        ->not->toContain("'label' => 'Settings'");
-
     $applicationLinks = file_get_contents(resource_path('views/components/applications/links.blade.php'));
+    $mobileApplicationTitle = str($application)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+    $mobileApplicationActions = str($application)->between('<div class="w-full xl:hidden">', '<div class="hidden" aria-hidden="true">')->toString();
+
+    expect($mobileApplicationTitle)
+        ->toContain('<x-status-summary')
+        ->toContain('<x-applications.links')
+        ->toContain('relative flex w-full min-w-0 items-center gap-2')
+        ->toContain('compact')
+        ->not->toContain('full-width');
+
+    expect($mobileApplicationActions)
+        ->not->toContain('<x-applications.links');
+
     expect($applicationLinks)
-        ->toContain("'button w-full justify-between' => \$fullWidth")
-        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
+        ->toContain("'compact' => false")
+        ->toContain("'static' => \$compact")
+        ->toContain("'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => \$compact")
+        ->toContain('@unless ($compact)')
+        ->toContain("'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => \$compact")
         ->toContain('<x-reicon name="chevron-down"');
+});
 
-    expect($mobileServiceSection)
-        ->toContain('<x-services.links')
-        ->toContain('full-width')
-        ->toContain('resource-heading-menus')
-        ->not->toContain('<x-resource-heading-tabs');
-
+it('shows service Links as a compact badge beside the mobile status', function () {
+    $service = file_get_contents(resource_path('views/livewire/project/service/heading.blade.php'));
     $serviceLinks = file_get_contents(resource_path('views/components/services/links.blade.php'));
+    $serviceLinksComponent = file_get_contents(app_path('View/Components/Services/Links.php'));
+    $mobileServiceTitle = str($service)->between('class="mb-3 w-full xl:hidden"', '<div class="w-full xl:hidden">')->toString();
+    $mobileServiceActions = str($service)->between('<div class="w-full xl:hidden">', '@teleport')->toString();
+
+    expect($mobileServiceTitle)
+        ->toContain('<x-status-summary')
+        ->toContain('<x-services.links')
+        ->toContain('relative flex w-full min-w-0 items-center gap-2')
+        ->toContain('compact')
+        ->not->toContain('full-width');
+
+    expect($mobileServiceActions)
+        ->not->toContain('<x-services.links');
+
+    expect($serviceLinksComponent)
+        ->toContain('public bool $compact = false');
+
     expect($serviceLinks)
-        ->toContain("'button w-full justify-between' => \$fullWidth")
-        ->toContain("'left-0! right-0! w-full! min-w-0! max-w-none!' => \$fullWidth")
+        ->toContain("'static' => \$compact")
+        ->toContain("'inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-100 px-2 text-xs font-medium leading-none text-neutral-700 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-white' => \$compact")
+        ->toContain('@unless ($compact)')
+        ->toContain("'left-1/2! right-auto! w-[calc(100vw-2rem)]! max-w-md! min-w-0! -translate-x-1/2' => \$compact")
         ->toContain('<x-reicon name="chevron-down"')
         ->toContain('No links available');
 
-    // One mobile + one desktop instance.
-    expect(substr_count($application, '<x-applications.links'))->toBe(2);
     expect(substr_count($service, '<x-services.links'))->toBe(2);
 });
 

@@ -15,8 +15,10 @@ class Show extends Component
 {
     use AuthorizesRequests;
 
+    #[Locked]
     public Application|Service $resource;
 
+    #[Locked]
     public ScheduledTask $task;
 
     #[Locked]
@@ -85,7 +87,7 @@ class Show extends Component
         }
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -115,6 +117,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $this->authorize('update', $this->task);
             $this->isEnabled = ! $this->isEnabled;
             $this->task->enabled = $this->isEnabled;
             $this->task->save();
@@ -128,6 +131,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $this->authorize('update', $this->task);
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
             $this->refreshTasks();
@@ -140,6 +144,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $this->authorize('update', $this->task);
             $this->syncData(true);
             $this->dispatch('success', 'Scheduled task updated.');
         } catch (\Exception $e) {
@@ -160,12 +165,13 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $this->authorize('delete', $this->task);
             $this->task->delete();
 
             if ($this->type === 'application') {
-                return redirect()->route('project.application.scheduled-tasks.show', $this->parameters);
+                return redirectRoute($this, 'project.application.scheduled-tasks.show', $this->parameters);
             } else {
-                return redirect()->route('project.service.scheduled-tasks.show', $this->parameters);
+                return redirectRoute($this, 'project.service.scheduled-tasks.show', $this->parameters);
             }
         } catch (\Exception $e) {
             return handleError($e);
@@ -176,6 +182,7 @@ class Show extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $this->authorize('update', $this->task);
             ScheduledTaskJob::dispatch($this->task);
             $this->dispatch('success', 'Scheduled task executed.');
         } catch (\Exception $e) {

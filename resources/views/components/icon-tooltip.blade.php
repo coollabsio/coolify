@@ -38,11 +38,11 @@
         this.visible = true;
         const rect = target.getBoundingClientRect();
         this.below = rect.top < 48;
-        this.x = rect.left;
+        this.x = rect.left + rect.width / 2;
         this.y = this.below ? rect.bottom + 8 : rect.top - 8;
         this.$nextTick(() => {
             const width = this.$refs.tooltip?.offsetWidth || 0;
-            this.x = Math.max(8, Math.min(window.innerWidth - width - 8, this.x));
+            this.x = Math.max(8, Math.min(window.innerWidth - width - 8, this.x - width / 2));
             this.$nextTick(() => this.positioned = true);
         });
     },

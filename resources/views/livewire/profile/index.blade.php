@@ -7,7 +7,7 @@
 }"
     @close-email-change-modal.window="emailModalOpen = false">
     <x-slot:title>Profile | Coolify</x-slot>
-    <div class="mt-8 flex w-full max-w-[1180px] flex-col gap-6 lg:mt-3">
+    <div class="mt-8 flex w-full max-w-none flex-col gap-6 lg:mt-3">
         <section class="application-settings-section" x-data="{
             preview: null,
             processing: false,
@@ -91,7 +91,7 @@
                     <img x-cloak x-show="preview" :src="preview" alt="Profile picture preview"
                         class="h-full w-full object-cover">
                     @if (auth()->user()->avatar_path)
-                        <img src="{{ route('profile.avatar', ['v' => auth()->user()->updated_at->timestamp]) }}"
+                        <img src="{{ profile_avatar_url(auth()->user()) }}"
                             x-show="!preview" alt="{{ auth()->user()->name }}" class="h-full w-full object-cover">
                     @else
                         <span x-show="!preview">
