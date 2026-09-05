@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\BuildPackTypes;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
@@ -291,9 +292,11 @@ class Application extends BaseModel
                 if ($application->fqdn === '') {
                     $application->fqdn = null;
                 }
-                $normalized = DomainPortOverrides::normalize($application->fqdn, $application->domain_port_overrides);
-                $application->fqdn = $normalized['fqdn'];
-                $application->domain_port_overrides = $normalized['overrides'];
+                if ($application->build_pack !== BuildPackTypes::DOCKERCOMPOSE->value || filled($application->fqdn)) {
+                    $normalized = DomainPortOverrides::normalize($application->fqdn, $application->domain_port_overrides);
+                    $application->fqdn = $normalized['fqdn'];
+                    $application->domain_port_overrides = $normalized['overrides'];
+                }
                 $payload['fqdn'] = $application->fqdn;
                 $application->syncNoindexDomains();
             }
