@@ -147,6 +147,10 @@ class VolumeBackups extends Component
         }
 
         $this->resetErrorBag('s3StorageId');
+        if (! $this->validateSettings()) {
+            return;
+        }
+
         $this->backup = $this->persistBackup($this->enabled);
         $this->dispatch('success', 'S3 storage updated.');
     }
@@ -163,6 +167,10 @@ class VolumeBackups extends Component
 
         $this->saveToS3 = ! $this->saveToS3;
         $this->disableLocalBackup = $this->saveToS3 && $this->disableLocalBackup;
+        if (! $this->validateSettings()) {
+            return;
+        }
+
         $this->backup = $this->persistBackup($this->enabled);
         $this->dispatch('success', $this->saveToS3 ? 'S3 backups enabled.' : 'S3 backups disabled.');
     }

@@ -992,6 +992,35 @@ it('persists S3 settings the first time when a volume backup schedule does not e
         ->and($backup->s3_storage_id)->toBe($s3Storage->id);
 });
 
+it('persists the selected S3 storage when a volume backup schedule does not exist yet', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $s3Storage = S3Storage::create([
+        'name' => 'Volume backups',
+        'region' => 'us-east-1',
+        'key' => 'key',
+        'secret' => 'secret',
+        'bucket' => 'bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+
+    Livewire::test(VolumeBackups::class, [
+        'storage' => $volume,
+        'resource' => $application,
+        'section' => 's3',
+    ])
+        ->set('s3StorageId', $s3Storage->id)
+        ->assertDispatched('success');
+
+    $backup = ScheduledVolumeBackup::query()->sole();
+
+    expect($backup->enabled)->toBeFalse()
+        ->and($backup->s3_storage_id)->toBe($s3Storage->id);
+});
+
 it('shows and saves volume S3 retention while S3 backups are disabled', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);
@@ -1036,7 +1065,7 @@ it('allows team owners to edit volume backup retention settings', function () {
     ])->assertDontSee('You do not have permission to perform this action.');
 });
 
-it('only updates S3 fields when toggling volume S3 backups', function () {
+it('does not enable S3 backups when another volume backup setting is invalid', function () {
     $team = Team::factory()->create();
     signInForVolumeBackups($this, $team);
     [$application, $volume] = createVolumeBackupApplication($team);
@@ -1063,9 +1092,54 @@ it('only updates S3 fields when toggling volume S3 backups', function () {
     ])
         ->set('frequency', 'not a valid schedule')
         ->call('toggleS3')
-        ->assertDispatched('success');
+        ->assertHasErrors('frequency')
+        ->assertNotDispatched('success');
 
-    expect($backup->refresh()->save_s3)->toBeTrue()
+    expect($backup->refresh()->save_s3)->toBeFalse()
+        ->and($backup->frequency)->toBe('daily');
+});
+
+it('does not change S3 storage when another volume backup setting is invalid', function () {
+    $team = Team::factory()->create();
+    signInForVolumeBackups($this, $team);
+    [$application, $volume] = createVolumeBackupApplication($team);
+    $firstS3Storage = S3Storage::create([
+        'name' => 'First storage',
+        'region' => 'us-east-1',
+        'key' => 'first-key',
+        'secret' => 'secret',
+        'bucket' => 'first-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $secondS3Storage = S3Storage::create([
+        'name' => 'Second storage',
+        'region' => 'us-east-1',
+        'key' => 'second-key',
+        'secret' => 'secret',
+        'bucket' => 'second-bucket',
+        'endpoint' => 'https://s3.example.com',
+        'team_id' => $team->id,
+        'is_usable' => true,
+    ]);
+    $backup = $volume->scheduledBackups()->create([
+        'team_id' => $team->id,
+        'frequency' => 'daily',
+        's3_storage_id' => $firstS3Storage->id,
+    ]);
+
+    Livewire::test(VolumeBackups::class, [
+        'storage' => $volume,
+        'resource' => $application,
+        'section' => 's3',
+    ])
+        ->set('frequency', 'not a valid schedule')
+        ->set('s3StorageId', $secondS3Storage->id)
+        ->assertHasErrors('frequency')
+        ->assertNotDispatched('success');
+
+    expect($backup->refresh()->s3_storage_id)->toBe($firstS3Storage->id)
         ->and($backup->frequency)->toBe('daily');
 });
 
