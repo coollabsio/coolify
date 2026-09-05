@@ -63,8 +63,8 @@ services:
       test:
         - CMD
         - wget
-        - --spider
         - -q
+        - -O-
         - 0.0.0.0:8123/ping
       interval: 30s
       timeout: 5s
