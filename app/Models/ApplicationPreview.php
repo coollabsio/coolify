@@ -283,7 +283,7 @@ class ApplicationPreview extends BaseModel
     }
 
     /**
-     * Original compose service names for this preview (PR suffix stripped), excluding database images.
+     * Original compose service names for this preview, excluding database images.
      *
      * @return list<string>
      */
@@ -295,15 +295,19 @@ class ApplicationPreview extends BaseModel
             return [];
         }
 
+        $usesLegacyServiceKeys = (int) $this->application->compose_parsing_version < 3;
+        $previewSuffix = '-pr-'.$this->pull_request_id;
         $names = [];
         foreach ($services as $serviceName => $service) {
             if (isDatabaseImage(data_get($service, 'image'))) {
                 continue;
             }
 
-            $names[] = str((string) $serviceName)
-                ->replaceLast('-pr-'.$this->pull_request_id, '')
-                ->toString();
+            $serviceName = (string) $serviceName;
+            if ($usesLegacyServiceKeys && str_ends_with($serviceName, $previewSuffix)) {
+                $serviceName = substr($serviceName, 0, -strlen($previewSuffix));
+            }
+            $names[] = $serviceName;
         }
 
         return array_values(array_unique($names));

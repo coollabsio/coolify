@@ -670,3 +670,44 @@ it('handles docker compose build with no arguments', function () {
 
     expect($result)->toBe('docker compose build --build-arg FOO=bar');
 });
+
+it('injects an isolated compose project name when provided', function () {
+    $command = injectDockerComposeFlags(
+        'docker compose up -d',
+        '/workdir/docker-compose.yaml',
+        '/workdir/.env',
+        'application-uuid-pr-42',
+    );
+
+    expect($command)->toContain('--project-name application-uuid-pr-42');
+});
+
+it('preserves an explicit compose project name', function () {
+    $command = injectDockerComposeFlags(
+        'docker compose --project-name custom-project up -d',
+        '/workdir/docker-compose.yaml',
+        '/workdir/.env',
+        'application-uuid',
+    );
+
+    expect($command)->toContain('--project-name custom-project')
+        ->not->toContain('--project-name application-uuid');
+});
+
+it('replaces an explicit compose project name for preview isolation', function (string $projectNameFlag) {
+    $command = injectDockerComposeFlags(
+        "docker compose {$projectNameFlag} up -d",
+        '/workdir/docker-compose.yaml',
+        '/workdir/.env',
+        'application-uuid-pr-42',
+        true,
+    );
+
+    expect($command)->toContain('--project-name application-uuid-pr-42')
+        ->not->toContain('custom-project');
+})->with([
+    'long flag with space' => '--project-name custom-project',
+    'long flag with equals' => '--project-name=custom-project',
+    'short flag with space' => '-p custom-project',
+    'short flag with equals' => '-p=custom-project',
+]);

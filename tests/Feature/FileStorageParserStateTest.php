@@ -129,6 +129,20 @@ it('defaults new application bind mounts to directories', function () {
         ->and($fileVolume->is_directory)->toBeTrue();
 });
 
+it('keeps preview bind mount sources stable when parsing twice', function () {
+    $application = makeComposeApplication(DATA_DIR_COMPOSE);
+
+    $firstParse = applicationParser($application, pull_request_id: 42);
+    $secondParse = applicationParser($application->refresh(), pull_request_id: 42);
+
+    $firstSource = data_get($firstParse, 'services.app.volumes.0');
+    $secondSource = data_get($secondParse, 'services.app.volumes.0');
+
+    expect($firstSource)
+        ->toBe($secondSource)
+        ->toContain('-pr-42:/app/data');
+});
+
 it('preserves existing service file volume content when reparsing compose bind mounts', function () {
     [$service, $serviceApplication] = makeComposeService(TWO_FILE_COMPOSE);
     $baseDir = service_configuration_dir()."/{$service->uuid}";

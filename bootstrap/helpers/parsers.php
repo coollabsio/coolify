@@ -682,7 +682,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     // generate SERVICE_NAME variables for docker compose services
     $serviceNameEnvironments = collect([]);
     if ($resource->build_pack === 'dockercompose') {
-        $serviceNameEnvironments = generateDockerComposeServiceName($services, $pullRequestId);
+        $serviceNameEnvironments = generateDockerComposeServiceName($services);
     }
 
     // Parse the rest of the services
@@ -721,11 +721,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         $isDatabase = isDatabaseImage($image, $service);
         $volumesParsed = collect([]);
 
-        $baseName = generateApplicationContainerName(
-            application: $resource,
-            pull_request_id: $pullRequestId
+        $configuredContainerName = data_get($service, 'container_name');
+        $containerName = generateDockerComposeContainerName(
+            projectName: generateDockerComposeProjectName($resource->uuid, $pullRequestId),
+            serviceName: $serviceName,
+            configuredContainerName: $configuredContainerName,
+            pullRequestId: $pullRequestId,
         );
-        $containerName = "$serviceName-$baseName";
         $predefinedPort = null;
 
         $originalResource = $resource;
@@ -821,9 +823,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = replaceLocalSource($source, $mainDirectory);
-                        $isPreviewSuffixEnabled = $foundConfig
-                            ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
-                            : true;
+                        $isPreviewSuffixEnabled = (bool) data_get(
+                            $foundConfig,
+                            'is_preview_suffix_enabled',
+                            true,
+                        );
                         if ($isPullRequest && $isPreviewSuffixEnabled) {
                             $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                         }
@@ -904,22 +908,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
         }
 
-        if ($depends_on?->count() > 0) {
-            if ($isPullRequest) {
-                $newDependsOn = collect([]);
-                $depends_on->each(function ($dependency, $condition) use ($pullRequestId, $newDependsOn) {
-                    if (is_numeric($condition)) {
-                        $dependency = addPreviewDeploymentSuffix($dependency, $pullRequestId);
-
-                        $newDependsOn->put($condition, $dependency);
-                    } else {
-                        $condition = addPreviewDeploymentSuffix($condition, $pullRequestId);
-                        $newDependsOn->put($condition, $dependency);
-                    }
-                });
-                $depends_on = $newDependsOn;
-            }
-        }
         if (! $use_network_mode) {
             if ($topLevel->get('networks')?->count() > 0) {
                 foreach ($topLevel->get('networks') as $networkName => $network) {
@@ -1186,9 +1174,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             $coolifyEnvironments->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
         }
 
-        // Add COOLIFY_CONTAINER_NAME to environment
+        // Informational only. Runtime operations discover containers through Docker labels.
         if ($resource->environment_variables->where('key', 'COOLIFY_CONTAINER_NAME')->isEmpty()) {
-            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "{$containerName}");
+            $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', $containerName);
         }
 
         if ($isPullRequest) {
@@ -1447,10 +1435,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         });
 
         $payload = collect($service)->merge([
-            'container_name' => $containerName,
             'restart' => $restart->value(),
             'labels' => $serviceLabels,
         ]);
+        $payload = applyDockerComposeContainerName(
+            $payload,
+            filled($configuredContainerName) ? $containerName : null,
+        );
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
@@ -1490,10 +1481,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
             }
             $imageRepo = "{$uuid}_{$serviceName}";
             $payload['image'] = "{$imageRepo}:{$imageTag}";
-        }
-
-        if ($isPullRequest) {
-            $serviceName = addPreviewDeploymentSuffix($serviceName, $pullRequestId);
         }
 
         $parsedServices->put($serviceName, $payload);

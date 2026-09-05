@@ -525,7 +525,7 @@ YAML,
     ]);
 
     $parsedCompose = applicationParser($this->application->fresh(), 117, $preview->id);
-    $labels = collect(data_get($parsedCompose, 'services.frontend-pr-117.labels'));
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
     expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=8080')))
         ->toBeTrue()
@@ -563,7 +563,7 @@ YAML,
     ]);
 
     $parsedCompose = applicationParser($this->application->fresh(), 118, $preview->id);
-    $labels = collect(data_get($parsedCompose, 'services.frontend-pr-118.labels'));
+    $labels = collect(data_get($parsedCompose, 'services.frontend.labels'));
 
     expect($labels->contains(fn (string $label): bool => str_ends_with($label, '.loadbalancer.server.port=4000')))
         ->toBeTrue()

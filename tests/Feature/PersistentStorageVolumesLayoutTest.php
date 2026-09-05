@@ -251,6 +251,7 @@ it('renders volume actions and PR suffix controls as valid markup', function () 
 
 it('declares explicit authorization on the changed storage controls', function () {
     $view = file_get_contents(resource_path('views/livewire/project/shared/storages/all.blade.php'));
+    $showView = file_get_contents(resource_path('views/livewire/project/shared/storages/show.blade.php'));
 
     preg_match(
         '/<x-forms\.listbox\s+id="forms\.\{\{ \$id \}\}\.isPreviewSuffixEnabled"[\s\S]*?\/>/',
@@ -260,7 +261,9 @@ it('declares explicit authorization on the changed storage controls', function (
 
     expect($previewSuffixListbox[0] ?? '')
         ->toContain('canGate="update"')
-        ->toContain(':canResource="$resource"');
+        ->toContain(':canResource="$resource"')
+        ->and($showView)
+        ->toContain('<x-forms.listbox canGate="update" :canResource="$resource"');
 
     preg_match_all('/<x-forms\.button\b[^>]*>\s*Backup\s*<\/x-forms\.button>/s', $view, $backupButtons);
 

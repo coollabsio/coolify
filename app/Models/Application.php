@@ -539,7 +539,8 @@ class Application extends BaseModel
         $persistentStorages = $this->persistentStorages()->get() ?? collect();
         if ($this->build_pack === 'dockercompose') {
             $server = data_get($this, 'destination.server');
-            instant_remote_process(["cd {$this->dirOnServer()} && docker compose down -v"], $server, false);
+            $projectName = generateDockerComposeProjectName($this->uuid);
+            instant_remote_process(["cd {$this->dirOnServer()} && docker compose --project-name {$projectName} down -v"], $server, false);
         } else {
             if ($persistentStorages->count() === 0) {
                 return;

@@ -50,7 +50,10 @@
 
             @if ($supportsPreviewSuffix)
                 <div class="volumes-col-pr min-w-0">
-                    <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
+                    <span class="volumes-mobile-label volumes-field-label flex items-center gap-1.5">
+                        <span>PR suffix</span>
+                        <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
+                    </span>
                     <span>{{ $isPreviewSuffixEnabled ? 'Add suffix' : 'Share volume' }}</span>
                 </div>
             @endif
@@ -116,7 +119,11 @@
             @if ($supportsPreviewSuffix)
                 <div class="volumes-col-pr min-w-0">
                     <span class="volumes-mobile-label volumes-field-label">PR suffix</span>
-                    <x-forms.listbox id="isPreviewSuffixEnabled" onChange="instantSave" :options="[
+                    <x-forms.listbox canGate="update" :canResource="$resource" id="isPreviewSuffixEnabled"
+                        label="PR deployment suffix"
+                        helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews."
+                        onChange="instantSave" x-on:storage-sharing-pending.window="value = true"
+                        x-on:storage-sharing-confirmed.window="value = false" :options="[
                         ['value' => true, 'label' => 'Add suffix'],
                         ['value' => false, 'label' => 'Share volume'],
                     ]" />
@@ -152,5 +159,6 @@
                     shortConfirmationLabel="Storage Name" />
             </div>
         </div>
+        <x-storage-sharing-confirmation subject="volume" />
     </form>
 @endif
