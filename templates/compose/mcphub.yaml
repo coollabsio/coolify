@@ -1,0 +1,82 @@
+# documentation: https://docs.mcphub.app/
+# slogan: MCPHub is a unified hub for centrally managing and dynamically orchestrating multiple MCP servers.
+# category: ai
+# tags: ai,mcp,mcp-server,mcp-gateway,mcp-router,pgvector,postgresql
+# logo: svgs/mcphub.svg
+# port: 3000
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=mcphub
+      - POSTGRES_USER=mcphub
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_64_POSTGRES}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcphub -d mcphub"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  mcphub:
+    image: samanhappy/mcphub:latest
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_MCPHUB_3000
+      - NODE_ENV=production
+      - PORT=3000
+      - TRUST_PROXY=1
+      - USE_DB=true
+      - DB_URL=postgresql://mcphub:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/mcphub
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_64_ADMIN}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - INSTALL_BASE_URL=${SERVICE_URL_MCPHUB_3000}
+      - BASE_PATH=${BASE_PATH:-}
+      - READONLY=${READONLY:-false}
+      - DISABLE_WEB=${DISABLE_WEB:-false}
+      - DEFAULT_REQUEST_TIMEOUT=${DEFAULT_REQUEST_TIMEOUT:-60000}
+      - INIT_TIMEOUT=${INIT_TIMEOUT:-300000}
+      - DB_POOL_SIZE=${DB_POOL_SIZE:-10}
+      - DB_POOL_IDLE_TIMEOUT=${DB_POOL_IDLE_TIMEOUT:-30000}
+      - DB_CONNECTION_TIMEOUT=${DB_CONNECTION_TIMEOUT:-60000}
+      - DB_CONNECTION_RETRY_DELAY=${DB_CONNECTION_RETRY_DELAY:-3000}
+      - DB_MAX_CONNECTION_RETRIES=${DB_MAX_CONNECTION_RETRIES:-5}
+      - DB_ENABLE_HEALTH_CHECK=${DB_ENABLE_HEALTH_CHECK:-true}
+      - DB_HEALTH_CHECK_INTERVAL=${DB_HEALTH_CHECK_INTERVAL:-30000}
+      - SMART_ROUTING_ENABLED=${SMART_ROUTING_ENABLED:-true}
+      - SMART_ROUTING_EMBEDDING_PROVIDER=${SMART_ROUTING_EMBEDDING_PROVIDER:-openai}
+      - SMART_ROUTING_EMBEDDING_ENCODING_FORMAT=${SMART_ROUTING_EMBEDDING_ENCODING_FORMAT:-auto}
+      - SMART_ROUTING_BASE_PACING_DELAY_MS=${SMART_ROUTING_BASE_PACING_DELAY_MS:-0}
+      - SMART_ROUTING_PROGRESSIVE_DISCLOSURE=${SMART_ROUTING_PROGRESSIVE_DISCLOSURE:-false}
+      - SMART_ROUTING_SERVER_DESCRIPTION_MODE=${SMART_ROUTING_SERVER_DESCRIPTION_MODE:-names}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:?}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+      - EMBEDDING_MAX_TOKENS=${EMBEDDING_MAX_TOKENS:-}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2024-02-15-preview}
+      - AZURE_OPENAI_EMBEDDING_DEPLOYMENT=${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:-}
+      - AZURE_OPENAI_EMBEDDING_MODEL=${AZURE_OPENAI_EMBEDDING_MODEL:-}
+      - NPM_REGISTRY=${NPM_REGISTRY:-https://registry.npmjs.org/}
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+    volumes:
+      - mcphub_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  pgdata:
+  mcphub_data:
