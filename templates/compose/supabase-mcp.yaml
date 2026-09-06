@@ -1,0 +1,6 @@
+labels:
+  - "traefik.enable=true"
+  - "traefik.http.routers.supabase-mcp.rule=Host(`{domain}`) && PathPrefix(`/mcp`)"
+  - "traefik.http.routers.supabase-mcp.entrypoints=websecure"
+  - "traefik.http.services.supabase-mcp.loadbalancer.server.port=8000"
+  - "traefik.http.middlewares.mcp-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
