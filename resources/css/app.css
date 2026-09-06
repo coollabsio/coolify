@@ -2276,6 +2276,18 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
 }
 
+.env-table-grid.env-table-grid-selectable {
+    grid-template-columns: 1.125rem minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+.env-table-grid.env-table-grid-no-type.env-table-grid-selectable {
+    grid-template-columns: 1.125rem minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+.environment-table-scroll .env-table-grid.env-table-grid-selectable {
+    min-width: 55.25rem;
+}
+
 @media (max-width: 768px) {
     .environment-table-scroll .env-table-grid {
         min-width: 0;
@@ -2298,6 +2310,18 @@ input[type="search"]::-webkit-search-results-decoration {
     .data-table-row.env-table-grid > :last-child {
         display: block;
         justify-self: end;
+    }
+
+    .environment-table-scroll .env-table-grid.env-table-grid-selectable {
+        min-width: 0;
+    }
+
+    .data-table-row.env-table-grid.env-table-grid-selectable {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .data-table-row.env-table-grid.env-table-grid-selectable > :nth-child(2) {
+        display: flex;
     }
 }
 
