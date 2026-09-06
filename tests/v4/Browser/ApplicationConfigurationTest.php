@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Visus\Cuid2\Cuid2;
 
@@ -35,6 +36,61 @@ it('shows application configuration sections and navigation', function () {
         ->assertSee('Docker network')
         ->assertSee('Build pipeline')
         ->screenshot(filename: 'application-configuration-overview');
+});
+
+it('keeps the PR suffix listbox visible outside the volumes table while scrolling', function () {
+    foreach (range(1, 8) as $index) {
+        LocalPersistentVolume::create([
+            'uuid' => (string) new Cuid2,
+            'name' => $this->application->uuid.'-data-'.$index,
+            'mount_path' => '/data/'.$index,
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+            'is_preview_suffix_enabled' => true,
+        ]);
+    }
+
+    loginAndSkipBoarding();
+
+    $url = applicationConfigurationUrl(
+        $this->stack['project'],
+        $this->stack['environment'],
+        $this->application
+    ).'/persistent-storage';
+
+    $page = visit($url);
+    $page->assertSee('PR suffix')
+        ->assertSee('Add suffix')
+        ->assertScript(<<<'JS'
+            () => {
+                const table = document.querySelector('.data-table');
+                const trigger = document.querySelector('[id$="isPreviewSuffixEnabled-trigger"]');
+                window.__volumeTableScrollHeight = table.scrollHeight;
+                trigger.click();
+
+                return true;
+            }
+            JS)
+        ->wait(0.2)
+        ->assertScript(<<<'JS'
+            () => {
+                const table = document.querySelector('.data-table');
+                const panel = document.querySelector('[id$="isPreviewSuffixEnabled-panel"]');
+                const beforeScroll = panel.getBoundingClientRect();
+                window.scrollBy(0, 100);
+                const afterScroll = panel.getBoundingClientRect();
+
+                return panel.parentElement === document.body
+                    && table.scrollHeight === window.__volumeTableScrollHeight
+                    && window.scrollY > 0
+                    && beforeScroll.top >= 0
+                    && beforeScroll.bottom <= window.innerHeight
+                    && afterScroll.top >= 0
+                    && afterScroll.bottom <= window.innerHeight;
+            }
+            JS)
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'application-persistent-storage-pr-suffix-listbox');
 });
 
 it('saves application name description and ports from the general form', function () {

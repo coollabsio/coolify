@@ -9,10 +9,8 @@ use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
@@ -121,46 +119,6 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::twoFactorChallengeView(function () {
             return view('auth.two-factor-challenge');
-        });
-
-        RateLimiter::for('force-password-reset', function (Request $request) {
-            return Limit::perMinute(15)->by($request->user()->id);
-        });
-
-        RateLimiter::for('forgot-password', function (Request $request) {
-            // Use real client IP (not spoofable forwarded headers)
-            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
-
-            $limits = [
-                Limit::perMinutes(10, 3)->by('forgot-password:ip:'.sha1($realIp)),
-            ];
-
-            $emailIdentity = normalize_email_identity($request->input('email'));
-            if ($emailIdentity !== null) {
-                $limits[] = Limit::perHour(3)->by('forgot-password:email-identity:'.sha1($emailIdentity));
-            }
-
-            return $limits;
-        });
-
-        RateLimiter::for('login', function (Request $request) {
-            $email = (string) $request->email;
-            // Use email + real client IP (not spoofable forwarded headers)
-            // server('REMOTE_ADDR') gives the actual connecting IP before proxy headers
-            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
-
-            return Limit::perMinute(5)->by($email.'|'.$realIp);
-        });
-
-        RateLimiter::for('magic-link', function (Request $request) {
-            $realIp = $request->server('REMOTE_ADDR') ?? $request->ip();
-            $token = (string) $request->input('token');
-
-            return Limit::perMinute(5)->by(hash('sha256', $token.'|'.$realIp));
-        });
-
-        RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
     }
 }

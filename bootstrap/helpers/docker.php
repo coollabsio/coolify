@@ -530,7 +530,7 @@ function isNoindexDomain(string $domain, ?Collection $noindex_domains): bool
         ->contains(ValidationPatterns::normalizeApplicationDomainUrl($domain));
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, array $domainPortOverrides = [])
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -554,7 +554,8 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         if ($schema === 'https' && ! $is_force_https_enabled) {
             $siteAddress = "http://{$host}, https://{$host}";
         }
-        $port = $url->getPort();
+        $portlessDomain = ServiceApplication::withoutPort($domain);
+        $port = $url->getPort() ?? ($domainPortOverrides[$portlessDomain] ?? null);
         $handle = 'handle_path';
         if (! $is_stripprefix_enabled) {
             $handle = 'handle';
@@ -600,7 +601,40 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     return $labels->sort();
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true)
+function firstDockerComposeServicePort(mixed $service): ?int
+{
+    $portDefinitions = collect(data_get($service, 'expose', []))
+        ->merge(data_get($service, 'ports', []));
+
+    foreach ($portDefinitions as $definition) {
+        $port = is_array($definition)
+            ? data_get($definition, 'target')
+            : str((string) $definition)->before('/')->afterLast(':')->value();
+
+        if (is_numeric($port) && (int) $port >= 1 && (int) $port <= 65535) {
+            return (int) $port;
+        }
+    }
+
+    return null;
+}
+
+function dockerComposeServicePort(?string $compose, ?string $serviceName): ?int
+{
+    if (blank($compose) || blank($serviceName)) {
+        return null;
+    }
+
+    try {
+        $services = data_get(Yaml::parse($compose), 'services', []);
+    } catch (Throwable) {
+        return null;
+    }
+
+    return firstDockerComposeServicePort(is_array($services) ? ($services[$serviceName] ?? null) : null);
+}
+
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [])
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -655,7 +689,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $host = $url->getHost();
             $path = $url->getPath();
             $schema = $url->getScheme();
-            $port = $url->getPort();
+            $portlessDomain = ServiceApplication::withoutPort($domain);
+            $port = $url->getPort() ?? ($domainPortOverrides[$portlessDomain] ?? null);
             if (is_null($port) && ! is_null($onlyPort)) {
                 $port = $onlyPort;
             }
@@ -898,6 +933,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
+                            domainPortOverrides: $application->domain_port_overrides ?? [],
                         ));
                         break;
                     case ProxyTypes::CADDY->value:
@@ -914,6 +950,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             noindex_domains: $noindexDomains,
+                            domainPortOverrides: $application->domain_port_overrides ?? [],
                         ));
                         break;
                 }
@@ -931,6 +968,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     http_basic_auth_password: $application->http_basic_auth_password,
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
+                    domainPortOverrides: $application->domain_port_overrides ?? [],
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
                     network: $application->destination->network,
@@ -945,6 +983,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
                     noindex_domains: $noindexDomains,
+                    domainPortOverrides: $application->domain_port_overrides ?? [],
                 ));
             }
         }
@@ -972,6 +1011,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         http_basic_auth_password: $application->http_basic_auth_password,
                         noindex_domains: $noindexDomains,
                         escape_redirect_replacement_for_compose: false,
+                        domainPortOverrides: $preview->domain_port_overrides ?? [],
                     ));
                     break;
                 case ProxyTypes::CADDY->value:
@@ -987,6 +1027,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
                         noindex_domains: $noindexDomains,
+                        domainPortOverrides: $preview->domain_port_overrides ?? [],
                     ));
                     break;
             }
@@ -1003,6 +1044,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 http_basic_auth_password: $application->http_basic_auth_password,
                 noindex_domains: $noindexDomains,
                 escape_redirect_replacement_for_compose: false,
+                domainPortOverrides: $preview->domain_port_overrides ?? [],
             ));
             $labels = $labels->merge(fqdnLabelsForCaddy(
                 network: $application->destination->network,
@@ -1016,6 +1058,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
                 noindex_domains: $noindexDomains,
+                domainPortOverrides: $preview->domain_port_overrides ?? [],
             ));
         }
     }

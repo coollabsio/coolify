@@ -18,14 +18,13 @@ use Illuminate\Support\Facades\Log;
  * State Priority (highest to lowest):
  * 1. Degraded (from sub-resources) → degraded:unhealthy
  * 2. Restarting → degraded:unhealthy (or restarting:unknown if preserveRestarting=true)
- * 3. Crash Loop (exited with restarts) → degraded:unhealthy
- * 4. Mixed (running + exited) → degraded:unhealthy
- * 5. Mixed (running + starting) → starting:unknown
- * 6. Running → running:healthy/unhealthy/unknown
- * 7. Dead/Removing → degraded:unhealthy
- * 8. Paused → paused:unknown
- * 9. Starting/Created → starting:unknown
- * 10. Exited → exited
+ * 3. Mixed (running + exited) → degraded:unhealthy
+ * 4. Mixed (running + starting) → starting:unknown
+ * 5. Running → running:healthy/unhealthy/unknown
+ * 6. Dead/Removing → degraded:unhealthy
+ * 7. Paused → paused:unknown
+ * 8. Starting/Created → starting:unknown
+ * 9. Exited → exited
  *
  * The $preserveRestarting parameter controls whether "restarting" containers should be
  * reported as "restarting:unknown" (true) or "degraded:unhealthy" (false, default).
@@ -228,23 +227,18 @@ class ContainerStatusAggregator
             return $preserveRestarting ? 'restarting:unknown' : 'degraded:unhealthy';
         }
 
-        // Priority 3: Crash loop detection (exited with restart count > 0)
-        if ($hasExited && $maxRestartCount > 0) {
-            return 'degraded:unhealthy';
-        }
-
-        // Priority 4: Mixed state (some running, some exited = degraded)
+        // Priority 3: Mixed state (some running, some exited = degraded)
         if ($hasRunning && $hasExited) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 5: Mixed state (some running, some starting = still starting)
+        // Priority 4: Mixed state (some running, some starting = still starting)
         // If any component is still starting, the entire service stack is not fully ready
         if ($hasRunning && $hasStarting) {
             return 'starting:unknown';
         }
 
-        // Priority 6: Running containers (check health status)
+        // Priority 5: Running containers (check health status)
         if ($hasRunning) {
             if ($hasUnhealthy) {
                 return 'running:unhealthy';
@@ -255,22 +249,22 @@ class ContainerStatusAggregator
             }
         }
 
-        // Priority 7: Dead or removing containers
+        // Priority 6: Dead or removing containers
         if ($hasDead) {
             return 'degraded:unhealthy';
         }
 
-        // Priority 8: Paused containers
+        // Priority 7: Paused containers
         if ($hasPaused) {
             return 'paused:unknown';
         }
 
-        // Priority 9: Starting/created containers
+        // Priority 8: Starting/created containers
         if ($hasStarting) {
             return 'starting:unknown';
         }
 
-        // Priority 10: All containers exited (no restart count = truly stopped)
+        // Priority 9: All containers exited
         return 'exited';
     }
 }

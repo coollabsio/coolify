@@ -91,7 +91,7 @@
                     <img x-cloak x-show="preview" :src="preview" alt="Profile picture preview"
                         class="h-full w-full object-cover">
                     @if (auth()->user()->avatar_path)
-                        <img src="{{ route('profile.avatar', ['v' => auth()->user()->updated_at->timestamp]) }}"
+                        <img src="{{ profile_avatar_url(auth()->user()) }}"
                             x-show="!preview" alt="{{ auth()->user()->name }}" class="h-full w-full object-cover">
                     @else
                         <span x-show="!preview">

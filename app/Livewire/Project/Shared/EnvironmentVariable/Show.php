@@ -145,6 +145,8 @@ class Show extends Component
      */
     public function loadValues(): void
     {
+        $this->authorize('update', $this->env);
+
         if ($this->valuesLoaded) {
             return;
         }
@@ -162,7 +164,7 @@ class Show extends Component
         $this->valuesLoaded = true;
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->key = ValidationPatterns::normalizeEnvironmentVariableKey($this->key);

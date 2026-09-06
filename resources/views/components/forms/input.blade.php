@@ -22,7 +22,11 @@
             @endif
         </div>
     @endif
-    @if ($type === 'password')
+    @if ($loading)
+        <div class="{{ $defaultClass }} flex w-full items-center text-neutral-500 dark:text-fg-dim" aria-busy="true">
+            <x-loading :text="$loadingText" />
+        </div>
+    @elseif ($type === 'password')
         <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
             <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
                 x-bind:type="type"

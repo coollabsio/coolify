@@ -5,9 +5,9 @@ namespace App\Notifications\Channels;
 use App\Jobs\SendMessageToTelegramJob;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Notifications\Application\RestartLimitReached;
 use App\Notifications\Application\StatusChanged;
 use App\Notifications\Container\ContainerRestarted;
-use App\Notifications\Container\ContainerStopped;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupMissing;
 use App\Notifications\Database\BackupSuccess;
@@ -18,6 +18,7 @@ use App\Notifications\Server\DockerCleanupSuccess;
 use App\Notifications\Server\HighDiskUsage;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\ServerPatchCheck;
+use App\Notifications\Server\TraefikVersionOutdated;
 use App\Notifications\Server\Unreachable;
 
 class TelegramChannel
@@ -36,8 +37,8 @@ class TelegramChannel
             DeploymentSuccess::class => $settings->telegram_notifications_deployment_success_thread_id,
             DeploymentFailed::class => $settings->telegram_notifications_deployment_failure_thread_id,
             StatusChanged::class,
-            ContainerRestarted::class,
-            ContainerStopped::class => $settings->telegram_notifications_status_change_thread_id,
+            ContainerRestarted::class => $settings->telegram_notifications_status_change_thread_id,
+            RestartLimitReached::class => $settings->telegram_notifications_restart_limit_reached_thread_id,
 
             BackupSuccess::class => $settings->telegram_notifications_backup_success_thread_id,
             BackupFailed::class,
@@ -52,7 +53,7 @@ class TelegramChannel
             Unreachable::class => $settings->telegram_notifications_server_unreachable_thread_id,
             Reachable::class => $settings->telegram_notifications_server_reachable_thread_id,
             ServerPatchCheck::class => $settings->telegram_notifications_server_patch_thread_id,
-
+            TraefikVersionOutdated::class => $settings->telegram_notifications_traefik_outdated_thread_id,
             default => null,
         };
 
