@@ -233,3 +233,50 @@ test('ConvertIpAndIp6Together', function () {
         'ip6' => ['2001:db8::1'],
     ]);
 });
+
+test('ConvertInteractiveShortFlag', function () {
+    // -i keeps STDIN open so `docker attach` can send input (e.g. game server consoles).
+    expect(convertDockerRunToCompose('-i'))->toBe([
+        'stdin_open' => true,
+    ]);
+});
+
+test('ConvertTtyShortFlag', function () {
+    expect(convertDockerRunToCompose('-t'))->toBe([
+        'tty' => true,
+    ]);
+});
+
+test('ConvertInteractiveTtyCombinedShortFlag', function () {
+    expect(convertDockerRunToCompose('-it'))->toBe([
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('ConvertTtyInteractiveCombinedShortFlag', function () {
+    expect(convertDockerRunToCompose('-ti'))->toBe([
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('ConvertInteractiveTtyLongFlags', function () {
+    expect(convertDockerRunToCompose('--interactive --tty'))->toBe([
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('ConvertInteractiveTtyWithOtherOptions', function () {
+    expect(convertDockerRunToCompose('-it --cap-add SYS_ADMIN'))->toBe([
+        'cap_add' => ['SYS_ADMIN'],
+        'stdin_open' => true,
+        'tty' => true,
+    ]);
+});
+
+test('DoesNotSetInteractiveTtyForUnrelatedShortFlags', function () {
+    // -d (detach) and other short flags without i/t must not enable stdin/tty.
+    expect(convertDockerRunToCompose('-d'))->toBe([]);
+});
