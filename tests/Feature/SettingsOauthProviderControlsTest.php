@@ -30,6 +30,10 @@ it('requires the provider-specific fields used by oauth enablement', function ()
         'oauth_settings_map.authentik.client_id',
         'oauth_settings_map.authentik.client_secret',
         'oauth_settings_map.authentik.base_url',
+    ])->and($method->invoke($component, 'oidc'))->toHaveKeys([
+        'oauth_settings_map.oidc.client_id',
+        'oauth_settings_map.oidc.client_secret',
+        'oauth_settings_map.oidc.base_url',
     ]);
 });
 
@@ -46,6 +50,7 @@ it('uses monochrome brand logos for each oauth provider in the sidebar', functio
         'gitlab',
         'google',
         'infomaniak',
+        'oidc',
         'zitadel',
     ];
 

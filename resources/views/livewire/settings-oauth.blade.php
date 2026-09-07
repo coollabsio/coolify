@@ -6,14 +6,14 @@
     <x-settings.layout>
         <x-slot:submenu>
         <div
-            x-data="{ activeProvider: location.hash.slice(1).replace('-oauth-section', '') || '{{ $oauth_settings_map[0]['provider'] ?? '' }}' }"
+            x-data="{ activeProvider: location.hash.slice(1).replace('-oauth-section', '') || @js(array_key_first($oauth_settings_map)) }"
             @hashchange.window="activeProvider = location.hash.slice(1).replace('-oauth-section', '')">
             <nav aria-label="OAuth providers"
                 class="grid gap-0.5 py-1">
                 @foreach ($oauth_settings_map as $oauth_setting)
                     @php
                         $provider = $oauth_setting['provider'];
-                        $providerLabel = str($provider)->headline();
+                        $providerLabel = $provider === 'oidc' ? 'OpenID Connect' : str($provider)->headline();
                     @endphp
                     <a href="#{{ $provider }}-oauth-section" class="menu-item min-h-8! py-1! text-[12px]!"
                         :class="{ 'menu-item-active': activeProvider === '{{ $provider }}' }"
@@ -31,7 +31,7 @@
             @foreach ($oauth_settings_map as $oauth_setting)
                 @php
                     $provider = $oauth_setting['provider'];
-                    $providerLabel = str($provider)->headline();
+                    $providerLabel = $provider === 'oidc' ? 'OpenID Connect' : str($provider)->headline();
                 @endphp
 
                 <x-application.settings-section id="{{ $provider }}-oauth-section" class="scroll-mt-28"
@@ -55,10 +55,29 @@
                         <x-forms.input id="oauth_settings_map.{{ $provider }}.redirect_uri"
                             placeholder="{{ route('auth.callback', $provider) }}" label="Redirect URI" />
 
+                        @if ($provider === 'oidc')
+                            <x-forms.input id="oauth_settings_map.{{ $provider }}.base_url"
+                                label="Issuer URL" required
+                                helper="OpenID Provider issuer URL, for example https://auth.example.com/realms/coolify. Coolify discovers authorization, token, userinfo, and JWKS endpoints from {issuer}/.well-known/openid-configuration." />
+                        @endif
+
                         <x-forms.input id="oauth_settings_map.{{ $provider }}.client_id"
                             label="Client ID" required />
                         <x-forms.input id="oauth_settings_map.{{ $provider }}.client_secret"
                             type="password" label="Client secret" autocomplete="new-password" required />
+
+                        @if ($provider === 'oidc')
+                            <x-forms.input id="oauth_settings_map.{{ $provider }}.scopes" label="Scopes"
+                                helper="Space-separated scopes. Must include openid. Common values are openid email profile." />
+                            <x-forms.input id="oauth_settings_map.{{ $provider }}.clock_skew_seconds" type="number"
+                                label="Clock skew (seconds)"
+                                helper="Allowed clock difference when validating the id_token exp/nbf/iat claims." />
+                            <x-forms.input id="oauth_settings_map.{{ $provider }}.custom_label"
+                                label="Login button label" placeholder="Login with SSO" />
+                            <x-forms.checkbox id="oauth_settings_map.{{ $provider }}.use_pkce"
+                                label="Use PKCE"
+                                helper="Recommended. Sends a code challenge on authorize and a code verifier on token exchange." />
+                        @endif
 
                         @if ($provider === 'azure')
                             <x-forms.input id="oauth_settings_map.{{ $provider }}.tenant"
