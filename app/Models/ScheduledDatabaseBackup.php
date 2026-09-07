@@ -14,6 +14,9 @@ class ScheduledDatabaseBackup extends BaseModel
             'dump_all' => 'boolean',
             'database_backup_retention_max_storage_locally' => 'float',
             'database_backup_retention_max_storage_s3' => 'float',
+            'missing_backup_notification_days' => 'integer',
+            'missing_backup_notification_sent_at' => 'datetime',
+            'last_execution_at' => 'datetime',
         ];
     }
 
@@ -37,6 +40,7 @@ class ScheduledDatabaseBackup extends BaseModel
         'database_backup_retention_max_storage_s3',
         'timeout',
         'disable_local_backup',
+        'missing_backup_notification_days',
     ];
 
     public static function ownedByCurrentTeam()
