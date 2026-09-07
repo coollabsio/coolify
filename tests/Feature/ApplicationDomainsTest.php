@@ -1933,10 +1933,12 @@ it('uses compact labeled domain cards on mobile', function () {
         ->toContain('@container service-domains (max-width: 980px)')
         ->toContain('.service-domain-detail-label')
         ->toContain('.service-domains-overview-grid')
+        ->toContain('@container service-domains (max-width: 600px)')
+        ->toContain('.service-domain-mobile-summary')
         ->and($row)
-        ->toContain('service-domain-detail-label')
-        ->toContain('Search indexing')
-        ->toContain('Domain redirect');
+        ->toContain('service-domain-mobile-summary')
+        ->toContain('No redirects')
+        ->toContain('Noindex');
 });
 
 it('uses segmented fields when adding and editing application domains', function () {

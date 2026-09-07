@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ApplicationPreview;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -293,4 +294,67 @@ it('edits Compose application domain redirects in the unified settings dialog', 
     $page->click('[aria-label="Close"]:visible')
         ->assertSee('https://www.web.example.com')
         ->screenshot(filename: 'application-compose-domain-overview');
+});
+
+it('uses compact preview domains and opens only the selected preview settings', function (bool $isCompose) {
+    config()->set('app.maintenance.store', 'array');
+    InstanceSettings::find(0)->update(['is_dns_validation_enabled' => false]);
+    Cache::forget('instance_settings');
+    if ($isCompose) {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'compose_parsing_version' => '3',
+            'docker_compose_raw' => "services:\n  web.api:\n    image: nginx:alpine\n    expose:\n      - '8080'\n",
+            'docker_compose_domains' => json_encode(['web.api' => ['domain' => 'https://production.example.com']]),
+        ]);
+    }
+    foreach ([101, 102] as $number) {
+        ApplicationPreview::create([
+            'application_id' => $this->application->id,
+            'pull_request_id' => $number,
+            'pull_request_html_url' => "https://example.com/pull/{$number}",
+            'fqdn' => $isCompose ? null : "https://preview-{$number}.example.com",
+            'docker_compose_domains' => $isCompose ? json_encode(['web.api' => ['domain' => "https://preview-{$number}.example.com"]]) : null,
+        ]);
+    }
+    loginAndSkipBoarding();
+    $url = applicationConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->application).'/preview-deployments';
+    $page = visit($url);
+    $page->click('Accept and close')
+        ->click('[aria-label="Settings for https://preview-101.example.com"]')
+        ->assertSee('Domain settings')
+        ->assertVisible('[aria-label="Search indexing blocked"] >> nth=0');
+    expect($page->script("[...document.querySelectorAll('[data-preview-domain-dialog]')].filter(el => el.getClientRects().length > 0).length"))->toBe(1);
+    $page->fill('#editingDomainParts-host:visible', 'renamed-preview.example.com')
+        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->screenshot(filename: 'preview-domain-unified-settings')
+        ->click('.is-dirty [wire\\:click="updateDomain"]')
+        ->assertDontSee('Domain settings')
+        ->assertSee('https://renamed-preview.example.com')
+        ->assertSee('https://preview-102.example.com')
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'preview-domains-compact');
+    $page->click('[aria-label="Settings for https://preview-102.example.com"]')
+        ->assertSee('Domain settings')
+        ->fill('#editingDomainParts-path:visible', '/discard')
+        ->assertVisible('.is-dirty:not(.is-saving) [wire\\:click="updateDomain"]')
+        ->screenshot(filename: 'preview-domain-before-reset')
+        ->click('.is-dirty button:has-text("Reset")')
+        ->assertDontSee('Domain settings')
+        ->click('[aria-label="Settings for https://preview-102.example.com"]')
+        ->assertValue('#editingDomainParts-path:visible', '')
+        ->click('[data-preview-domain-dialog]:visible [aria-label="Close"]')
+        ->resize(390, 844)
+        ->assertNoJavaScriptErrors()
+        ->screenshot(filename: 'preview-domains-mobile');
+    expect($page->script('document.documentElement.scrollWidth <= window.innerWidth'))->toBeTrue();
+})->with(['regular application' => false, 'Compose application' => true]);
+
+it('declares the compact preview domain layout and shared save bar', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/application/preview-domains.blade.php'));
+    expect($view)->toContain('service-domains-overview-grid')
+        ->toContain('service-domain-mobile-summary')
+        ->toContain('Domain routing summary')
+        ->toContain('<x-unsaved-bar action="updateDomain"')
+        ->toContain('$event.detail.previewId');
 });

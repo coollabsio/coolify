@@ -133,7 +133,20 @@
                     </span>
                 </div>
 
-                <div class="flex min-w-0 items-center">
+                <div class="service-domain-mobile-summary" aria-label="Domain routing summary">
+                    @if (str_starts_with($row['url'], 'https://') && ($forceHttpsRedirects[$row['service_application_id']] ?? true))
+                        <span>HTTP → HTTPS</span>
+                    @endif
+                    @if (in_array($rowDirection, ['www', 'non-www'], true))
+                        <span>{{ $rowDirection === 'www' ? 'non-www → www' : 'www → non-www' }}</span>
+                    @elseif (! str_starts_with($row['url'], 'https://') || ! ($forceHttpsRedirects[$row['service_application_id']] ?? true))
+                        <span>No redirects</span>
+                    @endif
+                    <span>Port {{ $row['internal_port'] ?? 'missing' }}</span>
+                    <span>{{ $isNoindexed ? 'Noindex' : 'Indexable' }}</span>
+                </div>
+
+                <div class="service-domain-dns flex min-w-0 items-center">
                     @if ($row['dns_status'] === 'failed')
                         <x-status-badge as="button" @click="$dispatch('open-dns-records-modal')" :status="$dnsLabel" :type="$dnsType"
                             title="View DNS records to fix" class="cursor-pointer hover:bg-neutral-200 dark:hover:bg-white/[0.1]" />
@@ -143,7 +156,7 @@
                     @endif
                 </div>
 
-                <div class="flex items-center justify-end gap-1">
+                <div class="service-domain-actions flex items-center justify-end gap-1">
                     @can('update', $service)
                         <button type="button" wire:click="checkDomainDns({{ $index }})"
                             wire:loading.attr="disabled"

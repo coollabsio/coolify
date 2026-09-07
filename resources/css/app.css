@@ -4428,6 +4428,10 @@ a.command-palette-item:focus-visible {
     display: none;
 }
 
+.service-domain-mobile-summary {
+    display: none;
+}
+
 .service-domains-https .listbox-trigger {
     min-width: 7rem;
 }
@@ -4454,5 +4458,60 @@ a.command-palette-item:focus-visible {
     .service-domain-detail-label {
         display: inline;
         color: var(--coollabs-fg-dim);
+    }
+}
+
+@container service-domains (max-width: 600px) {
+    .data-table-row.service-domains-overview-grid {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.625rem 0.75rem;
+        padding: 0.875rem;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child {
+        grid-column: 1 / -1;
+    }
+
+    .data-table-row.service-domains-overview-grid > :first-child a,
+    .data-table-row.service-domains-overview-grid > :first-child span[title] {
+        overflow: visible;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.35;
+    }
+
+    .service-domain-detail,
+    .domains-service-desktop {
+        display: none;
+    }
+
+    .service-domain-mobile-summary {
+        display: flex;
+        grid-column: 1 / -1;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.375rem 0.75rem;
+        color: var(--coollabs-fg-dim);
+        font-size: 12px;
+        line-height: 1.25rem;
+    }
+
+    .service-domain-mobile-summary > span:not(:last-child)::after {
+        margin-left: 0.75rem;
+        color: var(--coollabs-line);
+        content: "·";
+    }
+
+    .service-domain-dns {
+        justify-self: start;
+    }
+
+    .service-domain-actions {
+        justify-self: end;
+    }
+
+    .service-domain-actions .icon-button {
+        width: 2.5rem;
+        height: 2.5rem;
     }
 }

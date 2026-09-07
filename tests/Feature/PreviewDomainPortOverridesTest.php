@@ -235,7 +235,7 @@ it('prunes a preview domain port override when removing the domain', function ()
         ->toBe(['https://two-preview.example.com' => 3000]);
 });
 
-it('shows an error badge when a preview domain has no internal port and ports exposes is empty', function () {
+it('shows a warning when a preview domain has no internal port and ports exposes is empty', function () {
     $this->application->update([
         'ports_exposes' => null,
     ]);
@@ -246,8 +246,9 @@ it('shows an error badge when a preview domain has no internal port and ports ex
     ]);
 
     Livewire::test(PreviewDomains::class, ['preview' => $preview])
-        ->assertSee('No internal port')
-        ->assertDontSee('Internal port');
+        ->assertSee('aria-label="No internal port"', false)
+        ->assertSee('Set Ports Exposes or a per-domain internal port')
+        ->assertDontSee('aria-label="Internal port ', false);
 });
 
 it('rejects adding a preview domain whose portless URL is already configured', function () {
@@ -759,4 +760,218 @@ it('keeps an existing custom compose preview port without another warning', func
         ->assertDispatched('success');
 
     expect($preview->fresh()->domain_port_overrides['https://existing.example.com'] ?? null)->toBe(7070);
+});
+
+it('keeps the selected preview domain identity across polling refreshes', function (bool $compose) {
+    $first = 'https://first-preview.example.com';
+    $second = 'https://second-preview.example.com';
+    if ($compose) {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: nginx:alpine\n",
+        ]);
+    }
+    $preview = createPreviewForPortTests($this->application, 140, $compose ? [
+        'docker_compose_domains' => json_encode(['web' => ['domain' => $first], 'api' => ['domain' => $first]]),
+    ] : ['fqdn' => "$first,$second"]);
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.host', 'renamed-preview.example.com');
+
+    $preview->update($compose ? [
+        'docker_compose_domains' => json_encode(['api' => ['domain' => $first], 'web' => ['domain' => $first]]),
+    ] : ['fqdn' => "$second,$first"]);
+
+    $component->call('pollDnsChecks')
+        ->assertSet('editingIndex', 1)
+        ->assertSet('editingDomainParts.host', 'renamed-preview.example.com')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    $preview->refresh();
+    if ($compose) {
+        expect(json_decode($preview->docker_compose_domains, true))
+            ->toMatchArray(['web' => ['domain' => 'https://renamed-preview.example.com'], 'api' => ['domain' => $first]]);
+    } else {
+        expect($preview->fqdn)->toBe("$second,https://renamed-preview.example.com");
+    }
+})->with([false, true]);
+
+it('keeps the selected preview domain when deleting an earlier row', function () {
+    $preview = createPreviewForPortTests($this->application, 141, [
+        'fqdn' => 'https://first-preview.example.com,https://second-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 1)
+        ->call('removeDomainByKey', hash('sha256', 'https://first-preview.example.com|'))
+        ->assertSet('editingIndex', 0)
+        ->set('editingDomainParts.host', 'renamed-preview.example.com')
+        ->call('updateDomain')
+        ->assertHasNoErrors();
+
+    expect($preview->fresh()->fqdn)->toBe('https://renamed-preview.example.com');
+});
+
+it('clears the selected preview domain when it is deleted', function () {
+    $preview = createPreviewForPortTests($this->application, 142, [
+        'fqdn' => 'https://first-preview.example.com,https://second-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->call('removeDomain', 0)
+        ->assertSet('editingIndex', null)
+        ->assertDispatched('close-preview-domain-edit', previewId: $preview->id)
+        ->set('editingDomainParts.host', 'wrong-preview.example.com')
+        ->call('updateDomain');
+
+    expect($preview->fresh()->fqdn)->toBe('https://second-preview.example.com');
+});
+
+it('scopes preview domain modal events to their preview', function () {
+    $preview = createPreviewForPortTests($this->application, 143, ['fqdn' => 'https://preview.example.com']);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->assertDispatched('open-preview-domain-edit', previewId: $preview->id)
+        ->set('editingDomainParts.host', 'renamed-preview.example.com')
+        ->call('updateDomain')
+        ->assertDispatched('close-preview-domain-edit', previewId: $preview->id)
+        ->set('newDomainParts.host', 'another-preview.example.com')
+        ->call('addDomain')
+        ->assertDispatched('close-preview-domain-add', previewId: $preview->id)
+        ->assertNotDispatched('close-modal');
+});
+
+it('prevents members from opening editable preview domain settings', function () {
+    $preview = createPreviewForPortTests($this->application, 144, ['fqdn' => 'https://preview.example.com']);
+    $this->team->members()->updateExistingPivot($this->user->id, ['role' => 'member']);
+    $this->actingAs($this->user->fresh());
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSuccessful()
+        ->call('startEdit', 0)
+        ->assertForbidden();
+});
+
+it('prevents reading preview domains from another team', function () {
+    $preview = createPreviewForPortTests($this->application, 145, ['fqdn' => 'https://private-preview.example.com']);
+    $otherTeam = Team::factory()->create();
+    $otherUser = User::factory()->create();
+    $otherTeam->members()->attach($otherUser->id, ['role' => 'owner']);
+    $this->actingAs($otherUser);
+    session(['currentTeam' => $otherTeam]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])->assertForbidden();
+});
+
+it('rechecks preview view permission before polling domains', function () {
+    $preview = createPreviewForPortTests($this->application, 146, ['fqdn' => 'https://private-preview.example.com']);
+    $component = Livewire::test(PreviewDomains::class, ['preview' => $preview]);
+    $this->team->members()->detach($this->user->id);
+    $this->actingAs($this->user->fresh());
+
+    $component->call('pollDnsChecks')->assertForbidden();
+});
+
+it('reports the readonly preview redirect policy used by proxy labels', function (int $parserVersion, string $expectedRedirect) {
+    $compose = $parserVersion > 0;
+    $this->application->update(array_merge(['redirect' => 'www'], $compose ? [
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => (string) $parserVersion,
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [3000]\n",
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://production.example.com', 'redirect' => 'www']]),
+    ] : []));
+    $previewDomain = $expectedRedirect === 'non-www' ? 'https://www.preview.example.com' : 'https://preview.example.com';
+    $preview = createPreviewForPortTests($this->application, 147, array_merge([
+        'fqdn' => $previewDomain,
+    ], $compose ? [
+        'docker_compose_domains' => json_encode(['web' => [
+            'domain' => $previewDomain,
+            'redirect' => 'non-www',
+        ]]),
+    ] : []));
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.redirect', $expectedRedirect);
+
+    $labels = $compose
+        ? collect(data_get($this->application->fresh()->parse(147, $preview->id), 'services.web-pr-147.labels'))->implode("\n")
+        : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
+    expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');
+    if ($expectedRedirect === 'both') {
+        expect($labels)->not->toContain('.redirectregex.');
+    } else {
+        expect($labels)->toContain('.redirectregex.');
+    }
+})->with([
+    'normal previews ignore the production redirect' => [0, 'both'],
+    'legacy compose previews use the production redirect' => [2, 'www'],
+    'current compose previews use their own stored redirect' => [3, 'non-www'],
+]);
+
+it('clears the previous preview address validation error when opening another domain', function () {
+    $preview = createPreviewForPortTests($this->application, 148, [
+        'fqdn' => 'https://first-preview.example.com,https://second-preview.example.com',
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.host', 'not a hostname')
+        ->call('updateDomain')
+        ->assertHasErrors('editingDomainParts.host')
+        ->call('startEdit', 1)
+        ->assertHasNoErrors('editingDomainParts.host');
+});
+
+it('inherits preview HTTPS redirect policy while always preventing indexing', function (bool $compose, bool $forceHttps) {
+    if ($compose) {
+        $this->application->update([
+            'build_pack' => 'dockercompose',
+            'compose_parsing_version' => '3',
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n    expose: [3000]\n",
+            'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://production.example.com']]),
+        ]);
+    }
+    $this->application->settings()->update(['is_force_https_enabled' => $forceHttps]);
+    $preview = createPreviewForPortTests($this->application, 149, array_merge([
+        'fqdn' => 'https://preview.example.com',
+    ], $compose ? [
+        'docker_compose_domains' => json_encode(['web' => ['domain' => 'https://preview.example.com']]),
+    ] : []));
+
+    $labels = $compose
+        ? collect(data_get($this->application->fresh()->parse(149, $preview->id), 'services.web-pr-149.labels'))->implode("\n")
+        : implode("\n", generateLabelsApplication($this->application->fresh(), $preview->fresh()));
+
+    expect($labels)->toContain('X-Robots-Tag=noindex, nofollow');
+    expect((bool) preg_match('/\.middlewares=[^\n]*redirect-to-https/', $labels))->toBe($forceHttps);
+})->with([false, true])->with([false, true]);
+
+it('preserves readonly compose preview redirects when saving an address', function () {
+    $this->application->update([
+        'build_pack' => 'dockercompose',
+        'compose_parsing_version' => '3',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx:alpine\n  api:\n    image: nginx:alpine\n",
+    ]);
+    $preview = createPreviewForPortTests($this->application, 150, [
+        'docker_compose_domains' => json_encode([
+            'web' => ['domain' => 'https://www.preview.example.com', 'redirect' => 'non-www'],
+            'api' => ['domain' => '', 'redirect' => 'www'],
+        ]),
+    ]);
+
+    Livewire::test(PreviewDomains::class, ['preview' => $preview])
+        ->assertSet('domainRows.0.redirect', 'non-www')
+        ->call('startEdit', 0)
+        ->set('editingDomainParts.host', 'www.renamed-preview.example.com')
+        ->call('updateDomain')
+        ->assertHasNoErrors()
+        ->assertSet('domainRows.0.redirect', 'non-www');
+
+    expect(json_decode($preview->fresh()->docker_compose_domains, true))->toBe([
+        'web' => ['domain' => 'https://www.renamed-preview.example.com', 'redirect' => 'non-www'],
+        'api' => ['domain' => '', 'redirect' => 'www'],
+    ]);
 });

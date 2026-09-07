@@ -570,6 +570,15 @@ that hide secondary columns before allowing horizontal overflow.
 
 ---
 
+### Domain rows on mobile
+
+Domain tables become compact summary cards below 600px. Keep the public URL on
+its own line, followed by a short routing summary such as `HTTP → HTTPS · Port
+80 · Noindex`. Put DNS status and the existing icon actions on the final row.
+Do not squeeze desktop label/value columns into a mobile card or move settings
+behind an overflow menu. Long domains wrap, and icon actions retain 40px touch
+targets.
+
 ## 8. Modals, confirmations, and toasts
 
 ### Modals

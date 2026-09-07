@@ -1011,6 +1011,16 @@ it('renders compact icon-only domain actions with accessible labels', function (
     expect($html)->not->toContain('aria-label="More actions for');
 });
 
+it('uses the shared mobile domain summary layout', function () {
+    $view = file_get_contents(resource_path('views/livewire/project/service/partials/domain-table.blade.php'));
+
+    expect($view)
+        ->toContain('service-domain-mobile-summary')
+        ->toContain('Domain routing summary')
+        ->toContain('No redirects')
+        ->toContain('Noindex');
+});
+
 it('reuses the floating save bar for pending domain address edits', function () {
     $view = file_get_contents(resource_path('views/livewire/project/service/domains.blade.php'));
 
