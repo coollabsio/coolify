@@ -82,11 +82,10 @@ it('creates a service database backup without S3 and opens its configuration', f
 
     $backup = ScheduledDatabaseBackup::query()->sole();
 
-    $component->assertRedirectToRoute('project.service.database.backup.show', [
+    $component->assertRedirectToRoute('project.service.volume-backups.index', [
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
         'service_uuid' => $service->uuid,
-        'stack_service_uuid' => $database->uuid,
         'backup_uuid' => $backup->uuid,
     ]);
 
@@ -114,14 +113,22 @@ it('selects a service database when creating a backup from the unified backups p
         'custom_type' => 'postgresql',
     ]);
 
-    Livewire::test(CreateScheduledBackup::class, ['service' => $service])
+    $component = Livewire::test(CreateScheduledBackup::class, ['service' => $service])
         ->assertSee('Database')
         ->assertSee('analytics')
         ->set('selectedDatabaseUuid', $analytics->uuid)
         ->set('frequency', 'daily')
         ->call('submit');
 
-    expect(ScheduledDatabaseBackup::query()->sole()->database->is($analytics))->toBeTrue();
+    $backup = ScheduledDatabaseBackup::query()->sole();
+    expect($backup->database->is($analytics))->toBeTrue();
+
+    $component->assertRedirectToRoute('project.service.volume-backups.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'service_uuid' => $service->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
 });
 
 it('creates a clickhouse backup for its configured database', function () {
