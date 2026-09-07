@@ -261,6 +261,11 @@
                     </div>
                 @elseif (request()->user()->two_factor_confirmed_at)
                     <div class="flex flex-col gap-4">
+                        <x-callout type="success" title="Two-factor authentication is enabled">
+                            Enabled {{ \Carbon\Carbon::parse(request()->user()->two_factor_confirmed_at)->diffForHumans() }}. A code from your
+                            authenticator app is required at every sign-in. Keep your recovery codes somewhere safe -
+                            they are the only way in if you lose the device.
+                        </x-callout>
                         <div class="flex flex-wrap items-center justify-end gap-2">
                             <form action="/user/two-factor-recovery-codes" method="POST">
                                 @csrf
@@ -274,11 +279,16 @@
                         </div>
                         @if (session('status') === 'two-factor-authentication-confirmed'
                                 || session('status') === 'recovery-codes-generated')
-                            <div
-                                class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-fg-dim">
-                                @foreach (request()->user()->recoveryCodes() as $code)
-                                    <div>{{ $code }}</div>
-                                @endforeach
+                            <div class="space-y-2">
+                                <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                                    Recovery codes - each one can be used once. Regenerating invalidates the old codes.
+                                </p>
+                                <div
+                                    class="grid gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-4 font-mono text-xs text-neutral-700 sm:grid-cols-2 dark:border-white/[0.07] dark:bg-white/[0.025] dark:text-fg-dim">
+                                    @foreach (request()->user()->recoveryCodes() as $code)
+                                        <div>{{ $code }}</div>
+                                    @endforeach
+                                </div>
                             </div>
                         @endif
                     </div>
